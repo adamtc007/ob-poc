@@ -185,8 +185,10 @@ pub struct TradingMatrixResponse {
 #[derive(Debug, sqlx::FromRow)]
 struct UniverseEntryRow {
     universe_id: Uuid,
+    #[allow(dead_code)]
     instrument_class_id: Uuid,
     instrument_class_code: String,
+    #[allow(dead_code)]
     market_id: Option<Uuid>,
     market_mic: Option<String>,
     market_name: Option<String>,
@@ -210,7 +212,9 @@ struct SsiRow {
     safekeeping_bic: Option<String>,
     cash_account: Option<String>,
     cash_bic: Option<String>,
+    #[allow(dead_code)]
     cash_currency: Option<String>,
+    #[allow(dead_code)]
     pset_bic: Option<String>,
 }
 
@@ -220,9 +224,13 @@ struct BookingRuleRow {
     ssi_id: Uuid,
     rule_name: String,
     priority: i32,
+    #[allow(dead_code)]
     instrument_class_id: Option<Uuid>,
+    #[allow(dead_code)]
     market_id: Option<Uuid>,
+    #[allow(dead_code)]
     currency: Option<String>,
+    #[allow(dead_code)]
     settlement_type: Option<String>,
     specificity_score: Option<i32>,
     is_active: Option<bool>,
@@ -232,8 +240,11 @@ struct BookingRuleRow {
 struct SettlementChainRow {
     chain_id: Uuid,
     chain_name: String,
+    #[allow(dead_code)]
     instrument_class_id: Option<Uuid>,
+    #[allow(dead_code)]
     market_id: Option<Uuid>,
+    #[allow(dead_code)]
     currency: Option<String>,
     is_active: Option<bool>,
 }
@@ -269,6 +280,7 @@ struct TaxStatusRow {
 #[derive(Debug, sqlx::FromRow)]
 struct IsdaRow {
     isda_id: Uuid,
+    #[allow(dead_code)]
     counterparty_entity_id: Uuid,
     counterparty_name: String,
     governing_law: Option<String>,
@@ -530,7 +542,7 @@ pub async fn get_trading_matrix(
     );
 
     // Compute total leaf count
-    let total_leaf_count = children.iter().map(|c| count_leaves(c)).sum();
+    let total_leaf_count = children.iter().map(count_leaves).sum();
 
     let response = TradingMatrixResponse {
         cbu_id: cbu_id.to_string(),
@@ -546,7 +558,7 @@ fn count_leaves(node: &TradingMatrixNode) -> usize {
     if node.children.is_empty() {
         1
     } else {
-        node.children.iter().map(|c| count_leaves(c)).sum()
+        node.children.iter().map(count_leaves).sum()
     }
 }
 

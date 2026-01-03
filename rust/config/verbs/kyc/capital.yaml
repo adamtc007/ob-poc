@@ -1,0 +1,367 @@
+domains:
+  capital:
+    description: |
+      Corporate capital structure management - extends Clearstream-style registry.
+      Wraps share-class and holding verbs with corporate-specific semantics.
+      Enforces reconciliation: SUM(holdings) = issued_shares.
+
+    verbs:
+      define-share-class:
+        description: Define a corporate share class (ordinary, preference, etc.)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: share_classes
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - cbu_id
+            - name
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: issuer-entity-id
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            description: The entity (company) that issues these shares
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+            description: Share class name (e.g., 'Ordinary Shares', 'A Preference')
+          - name: share-type
+            type: string
+            required: true
+            maps_to: share_type
+            valid_values:
+              - ORDINARY
+              - PREFERENCE_A
+              - PREFERENCE_B
+              - DEFERRED
+              - REDEEMABLE
+              - GROWTH
+              - MANAGEMENT
+              - CONVERTIBLE
+              - COMMON
+              - PREFERRED
+              - RESTRICTED
+              - FOUNDERS
+          - name: authorized-shares
+            type: integer
+            required: false
+            maps_to: authorized_shares
+            description: Maximum shares authorized in articles
+          - name: issued-shares
+            type: integer
+            required: true
+            maps_to: issued_shares
+            description: Actually issued shares
+          - name: voting-rights-per-share
+            type: decimal
+            required: false
+            maps_to: voting_rights_per_share
+            default: 1.0
+            description: 0 = non-voting, >1 = super-voting
+          - name: par-value
+            type: decimal
+            required: false
+            maps_to: par_value
+          - name: par-value-currency
+            type: string
+            required: false
+            maps_to: par_value_currency
+            default: GBP
+          - name: dividend-rights
+            type: boolean
+            required: false
+            maps_to: dividend_rights
+            default: true
+          - name: liquidation-preference
+            type: decimal
+            required: false
+            maps_to: liquidation_preference
+            description: Priority claim amount on liquidation
+        set_values:
+          class_category: CORPORATE
+          status: active
+        returns:
+          type: uuid
+          name: share_class_id
+          capture: true
+
+      allocate:
+        description: |
+          Allocate shares to a shareholder. Creates holding record.
+          Validates total allocations don't exceed issued_shares.
+        behavior: crud
+        crud:
+          operation: upsert
+          table: holdings
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - share_class_id
+            - investor_entity_id
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: share_class_id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: shareholder-entity-id
+            type: uuid
+            required: true
+            maps_to: investor_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: units
+            type: decimal
+            required: true
+            maps_to: units
+          - name: acquisition-date
+            type: date
+            required: false
+            maps_to: acquisition_date
+          - name: cost-basis
+            type: decimal
+            required: false
+            maps_to: cost_basis
+        set_values:
+          status: active
+        returns:
+          type: uuid
+          name: holding_id
+          capture: true
+
+      transfer:
+        description: Transfer shares between shareholders (creates movement records)
+        behavior: plugin
+        plugin:
+          handler: CapitalTransferOp
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: from-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: to-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: units
+            type: decimal
+            required: true
+          - name: transfer-date
+            type: date
+            required: true
+          - name: price-per-unit
+            type: decimal
+            required: false
+          - name: reference
+            type: string
+            required: true
+        returns:
+          type: uuid
+          name: transfer_id
+
+      reconcile:
+        description: |
+          Verify capital structure reconciliation:
+          - SUM(holdings.units) = issued_shares
+          - All shareholders have verified identity
+          Returns ownership% and voting% for each holder.
+        behavior: plugin
+        plugin:
+          handler: CapitalReconcileOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: The issuing entity to reconcile
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields:
+            - name: is_reconciled
+              type: boolean
+            - name: issued_shares
+              type: integer
+            - name: allocated_shares
+              type: integer
+            - name: unallocated_shares
+              type: integer
+            - name: shareholders
+              type: array
+
+      get-ownership-chain:
+        description: |
+          Traverse ownership upward from entity to all terminus points.
+          Computes indirect ownership percentages multiplicatively.
+        behavior: plugin
+        plugin:
+          handler: CapitalOwnershipChainOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: min-ownership-pct
+            type: decimal
+            required: false
+            default: 0.01
+            description: Minimum ownership % to include in chain
+        returns:
+          type: record_set
+          description: Array of ownership paths with computed indirect %
+
+      issue-shares:
+        description: Issue additional shares (increases issued_shares)
+        behavior: plugin
+        plugin:
+          handler: CapitalIssueSharesOp
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: additional-shares
+            type: integer
+            required: true
+          - name: issue-date
+            type: date
+            required: true
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      cancel-shares:
+        description: Cancel/buyback shares (decreases issued_shares)
+        behavior: plugin
+        plugin:
+          handler: CapitalCancelSharesOp
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: shares-to-cancel
+            type: integer
+            required: true
+          - name: cancel-date
+            type: date
+            required: true
+          - name: reason
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      list-by-issuer:
+        description: List all share classes for an issuing entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: share_classes
+          schema: kyc
+          fk_col: issuer_entity_id
+        args:
+          - name: issuer-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      list-shareholders:
+        description: List all shareholders for a share class
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: holdings
+          schema: kyc
+          fk_col: share_class_id
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set

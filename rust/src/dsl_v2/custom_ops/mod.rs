@@ -20,9 +20,12 @@
 
 mod access_review_ops;
 pub mod batch_control_ops;
+mod board_ops;
 mod bods_ops;
+mod capital_ops;
 mod cbu_ops;
 mod cbu_role_ops;
+mod control_ops;
 mod custody;
 mod document_ops;
 mod entity_ops;
@@ -34,6 +37,7 @@ mod lifecycle_ops;
 mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
+mod partnership_ops;
 mod refdata_loader;
 mod regulatory_ops;
 mod request_ops;
@@ -45,11 +49,14 @@ mod team_ops;
 pub mod template_ops;
 mod temporal_ops;
 mod threshold;
+mod tollgate_ops;
 mod trading_matrix;
 mod trading_profile;
+mod trust_ops;
 mod ubo_analysis;
 pub mod ubo_graph_ops;
 mod verify_ops;
+mod view_ops;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -168,6 +175,32 @@ pub use bods_ops::{
     BodsDiscoverUbosOp, BodsFindByLeiOp, BodsGetStatementOp, BodsImportOp, BodsListOwnershipOp,
     BodsSyncFromGleifOp,
 };
+
+// View operations (session scope and selection management)
+pub use view_ops::{
+    ViewBackToOp, ViewBookOp, ViewBreadcrumbsOp, ViewCbuOp, ViewClearOp, ViewEntityForestOp,
+    ViewLayoutOp, ViewOpResult, ViewRefineOp, ViewSelectOp, ViewSelectionInfoOp, ViewStatusOp,
+    ViewUniverseOp, ViewZoomInOp, ViewZoomOutOp,
+};
+
+// KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
+pub use board_ops::BoardAnalyzeControlOp;
+pub use capital_ops::{
+    CapitalCancelSharesOp, CapitalIssueSharesOp, CapitalOwnershipChainOp, CapitalReconcileOp,
+    CapitalTransferOp,
+};
+pub use control_ops::{
+    ControlAnalyzeOp, ControlBuildGraphOp, ControlIdentifyUbosOp, ControlReconcileOwnershipOp,
+    ControlTraceChainOp,
+};
+pub use partnership_ops::{
+    PartnershipAnalyzeControlOp, PartnershipContributionOp, PartnershipDistributionOp,
+    PartnershipReconcileOp,
+};
+pub use tollgate_ops::{
+    TollgateDecisionReadinessOp, TollgateEvaluateOp, TollgateGetMetricsOp, TollgateOverrideOp,
+};
+pub use trust_ops::{TrustAnalyzeControlOp, TrustClassifyOp, TrustIdentifyUbosOp};
 
 // GLEIF operations (LEI data enrichment)
 pub use gleif_ops::{
@@ -460,6 +493,58 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(BodsListOwnershipOp));
         registry.register(Arc::new(BodsSyncFromGleifOp));
 
+        // View operations (session scope and selection management)
+        registry.register(Arc::new(ViewUniverseOp));
+        registry.register(Arc::new(ViewBookOp));
+        registry.register(Arc::new(ViewCbuOp));
+        registry.register(Arc::new(ViewEntityForestOp));
+        registry.register(Arc::new(ViewRefineOp));
+        registry.register(Arc::new(ViewClearOp));
+        registry.register(Arc::new(ViewSelectOp));
+        registry.register(Arc::new(ViewLayoutOp));
+        registry.register(Arc::new(ViewStatusOp));
+        registry.register(Arc::new(ViewSelectionInfoOp));
+        // Zoom navigation (fractal taxonomy navigation)
+        registry.register(Arc::new(ViewZoomInOp));
+        registry.register(Arc::new(ViewZoomOutOp));
+        registry.register(Arc::new(ViewBackToOp));
+        registry.register(Arc::new(ViewBreadcrumbsOp));
+
+        // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
+        // Capital operations (share class transfers, reconciliation, ownership chains)
+        registry.register(Arc::new(CapitalTransferOp));
+        registry.register(Arc::new(CapitalReconcileOp));
+        registry.register(Arc::new(CapitalOwnershipChainOp));
+        registry.register(Arc::new(CapitalIssueSharesOp));
+        registry.register(Arc::new(CapitalCancelSharesOp));
+
+        // Board operations (board composition control analysis)
+        registry.register(Arc::new(BoardAnalyzeControlOp));
+
+        // Trust operations (trust control analysis, UBO identification)
+        registry.register(Arc::new(TrustAnalyzeControlOp));
+        registry.register(Arc::new(TrustIdentifyUbosOp));
+        registry.register(Arc::new(TrustClassifyOp));
+
+        // Partnership operations (capital contributions, distributions, GP/LP control)
+        registry.register(Arc::new(PartnershipContributionOp));
+        registry.register(Arc::new(PartnershipDistributionOp));
+        registry.register(Arc::new(PartnershipReconcileOp));
+        registry.register(Arc::new(PartnershipAnalyzeControlOp));
+
+        // Tollgate operations (decision gates with metrics and overrides)
+        registry.register(Arc::new(TollgateEvaluateOp));
+        registry.register(Arc::new(TollgateGetMetricsOp));
+        registry.register(Arc::new(TollgateOverrideOp));
+        registry.register(Arc::new(TollgateDecisionReadinessOp));
+
+        // Unified control operations (cross-vector control analysis)
+        registry.register(Arc::new(ControlAnalyzeOp));
+        registry.register(Arc::new(ControlBuildGraphOp));
+        registry.register(Arc::new(ControlIdentifyUbosOp));
+        registry.register(Arc::new(ControlTraceChainOp));
+        registry.register(Arc::new(ControlReconcileOwnershipOp));
+
         registry
     }
 
@@ -611,17 +696,61 @@ mod tests {
         assert!(registry.has("bods", "find-by-lei"));
         assert!(registry.has("bods", "list-ownership"));
         assert!(registry.has("bods", "sync-from-gleif"));
+        // View operations (session scope and selection management)
+        assert!(registry.has("view", "universe"));
+        assert!(registry.has("view", "book"));
+        assert!(registry.has("view", "cbu"));
+        assert!(registry.has("view", "entity-forest"));
+        assert!(registry.has("view", "refine"));
+        assert!(registry.has("view", "clear"));
+        assert!(registry.has("view", "select"));
+        assert!(registry.has("view", "layout"));
+        assert!(registry.has("view", "status"));
+        assert!(registry.has("view", "selection-info"));
+        // Zoom navigation (fractal taxonomy navigation)
+        assert!(registry.has("view", "zoom-in"));
+        assert!(registry.has("view", "zoom-out"));
+        assert!(registry.has("view", "back-to"));
+        assert!(registry.has("view", "breadcrumbs"));
+        // KYC Control Enhancement: Capital operations
+        assert!(registry.has("capital", "transfer"));
+        assert!(registry.has("capital", "reconcile"));
+        assert!(registry.has("capital", "get-ownership-chain"));
+        assert!(registry.has("capital", "issue-shares"));
+        assert!(registry.has("capital", "cancel-shares"));
+        // KYC Control Enhancement: Board operations
+        assert!(registry.has("board", "analyze-control"));
+        // KYC Control Enhancement: Trust operations
+        assert!(registry.has("trust", "analyze-control"));
+        assert!(registry.has("trust", "identify-ubos"));
+        assert!(registry.has("trust", "classify"));
+        // KYC Control Enhancement: Partnership operations
+        assert!(registry.has("partnership", "record-contribution"));
+        assert!(registry.has("partnership", "record-distribution"));
+        assert!(registry.has("partnership", "reconcile"));
+        assert!(registry.has("partnership", "analyze-control"));
+        // KYC Control Enhancement: Tollgate operations
+        assert!(registry.has("tollgate", "evaluate"));
+        assert!(registry.has("tollgate", "get-metrics"));
+        assert!(registry.has("tollgate", "override"));
+        assert!(registry.has("tollgate", "get-decision-readiness"));
+        // KYC Control Enhancement: Unified control operations
+        assert!(registry.has("control", "analyze"));
+        assert!(registry.has("control", "build-graph"));
+        assert!(registry.has("control", "identify-ubos"));
+        assert!(registry.has("control", "trace-chain"));
+        assert!(registry.has("control", "reconcile-ownership"));
     }
 
     #[test]
     fn test_registry_list() {
         let registry = CustomOperationRegistry::new();
         let ops = registry.list();
-        // Count updated after entity relationship consolidation
+        // Count updated after KYC Control Enhancement operations added
         // Verify we have a reasonable number of operations registered
         assert!(
-            ops.len() >= 60,
-            "Expected at least 60 operations, got {}",
+            ops.len() >= 80,
+            "Expected at least 80 operations, got {}",
             ops.len()
         );
     }

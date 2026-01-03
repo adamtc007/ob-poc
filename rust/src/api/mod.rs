@@ -49,6 +49,9 @@ pub mod verb_discovery_routes;
 pub mod trading_matrix_routes;
 
 #[cfg(feature = "server")]
+pub mod taxonomy_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -85,3 +88,6 @@ pub use verb_discovery_routes::create_verb_discovery_router;
 
 #[cfg(feature = "server")]
 pub use trading_matrix_routes::create_trading_matrix_router;
+
+#[cfg(feature = "server")]
+pub use taxonomy_routes::create_taxonomy_router;

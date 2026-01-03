@@ -187,13 +187,8 @@ impl GleifEnrichmentService {
             .unwrap_or(false)
         {
             "PUBLIC_FLOAT"
-        } else if ultimate_exception
-            .as_ref()
-            .map(|e| e.requires_bods_lookup())
-            .unwrap_or(false)
-        {
-            "PENDING" // Will need BODS lookup
         } else {
+            // Either requires BODS lookup or no exception info yet
             "PENDING"
         };
 
@@ -294,7 +289,7 @@ impl GleifEnrichmentService {
                     // Direct parent
                     if let Some(ref dp) = rels.direct_parent {
                         if let Some(ref url) = dp.links.related {
-                            if let Some(parent_lei) = url.split('/').last() {
+                            if let Some(parent_lei) = url.split('/').next_back() {
                                 let parent_record = records.iter().find(|r| r.lei() == parent_lei);
                                 let parent_name = parent_record
                                     .map(|r| r.attributes.entity.legal_name.name.as_str());

@@ -1735,15 +1735,14 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // =========================================================================
         // SEARCH
         // =========================================================================
-        if words[0] == "find" || words[0] == "search" || words[0] == "locate" {
-            if words.len() > 1 {
+        if (words[0] == "find" || words[0] == "search" || words[0] == "locate")
+            && words.len() > 1 {
                 let query = words[1..].join(" ");
                 return Some(make_response(
                     &format!("Searching for '{}'...", query),
                     AgentCommand::Search { query },
                 ));
             }
-        }
 
         // =========================================================================
         // HELP

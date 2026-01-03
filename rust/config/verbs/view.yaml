@@ -1,0 +1,327 @@
+# View DSL Domain
+#
+# Semantic view operations - set session scope and selection
+# These verbs manage the "it" that the session is looking at.
+#
+# Session = Intent Scope = Visual State = Operation Target
+# One source of truth. Three expressions:
+#   - Agent context: "You're looking at 12 LU equity CBUs with CUSTODY pending"
+#   - DSL REPL: `@_selection = [12 UUIDs]`
+#   - Visualization: 12 highlighted nodes in the taxonomy view
+
+version: "1.0"
+
+domains:
+  view:
+    description: "Semantic view operations - set session scope and selection"
+    verbs:
+      # =========================================================================
+      # SCOPE SELECTION
+      # =========================================================================
+
+      universe:
+        description: "View all CBUs with optional filters"
+        behavior: plugin
+        plugin:
+          handler: ViewUniverseOp
+        args:
+          - name: client
+            type: uuid
+            required: false
+            description: "Filter to CBUs for this client entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: jurisdiction
+            type: string_list
+            required: false
+            description: "Filter by jurisdiction(s)"
+          - name: fund-type
+            type: string_list
+            required: false
+            description: "Filter by fund type(s)"
+          - name: status
+            type: string_list
+            required: false
+            description: "Filter by status (RED, AMBER, GREEN)"
+            valid_values:
+              - RED
+              - AMBER
+              - GREEN
+          - name: needs-attention
+            type: boolean
+            required: false
+            description: "Filter to items needing attention"
+        returns:
+          type: view_state
+          capture: true
+          description: "Sets session view state, returns summary"
+
+      book:
+        description: "View all CBUs for a commercial client (book view)"
+        behavior: plugin
+        plugin:
+          handler: ViewBookOp
+        args:
+          - name: client
+            type: uuid
+            required: true
+            description: "Commercial client entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+        returns:
+          type: view_state
+          capture: true
+
+      cbu:
+        description: "Focus on a single CBU with specified view mode"
+        behavior: plugin
+        plugin:
+          handler: ViewCbuOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to focus on"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+              resolution_mode: entity
+          - name: mode
+            type: string
+            required: false
+            default: "trading"
+            valid_values:
+              - trading # Trading network view
+              - ubo # UBO ownership view
+            description: "View mode for CBU focus"
+        returns:
+          type: view_state
+          capture: true
+
+      entity-forest:
+        description: "View entities by type/ownership filters"
+        behavior: plugin
+        plugin:
+          handler: ViewEntityForestOp
+        args:
+          - name: entity-type
+            type: string_list
+            required: false
+            description: "Filter by entity types"
+          - name: jurisdiction
+            type: string_list
+            required: false
+            description: "Filter by jurisdictions"
+          - name: role
+            type: string_list
+            required: false
+            description: "Filter by roles"
+        returns:
+          type: view_state
+          capture: true
+
+      # =========================================================================
+      # REFINEMENT
+      # =========================================================================
+
+      refine:
+        description: "Refine current view with additional filter"
+        behavior: plugin
+        plugin:
+          handler: ViewRefineOp
+        args:
+          - name: include
+            type: object
+            required: false
+            description: "Filter to include (narrows selection)"
+          - name: exclude
+            type: object
+            required: false
+            description: "Filter to exclude (removes from selection)"
+          - name: add
+            type: uuid_list
+            required: false
+            description: "Specific IDs to add to selection"
+          - name: remove
+            type: uuid_list
+            required: false
+            description: "Specific IDs to remove from selection"
+        returns:
+          type: view_state
+          capture: true
+
+      clear:
+        description: "Clear refinements, return to base view"
+        behavior: plugin
+        plugin:
+          handler: ViewClearOp
+        args: []
+        returns:
+          type: view_state
+          capture: true
+
+      # =========================================================================
+      # SELECTION
+      # =========================================================================
+
+      select:
+        description: "Explicitly set selection within current view"
+        behavior: plugin
+        plugin:
+          handler: ViewSelectOp
+        args:
+          - name: ids
+            type: uuid_list
+            required: false
+            description: "Explicit IDs to select"
+          - name: all
+            type: boolean
+            required: false
+            description: "Select all nodes in current view"
+          - name: none
+            type: boolean
+            required: false
+            description: "Clear selection"
+        returns:
+          type: view_state
+          capture: true
+
+      # =========================================================================
+      # LAYOUT
+      # =========================================================================
+
+      layout:
+        description: "Change layout strategy for current view"
+        behavior: plugin
+        plugin:
+          handler: ViewLayoutOp
+        args:
+          - name: mode
+            type: string
+            required: false
+            valid_values:
+              - auto # Derive from taxonomy shape
+              - galaxy # Semantic clustering
+              - grid # Rows/columns
+              - tree # Hierarchical
+              - network # Force directed
+              - pyramid # Ownership pyramid
+            description: "Layout algorithm to use"
+          - name: primary-axis
+            type: string
+            required: false
+            valid_values:
+              - jurisdiction
+              - fund_type
+              - status
+              - manco
+              - role_category
+            description: "Primary grouping dimension for layout"
+          - name: size-by
+            type: string
+            required: false
+            description: "Attribute to map to node size"
+          - name: color-by
+            type: string
+            required: false
+            description: "Attribute to map to node color"
+        returns:
+          type: layout_result
+          capture: true
+
+      # =========================================================================
+      # FRACTAL NAVIGATION - Zoom in/out through taxonomy
+      # =========================================================================
+
+      zoom-in:
+        description: "Zoom into a node, expanding it into its child taxonomy"
+        behavior: plugin
+        plugin:
+          handler: ViewZoomInOp
+        args:
+          - name: node-id
+            type: uuid
+            required: true
+            description: "Node to zoom into"
+        returns:
+          type: view_state
+          capture: true
+          description: "Sets session view state to child taxonomy"
+
+      zoom-out:
+        description: "Zoom out to the parent taxonomy"
+        behavior: plugin
+        plugin:
+          handler: ViewZoomOutOp
+        args: []
+        returns:
+          type: view_state
+          capture: true
+          description: "Pops current frame, returns to parent view"
+
+      back-to:
+        description: "Jump back to a specific breadcrumb level"
+        behavior: plugin
+        plugin:
+          handler: ViewBackToOp
+        args:
+          - name: depth
+            type: integer
+            required: false
+            description: "Breadcrumb depth (0 = root, 1 = first zoom, etc.)"
+          - name: frame-id
+            type: uuid
+            required: false
+            description: "Specific frame ID to jump to"
+        returns:
+          type: view_state
+          capture: true
+          description: "Pops frames until reaching target level"
+
+      breadcrumbs:
+        description: "Get current navigation breadcrumbs"
+        behavior: plugin
+        plugin:
+          handler: ViewBreadcrumbsOp
+        args: []
+        returns:
+          type: object
+          capture: true
+          description: "Returns breadcrumb labels and frame IDs"
+
+      # =========================================================================
+      # INTROSPECTION
+      # =========================================================================
+
+      status:
+        description: "Get current view state summary"
+        behavior: plugin
+        plugin:
+          handler: ViewStatusOp
+        args: []
+        returns:
+          type: view_state
+          capture: true
+
+      selection-info:
+        description: "Get detailed info about current selection"
+        behavior: plugin
+        plugin:
+          handler: ViewSelectionInfoOp
+        args: []
+        returns:
+          type: selection_info
+          capture: true

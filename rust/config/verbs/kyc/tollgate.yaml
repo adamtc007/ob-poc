@@ -1,0 +1,334 @@
+# Tollgate Decision Engine Verbs
+# Phase C.5 of KYC Control Enhancement
+#
+# Decision engine for KYC workflow gates.
+# Evaluates verification completeness against configurable thresholds.
+
+domains:
+  tollgate:
+    description: |
+      Decision engine for KYC workflow gates.
+      Evaluates verification completeness against configurable thresholds.
+      Supports management overrides with audit trail.
+
+    verbs:
+      evaluate:
+        description: |
+          Run tollgate evaluation for a case.
+          Computes all metrics and compares against thresholds.
+        behavior: plugin
+        plugin:
+          handler: TollgateEvaluateOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: evaluation-type
+            type: string
+            required: true
+            valid_values:
+              - DISCOVERY_COMPLETE
+              - EVIDENCE_COMPLETE
+              - VERIFICATION_COMPLETE
+              - DECISION_READY
+              - PERIODIC_REVIEW
+            description: "Type of tollgate checkpoint"
+          - name: evaluated-by
+            type: string
+            required: false
+            description: "User/system performing evaluation"
+        returns:
+          type: record
+          fields:
+            - name: evaluation_id
+              type: uuid
+            - name: overall_result
+              type: string
+              description: "PASS, FAIL, PASS_WITH_WARNINGS"
+            - name: score
+              type: decimal
+              description: "Overall score 0-100"
+            - name: metrics
+              type: json
+              description: "All computed metrics"
+            - name: blocking_failures
+              type: array
+              description: "Metrics that failed blocking thresholds"
+            - name: warnings
+              type: array
+              description: "Non-blocking issues"
+
+      get-metrics:
+        description: Compute current metrics for a CBU without recording evaluation
+        behavior: plugin
+        plugin:
+          handler: TollgateGetMetricsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          fields:
+            - name: ownership_verified_pct
+              type: decimal
+              description: "Percentage of ownership chain verified"
+            - name: control_verified_pct
+              type: decimal
+              description: "Percentage of control relationships verified"
+            - name: ubo_coverage_pct
+              type: decimal
+              description: "Percentage of ownership/control covered by identified UBOs"
+            - name: doc_completeness_pct
+              type: decimal
+              description: "Percentage of required documents received"
+            - name: screening_clear_pct
+              type: decimal
+              description: "Percentage of screenings with clear results"
+            - name: red_flag_count
+              type: integer
+              description: "Number of unresolved red flags"
+            - name: allegation_unresolved_count
+              type: integer
+              description: "Number of unresolved allegations"
+            - name: days_since_last_refresh
+              type: integer
+              description: "Days since last KYC refresh"
+
+      set-threshold:
+        description: Update a tollgate threshold
+        behavior: crud
+        crud:
+          operation: update
+          table: tollgate_thresholds
+          schema: kyc
+          key: id
+        args:
+          - name: threshold-name
+            type: string
+            required: true
+            maps_to: threshold_name
+          - name: metric-type
+            type: string
+            required: false
+            maps_to: metric_type
+            valid_values:
+              - OWNERSHIP_VERIFIED_PCT
+              - CONTROL_VERIFIED_PCT
+              - UBO_COVERAGE_PCT
+              - DOC_COMPLETENESS_PCT
+              - SCREENING_CLEAR_PCT
+              - RED_FLAG_COUNT
+              - ALLEGATION_UNRESOLVED_COUNT
+              - DAYS_SINCE_REFRESH
+            description: "Type of metric being evaluated"
+          - name: comparison
+            type: string
+            required: false
+            maps_to: comparison
+            valid_values:
+              - GT
+              - GTE
+              - LT
+              - LTE
+              - EQ
+              - NEQ
+            description: "Comparison operator (GT=greater than, GTE=>=, LT=<, LTE=<=, EQ==, NEQ=!=)"
+          - name: threshold-value
+            type: decimal
+            required: false
+            maps_to: threshold_value
+            description: "Threshold value for comparison"
+          - name: is-blocking
+            type: boolean
+            required: false
+            maps_to: is_blocking
+            description: "Whether failure blocks progression"
+          - name: weight
+            type: decimal
+            required: false
+            maps_to: weight
+            description: "Weight for scoring (default 1.0)"
+        returns:
+          type: affected
+
+      override:
+        description: Record management override of tollgate failure
+        behavior: plugin
+        plugin:
+          handler: TollgateOverrideOp
+        args:
+          - name: evaluation-id
+            type: uuid
+            required: true
+            description: "ID of the failed evaluation"
+          - name: override-reason
+            type: string
+            required: true
+            description: "Justification for override"
+          - name: approved-by
+            type: string
+            required: true
+            description: "User who approved the override"
+          - name: approval-authority
+            type: string
+            required: true
+            valid_values:
+              - ANALYST
+              - SENIOR_ANALYST
+              - TEAM_LEAD
+              - COMPLIANCE_OFFICER
+              - SENIOR_COMPLIANCE
+              - MLRO
+              - EXECUTIVE
+              - BOARD
+            description: "Level of authority that approved the override"
+          - name: conditions
+            type: string
+            required: false
+            description: "Any conditions attached to override"
+          - name: expiry-date
+            type: date
+            required: false
+            description: "When override expires (if applicable)"
+        returns:
+          type: uuid
+          name: override_id
+
+      list-evaluations:
+        description: List tollgate evaluations for a case
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: tollgate_evaluations
+          schema: kyc
+          fk_col: case_id
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+          - name: evaluation-type
+            type: string
+            required: false
+            maps_to: evaluation_type
+            valid_values:
+              - DISCOVERY_COMPLETE
+              - EVIDENCE_COMPLETE
+              - VERIFICATION_COMPLETE
+              - DECISION_READY
+              - PERIODIC_REVIEW
+        returns:
+          type: record_set
+
+      list-thresholds:
+        description: List all configured thresholds
+        behavior: crud
+        crud:
+          operation: select
+          table: tollgate_thresholds
+          schema: kyc
+        args:
+          - name: evaluation-type
+            type: string
+            required: false
+            maps_to: evaluation_type
+          - name: is-blocking
+            type: boolean
+            required: false
+            maps_to: is_blocking
+        returns:
+          type: record_set
+
+      get-decision-readiness:
+        description: |
+          Summary view of decision readiness:
+          - What's blocking?
+          - What's complete?
+          - What needs attention?
+        behavior: plugin
+        plugin:
+          handler: TollgateDecisionReadinessOp
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            lookup:
+              table: cases
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+        returns:
+          type: record
+          fields:
+            - name: is_decision_ready
+              type: boolean
+              description: "True if all blocking gates passed"
+            - name: blocking_issues
+              type: array
+              description: "List of blocking issues"
+            - name: completion_summary
+              type: json
+              description: "Summary of completion by category"
+            - name: recommended_actions
+              type: array
+              description: "Suggested next steps"
+
+      list-overrides:
+        description: List overrides for a case or evaluation
+        behavior: crud
+        crud:
+          operation: select
+          table: tollgate_overrides
+          schema: kyc
+        args:
+          - name: evaluation-id
+            type: uuid
+            required: false
+            maps_to: evaluation_id
+          - name: case-id
+            type: uuid
+            required: false
+            description: "Filter by case (via evaluation)"
+        returns:
+          type: record_set
+
+      expire-override:
+        description: Manually expire an override
+        behavior: crud
+        crud:
+          operation: update
+          table: tollgate_overrides
+          schema: kyc
+          key: id
+        args:
+          - name: override-id
+            type: uuid
+            required: true
+            maps_to: id
+          - name: expired-by
+            type: string
+            required: true
+            description: "User expiring the override"
+          - name: reason
+            type: string
+            required: false
+            description: "Reason for early expiration"
+        set_values:
+          expiry_date: "now()"
+        returns:
+          type: affected

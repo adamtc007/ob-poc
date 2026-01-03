@@ -12,10 +12,9 @@
 //!                                                            egui update() loop
 //! ```
 
-use crate::command::{CommandSource, NavigationVerb, VoiceProvider};
+use crate::command::{CommandSource, VoiceProvider};
 use std::cell::RefCell;
 use std::collections::VecDeque;
-use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -59,7 +58,7 @@ impl VoiceCommandQueue {
     }
 }
 
-/// Global voice command queue (thread-local for WASM)
+// Global voice command queue (thread-local for WASM)
 thread_local! {
     static VOICE_QUEUE: RefCell<VoiceCommandQueue> = RefCell::new(VoiceCommandQueue::default());
     static LISTENER_INSTALLED: RefCell<bool> = RefCell::new(false);
@@ -82,28 +81,29 @@ pub fn install_voice_listener() -> Result<(), JsValue> {
 
     // Create closure for voice-command events
     let voice_callback = Closure::wrap(Box::new(move |event: web_sys::CustomEvent| {
-        if let Some(detail) = event.detail().as_object() {
-            let command = js_sys::Reflect::get(&event.detail(), &"command".into())
+        let detail = event.detail();
+        if detail.is_object() {
+            let command = js_sys::Reflect::get(&detail, &"command".into())
                 .ok()
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
 
-            let transcript = js_sys::Reflect::get(&event.detail(), &"transcript".into())
+            let transcript = js_sys::Reflect::get(&detail, &"transcript".into())
                 .ok()
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
 
-            let confidence = js_sys::Reflect::get(&event.detail(), &"confidence".into())
+            let confidence = js_sys::Reflect::get(&detail, &"confidence".into())
                 .ok()
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.0) as f32;
 
-            let provider = js_sys::Reflect::get(&event.detail(), &"provider".into())
+            let provider = js_sys::Reflect::get(&detail, &"provider".into())
                 .ok()
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
 
-            let params = js_sys::Reflect::get(&event.detail(), &"params".into())
+            let params = js_sys::Reflect::get(&detail, &"params".into())
                 .ok()
                 .map(|v| {
                     // Convert JsValue to serde_json::Value

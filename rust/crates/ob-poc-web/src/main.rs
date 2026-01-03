@@ -26,7 +26,7 @@ use crate::state::AppState;
 use ob_poc::api::{
     create_agent_router_with_sessions, create_attribute_router, create_client_router,
     create_dsl_viewer_router, create_entity_router, create_resolution_router, create_session_store,
-    create_trading_matrix_router, create_verb_discovery_router,
+    create_taxonomy_router, create_trading_matrix_router, create_verb_discovery_router,
 };
 
 // Import resolution store from services
@@ -340,11 +340,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_dsl_viewer_router(pool.clone()))
         .merge(create_resolution_router(sessions.clone(), resolution_store))
         // Client portal router (separate auth, scoped access)
-        .merge(create_client_router(pool.clone(), sessions))
+        .merge(create_client_router(pool.clone(), sessions.clone()))
         // Verb discovery router (RAG-style verb suggestions)
         .merge(create_verb_discovery_router(pool.clone()))
         // Trading matrix router (custody taxonomy browser)
-        .merge(create_trading_matrix_router(pool.clone()));
+        .merge(create_trading_matrix_router(pool.clone()))
+        // Taxonomy navigation router (fractal drill-down)
+        .merge(create_taxonomy_router(pool.clone(), sessions));
 
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());

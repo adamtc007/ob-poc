@@ -1,0 +1,315 @@
+# Partnership Capital and Control Verbs
+# Phase C.4 of KYC Control Enhancement
+#
+# Models GP/LP dynamics and profit/loss allocation for partnerships.
+# Supports LPs, LLPs, and general partnerships.
+
+domains:
+  partnership:
+    description: |
+      Partnership capital accounts and control structure.
+      Models GP/LP dynamics and profit/loss allocation.
+
+    verbs:
+      add-partner:
+        description: Add a partner to the partnership with capital commitment
+        behavior: crud
+        crud:
+          operation: upsert
+          table: partnership_capital
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - partnership_entity_id
+            - partner_entity_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: partnership-entity-id
+            type: uuid
+            required: true
+            maps_to: partnership_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: partner-entity-id
+            type: uuid
+            required: true
+            maps_to: partner_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: partner-type
+            type: string
+            required: true
+            maps_to: partner_type
+            valid_values: [GP, LP, MEMBER]
+            description: "GP=General Partner, LP=Limited Partner, MEMBER=LLC member"
+          - name: capital-commitment
+            type: decimal
+            required: true
+            maps_to: capital_commitment
+            description: "Total capital commitment amount"
+          - name: profit-share-pct
+            type: decimal
+            required: true
+            maps_to: profit_share_pct
+            description: "Profit sharing percentage (should sum to 100 across partners)"
+          - name: loss-share-pct
+            type: decimal
+            required: false
+            maps_to: loss_share_pct
+            description: "Defaults to profit-share-pct if not specified"
+          - name: voting-pct
+            type: decimal
+            required: false
+            maps_to: voting_pct
+            description: "Voting percentage (if different from profit share)"
+          - name: management-rights
+            type: boolean
+            required: false
+            maps_to: management_rights
+            description: "Auto-true for GP, default false for LP"
+          - name: admission-date
+            type: date
+            required: false
+            maps_to: admission_date
+          - name: source-document-id
+            type: uuid
+            required: false
+            maps_to: source_document_id
+            lookup:
+              table: document_catalog
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+        returns:
+          type: uuid
+          name: partner_capital_id
+          capture: true
+
+      record-contribution:
+        description: Record capital contribution (drawdown)
+        behavior: plugin
+        plugin:
+          handler: PartnershipContributionOp
+        args:
+          - name: partnership-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: partner-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: amount
+            type: decimal
+            required: true
+            description: "Amount of capital contributed"
+          - name: contribution-date
+            type: date
+            required: true
+          - name: reference
+            type: string
+            required: false
+            description: "External reference for the contribution"
+        returns:
+          type: uuid
+          name: contribution_id
+
+      record-distribution:
+        description: Record distribution to partner
+        behavior: plugin
+        plugin:
+          handler: PartnershipDistributionOp
+        args:
+          - name: partnership-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: partner-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: amount
+            type: decimal
+            required: true
+            description: "Distribution amount"
+          - name: distribution-type
+            type: string
+            required: true
+            valid_values: [PROFIT, RETURN_OF_CAPITAL, LIQUIDATION]
+          - name: distribution-date
+            type: date
+            required: true
+        returns:
+          type: uuid
+          name: distribution_id
+
+      withdraw-partner:
+        description: Record partner withdrawal/exit
+        behavior: crud
+        crud:
+          operation: update
+          table: partnership_capital
+          schema: kyc
+        args:
+          - name: partnership-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: partner-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: withdrawal-date
+            type: date
+            required: true
+            maps_to: withdrawal_date
+        set_values:
+          is_active: false
+        returns:
+          type: affected
+
+      list-partners:
+        description: List all partners in a partnership
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: partnership_capital
+          schema: kyc
+          fk_col: partnership_entity_id
+        args:
+          - name: partnership-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: partner-type
+            type: string
+            required: false
+            maps_to: partner_type
+            valid_values: [GP, LP, MEMBER]
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set
+
+      reconcile:
+        description: |
+          Reconcile partnership capital:
+          - Verify profit shares sum to 100%
+          - Calculate total committed/contributed/unfunded
+          - Identify control (GP or majority LP)
+        behavior: plugin
+        plugin:
+          handler: PartnershipReconcileOp
+        args:
+          - name: partnership-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields:
+            - name: is_reconciled
+              type: boolean
+              description: "True if profit shares sum to 100%"
+            - name: total_commitment
+              type: decimal
+              description: "Sum of all capital commitments"
+            - name: total_contributed
+              type: decimal
+              description: "Sum of all contributions"
+            - name: total_unfunded
+              type: decimal
+              description: "Commitment minus contributed"
+            - name: profit_share_total
+              type: decimal
+              description: "Should be 100.0 if reconciled"
+            - name: controlling_partners
+              type: array
+              description: "Partners with control (GPs or majority)"
+              items:
+                - entity_id
+                - partner_type
+                - control_basis
+
+      analyze-control:
+        description: |
+          Analyze control structure of partnership for UBO identification.
+          GPs have presumptive control regardless of capital percentage.
+          LPs may have control through voting rights or super-majority stake.
+        behavior: plugin
+        plugin:
+          handler: PartnershipAnalyzeControlOp
+        args:
+          - name: partnership-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: control-threshold
+            type: decimal
+            required: false
+            default: 25.0
+            description: "Percentage threshold for ownership control"
+        returns:
+          type: record
+          fields:
+            - name: gp_controllers
+              type: array
+              description: "GPs with management control"
+            - name: lp_controllers
+              type: array
+              description: "LPs exceeding control threshold"
+            - name: ubo_candidates
+              type: array
+              description: "Natural persons identified as potential UBOs"

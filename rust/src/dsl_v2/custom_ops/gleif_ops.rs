@@ -710,7 +710,7 @@ impl CustomOperation for GleifImportManagedFundsOp {
                 if let Some(ref rels) = fund.relationships {
                     if let Some(ref umbrella) = rels.umbrella_fund {
                         if let Some(ref url) = umbrella.links.related {
-                            if let Some(umbrella_lei) = url.split('/').last() {
+                            if let Some(umbrella_lei) = url.split('/').next_back() {
                                 // Get or create umbrella entity
                                 let umbrella_entity_id =
                                     get_or_create_entity_by_lei(pool, &client, umbrella_lei)

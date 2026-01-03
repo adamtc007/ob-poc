@@ -131,6 +131,10 @@ pub struct AppState {
     /// Taxonomy browser state (expand/collapse, selection)
     pub taxonomy_state: TaxonomyState,
 
+    /// Taxonomy navigation breadcrumbs (from server TaxonomyStack)
+    /// Each entry is (level_label, type_code) for display
+    pub taxonomy_breadcrumbs: Vec<(String, String)>,
+
     /// Active type filter (None = show all, Some = filter to type)
     pub type_filter: Option<String>,
 
@@ -182,6 +186,7 @@ impl Default for AppState {
             graph_widget: CbuGraphWidget::new(),
             entity_ontology: EntityTypeOntology::new(),
             taxonomy_state: TaxonomyState::new(),
+            taxonomy_breadcrumbs: Vec::new(),
             type_filter: None,
             trading_matrix_state: TradingMatrixState::new(),
             selected_matrix_node: None,
@@ -384,6 +389,18 @@ pub struct AsyncState {
 
     // Context intentions
     pub pending_context: Option<String>, // "review", "investigation", "onboarding", etc.
+
+    // Taxonomy navigation (fractal navigation via TaxonomyStack on server)
+    pub pending_taxonomy_zoom_in: Option<String>, // type_code to zoom into
+    pub pending_taxonomy_zoom_out: bool,          // zoom out one level
+    pub pending_taxonomy_back_to: Option<usize>,  // jump to specific breadcrumb index
+    pub pending_taxonomy_breadcrumbs: bool,       // request current breadcrumbs
+
+    // Taxonomy API responses (from server calls)
+    pub pending_taxonomy_breadcrumbs_response:
+        Option<Result<crate::api::TaxonomyBreadcrumbsResponse, String>>,
+    pub pending_taxonomy_zoom_response: Option<Result<crate::api::TaxonomyZoomResponse, String>>,
+    pub loading_taxonomy: bool, // loading flag for taxonomy operations
 
     // State change flags (set by actions, processed centrally in update loop)
     // These are checked ONCE in update() AFTER process_async_results()
@@ -591,6 +608,42 @@ impl AppState {
                     self.trading_matrix = Some(matrix);
                 }
                 Err(e) => state.last_error = Some(format!("Trading matrix fetch failed: {}", e)),
+            }
+        }
+
+        // Process taxonomy breadcrumbs response
+        if let Some(result) = state.pending_taxonomy_breadcrumbs_response.take() {
+            state.loading_taxonomy = false;
+            match result {
+                Ok(response) => {
+                    self.taxonomy_breadcrumbs = response
+                        .breadcrumbs
+                        .into_iter()
+                        .map(|b| (b.label, b.type_code))
+                        .collect();
+                }
+                Err(e) => {
+                    state.last_error = Some(format!("Taxonomy breadcrumbs fetch failed: {}", e))
+                }
+            }
+        }
+
+        // Process taxonomy zoom response
+        if let Some(result) = state.pending_taxonomy_zoom_response.take() {
+            state.loading_taxonomy = false;
+            match result {
+                Ok(response) => {
+                    if response.success {
+                        self.taxonomy_breadcrumbs = response
+                            .breadcrumbs
+                            .into_iter()
+                            .map(|b| (b.label, b.type_code))
+                            .collect();
+                    } else if let Some(error) = response.error {
+                        state.last_error = Some(format!("Taxonomy navigation failed: {}", error));
+                    }
+                }
+                Err(e) => state.last_error = Some(format!("Taxonomy navigation failed: {}", e)),
             }
         }
     }
@@ -1089,6 +1142,50 @@ impl AppState {
         }
     }
 
+    // =========================================================================
+    // Taxonomy Navigation - Take Methods
+    // =========================================================================
+
+    /// Check if a taxonomy zoom-in command is pending
+    pub fn take_pending_taxonomy_zoom_in(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_taxonomy_zoom_in.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a taxonomy zoom-out command is pending
+    pub fn take_pending_taxonomy_zoom_out(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_taxonomy_zoom_out;
+            state.pending_taxonomy_zoom_out = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if a taxonomy back-to command is pending
+    pub fn take_pending_taxonomy_back_to(&self) -> Option<usize> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_taxonomy_back_to.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a taxonomy breadcrumbs request is pending
+    pub fn take_pending_taxonomy_breadcrumbs(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_taxonomy_breadcrumbs;
+            state.pending_taxonomy_breadcrumbs = false;
+            pending
+        } else {
+            false
+        }
+    }
+
     /// Add a user message to the chat history
     pub fn add_user_message(&mut self, content: String) {
         self.messages.push(ChatMessage {
@@ -1257,4 +1354,110 @@ impl AppState {
 /// Parse view mode from string (used by agent commands)
 pub fn parse_view_mode(s: &str) -> Option<ViewMode> {
     ViewMode::from_str(s)
+}
+
+// =============================================================================
+// TAXONOMY NAVIGATION METHODS
+// =============================================================================
+
+impl AppState {
+    /// Fetch current taxonomy breadcrumbs from server
+    pub fn fetch_taxonomy_breadcrumbs(&mut self, session_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_taxonomy = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_taxonomy_breadcrumbs(session_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_taxonomy_breadcrumbs_response = Some(result);
+                state.loading_taxonomy = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Zoom into a type (push onto taxonomy stack on server)
+    pub fn taxonomy_zoom_in(&mut self, session_id: Uuid, type_code: String) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_taxonomy = true;
+        }
+
+        spawn_local(async move {
+            let result = api::taxonomy_zoom_in(session_id, &type_code).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_taxonomy_zoom_response = Some(result);
+                state.loading_taxonomy = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Zoom out one level (pop from taxonomy stack on server)
+    pub fn taxonomy_zoom_out(&mut self, session_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_taxonomy = true;
+        }
+
+        spawn_local(async move {
+            let result = api::taxonomy_zoom_out(session_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_taxonomy_zoom_response = Some(result);
+                state.loading_taxonomy = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Jump to a specific breadcrumb level (back-to on server)
+    pub fn taxonomy_back_to(&mut self, session_id: Uuid, level_index: usize) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_taxonomy = true;
+        }
+
+        spawn_local(async move {
+            let result = api::taxonomy_back_to(session_id, level_index).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_taxonomy_zoom_response = Some(result);
+                state.loading_taxonomy = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
 }

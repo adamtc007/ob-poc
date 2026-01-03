@@ -101,6 +101,9 @@ pub struct ExecutionContext {
     pub execution_id: Uuid,
     /// Whether idempotency checking is enabled
     pub idempotency_enabled: bool,
+    /// Current selection (from view.selection) - for batch operations
+    /// Populated when view.* verbs execute, provides @_selection binding
+    pub current_selection: Option<Vec<Uuid>>,
 }
 
 impl Default for ExecutionContext {
@@ -116,6 +119,7 @@ impl Default for ExecutionContext {
             transaction_id: None,
             execution_id: Uuid::new_v4(),
             idempotency_enabled: true,
+            current_selection: None,
         }
     }
 }
@@ -222,6 +226,7 @@ impl ExecutionContext {
             transaction_id: self.transaction_id,
             execution_id: self.execution_id,
             idempotency_enabled: self.idempotency_enabled,
+            current_selection: self.current_selection.clone(),
         }
     }
 
@@ -252,6 +257,46 @@ impl ExecutionContext {
     pub fn with_parent_symbol_types(mut self, types: HashMap<String, String>) -> Self {
         self.parent_symbol_types = types;
         self
+    }
+
+    // =========================================================================
+    // SELECTION METHODS - For view.* verb integration
+    // =========================================================================
+
+    /// Set selection from view state (called by view.* verbs)
+    /// Also binds as @_selection for DSL access
+    pub fn set_selection(&mut self, selection: Vec<Uuid>) {
+        // Store as JSON binding for DSL access
+        if let Ok(json_value) = serde_json::to_value(&selection) {
+            self.bind_json("_selection", json_value);
+        }
+        self.current_selection = Some(selection);
+    }
+
+    /// Get current selection
+    pub fn get_selection(&self) -> Option<&Vec<Uuid>> {
+        self.current_selection.as_ref()
+    }
+
+    /// Check if a selection is active
+    pub fn has_selection(&self) -> bool {
+        self.current_selection
+            .as_ref()
+            .is_some_and(|s| !s.is_empty())
+    }
+
+    /// Get selection count
+    pub fn selection_count(&self) -> usize {
+        self.current_selection
+            .as_ref()
+            .map(|s| s.len())
+            .unwrap_or(0)
+    }
+
+    /// Clear the current selection
+    pub fn clear_selection(&mut self) {
+        self.current_selection = None;
+        self.json_bindings.remove("_selection");
     }
 
     /// Create context from DomainContext (for submission execution)

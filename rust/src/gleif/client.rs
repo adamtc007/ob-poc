@@ -503,20 +503,11 @@ impl GleifClient {
         let record = self.get_lei_record(lei).await?;
 
         // Check for exception in relationships
-        if let Some(ref rels) = record.relationships {
-            let direct_exception = if rels.direct_parent.is_none() {
-                // No direct parent link - check if there's an exception recorded
-                // This requires fetching the relationship-record URL
-                None
-            } else {
-                None
-            };
-
-            let ultimate_exception = if rels.ultimate_parent.is_none() {
-                None
-            } else {
-                None
-            };
+        if let Some(ref _rels) = record.relationships {
+            // TODO: Fetch actual exceptions from relationship-record URLs
+            // For now, we return None for both - this is a placeholder
+            let direct_exception: Option<String> = None;
+            let ultimate_exception: Option<String> = None;
 
             return Ok(Some((direct_exception, ultimate_exception)));
         }
@@ -628,7 +619,7 @@ impl Default for GleifClient {
 
 /// Extract LEI from a GLEIF API URL like "/api/v1/lei-records/5493001KJTIIGC8Y1R12"
 pub fn extract_lei_from_url(url: &str) -> Option<String> {
-    url.split('/').last().map(|s| s.to_string())
+    url.split('/').next_back().map(|s| s.to_string())
 }
 
 #[cfg(test)]

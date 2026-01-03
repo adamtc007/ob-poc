@@ -1,0 +1,405 @@
+domains:
+  board:
+    description: |
+      Board composition and appointment rights management.
+      Tracks who sits on boards and who has power to appoint/remove.
+      Key for control-based UBO analysis.
+
+    verbs:
+      appoint:
+        description: Appoint a person to a board position
+        behavior: crud
+        crud:
+          operation: upsert
+          table: board_compositions
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - entity_id
+            - person_entity_id
+            - role_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            description: The entity whose board this is
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: person-entity-id
+            type: uuid
+            required: true
+            maps_to: person_entity_id
+            description: The person being appointed
+            lookup:
+              table: entities
+              entity_type: proper_person
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: role-id
+            type: uuid
+            required: true
+            maps_to: role_id
+            lookup:
+              table: roles
+              entity_type: role
+              schema: ob-poc
+              search_key: name
+              primary_key: role_id
+          - name: appointed-by-entity-id
+            type: uuid
+            required: false
+            maps_to: appointed_by_entity_id
+            description: Entity exercising appointment right
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: appointment-date
+            type: date
+            required: false
+            maps_to: appointment_date
+          - name: appointment-source
+            type: string
+            required: false
+            maps_to: appointment_source
+            valid_values:
+              - ARTICLES
+              - SHA
+              - BOARD_RESOLUTION
+              - SHAREHOLDER_RESOLUTION
+              - REGULATOR_APPROVAL
+              - COURT_ORDER
+              - OTHER
+          - name: appointment-document-id
+            type: uuid
+            required: false
+            maps_to: appointment_document_id
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        set_values:
+          is_active: true
+        returns:
+          type: uuid
+          name: board_appointment_id
+          capture: true
+
+      resign:
+        description: Record resignation/removal from board
+        behavior: crud
+        crud:
+          operation: update
+          table: board_compositions
+          schema: kyc
+          key: id
+        args:
+          - name: appointment-id
+            type: uuid
+            required: true
+            maps_to: id
+          - name: resignation-date
+            type: date
+            required: true
+            maps_to: resignation_date
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        set_values:
+          is_active: false
+        returns:
+          type: affected
+
+      list-by-entity:
+        description: List current board composition for an entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: board_compositions
+          schema: kyc
+          fk_col: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set
+
+      list-by-person:
+        description: List all board positions held by a person
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: board_compositions
+          schema: kyc
+          fk_col: person_entity_id
+        args:
+          - name: person-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: proper_person
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set
+
+      grant-appointment-right:
+        description: Record an appointment right from SHA/articles
+        behavior: crud
+        crud:
+          operation: upsert
+          table: appointment_rights
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - target_entity_id
+            - holder_entity_id
+            - right_type
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: target-entity-id
+            type: uuid
+            required: true
+            maps_to: target_entity_id
+            description: Entity whose board can be affected
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder-entity-id
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            description: Entity holding the right
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: right-type
+            type: string
+            required: true
+            maps_to: right_type
+            valid_values:
+              - APPOINT_DIRECTOR
+              - REMOVE_DIRECTOR
+              - APPOINT_AND_REMOVE
+              - VETO_APPOINTMENT
+              - CONSENT_REQUIRED
+              - OBSERVER_SEAT
+              - APPOINT_CHAIRMAN
+              - APPOINT_CEO
+              - APPOINT_AUDITOR
+          - name: appointable-role-id
+            type: uuid
+            required: false
+            maps_to: appointable_role_id
+            lookup:
+              table: roles
+              entity_type: role
+              schema: ob-poc
+              search_key: name
+              primary_key: role_id
+          - name: max-appointments
+            type: integer
+            required: false
+            maps_to: max_appointments
+          - name: source-document-id
+            type: uuid
+            required: false
+            maps_to: source_document_id
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+          - name: source-clause
+            type: string
+            required: false
+            maps_to: source_clause
+            description: Reference to specific clause (e.g., "Clause 5.2(a)")
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        set_values:
+          is_active: true
+          current_appointments: 0
+        returns:
+          type: uuid
+          name: appointment_right_id
+          capture: true
+
+      revoke-appointment-right:
+        description: Revoke an appointment right
+        behavior: crud
+        crud:
+          operation: update
+          table: appointment_rights
+          schema: kyc
+          key: id
+        args:
+          - name: appointment-right-id
+            type: uuid
+            required: true
+            maps_to: id
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        set_values:
+          is_active: false
+        returns:
+          type: affected
+
+      list-appointment-rights:
+        description: List who has appointment rights over an entity's board
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: appointment_rights
+          schema: kyc
+          fk_col: target_entity_id
+        args:
+          - name: target-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set
+
+      list-rights-held:
+        description: List appointment rights held by an entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: appointment_rights
+          schema: kyc
+          fk_col: holder_entity_id
+        args:
+          - name: holder-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set
+
+      analyze-control:
+        description: |
+          Analyze board control - who controls the board through:
+          - Majority of appointments
+          - Appointment/removal rights
+          - Veto powers
+        behavior: plugin
+        plugin:
+          handler: BoardAnalyzeControlOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields:
+            - name: total_seats
+              type: integer
+            - name: filled_seats
+              type: integer
+            - name: vacant_seats
+              type: integer
+            - name: controllers
+              type: array
+              description: Entities with board control
+            - name: majority_controller
+              type: uuid
+              description: Entity with majority of appointments (if any)

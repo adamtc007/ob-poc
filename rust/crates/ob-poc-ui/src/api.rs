@@ -469,6 +469,89 @@ pub async fn cancel_resolution(session_id: Uuid) -> Result<(), String> {
 }
 
 // =============================================================================
+// Taxonomy Navigation API
+// =============================================================================
+
+/// Breadcrumb entry from taxonomy navigation
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct Breadcrumb {
+    pub label: String,
+    pub type_code: String,
+    pub index: usize,
+}
+
+/// Response from taxonomy breadcrumbs endpoint
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct TaxonomyBreadcrumbsResponse {
+    pub breadcrumbs: Vec<Breadcrumb>,
+    pub depth: usize,
+    pub can_zoom_out: bool,
+}
+
+/// Response from taxonomy zoom operations
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct TaxonomyZoomResponse {
+    pub success: bool,
+    pub breadcrumbs: Vec<Breadcrumb>,
+    pub depth: usize,
+    pub error: Option<String>,
+}
+
+/// Request for zoom-in operation
+#[derive(Clone, Debug, serde::Serialize)]
+struct ZoomInRequest {
+    type_code: String,
+}
+
+/// Request for back-to operation
+#[derive(Clone, Debug, serde::Serialize)]
+struct BackToRequest {
+    level_index: usize,
+}
+
+/// Get current taxonomy breadcrumbs for a session
+pub async fn get_taxonomy_breadcrumbs(
+    session_id: Uuid,
+) -> Result<TaxonomyBreadcrumbsResponse, String> {
+    get(&format!("/api/session/{}/taxonomy/breadcrumbs", session_id)).await
+}
+
+/// Zoom into a type (push onto taxonomy stack)
+pub async fn taxonomy_zoom_in(
+    session_id: Uuid,
+    type_code: &str,
+) -> Result<TaxonomyZoomResponse, String> {
+    post(
+        &format!("/api/session/{}/taxonomy/zoom-in", session_id),
+        &ZoomInRequest {
+            type_code: type_code.to_string(),
+        },
+    )
+    .await
+}
+
+/// Zoom out one level (pop from taxonomy stack)
+pub async fn taxonomy_zoom_out(session_id: Uuid) -> Result<TaxonomyZoomResponse, String> {
+    post(
+        &format!("/api/session/{}/taxonomy/zoom-out", session_id),
+        &(),
+    )
+    .await
+}
+
+/// Jump to a specific breadcrumb level
+pub async fn taxonomy_back_to(
+    session_id: Uuid,
+    level_index: usize,
+) -> Result<TaxonomyZoomResponse, String> {
+    post(
+        &format!("/api/session/{}/taxonomy/back-to", session_id),
+        &BackToRequest { level_index },
+    )
+    .await
+}
+
+// =============================================================================
 // Local Storage Helpers
 // =============================================================================
 

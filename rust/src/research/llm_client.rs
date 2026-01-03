@@ -127,24 +127,89 @@ impl ClaudeResearchClient {
         Ok(Self::new(api_key))
     }
 
-    /// Execute a web search using a search API
+    /// Execute a web search using Brave Search API
+    ///
+    /// Requires BRAVE_SEARCH_API_KEY environment variable.
+    /// Falls back to LLM knowledge if API key not set or search fails.
     async fn execute_web_search(&self, query: &str) -> Result<Value> {
-        // For now, return a placeholder that indicates web search was requested
-        // In production, this would call Brave/Google/Bing API
         tracing::info!(query = %query, "Executing web search");
 
-        // Return structured result that the LLM can use
-        Ok(serde_json::json!({
-            "query": query,
-            "results": [
-                {
-                    "title": format!("Search results for: {}", query),
-                    "url": "https://example.com/search",
-                    "snippet": "Web search integration pending. Use available context."
-                }
-            ],
-            "note": "Web search API integration pending - using available LLM knowledge"
-        }))
+        // Check for Brave API key
+        let api_key = match std::env::var("BRAVE_SEARCH_API_KEY") {
+            Ok(key) if !key.is_empty() => key,
+            _ => {
+                tracing::warn!("BRAVE_SEARCH_API_KEY not set - falling back to LLM knowledge");
+                return Ok(serde_json::json!({
+                    "query": query,
+                    "results": [],
+                    "fallback": true,
+                    "note": "Web search unavailable (BRAVE_SEARCH_API_KEY not set). Using LLM knowledge only."
+                }));
+            }
+        };
+
+        // Call Brave Search API
+        let response = self
+            .client
+            .get("https://api.search.brave.com/res/v1/web/search")
+            .header("X-Subscription-Token", &api_key)
+            .header("Accept", "application/json")
+            .query(&[("q", query), ("count", "5")])
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) if resp.status().is_success() => {
+                let body: Value = resp.json().await.unwrap_or_default();
+
+                // Extract web results from Brave response
+                let results: Vec<Value> = body["web"]["results"]
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .take(5)
+                    .map(|r| {
+                        serde_json::json!({
+                            "title": r["title"].as_str().unwrap_or(""),
+                            "url": r["url"].as_str().unwrap_or(""),
+                            "snippet": r["description"].as_str().unwrap_or("")
+                        })
+                    })
+                    .collect();
+
+                tracing::info!(result_count = results.len(), "Web search completed");
+
+                Ok(serde_json::json!({
+                    "query": query,
+                    "results": results,
+                    "fallback": false
+                }))
+            }
+            Ok(resp) => {
+                let status = resp.status();
+                let error_body = resp.text().await.unwrap_or_default();
+                tracing::warn!(
+                    status = %status,
+                    error = %error_body,
+                    "Brave Search API error - falling back to LLM knowledge"
+                );
+                Ok(serde_json::json!({
+                    "query": query,
+                    "results": [],
+                    "fallback": true,
+                    "note": format!("Search API error ({}). Using LLM knowledge only.", status)
+                }))
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Web search request failed - falling back to LLM knowledge");
+                Ok(serde_json::json!({
+                    "query": query,
+                    "results": [],
+                    "fallback": true,
+                    "note": format!("Search request failed: {}. Using LLM knowledge only.", e)
+                }))
+            }
+        }
     }
 }
 

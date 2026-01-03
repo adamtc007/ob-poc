@@ -1031,6 +1031,10 @@ pub struct SessionContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub business_reference: Option<String>,
 
+    /// Taxonomy navigation stack for fractal drill-down
+    #[serde(default)]
+    pub taxonomy_stack: crate::taxonomy::TaxonomyStack,
+
     /// Most recently created CBU
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_cbu_id: Option<Uuid>,

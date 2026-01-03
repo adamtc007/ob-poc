@@ -1,0 +1,342 @@
+domains:
+  trust:
+    description: |
+      Trust-specific control and beneficial interest management.
+      Maps trust deed provisions to control vectors for UBO analysis.
+      Supports discretionary, fixed interest, unit, and charitable trusts.
+
+    verbs:
+      record-provision:
+        description: Record a provision from the trust deed affecting control or benefit
+        behavior: crud
+        crud:
+          operation: upsert
+          table: trust_provisions
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - trust_entity_id
+            - provision_type
+            - holder_entity_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: trust-entity-id
+            type: uuid
+            required: true
+            maps_to: trust_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: provision-type
+            type: string
+            required: true
+            maps_to: provision_type
+            valid_values:
+              - INCOME_BENEFICIARY
+              - CAPITAL_BENEFICIARY
+              - DISCRETIONARY_BENEFICIARY
+              - REMAINDER_BENEFICIARY
+              - CONTINGENT_BENEFICIARY
+              - DEFAULT_BENEFICIARY
+              - APPOINTOR_POWER
+              - PROTECTOR_POWER
+              - TRUSTEE_REMOVAL
+              - TRUST_VARIATION
+              - ACCUMULATION_POWER
+              - ADVANCEMENT_POWER
+              - INVESTMENT_DIRECTION
+              - DISTRIBUTION_DIRECTION
+              - ADD_BENEFICIARY
+              - EXCLUDE_BENEFICIARY
+              - RESERVED_POWER
+          - name: holder-entity-id
+            type: uuid
+            required: false
+            maps_to: holder_entity_id
+            description: Entity holding this provision (null for class beneficiaries)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: beneficiary-class
+            type: string
+            required: false
+            maps_to: beneficiary_class
+            description: Description of beneficiary class if not specific entity
+          - name: interest-percentage
+            type: decimal
+            required: false
+            maps_to: interest_percentage
+            description: Fixed interest percentage for fixed interest trusts
+          - name: discretion-level
+            type: string
+            required: false
+            maps_to: discretion_level
+            valid_values:
+              - ABSOLUTE
+              - LIMITED
+              - NONE
+              - FETTERED
+          - name: vesting-conditions
+            type: string
+            required: false
+            maps_to: vesting_conditions
+          - name: vesting-date
+            type: date
+            required: false
+            maps_to: vesting_date
+          - name: source-document-id
+            type: uuid
+            required: false
+            maps_to: source_document_id
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+          - name: source-clause
+            type: string
+            required: false
+            maps_to: source_clause
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        set_values:
+          is_active: true
+        returns:
+          type: uuid
+          name: provision_id
+          capture: true
+
+      update-provision:
+        description: Update an existing trust provision
+        behavior: crud
+        crud:
+          operation: update
+          table: trust_provisions
+          schema: kyc
+          key: id
+        args:
+          - name: provision-id
+            type: uuid
+            required: true
+            maps_to: id
+          - name: interest-percentage
+            type: decimal
+            required: false
+            maps_to: interest_percentage
+          - name: discretion-level
+            type: string
+            required: false
+            maps_to: discretion_level
+            valid_values:
+              - ABSOLUTE
+              - LIMITED
+              - NONE
+              - FETTERED
+          - name: vesting-conditions
+            type: string
+            required: false
+            maps_to: vesting_conditions
+          - name: vesting-date
+            type: date
+            required: false
+            maps_to: vesting_date
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: affected
+
+      end-provision:
+        description: End/revoke a trust provision
+        behavior: crud
+        crud:
+          operation: update
+          table: trust_provisions
+          schema: kyc
+          key: id
+        args:
+          - name: provision-id
+            type: uuid
+            required: true
+            maps_to: id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        set_values:
+          is_active: false
+        returns:
+          type: affected
+
+      list-provisions:
+        description: List all provisions for a trust
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: trust_provisions
+          schema: kyc
+          fk_col: trust_entity_id
+        args:
+          - name: trust-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: provision-type
+            type: string
+            required: false
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set
+
+      list-by-holder:
+        description: List all trust provisions held by an entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: trust_provisions
+          schema: kyc
+          fk_col: holder_entity_id
+        args:
+          - name: holder-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record_set
+
+      analyze-control:
+        description: |
+          Analyze trust control vectors:
+          - Trustee with absolute discretion = control
+          - Appointor with trustee removal = control
+          - Protector with veto = influence
+          - Settlor with reserved powers = control
+        behavior: plugin
+        plugin:
+          handler: TrustAnalyzeControlOp
+        args:
+          - name: trust-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields:
+            - name: controlling_parties
+              type: array
+              description: Entities with control over trust
+            - name: beneficial_parties
+              type: array
+              description: Entities with beneficial interest
+            - name: trust_type_inference
+              type: string
+              description: Inferred trust type (DISCRETIONARY, FIXED_INTEREST, BARE)
+            - name: control_summary
+              type: object
+
+      identify-ubos:
+        description: |
+          Identify UBOs from trust structure:
+          - Fixed interest beneficiaries >= 25%
+          - Settlor (if reserved powers)
+          - Trustee with absolute discretion
+          - Appointor/Protector with removal power
+        behavior: plugin
+        plugin:
+          handler: TrustIdentifyUbosOp
+        args:
+          - name: trust-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: cbu-id
+            type: uuid
+            required: false
+            description: Optional CBU context for UBO registration
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+          description: Array of UBO candidates with control/ownership vector
+
+      classify:
+        description: |
+          Classify trust type based on provisions:
+          - DISCRETIONARY: Trustee has absolute discretion over distributions
+          - FIXED_INTEREST: Beneficiaries have fixed entitlements
+          - BARE: Beneficiary has absolute right to capital and income
+          - ACCUMULATION: Income can be accumulated
+          - PURPOSE: Non-charitable purpose trust
+          - CHARITABLE: Charitable trust
+        behavior: plugin
+        plugin:
+          handler: TrustClassifyOp
+        args:
+          - name: trust-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields:
+            - name: trust_classification
+              type: string
+            - name: classification_reasons
+              type: array
+            - name: confidence
+              type: decimal

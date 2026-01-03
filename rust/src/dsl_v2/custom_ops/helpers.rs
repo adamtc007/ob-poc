@@ -23,6 +23,27 @@ pub fn extract_uuid(verb_call: &VerbCall, ctx: &ExecutionContext, arg_name: &str
         .ok_or_else(|| anyhow!("Missing {} argument", arg_name))
 }
 
+/// Simple UUID extraction without context - for ops that don't use symbol resolution.
+/// Handles literal UUIDs and string UUIDs directly from verb arguments.
+pub fn get_required_uuid(verb_call: &VerbCall, arg_name: &str) -> Result<Uuid> {
+    verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == arg_name)
+        .and_then(|a| {
+            // Try literal UUID
+            if let Some(uuid) = a.value.as_uuid() {
+                return Some(uuid);
+            }
+            // Try parsing string as UUID
+            if let Some(s) = a.value.as_string() {
+                return Uuid::parse_str(s).ok();
+            }
+            None
+        })
+        .ok_or_else(|| anyhow!("Missing or invalid {} argument", arg_name))
+}
+
 /// Extract an optional UUID argument from a verb call.
 /// Handles @symbol references and literal UUIDs.
 pub fn extract_uuid_opt(

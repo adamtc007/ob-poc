@@ -57,9 +57,9 @@ The lexicon defines vocabulary for: verbs (add, create, set up), entities (resol
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                   Web UI (localhost:3000)                       │
-│  Server-rendered HTML with embedded JS/CSS                      │
-│  Three panels: Chat | DSL Editor | Results                      │
-│  rust/src/ui/                                                   │
+│  ob-poc-ui (egui/WASM) + ob-poc-web (Axum)                     │
+│  5-panel layout: Context | Chat | DSL | Graph | Results         │
+│  rust/crates/ob-poc-ui/ + rust/crates/ob-poc-web/              │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -478,6 +478,205 @@ let token = state.token_registry.get("cbu");
 let color = token.visual.status_color32(Some("ACTIVE"));
 ```
 
+## Voice Navigation Module (`rust/src/navigation/`)
+
+Natural language navigation for the EntityGraph, designed for voice-first interaction (Blade Runner Esper-style).
+
+### Architecture
+
+```
+rust/src/navigation/
+├── mod.rs          # Module exports
+├── commands.rs     # NavCommand enum with all command types
+├── parser.rs       # Nom-based natural language parser
+└── executor.rs     # Execute commands against EntityGraph
+```
+
+### Command Categories
+
+| Category | Examples |
+|----------|----------|
+| **Scope** | `load cbu "Fund Name"`, `show the Allianz book` |
+| **Filter** | `filter jurisdiction LU, IE`, `show ownership prong`, `as of 2024-01-01` |
+| **Navigate** | `go to "Entity"`, `go up`, `go down`, `back`, `forward`, `terminus` |
+| **Query** | `find "Name"`, `where is "Person"`, `list children`, `list owners` |
+| **Display** | `show path`, `show tree 3`, `expand cbu`, `zoom in`, `fit` |
+
+### Usage
+
+```rust
+use ob_poc::navigation::{parse_nav_command, NavCommand, NavExecutor};
+
+let input = "show me the Allianz book";
+match parse_nav_command(input) {
+    Ok((_, cmd)) => {
+        let executor = NavExecutor::new(&graph);
+        let result = executor.execute(cmd);
+    }
+    Err(e) => eprintln!("Parse error: {:?}", e),
+}
+```
+
+## Ontology Module (`rust/src/ontology/`)
+
+Manages entity type definitions and lifecycle state machines.
+
+| File | Purpose |
+|------|---------|
+| `taxonomy.rs` | `EntityTaxonomy` - loads from `entity_taxonomy.yaml` |
+| `lifecycle.rs` | State machine validation (`is_valid_transition`, `valid_next_states`) |
+| `semantic_stage.rs` | `SemanticStageRegistry` - onboarding journey stages |
+| `service.rs` | `OntologyService` - global access via `ontology()` |
+
+**Config sources:**
+- `config/entity_taxonomy.yaml` - Entity type definitions with DB mappings
+- `config/agent/semantic_stages.yaml` - Onboarding stage definitions
+
+## Taxonomy Module (`rust/src/taxonomy/`)
+
+The taxonomy module provides **fractal navigation** for hierarchical entity views. Every node can expand into a child taxonomy, enabling infinite drill-down through CBU structures, UBO chains, and entity forests.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   TaxonomyStack (Session)                        │
+│  Stack of TaxonomyFrames for fractal navigation                 │
+│  - push(frame) on zoom-in                                       │
+│  - pop() on zoom-out                                            │
+│  - breadcrumbs_with_codes() for navigation trail                │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   TaxonomyFrame                                  │
+│  Single navigation level with:                                  │
+│  - focus_node: Uuid (current root)                              │
+│  - label: String (breadcrumb display)                           │
+│  - parser: Option<Arc<dyn TaxonomyParser>>                      │
+│  - filters: Vec<Filter>                                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   TaxonomyNode                                   │
+│  Universal tree node with ExpansionRule:                        │
+│  - Parser(Arc<dyn TaxonomyParser>) - custom expansion           │
+│  - Context(TaxonomyContext) - derive from context               │
+│  - Complete - already loaded                                    │
+│  - Terminal - cannot expand (leaf nodes)                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `stack.rs` | `TaxonomyStack`, `TaxonomyFrame` - navigation state |
+| `node.rs` | `TaxonomyNode`, `ExpansionRule` - tree structure |
+| `builder.rs` | `TaxonomyBuilder` - construct trees from entities/edges |
+| `types.rs` | `NodeType`, `DimensionValues`, `Metaphor`, `AstroLevel` |
+| `rules.rs` | `TaxonomyRules`, `TaxonomyContext` - filtering rules |
+| `combinators/` | Nom-based parser combinators for data sources |
+
+### Combinator Module (`rust/src/taxonomy/combinators/`)
+
+| File | Purpose |
+|------|---------|
+| `parser.rs` | `TaxonomyParser` trait, `ParserCombinator` builder |
+| `source.rs` | `DataSource` trait, `EmptySource`, `VecSource` |
+| `grouper.rs` | `Grouper` trait, `FieldGrouper`, `JurisdictionGrouper` |
+
+**Parser Combinator Pattern:**
+```rust
+ParserCombinator::new("CBU Browser")
+    .from_source(db_source)
+    .group_by(JurisdictionGrouper::new())
+    .with_node_type(NodeType::Cbu)
+    .each_is_taxonomy()  // Each node expands to child taxonomy
+    .build()
+```
+
+### API Endpoints (`rust/src/api/taxonomy_routes.rs`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/session/:id/taxonomy/breadcrumbs` | GET | Get current navigation path |
+| `/api/session/:id/taxonomy/zoom-in` | POST | Navigate into a type |
+| `/api/session/:id/taxonomy/zoom-out` | POST | Navigate up one level |
+| `/api/session/:id/taxonomy/back-to` | POST | Jump to specific breadcrumb |
+
+### UI Integration
+
+The taxonomy panel (`rust/crates/ob-poc-ui/src/panels/taxonomy.rs`) provides:
+- Breadcrumb navigation bar with clickable levels
+- Zoom controls (in/out buttons)
+- Type browser with expand/collapse
+- Double-click to zoom into a type
+
+**Async Flow:**
+```
+TaxonomyPanelAction::ZoomIn → pending_taxonomy_zoom_in flag
+  → update loop → taxonomy_zoom_in() → spawn_local POST
+  → server pushes TaxonomyFrame → response with breadcrumbs
+  → process_async_results → UI re-renders
+```
+
+### Legacy: Domain Taxonomy Pattern
+
+Generic three-tier taxonomy pattern: `Type → Operation → Resource`
+
+```
+Domain Type ──(M:N)──► Operation ──(M:N)──► Resource Type
+                                                 │
+                                      CBU Instance Table
+```
+
+| File | Purpose |
+|------|---------|
+| `domain.rs` | `TaxonomyDomain` trait, `TaxonomyMetadata` |
+| `ops.rs` | `TaxonomyOps<D>` - generic operations for any domain |
+| `product.rs` | `ProductDomain` - product taxonomy implementation |
+| `instrument.rs` | `InstrumentDomain` - instrument taxonomy implementation |
+
+**Key operations:** `Discovery` (find gaps), `Gap` (missing coverage), `ProvisionResult` (provision resources)
+
+## Services Module (`rust/src/services/`)
+
+Business logic implementations for the DSL execution layer.
+
+| File | Purpose |
+|------|---------|
+| `attribute_executor.rs` | Attribute validation and execution |
+| `resolution_service.rs` | Entity reference disambiguation |
+| `document_extraction_service.rs` | Document content extraction |
+| `document_attribute_crud_service.rs` | Document-attribute linking |
+| `dsl_enrichment.rs` | DSL source → UI segments for highlighting |
+| `sink_executor.rs` | Composite sink operations |
+| `source_executor.rs` | Composite source operations |
+
+**Note:** Entity search has moved to EntityGateway gRPC service. The services module focuses on document/attribute operations and DSL enrichment.
+
+## Domains Module (`rust/src/domains/`)
+
+> **Status:** Stub implementation. Defines `DomainHandler` trait but uses `StubDomainHandler` for most domains.
+
+The domains module provides a trait-based abstraction for domain-specific DSL handling:
+
+```rust
+#[async_trait]
+pub trait DomainHandler: Send + Sync {
+    fn domain_name(&self) -> &str;
+    fn supported_verbs(&self) -> Vec<&str>;
+    async fn validate_dsl(&self, verb: &str, properties: &PropertyMap) -> Result<(), String>;
+    async fn process_operation(&self, verb: &str, properties: &PropertyMap) -> Result<DomainResult, String>;
+}
+```
+
+**Registered domains:** `kyc`, `onboarding`, `ubo`, `isda`, `entity`, `products`, `documents`, `cbu`, `crud`, `attr`
+
+**Note:** Actual DSL execution goes through `GenericCrudExecutor` (YAML-driven) or `custom_ops/` plugins. This module is for future domain-specific logic.
+
 ## Shared Types Crate (ob-poc-types)
 
 The `ob-poc-types` crate is the **single source of truth** for all API types crossing HTTP boundaries.
@@ -554,7 +753,9 @@ pub enum MyEvent {
 
 ## Code Statistics
 
-As of 2026-01-01:
+> **Note:** Statistics below are approximate and may drift. Run `tokei` or `cloc` for current counts.
+
+As of late 2025:
 
 | Language | Files | Lines |
 |----------|-------|-------|
@@ -633,65 +834,113 @@ config/
 ob-poc/
 ├── rust/
 │   ├── config/                     # YAML configuration (source of truth)
-│   │   ├── verbs.yaml              # All verb definitions
+│   │   ├── verbs/                  # Verb definitions (86 YAML files)
+│   │   │   ├── cbu.yaml            # CBU domain verbs
+│   │   │   ├── entity.yaml         # Entity domain verbs
+│   │   │   ├── custody/            # Custody subdomain (8 files)
+│   │   │   ├── kyc/                # KYC subdomain (7 files)
+│   │   │   ├── observation/        # Evidence model (3 files)
+│   │   │   ├── refdata/            # Reference data (10 files)
+│   │   │   ├── reference/          # Domain reference (4 files)
+│   │   │   ├── registry/           # Investor registry (3 files)
+│   │   │   └── templates/          # DSL templates (13 files)
+│   │   ├── agent/                  # Agent configuration
+│   │   │   ├── lexicon.yaml        # Token vocabulary
+│   │   │   └── semantic_stages.yaml
+│   │   ├── macros/research/        # Research macro definitions
+│   │   ├── workflows/              # Workflow definitions
 │   │   └── csg_rules.yaml          # Validation rules
-│   ├── src/
-│   │   ├── ui/                     # Server-rendered UI (pages.rs, routes.rs)
+│   │
+│   ├── crates/                     # Standalone crates (no-DB where noted)
+│   │   ├── dsl-core/               # Core DSL parser/AST/compiler (NO DB)
+│   │   │   └── src/
+│   │   │       ├── parser.rs       # Nom-based S-expression parser
+│   │   │       ├── ast.rs          # Program, Statement, VerbCall, Value
+│   │   │       ├── compiler.rs     # AST → Ops compiler
+│   │   │       ├── ops.rs          # Op enum (primitive operations)
+│   │   │       ├── dag.rs          # DAG builder + toposort
+│   │   │       ├── diagnostics.rs  # Unified diagnostic types
+│   │   │       └── config/         # YAML config types
+│   │   ├── ob-agentic/             # LLM agent for DSL generation (NO DB)
+│   │   │   └── src/lexicon/        # Tokenizer, intent parser, pipeline
+│   │   ├── ob-templates/           # Template expansion (NO DB)
+│   │   ├── ob-workflow/            # Workflow orchestration (optional DB)
+│   │   ├── ob-execution-types/     # Core execution types
+│   │   ├── ob-poc-web/             # Axum server + static files + API
+│   │   ├── ob-poc-ui/              # Pure egui/WASM UI application
+│   │   ├── ob-poc-graph/           # WASM/egui graph widget
+│   │   ├── ob-poc-types/           # Shared API types (single source of truth)
+│   │   ├── dsl-lsp/                # Language Server Protocol
+│   │   ├── entity-gateway/         # gRPC entity resolution (Tantivy)
+│   │   └── ob-semantic-matcher/    # Voice command matching (Candle ML)
+│   │
+│   ├── src/                        # Main crate (database-integrated)
 │   │   ├── api/                    # REST API routes
 │   │   │   ├── agent_routes.rs     # /api/agent/* (generate, validate)
 │   │   │   ├── session_routes.rs   # /api/session/* (chat, execute)
-│   │   │   └── template_routes.rs  # /api/templates/*
-│   │   ├── dsl_v2/                 # Core DSL implementation
-│   │   │   ├── parser.rs           # Nom-based S-expression parser
-│   │   │   ├── ast.rs              # Program, Statement, VerbCall, Value
-│   │   │   ├── config/             # YAML config types and loader
-│   │   │   │   ├── types.rs        # Serde structs for verbs.yaml
-│   │   │   │   └── loader.rs       # ConfigLoader (from env or path)
-│   │   │   ├── runtime_registry.rs # RuntimeVerbRegistry (loads from YAML)
-│   │   │   ├── verb_registry.rs    # UnifiedVerbRegistry (wraps runtime)
-│   │   │   ├── entity_deps.rs      # Unified entity dependency DAG
-│   │   │   ├── ops.rs              # Op enum (primitive operations)
-│   │   │   ├── compiler.rs         # AST → Ops compiler
-│   │   │   ├── dag.rs              # DAG builder + toposort
-│   │   │   ├── diagnostics.rs      # Unified diagnostic types for LSP
-│   │   │   ├── execution_result.rs # StepResult enum + ExecutionResults
-│   │   │   ├── repl_session.rs     # REPL state with undo support
-│   │   │   ├── planning_facade.rs  # Central analyse_and_plan() entrypoint
-│   │   │   ├── generic_executor.rs # GenericCrudExecutor (14 CRUD ops)
+│   │   │   └── graph_routes.rs     # /api/cbu/:id/graph
+│   │   ├── dsl_v2/                 # DSL execution layer (uses dsl-core)
+│   │   │   ├── generic_executor.rs # GenericCrudExecutor (YAML-driven CRUD)
 │   │   │   ├── executor.rs         # DslExecutor (orchestrates execution)
 │   │   │   ├── csg_linter.rs       # Context-sensitive validation
-│   │   │   ├── execution_plan.rs   # AST → ExecutionPlan compiler
-│   │   │   └── custom_ops/         # Plugin handlers for non-CRUD ops
-│   │   │       ├── mod.rs          # Registry + re-exports only (~370 lines)
-│   │   │       ├── helpers.rs      # Shared argument extraction helpers
-│   │   │       ├── entity_ops.rs   # EntityCreateOp
-│   │   │       ├── document_ops.rs # DocumentCatalogOp, DocumentExtractOp
-│   │   │       ├── screening_ops.rs # PEP, Sanctions, AdverseMedia ops
-│   │   │       ├── resource_ops.rs # Resource instance lifecycle ops
-│   │   │       ├── cbu_ops.rs      # CBU operations (add-product, show, decide, delete-cascade)
-│   │   │       ├── observation_ops.rs # Observation and allegation verification ops
-│   │   │       ├── ubo_analysis.rs # UBO chain tracing and snapshots
-│   │   │       └── ...             # Other domain-specific op modules
+│   │   │   ├── semantic_validator.rs # Entity resolution + validation
+│   │   │   ├── execution_plan.rs   # AST → ExecutionPlan
+│   │   │   ├── topo_sort.rs        # Topological sorting
+│   │   │   └── custom_ops/         # Plugin handlers (~28 files)
 │   │   ├── database/               # Repository pattern services
-│   │   │   └── visualization_repository.rs  # Centralized visualization queries
-│   │   ├── graph/                  # Graph visualization (single pipeline)
-│   │   │   ├── builder.rs          # CbuGraphBuilder (multi-layer graph)
-│   │   │   └── types.rs            # GraphNode, GraphEdge, CbuGraph
-│   │   ├── domains/                # Domain-specific logic
-│   │   ├── mcp/                    # MCP server for Claude Desktop
+│   │   ├── domains/                # Domain handler trait (stub implementations)
+│   │   ├── graph/                  # Graph visualization
+│   │   ├── mcp/                    # MCP server handlers
+│   │   ├── navigation/             # Voice navigation commands + nom parser
+│   │   ├── ontology/               # Entity taxonomy + lifecycle state machines
+│   │   ├── research/               # Research macros (LLM + web search)
+│   │   ├── services/               # Document/attribute services, DSL enrichment
+│   │   ├── session/                # Session context + verb discovery
+│   │   ├── taxonomy/               # Generic Type→Operation→Resource pattern
+│   │   ├── gleif/                  # GLEIF API integration
+│   │   ├── bods/                   # BODS UBO discovery
+│   │   ├── verification/           # Adversarial verification
+│   │   ├── templates/              # Template helpers (uses ob-templates)
+│   │   ├── workflow/               # Workflow re-exports (uses ob-workflow)
+│   │   ├── trading_profile/        # Trading profile documents
 │   │   └── bin/
 │   │       ├── agentic_server.rs   # Main server binary
 │   │       ├── dsl_cli.rs          # CLI tool
 │   │       └── dsl_mcp.rs          # MCP server binary
-│   ├── crates/dsl-lsp/             # LSP server
+│   │
 │   └── tests/
 │       ├── db_integration.rs       # Database integration tests
-│       └── scenarios/              # DSL test scenarios (8 valid, 5 error)
+│       └── scenarios/              # DSL test scenarios
+│
+├── .claude/commands/               # Custom slash commands
+│   ├── egui.md                     # /egui - egui development rules
+│   ├── verify-complete.md          # /verify-complete - stub detection
+│   └── ...
 ├── docs/
-│   └── DSL_TEST_SCENARIOS.md       # Test scenario documentation
 ├── schema_export.sql               # Full DDL for database rebuild
 └── CLAUDE.md                       # This file
 ```
+
+### Crate Architecture
+
+The codebase uses **fine-grained crates** to separate concerns:
+
+| Crate | DB Required | Purpose |
+|-------|-------------|---------|
+| `dsl-core` | No | Pure parser, AST, compiler - works offline |
+| `ob-agentic` | No | LLM intent extraction - uses EntityGateway for resolution |
+| `ob-templates` | No | Template expansion - pure string manipulation |
+| `ob-workflow` | Optional | Workflow engine - has `database` feature flag |
+| `ob-execution-types` | No | Shared execution types |
+| `ob-poc-types` | No | Shared API types for TypeScript generation |
+| `ob-poc-ui` | No | Pure egui/WASM UI - fetches data via HTTP |
+| `ob-poc-graph` | No | WASM graph widget - pure rendering |
+| `entity-gateway` | Yes | gRPC entity resolution with Tantivy indexes |
+| `dsl-lsp` | Yes | LSP needs full schema for completions |
+| `ob-poc-web` | Yes | Axum server handles all DB operations |
+| `ob-semantic-matcher` | Yes | Voice matching needs pgvector embeddings |
+
+**Key insight:** `dsl-core` and `ob-agentic` can run without a database, enabling offline DSL editing and LLM-based generation that resolves entities via gRPC.
 
 ## Web UI Architecture
 
@@ -2586,8 +2835,13 @@ args:
 | isda | ISDA master agreements and product coverage |
 | entity-settlement | Entity BIC/LEI settlement identity |
 | fund | Fund structure operations (umbrella, subfund, share class, master-feeder, FoF) |
-| control | Control relationships distinct from ownership (voting, board, veto) |
+| control | Control relationships and unified analysis (ownership, board, trust, partnership) |
 | delegation | Service provider delegation chains (ManCo to sub-advisor) |
+| board | Board composition and appointment rights management |
+| capital | Corporate share registry and capital structure |
+| partnership | Partnership capital accounts and GP/LP structure |
+| tollgate | Decision engine for KYC workflow gates |
+| trust | Trust provisions and control structure |
 
 ## KYC Case Management DSL
 
@@ -5399,7 +5653,7 @@ Templates capture domain lifecycle patterns - chained verb sequences that accomp
 ### Directory Structure
 
 ```
-rust/config/templates/
+rust/config/verbs/templates/           # Templates are under verbs config
 ├── director/
 │   └── onboard-director.yaml
 ├── signatory/
@@ -5414,10 +5668,23 @@ rust/config/templates/
 ├── documents/
 │   ├── catalog-document.yaml
 │   └── request-documents.yaml
-└── case/
-    ├── create-kyc-case.yaml
-    ├── escalate-case.yaml
-    └── approve-case.yaml
+├── case/
+│   ├── create-kyc-case.yaml
+│   ├── escalate-case.yaml
+│   └── approve-case.yaml
+└── fund/
+    └── onboard-fund-cbu.yaml          # Batch fund onboarding template
+```
+
+### Rust Module Structure
+
+```
+rust/crates/ob-templates/src/
+├── lib.rs              # Module exports
+├── definition.rs       # TemplateDefinition, ParamDefinition, WorkflowContext
+├── registry.rs         # TemplateRegistry with multi-index lookup (loads from YAML)
+├── expander.rs         # TemplateExpander for parameter substitution
+└── error.rs            # TemplateError enum
 ```
 
 ### Template YAML Schema
@@ -5589,6 +5856,146 @@ Load templates → Expand with sample params → Parse DSL → Compile → (Exec
 | `get_sample_params()` | Sample parameters for all 12 templates |
 | `run_harness()` | Full pipeline with optional DB execution |
 | `run_harness_no_db()` | Pipeline without database execution |
+
+## Research Macros
+
+Research macros provide LLM-powered structured data discovery for KYC workflows. They execute multi-step research with optional web search and return structured JSON conforming to defined schemas.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   Research Macro Request                         │
+│  macro: "client-discovery", params: { client_name: "Apex" }     │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   ResearchRegistry                               │
+│  Loads YAML definitions from config/macros/research/            │
+│  rust/src/research/registry.rs                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   ResearchExecutor                               │
+│  1. Build prompt from template + params                         │
+│  2. Call LLM with tools (web_search)                           │
+│  3. LLM may invoke web_search tool → Brave API                 │
+│  4. Parse structured JSON output                                │
+│  5. Return ResearchResult with sources                          │
+│  rust/src/research/executor.rs                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   ClaudeResearchClient                           │
+│  - Iterative tool use loop (web_search)                        │
+│  - Brave Search API integration                                 │
+│  - Graceful fallback if API key not set                        │
+│  rust/src/research/llm_client.rs                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Module Structure
+
+```
+rust/src/research/
+├── mod.rs              # Module exports
+├── definition.rs       # ResearchMacroDefinition, Parameter, OutputSchema
+├── registry.rs         # ResearchRegistry - loads from YAML
+├── executor.rs         # ResearchExecutor - runs macros
+├── llm_client.rs       # ClaudeResearchClient with tool use
+└── error.rs            # ResearchError enum
+
+rust/config/macros/research/
+├── client-discovery.yaml    # Discover client info from web
+├── ubo-investigation.yaml   # Trace UBO from public sources
+└── regulatory-check.yaml    # Check regulatory status
+```
+
+### YAML Macro Definition
+
+```yaml
+name: client-discovery
+description: Discover client information from public sources
+
+parameters:
+  - name: client_name
+    type: string
+    required: true
+    description: Name of the client to research
+  - name: jurisdiction
+    type: string
+    required: false
+    description: Primary jurisdiction to focus on
+
+tools:
+  - web_search
+
+prompt_template: |
+  Research the following client: {{ client_name }}
+  {% if jurisdiction %}Focus on {{ jurisdiction }} registrations.{% endif %}
+  
+  Find: legal name, registration numbers, key personnel, ownership structure.
+
+output_schema:
+  type: object
+  properties:
+    legal_name:
+      type: string
+    registration_number:
+      type: string
+    jurisdiction:
+      type: string
+    key_personnel:
+      type: array
+      items:
+        type: object
+        properties:
+          name: { type: string }
+          role: { type: string }
+
+suggested_verbs:
+  - entity.ensure-limited-company
+  - cbu.assign-role
+```
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `research_list` | List available research macros |
+| `research_get` | Get macro definition with schema |
+| `research_execute` | Execute macro (returns pending result) |
+| `research_status` | Check execution status |
+| `research_approve` | Approve result for DSL generation |
+| `research_reject` | Reject result with reason |
+
+### Web Search Integration
+
+Web search uses Brave Search API with graceful fallback:
+
+```rust
+// If BRAVE_SEARCH_API_KEY is set: real search
+// If not set: returns empty results with fallback note
+// LLM uses its knowledge when search unavailable
+```
+
+**Environment variable:** `BRAVE_SEARCH_API_KEY` (optional)
+
+### Example Flow
+
+```
+1. Agent: research_execute { macro: "client-discovery", params: { client_name: "Apex Capital" } }
+2. System: Executes LLM with web_search tool available
+3. LLM: Calls web_search("Apex Capital hedge fund registration")
+4. System: Returns Brave search results
+5. LLM: Synthesizes structured response
+6. System: Returns ResearchResult { data: {...}, sources: [...], suggested_verbs: [...] }
+7. Agent: research_approve { result_id: "..." }
+8. System: Generates DSL from suggested_verbs template
+```
 
 ## Agentic DSL Generation
 
@@ -5985,6 +6392,9 @@ OPENAI_MODEL="gpt-4.1"  # optional, default: gpt-4.1
 # Optional
 DSL_CONFIG_DIR="/path/to/config"  # override config location
 ENTITY_GATEWAY_URL="http://[::1]:50051"  # EntityGateway gRPC endpoint
+
+# Research Macros (optional - falls back to LLM knowledge if not set)
+BRAVE_SEARCH_API_KEY="..."  # Brave Search API key for web search in research macros
 ```
 
 ### Database Pool Sizing Guide
@@ -6205,6 +6615,38 @@ Sanctions, PEP, and adverse media screening for KYC workstreams
 | `case-screening.review-hit` | Review a screening hit |
 | `case-screening.run` | Initiate a screening |
 
+### board
+
+Board composition and appointment rights management
+
+| Verb | Description |
+|------|-------------|
+| `board.appoint` | Appoint a person to a board position |
+| `board.resign` | Record resignation from board |
+| `board.list-by-entity` | List board members for an entity |
+| `board.list-by-person` | List board positions held by a person |
+| `board.grant-appointment-right` | Grant board appointment right (from SHA) |
+| `board.revoke-appointment-right` | Revoke an appointment right |
+| `board.list-appointment-rights` | List appointment rights for an entity |
+| `board.list-rights-held` | List appointment rights held by an entity |
+| `board.analyze-control` | Analyze board control for UBO identification |
+
+### capital
+
+Corporate share registry and capital structure management
+
+| Verb | Description |
+|------|-------------|
+| `capital.define-share-class` | Define a share class for an issuer entity |
+| `capital.allocate` | Allocate shares to a shareholder |
+| `capital.transfer` | Transfer shares between shareholders |
+| `capital.reconcile` | Reconcile share ownership (verify 100% allocation) |
+| `capital.get-ownership-chain` | Get ownership chain for UBO tracing |
+| `capital.issue-shares` | Issue new shares |
+| `capital.cancel-shares` | Cancel existing shares |
+| `capital.list-by-issuer` | List share classes for an issuer |
+| `capital.list-shareholders` | List shareholders for a share class |
+
 ### cbu
 
 Client Business Unit operations
@@ -6245,6 +6687,18 @@ CBU custody operations: Universe, SSIs, and Booking Rules
 | `cbu-custody.suspend-ssi` | Suspend an SSI |
 | `cbu-custody.update-rule-priority` | Update booking rule priority |
 | `cbu-custody.validate-booking-coverage` | Validate that all universe entries have matching booking rules |
+
+### control
+
+Unified control analysis across all control vectors (ownership, voting, board, trust, partnership)
+
+| Verb | Description |
+|------|-------------|
+| `control.analyze` | Comprehensive control analysis across all control vectors |
+| `control.build-graph` | Build full control graph for a CBU |
+| `control.identify-ubos` | Identify all UBOs across all control vectors |
+| `control.trace-chain` | Trace specific control chain between entities |
+| `control.reconcile-ownership` | Reconcile ownership percentages with control |
 
 ### delivery
 
@@ -6453,6 +6907,20 @@ Attribute observations from various sources
 | `observation.supersede` | Supersede an observation with a newer one |
 | `observation.verify-allegations` | Batch verify pending allegations against observations |
 
+### partnership
+
+Partnership capital accounts and GP/LP structure management
+
+| Verb | Description |
+|------|-------------|
+| `partnership.add-partner` | Add a partner to partnership with capital commitment |
+| `partnership.record-contribution` | Record capital contribution (drawdown) |
+| `partnership.record-distribution` | Record distribution to partner |
+| `partnership.withdraw-partner` | Record partner withdrawal/exit |
+| `partnership.list-partners` | List all partners in a partnership |
+| `partnership.reconcile` | Reconcile partnership capital (verify profit shares sum to 100%) |
+| `partnership.analyze-control` | Analyze control structure for UBO identification |
+
 ### product
 
 Product catalog operations (read-only - products are reference data)
@@ -6603,6 +7071,37 @@ KYC threshold computation and evaluation
 | `threshold.check-entity` | Check single entity against requirements |
 | `threshold.derive` | Compute KYC requirements based on CBU risk factors |
 | `threshold.evaluate` | Check if CBU meets threshold requirements |
+
+### tollgate
+
+Decision engine for KYC workflow gates
+
+| Verb | Description |
+|------|-------------|
+| `tollgate.evaluate` | Run tollgate evaluation for a case |
+| `tollgate.get-metrics` | Compute current metrics for a CBU |
+| `tollgate.set-threshold` | Update a tollgate threshold |
+| `tollgate.override` | Record management override of tollgate failure |
+| `tollgate.list-evaluations` | List tollgate evaluations for a case |
+| `tollgate.list-thresholds` | List all configured thresholds |
+| `tollgate.get-decision-readiness` | Summary view of decision readiness |
+| `tollgate.list-overrides` | List overrides for a case or evaluation |
+| `tollgate.expire-override` | Manually expire an override |
+
+### trust
+
+Trust provisions and control structure management
+
+| Verb | Description |
+|------|-------------|
+| `trust.record-provision` | Record a trust provision |
+| `trust.update-provision` | Update a provision |
+| `trust.end-provision` | End a provision (set effective_to date) |
+| `trust.list-provisions` | List provisions for a trust |
+| `trust.list-by-holder` | List provisions held by an entity |
+| `trust.analyze-control` | Analyze trust control structure |
+| `trust.identify-ubos` | Identify UBOs from trust provisions |
+| `trust.classify` | Classify trust type based on provisions |
 
 ### ubo
 

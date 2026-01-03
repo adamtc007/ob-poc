@@ -111,6 +111,7 @@ pub async fn allow_unauthenticated(request: Request<Body>, next: Next) -> Respon
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]

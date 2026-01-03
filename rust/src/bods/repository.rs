@@ -249,13 +249,13 @@ impl BodsRepository {
 
         let share_min = first_interest
             .and_then(|i| i.share.as_ref())
-            .and_then(|s| s.minimum.map(|v| Decimal::try_from(v).ok()).flatten());
+            .and_then(|s| s.minimum.and_then(|v| Decimal::try_from(v).ok()));
         let share_max = first_interest
             .and_then(|i| i.share.as_ref())
-            .and_then(|s| s.maximum.map(|v| Decimal::try_from(v).ok()).flatten());
+            .and_then(|s| s.maximum.and_then(|v| Decimal::try_from(v).ok()));
         let share_exact = first_interest
             .and_then(|i| i.share.as_ref())
-            .and_then(|s| s.exact.map(|v| Decimal::try_from(v).ok()).flatten());
+            .and_then(|s| s.exact.and_then(|v| Decimal::try_from(v).ok()));
 
         let start_date = first_interest
             .and_then(|i| i.start_date.as_ref())
@@ -361,7 +361,7 @@ impl BodsRepository {
         confidence: Option<f64>,
     ) -> Result<Uuid> {
         let link_id = Uuid::new_v4();
-        let confidence_decimal = confidence.map(|c| Decimal::try_from(c).ok()).flatten();
+        let confidence_decimal = confidence.and_then(|c| Decimal::try_from(c).ok());
 
         sqlx::query(
             r#"
@@ -444,18 +444,15 @@ impl BodsRepository {
         .bind(chain_depth)
         .bind(
             ubo.ownership_min
-                .map(|v| Decimal::try_from(v).ok())
-                .flatten(),
+                .and_then(|v| Decimal::try_from(v).ok()),
         )
         .bind(
             ubo.ownership_max
-                .map(|v| Decimal::try_from(v).ok())
-                .flatten(),
+                .and_then(|v| Decimal::try_from(v).ok()),
         )
         .bind(
             ubo.ownership_percentage
-                .map(|v| Decimal::try_from(v).ok())
-                .flatten(),
+                .and_then(|v| Decimal::try_from(v).ok()),
         )
         .bind(&ubo.control_types)
         .bind(ubo.is_direct)

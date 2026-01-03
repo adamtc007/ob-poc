@@ -149,3 +149,232 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+
+      # ============================================================
+      # Unified Control Analysis Verbs (Phase C.6 KYC Enhancement)
+      # Aggregates ownership, board, trust, and partnership control
+      # ============================================================
+
+      analyze:
+        description: |
+          Comprehensive control analysis for any entity type.
+          Routes to appropriate analyzer based on entity_type.
+          Aggregates all control vectors: ownership, board, trust, partnership.
+        behavior: plugin
+        plugin:
+          handler: ControlAnalyzeOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-indirect
+            type: boolean
+            required: false
+            default: true
+            description: "Include indirect control through chains"
+          - name: control-threshold
+            type: decimal
+            required: false
+            default: 25.0
+            description: "Minimum percentage for ownership control"
+        returns:
+          type: record
+          fields:
+            - name: entity_type
+              type: string
+              description: "Type of entity analyzed"
+            - name: ownership_controllers
+              type: array
+              description: "Entities with ≥25% ownership"
+            - name: board_controllers
+              type: array
+              description: "Entities with board control"
+            - name: other_controllers
+              type: array
+              description: "SHA rights, trust powers, etc."
+            - name: ubo_candidates
+              type: array
+              description: "Natural persons identified as potential UBOs"
+
+      build-graph:
+        description: |
+          Build full control graph for a CBU.
+          Nodes: entities, persons, positions
+          Edges: OWNS, CONTROLS, APPOINTS, INFLUENCES, HOLDS_POSITION
+        behavior: plugin
+        plugin:
+          handler: ControlBuildGraphOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: depth
+            type: integer
+            required: false
+            default: 10
+            description: "Maximum traversal depth"
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+            description: "Include historical/inactive relationships"
+        returns:
+          type: record
+          fields:
+            - name: nodes
+              type: array
+              description: "All entities/persons in the control graph"
+            - name: edges
+              type: array
+              description: "All relationships between nodes"
+            - name: terminus_entities
+              type: array
+              description: "Entities with no further upstream owners"
+            - name: cycles_detected
+              type: array
+              description: "Any circular ownership/control detected"
+
+      identify-ubos:
+        description: |
+          Identify all UBOs for a CBU across all control vectors:
+          - Ownership ≥25% (direct or indirect)
+          - Board majority control
+          - Trust control (trustee discretion, appointor power)
+          - Partnership GP control
+        behavior: plugin
+        plugin:
+          handler: ControlIdentifyUbosOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: ownership-threshold
+            type: decimal
+            required: false
+            default: 25.0
+            description: "Ownership percentage threshold for UBO"
+          - name: include-indirect
+            type: boolean
+            required: false
+            default: true
+            description: "Include indirect ownership chains"
+        returns:
+          type: record_set
+          fields:
+            - name: person_entity_id
+              type: uuid
+            - name: person_name
+              type: string
+            - name: control_vectors
+              type: array
+              description: "Array of {type, path, percentage}"
+            - name: highest_percentage
+              type: decimal
+              description: "Highest ownership/control percentage"
+            - name: verification_status
+              type: string
+              description: "DISCOVERED, ALLEGED, EVIDENCED, VERIFIED"
+            - name: evidence_documents
+              type: array
+              description: "Supporting document IDs"
+
+      trace-chain:
+        description: |
+          Trace a specific control chain from one entity to another.
+          Returns the path and cumulative control percentage.
+        behavior: plugin
+        plugin:
+          handler: ControlTraceChainOp
+        args:
+          - name: from-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: to-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: relationship-types
+            type: array
+            required: false
+            description: "Filter by relationship types (OWNERSHIP, CONTROL, TRUST_ROLE)"
+        returns:
+          type: record
+          fields:
+            - name: path_exists
+              type: boolean
+            - name: path
+              type: array
+              description: "Ordered list of entities in chain"
+            - name: relationships
+              type: array
+              description: "Relationship details for each hop"
+            - name: cumulative_percentage
+              type: decimal
+              description: "Multiplicative ownership through chain"
+            - name: control_basis
+              type: string
+              description: "Primary basis: OWNERSHIP, BOARD, TRUST, PARTNERSHIP"
+
+      reconcile-ownership:
+        description: |
+          Reconcile ownership for an entity:
+          - Verify voting shares sum to 100%
+          - Identify gaps or overlaps
+          - Flag discrepancies
+        behavior: plugin
+        plugin:
+          handler: ControlReconcileOwnershipOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields:
+            - name: is_reconciled
+              type: boolean
+              description: "True if ownership sums to 100%"
+            - name: total_ownership_pct
+              type: decimal
+              description: "Sum of all ownership percentages"
+            - name: gap_pct
+              type: decimal
+              description: "Missing percentage (if any)"
+            - name: overlap_pct
+              type: decimal
+              description: "Overlapping claims (if any)"
+            - name: shareholders
+              type: array
+              description: "List of shareholders with percentages"
+            - name: discrepancies
+              type: array
+              description: "Any discrepancy details"

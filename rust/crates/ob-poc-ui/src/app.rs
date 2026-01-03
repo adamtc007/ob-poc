@@ -6,6 +6,7 @@
 //! 3. Handling widget responses (no callbacks, return values only)
 
 use crate::api;
+use crate::command::AgentPromptConduit;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
     dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, taxonomy_panel, toolbar,
@@ -57,6 +58,7 @@ impl App {
             ctx: Some(cc.egui_ctx.clone()),
             entity_ontology: ob_poc_graph::EntityTypeOntology::new(),
             taxonomy_state: ob_poc_graph::TaxonomyState::new(),
+            taxonomy_breadcrumbs: Vec::new(),
             type_filter: None,
             trading_matrix_state: ob_poc_graph::TradingMatrixState::new(),
             selected_matrix_node: None,
@@ -151,7 +153,6 @@ impl App {
     #[cfg(target_arch = "wasm32")]
     fn execute_navigation_verb(&mut self, verb: crate::command::NavigationVerb) {
         use crate::command::NavigationVerb;
-        use ob_poc_graph::ViewMode;
         use ob_poc_types::PanDirection;
 
         match verb {
@@ -204,7 +205,8 @@ impl App {
 
             // Filtering
             NavigationVerb::FilterByType { type_codes } => {
-                self.state.type_filter = Some(type_codes);
+                // Join multiple type codes into comma-separated string
+                self.state.type_filter = Some(type_codes.join(","));
             }
             NavigationVerb::HighlightType { type_code } => {
                 self.state.graph_widget.highlight_type(&type_code);
@@ -223,8 +225,10 @@ impl App {
                 self.state.graph_widget.set_zoom(0.3);
             }
             NavigationVerb::ScaleSystem { cbu_id } => {
-                if let Some(id) = cbu_id {
-                    self.state.select_cbu(Uuid::parse_str(&id).ok());
+                if let Some(ref id) = cbu_id {
+                    if let Ok(uuid) = Uuid::parse_str(id) {
+                        self.state.select_cbu(uuid, id);
+                    }
                 }
             }
             NavigationVerb::ScalePlanet { entity_id } => {
@@ -297,11 +301,17 @@ impl App {
             }
 
             // Investigation patterns (these are navigation, not agent)
-            NavigationVerb::FollowMoney { from_entity } => {
-                if let Some(id) = from_entity {
-                    self.state.graph_widget.focus_on_entity(&id);
+            NavigationVerb::FollowRabbit { from_entity } => {
+                if let Some(ref id) = from_entity {
+                    self.state.graph_widget.focus_on_entity(id);
                 }
-                // TODO: Highlight money flow edges
+                // TODO: Highlight ownership chain to terminus
+            }
+            NavigationVerb::DiveInto { entity_id } => {
+                if let Some(ref id) = entity_id {
+                    self.state.graph_widget.focus_on_entity(id);
+                    self.state.graph_widget.zoom_in(Some(1.5));
+                }
             }
             NavigationVerb::WhoControls { entity_id } => {
                 if let Some(id) = entity_id {
@@ -348,8 +358,6 @@ impl crate::command::AgentPromptConduit for App {
     /// This is the SINGLE entry point for ALL agent-bound commands,
     /// regardless of source (voice, chat, egui button).
     fn send_to_agent(&mut self, prompt: crate::command::AgentPrompt) {
-        use crate::command::AgentPrompt;
-
         // Log the prompt with source attribution
         let source_desc = match prompt.source() {
             crate::command::PromptSource::Voice { confidence, .. } => {
@@ -389,7 +397,7 @@ impl crate::command::AgentPromptConduit for App {
 
         // Use the existing chat infrastructure
         self.state.buffers.chat_input = message;
-        self.state.send_chat(session_id);
+        self.state.send_chat_message();
     }
 
     /// Check if the conduit is ready to accept new prompts.
@@ -779,6 +787,44 @@ impl eframe::App for App {
             // - onboarding: workflow-driven, progress focus
             // - monitoring: alerts, changes, flags
             // - remediation: issues, resolutions, actions
+        }
+
+        // =================================================================
+        // Process Taxonomy Navigation Commands (fractal drill-down via server)
+        // =================================================================
+
+        // Handle taxonomy zoom-in command
+        if let Some(type_code) = self.state.take_pending_taxonomy_zoom_in() {
+            web_sys::console::log_1(&format!("update: taxonomy zoom in to {}", type_code).into());
+            if let Some(session_id) = self.state.session_id {
+                self.state.taxonomy_zoom_in(session_id, type_code);
+            }
+        }
+
+        // Handle taxonomy zoom-out command
+        if self.state.take_pending_taxonomy_zoom_out() {
+            web_sys::console::log_1(&"update: taxonomy zoom out".into());
+            if let Some(session_id) = self.state.session_id {
+                self.state.taxonomy_zoom_out(session_id);
+            }
+        }
+
+        // Handle taxonomy back-to command
+        if let Some(level_index) = self.state.take_pending_taxonomy_back_to() {
+            web_sys::console::log_1(
+                &format!("update: taxonomy back to level {}", level_index).into(),
+            );
+            if let Some(session_id) = self.state.session_id {
+                self.state.taxonomy_back_to(session_id, level_index);
+            }
+        }
+
+        // Handle taxonomy breadcrumbs refresh request
+        if self.state.take_pending_taxonomy_breadcrumbs() {
+            web_sys::console::log_1(&"update: taxonomy fetch breadcrumbs".into());
+            if let Some(session_id) = self.state.session_id {
+                self.state.fetch_taxonomy_breadcrumbs(session_id);
+            }
         }
 
         // =================================================================
@@ -1239,6 +1285,27 @@ impl App {
             }
             TaxonomyPanelAction::CollapseAll => {
                 self.state.taxonomy_state.collapse_all();
+            }
+            TaxonomyPanelAction::ZoomIn { type_code } => {
+                web_sys::console::log_1(&format!("Taxonomy: Zoom into type {}", type_code).into());
+                // Set pending zoom-in command (will be processed by server)
+                if let Ok(mut async_state) = self.state.async_state.lock() {
+                    async_state.pending_taxonomy_zoom_in = Some(type_code);
+                }
+            }
+            TaxonomyPanelAction::ZoomOut => {
+                web_sys::console::log_1(&"Taxonomy: Zoom out".into());
+                // Set pending zoom-out command
+                if let Ok(mut async_state) = self.state.async_state.lock() {
+                    async_state.pending_taxonomy_zoom_out = true;
+                }
+            }
+            TaxonomyPanelAction::BackTo { level_index } => {
+                web_sys::console::log_1(&format!("Taxonomy: Back to level {}", level_index).into());
+                // Set pending back-to command
+                if let Ok(mut async_state) = self.state.async_state.lock() {
+                    async_state.pending_taxonomy_back_to = Some(level_index);
+                }
             }
         }
     }

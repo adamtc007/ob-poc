@@ -23,6 +23,7 @@ pub mod scope;
 pub mod verb_discovery;
 pub mod verb_rag_metadata;
 pub mod verb_sync;
+pub mod view_state;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -46,6 +47,10 @@ pub use verb_discovery::{
     VerbDiscoveryService, VerbSuggestion, WorkflowPhaseInfo,
 };
 pub use verb_sync::{SyncResult, VerbSyncError, VerbSyncService};
+pub use view_state::{
+    BatchOperation, LayoutBounds, LayoutResult, NodePosition, OperationPreview, PendingOperation,
+    Refinement, ViewState,
+};
 
 /// Unified session context - handles REPL + Visualization + Navigation
 #[derive(Debug, Serialize, Deserialize)]
@@ -77,6 +82,10 @@ pub struct UnifiedSessionContext {
 
     /// Research macro state (pending results, approvals)
     pub research: ResearchContext,
+
+    /// View state - the unified "it" that session is looking at
+    /// This IS what the user sees = what operations target = what agent knows about
+    pub view: Option<ViewState>,
 }
 
 impl Clone for UnifiedSessionContext {
@@ -93,6 +102,7 @@ impl Clone for UnifiedSessionContext {
             command_history: self.command_history.clone(),
             bookmarks: self.bookmarks.clone(),
             research: self.research.clone(),
+            view: self.view.clone(),
         }
     }
 }
@@ -135,6 +145,7 @@ impl UnifiedSessionContext {
             command_history: Vec::new(),
             bookmarks: HashMap::new(),
             research: ResearchContext::new(),
+            view: None,
         }
     }
 
@@ -263,6 +274,168 @@ impl UnifiedSessionContext {
             g.cursor
                 .and_then(|id| g.nodes.get(&id).map(|n| n.name.clone()))
         })
+    }
+
+    // =========================================================================
+    // VIEW STATE METHODS - The unified "it" management
+    // =========================================================================
+
+    /// Check if session has a view loaded
+    pub fn has_view(&self) -> bool {
+        self.view.is_some()
+    }
+
+    /// Get current view for rendering (immutable)
+    pub fn current_view(&self) -> Option<&ViewState> {
+        self.view.as_ref()
+    }
+
+    /// Get current view for modification
+    pub fn current_view_mut(&mut self) -> Option<&mut ViewState> {
+        self.view.as_mut()
+    }
+
+    /// Set view from an existing ViewState
+    pub fn set_view(&mut self, view: ViewState) {
+        self.view = Some(view);
+    }
+
+    /// Clear the current view
+    pub fn clear_view(&mut self) {
+        self.view = None;
+    }
+
+    /// Apply refinement to current view
+    pub fn refine_view(&mut self, refinement: Refinement) -> anyhow::Result<()> {
+        if let Some(view) = &mut self.view {
+            view.refine(refinement);
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("No active view"))
+        }
+    }
+
+    /// Clear all refinements from current view
+    pub fn clear_view_refinements(&mut self) -> anyhow::Result<()> {
+        if let Some(view) = &mut self.view {
+            view.clear_refinements();
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("No active view"))
+        }
+    }
+
+    /// Stage batch operation on current selection
+    pub fn stage_operation(&mut self, operation: BatchOperation) -> anyhow::Result<()> {
+        if let Some(view) = &mut self.view {
+            view.stage_operation(operation)
+        } else {
+            Err(anyhow::anyhow!("No active view"))
+        }
+    }
+
+    /// Clear pending operation from current view
+    pub fn clear_pending_operation(&mut self) -> anyhow::Result<()> {
+        if let Some(view) = &mut self.view {
+            view.clear_pending();
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("No active view"))
+        }
+    }
+
+    /// Get current selection count
+    pub fn selection_count(&self) -> usize {
+        self.view.as_ref().map(|v| v.selection_count()).unwrap_or(0)
+    }
+
+    /// Check if there's a pending operation
+    pub fn has_pending_operation(&self) -> bool {
+        self.view.as_ref().is_some_and(|v| v.has_pending())
+    }
+
+    /// Get the pending operation's generated DSL (for preview/editing)
+    pub fn pending_dsl(&self) -> Option<&str> {
+        self.view
+            .as_ref()
+            .and_then(|v| v.pending.as_ref())
+            .map(|p| p.verbs.as_str())
+    }
+
+    /// Get selection IDs for external use
+    pub fn selection_ids(&self) -> Vec<Uuid> {
+        self.view
+            .as_ref()
+            .map(|v| v.selection.clone())
+            .unwrap_or_default()
+    }
+
+    // =========================================================================
+    // FRACTAL NAVIGATION - Zoom in/out through taxonomy stack
+    // =========================================================================
+
+    /// Zoom into a node, expanding it into its child taxonomy.
+    ///
+    /// Delegates to ViewState::zoom_in. Returns Ok(true) if zoom succeeded.
+    pub async fn zoom_in(&mut self, node_id: Uuid) -> anyhow::Result<bool> {
+        if let Some(view) = &mut self.view {
+            view.zoom_in(node_id).await
+        } else {
+            Err(anyhow::anyhow!("No active view"))
+        }
+    }
+
+    /// Zoom out to the parent taxonomy.
+    ///
+    /// Delegates to ViewState::zoom_out. Returns Ok(true) if zoom out succeeded.
+    pub fn zoom_out(&mut self) -> anyhow::Result<bool> {
+        if let Some(view) = &mut self.view {
+            view.zoom_out()
+        } else {
+            Err(anyhow::anyhow!("No active view"))
+        }
+    }
+
+    /// Jump back to a specific breadcrumb level.
+    ///
+    /// `depth` is 0-indexed: 0 = root, 1 = first zoom, etc.
+    pub fn back_to(&mut self, depth: usize) -> anyhow::Result<bool> {
+        if let Some(view) = &mut self.view {
+            view.back_to(depth)
+        } else {
+            Err(anyhow::anyhow!("No active view"))
+        }
+    }
+
+    /// Get breadcrumbs for navigation display.
+    pub fn breadcrumbs(&self) -> Vec<String> {
+        self.view
+            .as_ref()
+            .map(|v| v.breadcrumbs())
+            .unwrap_or_default()
+    }
+
+    /// Get breadcrumbs with frame IDs.
+    pub fn breadcrumbs_with_ids(&self) -> Vec<(String, Uuid)> {
+        self.view
+            .as_ref()
+            .map(|v| v.breadcrumbs_with_ids())
+            .unwrap_or_default()
+    }
+
+    /// Get current zoom depth (0 = root level).
+    pub fn zoom_depth(&self) -> usize {
+        self.view.as_ref().map(|v| v.zoom_depth()).unwrap_or(0)
+    }
+
+    /// Check if we can zoom out (not at root).
+    pub fn can_zoom_out(&self) -> bool {
+        self.view.as_ref().is_some_and(|v| v.can_zoom_out())
+    }
+
+    /// Check if a node can be zoomed into.
+    pub fn can_zoom_in(&self, node_id: Uuid) -> bool {
+        self.view.as_ref().is_some_and(|v| v.can_zoom_in(node_id))
     }
 }
 

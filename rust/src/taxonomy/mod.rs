@@ -1,32 +1,54 @@
-//! Common Taxonomy Model
+//! Unified Taxonomy Module
 //!
-//! Generic taxonomy pattern for domains following the three-tier structure:
-//! `Type → Operation → Resource`
+//! This module implements the unified session + taxonomy architecture where:
+//! - **Session = Intent Scope = Visual State = Operation Target**
+//! - Shape determines metaphor (not prescribed)
+//! - AstroLevel derives from descendant count and depth
 //!
-//! This module provides:
-//! - `TaxonomyDomain` trait for domain-specific metadata
-//! - `TaxonomyOps<D>` generic operations that work for any domain
-//! - Concrete implementations for Product and Instrument domains
+//! # Key Types
 //!
-//! # Philosophy
+//! - [`TaxonomyNode`] - Universal tree node with computed metrics
+//! - [`TaxonomyContext`] - Defines WHAT taxonomy to build (Universe, Book, CbuTrading, etc.)
+//! - [`MembershipRules`] - Defines HOW to build (edges, grouping, terminus)
+//! - [`TaxonomyBuilder`] - Constructs trees from rules and data
+//! - [`TaxonomyParser`] - Nom-style parser trait with combinators
+//! - [`TaxonomyStack`] - Stack-based fractal navigation
 //!
-//! "Think in bits and bytes / structures - then pivot functionality on metadata"
+//! # Derivation Philosophy
 //!
-//! All domains share the same structural pattern:
 //! ```text
-//! Domain Type ──(M:N)──► Operation ──(M:N)──► Resource Type
-//!                                                  │
-//!                                       CBU Instance Table
+//! Tree Shape → Metrics → Metaphor
+//!           → Metrics → AstroLevel
 //! ```
 //!
-//! The only differences are metadata (table names, column names).
+//! The taxonomy doesn't prescribe metaphors or levels - they emerge from structure.
+//!
+//! # Fractal Navigation
+//!
+//! Every node can expand into its own taxonomy via `ExpansionRule::Parser`.
+//! The `.each_is_taxonomy()` combinator sets this on child nodes.
 
-mod domain;
-mod instrument;
-mod ops;
-mod product;
+mod builder;
+pub mod combinators;
+mod node;
+mod rules;
+mod stack;
+mod types;
 
-pub use domain::{TaxonomyDomain, TaxonomyMetadata};
-pub use instrument::InstrumentDomain;
-pub use ops::{Discovery, Gap, ProvisionArgs, ProvisionResult, TaxonomyOps};
-pub use product::ProductDomain;
+pub use types::{AstroLevel, DimensionValues, EntitySummary, Filter, Metaphor, NodeType, Status};
+
+pub use node::{ExpansionRule, TaxonomyNode};
+
+pub use rules::{
+    Dimension, EdgeType, EntityFilter, GroupingStrategy, MembershipRules, RootFilter,
+    TaxonomyContext, TerminusCondition, TraversalDirection,
+};
+
+pub use builder::TaxonomyBuilder;
+
+pub use combinators::{
+    DataSource, DataSourceBox, EmptySource, Grouper, GrouperBox, ParserCombinator, TaxonomyParser,
+    TaxonomyParserBuilder,
+};
+
+pub use stack::{TaxonomyFrame, TaxonomyStack};

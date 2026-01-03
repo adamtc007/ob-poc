@@ -113,7 +113,7 @@ impl ResearchMacroRegistry {
         self.macros
             .values()
             .filter(|m| {
-                search_lower.as_ref().map_or(true, |term| {
+                search_lower.as_ref().is_none_or(|term| {
                     m.name.to_lowercase().contains(term)
                         || m.description.to_lowercase().contains(term)
                         || m.tags.iter().any(|t| t.to_lowercase().contains(term))
