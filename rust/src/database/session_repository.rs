@@ -58,6 +58,10 @@ pub struct PersistedSession {
     pub client_type: Option<String>,
     pub jurisdiction: Option<String>,
 
+    // View state for session restore
+    pub current_view_state: Option<serde_json::Value>,
+    pub view_updated_at: Option<DateTime<Utc>>,
+
     // Timing
     pub created_at: DateTime<Utc>,
     pub last_activity_at: DateTime<Utc>,
@@ -194,6 +198,8 @@ impl SessionRepository {
             named_refs: HashMap::new(),
             client_type: client_type.map(String::from),
             jurisdiction: jurisdiction.map(String::from),
+            current_view_state: None,
+            view_updated_at: None,
             created_at: now,
             last_activity_at: now,
             expires_at,
@@ -213,7 +219,8 @@ impl SessionRepository {
             r#"
             SELECT
                 session_id, status, primary_domain, cbu_id, kyc_case_id, onboarding_request_id,
-                named_refs, client_type, jurisdiction, created_at, last_activity_at, expires_at,
+                named_refs, client_type, jurisdiction, current_view_state, view_updated_at,
+                created_at, last_activity_at, expires_at,
                 completed_at, error_count, last_error, last_error_at
             FROM "ob-poc".dsl_sessions
             WHERE session_id = $1
@@ -244,6 +251,8 @@ impl SessionRepository {
                 named_refs,
                 client_type: r.client_type,
                 jurisdiction: r.jurisdiction,
+                current_view_state: r.current_view_state,
+                view_updated_at: r.view_updated_at,
                 created_at: r.created_at,
                 last_activity_at: r.last_activity_at,
                 expires_at: r.expires_at,
@@ -607,7 +616,8 @@ impl SessionRepository {
             r#"
             SELECT
                 session_id, status, primary_domain, cbu_id, kyc_case_id, onboarding_request_id,
-                named_refs, client_type, jurisdiction, created_at, last_activity_at, expires_at,
+                named_refs, client_type, jurisdiction, current_view_state, view_updated_at,
+                created_at, last_activity_at, expires_at,
                 completed_at, error_count, last_error, last_error_at
             FROM "ob-poc".dsl_sessions
             WHERE cbu_id = $1 AND status = 'active'
@@ -640,6 +650,8 @@ impl SessionRepository {
                 named_refs,
                 client_type: r.client_type,
                 jurisdiction: r.jurisdiction,
+                current_view_state: r.current_view_state,
+                view_updated_at: r.view_updated_at,
                 created_at: r.created_at,
                 last_activity_at: r.last_activity_at,
                 expires_at: r.expires_at,
@@ -683,6 +695,8 @@ impl SessionRepository {
             named_refs: HashMap::new(),
             client_type: None,
             jurisdiction: None,
+            current_view_state: None,
+            view_updated_at: None,
             created_at: now,
             last_activity_at: now,
             expires_at,

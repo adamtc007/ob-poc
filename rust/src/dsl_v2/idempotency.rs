@@ -137,6 +137,8 @@ impl IdempotencyManager {
     ///
     /// The optional `verb_hash` parameter links this execution to a specific
     /// verb configuration version for audit trail purposes.
+    ///
+    /// Returns the idempotency key for downstream audit linkage (e.g., view state audit).
     pub async fn record(
         &self,
         execution_id: Uuid,
@@ -145,7 +147,7 @@ impl IdempotencyManager {
         args: &HashMap<String, JsonValue>,
         result: &ExecutionResult,
         verb_hash: Option<&[u8]>,
-    ) -> Result<()> {
+    ) -> Result<String> {
         let key = compute_idempotency_key(execution_id, statement_index, verb, args);
         let args_hash = compute_args_hash(args);
 
@@ -235,7 +237,7 @@ impl IdempotencyManager {
         .execute(&self.pool)
         .await?;
 
-        Ok(())
+        Ok(key)
     }
 
     /// Clear idempotency records for an execution (for testing/reset)

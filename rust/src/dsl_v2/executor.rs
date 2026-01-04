@@ -410,6 +410,8 @@ pub struct DslExecutor {
     idempotency: super::idempotency::IdempotencyManager,
     #[cfg(feature = "database")]
     verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService,
+    #[cfg(feature = "database")]
+    view_state_audit: crate::database::ViewStateAuditRepository,
 }
 
 impl DslExecutor {
@@ -422,6 +424,7 @@ impl DslExecutor {
             verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService::new(
                 pool.clone(),
             ),
+            view_state_audit: crate::database::ViewStateAuditRepository::new(pool.clone()),
             pool,
             custom_ops: CustomOperationRegistry::new(),
         }
@@ -838,7 +841,9 @@ impl DslExecutor {
                     .ok()
                     .flatten();
 
-                self.idempotency
+                // Get idempotency key for view state audit linkage
+                let idempotency_key = self
+                    .idempotency
                     .record(
                         ctx.execution_id,
                         step_index,
@@ -848,6 +853,28 @@ impl DslExecutor {
                         verb_hash.as_deref(),
                     )
                     .await?;
+
+                // Record view state change if this verb produced one (view.* operations)
+                if let Some(ref view_state) = ctx.pending_view_state {
+                    if let Err(e) = self
+                        .view_state_audit
+                        .record_view_state_change(crate::database::RecordViewStateChange {
+                            idempotency_key: idempotency_key.clone(),
+                            session_id: None, // Session ID propagated from caller if available
+                            verb_name: verb_name.clone(),
+                            view_state: view_state.clone(),
+                            audit_user_id: None,
+                        })
+                        .await
+                    {
+                        // Log but don't fail execution - audit is secondary to execution
+                        tracing::warn!(
+                            "Failed to record view state change for {}: {}",
+                            verb_name,
+                            e
+                        );
+                    }
+                }
             }
 
             // Handle explicit :as binding (in addition to verb's default capture)

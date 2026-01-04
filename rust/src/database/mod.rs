@@ -29,6 +29,7 @@ pub mod resource_instance_service;
 pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
+pub mod view_state_audit;
 pub mod visualization_repository;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
@@ -86,6 +87,10 @@ pub use execution_audit::{
 
 pub use context_discovery_service::{
     CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,
+};
+
+pub use view_state_audit::{
+    RecordViewStateChange, SessionViewHistoryEntry, ViewStateAuditRepository, ViewStateChange,
 };
 
 pub use semantic_state_service::derive_semantic_state;

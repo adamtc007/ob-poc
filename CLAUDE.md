@@ -4500,6 +4500,93 @@ The `share-class`, `holding`, and `movement` domains implement a Clearstream-sty
   :trade-date "2024-02-01" :reference "RED-2024-001")
 ```
 
+## View State Audit Trail
+
+The view state audit trail ensures full auditability of DSL execution from REPL to database. Every view state change is persisted, closing the "side door" where selection/navigation state could be lost.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    REPL / Agent Session                          │
+│  User navigates: view.universe → view.cbu → view.focus          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    DSL Executor                                  │
+│  Executes view.* operations, sets pending_view_state            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              ▼                               ▼
+┌─────────────────────────┐     ┌─────────────────────────┐
+│  dsl_idempotency        │     │  dsl_view_state_changes │
+│  - input_view_state     │     │  - Full audit trail     │
+│  - input_selection      │     │  - Selection arrays     │
+│  - output_view_state    │     │  - Taxonomy context     │
+└─────────────────────────┘     └─────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    dsl_sessions                                  │
+│  - current_view_state (for session restore)                     │
+│  - view_updated_at                                               │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| `dsl_view_state_changes` | Append-only audit trail of all view state mutations |
+| `dsl_idempotency.input_view_state` | View state before execution (what was targeted) |
+| `dsl_idempotency.input_selection` | Selection array before execution (batch audit) |
+| `dsl_idempotency.output_view_state` | View state after execution (result of view.* ops) |
+| `dsl_sessions.current_view_state` | Current view state for session restore |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/database/view_state_audit.rs` | `ViewStateAuditRepository` with persistence methods |
+| `rust/src/session/view_state.rs` | `ViewState` struct (selection, taxonomy, refinements) |
+| `rust/migrations/20260104_view_state_audit.sql` | Migration creating audit tables and views |
+| `rust/tests/view_state_audit_integration.rs` | Integration tests for audit trail |
+
+### Repository API
+
+```rust
+// Record a view state change (append-only audit)
+repo.record_view_state_change(RecordViewStateChange {
+    idempotency_key: "...",
+    session_id: Some(uuid),
+    verb_name: "view.cbu",
+    view_state: view_state.clone(),
+    audit_user_id: None,
+}).await?;
+
+// Record input view state before execution
+repo.record_input_view_state(&idempotency_key, &view_state).await?;
+
+// Record output view state after view.* operation
+repo.record_output_view_state(&idempotency_key, &view_state).await?;
+
+// Find changes affecting specific entities (GIN index)
+let changes = repo.find_changes_affecting_entities(&[entity_id], Some(10)).await?;
+
+// Get session view history for navigation reconstruction
+let history = repo.get_session_view_history(session_id, Some(50)).await?;
+```
+
+### Design Principles
+
+1. **Append-only**: `dsl_view_state_changes` is INSERT-only, no UPDATEs
+2. **Linked to idempotency**: Every audit record links to an execution via `idempotency_key`
+3. **Session restore**: `dsl_sessions.current_view_state` enables full session reconstruction
+4. **GIN indexed**: Selection arrays use GIN index for efficient "what touched entity X?" queries
+5. **No side doors**: View state changes are recorded in the DSL pipeline, not optional
+
 
 
 ## Database Schema Reference
