@@ -472,6 +472,7 @@ impl CustomOperation for TemplateBatchOp {
             idempotency_enabled: ctx.idempotency_enabled,
             json_bindings: ctx.json_bindings.clone(),
             current_selection: ctx.current_selection.clone(),
+            pending_view_state: None, // Batch operations don't produce view state
         };
 
         // 10. Create and run BatchExecutor

@@ -1100,6 +1100,12 @@ pub struct SessionContext {
     /// Research macro state - tracks pending results and approvals
     #[serde(default)]
     pub research: crate::session::ResearchContext,
+
+    /// View state from view.* operations (universe, book, cbu, entity-forest)
+    /// This captures what the user is currently viewing - the unified "it" that
+    /// operations target. Populated after DSL execution when view.* verbs run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view_state: Option<crate::session::ViewState>,
 }
 
 /// Primary domain keys tracked across the session
@@ -1365,6 +1371,31 @@ impl SessionContext {
     pub fn statement_count(&self) -> usize {
         self.ast.len()
     }
+
+    // =========================================================================
+    // VIEW STATE METHODS - For view.* verb output propagation
+    // =========================================================================
+
+    /// Set the view state from view.* operations
+    /// This is called after DSL execution when view.* verbs produce a ViewState
+    pub fn set_view_state(&mut self, view: crate::session::ViewState) {
+        self.view_state = Some(view);
+    }
+
+    /// Get the current view state
+    pub fn view_state(&self) -> Option<&crate::session::ViewState> {
+        self.view_state.as_ref()
+    }
+
+    /// Take the view state (consumes it)
+    pub fn take_view_state(&mut self) -> Option<crate::session::ViewState> {
+        self.view_state.take()
+    }
+
+    /// Check if there's a view state set
+    pub fn has_view_state(&self) -> bool {
+        self.view_state.is_some()
+    }
 }
 
 // ============================================================================
@@ -1493,6 +1524,9 @@ pub struct SessionStateResponse {
     pub messages: Vec<ChatMessage>,
     /// Whether the session can execute
     pub can_execute: bool,
+    /// Session version (ISO timestamp from updated_at)
+    /// UI uses this to detect external changes (MCP/REPL modifying session)
+    pub version: String,
 }
 
 /// Request to execute accumulated DSL

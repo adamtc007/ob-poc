@@ -110,6 +110,8 @@ pub fn create_taxonomy_router(pool: PgPool, sessions: SessionStore) -> Router {
         .route("/api/session/:session_id/taxonomy/zoom-out", post(zoom_out))
         // Jump to a breadcrumb level
         .route("/api/session/:session_id/taxonomy/back-to", post(back_to))
+        // Reset to root level
+        .route("/api/session/:session_id/taxonomy/reset", post(reset))
         .with_state(state)
 }
 
@@ -322,6 +324,33 @@ async fn back_to(
         success: true,
         breadcrumbs,
         depth,
+        error: None,
+    }))
+}
+
+/// POST /api/session/:session_id/taxonomy/reset
+///
+/// Reset taxonomy navigation to root level by clearing the stack.
+async fn reset(
+    State(state): State<TaxonomyState>,
+    Path(session_id): Path<Uuid>,
+) -> Result<Json<ZoomResponse>, (StatusCode, String)> {
+    let mut sessions = state.sessions.write().await;
+
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Session {} not found", session_id),
+        )
+    })?;
+
+    // Clear the taxonomy stack
+    session.context.taxonomy_stack.clear();
+
+    Ok(Json(ZoomResponse {
+        success: true,
+        breadcrumbs: Vec::new(),
+        depth: 0,
         error: None,
     }))
 }

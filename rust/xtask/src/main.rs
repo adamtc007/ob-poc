@@ -16,6 +16,7 @@ mod gleif_load;
 mod gleif_test;
 mod seed_allianz;
 mod ubo_test;
+mod verbs;
 
 #[derive(Parser)]
 #[command(name = "xtask")]
@@ -309,6 +310,35 @@ enum Command {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
+
+    /// Verb contract management commands
+    Verbs {
+        #[command(subcommand)]
+        action: VerbsAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum VerbsAction {
+    /// Compile all verbs from YAML and sync to database
+    Compile {
+        /// Show additional details
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Show compiled contract for a specific verb
+    Show {
+        /// Verb name (e.g., 'cbu.ensure' or 'entity.create-proper-person')
+        verb_name: String,
+    },
+
+    /// Show all verbs with diagnostics (errors or warnings)
+    Diagnostics {
+        /// Show only errors, not warnings
+        #[arg(long)]
+        errors_only: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -432,6 +462,16 @@ fn main() -> Result<()> {
                 verbose,
             ))?;
             Ok(())
+        }
+        Command::Verbs { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            match action {
+                VerbsAction::Compile { verbose } => rt.block_on(verbs::verbs_compile(verbose)),
+                VerbsAction::Show { verb_name } => rt.block_on(verbs::verbs_show(&verb_name)),
+                VerbsAction::Diagnostics { errors_only } => {
+                    rt.block_on(verbs::verbs_diagnostics(errors_only))
+                }
+            }
         }
     }
 }

@@ -828,6 +828,102 @@ config/
 - `maps_to:` → DSL arg name → DB column mapping
 - `dynamic_verbs:` → Generated from DB tables (e.g., entity.create-*)
 
+### Verb Contract Layer
+
+The Verb Contract Layer provides deterministic versioning and audit trail for verb configurations. When a verb's YAML definition changes, the system can track which version was active during any past execution.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    YAML Verb Definition                          │
+│  config/verbs/cbu.yaml                                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 VerbSyncService.sync_verbs()                     │
+│  1. Load YAML → RuntimeVerbRegistry                             │
+│  2. Compile to canonical JSON (sorted keys)                     │
+│  3. SHA256 hash of canonical JSON → compiled_hash               │
+│  4. Upsert to dsl_verbs table                                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    dsl_verbs Table                               │
+│  - verb_name: "cbu.ensure"                                      │
+│  - effective_config_json: { canonical JSON }                    │
+│  - compiled_hash: 0x3a7f... (32 bytes)                          │
+│  - config_hash: legacy field (YAML hash)                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Execution Audit Trail:**
+
+When DSL executes, the verb hash is recorded with each statement:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DSL Execution                                 │
+│  (cbu.ensure :name "Fund" :jurisdiction "LU")                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 DslExecutor.execute_plan()                       │
+│  1. Look up verb_hash from VerbHashLookupService                │
+│  2. Execute verb                                                │
+│  3. Record to dsl_idempotency with verb_hash                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 dsl_idempotency Table                            │
+│  - idempotency_key, execution_id, verb                          │
+│  - verb_hash: 0x3a7f... (links to dsl_verbs.compiled_hash)      │
+│  - result_type, result_id, executed_at                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Modules:**
+
+| Module | Purpose |
+|--------|---------|
+| `session/canonical_hash.rs` | Canonical JSON serialization with sorted keys |
+| `session/verb_contract.rs` | VerbContract type with hash computation |
+| `session/verb_sync.rs` | VerbSyncService for YAML→DB sync with contracts |
+| `session/verb_hash_lookup.rs` | Cached lookup service for verb hashes |
+| `database/execution_audit.rs` | Query helpers for execution audit trail |
+
+**xtask Commands:**
+
+```bash
+# Sync YAML verbs to database with contract compilation
+cargo x verbs compile
+
+# Show verb details including contract hash
+cargo x verbs show cbu.ensure
+
+# Show verbs with outdated or missing contracts
+cargo x verbs diagnostics
+```
+
+**Audit Queries:**
+
+```sql
+-- Find executions that used a specific verb config
+SELECT * FROM "ob-poc".find_executions_by_verb_hash('\x3a7f...');
+
+-- Check if verb config changed since execution
+SELECT * FROM "ob-poc".get_verb_config_at_execution(
+    '550e8400-e29b-41d4-a716-446655440000',
+    'cbu.ensure'
+);
+
+-- View execution audit with config change detection
+SELECT * FROM "ob-poc".v_execution_verb_audit
+WHERE verb_config_changed = true;
+```
+
 ## Directory Structure
 
 ```
@@ -2480,44 +2576,199 @@ The server generates DSL like `(cbu.add-product :cbu-id "uuid" :product "CODE")`
 
 ### Session Management Architecture
 
-Sessions are managed server-side with a shared in-memory store. The UI sends state changes to the server and receives updates.
+**The session is the single source of truth for all UI state.** It holds conversation history, accumulated AST, execution context, and drives what the UI visualizes.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Browser (TypeScript)                          │
-│  - ChatPanel creates session on init                            │
-│  - App binds CBU selection to session                           │
-│  - Auto-recovery on 404 (server restart)                        │
+│                    CONSUMERS                                     │
+│  Browser UI ──── MCP (Claude Desktop) ──── REPL ──── Tests      │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Shared SessionStore                           │
+│                    SessionStore (Shared State Hub)               │
 │  Arc<RwLock<HashMap<Uuid, AgentSession>>>                       │
-│  - Single store shared across all routers                       │
-│  - agent_routes and web app use same store                      │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    AgentSession                              ││
+│  │  id, user_id, entity_type, entity_id                        ││
+│  │  state: SessionState (New→PendingValidation→Ready→Executed) ││
+│  │  messages: Vec<ChatMessage>                                  ││
+│  │  pending: Option<PendingDsl> (current DSL awaiting confirm)  ││
+│  │  pending_intents: Vec<VerbIntent>                           ││
+│  │  context: SessionContext (see below)                        ││
+│  │  updated_at: DateTime<Utc> (version signal for polling)     ││
+│  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        HTTP API          MCP Tools      Graph/Viz
+        (Axum)            (JSON-RPC)     (egui/WASM)
+```
+
+### SessionContext - The Rich State Container
+
+`SessionContext` is the heart of session state. It accumulates everything needed for:
+- **LLM context injection** (bindings, active CBU, stage focus)
+- **DSL execution** (AST, primary keys, named refs)
+- **UI visualization** (active CBU drives graph, taxonomy stack)
+- **Batch operations** (template execution, batch context)
+
+```rust
+// rust/src/api/session.rs - SessionContext fields
+pub struct SessionContext {
+    // === ENTITY BINDINGS (for LLM context + UI display) ===
+    pub active_cbu: Option<BoundEntity>,           // THE active CBU for this session
+    pub bindings: HashMap<String, BoundEntity>,    // @fund, @director, etc.
+    pub named_refs: HashMap<String, Uuid>,         // Legacy UUID-only refs
+    
+    // === AST ACCUMULATION (source of truth for DSL) ===
+    pub ast: Vec<Statement>,                       // Accumulated DSL statements
+    pub ast_index: HashMap<String, usize>,         // binding name → statement index
+    pub pending_bindings: HashMap<String, (String, String)>,  // Pre-execution
+    
+    // === PRIMARY KEYS (onboarding workflow state) ===
+    pub primary_keys: PrimaryDomainKeys {
+        cbu_id, kyc_case_id, onboarding_request_id,
+        document_batch_id, resource_instance_id
+    },
+    
+    // === NAVIGATION & FOCUS ===
+    pub stage_focus: Option<String>,               // Semantic stage for verb filtering
+    pub taxonomy_stack: TaxonomyStack,             // Fractal drill-down navigation
+    pub domain_hint: Option<String>,               // RAG domain hint
+    
+    // === BATCH EXECUTION ===
+    pub mode: SessionMode,                         // Chat | TemplateExpansion | BatchExecution
+    pub template_execution: TemplateExecutionContext,  // Agent-driven batch
+    pub active_batch: Option<ActiveBatchState>,    // DSL-native batch (pause/resume)
+    pub batch: BatchContext,                       // Legacy batch context
+    
+    // === OPTIMISTIC LOCKING ===
+    pub loaded_dsl_version: Option<i32>,           // For conflict detection
+    pub business_reference: Option<String>,        // CBU name for error messages
+}
+```
+
+### Session State Machine
+
+Sessions follow a state machine for DSL lifecycle:
+
+```
+New → PendingValidation → ReadyToExecute → Executing → Executed
+                              │                           │
+                              └─── (cancel) ──────────────┘
+```
+
+| State | Meaning |
+|-------|---------|
+| `New` | Session created, no intents yet |
+| `PendingValidation` | Has intents awaiting validation |
+| `ReadyToExecute` | DSL validated, pending user confirmation |
+| `Executing` | Execution in progress |
+| `Executed` | Execution complete, ready for next command |
+
+### PendingDsl - DSL Lifecycle Within Session
+
+Each chat turn can produce a `PendingDsl` that awaits user confirmation:
+
+```rust
+pub struct PendingDsl {
+    pub id: Uuid,
+    pub source: String,              // DSL source text
+    pub ast: Vec<Statement>,         // Parsed AST
+    pub plan: Option<ExecutionPlan>, // Compiled, ready to run
+    pub status: DslStatus,           // Draft → Ready → Executed/Cancelled/Failed
+    pub pending_bindings: HashMap<String, String>,
+    pub was_reordered: bool,         // If deps required reordering
+}
+
+pub enum DslStatus {
+    Draft,      // Awaiting user confirmation
+    Ready,      // User confirmed, ready to execute
+    Executed,   // Successfully executed
+    Cancelled,  // User declined
+    Failed,     // Execution error
+}
+```
+
+**User → Display DSL flow:**
+- `pending.to_user_dsl()` - Human-readable with entity names
+- `pending.to_exec_dsl()` - With resolved UUIDs for execution
+
+### Session Modes
+
+Sessions operate in different modes for different interaction patterns:
+
+| Mode | Description |
+|------|-------------|
+| `Chat` | Normal agent chat - NL → DSL generation |
+| `TemplateExpansion` | Agent collecting params for a template |
+| `BatchExecution` | Iterating over key set, expanding template per item |
+
+### How Session Drives UI Visualization
+
+The session's `active_cbu` determines what the graph visualizes:
+
+```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    AgentSession                                  │
-│  - messages: Vec<Message>                                       │
-│  - context.active_cbu: Option<BoundEntity>                      │
-│  - context.bindings: HashMap<String, BoundEntity>               │
-│  - context.stage_focus: Option<String>  (semantic stage code)   │
-│  - pending/ast state for DSL execution                          │
+│  User selects CBU in UI                                          │
+│        │                                                         │
+│        ▼                                                         │
+│  POST /api/session/:id/bind { entity_type: "cbu", entity_id }   │
+│        │                                                         │
+│        ▼                                                         │
+│  session.context.active_cbu = Some(BoundEntity { ... })         │
+│  session.updated_at = now()  ←── triggers version change        │
+│        │                                                         │
+│        ▼                                                         │
+│  UI polls GET /api/session/:id → sees version changed           │
+│        │                                                         │
+│        ▼                                                         │
+│  UI refetches graph: GET /api/cbu/:active_cbu_id/graph          │
+│        │                                                         │
+│        ▼                                                         │
+│  Graph widget renders entities, roles, ownership chains          │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-**Key endpoints:**
+### Version Polling for External Changes
+
+When MCP or REPL modifies the session, the UI detects it via version polling:
+
+```rust
+// UI polls every 2 seconds
+let server_version = api::get_session_version(session_id).await?;
+if server_version != last_known_version {
+    // Session changed externally (MCP/REPL) - refetch everything
+    refetch_session();
+    refetch_graph();
+}
+```
+
+The `updated_at` timestamp on `AgentSession` serves as the version signal.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/api/session.rs` | Core types: `AgentSession`, `SessionStore`, `SessionContext`, `PendingDsl` |
+| `rust/src/api/session_routes.rs` | HTTP endpoints for session CRUD |
+| `rust/src/api/agent_routes.rs` | Chat endpoint, session state management |
+| `rust/src/session/` | Extended context services (verb discovery, RAG, view state) |
+| `rust/crates/ob-poc-ui/src/state.rs` | UI-side session state mirroring |
+
+### Key Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/session` | Create new session, returns `session_id` |
-| `GET /api/session/:id` | Get session state with `active_cbu`, `bindings`, `stage_focus` |
+| `GET /api/session/:id` | Get session state with `active_cbu`, `bindings`, `stage_focus`, `version` |
 | `POST /api/session/:id/bind` | Bind entity (CBU, etc.) to session context |
 | `POST /api/session/:id/chat` | Chat with agent (uses `active_cbu` and `stage_focus` in prompt) |
 | `POST /api/session/:id/focus` | Set stage focus for verb filtering |
+| `POST /api/session/:id/execute` | Execute pending DSL |
 
 **Session auto-recovery:** When the UI gets a 404 on bind (e.g., after server restart), it automatically recreates the session and retries.
 
@@ -2724,6 +2975,77 @@ When a version conflict occurs, the error message includes:
 - Business reference (CBU name) for context
 
 The UI should prompt the user to refresh and retry their changes.
+
+### ViewState Propagation from View Operations
+
+View operations (`view.universe`, `view.book`, `view.cbu`, `view.entity-forest`) produce `ViewState` - a rich state container capturing what the user is currently viewing. This ViewState needs to propagate from the DSL execution layer to the session layer.
+
+**The Problem (Session State Side Door):**
+
+Custom operations implement the `CustomOperation` trait which only receives `ExecutionContext`, not the full session:
+
+```rust
+// CustomOperation trait - limited access
+fn execute(
+    &self,
+    pool: &PgPool,
+    ctx: &mut ExecutionContext,  // ← Only execution context, not session
+    verb_call: &VerbCall,
+) -> Result<StepResult, ...>
+```
+
+ViewState was being created but discarded because there was no path back to the session layer.
+
+**The Solution:**
+
+`ExecutionContext` has a `pending_view_state` field that serves as a side channel:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    View Operation Executes                       │
+│  1. view.universe runs, creates ViewState                       │
+│  2. Calls ctx.set_pending_view_state(view_state)                │
+│  3. Returns StepResult::Success                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    After Execution                               │
+│  1. agent_routes.rs calls exec_ctx.take_pending_view_state()    │
+│  2. If Some(view_state), calls context.set_view_state(view)     │
+│  3. ViewState now accessible to UI                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key Types and Methods:**
+
+| Type/Method | Location | Purpose |
+|-------------|----------|---------|
+| `ExecutionContext.pending_view_state` | `dsl_v2/executor.rs` | Side channel for view ops |
+| `ctx.set_pending_view_state()` | `dsl_v2/executor.rs` | Called by view ops |
+| `ctx.take_pending_view_state()` | `dsl_v2/executor.rs` | Called after execution |
+| `SessionContext.view_state` | `api/session.rs` | Stored view for UI access |
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `rust/src/dsl_v2/executor.rs` | `ExecutionContext` with `pending_view_state` field |
+| `rust/src/dsl_v2/custom_ops/view_ops.rs` | View operations call `set_pending_view_state()` |
+| `rust/src/api/agent_routes.rs` | Propagates ViewState after execution (~line 1137) |
+| `rust/src/api/session.rs` | `SessionContext.view_state` field and methods |
+| `rust/src/mcp/handlers/core.rs` | MCP handler includes `view_state` in response |
+
+**ViewState Contents:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `taxonomy` | `TaxonomyNode` | The taxonomy tree (root node with children) |
+| `context` | `TaxonomyContext` | What built this taxonomy (CBU, entity, etc.) |
+| `refinements` | `Vec<Refinement>` | Active refinements ("except...", "plus...") |
+| `selection` | `ComputedSelection` | The actual "those" after refinements |
+| `pending_operations` | `Vec<PendingOperation>` | Queued operations awaiting confirmation |
+| `layout` | `LayoutPreferences` | View layout preferences |
 
 ## DSL Syntax
 
@@ -5416,6 +5738,50 @@ let instance = engine.transition(
 ## MCP Server Tools
 
 For Claude Desktop integration. The MCP server (`dsl_mcp`) provides tools for DSL generation and execution.
+
+### Dual Interface Architecture (MCP + HTTP)
+
+**Key Pattern**: ob-poc exposes the same backend through two interfaces that share state:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Shared Backend                                │
+│  ToolHandlers ─── EntityGateway ─── PostgreSQL                  │
+│        │                                                         │
+│        └──── SessionStore (Arc<RwLock<HashMap<Uuid, AgentSession>>>)
+│                    │                                             │
+│        ┌──────────┴──────────┐                                  │
+│        ▼                     ▼                                  │
+│  ┌───────────────┐    ┌───────────────┐                        │
+│  │  MCP Server   │    │  HTTP API     │                        │
+│  │  (dsl_mcp)    │    │  (Axum)       │                        │
+│  │  JSON-RPC     │    │  REST         │                        │
+│  │  over stdio   │    │  port 3000    │                        │
+│  └───────────────┘    └───────────────┘                        │
+│        │                     │                                  │
+│        ▼                     ▼                                  │
+│  Claude Desktop        Browser UI / External Clients            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+| Interface | Binary | Protocol | Use Case |
+|-----------|--------|----------|----------|
+| MCP Server | `dsl_mcp` | JSON-RPC over stdio | Claude Desktop integration |
+| HTTP API | `agentic_server` | REST over HTTP | Browser UI, external clients, REPL |
+
+**Why this matters:**
+- Both interfaces use the same `ToolHandlers` implementation (`rust/src/mcp/handlers/core.rs`)
+- Both share the same `SessionStore` - changes from MCP are visible to HTTP and vice versa
+- The UI polls session version to detect external changes (from MCP or REPL)
+- Tool logic is written once, exposed through both interfaces
+
+**Key files:**
+| File | Purpose |
+|------|---------|
+| `rust/src/bin/dsl_mcp.rs` | MCP server binary (standalone) |
+| `rust/src/bin/agentic_server.rs` | HTTP server with integrated MCP tools |
+| `rust/src/mcp/handlers/core.rs` | `ToolHandlers` - shared tool implementations |
+| `rust/src/api/session.rs` | `SessionStore` type and `AgentSession` |
 
 ### Core DSL Tools
 

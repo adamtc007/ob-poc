@@ -379,6 +379,9 @@ pub enum ArgType {
     /// Array of UUIDs
     #[serde(rename = "uuid_array")]
     UuidArray,
+    /// Alias for UuidArray (used in view.yaml)
+    #[serde(rename = "uuid_list")]
+    UuidList,
     Json,
     Lookup,
     StringList,
@@ -386,6 +389,8 @@ pub enum ArgType {
     Map,
     /// Symbol reference (@binding)
     SymbolRef,
+    /// Generic object/struct (for complex nested args)
+    Object,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -980,6 +985,14 @@ pub enum ReturnTypeConfig {
     GraphResult,
     /// Path query result - returns list of paths
     PathResult,
+    /// View state result - returns view/UI state
+    ViewState,
+    /// Layout result - returns layout configuration
+    LayoutResult,
+    /// Selection info result - returns selection details
+    SelectionInfo,
+    /// Generic object return type
+    Object,
 }
 
 // =============================================================================

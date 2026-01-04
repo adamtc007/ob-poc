@@ -298,6 +298,10 @@ impl CustomOperation for ViewUniverseOp {
 
         let result = ViewOpResult::from_view_state(&view);
 
+        // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
+        // This fixes the "session state side door" - ViewState was previously discarded
+        ctx.set_pending_view_state(view);
+
         // Return as JSON
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
@@ -353,6 +357,10 @@ impl CustomOperation for ViewBookOp {
         ctx.set_selection(view.selection.clone());
 
         let result = ViewOpResult::from_view_state(&view);
+
+        // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
+        ctx.set_pending_view_state(view);
+
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
@@ -413,6 +421,10 @@ impl CustomOperation for ViewCbuOp {
         ctx.set_selection(view.selection.clone());
 
         let result = ViewOpResult::from_view_state(&view);
+
+        // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
+        ctx.set_pending_view_state(view);
+
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 
@@ -475,6 +487,10 @@ impl CustomOperation for ViewEntityForestOp {
         ctx.set_selection(view.selection.clone());
 
         let result = ViewOpResult::from_view_state(&view);
+
+        // Store ViewState in ExecutionContext for propagation to UnifiedSessionContext
+        ctx.set_pending_view_state(view);
+
         Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
     }
 

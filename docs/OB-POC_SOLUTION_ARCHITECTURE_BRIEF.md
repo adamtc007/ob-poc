@@ -656,6 +656,254 @@ This is genuinely complex. But the complexity is **concentrated and paid once**.
 
 **The architecture front-loads complexity to eliminate it from the ongoing operation.**
 
+---
+
+## LLM-Assisted Development: Why This Stack Converges
+
+OB-POC was built in 4 months using agentic AI development (Claude + Zed IDE). This section explains *why* the architectural choices enable LLM productivity—not through hope, but through constraint mechanics.
+
+### The Mechanistic Model
+
+LLMs don't "retrieve code snippets." They predict token continuations based on statistical associations learned from training data. When generating code, the model is constantly weighing "which next token is most probable" based on:
+
+- **Local constraints**: imports, types, naming conventions in your file
+- **Global priors**: "what code usually looks like when someone says X"
+- **Tool feedback**: compiler/test errors fed back into context
+
+The dominant pattern that emerges depends on how tightly these constraints narrow the probability space.
+
+### Why Rust + SQLx Converges Fast
+
+Rust creates **hard constraints** that dominate the probability landscape:
+
+| Constraint | Effect on LLM Generation |
+|------------|-------------------------|
+| Explicit function signatures | Model must match types exactly |
+| Ownership/borrowing rules | Many "almost right" variants eliminated |
+| `Result<T, E>` error handling | Error paths must type-check |
+| SQLx compile-time macros | Schema alignment forced at compile |
+| Precise compiler messages | Strong correction signal for retry |
+
+The model's "candidate code shapes" collapse quickly toward a narrow band that compiles.
+
+### Why Spring/ORM Diverges
+
+Traditional enterprise stacks do the opposite:
+
+| Property | Effect on LLM Generation |
+|----------|-------------------------|
+| Many valid patterns | Probability mass spread across plausible outputs |
+| Runtime/reflection wiring | Failures not visible until execution |
+| ORM mapping flexibility | "Almost right" variants pass compilation |
+| Convention-based design | "Correct" is social, not type-checked |
+
+The model generates more "plausible wrong" variants. Feedback arrives later. Convergence is slower.
+
+### The Feedback Loop That Matters
+
+LLMs become productive coding partners when you create a **high-gain feedback loop**:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  1. Generate candidate change                                │
+│  2. Run strict checker (compiler/linter/tests)               │
+│  3. Feed back error signal                                   │
+│  4. Iterate                                                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+In Rust, steps 2 and 3 are brutally effective—errors are precise, actionable, and immediate. In Spring, failures move to runtime/integration tests; error signals are weaker or delayed; loop gain drops.
+
+**This is the "secret sauce" behind ob-poc: not magic intelligence, but fast deterministic correction.**
+
+### The Canonical Pattern Library
+
+The second leverage point: make your repo itself the implicit training set for your project.
+
+When Claude Code generates code in ob-poc, it's not choosing from "all plausible Rust." It's choosing from patterns already present in the codebase:
+
+| Artifact | Constraint It Creates |
+|----------|----------------------|
+| `CompiledVerbSchema` | Locks down verb shapes—LLM can't drift |
+| `TaxonomyParser` combinators | One way to build trees—nom-style, declarative |
+| `OperationContext` | One way to access session state—no side doors |
+| `ExpansionRule` | One way to do fractal navigation |
+| YAML verb definitions | Declarative patterns the model mirrors |
+
+The model's "most likely continuation" becomes your patterns because those patterns dominate the context.
+
+### The Formula
+
+> **LLM productivity = (constraint strength × feedback speed) / degrees of freedom**
+
+OB-POC maximizes this:
+
+- **Constraint strength**: Rust type system, SQLx compile-time checks, YAML schemas
+- **Feedback speed**: `cargo check` in seconds, not integration test suites in minutes
+- **Degrees of freedom**: Single stack (Rust), single patterns, single data model
+
+Spring/ORM minimizes it:
+
+- **Constraint strength**: Runtime validation, reflection-based wiring
+- **Feedback speed**: Failures at deployment or integration test
+- **Degrees of freedom**: Multiple valid patterns, social convention decides "correct"
+
+### Practical Implication
+
+This isn't an argument about language preference. It's a description of how probabilistic generation interacts with tool-driven feedback.
+
+The architecture choices that make ob-poc *auditable* and *deterministic* for production also make it *convergent* and *fast* for LLM-assisted development. The same constraints that eliminate runtime surprises also eliminate generation surprises.
+
+**The repo is the prompt. The compiler is the critic. The loop is the product.**
+
+---
+
+## Why Not Java 21 Spring? The Port Question
+
+A fair question: "Java 21 has virtual threads, records, pattern matching, sealed classes. Spring Boot 3 has AOT compilation. LLMs know Spring deeply. Why not port to a stack with 100x the talent pool?"
+
+This section provides an honest evaluation.
+
+### What Java 21 + Spring Actually Offers
+
+| Capability | Status |
+|------------|--------|
+| Virtual threads (Loom) | Async without callback hell ✓ |
+| Records + sealed classes | Algebraic data types (sort of) ✓ |
+| GraalVM native | Sub-second startup possible ✓ |
+| Spring AOT | Compile-time DI processing ✓ |
+| Talent pool | 100x Rust availability ✓ |
+| LLM training data | Vastly more Java/Spring examples ✓ |
+
+These are real advantages. The business case for "who maintains this when Adam leaves" is legitimate.
+
+### Where The Case Falls Apart
+
+**1. The DSL Can't Port—It Must Be Reimplemented**
+
+| Component | Rust | Java Equivalent | Gap |
+|-----------|------|-----------------|-----|
+| Parser | Nom (zero-copy, composable) | ANTLR? Hand-rolled? | Major rewrite |
+| SQL checking | SQLx compile-time macros | jOOQ (closest) | Runtime, not compile-time |
+| Error handling | `Result<T, E>` + `?` | Exceptions or verbose wrappers | Pattern breaks |
+| Null safety | `Option<T>` enforced | Optional + discipline | Runtime NPEs return |
+| Concurrency | Ownership prevents races | Locks + hope | Race conditions return |
+
+The architecture *exploits* Rust's compile-time guarantees. Porting isn't translation—it's rebuilding on weaker foundations.
+
+**2. The LLM Argument Is Precisely Backwards**
+
+The intuition: "More training data = better generation."
+
+The reality: More training data = **more valid patterns** = higher entropy = slower convergence.
+
+```
+Rust:   Generate → Compiler rejects 9/10 → Retry → Converges fast
+Spring: Generate → Compiles → Fails at runtime → Debug → Slow feedback
+```
+
+LLMs "knowing Spring" means they know **50 ways to wire a service**. Which is correct for your codebase? That's a social convention question. The model can't know. You reconcile manually.
+
+LLMs "knowing Rust" means they generate something that **must type-check**. The compiler arbitrates. Feedback is immediate. Convergence is mechanical.
+
+**3. Digital vs Analogue: The Qualitative Shift**
+
+This is the key insight:
+
+| Stack | LLM Effect | Nature |
+|-------|------------|--------|
+| Java + Spring + LLM | Faster analogue | Same failure modes, just quicker generation |
+| Rust + SQLx + LLM | Digital shift | Failure modes eliminated by type system |
+
+Java with LLM is still **analogue**—you generate code faster, but runtime errors, null pointers, race conditions, and ORM mismatches remain. LLM accelerates production of code that fails the same ways.
+
+Rust with LLM is **digital**—the compiler is a binary gate. Code either type-checks or it doesn't. The failure modes that plague enterprise Java (silent nulls, runtime wiring errors, concurrency bugs) are **structurally eliminated**. LLM + compiler forms a closed feedback loop that converges to correct code.
+
+LLMs don't change Java's fundamental character. They make it faster to write code that fails at runtime. That's not a qualitative improvement—it's the same problems at higher velocity.
+
+**4. The 4-Month Story Can't Replicate**
+
+OB-POC was built in 4 months using Claude Code pair programming. This would have been unthinkable even 9 months ago.
+
+The velocity came from the feedback loop:
+
+```
+LLM productivity = (constraint strength × feedback speed) / degrees of freedom
+```
+
+Porting to Spring:
+- ↓ Constraint strength (runtime typing, reflection)
+- ↓ Feedback speed (failures at integration test, not compile)
+- ↑ Degrees of freedom (many "valid" patterns, social conventions)
+
+The same developers, same LLM, same time investment would produce **less** in Java/Spring because the feedback loop is weaker. You'd be porting the artifact but losing the engine that created it.
+
+**5. "Available Developers" Won't Understand the Architecture**
+
+Yes, 100x more Java developers exist. But they'd be maintaining:
+
+- A DSL-first architecture (alien to Spring patterns)
+- A custom parser (not Spring Data repositories)
+- A configuration-driven executor (not annotation-based wiring)
+- An evidence-based state model (not JPA entities)
+
+A Java developer would ask: "Why isn't this Spring Data + JPA + Camunda?" Because that's what they know. The architecture **fights the framework**.
+
+You'd have abundant developers who don't understand *why* the system works, trying to maintain code that violates every pattern they learned.
+
+### The Honest Tradeoff
+
+| Gain | Loss |
+|------|------|
+| More developers available | Compile-time SQL checking |
+| Familiar deployment | Ownership-based concurrency safety |
+| Ecosystem integration | LLM convergence speed |
+| Institutional comfort | Single-codebase UI |
+| | Development velocity |
+| | Deterministic guarantees |
+
+### The Real Question
+
+The case for Java isn't technical merit. It's **institutional risk tolerance**:
+
+> "Would BNY rather have a superior architecture that depends on scarce Rust talent, or a conventional architecture that can be staffed abundantly?"
+
+That's legitimate. But it should be asked honestly:
+
+**"We're choosing to trade correctness guarantees and development velocity for staffing convenience."**
+
+### The Better Answer
+
+**Train Rust developers.**
+
+- Smaller investment than a 12-18 month rewrite
+- Keep architectural advantages
+- Keep LLM development velocity
+- Build institutional capability
+
+Rust's learning curve is real but finite. The architectural advantages compound forever.
+
+### What LLMs Changed for Rust
+
+A note on timing: Rust was historically considered "too hard" for enterprise adoption. LLMs changed that calculus:
+
+| Before LLMs | With LLMs |
+|-------------|-----------|
+| Borrow checker = steep learning curve | Model handles most ownership patterns |
+| Lifetime annotations = expert knowledge | Model generates correct lifetimes 80%+ |
+| Error handling verbosity = friction | Model generates `?` chains fluently |
+| Ecosystem knowledge = tribal | Model knows crates and idioms |
+
+The combination of Rust's compile-time guarantees + LLM's pattern generation + fast feedback loops creates a development experience that didn't exist 12 months ago.
+
+**Rust has massively benefited from LLMs**—not by relaxing its constraints, but by making those constraints *navigable*. The developer says what they want; the model proposes; the compiler validates; iteration is fast.
+
+Java hasn't changed. Spring hasn't changed. They're the same runtime-failure-prone stack, just with faster boilerplate generation.
+
+The question isn't "can LLMs make Java productive?" They can. The question is "can LLMs make Java *as productive as Rust*?" They cannot, because Java's feedback loop is fundamentally weaker.
+
+---
+
 Traditional systems spread complexity everywhere:
 - Every new screen: validation logic
 - Every new service: transaction handling

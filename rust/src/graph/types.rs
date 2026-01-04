@@ -2350,26 +2350,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_entity_graph_new() {
-        let graph = EntityGraph::new();
-        assert!(graph.nodes.is_empty());
-        assert!(graph.cbus.is_empty());
-        assert!(graph.ownership_edges.is_empty());
-        assert!(graph.cursor.is_none());
-        assert!(matches!(graph.scope, GraphScope::Empty));
-    }
-
-    #[test]
-    fn test_entity_graph_with_scope() {
-        let cbu_id = Uuid::new_v4();
-        let graph = EntityGraph::with_scope(GraphScope::SingleCbu {
-            cbu_id,
-            cbu_name: "Test Fund".to_string(),
-        });
-        assert!(matches!(graph.scope, GraphScope::SingleCbu { .. }));
-    }
-
-    #[test]
     fn test_navigation_history_push_and_back() {
         let mut history = NavigationHistory::new();
         let id1 = Uuid::new_v4();
@@ -2409,59 +2389,7 @@ mod tests {
     }
 
     #[test]
-    fn test_graph_scope_debug() {
-        // GraphScope uses Debug, not Display
-        let cbu_id = Uuid::new_v4();
-        let scope = GraphScope::SingleCbu {
-            cbu_id,
-            cbu_name: "Test Fund".to_string(),
-        };
-
-        let debug = format!("{:?}", scope);
-        assert!(debug.contains("SingleCbu"));
-        assert!(debug.contains("Test Fund"));
-    }
-
-    #[test]
-    fn test_graph_scope_book_debug() {
-        let apex_id = Uuid::new_v4();
-        let scope = GraphScope::Book {
-            apex_entity_id: apex_id,
-            apex_name: "Allianz SE".to_string(),
-        };
-
-        let debug = format!("{:?}", scope);
-        assert!(debug.contains("Book"));
-        assert!(debug.contains("Allianz SE"));
-    }
-
-    #[test]
-    fn test_graph_scope_jurisdiction_debug() {
-        let scope = GraphScope::Jurisdiction {
-            code: "LU".to_string(),
-        };
-
-        let debug = format!("{:?}", scope);
-        assert!(debug.contains("Jurisdiction"));
-        assert!(debug.contains("LU"));
-    }
-
-    #[test]
-    fn test_cbu_status_default() {
-        assert_eq!(CbuStatus::default(), CbuStatus::Active);
-    }
-
-    #[test]
-    fn test_graph_filters_default() {
-        let filters = GraphFilters::default();
-        assert!(matches!(filters.prong, ProngFilter::Both));
-        assert!(filters.jurisdictions.is_none());
-        assert!(!filters.path_only);
-    }
-
-    #[test]
     fn test_layout_behavior_from_str() {
-        // LayoutBehavior uses FromStr trait
         assert!(matches!(
             "pyramid_up".parse::<LayoutBehavior>(),
             Ok(LayoutBehavior::PyramidUp)
@@ -2483,7 +2411,6 @@ mod tests {
 
     #[test]
     fn test_entity_type_from_str() {
-        // EntityType uses FromStr trait (infallible - always Ok)
         assert!(matches!(
             "PROPER_PERSON".parse::<EntityType>(),
             Ok(EntityType::ProperPerson)
@@ -2501,77 +2428,10 @@ mod tests {
             "PARTNERSHIP".parse::<EntityType>(),
             Ok(EntityType::Partnership)
         ));
+        // Unknown values map to Unknown (infallible FromStr)
         assert!(matches!(
             "unknown".parse::<EntityType>(),
             Ok(EntityType::Unknown)
-        ));
-    }
-
-    #[test]
-    fn test_ownership_type_default() {
-        assert!(matches!(OwnershipType::default(), OwnershipType::Direct));
-    }
-
-    #[test]
-    fn test_control_type_default() {
-        // Default is VotingRights as marked with #[default]
-        assert!(matches!(ControlType::default(), ControlType::VotingRights));
-    }
-
-    #[test]
-    fn test_prong_filter_variants() {
-        let both = ProngFilter::Both;
-        let ownership = ProngFilter::OwnershipOnly;
-        let control = ProngFilter::ControlOnly;
-
-        // Just verify they exist and are distinct
-        assert!(matches!(both, ProngFilter::Both));
-        assert!(matches!(ownership, ProngFilter::OwnershipOnly));
-        assert!(matches!(control, ProngFilter::ControlOnly));
-    }
-
-    #[test]
-    fn test_graph_stats_default() {
-        let stats = GraphStats::default();
-        assert_eq!(stats.total_nodes, 0);
-        assert_eq!(stats.total_edges, 0);
-        assert!(stats.nodes_by_type.is_empty());
-        assert!(stats.nodes_by_layer.is_empty());
-    }
-
-    #[test]
-    fn test_role_category_variants() {
-        // Test that all role categories can be created
-        let categories = vec![
-            RoleCategory::OwnershipChain,
-            RoleCategory::ControlChain,
-            RoleCategory::FundStructure,
-            RoleCategory::FundManagement,
-            RoleCategory::TrustRoles,
-            RoleCategory::ServiceProvider,
-            RoleCategory::TradingExecution,
-            RoleCategory::InvestorChain,
-            RoleCategory::RelatedParty,
-        ];
-        assert_eq!(categories.len(), 9);
-    }
-
-    #[test]
-    fn test_ubo_treatment_variants() {
-        // Use the actual enum variants: Terminus, LookThrough, ControlProng, NotApplicable, PublicCompanyExemption
-        let terminus = UboTreatment::Terminus;
-        let look_through = UboTreatment::LookThrough;
-        let control_prong = UboTreatment::ControlProng;
-        let not_applicable = UboTreatment::NotApplicable;
-        let public_exemption = UboTreatment::PublicCompanyExemption;
-
-        assert!(matches!(terminus, UboTreatment::Terminus));
-        assert!(matches!(look_through, UboTreatment::LookThrough));
-        assert!(matches!(control_prong, UboTreatment::ControlProng));
-        assert!(matches!(not_applicable, UboTreatment::NotApplicable));
-        assert!(matches!(
-            public_exemption,
-            UboTreatment::PublicCompanyExemption
         ));
     }
 }

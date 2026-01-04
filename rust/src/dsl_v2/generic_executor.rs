@@ -1126,20 +1126,27 @@ impl GenericCrudExecutor {
 
         let returning = crud.returning.as_deref().unwrap_or(pk_col);
 
-        // If no columns to update, use DO UPDATE SET updated_at (harmless no-op that returns the row)
-        // We can't use DO NOTHING because it doesn't return the existing row
+        // If no columns to update, use DO UPDATE SET <first_conflict_key> = EXCLUDED.<first_conflict_key>
+        // This is a harmless no-op that returns the existing row.
+        // We can't use DO NOTHING because it doesn't return the existing row.
         let sql = if updates.is_empty() {
+            // Use first conflict key for the no-op update
+            let first_conflict = crud
+                .conflict_keys
+                .first()
+                .map(|c| c.as_str())
+                .unwrap_or(pk_col);
             format!(
                 r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
-                   ON CONFLICT ({}) DO UPDATE SET "updated_at" = COALESCE("{}"."{}"."updated_at", now())
+                   ON CONFLICT ({}) DO UPDATE SET "{}" = EXCLUDED."{}"
                    RETURNING "{}""#,
                 crud.schema,
                 crud.table,
                 columns.join(", "),
                 placeholders.join(", "),
                 conflict_cols.join(", "),
-                crud.schema,
-                crud.table,
+                first_conflict,
+                first_conflict,
                 returning
             )
         } else {
@@ -2228,6 +2235,26 @@ impl GenericCrudExecutor {
                     .ok_or_else(|| anyhow!("Expected UUID string for symbol ref {}", arg.name))?;
                 let uuid = Uuid::parse_str(s)?;
                 Ok(SqlValue::Uuid(uuid))
+            }
+            ArgType::UuidList => {
+                // UuidList is an alias for UuidArray
+                let arr = value
+                    .as_array()
+                    .ok_or_else(|| anyhow!("Expected array for {}", arg.name))?;
+                let uuids: Vec<Uuid> = arr
+                    .iter()
+                    .map(|v| {
+                        let s = v
+                            .as_str()
+                            .ok_or_else(|| anyhow!("Expected UUID string in array"))?;
+                        Uuid::parse_str(s).map_err(|e| anyhow!("Invalid UUID: {}", e))
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                Ok(SqlValue::UuidArray(uuids))
+            }
+            ArgType::Object => {
+                // Objects are passed as JSON
+                Ok(SqlValue::Json(value.clone()))
             }
         }
     }

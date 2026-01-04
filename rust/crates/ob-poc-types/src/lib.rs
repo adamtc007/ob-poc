@@ -126,6 +126,10 @@ pub struct SessionStateResponse {
     pub context: Option<serde_json::Value>,
     #[serde(default)]
     pub messages: Option<serde_json::Value>,
+    /// Session version (ISO timestamp from server's updated_at)
+    /// UI uses this to detect external changes (MCP/REPL modifying session)
+    #[serde(default)]
+    pub version: Option<String>,
 }
 
 // ============================================================================
@@ -508,6 +512,28 @@ pub enum AgentCommand {
     ContextMonitoring,
     /// Set context to remediation/gap-filling mode
     ContextRemediation,
+
+    // =========================================================================
+    // Taxonomy Navigation (Entity type hierarchy browsing)
+    // =========================================================================
+    /// Show current taxonomy position ("show taxonomy", "where am I")
+    TaxonomyShow,
+    /// Drill into a taxonomy node ("drill into shells", "explore funds")
+    TaxonomyDrillIn {
+        /// Node label or type to drill into (e.g., "SHELL", "FUND", "LIMITED_COMPANY")
+        node_label: String,
+    },
+    /// Zoom out one level in taxonomy ("zoom out", "go back", "up one level")
+    TaxonomyZoomOut,
+    /// Reset taxonomy to root level ("reset taxonomy", "taxonomy home")
+    TaxonomyReset,
+    /// Filter taxonomy view by criteria ("filter to active", "show only funds")
+    TaxonomyFilter {
+        /// Filter expression
+        filter: String,
+    },
+    /// Clear taxonomy filters ("clear taxonomy filter")
+    TaxonomyClearFilter,
 
     // =========================================================================
     // Help

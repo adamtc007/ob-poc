@@ -19,29 +19,6 @@ use sqlx::PgPool;
 use super::helpers::get_required_uuid;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
-/// Control vector types that can confer control over an entity
-#[derive(Debug, Clone, PartialEq)]
-pub enum ControlVector {
-    /// Direct ownership >= threshold (typically 25%)
-    Ownership { percentage: f64 },
-    /// Voting rights >= threshold
-    VotingRights { percentage: f64 },
-    /// Board appointment rights
-    BoardAppointment { can_appoint_majority: bool },
-    /// Board removal rights
-    BoardRemoval { can_remove_majority: bool },
-    /// Veto power over key decisions
-    VetoPower { scope: String },
-    /// Trust role (trustee, protector with powers)
-    TrustRole { role: String, has_discretion: bool },
-    /// GP status in partnership
-    GeneralPartner,
-    /// Executive control (CEO, MD with signing authority)
-    ExecutiveControl { position: String },
-    /// Contractual control (management agreement, etc.)
-    Contractual { agreement_type: String },
-}
-
 // ============================================================================
 // ControlAnalyzeOp - Comprehensive control analysis for any entity type
 // ============================================================================
@@ -1156,8 +1133,6 @@ impl CustomOperation for ControlReconcileOwnershipOp {
         #[derive(sqlx::FromRow)]
         struct ShareOwnershipRow {
             investor_entity_id: Uuid,
-            name: String,
-            total_units: Option<rust_decimal::Decimal>,
             ownership_pct: Option<f64>,
         }
 
@@ -1182,13 +1157,10 @@ impl CustomOperation for ControlReconcileOwnershipOp {
             )
             SELECT
                 st.investor_entity_id,
-                e.name,
-                st.total_units,
                 CASE WHEN ti.all_units > 0 THEN
                     (st.total_units::float / ti.all_units::float * 100)
                 ELSE 0 END as ownership_pct
             FROM share_totals st
-            JOIN "ob-poc".entities e ON st.investor_entity_id = e.entity_id
             CROSS JOIN total_issued ti
             "#,
         )
@@ -1307,15 +1279,6 @@ impl CustomOperation for ControlReconcileOwnershipOp {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_control_vector_types() {
-        let ownership = ControlVector::Ownership { percentage: 30.0 };
-        assert!(matches!(ownership, ControlVector::Ownership { .. }));
-
-        let gp = ControlVector::GeneralPartner;
-        assert!(matches!(gp, ControlVector::GeneralPartner));
-    }
 
     #[test]
     fn test_operation_metadata() {

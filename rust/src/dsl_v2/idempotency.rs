@@ -134,6 +134,9 @@ impl IdempotencyManager {
     }
 
     /// Record a successful execution for future idempotency checks
+    ///
+    /// The optional `verb_hash` parameter links this execution to a specific
+    /// verb configuration version for audit trail purposes.
     pub async fn record(
         &self,
         execution_id: Uuid,
@@ -141,6 +144,7 @@ impl IdempotencyManager {
         verb: &str,
         args: &HashMap<String, JsonValue>,
         result: &ExecutionResult,
+        verb_hash: Option<&[u8]>,
     ) -> Result<()> {
         let key = compute_idempotency_key(execution_id, statement_index, verb, args);
         let args_hash = compute_args_hash(args);
@@ -214,8 +218,8 @@ impl IdempotencyManager {
         sqlx::query(
             r#"INSERT INTO "ob-poc".dsl_idempotency
                (idempotency_key, execution_id, statement_index, verb, args_hash,
-                result_type, result_id, result_json, result_affected)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                result_type, result_id, result_json, result_affected, verb_hash)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                ON CONFLICT (idempotency_key) DO NOTHING"#,
         )
         .bind(&key)
@@ -227,6 +231,7 @@ impl IdempotencyManager {
         .bind(result_id)
         .bind(result_json)
         .bind(result_affected)
+        .bind(verb_hash)
         .execute(&self.pool)
         .await?;
 

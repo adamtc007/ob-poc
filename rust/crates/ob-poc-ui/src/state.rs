@@ -144,6 +144,13 @@ pub struct AppState {
     /// Currently selected trading matrix node (for detail panel)
     pub selected_matrix_node: Option<TradingMatrixNode>,
 
+    /// Last known session version (for detecting external changes from MCP/REPL)
+    /// When server version differs from this, we refetch the full session
+    pub last_known_version: Option<String>,
+
+    /// Timestamp of last version check (to throttle polling)
+    pub last_version_check: Option<f64>,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -190,6 +197,8 @@ impl Default for AppState {
             type_filter: None,
             trading_matrix_state: TradingMatrixState::new(),
             selected_matrix_node: None,
+            last_known_version: None,
+            last_version_check: None,
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),
@@ -318,6 +327,8 @@ pub struct AsyncState {
     // Pending results from async operations
     pub pending_session: Option<Result<SessionStateResponse, String>>,
     pub pending_session_id: Option<Uuid>,
+    /// Pending version check result (just the version string, not full session)
+    pub pending_version_check: Option<Result<String, String>>,
     pub pending_graph: Option<Result<CbuGraphData, String>>,
     pub pending_validation: Option<Result<ValidateDslResponse, String>>,
     pub pending_execution: Option<Result<ExecuteResponse, String>>,
@@ -395,6 +406,9 @@ pub struct AsyncState {
     pub pending_taxonomy_zoom_out: bool,          // zoom out one level
     pub pending_taxonomy_back_to: Option<usize>,  // jump to specific breadcrumb index
     pub pending_taxonomy_breadcrumbs: bool,       // request current breadcrumbs
+    pub pending_taxonomy_reset: bool,             // reset to root level
+    pub pending_taxonomy_filter: Option<String>,  // filter expression
+    pub pending_taxonomy_clear_filter: bool,      // clear taxonomy filter
 
     // Taxonomy API responses (from server calls)
     pub pending_taxonomy_breadcrumbs_response:
@@ -407,6 +421,7 @@ pub struct AsyncState {
     pub needs_graph_refetch: bool, // CBU selected or view mode changed
     pub needs_context_refetch: bool, // CBU selected, fetch session context
     pub needs_trading_matrix_refetch: bool, // Trading view mode selected
+    pub needs_session_refetch: bool, // Version changed, need full session refetch
     pub pending_cbu_id: Option<Uuid>, // CBU to fetch graph for (set by select_cbu)
 
     // Execution tracking - prevents repeated refetch
@@ -421,6 +436,7 @@ pub struct AsyncState {
     pub searching_resolution: bool,
     pub loading_session_context: bool,
     pub loading_trading_matrix: bool,
+    pub checking_version: bool, // Version poll in progress
 
     // Chat focus tracking - set when chat completes to refocus input
     pub chat_just_finished: bool,
@@ -468,10 +484,34 @@ impl AppState {
                             self.buffers.dsl_editor = dsl.clone();
                         }
                     }
+                    // Track session version for external change detection (MCP/REPL)
+                    self.last_known_version = session.version.clone();
                     self.session = Some(session);
                 }
                 Err(e) => {
                     state.last_error = Some(format!("Session fetch failed: {}", e));
+                }
+            }
+        }
+
+        // Process version check - if version changed, trigger full session refetch
+        if let Some(result) = state.pending_version_check.take() {
+            state.checking_version = false;
+            if let Ok(server_version) = result {
+                if let Some(ref known_version) = self.last_known_version {
+                    if &server_version != known_version {
+                        // Version changed externally (MCP/REPL modified session)
+                        // Trigger full session refetch
+                        web_sys::console::log_1(
+                            &format!(
+                                "Session version changed: {} -> {}, triggering refetch",
+                                known_version, server_version
+                            )
+                            .into(),
+                        );
+                        state.needs_session_refetch = true;
+                        state.needs_graph_refetch = true;
+                    }
                 }
             }
         }
@@ -746,6 +786,22 @@ impl AppState {
 
         // Clear the flag
         state.needs_context_refetch = false;
+        true
+    }
+
+    /// Check if session refetch is needed (version change detected from MCP/REPL)
+    /// Called ONCE per frame in update() - the single central place for session fetches
+    pub fn take_pending_session_refetch(&self) -> bool {
+        let Ok(mut state) = self.async_state.lock() else {
+            return false;
+        };
+
+        if !state.needs_session_refetch {
+            return false;
+        }
+
+        // Clear the flag
+        state.needs_session_refetch = false;
         true
     }
 
@@ -1186,6 +1242,37 @@ impl AppState {
         }
     }
 
+    /// Check if a taxonomy reset is pending
+    pub fn take_pending_taxonomy_reset(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_taxonomy_reset;
+            state.pending_taxonomy_reset = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Take pending taxonomy filter (if any)
+    pub fn take_pending_taxonomy_filter(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_taxonomy_filter.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a taxonomy clear filter is pending
+    pub fn take_pending_taxonomy_clear_filter(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_taxonomy_clear_filter;
+            state.pending_taxonomy_clear_filter = false;
+            pending
+        } else {
+            false
+        }
+    }
+
     /// Add a user message to the chat history
     pub fn add_user_message(&mut self, content: String) {
         self.messages.push(ChatMessage {
@@ -1299,6 +1386,40 @@ impl AppState {
             if let Ok(mut state) = async_state.lock() {
                 state.pending_trading_matrix = Some(result);
                 state.loading_trading_matrix = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Check session version for external changes (MCP/REPL)
+    /// Called periodically to detect if session was modified externally
+    pub fn check_session_version(&mut self, session_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        // Don't start another check if one is in progress
+        {
+            let state = async_state.lock().unwrap();
+            if state.checking_version {
+                return;
+            }
+        }
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.checking_version = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_session_version(session_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_version_check = Some(result);
+                state.checking_version = false;
             }
             if let Some(ctx) = ctx {
                 ctx.request_repaint();
@@ -1451,6 +1572,31 @@ impl AppState {
 
         spawn_local(async move {
             let result = api::taxonomy_back_to(session_id, level_index).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_taxonomy_zoom_response = Some(result);
+                state.loading_taxonomy = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Reset taxonomy to root level (clear the taxonomy stack on server)
+    pub fn taxonomy_reset(&mut self, session_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_taxonomy = true;
+        }
+
+        spawn_local(async move {
+            let result = api::taxonomy_reset(session_id).await;
             if let Ok(mut state) = async_state.lock() {
                 state.pending_taxonomy_zoom_response = Some(result);
                 state.loading_taxonomy = false;

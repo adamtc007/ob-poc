@@ -25,8 +25,9 @@ use crate::state::AppState;
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
     create_agent_router_with_sessions, create_attribute_router, create_client_router,
-    create_dsl_viewer_router, create_entity_router, create_resolution_router, create_session_store,
-    create_taxonomy_router, create_trading_matrix_router, create_verb_discovery_router,
+    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
+    create_session_graph_router, create_session_store, create_taxonomy_router,
+    create_trading_matrix_router, create_verb_discovery_router,
 };
 
 // Import resolution store from services
@@ -346,19 +347,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Trading matrix router (custody taxonomy browser)
         .merge(create_trading_matrix_router(pool.clone()))
         // Taxonomy navigation router (fractal drill-down)
-        .merge(create_taxonomy_router(pool.clone(), sessions));
+        .merge(create_taxonomy_router(pool.clone(), sessions.clone()))
+        // Graph visualization (legacy CBU endpoints)
+        .merge(create_graph_router(pool.clone()))
+        // Session-scoped graph (shares state with REPL and taxonomy)
+        .merge(create_session_graph_router(pool.clone(), sessions.clone()));
 
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
     // Build main app router with state
     // Session routes (including /bind) now share the same session store via create_agent_router_with_sessions
+    // Note: CBU routes (/api/cbu, /api/cbu/:id, /api/cbu/:id/graph) are provided by create_graph_router in api_router
     let app = Router::new()
-        // CBU API routes (custom implementations using AppState)
-        .route("/api/cbu", get(routes::api::list_cbus))
+        // CBU search uses local AppState implementation
         .route("/api/cbu/search", get(routes::api::search_cbus))
-        .route("/api/cbu/:id", get(routes::api::get_cbu))
-        .route("/api/cbu/:id/graph", get(routes::api::get_cbu_graph))
         // SSE streaming for agent chat
         .route("/api/chat/stream", get(routes::chat::chat_stream))
         // Static files (JS, CSS, WASM) with no-cache headers for development

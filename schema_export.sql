@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UfGsQ8GBNa5gYiejHDDNjZVUPeXknFg5KhotOKYodp3uhosaArtcutlPMOjtlxx
+\restrict NcWLZLHwwgnlKctp0gqCmYWU3npd4XFBssEWR07BP8Q0cqsFFrNwomIekEoyuGG
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -1531,6 +1531,59 @@ COMMENT ON FUNCTION "ob-poc".evaluate_case_decision(p_case_id uuid, p_evaluator 
 
 
 --
+-- Name: find_executions_by_verb_hash(bytea); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".find_executions_by_verb_hash(p_verb_hash bytea) RETURNS TABLE(execution_id uuid, cbu_id character varying, status character varying, started_at timestamp with time zone, verb_names text[])
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT
+        execution_id,
+        cbu_id,
+        status,
+        started_at,
+        verb_names
+    FROM "ob-poc".dsl_execution_log
+    WHERE p_verb_hash = ANY(verb_hashes)
+    ORDER BY started_at DESC;
+$$;
+
+
+--
+-- Name: FUNCTION find_executions_by_verb_hash(p_verb_hash bytea); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".find_executions_by_verb_hash(p_verb_hash bytea) IS 'Find all executions that used a specific verb configuration (by compiled_hash)';
+
+
+--
+-- Name: find_idempotency_by_verb_hash(bytea, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".find_idempotency_by_verb_hash(p_verb_hash bytea, p_limit integer DEFAULT 100) RETURNS TABLE(idempotency_key text, execution_id uuid, verb text, result_type text, created_at timestamp with time zone)
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT
+        idempotency_key,
+        execution_id,
+        verb,
+        result_type,
+        created_at
+    FROM "ob-poc".dsl_idempotency
+    WHERE verb_hash = p_verb_hash
+    ORDER BY created_at DESC
+    LIMIT p_limit;
+$$;
+
+
+--
+-- Name: FUNCTION find_idempotency_by_verb_hash(p_verb_hash bytea, p_limit integer); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".find_idempotency_by_verb_hash(p_verb_hash bytea, p_limit integer) IS 'Find idempotency records that used a specific verb configuration (by compiled_hash)';
+
+
+--
 -- Name: find_phonetic_matches(text[], integer); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -1662,6 +1715,38 @@ BEGIN
     RETURN next_version;
 END;
 $$;
+
+
+--
+-- Name: get_verb_config_at_execution(uuid, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_verb_config_at_execution(p_execution_id uuid, p_verb_name text) RETURNS TABLE(verb_name text, compiled_hash bytea, compiled_json jsonb, effective_config_json jsonb, diagnostics_json jsonb)
+    LANGUAGE sql STABLE
+    AS $$
+    WITH execution_hash AS (
+        SELECT verb_hashes[idx] as hash
+        FROM "ob-poc".dsl_execution_log el,
+             generate_subscripts(el.verb_names, 1) as idx
+        WHERE el.execution_id = p_execution_id
+          AND el.verb_names[idx] = p_verb_name
+    )
+    SELECT
+        v.verb_name,
+        v.compiled_hash,
+        v.compiled_json,
+        v.effective_config_json,
+        v.diagnostics_json
+    FROM "ob-poc".dsl_verbs v
+    WHERE v.compiled_hash = (SELECT hash FROM execution_hash LIMIT 1);
+$$;
+
+
+--
+-- Name: FUNCTION get_verb_config_at_execution(p_execution_id uuid, p_verb_name text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".get_verb_config_at_execution(p_execution_id uuid, p_verb_name text) IS 'Get the exact verb configuration that was active during a specific execution';
 
 
 --
@@ -5749,8 +5834,24 @@ CREATE TABLE "ob-poc".dsl_execution_log (
 CASE
     WHEN (completed_at IS NOT NULL) THEN (EXTRACT(epoch FROM (completed_at - started_at)) * (1000)::numeric)
     ELSE NULL::numeric
-END) STORED
+END) STORED,
+    verb_hashes bytea[],
+    verb_names text[]
 );
+
+
+--
+-- Name: COLUMN dsl_execution_log.verb_hashes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_execution_log.verb_hashes IS 'Array of compiled_hash values (SHA256) for verbs used in this execution. Links to dsl_verbs.compiled_hash for audit trail.';
+
+
+--
+-- Name: COLUMN dsl_execution_log.verb_names; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_execution_log.verb_names IS 'Array of verb names (domain.verb) used in this execution. Parallel to verb_hashes for readability.';
 
 
 --
@@ -5915,8 +6016,16 @@ CREATE TABLE "ob-poc".dsl_idempotency (
     result_id uuid,
     result_json jsonb,
     result_affected bigint,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    verb_hash bytea
 );
+
+
+--
+-- Name: COLUMN dsl_idempotency.verb_hash; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.verb_hash IS 'SHA256 compiled_hash of the verb config used for this execution. Links to dsl_verbs.compiled_hash.';
 
 
 --
@@ -6148,7 +6257,11 @@ CREATE TABLE "ob-poc".dsl_verbs (
     source text DEFAULT 'yaml'::text NOT NULL,
     yaml_hash text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    compiled_json jsonb,
+    effective_config_json jsonb,
+    diagnostics_json jsonb DEFAULT '{"errors": [], "warnings": []}'::jsonb,
+    compiled_hash bytea
 );
 
 
@@ -6157,6 +6270,34 @@ CREATE TABLE "ob-poc".dsl_verbs (
 --
 
 COMMENT ON TABLE "ob-poc".dsl_verbs IS 'DSL verb definitions synced from YAML, with RAG metadata for agent discovery';
+
+
+--
+-- Name: COLUMN dsl_verbs.compiled_json; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_verbs.compiled_json IS 'Full RuntimeVerb serialized as JSON - the complete compiled contract';
+
+
+--
+-- Name: COLUMN dsl_verbs.effective_config_json; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_verbs.effective_config_json IS 'Expanded configuration with all defaults applied (for debugging)';
+
+
+--
+-- Name: COLUMN dsl_verbs.diagnostics_json; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_verbs.diagnostics_json IS 'Compilation diagnostics: {"errors": [...], "warnings": [...]}';
+
+
+--
+-- Name: COLUMN dsl_verbs.compiled_hash; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_verbs.compiled_hash IS 'SHA256 of canonical compiled_json for integrity verification';
 
 
 --
@@ -9627,6 +9768,36 @@ CREATE VIEW "ob-poc".v_entity_regulatory_status AS
      LEFT JOIN "ob-poc".entity_regulatory_profiles erp ON ((e.entity_id = erp.entity_id)))
      LEFT JOIN "ob-poc".regulators r ON (((erp.regulator_code)::text = (r.regulator_code)::text)))
      LEFT JOIN "ob-poc".regulatory_tiers rt ON (((erp.regulatory_tier)::text = (rt.tier_code)::text)));
+
+
+--
+-- Name: v_execution_verb_audit; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_execution_verb_audit AS
+ SELECT execution_id,
+    cbu_id,
+    execution_phase,
+    status,
+    started_at,
+    completed_at,
+    duration_ms,
+    executed_by,
+    COALESCE(array_length(verb_names, 1), 0) AS verb_count,
+    verb_names,
+    (EXISTS ( SELECT 1
+           FROM (UNNEST(el.verb_hashes, el.verb_names) t(hash, name)
+             JOIN "ob-poc".dsl_verbs v ON ((v.verb_name = t.name)))
+          WHERE (v.compiled_hash IS DISTINCT FROM t.hash))) AS has_stale_verb_refs
+   FROM "ob-poc".dsl_execution_log el
+  WHERE (verb_hashes IS NOT NULL);
+
+
+--
+-- Name: VIEW v_execution_verb_audit; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_execution_verb_audit IS 'Execution log with verb versioning audit info. has_stale_verb_refs=true means verb config changed since execution.';
 
 
 --
@@ -15554,10 +15725,24 @@ CREATE INDEX idx_dsl_execution_status ON "ob-poc".dsl_execution_log USING btree 
 
 
 --
+-- Name: idx_dsl_execution_verb_hashes; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_execution_verb_hashes ON "ob-poc".dsl_execution_log USING gin (verb_hashes);
+
+
+--
 -- Name: idx_dsl_execution_version_phase; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_dsl_execution_version_phase ON "ob-poc".dsl_execution_log USING btree (version_id, execution_phase);
+
+
+--
+-- Name: idx_dsl_idempotency_verb_hash; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_idempotency_verb_hash ON "ob-poc".dsl_idempotency USING btree (verb_hash) WHERE (verb_hash IS NOT NULL);
 
 
 --
@@ -17259,6 +17444,13 @@ CREATE INDEX idx_workflow_subject ON "ob-poc".workflow_instances USING btree (su
 --
 
 CREATE INDEX idx_workflow_updated ON "ob-poc".workflow_instances USING btree (updated_at DESC);
+
+
+--
+-- Name: ix_dsl_verbs_compiled_hash; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX ix_dsl_verbs_compiled_hash ON "ob-poc".dsl_verbs USING btree (compiled_hash) WHERE (compiled_hash IS NOT NULL);
 
 
 --
@@ -20701,5 +20893,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UfGsQ8GBNa5gYiejHDDNjZVUPeXknFg5KhotOKYodp3uhosaArtcutlPMOjtlxx
+\unrestrict NcWLZLHwwgnlKctp0gqCmYWU3npd4XFBssEWR07BP8Q0cqsFFrNwomIekEoyuGG
 

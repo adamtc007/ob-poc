@@ -94,7 +94,7 @@
 //!
 //! | Component | LSP Usage | Agent Usage |
 //! |-----------|-----------|-------------|
-//! | EntityGateway | `complete_keyword_values()` autocomplete | `resolve_lookups()` entity resolution |
+//! | EntityGateway | `complete_keyword_values()` autocomplete | `resolve_all()` unified reference resolution |
 //! | Verb Registry | `complete_verb_names()`, `complete_keywords()` | LLM prompt vocabulary, intent validation |
 //! | CSG Linter | `diagnostics.rs` red squiggles | `run_semantic_validation()` retry feedback |
 //! | Parser | Real-time syntax check | Post-generation validation |
@@ -559,6 +559,82 @@ impl AgentService {
         }
     }
 
+    /// Derive taxonomy navigation context for the agent prompt.
+    /// Returns a formatted string showing the current navigation state.
+    ///
+    /// This helps the agent understand:
+    /// - Current position in the taxonomy (breadcrumb trail)
+    /// - Available navigation actions (drill down, zoom out)
+    /// - Visible entities at this level
+    fn derive_taxonomy_context(&self, session: &AgentSession) -> Option<String> {
+        let stack = &session.context.taxonomy_stack;
+
+        if stack.is_empty() {
+            return None;
+        }
+
+        let breadcrumbs = stack.breadcrumbs();
+        let depth = stack.depth();
+        let can_zoom_out = stack.can_zoom_out();
+        let can_zoom_in = stack.can_zoom_in();
+
+        let current_frame = stack.current()?;
+        let tree = &current_frame.tree;
+
+        // Build node summary (top-level children)
+        let node_summary: Vec<String> = tree
+            .children
+            .iter()
+            .take(10)
+            .map(|child| {
+                let count_info = if child.children.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({} children)", child.children.len())
+                };
+                format!("  - {} [{:?}]{}", child.label, child.node_type, count_info)
+            })
+            .collect();
+
+        let more_indicator = if tree.children.len() > 10 {
+            format!("\n  ... and {} more", tree.children.len() - 10)
+        } else {
+            String::new()
+        };
+
+        // Build navigation hints
+        let mut nav_hints = Vec::new();
+        if can_zoom_out {
+            nav_hints.push("'zoom out' or 'go back' to parent level");
+        }
+        if can_zoom_in && !tree.children.is_empty() {
+            nav_hints.push("'drill into <name>' to explore a child");
+        }
+        nav_hints.push("'show taxonomy' to see current position");
+
+        let context = format!(
+            r#"# TAXONOMY NAVIGATION
+
+Current Position: {} (depth {})
+Breadcrumb: {}
+
+## Visible Nodes:
+{}{}
+
+## Navigation:
+{}
+"#,
+            current_frame.label,
+            depth,
+            breadcrumbs.join(" → "),
+            node_summary.join("\n"),
+            more_indicator,
+            nav_hints.join("\n")
+        );
+
+        Some(context)
+    }
+
     /// Derive KYC case context when a case is active in the session.
     /// Returns a formatted string showing case state with embedded workstream requests.
     ///
@@ -733,6 +809,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return Ok(cmd_response);
         }
 
+        // Check for taxonomy navigation commands (drill into, zoom out, show taxonomy)
+        if let Some(cmd_response) = self.handle_taxonomy_command(session, &request.message) {
+            tracing::info!("Handled as taxonomy command");
+            return Ok(cmd_response);
+        }
+
         // If this is a disambiguation response, handle it
         if let Some(disambig_response) = &request.disambiguation_response {
             return self
@@ -814,10 +896,14 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             None
         };
 
+        // Derive taxonomy navigation context if active
+        let taxonomy_context = self.derive_taxonomy_context(session);
+
         let bindings_context = if !session_bindings.is_empty()
             || active_cbu_context.is_some()
             || semantic_context.is_some()
             || kyc_case_context.is_some()
+            || taxonomy_context.is_some()
         {
             let mut parts = Vec::new();
             if let Some(cbu) = active_cbu_context {
@@ -844,11 +930,19 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 String::new()
             };
 
+            // Add taxonomy navigation context if available
+            let taxonomy_section = if let Some(ref tax_ctx) = taxonomy_context {
+                format!("\n\n{}", tax_ctx)
+            } else {
+                String::new()
+            };
+
             format!(
-                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]{}{}",
+                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]{}{}{}",
                 parts.join(". "),
                 semantic_section,
-                kyc_section
+                kyc_section,
+                taxonomy_section
             )
         } else {
             String::new()
@@ -1735,14 +1829,13 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // =========================================================================
         // SEARCH
         // =========================================================================
-        if (words[0] == "find" || words[0] == "search" || words[0] == "locate")
-            && words.len() > 1 {
-                let query = words[1..].join(" ");
-                return Some(make_response(
-                    &format!("Searching for '{}'...", query),
-                    AgentCommand::Search { query },
-                ));
-            }
+        if (words[0] == "find" || words[0] == "search" || words[0] == "locate") && words.len() > 1 {
+            let query = words[1..].join(" ");
+            return Some(make_response(
+                &format!("Searching for '{}'...", query),
+                AgentCommand::Search { query },
+            ));
+        }
 
         // =========================================================================
         // HELP
@@ -2393,6 +2486,216 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         (direction, amount)
     }
 
+    /// Handle taxonomy navigation commands like "drill into shells", "show taxonomy", "zoom out"
+    fn handle_taxonomy_command(
+        &self,
+        session: &AgentSession,
+        message: &str,
+    ) -> Option<AgentChatResponse> {
+        let lower_msg = message.to_lowercase().trim().to_string();
+        let words: Vec<&str> = lower_msg.split_whitespace().collect();
+
+        if words.is_empty() {
+            return None;
+        }
+
+        // Helper to build response with taxonomy command
+        let make_response = |msg: &str, cmd: AgentCommand| AgentChatResponse {
+            message: msg.to_string(),
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::New,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: Some(vec![cmd]),
+        };
+
+        // =========================================================================
+        // SHOW TAXONOMY / WHERE AM I
+        // =========================================================================
+        if lower_msg == "show taxonomy"
+            || lower_msg == "taxonomy"
+            || lower_msg == "where am i"
+            || lower_msg == "taxonomy position"
+            || lower_msg.contains("current taxonomy")
+            || lower_msg.contains("taxonomy status")
+        {
+            // Build a description of current position
+            let stack = &session.context.taxonomy_stack;
+            if stack.is_empty() {
+                return Some(make_response(
+                    "Taxonomy navigation not active. Use 'browse entities' or 'show entity types' to start.",
+                    AgentCommand::TaxonomyShow,
+                ));
+            }
+
+            let breadcrumbs = stack.breadcrumbs();
+            let depth = stack.depth();
+            let msg = format!(
+                "Taxonomy position: {} (depth {})\nPath: {}",
+                breadcrumbs.last().unwrap_or(&"root".to_string()),
+                depth,
+                breadcrumbs.join(" → ")
+            );
+            return Some(make_response(&msg, AgentCommand::TaxonomyShow));
+        }
+
+        // =========================================================================
+        // DRILL INTO / EXPLORE / ENTER
+        // =========================================================================
+        if lower_msg.starts_with("drill into ")
+            || lower_msg.starts_with("explore ")
+            || lower_msg.starts_with("enter ")
+            || lower_msg.starts_with("go into ")
+            || lower_msg.starts_with("open ")
+            || lower_msg.starts_with("expand ")
+            || lower_msg.starts_with("browse ")
+        {
+            // Extract the target node label
+            let target = lower_msg
+                .trim_start_matches("drill into ")
+                .trim_start_matches("explore ")
+                .trim_start_matches("enter ")
+                .trim_start_matches("go into ")
+                .trim_start_matches("open ")
+                .trim_start_matches("expand ")
+                .trim_start_matches("browse ")
+                .trim()
+                .to_uppercase();
+
+            if target.is_empty() {
+                return Some(make_response(
+                    "Please specify what to drill into (e.g., 'drill into SHELL', 'explore funds').",
+                    AgentCommand::TaxonomyShow,
+                ));
+            }
+
+            // Normalize common names
+            let node_label = match target.as_str() {
+                "SHELLS" | "LEGAL VEHICLES" | "COMPANIES" => "SHELL".to_string(),
+                "PEOPLE" | "PERSONS" | "NATURAL PERSONS" | "INDIVIDUALS" => "PERSON".to_string(),
+                "FUNDS" | "FUND" => "FUND".to_string(),
+                "TRUSTS" | "TRUST" => "TRUST".to_string(),
+                "PARTNERSHIPS" | "PARTNERSHIP" => "PARTNERSHIP".to_string(),
+                "LIMITED COMPANIES" | "LIMITED COMPANY" | "LTD" => "LIMITED_COMPANY".to_string(),
+                _ => target,
+            };
+
+            return Some(make_response(
+                &format!("Drilling into {}...", node_label),
+                AgentCommand::TaxonomyDrillIn { node_label },
+            ));
+        }
+
+        // =========================================================================
+        // ZOOM OUT / GO BACK / UP
+        // =========================================================================
+        if lower_msg == "zoom out"
+            || lower_msg == "go back"
+            || lower_msg == "back"
+            || lower_msg == "up"
+            || lower_msg == "up one level"
+            || lower_msg == "parent"
+            || lower_msg == "go up"
+            || lower_msg.contains("taxonomy back")
+            || lower_msg.contains("taxonomy up")
+        {
+            let stack = &session.context.taxonomy_stack;
+            if !stack.can_zoom_out() {
+                return Some(make_response(
+                    "Already at the top level of the taxonomy.",
+                    AgentCommand::TaxonomyShow,
+                ));
+            }
+            return Some(make_response(
+                "Zooming out one level...",
+                AgentCommand::TaxonomyZoomOut,
+            ));
+        }
+
+        // =========================================================================
+        // RESET TAXONOMY / HOME
+        // =========================================================================
+        if lower_msg == "reset taxonomy"
+            || lower_msg == "taxonomy home"
+            || lower_msg == "taxonomy reset"
+            || lower_msg.contains("taxonomy root")
+            || lower_msg.contains("back to root")
+            || lower_msg.contains("start over taxonomy")
+        {
+            return Some(make_response(
+                "Resetting taxonomy to root level.",
+                AgentCommand::TaxonomyReset,
+            ));
+        }
+
+        // =========================================================================
+        // FILTER TAXONOMY
+        // =========================================================================
+        if lower_msg.starts_with("filter taxonomy ")
+            || lower_msg.starts_with("taxonomy filter ")
+            || lower_msg.starts_with("show only ")
+            || lower_msg.starts_with("filter to ")
+        {
+            let filter = lower_msg
+                .trim_start_matches("filter taxonomy ")
+                .trim_start_matches("taxonomy filter ")
+                .trim_start_matches("show only ")
+                .trim_start_matches("filter to ")
+                .trim()
+                .to_string();
+
+            if filter.is_empty() {
+                return Some(make_response(
+                    "Please specify a filter (e.g., 'filter to active', 'show only funds').",
+                    AgentCommand::TaxonomyShow,
+                ));
+            }
+
+            return Some(make_response(
+                &format!("Filtering taxonomy: {}", filter),
+                AgentCommand::TaxonomyFilter { filter },
+            ));
+        }
+
+        // =========================================================================
+        // CLEAR FILTER
+        // =========================================================================
+        if lower_msg == "clear taxonomy filter"
+            || lower_msg == "clear filter"
+            || lower_msg == "remove taxonomy filter"
+            || lower_msg == "show all"
+        {
+            return Some(make_response(
+                "Clearing taxonomy filter.",
+                AgentCommand::TaxonomyClearFilter,
+            ));
+        }
+
+        // =========================================================================
+        // BROWSE ENTITIES / SHOW ENTITY TYPES (Start taxonomy navigation)
+        // =========================================================================
+        if lower_msg == "browse entities"
+            || lower_msg == "show entity types"
+            || lower_msg == "entity types"
+            || lower_msg == "show types"
+            || lower_msg == "type hierarchy"
+            || lower_msg.contains("entity taxonomy")
+            || lower_msg.contains("browse entity")
+        {
+            // This should trigger the UI to load the taxonomy at root
+            return Some(make_response(
+                "Opening entity type taxonomy browser...",
+                AgentCommand::TaxonomyShow,
+            ));
+        }
+
+        // Not a taxonomy command
+        None
+    }
+
     /// Handle "show/load/select CBU" commands
     async fn handle_show_command(
         &self,
@@ -3019,143 +3322,6 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         Ok(corrections)
     }
 
-    /// Collect all entity lookups from intents (LEGACY - kept for tests)
-    #[allow(dead_code)]
-    fn collect_lookups(&self, intents: &[VerbIntent]) -> HashMap<String, EntityLookup> {
-        let mut lookups = HashMap::new();
-        for intent in intents {
-            if let Some(intent_lookups) = &intent.lookups {
-                for (param, lookup_val) in intent_lookups {
-                    if let Ok(info) = serde_json::from_value::<EntityLookup>(lookup_val.clone()) {
-                        lookups.insert(param.clone(), info);
-                    }
-                }
-            }
-        }
-        lookups
-    }
-
-    /// Resolve entity lookups via EntityGateway (LEGACY - kept for tests)
-    #[allow(dead_code)]
-    async fn resolve_lookups(&self, lookups: &HashMap<String, EntityLookup>) -> LookupResolution {
-        if lookups.is_empty() {
-            return LookupResolution::Resolved(HashMap::new());
-        }
-
-        let mut resolver = match GatewayRefResolver::connect(&self.config.gateway_addr).await {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::warn!("EntityGateway not available: {}", e);
-                return LookupResolution::Resolved(HashMap::new());
-            }
-        };
-
-        let mut resolved: HashMap<String, ResolvedEntityLookup> = HashMap::new();
-        let mut ambiguous: Vec<DisambiguationItem> = Vec::new();
-
-        for (param, lookup) in lookups {
-            // Determine ref type from entity_type hint
-            let ref_type = match lookup.entity_type.as_deref() {
-                Some("person") | Some("proper_person") => RefType::Entity,
-                Some("company") | Some("limited_company") | Some("legal_entity") => RefType::Entity,
-                Some("cbu") => RefType::Cbu,
-                Some("product") => RefType::Product,
-                Some("role") => RefType::Role,
-                Some("jurisdiction") => RefType::Jurisdiction,
-                _ => RefType::Entity,
-            };
-
-            match resolver.resolve(ref_type, &lookup.search_text).await {
-                Ok(ResolveResult::Found { id, .. }) => {
-                    resolved.insert(
-                        param.clone(),
-                        ResolvedEntityLookup {
-                            display_name: lookup.search_text.clone(),
-                            entity_id: id,
-                        },
-                    );
-                }
-                Ok(ResolveResult::FoundByCode { uuid: Some(id), .. }) => {
-                    resolved.insert(
-                        param.clone(),
-                        ResolvedEntityLookup {
-                            display_name: lookup.search_text.clone(),
-                            entity_id: id,
-                        },
-                    );
-                }
-                Ok(ResolveResult::FoundByCode { uuid: None, .. }) => {
-                    tracing::debug!(
-                        "Found by code but no UUID for '{}' (param: {})",
-                        lookup.search_text,
-                        param
-                    );
-                }
-                Ok(ResolveResult::NotFound { suggestions }) if !suggestions.is_empty() => {
-                    let matches: Vec<EntityMatchOption> = suggestions
-                        .into_iter()
-                        .filter_map(|s| {
-                            Uuid::parse_str(&s.value).ok().map(|id| EntityMatchOption {
-                                entity_id: id,
-                                name: s.display,
-                                entity_type: lookup
-                                    .entity_type
-                                    .clone()
-                                    .unwrap_or_else(|| "entity".to_string()),
-                                jurisdiction: None,
-                                context: None,
-                                score: Some(s.score),
-                            })
-                        })
-                        .collect();
-
-                    if !matches.is_empty() {
-                        ambiguous.push(DisambiguationItem::EntityMatch {
-                            param: param.clone(),
-                            search_text: lookup.search_text.clone(),
-                            matches,
-                        });
-                    }
-                }
-                Ok(ResolveResult::NotFound { .. }) => {
-                    tracing::debug!("No matches for '{}' (param: {})", lookup.search_text, param);
-                }
-                Err(e) => {
-                    return LookupResolution::Error(format!("Lookup failed: {}", e));
-                }
-            }
-        }
-
-        if ambiguous.is_empty() {
-            LookupResolution::Resolved(resolved)
-        } else {
-            LookupResolution::Ambiguous(ambiguous)
-        }
-    }
-
-    /// Inject resolved entity IDs into intents (LEGACY - kept for tests)
-    /// Uses ResolvedEntity to preserve display name for user-friendly DSL rendering
-    #[allow(dead_code)]
-    fn inject_resolved_ids(
-        &self,
-        mut intents: Vec<VerbIntent>,
-        resolved: &HashMap<String, ResolvedEntityLookup>,
-    ) -> Vec<VerbIntent> {
-        for intent in &mut intents {
-            for (param, lookup) in resolved {
-                intent.params.insert(
-                    param.clone(),
-                    ParamValue::ResolvedEntity {
-                        display_name: lookup.display_name.clone(),
-                        resolved_id: lookup.entity_id,
-                    },
-                );
-            }
-            intent.lookups = None;
-        }
-        intents
-    }
-
     /// Build final response with DSL
     /// Takes both execution DSL (with UUIDs for DB) and user DSL (with display names for chat)
     async fn build_response(
@@ -3643,82 +3809,5 @@ pub struct VerbInfo {
 impl Default for AgentService {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-// ============================================================================
-// Tests
-// ============================================================================
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_collect_lookups() {
-        let service = AgentService::new();
-
-        let mut lookups_map = HashMap::new();
-        lookups_map.insert(
-            "entity-id".to_string(),
-            serde_json::json!({
-                "search_text": "John Smith",
-                "entity_type": "person"
-            }),
-        );
-
-        let intent = VerbIntent {
-            verb: "cbu.assign-role".to_string(),
-            params: HashMap::new(),
-            refs: HashMap::new(),
-            lookups: Some(lookups_map),
-            sequence: None,
-        };
-
-        let collected = service.collect_lookups(&[intent]);
-        assert_eq!(collected.len(), 1);
-        assert!(collected.contains_key("entity-id"));
-        assert_eq!(collected["entity-id"].search_text, "John Smith");
-    }
-
-    #[test]
-    fn test_inject_resolved_ids() {
-        let service = AgentService::new();
-
-        let intent = VerbIntent {
-            verb: "cbu.assign-role".to_string(),
-            params: HashMap::new(),
-            refs: HashMap::new(),
-            lookups: Some(HashMap::new()),
-            sequence: None,
-        };
-
-        let mut resolved = HashMap::new();
-        let id = Uuid::new_v4();
-        resolved.insert(
-            "entity-id".to_string(),
-            ResolvedEntityLookup {
-                display_name: "John Smith".to_string(),
-                entity_id: id,
-            },
-        );
-
-        let modified = service.inject_resolved_ids(vec![intent], &resolved);
-
-        assert_eq!(modified.len(), 1);
-        assert!(modified[0].params.contains_key("entity-id"));
-        assert!(modified[0].lookups.is_none());
-
-        // Verify it's a ResolvedEntity with the display name preserved
-        match &modified[0].params["entity-id"] {
-            ParamValue::ResolvedEntity {
-                display_name,
-                resolved_id,
-            } => {
-                assert_eq!(display_name, "John Smith");
-                assert_eq!(*resolved_id, id);
-            }
-            _ => panic!("Expected ResolvedEntity variant"),
-        }
     }
 }

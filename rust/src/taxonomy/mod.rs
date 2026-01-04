@@ -32,6 +32,8 @@ mod builder;
 pub mod combinators;
 mod node;
 mod rules;
+#[cfg(feature = "database")]
+mod service;
 mod stack;
 mod types;
 
@@ -52,3 +54,6 @@ pub use combinators::{
 };
 
 pub use stack::{TaxonomyFrame, TaxonomyStack};
+
+#[cfg(feature = "database")]
+pub use service::{ChildNode, EntityListItem, TaxonomyPosition, TaxonomyService};

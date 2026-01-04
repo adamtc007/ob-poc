@@ -149,6 +149,17 @@ pub async fn get_session(session_id: Uuid) -> Result<SessionStateResponse, Strin
     get(&format!("/api/session/{}", session_id)).await
 }
 
+/// Get session version only (lightweight check for external changes)
+/// Returns the version string from the session, used for polling
+pub async fn get_session_version(session_id: Uuid) -> Result<String, String> {
+    // For now, fetch full session and extract version
+    // TODO: Add lightweight /api/session/:id/version endpoint for efficiency
+    let session: SessionStateResponse = get(&format!("/api/session/{}", session_id)).await?;
+    session
+        .version
+        .ok_or_else(|| "Session has no version".to_string())
+}
+
 /// Bind an entity to the session context
 pub async fn bind_entity(
     session_id: Uuid,
@@ -549,6 +560,11 @@ pub async fn taxonomy_back_to(
         &BackToRequest { level_index },
     )
     .await
+}
+
+/// Reset taxonomy to root level
+pub async fn taxonomy_reset(session_id: Uuid) -> Result<TaxonomyZoomResponse, String> {
+    post(&format!("/api/session/{}/taxonomy/reset", session_id), &()).await
 }
 
 // =============================================================================

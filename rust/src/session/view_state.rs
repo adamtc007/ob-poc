@@ -581,14 +581,6 @@ impl ViewState {
             .find(node_id)
             .is_some_and(|node| matches!(node.expansion, ExpansionRule::Parser(_)))
     }
-
-    /// Sync taxonomy field from stack (call after stack modifications).
-    fn sync_from_stack(&mut self) {
-        if let Some(frame) = self.stack.current() {
-            self.taxonomy = frame.tree.clone();
-            self.selection = frame.selection.clone();
-        }
-    }
 }
 
 impl LayoutBounds {

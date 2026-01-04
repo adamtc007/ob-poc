@@ -318,7 +318,7 @@ domains:
               search_key: name
               primary_key: entity_id
           - name: relationship-types
-            type: array
+            type: string_list
             required: false
             description: "Filter by relationship types (OWNERSHIP, CONTROL, TRUST_ROLE)"
         returns:

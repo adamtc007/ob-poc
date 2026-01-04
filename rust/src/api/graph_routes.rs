@@ -9,6 +9,9 @@
 //!   /api/graph/book/:apex_id - EntityGraph for ownership book
 //!   /api/graph/jurisdiction/:code - EntityGraph for jurisdiction
 //!
+//! Session-scoped endpoints share state with REPL/taxonomy:
+//!   /api/session/:id/graph - Graph for session's active CBU
+//!
 //! UI owns layout/visualization logic.
 
 use axum::{
@@ -17,10 +20,11 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::api::SessionStore;
 use crate::database::{LayoutOverrideView, PgGraphRepository, VisualizationRepository};
 use crate::graph::{
     CbuGraph, CbuGraphBuilder, CbuSummary, EntityGraph, GraphScope, LayoutEngine, LayoutOverride,
@@ -475,4 +479,111 @@ pub fn create_graph_router(pool: PgPool) -> Router {
             get(get_entity_neighborhood_graph),
         )
         .with_state(pool)
+}
+
+// =============================================================================
+// SESSION-SCOPED GRAPH ENDPOINTS
+// =============================================================================
+
+/// State for session-scoped graph endpoints
+#[derive(Clone)]
+pub struct SessionGraphState {
+    pub pool: PgPool,
+    pub sessions: SessionStore,
+}
+
+/// Response for session graph endpoint
+#[derive(Debug, Serialize)]
+pub struct SessionGraphResponse {
+    /// The graph data (if active CBU exists)
+    pub graph: Option<CbuGraph>,
+    /// The active CBU ID from session
+    pub active_cbu_id: Option<Uuid>,
+    /// The active CBU name from session
+    pub active_cbu_name: Option<String>,
+    /// Error message if graph couldn't be loaded
+    pub error: Option<String>,
+}
+
+/// GET /api/session/:session_id/graph
+///
+/// Returns the graph for the session's active CBU, using the same session state
+/// as the REPL and taxonomy navigation.
+async fn get_session_graph(
+    Path(session_id): Path<Uuid>,
+    Query(params): Query<GraphQuery>,
+    State(state): State<SessionGraphState>,
+) -> Result<Json<SessionGraphResponse>, (StatusCode, String)> {
+    // Get session and check for active CBU (tokio RwLock requires .await)
+    let sessions = state.sessions.read().await;
+
+    let session = sessions.get(&session_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Session {} not found", session_id),
+        )
+    })?;
+
+    // Check if session has an active CBU
+    let active_cbu = match &session.context.active_cbu {
+        Some(cbu) => cbu.clone(),
+        None => {
+            return Ok(Json(SessionGraphResponse {
+                graph: None,
+                active_cbu_id: None,
+                active_cbu_name: None,
+                error: Some(
+                    "No active CBU in session. Use /api/session/:id/bind to set one.".to_string(),
+                ),
+            }));
+        }
+    };
+
+    let cbu_id = active_cbu.id;
+    let cbu_name = active_cbu.display_name.clone();
+
+    // Drop the read lock before doing async work
+    drop(sessions);
+
+    // Build graph for the active CBU
+    let repo = VisualizationRepository::new(state.pool.clone());
+    let view_mode = ViewMode::parse(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
+    let orientation = Orientation::parse(params.orientation.as_deref().unwrap_or("VERTICAL"));
+
+    let mut graph = CbuGraphBuilder::new(cbu_id)
+        .with_custody(false)
+        .with_kyc(true)
+        .with_ubo(true)
+        .with_services(false)
+        .build(&repo)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build graph: {}", e),
+            )
+        })?;
+
+    // Apply layout
+    let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);
+    layout_engine.layout(&mut graph);
+
+    Ok(Json(SessionGraphResponse {
+        graph: Some(graph),
+        active_cbu_id: Some(cbu_id),
+        active_cbu_name: Some(cbu_name),
+        error: None,
+    }))
+}
+
+/// Create the session-scoped graph router
+///
+/// This router shares session state with the REPL and taxonomy navigation,
+/// providing a unified view of the current context.
+pub fn create_session_graph_router(pool: PgPool, sessions: SessionStore) -> Router {
+    let state = SessionGraphState { pool, sessions };
+
+    Router::new()
+        .route("/api/session/:session_id/graph", get(get_session_graph))
+        .with_state(state)
 }

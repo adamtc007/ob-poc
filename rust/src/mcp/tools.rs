@@ -985,5 +985,154 @@ Use to:
                 "required": ["session_id"]
             }),
         },
+        // =====================================================================
+        // Taxonomy Navigation Tools
+        // Entity type hierarchy browsing and navigation
+        // =====================================================================
+        Tool {
+            name: "taxonomy_get".into(),
+            description: r#"Get the entity type taxonomy tree.
+
+Returns the full entity type hierarchy starting from root.
+Each node includes:
+- node_id: Unique identifier
+- label: Display name (e.g., "SHELL", "LIMITED_COMPANY")
+- node_type: Category (e.g., "entity_type", "category")
+- children: Child nodes in the hierarchy
+- entity_count: Number of entities of this type (if applicable)
+
+Use this to understand the entity type structure before drilling in."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID (optional - for state persistence)"
+                    },
+                    "include_counts": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Include entity counts per type"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "taxonomy_drill_in".into(),
+            description: r#"Drill into a taxonomy node to see its children.
+
+Navigates deeper into the entity type hierarchy.
+The new level becomes the current view in the session's taxonomy stack.
+
+Use node_label to specify which node to drill into (e.g., "SHELL", "FUND").
+Returns the children of that node."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "node_label": {
+                        "type": "string",
+                        "description": "Label of node to drill into (e.g., 'SHELL', 'PERSON', 'LIMITED_COMPANY')"
+                    }
+                },
+                "required": ["session_id", "node_label"]
+            }),
+        },
+        Tool {
+            name: "taxonomy_zoom_out".into(),
+            description: r#"Zoom out one level in the taxonomy hierarchy.
+
+Returns to the parent level in the taxonomy stack.
+If already at root, returns an error."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "taxonomy_reset".into(),
+            description: r#"Reset taxonomy navigation to root level.
+
+Clears the taxonomy stack and returns to the top of the hierarchy."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "taxonomy_position".into(),
+            description: r#"Get current position in taxonomy navigation.
+
+Returns:
+- breadcrumbs: Path from root to current position
+- depth: Current depth in hierarchy
+- current_node: Details of current node
+- can_zoom_out: Whether zoom out is available
+- can_drill_in: Whether drilling in is available"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "taxonomy_entities".into(),
+            description: r#"List entities of the currently focused type.
+
+When drilled into a specific entity type (e.g., LIMITED_COMPANY),
+this returns actual entities of that type.
+
+Supports pagination and filtering by name."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Session ID"
+                    },
+                    "search": {
+                        "type": "string",
+                        "description": "Filter entities by name"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Max results to return"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Offset for pagination"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
     ]
 }

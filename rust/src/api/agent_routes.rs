@@ -466,6 +466,7 @@ async fn get_session(
         context: session.context.clone(),
         messages: session.messages.clone(),
         can_execute: !session.assembled_dsl.is_empty(),
+        version: session.updated_at.to_rfc3339(),
     })
 }
 
@@ -1126,6 +1127,23 @@ async fn execute_session_dsl(
             );
 
             // =========================================================================
+            // PROPAGATE VIEW STATE FROM EXECUTION CONTEXT
+            // =========================================================================
+            // View operations (view.universe, view.book, etc.) store ViewState in
+            // ExecutionContext.pending_view_state. Propagate it to SessionContext
+            // so the UI can access it. This fixes the "session state side door" where
+            // ViewState was previously discarded because CustomOperation only receives
+            // ExecutionContext, not the full session.
+            if let Some(view_state) = exec_ctx.take_pending_view_state() {
+                tracing::info!(
+                    "[EXEC] Propagating ViewState to session context (node_type: {:?}, label: {})",
+                    view_state.taxonomy.node_type,
+                    view_state.taxonomy.label
+                );
+                context.set_view_state(view_state);
+            }
+
+            // =========================================================================
             // LOG SUCCESS
             // =========================================================================
             if let Some(lid) = log_id {
@@ -1428,6 +1446,7 @@ async fn clear_session_dsl(
         context: session.context.clone(),
         messages: session.messages.clone(),
         can_execute: false,
+        version: session.updated_at.to_rfc3339(),
     }))
 }
 

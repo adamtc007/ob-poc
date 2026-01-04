@@ -62,6 +62,8 @@ impl App {
             type_filter: None,
             trading_matrix_state: ob_poc_graph::TradingMatrixState::new(),
             selected_matrix_node: None,
+            last_known_version: None,
+            last_version_check: None,
         };
 
         // Try to restore session from localStorage
@@ -476,6 +478,20 @@ impl eframe::App for App {
             }
         }
 
+        // Central session refetch - triggered by: version change detected (MCP/REPL)
+        if self.state.take_pending_session_refetch() {
+            if let Some(session_id) = self.state.session_id {
+                web_sys::console::log_1(
+                    &format!(
+                        "update: session refetch triggered by version change for session_id={}",
+                        session_id
+                    )
+                    .into(),
+                );
+                self.state.refetch_session();
+            }
+        }
+
         // Check for pending execute command from agent
         if let Some(session_id) = self.state.take_pending_execute() {
             web_sys::console::log_1(&format!("update: executing session {}", session_id).into());
@@ -827,6 +843,28 @@ impl eframe::App for App {
             }
         }
 
+        // Handle taxonomy reset command
+        if self.state.take_pending_taxonomy_reset() {
+            web_sys::console::log_1(&"update: taxonomy reset".into());
+            if let Some(session_id) = self.state.session_id {
+                self.state.taxonomy_reset(session_id);
+            }
+        }
+
+        // Handle taxonomy filter command
+        if let Some(filter) = self.state.take_pending_taxonomy_filter() {
+            web_sys::console::log_1(&format!("update: taxonomy filter: {}", filter).into());
+            // TODO: Implement taxonomy filtering via API
+            web_sys::console::warn_1(&"Taxonomy filtering not yet implemented".into());
+        }
+
+        // Handle taxonomy clear filter command
+        if self.state.take_pending_taxonomy_clear_filter() {
+            web_sys::console::log_1(&"update: taxonomy clear filter".into());
+            // TODO: Implement taxonomy filter clearing via API
+            web_sys::console::warn_1(&"Taxonomy clear filter not yet implemented".into());
+        }
+
         // =================================================================
         // DEBUG: F1 toggles debug window (dev builds only)
         // =================================================================
@@ -1077,10 +1115,31 @@ impl eframe::App for App {
         });
 
         // =================================================================
-        // STEP 6: Request repaint if async operations in progress
+        // STEP 6: Periodic session version polling (detect MCP/REPL changes)
+        // =================================================================
+        // Poll every 2 seconds when we have a session
+        const VERSION_POLL_INTERVAL_SECS: f64 = 2.0;
+        if let Some(session_id) = self.state.session_id {
+            let now = ctx.input(|i| i.time);
+            let should_poll = match self.state.last_version_check {
+                Some(last_check) => (now - last_check) >= VERSION_POLL_INTERVAL_SECS,
+                None => self.state.last_known_version.is_some(), // Only poll after initial session load
+            };
+
+            if should_poll {
+                self.state.last_version_check = Some(now);
+                self.state.check_session_version(session_id);
+            }
+        }
+
+        // =================================================================
+        // STEP 7: Request repaint if async operations in progress or polling active
         // =================================================================
         if self.state.is_loading() {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        } else if self.state.session_id.is_some() && self.state.last_known_version.is_some() {
+            // Keep polling for version changes even when not loading
+            ctx.request_repaint_after(std::time::Duration::from_millis(2000));
         }
     }
 }
@@ -2196,6 +2255,44 @@ impl AppState {
                                             &"Command: ContextRemediation".into(),
                                         );
                                         state.pending_context = Some("remediation".to_string());
+                                    }
+
+                                    // Taxonomy Navigation Commands
+                                    ob_poc_types::AgentCommand::TaxonomyShow => {
+                                        web_sys::console::log_1(&"Command: TaxonomyShow".into());
+                                        // Request taxonomy breadcrumbs refresh to show current position
+                                        state.pending_taxonomy_breadcrumbs = true;
+                                    }
+                                    ob_poc_types::AgentCommand::TaxonomyDrillIn { node_label } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: TaxonomyDrillIn node_label={}",
+                                                node_label
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_taxonomy_zoom_in = Some(node_label.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::TaxonomyZoomOut => {
+                                        web_sys::console::log_1(&"Command: TaxonomyZoomOut".into());
+                                        state.pending_taxonomy_zoom_out = true;
+                                    }
+                                    ob_poc_types::AgentCommand::TaxonomyReset => {
+                                        web_sys::console::log_1(&"Command: TaxonomyReset".into());
+                                        state.pending_taxonomy_reset = true;
+                                    }
+                                    ob_poc_types::AgentCommand::TaxonomyFilter { filter } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: TaxonomyFilter filter={}", filter)
+                                                .into(),
+                                        );
+                                        state.pending_taxonomy_filter = Some(filter.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::TaxonomyClearFilter => {
+                                        web_sys::console::log_1(
+                                            &"Command: TaxonomyClearFilter".into(),
+                                        );
+                                        state.pending_taxonomy_clear_filter = true;
                                     }
 
                                     // Unhandled commands - log but don't fail

@@ -170,6 +170,13 @@ impl ToolHandlers {
             "research_approve" => self.research_approve(args).await,
             "research_reject" => self.research_reject(args).await,
             "research_status" => self.research_status(args).await,
+            // Taxonomy navigation tools
+            "taxonomy_get" => self.taxonomy_get(args).await,
+            "taxonomy_drill_in" => self.taxonomy_drill_in(args).await,
+            "taxonomy_zoom_out" => self.taxonomy_zoom_out(args).await,
+            "taxonomy_reset" => self.taxonomy_reset(args).await,
+            "taxonomy_position" => self.taxonomy_position(args).await,
+            "taxonomy_entities" => self.taxonomy_entities(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -540,10 +547,14 @@ impl ToolHandlers {
                     .map(|(k, v)| (k.clone(), json!(v.to_string())))
                     .collect();
 
+                // Include view_state if a view.* operation produced one
+                let view_state = ctx.take_pending_view_state();
+
                 Ok(json!({
                     "success": true,
                     "steps_executed": results.len(),
-                    "bindings": bindings
+                    "bindings": bindings,
+                    "view_state": view_state
                 }))
             }
             Err(e) => {
@@ -2866,6 +2877,278 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         Ok(json!({
             "success": true,
             "status": status
+        }))
+    }
+
+    // =========================================================================
+    // Taxonomy Navigation Tools
+    // =========================================================================
+
+    /// Get the entity type taxonomy tree
+    async fn taxonomy_get(&self, args: Value) -> Result<Value> {
+        use crate::taxonomy::{TaxonomyNode, TaxonomyService};
+
+        let pool = self.require_pool()?;
+        let include_counts = args["include_counts"].as_bool().unwrap_or(true);
+
+        // Build the taxonomy tree from database
+        let service = TaxonomyService::new(pool.clone());
+        let tree = service.build_taxonomy_tree(include_counts).await?;
+
+        // Convert to JSON representation
+        fn node_to_json(node: &TaxonomyNode) -> serde_json::Value {
+            json!({
+                "node_id": node.id.to_string(),
+                "label": node.label,
+                "short_label": node.short_label,
+                "node_type": format!("{:?}", node.node_type),
+                "entity_count": node.descendant_count,
+                "children": node.children.iter().map(node_to_json).collect::<Vec<_>>()
+            })
+        }
+
+        Ok(json!({
+            "success": true,
+            "taxonomy": node_to_json(&tree)
+        }))
+    }
+
+    /// Drill into a taxonomy node
+    async fn taxonomy_drill_in(&self, args: Value) -> Result<Value> {
+        use crate::taxonomy::{TaxonomyFrame, TaxonomyService};
+
+        let sessions = self.require_sessions()?;
+        let pool = self.require_pool()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let node_label = args["node_label"]
+            .as_str()
+            .ok_or_else(|| anyhow!("node_label required"))?
+            .to_uppercase();
+
+        // Get the taxonomy subtree for this node
+        let service = TaxonomyService::new(pool.clone());
+        let subtree = service.get_subtree(&node_label).await?;
+
+        // Create a new frame for this level using the constructor
+        let frame = TaxonomyFrame::from_zoom(
+            subtree.id,
+            node_label.clone(),
+            subtree.clone(),
+            None, // No parser needed for type taxonomy
+        );
+
+        // Push onto the session's taxonomy stack
+        let breadcrumbs = {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            let _ = session.context.taxonomy_stack.push(frame);
+            session.context.taxonomy_stack.breadcrumbs()
+        };
+
+        // Return the children at this level
+        let children: Vec<serde_json::Value> = subtree
+            .children
+            .iter()
+            .map(|child| {
+                json!({
+                    "node_id": child.id.to_string(),
+                    "label": child.label,
+                    "short_label": child.short_label,
+                    "node_type": format!("{:?}", child.node_type),
+                    "entity_count": child.descendant_count,
+                    "has_children": !child.children.is_empty()
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "success": true,
+            "current_node": node_label,
+            "children": children,
+            "breadcrumbs": breadcrumbs
+        }))
+    }
+
+    /// Zoom out one level in taxonomy
+    async fn taxonomy_zoom_out(&self, args: Value) -> Result<Value> {
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let (success, breadcrumbs, current_label) = {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            if !session.context.taxonomy_stack.can_zoom_out() {
+                return Ok(json!({
+                    "success": false,
+                    "error": "Already at root level"
+                }));
+            }
+
+            session.context.taxonomy_stack.pop();
+            let breadcrumbs = session.context.taxonomy_stack.breadcrumbs();
+            let current_label = session
+                .context
+                .taxonomy_stack
+                .current()
+                .map(|f| f.label.clone())
+                .unwrap_or_else(|| "ROOT".to_string());
+
+            (true, breadcrumbs, current_label)
+        };
+
+        Ok(json!({
+            "success": success,
+            "current_node": current_label,
+            "breadcrumbs": breadcrumbs
+        }))
+    }
+
+    /// Reset taxonomy to root level
+    async fn taxonomy_reset(&self, args: Value) -> Result<Value> {
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        {
+            let mut sessions_guard = sessions.write().await;
+            let session = sessions_guard
+                .get_mut(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            session.context.taxonomy_stack.clear();
+        }
+
+        Ok(json!({
+            "success": true,
+            "message": "Taxonomy reset to root level"
+        }))
+    }
+
+    /// Get current taxonomy position
+    async fn taxonomy_position(&self, args: Value) -> Result<Value> {
+        let sessions = self.require_sessions()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let sessions_guard = sessions.read().await;
+        let session = sessions_guard
+            .get(&session_uuid)
+            .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+        let stack = &session.context.taxonomy_stack;
+
+        if stack.is_empty() {
+            return Ok(json!({
+                "success": true,
+                "at_root": true,
+                "breadcrumbs": [],
+                "depth": 0,
+                "can_zoom_out": false,
+                "can_drill_in": true
+            }));
+        }
+
+        let current_frame = stack.current();
+        let current_node = current_frame.map(|f| {
+            json!({
+                "label": f.label,
+                "child_count": f.tree.children.len()
+            })
+        });
+
+        Ok(json!({
+            "success": true,
+            "at_root": false,
+            "breadcrumbs": stack.breadcrumbs(),
+            "depth": stack.depth(),
+            "current_node": current_node,
+            "can_zoom_out": stack.can_zoom_out(),
+            "can_drill_in": stack.can_zoom_in()
+        }))
+    }
+
+    /// List entities of the currently focused type
+    async fn taxonomy_entities(&self, args: Value) -> Result<Value> {
+        use crate::taxonomy::TaxonomyService;
+
+        let sessions = self.require_sessions()?;
+        let pool = self.require_pool()?;
+
+        let session_id = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?;
+        let session_uuid =
+            Uuid::parse_str(session_id).map_err(|_| anyhow!("Invalid session_id"))?;
+
+        let search = args["search"].as_str().map(|s| s.to_string());
+        let limit = args["limit"].as_i64().unwrap_or(20);
+        let offset = args["offset"].as_i64().unwrap_or(0);
+
+        // Get current entity type from taxonomy stack
+        let entity_type = {
+            let sessions_guard = sessions.read().await;
+            let session = sessions_guard
+                .get(&session_uuid)
+                .ok_or_else(|| anyhow!("Session not found: {}", session_uuid))?;
+
+            session
+                .context
+                .taxonomy_stack
+                .current()
+                .map(|f| f.label.clone())
+                .ok_or_else(|| anyhow!("No taxonomy node selected. Use taxonomy_drill_in first."))?
+        };
+
+        // Query entities of this type
+        let service = TaxonomyService::new(pool.clone());
+        let entities = service
+            .list_entities_by_type(&entity_type, search.as_deref(), limit, offset)
+            .await?;
+
+        let entity_list: Vec<serde_json::Value> = entities
+            .iter()
+            .map(|e| {
+                json!({
+                    "entity_id": e.entity_id,
+                    "name": e.name,
+                    "entity_type": e.entity_type,
+                    "created_at": e.created_at.map(|t| t.to_rfc3339())
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "success": true,
+            "entity_type": entity_type,
+            "entities": entity_list,
+            "count": entity_list.len(),
+            "limit": limit,
+            "offset": offset
         }))
     }
 }

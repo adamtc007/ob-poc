@@ -64,7 +64,7 @@ pub use agent_routes::{create_agent_router, create_agent_router_with_sessions};
 pub use dsl_viewer_routes::create_dsl_viewer_router;
 
 #[cfg(feature = "server")]
-pub use graph_routes::create_graph_router;
+pub use graph_routes::{create_graph_router, create_session_graph_router};
 
 #[cfg(feature = "server")]
 pub use session::{create_session_store, SessionStore};

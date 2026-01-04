@@ -32,12 +32,9 @@ pub struct TrustAnalyzeControlOp;
 #[cfg(feature = "database")]
 #[derive(Debug, sqlx::FromRow)]
 struct TrustProvision {
-    id: Uuid,
     holder_entity_id: Option<Uuid>,
     holder_name: Option<String>,
     provision_type: String,
-    beneficiary_class: Option<String>,
-    interest_percentage: Option<rust_decimal::Decimal>,
     discretion_level: Option<String>,
 }
 
@@ -47,8 +44,6 @@ struct TrustParty {
     entity_id: Uuid,
     entity_name: Option<String>,
     party_role: String,
-    party_type: String,
-    is_active: Option<bool>,
 }
 
 #[async_trait]
@@ -87,7 +82,7 @@ impl CustomOperation for TrustAnalyzeControlOp {
         let parties: Vec<TrustParty> = if let Some(tid) = trust_id {
             sqlx::query_as(
                 r#"
-                SELECT tp.entity_id, e.name as entity_name, tp.party_role, tp.party_type, tp.is_active
+                SELECT tp.entity_id, e.name as entity_name, tp.party_role
                 FROM "ob-poc".trust_parties tp
                 JOIN "ob-poc".entities e ON tp.entity_id = e.entity_id
                 WHERE tp.trust_id = $1 AND tp.is_active = true
@@ -105,12 +100,9 @@ impl CustomOperation for TrustAnalyzeControlOp {
         let provisions: Vec<TrustProvision> = sqlx::query_as(
             r#"
             SELECT
-                tp.id,
                 tp.holder_entity_id,
                 e.name as holder_name,
                 tp.provision_type,
-                tp.beneficiary_class,
-                tp.interest_percentage,
                 tp.discretion_level
             FROM kyc.trust_provisions tp
             LEFT JOIN "ob-poc".entities e ON tp.holder_entity_id = e.entity_id

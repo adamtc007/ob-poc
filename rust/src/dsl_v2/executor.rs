@@ -13,6 +13,10 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+// Import ViewState for the pending_view_state field
+// This enables view operations to communicate ViewState back to the session layer
+use crate::session::ViewState;
+
 #[cfg(feature = "database")]
 use super::ast::{AstNode, Literal, VerbCall};
 #[cfg(feature = "database")]
@@ -104,6 +108,17 @@ pub struct ExecutionContext {
     /// Current selection (from view.selection) - for batch operations
     /// Populated when view.* verbs execute, provides @_selection binding
     pub current_selection: Option<Vec<Uuid>>,
+    /// Pending view state from view.* operations
+    ///
+    /// View operations (view.universe, view.book, view.cbu, etc.) create a ViewState
+    /// but cannot directly access UnifiedSessionContext. Instead, they store the
+    /// ViewState here. After execution completes, the caller (who has access to
+    /// UnifiedSessionContext) should call `take_pending_view_state()` and propagate
+    /// it via `session.set_view(view_state)`.
+    ///
+    /// This solves the "session state side door" where ViewState was being discarded
+    /// because CustomOperation only receives ExecutionContext, not UnifiedSessionContext.
+    pub pending_view_state: Option<ViewState>,
 }
 
 impl Default for ExecutionContext {
@@ -120,6 +135,7 @@ impl Default for ExecutionContext {
             execution_id: Uuid::new_v4(),
             idempotency_enabled: true,
             current_selection: None,
+            pending_view_state: None,
         }
     }
 }
@@ -227,6 +243,8 @@ impl ExecutionContext {
             execution_id: self.execution_id,
             idempotency_enabled: self.idempotency_enabled,
             current_selection: self.current_selection.clone(),
+            // Don't inherit pending_view_state - each iteration starts fresh
+            pending_view_state: None,
         }
     }
 
@@ -299,6 +317,38 @@ impl ExecutionContext {
         self.json_bindings.remove("_selection");
     }
 
+    // =========================================================================
+    // VIEW STATE METHODS - For view.* verb output to session layer
+    // =========================================================================
+
+    /// Set pending view state (called by view.* operations)
+    ///
+    /// View operations create a ViewState but cannot directly access
+    /// UnifiedSessionContext. Instead, they store the ViewState here.
+    /// After execution, the caller should call `take_pending_view_state()`
+    /// and propagate it to the session via `session.set_view(view_state)`.
+    pub fn set_pending_view_state(&mut self, view: ViewState) {
+        self.pending_view_state = Some(view);
+    }
+
+    /// Take the pending view state (consumes it)
+    ///
+    /// Called by the execution layer after DSL execution completes.
+    /// The caller should propagate this to UnifiedSessionContext:
+    /// ```ignore
+    /// if let Some(view) = ctx.take_pending_view_state() {
+    ///     session.set_view(view);
+    /// }
+    /// ```
+    pub fn take_pending_view_state(&mut self) -> Option<ViewState> {
+        self.pending_view_state.take()
+    }
+
+    /// Check if there's a pending view state
+    pub fn has_pending_view_state(&self) -> bool {
+        self.pending_view_state.is_some()
+    }
+
     /// Create context from DomainContext (for submission execution)
     #[cfg(feature = "database")]
     pub fn from_domain(domain_ctx: &DomainContext) -> Self {
@@ -358,6 +408,8 @@ pub struct DslExecutor {
     generic_executor: GenericCrudExecutor,
     #[cfg(feature = "database")]
     idempotency: super::idempotency::IdempotencyManager,
+    #[cfg(feature = "database")]
+    verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService,
 }
 
 impl DslExecutor {
@@ -367,6 +419,9 @@ impl DslExecutor {
         Self {
             generic_executor: GenericCrudExecutor::new(pool.clone()),
             idempotency: super::idempotency::IdempotencyManager::new(pool.clone()),
+            verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService::new(
+                pool.clone(),
+            ),
             pool,
             custom_ops: CustomOperationRegistry::new(),
         }
@@ -376,12 +431,6 @@ impl DslExecutor {
     #[cfg(feature = "database")]
     pub fn pool(&self) -> &PgPool {
         &self.pool
-    }
-
-    /// Create an executor without database (for testing/parsing only)
-    #[cfg(not(feature = "database"))]
-    pub fn new_without_db() -> Self {
-        Self {}
     }
 
     /// Execute a single verb call
@@ -781,6 +830,14 @@ impl DslExecutor {
 
             // Record in idempotency table if enabled
             if ctx.idempotency_enabled {
+                // Look up verb hash for audit trail
+                let verb_hash = self
+                    .verb_hash_lookup
+                    .get_verb_hash(&verb_name)
+                    .await
+                    .ok()
+                    .flatten();
+
                 self.idempotency
                     .record(
                         ctx.execution_id,
@@ -788,6 +845,7 @@ impl DslExecutor {
                         &verb_name,
                         &json_args,
                         &result,
+                        verb_hash.as_deref(),
                     )
                     .await?;
             }

@@ -10,8 +10,17 @@
 //!                                         │
 //!                                         ├── Compute SHA256 hash of verb definition
 //!                                         ├── Compare with yaml_hash in DB
+//!                                         ├── Compile to full contract JSON
 //!                                         └── Upsert only changed verbs
 //! ```
+//!
+//! # Contract Storage
+//!
+//! Each verb is compiled to a full JSON contract and stored in `dsl_verbs`:
+//! - `compiled_json`: Full RuntimeVerb serialized as JSON
+//! - `effective_config_json`: Expanded configuration with defaults applied
+//! - `diagnostics_json`: Compilation errors and warnings
+//! - `compiled_hash`: SHA256 of canonical compiled_json for integrity
 //!
 //! # RAG Metadata
 //!
@@ -31,6 +40,22 @@ use uuid::Uuid;
 
 use crate::dsl_v2::runtime_registry::{RuntimeBehavior, RuntimeVerb};
 use crate::dsl_v2::RuntimeVerbRegistry;
+
+use super::canonical_hash::canonical_json_hash;
+use super::verb_contract::{codes, VerbDiagnostics};
+
+/// Compiled verb contract with all metadata
+#[derive(Debug)]
+pub struct CompiledVerbContract {
+    /// Full RuntimeVerb serialized as JSON
+    pub compiled_json: serde_json::Value,
+    /// Expanded configuration with defaults applied
+    pub effective_config_json: serde_json::Value,
+    /// Compilation diagnostics (errors, warnings)
+    pub diagnostics: VerbDiagnostics,
+    /// SHA256 of canonical compiled_json
+    pub compiled_hash: [u8; 32],
+}
 
 /// Errors from verb sync operations
 #[derive(Debug, Error)]
@@ -95,14 +120,14 @@ impl VerbSyncService {
                     debug!("Verb {} unchanged (hash match)", verb.full_name);
                 }
                 Some(_) => {
-                    // Changed - update
-                    self.upsert_verb(verb, &verb_hash).await?;
+                    // Changed - update with full contract
+                    self.upsert_verb_with_contract(verb, &verb_hash).await?;
                     updated += 1;
                     debug!("Verb {} updated (hash changed)", verb.full_name);
                 }
                 None => {
-                    // New - insert
-                    self.upsert_verb(verb, &verb_hash).await?;
+                    // New - insert with full contract
+                    self.upsert_verb_with_contract(verb, &verb_hash).await?;
                     added += 1;
                     debug!("Verb {} added (new)", verb.full_name);
                 }
@@ -167,8 +192,297 @@ impl VerbSyncService {
             .collect())
     }
 
-    /// Upsert a verb to the database
-    async fn upsert_verb(&self, verb: &RuntimeVerb, hash: &str) -> Result<(), VerbSyncError> {
+    /// Log a sync operation
+    async fn log_sync(
+        &self,
+        added: i32,
+        updated: i32,
+        unchanged: i32,
+        removed: i32,
+        source_hash: &str,
+        duration_ms: i64,
+        error: Option<&str>,
+    ) -> Result<Uuid, VerbSyncError> {
+        let sync_id: (Uuid,) = sqlx::query_as(
+            r#"
+            INSERT INTO "ob-poc".dsl_verb_sync_log (
+                verbs_added, verbs_updated, verbs_unchanged, verbs_removed,
+                source_hash, duration_ms, error_message
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            RETURNING sync_id
+        "#,
+        )
+        .bind(added)
+        .bind(updated)
+        .bind(unchanged)
+        .bind(removed)
+        .bind(source_hash)
+        .bind(duration_ms as i32)
+        .bind(error)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok(sync_id.0)
+    }
+
+    // =========================================================================
+    // Contract Compilation Methods (Phase 1)
+    // =========================================================================
+
+    /// Compile a RuntimeVerb to its full JSON representation with diagnostics
+    ///
+    /// Returns compiled JSON, effective config, and any compilation diagnostics.
+    /// Note: We manually build the JSON since RuntimeVerb doesn't derive Serialize.
+    pub fn compile_verb_contract(&self, verb: &RuntimeVerb) -> CompiledVerbContract {
+        let mut diagnostics = VerbDiagnostics::default();
+
+        // Manually build compiled_json since RuntimeVerb doesn't derive Serialize
+        let compiled_json = self.verb_to_json(verb);
+
+        // Build effective_config with expanded defaults
+        let effective_config_json = self.build_effective_config(verb, &mut diagnostics);
+
+        // Validate and add warnings
+        self.validate_verb_contract(verb, &mut diagnostics);
+
+        // Compute canonical hash for integrity verification
+        let compiled_hash = canonical_json_hash(&compiled_json);
+
+        CompiledVerbContract {
+            compiled_json,
+            effective_config_json,
+            diagnostics,
+            compiled_hash,
+        }
+    }
+
+    /// Convert RuntimeVerb to JSON manually (since it doesn't derive Serialize)
+    fn verb_to_json(&self, verb: &RuntimeVerb) -> serde_json::Value {
+        let behavior_json = match &verb.behavior {
+            RuntimeBehavior::Crud(crud) => serde_json::json!({
+                "type": "crud",
+                "operation": format!("{:?}", crud.operation),
+                "table": crud.table,
+                "schema": crud.schema,
+                "key": crud.key,
+                "returning": crud.returning,
+            }),
+            RuntimeBehavior::Plugin(handler) => serde_json::json!({
+                "type": "plugin",
+                "handler": handler,
+            }),
+            RuntimeBehavior::GraphQuery(gq) => serde_json::json!({
+                "type": "graph_query",
+                "operation": format!("{:?}", gq.operation),
+            }),
+        };
+
+        let args_json: Vec<serde_json::Value> = verb
+            .args
+            .iter()
+            .map(|arg| {
+                let mut arg_json = serde_json::json!({
+                    "name": arg.name,
+                    "type": format!("{:?}", arg.arg_type),
+                    "required": arg.required,
+                });
+
+                if let Some(ref maps_to) = arg.maps_to {
+                    arg_json["maps_to"] = serde_json::Value::String(maps_to.clone());
+                }
+                if let Some(ref desc) = arg.description {
+                    arg_json["description"] = serde_json::Value::String(desc.clone());
+                }
+                if let Some(ref lookup) = arg.lookup {
+                    arg_json["lookup"] = serde_json::json!({
+                        "table": lookup.table,
+                        "schema": lookup.schema,
+                        "entity_type": lookup.entity_type,
+                    });
+                }
+                if let Some(ref default) = arg.default {
+                    // Convert serde_yaml::Value to serde_json::Value
+                    if let Ok(json_default) = serde_json::to_value(default) {
+                        arg_json["default"] = json_default;
+                    }
+                }
+
+                arg_json
+            })
+            .collect();
+
+        let mut json = serde_json::json!({
+            "domain": verb.domain,
+            "verb": verb.verb,
+            "full_name": verb.full_name,
+            "description": verb.description,
+            "behavior": behavior_json,
+            "args": args_json,
+            "returns": {
+                "type": format!("{:?}", verb.returns.return_type),
+                "name": verb.returns.name,
+                "capture": verb.returns.capture,
+            },
+        });
+
+        if let Some(ref produces) = verb.produces {
+            json["produces"] = serde_json::json!({
+                "produced_type": produces.produced_type,
+                "subtype": produces.subtype,
+            });
+        }
+
+        if !verb.consumes.is_empty() {
+            let consumes_json: Vec<serde_json::Value> = verb
+                .consumes
+                .iter()
+                .map(|c| {
+                    serde_json::json!({
+                        "consumed_type": c.consumed_type,
+                        "required": c.required,
+                    })
+                })
+                .collect();
+            json["consumes"] = serde_json::Value::Array(consumes_json);
+        }
+
+        if let Some(ref lifecycle) = verb.lifecycle {
+            json["lifecycle"] = serde_json::json!({
+                "entity_arg": lifecycle.entity_arg,
+                "requires_states": lifecycle.requires_states,
+                "transitions_to": lifecycle.transitions_to,
+            });
+        }
+
+        json
+    }
+
+    /// Build effective configuration with all defaults expanded
+    ///
+    /// For now, this mirrors compiled_json with some additional processing.
+    /// Future enhancements could expand more complex defaults.
+    fn build_effective_config(
+        &self,
+        verb: &RuntimeVerb,
+        _diagnostics: &mut VerbDiagnostics,
+    ) -> serde_json::Value {
+        // For now, effective config is the same as compiled JSON
+        // Future: expand defaults, resolve references, etc.
+        self.verb_to_json(verb)
+    }
+
+    /// Validate verb contract and add diagnostics for common issues
+    fn validate_verb_contract(&self, verb: &RuntimeVerb, diagnostics: &mut VerbDiagnostics) {
+        // Check for common issues in args
+        for (i, arg) in verb.args.iter().enumerate() {
+            // Warn if lookup configured but entity_type missing
+            if let Some(ref lookup) = arg.lookup {
+                if lookup.entity_type.is_none() && !lookup.table.is_empty() {
+                    diagnostics.add_warning_with_path(
+                        codes::LOOKUP_MISSING_ENTITY_TYPE,
+                        &format!(
+                            "Arg '{}' has lookup.table but no lookup.entity_type",
+                            arg.name
+                        ),
+                        Some(&format!("args[{}].lookup", i)),
+                        Some("Add entity_type for EntityGateway resolution"),
+                    );
+                }
+            }
+
+            // Warn if required arg has default (contradiction)
+            if arg.required && arg.default.is_some() {
+                diagnostics.add_warning_with_path(
+                    codes::REQUIRED_WITH_DEFAULT,
+                    &format!(
+                        "Arg '{}' is marked required but has a default value",
+                        arg.name
+                    ),
+                    Some(&format!("args[{}]", i)),
+                    Some("Either remove 'required: true' or remove the default"),
+                );
+            }
+        }
+
+        // Check lifecycle consistency
+        if let Some(ref lifecycle) = verb.lifecycle {
+            if lifecycle.transitions_to.is_some() && lifecycle.entity_arg.is_none() {
+                diagnostics.add_error_with_path(
+                    codes::LIFECYCLE_MISSING_ENTITY_ARG,
+                    "Lifecycle has transitions_to but no entity_arg specified",
+                    Some("lifecycle"),
+                    Some(
+                        "Add entity_arg to identify which arg holds the entity being transitioned",
+                    ),
+                );
+            }
+
+            if !lifecycle.requires_states.is_empty() && lifecycle.entity_arg.is_none() {
+                diagnostics.add_warning_with_path(
+                    codes::LIFECYCLE_MISSING_ENTITY_ARG,
+                    "Lifecycle has requires_states but no entity_arg specified",
+                    Some("lifecycle"),
+                    Some("Add entity_arg for state validation to work"),
+                );
+            }
+        }
+
+        // Check produces/consumes consistency
+        if let Some(ref produces) = verb.produces {
+            if produces.produced_type.is_empty() {
+                diagnostics.add_warning_with_path(
+                    codes::PRODUCES_EMPTY_TYPE,
+                    "Produces block has empty produced_type",
+                    Some("produces"),
+                    Some("Specify what entity type this verb produces"),
+                );
+            }
+        }
+
+        // Check behavior-specific requirements
+        match &verb.behavior {
+            RuntimeBehavior::Crud(crud) => {
+                // CRUD verbs should have table mapping
+                if crud.table.is_empty() {
+                    diagnostics.add_error_with_path(
+                        codes::CRUD_MISSING_TABLE,
+                        "CRUD behavior missing table name",
+                        Some("behavior.crud"),
+                        None,
+                    );
+                }
+            }
+            RuntimeBehavior::Plugin(handler) => {
+                // Plugin handler should be non-empty
+                if handler.is_empty() {
+                    diagnostics.add_warning_with_path(
+                        codes::PLUGIN_EMPTY_HANDLER,
+                        "Plugin behavior has empty handler name",
+                        Some("behavior.plugin"),
+                        None,
+                    );
+                }
+            }
+            RuntimeBehavior::GraphQuery(_) => {
+                // Graph queries are generally valid if they compile
+            }
+        }
+    }
+
+    /// Enhanced upsert that stores compiled contract alongside verb metadata
+    async fn upsert_verb_with_contract(
+        &self,
+        verb: &RuntimeVerb,
+        yaml_hash: &str,
+    ) -> Result<(), VerbSyncError> {
+        // Compile the verb to get full contract
+        let contract = self.compile_verb_contract(verb);
+
+        // Convert diagnostics to JSON
+        let diagnostics_json = serde_json::to_value(&contract.diagnostics)
+            .unwrap_or(serde_json::json!({"errors":[],"warnings":[]}));
+
+        // Get behavior string
         let behavior = match &verb.behavior {
             RuntimeBehavior::Crud(_) => "crud",
             RuntimeBehavior::Plugin(_) => "plugin",
@@ -202,7 +516,7 @@ impl VerbSyncService {
             })
             .unwrap_or((None, None, None));
 
-        // Determine category from domain (can be overridden later)
+        // Determine category from domain
         let category = self.infer_category(&verb.domain);
 
         sqlx::query(
@@ -211,8 +525,9 @@ impl VerbSyncService {
                 domain, verb_name, description, behavior,
                 category, produces_type, produces_subtype, consumes,
                 lifecycle_entity_arg, requires_states, transitions_to,
-                source, yaml_hash
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+                source, yaml_hash,
+                compiled_json, effective_config_json, diagnostics_json, compiled_hash
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             ON CONFLICT (domain, verb_name) DO UPDATE SET
                 description = EXCLUDED.description,
                 behavior = EXCLUDED.behavior,
@@ -224,6 +539,10 @@ impl VerbSyncService {
                 requires_states = EXCLUDED.requires_states,
                 transitions_to = EXCLUDED.transitions_to,
                 yaml_hash = EXCLUDED.yaml_hash,
+                compiled_json = EXCLUDED.compiled_json,
+                effective_config_json = EXCLUDED.effective_config_json,
+                diagnostics_json = EXCLUDED.diagnostics_json,
+                compiled_hash = EXCLUDED.compiled_hash,
                 updated_at = now()
         "#,
         )
@@ -239,45 +558,36 @@ impl VerbSyncService {
         .bind(&requires_states)
         .bind(&transitions_to)
         .bind("yaml")
-        .bind(hash)
+        .bind(yaml_hash)
+        .bind(&contract.compiled_json)
+        .bind(&contract.effective_config_json)
+        .bind(&diagnostics_json)
+        .bind(&contract.compiled_hash[..])
         .execute(&self.pool)
         .await?;
+
+        // Log if there were compilation issues
+        if contract.diagnostics.has_errors() {
+            warn!(
+                "Verb {} has {} compilation error(s)",
+                verb.full_name,
+                contract.diagnostics.errors.len()
+            );
+        }
+        if !contract.diagnostics.warnings.is_empty() {
+            debug!(
+                "Verb {} has {} warning(s)",
+                verb.full_name,
+                contract.diagnostics.warnings.len()
+            );
+        }
 
         Ok(())
     }
 
-    /// Log a sync operation
-    async fn log_sync(
-        &self,
-        added: i32,
-        updated: i32,
-        unchanged: i32,
-        removed: i32,
-        source_hash: &str,
-        duration_ms: i64,
-        error: Option<&str>,
-    ) -> Result<Uuid, VerbSyncError> {
-        let sync_id: (Uuid,) = sqlx::query_as(
-            r#"
-            INSERT INTO "ob-poc".dsl_verb_sync_log (
-                verbs_added, verbs_updated, verbs_unchanged, verbs_removed,
-                source_hash, duration_ms, error_message
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING sync_id
-        "#,
-        )
-        .bind(added)
-        .bind(updated)
-        .bind(unchanged)
-        .bind(removed)
-        .bind(source_hash)
-        .bind(duration_ms as i32)
-        .bind(error)
-        .fetch_one(&self.pool)
-        .await?;
-
-        Ok(sync_id.0)
-    }
+    // =========================================================================
+    // Hash Computation Methods
+    // =========================================================================
 
     /// Compute SHA256 hash of a verb definition
     fn compute_verb_hash(&self, verb: &RuntimeVerb) -> String {

@@ -136,8 +136,6 @@ impl std::error::Error for CompileError {}
 pub struct PlanningContext {
     /// Bindings available from session context (e.g., @last_cbu)
     available_bindings: HashMap<String, BindingInfo>,
-    /// Whether to enable strict mode (errors vs warnings)
-    strict_mode: bool,
 }
 
 /// Information about an available binding
@@ -155,14 +153,6 @@ impl PlanningContext {
     /// Create empty context
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Create context with strict mode enabled
-    pub fn strict() -> Self {
-        Self {
-            strict_mode: true,
-            ..Default::default()
-        }
     }
 
     /// Add a binding to the context
@@ -190,11 +180,6 @@ impl PlanningContext {
     /// Get binding info
     pub fn get_binding(&self, name: &str) -> Option<&BindingInfo> {
         self.available_bindings.get(name)
-    }
-
-    /// Check if strict mode is enabled
-    pub fn is_strict(&self) -> bool {
-        self.strict_mode
     }
 }
 

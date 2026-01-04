@@ -17,10 +17,13 @@
 //! ```
 
 pub mod agent_context;
+pub mod canonical_hash;
 pub mod enhanced_context;
 pub mod research_context;
 pub mod scope;
+pub mod verb_contract;
 pub mod verb_discovery;
+pub mod verb_hash_lookup;
 pub mod verb_rag_metadata;
 pub mod verb_sync;
 pub mod view_state;
@@ -36,12 +39,14 @@ use crate::navigation::{NavCommand, NavExecutor, NavResult};
 
 pub use crate::research::ApprovedResearch;
 pub use agent_context::AgentGraphContext;
+pub use canonical_hash::{canonical_json_hash, hash_to_hex, hex_to_hash, sha256};
 pub use enhanced_context::{
     get_verb_suggestions, EnhancedAgentContext, EnhancedContextBuilder, SerializableAgentContext,
     SerializableBinding,
 };
 pub use research_context::{ResearchContext, ResearchState};
 pub use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
+pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostic, VerbDiagnostics};
 pub use verb_discovery::{
     AgentVerbContext, CategoryInfo, DiscoveryQuery, SuggestionReason, VerbDiscoveryError,
     VerbDiscoveryService, VerbSuggestion, WorkflowPhaseInfo,
