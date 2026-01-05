@@ -143,95 +143,34 @@ pub async fn get_cbu_graph(
     axum::extract::Query(params): axum::extract::Query<GraphQuery>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     use ob_poc::database::VisualizationRepository;
-    use ob_poc::graph::{CbuGraphBuilder, LayoutEngine, Orientation, ViewMode};
+    use ob_poc::graph::{ConfigDrivenGraphBuilder, LayoutEngineV2};
+
+    let view_mode = params.view_mode.as_deref().unwrap_or("KYC_UBO");
+    let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
+    let horizontal = orientation.eq_ignore_ascii_case("HORIZONTAL");
+
+    // Build graph using config-driven builder
+    let builder = ConfigDrivenGraphBuilder::new(&state.pool, cbu_id, view_mode)
+        .await
+        .map_err(|e| {
+            tracing::error!("Config-driven builder init error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let repo = VisualizationRepository::new(state.pool.clone());
-    let view_mode = ViewMode::parse(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
-    let orientation = Orientation::parse(params.orientation.as_deref().unwrap_or("VERTICAL"));
-
-    // Build graph filtered by view_mode - server does the filtering
-    let mut graph = match view_mode {
-        ViewMode::KycUbo => {
-            // KYC/UBO view: entities + KYC + UBO layers, no services
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(true)
-                .with_ubo(true)
-                .with_services(false)
-                .build(&repo)
-                .await
-        }
-        ViewMode::UboOnly => {
-            // UBO Only view: pure ownership/control graph
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(true)
-                .with_services(false)
-                .with_entities(true)
-                .build(&repo)
-                .await
-        }
-        ViewMode::ServiceDelivery => {
-            // Service Delivery view: products + services + resources + trading entities
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(false)
-                .with_services(true)
-                .with_entities(true)
-                .build(&repo)
-                .await
-        }
-        ViewMode::ProductsOnly => {
-            // Products only: just CBU + products
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(false)
-                .with_services(true) // Load services layer to get products
-                .with_entities(false)
-                .build(&repo)
-                .await
-        }
-        ViewMode::Trading => {
-            // Trading view: CBU as container with trading entities (Asset Owner, IM, ManCo, etc.)
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(false)
-                .with_services(false)
-                .with_entities(true) // Load entities for trading roles
-                .build(&repo)
-                .await
-        }
-    }
-    .map_err(|e| {
+    let mut graph = builder.build(&repo).await.map_err(|e| {
         tracing::error!("Graph build error: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // Apply view-mode specific filtering after loading
-    match view_mode {
-        ViewMode::UboOnly => {
-            graph.filter_to_ubo_only();
-        }
-        ViewMode::ServiceDelivery => {
-            graph.filter_to_trading_entities();
-        }
-        ViewMode::ProductsOnly => {
-            graph.filter_to_products_only();
-        }
-        ViewMode::Trading => {
-            graph.filter_to_trading_entities();
-        }
-        ViewMode::KycUbo => {
-            // No additional filtering
-        }
-    }
+    // Apply layout using LayoutEngineV2
+    let layout_engine = LayoutEngineV2::from_database(&state.pool, view_mode, horizontal)
+        .await
+        .map_err(|e| {
+            tracing::error!("Layout config load error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    // Apply server-side layout (computes x/y positions)
-    let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);
     layout_engine.layout(&mut graph);
 
     serde_json::to_value(graph).map(Json).map_err(|e| {

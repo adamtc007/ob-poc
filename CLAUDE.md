@@ -2639,6 +2639,11 @@ pub struct SessionContext {
     pub taxonomy_stack: TaxonomyStack,             // Fractal drill-down navigation
     pub domain_hint: Option<String>,               // RAG domain hint
     
+    // === VIEW STATE (REPL/View synchronization) ===
+    pub view_mode: Option<String>,                 // Current graph view mode (KYC_UBO, etc.)
+    pub zoom_level: Option<f32>,                   // Camera zoom level (persisted)
+    pub expanded_nodes: HashSet<Uuid>,             // Expanded node IDs for fractal nav
+    
     // === BATCH EXECUTION ===
     pub mode: SessionMode,                         // Chat | TemplateExpansion | BatchExecution
     pub template_execution: TemplateExecutionContext,  // Agent-driven batch

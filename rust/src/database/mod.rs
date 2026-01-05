@@ -29,6 +29,7 @@ pub mod resource_instance_service;
 pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
+pub mod view_config_service;
 pub mod view_state_audit;
 pub mod visualization_repository;
 
@@ -91,6 +92,11 @@ pub use context_discovery_service::{
 
 pub use view_state_audit::{
     RecordViewStateChange, SessionViewHistoryEntry, ViewStateAuditRepository, ViewStateChange,
+};
+
+pub use view_config_service::{
+    EdgeTypeConfig, LayoutCacheEntry, LayoutConfigEntry, NodeLayoutOverride, NodeTypeConfig,
+    ViewConfigService, ViewModeConfig,
 };
 
 pub use semantic_state_service::derive_semantic_state;

@@ -1562,36 +1562,9 @@ impl RoleCategory {
         )
     }
 
-    /// Returns true if this category is relevant for UBO/KYC views
-    /// Includes ownership chains, control chains, and trust structures
-    pub fn is_ubo_relevant(&self) -> bool {
-        matches!(
-            self,
-            Self::OwnershipChain
-                | Self::ControlChain
-                | Self::OwnershipControl
-                | Self::TrustRoles
-                | Self::InvestorChain
-                | Self::Both
-        )
-    }
-
-    /// Returns true if this category is relevant for Trading views
-    /// Some categories (like ControlChain) appear in BOTH UBO and Trading
-    pub fn is_trading_relevant(&self) -> bool {
-        matches!(
-            self,
-            Self::FundManagement
-                | Self::FundStructure
-                | Self::TradingExecution
-                | Self::FundOperations
-                | Self::Distribution
-                | Self::Financing
-                | Self::InvestmentVehicle  // Pooled funds AO invests in (Umbrella, ETF, Unit Trust)
-                | Self::ControlChain  // Directors, officers appear in trading view too
-                | Self::Both
-        )
-    }
+    // NOTE: is_ubo_relevant() and is_trading_relevant() removed - replaced by database-driven
+    // visibility config in ob-poc.node_types and ob-poc.view_modes tables.
+    // See ViewConfigService for the config-driven approach.
 }
 
 /// Layout behavior hint for node positioning
@@ -2079,6 +2052,71 @@ pub enum EdgeType {
 }
 
 impl EdgeType {
+    /// Convert from database edge_type_code (SCREAMING_SNAKE_CASE)
+    /// Used by ConfigDrivenGraphBuilder for view configuration filtering
+    pub fn from_code(code: &str) -> Option<Self> {
+        match code {
+            "CBU_ROLE" => Some(Self::HasRole),
+            "OWNERSHIP" => Some(Self::Owns),
+            "INDIRECT_OWNERSHIP" => Some(Self::Owns), // Maps to same variant
+            "CONTROL" => Some(Self::Controls),
+            "BOARD_MEMBER" => Some(Self::Controls), // Control variant
+            "TRUST_SETTLOR" => Some(Self::TrustSettlor),
+            "TRUST_TRUSTEE" => Some(Self::TrustTrustee),
+            "TRUST_BENEFICIARY" => Some(Self::TrustBeneficiary),
+            "TRUST_PROTECTOR" => Some(Self::TrustProtector),
+            "FUND_MANAGED_BY" => Some(Self::ManagedBy),
+            "CBU_USES_PRODUCT" => Some(Self::UsesProduct),
+            "FEEDER_TO_MASTER" => Some(Self::FeederTo),
+            "INVESTS_IN_VEHICLE" => Some(Self::InvestsIn),
+            "UMBRELLA_CONTAINS_SUBFUND" => Some(Self::Contains),
+            "FUND_HAS_SHARE_CLASS" => Some(Self::ShareClassOf),
+            "PRODUCT_PROVIDES_SERVICE" => Some(Self::Delivers),
+            "SERVICE_USES_RESOURCE" => Some(Self::ProvisionedFor),
+            "ENTITY_AUTHORIZES_TRADING" => Some(Self::DelegatesTo),
+            "CBU_HAS_TRADING_PROFILE" => Some(Self::BelongsTo),
+            "TRADING_PROFILE_HAS_MATRIX" => Some(Self::BelongsTo),
+            _ => None,
+        }
+    }
+
+    /// Convert to database edge_type_code (SCREAMING_SNAKE_CASE)
+    /// Used by ConfigDrivenGraphBuilder for view configuration filtering
+    pub fn to_code(&self) -> &'static str {
+        match self {
+            Self::HasRole => "CBU_ROLE",
+            Self::Owns => "OWNERSHIP",
+            Self::Controls => "CONTROL",
+            Self::TrustSettlor => "TRUST_SETTLOR",
+            Self::TrustTrustee => "TRUST_TRUSTEE",
+            Self::TrustBeneficiary => "TRUST_BENEFICIARY",
+            Self::TrustProtector => "TRUST_PROTECTOR",
+            Self::ManagedBy => "FUND_MANAGED_BY",
+            Self::AdministeredBy => "FUND_MANAGED_BY", // No separate code, use managed
+            Self::CustodiedBy => "FUND_MANAGED_BY",    // No separate code, use managed
+            Self::UsesProduct => "CBU_USES_PRODUCT",
+            Self::FeederTo => "FEEDER_TO_MASTER",
+            Self::InvestsIn => "INVESTS_IN_VEHICLE",
+            Self::Contains => "UMBRELLA_CONTAINS_SUBFUND",
+            Self::ShareClassOf => "FUND_HAS_SHARE_CLASS",
+            Self::RoutesTo => "SERVICE_USES_RESOURCE",
+            Self::Matches => "SERVICE_USES_RESOURCE",
+            Self::CoveredBy => "SERVICE_USES_RESOURCE",
+            Self::SecuredBy => "SERVICE_USES_RESOURCE",
+            Self::SettlesAt => "SERVICE_USES_RESOURCE",
+            Self::SubcustodianOf => "SERVICE_USES_RESOURCE",
+            Self::Requires => "SERVICE_USES_RESOURCE",
+            Self::Validates => "SERVICE_USES_RESOURCE",
+            Self::VerifiedBy => "SERVICE_USES_RESOURCE",
+            Self::Contradicts => "SERVICE_USES_RESOURCE",
+            Self::Delivers => "PRODUCT_PROVIDES_SERVICE",
+            Self::BelongsTo => "CBU_HAS_TRADING_PROFILE",
+            Self::ProvisionedFor => "SERVICE_USES_RESOURCE",
+            Self::DelegatesTo => "ENTITY_AUTHORIZES_TRADING",
+            Self::UboTerminus => "OWNERSHIP", // Terminus is an ownership termination
+        }
+    }
+
     pub fn from_relationship_type(rel_type: &str) -> Option<Self> {
         match rel_type.to_lowercase().as_str() {
             "ownership" => Some(EdgeType::Owns),
@@ -2274,80 +2312,9 @@ impl LegacyCbuGraph {
             .retain(|e| kept_node_ids.contains(&e.source) && kept_node_ids.contains(&e.target));
     }
 
-    pub fn filter_to_ubo_only(&mut self) {
-        // Use RoleCategory::is_ubo_relevant() for consistent filtering
-        let ubo_entity_ids: std::collections::HashSet<String> = self
-            .nodes
-            .iter()
-            .filter(|n| {
-                n.node_type == NodeType::Entity
-                    && n.role_categories.iter().any(|cat| {
-                        RoleCategory::from_str(cat)
-                            .map(|rc| rc.is_ubo_relevant())
-                            .unwrap_or(false)
-                    })
-            })
-            .map(|n| n.id.clone())
-            .collect();
-
-        // Keep edges that are ownership/control relationships or connect UBO-relevant entities
-        self.edges.retain(|e| match e.edge_type {
-            EdgeType::Owns | EdgeType::Controls => true,
-            EdgeType::HasRole => ubo_entity_ids.contains(&e.target),
-            _ => false,
-        });
-
-        // Recompute connected nodes after edge filtering
-        let connected_node_ids: std::collections::HashSet<String> = self
-            .edges
-            .iter()
-            .flat_map(|e| [e.source.clone(), e.target.clone()])
-            .collect();
-
-        self.nodes
-            .retain(|n| matches!(n.node_type, NodeType::Cbu) || connected_node_ids.contains(&n.id));
-    }
-
-    pub fn filter_to_trading_entities(&mut self) {
-        // Use RoleCategory::is_trading_relevant() for consistent filtering
-        let trading_entity_ids: std::collections::HashSet<String> = self
-            .nodes
-            .iter()
-            .filter(|n| {
-                n.node_type == NodeType::Entity
-                    && n.role_categories.iter().any(|cat| {
-                        RoleCategory::from_str(cat)
-                            .map(|rc| rc.is_trading_relevant())
-                            .unwrap_or(false)
-                    })
-            })
-            .map(|n| n.id.clone())
-            .collect();
-
-        // Keep edges that are:
-        // 1. Fund structure edges (ManagedBy, FeederTo, Contains) - trading view shows fund structure
-        // 2. HasRole edges to trading-relevant entities
-        // 3. Other non-role edges
-        self.edges.retain(|e| match e.edge_type {
-            EdgeType::ManagedBy
-            | EdgeType::FeederTo
-            | EdgeType::Contains
-            | EdgeType::AdministeredBy
-            | EdgeType::CustodiedBy => true,
-            EdgeType::HasRole => trading_entity_ids.contains(&e.target),
-            _ => true,
-        });
-
-        // Recompute connected nodes after edge filtering
-        let connected_node_ids: std::collections::HashSet<String> = self
-            .edges
-            .iter()
-            .flat_map(|e| [e.source.clone(), e.target.clone()])
-            .collect();
-
-        self.nodes
-            .retain(|n| matches!(n.node_type, NodeType::Cbu) || connected_node_ids.contains(&n.id));
-    }
+    // NOTE: filter_to_ubo_only() and filter_to_trading_entities() removed.
+    // Filtering is now done at query time by ConfigDrivenGraphBuilder using
+    // view_modes.node_types and view_modes.edge_types from the database.
 
     pub fn compute_visual_hints(&mut self) {
         let mut edge_counts: HashMap<String, usize> = HashMap::new();

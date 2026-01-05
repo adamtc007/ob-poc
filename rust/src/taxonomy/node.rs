@@ -102,6 +102,41 @@ pub struct TaxonomyNode {
     /// How to expand this node into a child taxonomy (fractal navigation)
     #[serde(skip)]
     pub expansion: ExpansionRule,
+
+    // =========================================================================
+    // FRACTAL ZOOM STATE - For zoom-level-dependent rendering
+    // =========================================================================
+    /// Whether this node is currently collapsed (children hidden).
+    /// When collapsed, node shows aggregate summary instead of children.
+    #[serde(default)]
+    pub is_collapsed: bool,
+
+    /// Zoom threshold at which this node auto-collapses.
+    /// When camera zoom < this value, node collapses to save screen space.
+    /// None = never auto-collapse.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collapse_at_zoom: Option<f32>,
+
+    /// Zoom threshold at which this node auto-expands.
+    /// When camera zoom > this value, node expands to show children.
+    /// None = never auto-expand (requires explicit user action).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expand_at_zoom: Option<f32>,
+
+    /// Whether to show aggregate summary when collapsed.
+    /// If true, shows "N items" or similar; if false, just shows the node.
+    #[serde(default)]
+    pub show_aggregate_when_collapsed: bool,
+
+    /// Cached aggregate summary for collapsed display (e.g., "15 funds, 3 entities").
+    /// Computed lazily when node is collapsed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aggregate_summary: Option<String>,
+
+    /// Priority for fractal navigation (higher = more important, shown first).
+    /// Used when space is limited to decide which nodes to show.
+    #[serde(default)]
+    pub priority: i32,
 }
 
 impl TaxonomyNode {
@@ -121,6 +156,13 @@ impl TaxonomyNode {
             entity_data: None,
             has_more_children: false,
             expansion: ExpansionRule::Complete,
+            // Fractal zoom state - defaults
+            is_collapsed: false,
+            collapse_at_zoom: None,
+            expand_at_zoom: None,
+            show_aggregate_when_collapsed: false,
+            aggregate_summary: None,
+            priority: 0,
         }
     }
 
@@ -145,6 +187,13 @@ impl TaxonomyNode {
             entity_data: None,
             has_more_children: false,
             expansion: ExpansionRule::Complete,
+            // Fractal zoom state - defaults
+            is_collapsed: false,
+            collapse_at_zoom: None,
+            expand_at_zoom: None,
+            show_aggregate_when_collapsed: false,
+            aggregate_summary: None,
+            priority: 0,
         }
     }
 

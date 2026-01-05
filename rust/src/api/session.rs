@@ -1106,6 +1106,27 @@ pub struct SessionContext {
     /// operations target. Populated after DSL execution when view.* verbs run.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub view_state: Option<crate::session::ViewState>,
+
+    // =========================================================================
+    // View State Fields - For REPL/View synchronization
+    // =========================================================================
+    /// Current view mode (e.g., "KYC_UBO", "UBO_ONLY", "SERVICE_DELIVERY", "PRODUCTS_ONLY")
+    /// Determines which layers and edges are visible in the graph visualization.
+    /// Syncs between UI graph panel and REPL session.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub view_mode: Option<String>,
+
+    /// Current zoom level for the graph visualization (0.0 - 1.0+ range)
+    /// Persisted so zoom state is maintained across page refreshes and
+    /// synchronized between REPL and graph view.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zoom_level: Option<f32>,
+
+    /// Set of expanded node IDs in the current view.
+    /// Tracks which nodes have been expanded to show children.
+    /// Used for fractal navigation persistence.
+    #[serde(default, skip_serializing_if = "std::collections::HashSet::is_empty")]
+    pub expanded_nodes: std::collections::HashSet<Uuid>,
 }
 
 /// Primary domain keys tracked across the session
@@ -1395,6 +1416,79 @@ impl SessionContext {
     /// Check if there's a view state set
     pub fn has_view_state(&self) -> bool {
         self.view_state.is_some()
+    }
+
+    // =========================================================================
+    // VIEW MODE / ZOOM / EXPANDED NODES METHODS
+    // =========================================================================
+
+    /// Set the view mode
+    pub fn set_view_mode(&mut self, mode: &str) {
+        self.view_mode = Some(mode.to_string());
+    }
+
+    /// Get the view mode, defaulting to "KYC_UBO" if not set
+    pub fn get_view_mode(&self) -> &str {
+        self.view_mode.as_deref().unwrap_or("KYC_UBO")
+    }
+
+    /// Clear the view mode (reset to default)
+    pub fn clear_view_mode(&mut self) {
+        self.view_mode = None;
+    }
+
+    /// Set the zoom level
+    pub fn set_zoom_level(&mut self, level: f32) {
+        self.zoom_level = Some(level);
+    }
+
+    /// Get the zoom level, defaulting to 1.0 if not set
+    pub fn get_zoom_level(&self) -> f32 {
+        self.zoom_level.unwrap_or(1.0)
+    }
+
+    /// Clear the zoom level (reset to default)
+    pub fn clear_zoom_level(&mut self) {
+        self.zoom_level = None;
+    }
+
+    /// Expand a node (add to expanded set)
+    pub fn expand_node(&mut self, node_id: Uuid) {
+        self.expanded_nodes.insert(node_id);
+    }
+
+    /// Collapse a node (remove from expanded set)
+    pub fn collapse_node(&mut self, node_id: Uuid) {
+        self.expanded_nodes.remove(&node_id);
+    }
+
+    /// Toggle node expansion
+    pub fn toggle_node_expansion(&mut self, node_id: Uuid) {
+        if self.expanded_nodes.contains(&node_id) {
+            self.expanded_nodes.remove(&node_id);
+        } else {
+            self.expanded_nodes.insert(node_id);
+        }
+    }
+
+    /// Check if a node is expanded
+    pub fn is_node_expanded(&self, node_id: Uuid) -> bool {
+        self.expanded_nodes.contains(&node_id)
+    }
+
+    /// Clear all expanded nodes
+    pub fn clear_expanded_nodes(&mut self) {
+        self.expanded_nodes.clear();
+    }
+
+    /// Get the number of expanded nodes
+    pub fn expanded_node_count(&self) -> usize {
+        self.expanded_nodes.len()
+    }
+
+    /// Set multiple expanded nodes at once (replaces existing)
+    pub fn set_expanded_nodes(&mut self, nodes: impl IntoIterator<Item = Uuid>) {
+        self.expanded_nodes = nodes.into_iter().collect();
     }
 }
 

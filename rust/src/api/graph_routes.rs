@@ -27,8 +27,8 @@ use uuid::Uuid;
 use crate::api::SessionStore;
 use crate::database::{LayoutOverrideView, PgGraphRepository, VisualizationRepository};
 use crate::graph::{
-    CbuGraph, CbuGraphBuilder, CbuSummary, EntityGraph, GraphScope, LayoutEngine, LayoutOverride,
-    NodeOffset, NodeSizeOverride, Orientation, ViewMode,
+    CbuGraph, CbuSummary, ConfigDrivenGraphBuilder, EntityGraph, GraphScope, LayoutEngineV2,
+    LayoutOverride, NodeOffset, NodeSizeOverride,
 };
 
 /// Query parameters for graph endpoint
@@ -46,11 +46,9 @@ pub struct GraphQuery {
 ///
 /// Returns graph data with server-computed layout positions.
 ///
-/// View mode determines which nodes are included and how they're arranged:
-/// - KYC_UBO: CBU + entities (by role category) + KYC/UBO layers
-/// - SERVICE_DELIVERY: CBU + products + services + resources (no entities)
-/// - CUSTODY: CBU + custody layer (markets, SSIs, rules)
-/// - PRODUCTS_ONLY: CBU + products only
+/// View mode determines which nodes are included and how they're arranged.
+/// Node/edge visibility and layout hints come from database configuration
+/// in node_types, edge_types, and view_modes tables.
 ///
 /// Orientation determines flow direction: VERTICAL (top-to-bottom) or HORIZONTAL (left-to-right)
 pub async fn get_cbu_graph(
@@ -58,98 +56,38 @@ pub async fn get_cbu_graph(
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<GraphQuery>,
 ) -> Result<Json<CbuGraph>, (StatusCode, String)> {
-    let repo = VisualizationRepository::new(pool);
-    let view_mode = ViewMode::parse(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
-    let orientation = Orientation::parse(params.orientation.as_deref().unwrap_or("VERTICAL"));
+    let view_mode = params.view_mode.as_deref().unwrap_or("KYC_UBO");
+    let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
+    let horizontal = orientation.eq_ignore_ascii_case("HORIZONTAL");
 
-    // Load layers based on view_mode - server does the filtering
-    let mut graph = match view_mode {
-        ViewMode::KycUbo => {
-            // KYC/UBO view: entities (via roles) + KYC + UBO layers, no services
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(true)
-                .with_ubo(true)
-                .with_services(false)
-                .build(&repo)
-                .await
-        }
-        ViewMode::UboOnly => {
-            // UBO Only view: pure ownership/control graph - no roles, no products
-            // Load entities via roles (to get all potential UBO entities) plus UBO layer
-            // Then filter to ownership/control edges only
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(true)
-                .with_services(false)
-                .with_entities(true) // Load entities so UBO layer can reference them
-                .build(&repo)
-                .await
-        }
-        ViewMode::ServiceDelivery => {
-            // Service Delivery view: products + services + resources + trading entities
-            // Load all entities, then filter to trading roles
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(false)
-                .with_services(true)
-                .with_entities(true)
-                .build(&repo)
-                .await
-        }
-        ViewMode::ProductsOnly => {
-            // Products only: just CBU + products
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(false)
-                .with_services(true) // Services layer loads products
-                .with_entities(false)
-                .build(&repo)
-                .await
-        }
-        ViewMode::Trading => {
-            // Trading view: CBU as container with trading entities (Asset Owner, IM, ManCo, etc.)
-            // No products, no services - just the trading entities
-            CbuGraphBuilder::new(cbu_id)
-                .with_custody(false)
-                .with_kyc(false)
-                .with_ubo(false)
-                .with_services(false)
-                .with_entities(true) // Load entities for trading roles
-                .build(&repo)
-                .await
-        }
-    }
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    // Build graph using config-driven builder
+    let builder = ConfigDrivenGraphBuilder::new(&pool, cbu_id, view_mode)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to initialize config-driven builder: {}", e),
+            )
+        })?;
 
-    // Apply view-mode specific filtering after loading
-    match view_mode {
-        ViewMode::UboOnly => {
-            // Remove role edges, keep only ownership/control edges
-            graph.filter_to_ubo_only();
-        }
-        ViewMode::ServiceDelivery => {
-            // Filter entities to trading roles only
-            graph.filter_to_trading_entities();
-        }
-        ViewMode::ProductsOnly => {
-            // Keep only CBU and Product nodes
-            graph.filter_to_products_only();
-        }
-        ViewMode::Trading => {
-            // Filter to trading entities only (Asset Owner, IM, ManCo, etc.)
-            graph.filter_to_trading_entities();
-        }
-        ViewMode::KycUbo => {
-            // No additional filtering needed - shows full KYC/UBO structure
-        }
-    }
+    let repo = VisualizationRepository::new(pool.clone());
+    let mut graph = builder.build(&repo).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to build graph: {}", e),
+        )
+    })?;
 
-    // Apply server-side layout based on view mode and orientation
-    let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);
+    // Apply layout using LayoutEngineV2
+    let layout_engine = LayoutEngineV2::from_database(&pool, view_mode, horizontal)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to load layout config: {}", e),
+            )
+        })?;
+
     layout_engine.layout(&mut graph);
 
     Ok(Json(graph))
@@ -464,13 +402,13 @@ pub async fn get_entity_neighborhood_graph(
 /// Create the graph router
 pub fn create_graph_router(pool: PgPool) -> Router {
     Router::new()
-        // Legacy CBU endpoints (using VisualizationRepository)
+        // CBU endpoints (config-driven)
         .route("/api/cbu", get(list_cbus))
         .route("/api/cbu/:cbu_id", get(get_cbu))
         .route("/api/cbu/:cbu_id/graph", get(get_cbu_graph))
         .route("/api/cbu/:cbu_id/layout", get(get_cbu_layout))
         .route("/api/cbu/:cbu_id/layout", post(save_cbu_layout))
-        // New unified graph endpoints (using GraphRepository + EntityGraph)
+        // Unified graph endpoints (using GraphRepository + EntityGraph)
         .route("/api/graph/cbu/:cbu_id", get(get_unified_cbu_graph))
         .route("/api/graph/book/:apex_entity_id", get(get_book_graph))
         .route("/api/graph/jurisdiction/:code", get(get_jurisdiction_graph))
@@ -542,30 +480,49 @@ async fn get_session_graph(
     let cbu_id = active_cbu.id;
     let cbu_name = active_cbu.display_name.clone();
 
+    // Get session's stored view_mode as fallback (REPL/View alignment)
+    let session_view_mode = session.context.view_mode.clone();
+
     // Drop the read lock before doing async work
     drop(sessions);
 
-    // Build graph for the active CBU
-    let repo = VisualizationRepository::new(state.pool.clone());
-    let view_mode = ViewMode::parse(params.view_mode.as_deref().unwrap_or("KYC_UBO"));
-    let orientation = Orientation::parse(params.orientation.as_deref().unwrap_or("VERTICAL"));
+    // Build graph for the active CBU using config-driven approach
+    // Priority: query param > session stored > default
+    let view_mode = params
+        .view_mode
+        .as_deref()
+        .or(session_view_mode.as_deref())
+        .unwrap_or("KYC_UBO");
+    let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
+    let horizontal = orientation.eq_ignore_ascii_case("HORIZONTAL");
 
-    let mut graph = CbuGraphBuilder::new(cbu_id)
-        .with_custody(false)
-        .with_kyc(true)
-        .with_ubo(true)
-        .with_services(false)
-        .build(&repo)
+    let builder = ConfigDrivenGraphBuilder::new(&state.pool, cbu_id, view_mode)
         .await
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to build graph: {}", e),
+                format!("Failed to initialize config-driven builder: {}", e),
             )
         })?;
 
-    // Apply layout
-    let layout_engine = LayoutEngine::with_orientation(view_mode, orientation);
+    let repo = VisualizationRepository::new(state.pool.clone());
+    let mut graph = builder.build(&repo).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to build graph: {}", e),
+        )
+    })?;
+
+    // Apply layout using LayoutEngineV2
+    let layout_engine = LayoutEngineV2::from_database(&state.pool, view_mode, horizontal)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to load layout config: {}", e),
+            )
+        })?;
+
     layout_engine.layout(&mut graph);
 
     Ok(Json(SessionGraphResponse {

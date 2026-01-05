@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict co440W0X5j8k44FRAUchysiL8ZIcXqhfDbLqjnQSPkS39S1QeSo20xOUGtmyXLh
+\restrict NX9zrPRf7VuwglW1rkrc9vqyqzdT4QtuLNgj3obYg7IE0gtRySpSxb0XRgpPgea
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -45,6 +45,13 @@ CREATE SCHEMA kyc;
 --
 
 CREATE SCHEMA "ob-poc";
+
+
+--
+-- Name: SCHEMA "ob-poc"; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA "ob-poc" IS 'OB-POC schema with config-driven visualization. Phase 2 adds layout persistence and caching.';
 
 
 --
@@ -1697,6 +1704,24 @@ $$;
 
 
 --
+-- Name: get_layout_config(character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_layout_config(p_key character varying) RETURNS jsonb
+    LANGUAGE sql STABLE
+    AS $$
+    SELECT config_value FROM "ob-poc".layout_config WHERE config_key = p_key;
+$$;
+
+
+--
+-- Name: FUNCTION get_layout_config(p_key character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".get_layout_config(p_key character varying) IS 'Get a layout configuration value by key. Returns JSONB.';
+
+
+--
 -- Name: get_next_version_number(character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -1766,6 +1791,35 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+
+--
+-- Name: invalidate_layout_cache(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".invalidate_layout_cache(p_cbu_id uuid, p_view_mode character varying DEFAULT NULL::character varying) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_count INTEGER;
+BEGIN
+    IF p_view_mode IS NULL THEN
+        DELETE FROM "ob-poc".layout_cache WHERE cbu_id = p_cbu_id;
+    ELSE
+        DELETE FROM "ob-poc".layout_cache
+        WHERE cbu_id = p_cbu_id AND view_mode = p_view_mode;
+    END IF;
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION invalidate_layout_cache(p_cbu_id uuid, p_view_mode character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".invalidate_layout_cache(p_cbu_id uuid, p_view_mode character varying) IS 'Invalidate layout cache for a CBU. Pass view_mode to invalidate only that view, or NULL for all views.';
 
 
 --
@@ -2135,6 +2189,33 @@ $$;
 
 
 --
+-- Name: reset_layout_overrides(uuid, character varying, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".reset_layout_overrides(p_cbu_id uuid, p_view_mode character varying DEFAULT NULL::character varying, p_user_id uuid DEFAULT NULL::uuid) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_count INTEGER;
+BEGIN
+    DELETE FROM "ob-poc".layout_overrides
+    WHERE cbu_id = p_cbu_id
+      AND (p_view_mode IS NULL OR view_mode = p_view_mode)
+      AND (p_user_id IS NULL OR user_id = p_user_id);
+    GET DIAGNOSTICS v_count = ROW_COUNT;
+    RETURN v_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION reset_layout_overrides(p_cbu_id uuid, p_view_mode character varying, p_user_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".reset_layout_overrides(p_cbu_id uuid, p_view_mode character varying, p_user_id uuid) IS 'Reset layout overrides for a CBU. Pass view_mode and/or user_id to limit scope.';
+
+
+--
 -- Name: resolve_semantic_to_uuid(text); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -2247,6 +2328,45 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".sync_commercial_client_role() IS 'Maintains invariant: commercial_client_entity_id always has matching COMMERCIAL_CLIENT role in cbu_entity_roles';
+
+
+--
+-- Name: trigger_invalidate_layout_cache(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".trigger_invalidate_layout_cache() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- For entity_relationships changes, find affected CBUs
+    IF TG_TABLE_NAME = 'entity_relationships' THEN
+        -- Find CBUs that include either entity
+        DELETE FROM "ob-poc".layout_cache lc
+        WHERE lc.cbu_id IN (
+            SELECT DISTINCT cer.cbu_id
+            FROM "ob-poc".cbu_entity_roles cer
+            WHERE cer.entity_id IN (
+                COALESCE(NEW.from_entity_id, OLD.from_entity_id),
+                COALESCE(NEW.to_entity_id, OLD.to_entity_id)
+            )
+        );
+    END IF;
+
+    -- For cbu_entity_roles changes
+    IF TG_TABLE_NAME = 'cbu_entity_roles' THEN
+        DELETE FROM "ob-poc".layout_cache
+        WHERE cbu_id = COALESCE(NEW.cbu_id, OLD.cbu_id);
+    END IF;
+
+    -- For cbu_products changes
+    IF TG_TABLE_NAME = 'cbu_products' THEN
+        DELETE FROM "ob-poc".layout_cache
+        WHERE cbu_id = COALESCE(NEW.cbu_id, OLD.cbu_id);
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
 
 
 --
@@ -6602,6 +6722,86 @@ COMMENT ON TABLE "ob-poc".dsl_workflow_phases IS 'KYC workflow phase reference d
 
 
 --
+-- Name: edge_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".edge_types (
+    edge_type_code character varying(50) NOT NULL,
+    display_name character varying(100) NOT NULL,
+    description text,
+    from_node_types jsonb NOT NULL,
+    to_node_types jsonb NOT NULL,
+    show_in_ubo_view boolean DEFAULT false,
+    show_in_trading_view boolean DEFAULT false,
+    show_in_fund_structure_view boolean DEFAULT false,
+    show_in_service_view boolean DEFAULT false,
+    show_in_product_view boolean DEFAULT false,
+    edge_style character varying(30) DEFAULT 'SOLID'::character varying,
+    edge_color character varying(30),
+    edge_width numeric(3,1) DEFAULT 1.0,
+    arrow_style character varying(30) DEFAULT 'SINGLE'::character varying,
+    shows_percentage boolean DEFAULT false,
+    shows_label boolean DEFAULT true,
+    label_template character varying(100),
+    label_position character varying(20) DEFAULT 'MIDDLE'::character varying,
+    layout_direction character varying(20) DEFAULT 'DOWN'::character varying,
+    tier_delta integer DEFAULT 1,
+    is_hierarchical boolean DEFAULT true,
+    bundle_group character varying(30),
+    routing_priority integer DEFAULT 50,
+    spring_strength numeric(4,3) DEFAULT 1.0,
+    ideal_length numeric(6,1) DEFAULT 100.0,
+    sibling_sort_key character varying(30) DEFAULT 'PERCENTAGE_DESC'::character varying,
+    source_anchor character varying(20) DEFAULT 'AUTO'::character varying,
+    target_anchor character varying(20) DEFAULT 'AUTO'::character varying,
+    cycle_break_priority integer DEFAULT 50,
+    is_primary_parent_rule character varying(50) DEFAULT 'HIGHEST_PERCENTAGE'::character varying,
+    parallel_edge_offset numeric(4,1) DEFAULT 15.0,
+    self_loop_radius numeric(4,1) DEFAULT 30.0,
+    self_loop_position character varying(20) DEFAULT 'TOP_RIGHT'::character varying,
+    z_order integer DEFAULT 50,
+    is_ownership boolean DEFAULT false,
+    is_control boolean DEFAULT false,
+    is_structural boolean DEFAULT false,
+    is_service_delivery boolean DEFAULT false,
+    is_trading boolean DEFAULT false,
+    creates_kyc_obligation boolean DEFAULT false,
+    cardinality character varying(10) DEFAULT '1:N'::character varying,
+    sort_order integer DEFAULT 100,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE edge_types; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".edge_types IS 'Config-driven edge type definitions with view applicability and layout hints. Replaces hardcoded relationship handling.';
+
+
+--
+-- Name: COLUMN edge_types.tier_delta; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".edge_types.tier_delta IS 'How many tiers down (positive) or up (negative) the target is from source. Used by layout engine.';
+
+
+--
+-- Name: COLUMN edge_types.is_hierarchical; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".edge_types.is_hierarchical IS 'If true, this edge type contributes to tier computation in hierarchical layout.';
+
+
+--
+-- Name: COLUMN edge_types.bundle_group; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".edge_types.bundle_group IS 'Edges in same bundle group are routed together to reduce visual clutter.';
+
+
+--
 -- Name: entity_addresses; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -7683,6 +7883,25 @@ CREATE TABLE "ob-poc".kyc_service_agreements (
 
 
 --
+-- Name: layout_config; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".layout_config (
+    config_key character varying(50) NOT NULL,
+    config_value jsonb NOT NULL,
+    description text,
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE layout_config; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".layout_config IS 'Global layout configuration settings. Key-value store with JSONB values.';
+
+
+--
 -- Name: lifecycle_resource_capabilities; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -7820,6 +8039,68 @@ COMMENT ON TABLE "ob-poc".master_entity_xref IS 'Master cross-reference table li
 --
 
 COMMENT ON COLUMN "ob-poc".master_entity_xref.regulatory_numbers IS 'JSON object storing various regulatory identification numbers';
+
+
+--
+-- Name: node_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".node_types (
+    node_type_code character varying(30) NOT NULL,
+    display_name character varying(100) NOT NULL,
+    description text,
+    show_in_ubo_view boolean DEFAULT false,
+    show_in_trading_view boolean DEFAULT false,
+    show_in_fund_structure_view boolean DEFAULT false,
+    show_in_service_view boolean DEFAULT false,
+    show_in_product_view boolean DEFAULT false,
+    icon character varying(50),
+    default_color character varying(30),
+    default_shape character varying(30) DEFAULT 'RECTANGLE'::character varying,
+    default_width numeric(6,1) DEFAULT 160.0,
+    default_height numeric(6,1) DEFAULT 60.0,
+    can_be_container boolean DEFAULT false,
+    default_tier integer,
+    importance_weight numeric(3,2) DEFAULT 1.0,
+    child_layout_mode character varying(20) DEFAULT 'VERTICAL'::character varying,
+    container_padding numeric(5,1) DEFAULT 20.0,
+    collapse_below_zoom numeric(3,2) DEFAULT 0.3,
+    hide_label_below_zoom numeric(3,2) DEFAULT 0.2,
+    show_detail_above_zoom numeric(3,2) DEFAULT 0.7,
+    max_visible_children integer DEFAULT 20,
+    overflow_behavior character varying(20) DEFAULT 'COLLAPSE'::character varying,
+    dedupe_mode character varying(20) DEFAULT 'SINGLE'::character varying,
+    min_separation numeric(5,1) DEFAULT 20.0,
+    z_order integer DEFAULT 100,
+    is_kyc_subject boolean DEFAULT false,
+    is_structural boolean DEFAULT false,
+    is_operational boolean DEFAULT false,
+    is_trading boolean DEFAULT false,
+    sort_order integer DEFAULT 100,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE node_types; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".node_types IS 'Config-driven node type definitions with view applicability and layout hints. Replaces hardcoded Rust enums.';
+
+
+--
+-- Name: COLUMN node_types.show_in_ubo_view; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".node_types.show_in_ubo_view IS 'If true, nodes of this type appear in UBO/KYC views. Replaces hardcoded is_ubo_relevant().';
+
+
+--
+-- Name: COLUMN node_types.show_in_trading_view; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".node_types.show_in_trading_view IS 'If true, nodes of this type appear in Trading views. Replaces hardcoded is_trading_relevant().';
 
 
 --
@@ -8246,7 +8527,11 @@ CREATE TABLE "ob-poc".role_categories (
     category_name character varying(100) NOT NULL,
     description text,
     layout_behavior character varying(30) NOT NULL,
-    sort_order integer DEFAULT 100
+    sort_order integer DEFAULT 100,
+    show_in_ubo_view boolean DEFAULT true,
+    show_in_trading_view boolean DEFAULT false,
+    show_in_fund_structure_view boolean DEFAULT false,
+    show_in_service_view boolean DEFAULT false
 );
 
 
@@ -10542,6 +10827,62 @@ CREATE TABLE "ob-poc".verification_escalations (
 --
 
 COMMENT ON TABLE "ob-poc".verification_escalations IS 'Risk-based escalation routing for verification challenges requiring higher authority review';
+
+
+--
+-- Name: view_modes; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".view_modes (
+    view_mode_code character varying(30) NOT NULL,
+    display_name character varying(100) NOT NULL,
+    description text,
+    root_identification_rule character varying(50) NOT NULL,
+    primary_traversal_direction character varying(10) DEFAULT 'DOWN'::character varying,
+    hierarchy_edge_types jsonb NOT NULL,
+    overlay_edge_types jsonb DEFAULT '[]'::jsonb,
+    default_algorithm character varying(30) DEFAULT 'HIERARCHICAL'::character varying,
+    algorithm_params jsonb DEFAULT '{}'::jsonb,
+    swim_lane_attribute character varying(50),
+    swim_lane_direction character varying(10) DEFAULT 'VERTICAL'::character varying,
+    temporal_axis character varying(30),
+    temporal_axis_direction character varying(10) DEFAULT 'HORIZONTAL'::character varying,
+    snap_to_grid boolean DEFAULT false,
+    grid_size_x numeric(5,1) DEFAULT 20.0,
+    grid_size_y numeric(5,1) DEFAULT 20.0,
+    auto_cluster boolean DEFAULT false,
+    cluster_attribute character varying(50),
+    cluster_visual_style character varying(20) DEFAULT 'BACKGROUND'::character varying,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE view_modes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".view_modes IS 'Per-view configuration including root identification, hierarchy edges, and layout algorithm.';
+
+
+--
+-- Name: COLUMN view_modes.root_identification_rule; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".view_modes.root_identification_rule IS 'How to identify root nodes: CBU (CBU node), TERMINUS_ENTITIES (natural persons), APEX_ENTITY (top of chain), UMBRELLA_FUNDS (umbrella funds).';
+
+
+--
+-- Name: COLUMN view_modes.hierarchy_edge_types; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".view_modes.hierarchy_edge_types IS 'Edge types that define the primary hierarchy for layout. Array of edge_type_codes.';
+
+
+--
+-- Name: COLUMN view_modes.overlay_edge_types; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".view_modes.overlay_edge_types IS 'Edge types that overlay on the hierarchy (control, trustee). Not used for tier computation.';
 
 
 --
@@ -13016,6 +13357,14 @@ ALTER TABLE ONLY "ob-poc".dsl_workflow_phases
 
 
 --
+-- Name: edge_types edge_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".edge_types
+    ADD CONSTRAINT edge_types_pkey PRIMARY KEY (edge_type_code);
+
+
+--
 -- Name: entities entities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -13464,6 +13813,14 @@ ALTER TABLE ONLY "ob-poc".kyc_service_agreements
 
 
 --
+-- Name: layout_config layout_config_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".layout_config
+    ADD CONSTRAINT layout_config_pkey PRIMARY KEY (config_key);
+
+
+--
 -- Name: lifecycle_resource_capabilities lifecycle_resource_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -13541,6 +13898,14 @@ ALTER TABLE ONLY "ob-poc".master_entity_xref
 
 ALTER TABLE ONLY "ob-poc".master_jurisdictions
     ADD CONSTRAINT master_jurisdictions_pkey PRIMARY KEY (jurisdiction_code);
+
+
+--
+-- Name: node_types node_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".node_types
+    ADD CONSTRAINT node_types_pkey PRIMARY KEY (node_type_code);
 
 
 --
@@ -14261,6 +14626,14 @@ ALTER TABLE ONLY "ob-poc".verification_challenges
 
 ALTER TABLE ONLY "ob-poc".verification_escalations
     ADD CONSTRAINT verification_escalations_pkey PRIMARY KEY (escalation_id);
+
+
+--
+-- Name: view_modes view_modes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".view_modes
+    ADD CONSTRAINT view_modes_pkey PRIMARY KEY (view_mode_code);
 
 
 --
@@ -16312,6 +16685,27 @@ CREATE INDEX idx_dsl_versions_unresolved ON "ob-poc".dsl_instance_versions USING
 
 
 --
+-- Name: idx_edge_types_service; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_edge_types_service ON "ob-poc".edge_types USING btree (show_in_service_view) WHERE (show_in_service_view = true);
+
+
+--
+-- Name: idx_edge_types_trading; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_edge_types_trading ON "ob-poc".edge_types USING btree (show_in_trading_view) WHERE (show_in_trading_view = true);
+
+
+--
+-- Name: idx_edge_types_ubo; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_edge_types_ubo ON "ob-poc".edge_types USING btree (show_in_ubo_view) WHERE (show_in_ubo_view = true);
+
+
+--
 -- Name: idx_entities_external_id; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -17065,6 +17459,27 @@ CREATE INDEX idx_matrix_overlay_instrument ON "ob-poc".cbu_matrix_product_overla
 --
 
 CREATE INDEX idx_matrix_overlay_subscription ON "ob-poc".cbu_matrix_product_overlay USING btree (subscription_id);
+
+
+--
+-- Name: idx_node_types_service; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_node_types_service ON "ob-poc".node_types USING btree (show_in_service_view) WHERE (show_in_service_view = true);
+
+
+--
+-- Name: idx_node_types_trading; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_node_types_trading ON "ob-poc".node_types USING btree (show_in_trading_view) WHERE (show_in_trading_view = true);
+
+
+--
+-- Name: idx_node_types_ubo; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_node_types_ubo ON "ob-poc".node_types USING btree (show_in_ubo_view) WHERE (show_in_ubo_view = true);
 
 
 --
@@ -18456,6 +18871,20 @@ CREATE TRIGGER trg_entity_deps_updated_at BEFORE UPDATE ON "ob-poc".entity_type_
 --
 
 CREATE TRIGGER trg_entity_relationships_history BEFORE DELETE OR UPDATE ON "ob-poc".entity_relationships FOR EACH ROW EXECUTE FUNCTION "ob-poc".entity_relationships_history_trigger();
+
+
+--
+-- Name: cbu_entity_roles trg_invalidate_cache_cbu_entity_roles; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_invalidate_cache_cbu_entity_roles AFTER INSERT OR DELETE OR UPDATE ON "ob-poc".cbu_entity_roles FOR EACH ROW EXECUTE FUNCTION "ob-poc".trigger_invalidate_layout_cache();
+
+
+--
+-- Name: entity_relationships trg_invalidate_cache_entity_relationships; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_invalidate_cache_entity_relationships AFTER INSERT OR DELETE OR UPDATE ON "ob-poc".entity_relationships FOR EACH ROW EXECUTE FUNCTION "ob-poc".trigger_invalidate_layout_cache();
 
 
 --
@@ -21384,5 +21813,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict co440W0X5j8k44FRAUchysiL8ZIcXqhfDbLqjnQSPkS39S1QeSo20xOUGtmyXLh
+\unrestrict NX9zrPRf7VuwglW1rkrc9vqyqzdT4QtuLNgj3obYg7IE0gtRySpSxb0XRgpPgea
 

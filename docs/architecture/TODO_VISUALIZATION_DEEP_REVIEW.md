@@ -1,918 +1,576 @@
-# TODO: Visualization Deep Review
+# TODO: Config-Driven Visualization & Session Architecture
 
 **Created**: 2026-01-05  
-**Status**: Pre-Production Readiness  
+**Updated**: 2026-01-05  
+**Status**: Phase 1-2 Complete, Phase 3 Partial  
 **Priority**: HIGH  
+**Estimated Effort**: 8 days remaining  
+**Revision**: 4 - Updated after legacy code removal
 
 ---
 
-## Executive Summary
+## CRITICAL PRINCIPLE: WHAT YOU SEE = WHAT AGENT OPERATES ON
 
-This document provides a comprehensive architectural review of the ob-poc visualization system, covering session scope, selection, filtering, view modes (KYC/UBO vs Trading/CBU), and auto-layout/zoom mechanics. The review identifies gaps, inconsistencies, and proposes solutions.
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│   THE USER MUST ALWAYS SEE WHAT THE AGENT IS LOOKING AT                    │
+│                                                                             │
+│   When user says "add CUSTODY to those" or "remove the Luxembourg ones"    │
+│   "those" and "the Luxembourg ones" MUST BE VISIBLE ON SCREEN              │
+│                                                                             │
+│   If REPL scope ≠ Visual scope → REPL is unusable                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**The viewport IS the prompt context.**
 
 ---
 
-## 1. CURRENT ARCHITECTURE OVERVIEW
-
-### 1.1 Stack Layers
+## ARCHITECTURE: SESSION AS SINGLE SOURCE OF TRUTH
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                     CLIENT (egui/WASM)                              │
-│  - Receives pre-positioned nodes from server                        │
-│  - Renders immediately (no local layout logic)                      │
-│  - Viewport state (zoom, pan) managed locally                       │
-└─────────────────────────────────────────────────────────────────────┘
-                                 │
-                                 │ HTTP/JSON
-                                 ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                     SERVER (Axum/Rust)                              │
-├─────────────────────────────────────────────────────────────────────┤
-│  graph/                                                             │
-│  ├── types.rs         EntityGraph, GraphNode, edges, enums          │
-│  ├── layout.rs        LayoutEngine - position computation          │
-│  ├── filters.rs       GraphFilterOps - visibility control          │
-│  ├── viewport.rs      ViewportContext - zoom/pan state             │
-│  ├── view_model.rs    GraphViewModel - DSL verb output             │
-│  ├── builder.rs       CbuGraphBuilder - DB → graph construction    │
-│  └── query_engine.rs  GraphQueryEngine - graph.* verb executor     │
-├─────────────────────────────────────────────────────────────────────┤
-│  session/                                                           │
-│  ├── view_state.rs    ViewState - "it" the session sees            │
-│  ├── scope.rs         SessionScope - load strategies               │
-│  └── research_context TaxonomyStack for fractal navigation         │
-├─────────────────────────────────────────────────────────────────────┤
-│  taxonomy/                                                          │
-│  └── TaxonomyBuilder  Builds tree from database                     │
-├─────────────────────────────────────────────────────────────────────┤
-│  dsl_v2/custom_ops/                                                 │
-│  ├── view_ops.rs      view.* verbs (universe, book, cbu, etc.)     │
-│  └── ubo_graph_ops.rs graph.* verbs                                 │
-└─────────────────────────────────────────────────────────────────────┘
-```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              SESSION                                        │
+│                    (Single Source of Current Truth)                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  KEYS (what we're looking at):                                              │
+│    cbu_id: Option<Uuid>                                                     │
+│    book_id: Option<Uuid>                                                    │
+│    entity_ids: Vec<Uuid>                                                    │
+│    case_id: Option<Uuid>                                                    │
+│                                                                             │
+│  FILTERS (how we're filtering):                                             │
+│    jurisdiction: Option<String>                                             │
+│    status: Option<Status>                                                   │
+│    aum_range: Option<Range>                                                 │
+│    role_category: Option<String>                                            │
+│                                                                             │
+│  VIEW MODE (which visualization):                                           │
+│    view_mode: "KYC_UBO" | "TRADING" | "SERVICE" | "FUND_STRUCTURE"         │
+│                                                                             │
+│  ZOOM / FOCUS:                                                              │
+│    zoom_level: f32                                                          │
+│    focused_node: Option<Uuid>                                               │
+│    expanded_nodes: HashSet<Uuid>                                            │
+│                                                                             │
+│  SELECTION (the "those" / "it"):                                            │
+│    selection: Vec<Uuid>        ← WHAT AGENT WILL OPERATE ON                │
+│    refinements: Vec<Refinement> ← "except...", "plus...", "only..."        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    │
+            ┌───────────────────────┴───────────────────────┐
+            │                                               │
+            ▼                                               ▼
+┌───────────────────────────────┐           ┌───────────────────────────────┐
+│           REPL                │           │         EGUI VIEW(S)          │
+│                               │           │                               │
+│  Reads: session.selection     │           │  Renders: taxonomy structs    │
+│  Reads: session.keys          │           │  Built from: session keys +   │
+│  Reads: session.filters       │           │             filters + view    │
+│                               │           │                               │
+│  "add CUSTODY to those"       │           │  User SEES "those" visually   │
+│       │                       │           │       │                       │
+│       └───────────────────────┼───────────┼───────┘                       │
+│                               │           │                               │
+│  SAME "those" ════════════════╪═══════════╪══ SAME "those"                │
+│                               │           │                               │
+└───────────────────────────────┘           └───────────────────────────────┘
 
-### 1.2 Two Parallel Graph Systems
-
-**PROBLEM**: There are two graph type systems in coexistence:
-
-| System | Files | Purpose | Status |
-|--------|-------|---------|--------|
-| **EntityGraph** (new) | `types.rs` lines 1-900 | Unified UBO/CBU graph with typed edges | Partially implemented |
-| **CbuGraph** (legacy) | `types.rs` lines 1900-2500 | Older flat node/edge structure | Still in use |
-
-The layout engine (`layout.rs`) still operates on `CbuGraph`, not `EntityGraph`.
-
----
-
-## 2. SESSION SCOPE ANALYSIS
-
-### 2.1 Scope Definitions (GraphScope enum)
-
-```rust
-pub enum GraphScope {
-    Empty,                              // Initial state
-    SingleCbu { cbu_id, cbu_name },     // One CBU
-    Book { apex_entity_id, apex_name }, // All CBUs under ownership apex
-    Jurisdiction { code },              // All in jurisdiction
-    EntityNeighborhood { entity_id, hops }, // N-hop neighborhood
-    Custom { description },             // Free-form
-}
-```
-
-### 2.2 Load Strategies (LoadStatus enum)
-
-```rust
-pub enum LoadStatus {
-    Full,                   // All data in memory (< 1000 entities)
-    SummaryOnly {           // Expand on demand
-        expandable_nodes: Vec<ExpandableNode>
-    },
-    Windowed {              // Data around focal point
-        center_entity_id: Uuid,
-        loaded_hops: u32,
-        total_reachable: usize,
-    },
-}
-```
-
-### 2.3 Scope Selection Flow
-
-```
-User: "view.cbu :cbu-id @alpha :mode trading"
-        │
-        ▼
-ViewCbuOp.execute()
-        │
-        ├── Build TaxonomyContext::CbuTrading { cbu_id }
-        ├── TaxonomyBuilder.build(pool) → TaxonomyNode
-        ├── ViewState::from_taxonomy(taxonomy, context)
-        │
-        ▼
-ViewState {
-    stack: TaxonomyStack,      // Fractal navigation history
-    taxonomy: TaxonomyNode,    // Current tree
-    context: TaxonomyContext,  // What built this
-    selection: Vec<Uuid>,      // The "those" after refinements
-    ...
-}
-```
-
-### 2.4 GAPS IN SCOPE HANDLING
-
-| Gap | Description | Impact |
-|-----|-------------|--------|
-| **Scope ↔ ViewMode disconnect** | ViewState uses TaxonomyContext, LayoutEngine uses ViewMode enum | Mismatch between scope and rendering |
-| **No scope persistence** | Scope is ephemeral per request | Session loses scope on reconnect |
-| **Book scope incomplete** | `load_book_graph` in EntityGraph but CbuGraphBuilder doesn't support it | Can't view entire ownership book |
-| **Windowed loading stub** | LoadStatus::Windowed defined but no actual windowed loading | Large datasets fail |
-
----
-
-## 3. SELECTION & FILTERING ANALYSIS
-
-### 3.1 Filter Types (GraphFilters)
-
-```rust
-pub struct GraphFilters {
-    pub prong: ProngFilter,              // Ownership/Control/Both
-    pub jurisdictions: Option<Vec<String>>,
-    pub fund_types: Option<Vec<String>>,
-    pub entity_types: Option<Vec<EntityType>>,
-    pub as_of_date: NaiveDate,           // Temporal filter
-    pub min_ownership_pct: Option<Decimal>,
-    pub path_only: bool,                 // Show only path to cursor
-}
-```
-
-### 3.2 Refinement System (ViewState)
-
-```rust
-pub enum Refinement {
-    Include { filter: Filter },  // Keep only matching
-    Exclude { filter: Filter },  // Remove matching
-    Add { ids: Vec<Uuid> },      // Add specific IDs
-    Remove { ids: Vec<Uuid> },   // Remove specific IDs
-}
-```
-
-### 3.3 Selection Flow
-
-```
-1. ViewState::from_taxonomy() → selection = taxonomy.all_ids()
-2. User: "except under 100M"
-3. ViewState::refine(Refinement::Exclude { filter })
-4. recompute_selection() → selection.retain(|id| !filter.matches(node))
-5. selection now excludes small funds
-```
-
-### 3.4 GAPS IN FILTERING
-
-| Gap | Description | Impact |
-|-----|-------------|--------|
-| **Filter taxonomy mismatch** | ViewState uses Filter enum, GraphFilters uses different structure | Two filter systems don't interop |
-| **No role category filter** | GraphFilters lacks RoleCategory filter | Can't filter by OwnershipChain vs TradingExecution |
-| **Filter not applied to layout** | LayoutEngine ignores filters, positions all nodes | Hidden nodes still take space |
-| **No filter UI binding** | No DSL verb to add/remove filters dynamically | User must restart scope |
-| **Prong filter incomplete** | ProngFilter exists but edge visibility not fully wired | Control edges always visible |
-
----
-
-## 4. VIEW MODES: KYC/UBO vs TRADING/CBU
-
-### 4.1 View Modes Defined
-
-```rust
-pub enum ViewMode {
-    KycUbo,         // Entity hierarchy by role, ownership chains
-    UboOnly,        // Pure ownership/control - no roles, no products
-    ProductsOnly,   // CBU → Products only
-    ServiceDelivery,// Products → Services → Resources
-    Trading,        // CBU as container with trading entities
-}
-```
-
-### 4.2 Role Category → Layout Behavior Mapping
-
-```rust
-impl RoleCategory {
-    pub fn layout_behavior(&self) -> LayoutBehavior {
-        match self {
-            OwnershipChain | OwnershipControl => PyramidUp,
-            ControlChain => Overlay,
-            FundStructure | InvestmentVehicle => TreeDown,
-            FundManagement => Satellite,
-            TrustRoles => Radial,
-            ServiceProvider => FlatBottom,
-            TradingExecution | FundOperations | Distribution => FlatRight,
-            InvestorChain | Financing => PyramidDown,
-            RelatedParty => Peripheral,
-            Both => Overlay,
-        }
-    }
-}
-```
-
-### 4.3 Current Tier Layout (KYC/UBO Vertical)
-
-```
-Tier 0: CBU (center)
-Tier 1: Products (center-right)
-Tier 2: PyramidUp/Down (ownership/control) - SHELL left, PERSON right
-Tier 3: TreeDown/Overlay (fund structure, service providers)
-Tier 4: Satellite/Radial (trading, trust roles)
-Tier 5: FlatBottom/FlatRight (investor chain)
-Tier 6: Peripheral (related parties)
-```
-
-### 4.4 CRITICAL PROBLEMS WITH VIEW MODE RENDERING
-
-| Problem | Description | Severity |
-|---------|-------------|----------|
-| **Role-based tier placement is naive** | All PyramidUp nodes in Tier 2, regardless of depth | HIGH |
-| **No ownership depth consideration** | UBO at depth 4 placed same tier as direct shareholder | HIGH |
-| **SHELL/PERSON split too rigid** | Forces left/right split even when not appropriate | MEDIUM |
-| **No actual relationship routing** | Edges drawn as straight lines between tier positions | HIGH |
-| **Trading view incomplete** | Just a grid of entities, no semantic layout | MEDIUM |
-| **InvestmentVehicle role not wired** | RoleCategory exists but not in builder | MEDIUM |
-
-### 4.5 What KYC/UBO View SHOULD Show
-
-```
-                    ┌─────────────────┐
-                    │   Natural       │  ← Terminus (depth 0)
-                    │   Person UBO    │
-                    └────────┬────────┘
-                             │ 75%
-                    ┌────────┴────────┐
-                    │  Holding Co A   │  ← Intermediate (depth 1)
-                    │  (Luxembourg)   │
-                    └────────┬────────┘
-                             │ 100%
-                    ┌────────┴────────┐
-                    │  Holding Co B   │  ← Intermediate (depth 2)
-                    │  (Cayman)       │
-                    └────────┬────────┘
-                             │ 100%
-            ┌────────────────┼────────────────┐
-            │                │                │
-    ┌───────┴───────┐ ┌──────┴──────┐ ┌──────┴──────┐
-    │   Fund A      │ │   Fund B    │ │   Fund C    │  ← CBU subjects
-    └───────────────┘ └─────────────┘ └─────────────┘
-            │                │                │
-            └────────────────┼────────────────┘
-                             │
-                    ┌────────┴────────┐
-                    │       CBU       │  ← The client
-                    └─────────────────┘
-```
-
-**Current layout places ALL of these in Tier 2** because they all have `OwnershipChain` role category.
-
-### 4.6 What Trading/CBU View SHOULD Show
-
-```
-                    ┌─────────────────────────────────────┐
-                    │              CBU CONTAINER          │
-                    │                                     │
-                    │   ┌─────────┐    ┌─────────┐       │
-                    │   │ Asset   │───▶│ Invest  │       │
-                    │   │ Owner   │    │ Manager │       │
-                    │   └────┬────┘    └────┬────┘       │
-                    │        │              │             │
-                    │        ▼              ▼             │
-                    │   ┌─────────────────────────┐      │
-                    │   │    Trading Matrix       │      │
-                    │   │  ┌─────┬─────┬─────┐   │      │
-                    │   │  │ EQ  │ FI  │ FX  │   │      │
-                    │   │  └─────┴─────┴─────┘   │      │
-                    │   └─────────────────────────┘      │
-                    │                                     │
-                    │   ┌─────────┐    ┌─────────┐       │
-                    │   │ Prime   │    │ Custod- │       │
-                    │   │ Broker  │    │ ian     │       │
-                    │   └─────────┘    └─────────┘       │
-                    │                                     │
-                    └─────────────────────────────────────┘
-                                     │
-                    ┌────────────────┼────────────────┐
-                    ▼                ▼                ▼
-            ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-            │  ETF Pool   │  │  Unit Trust │  │  OEIC       │
-            │  (external) │  │  (external) │  │  (external) │
-            └─────────────┘  └─────────────┘  └─────────────┘
-            InvestmentVehicle - pooled funds AO invests in
+                    REPL SCOPE === VISUAL SCOPE === SESSION STATE
 ```
 
 ---
 
-## 5. AUTO-LAYOUT ENGINE ANALYSIS
+## TAXONOMY GENERATION FLOW
 
-### 5.1 Current Layout Algorithm
+Session provides keys/filters/view_mode → Builders generate structs → UI renders
 
-```rust
-fn layout_kyc_ubo_vertical(&self, graph: &mut CbuGraph) {
-    // 1. Categorize nodes by LayoutBehavior
-    for node in graph.nodes {
-        match get_layout_behavior(node) {
-            PyramidUp | PyramidDown => tier_2.push(node),
-            TreeDown | Overlay => tier_3.push(node),
-            Satellite | Radial => tier_4.push(node),
-            FlatBottom | FlatRight => tier_5.push(node),
-            Peripheral => tier_6.push(node),
-        }
-    }
-    
-    // 2. Split each tier by SHELL/PERSON
-    for tier in [tier_2, tier_3, tier_4, tier_5] {
-        tier_shell = tier.filter(is_shell);
-        tier_person = tier.filter(is_person);
-    }
-    
-    // 3. Position: shells left, persons right
-    layout_tier_left(&tier_2_shell, 2, y);
-    layout_tier_right(&tier_2_person, 2, y);
-    // ...
-}
 ```
-
-### 5.2 Layout Helper Functions
-
-```rust
-fn layout_tier_left(nodes, tier, y) {
-    start_x = SHELL_MARGIN_LEFT;  // 100.0
-    for (i, node) in nodes.enumerate() {
-        node.x = start_x + i * NODE_SPACING_X;
-        node.y = y;
-    }
-}
-
-fn layout_tier_right(nodes, tier, y) {
-    total_width = nodes.len() * NODE_SPACING_X;
-    start_x = max(CANVAS_WIDTH - MARGIN - total_width, CANVAS_WIDTH / 2);
-    for (i, node) in nodes.enumerate() {
-        node.x = start_x + i * NODE_SPACING_X;
-        node.y = y;
-    }
-}
+SESSION (keys + filters + view_mode + zoom)
+              │
+              │
+              ▼
+      ┌───────────────┐
+      │ ViewConfig    │◄─── DB tables: edge_types, node_types, view_modes
+      │ Service       │     (Config, not code!)
+      └───────┬───────┘
+              │
+              │  edge_types for this view_mode
+              │  node_types for this view_mode  
+              │  zoom thresholds
+              │
+              ▼
+      ┌───────────────┐
+      │ Membership    │◄─── Built FROM config + session keys/filters
+      │ Rules         │     (No hardcoded edge lists!)
+      └───────┬───────┘
+              │
+              ▼
+      ┌───────────────┐
+      │ Taxonomy      │     Can produce multiple taxonomies:
+      │ Builder(s)    │     - CBU ownership tree
+      │               │     - Instrument matrix
+      │               │     - Product/service chain
+      └───────┬───────┘
+              │
+              ▼
+      ┌───────────────────────────────────────────────────┐
+      │           Vec<TaxonomyNode> structs               │
+      │                                                   │
+      │  Pre-filtered, pre-computed                       │
+      │  Ready to render                                  │
+      │  Zero business logic needed by UI                 │
+      └───────────────────────────────────────────────────┘
+              │
+              │  (structs over wire)
+              │
+              ▼
+      ┌───────────────────────────────────────────────────┐
+      │                 EGUI (WASM)                       │
+      │                                                   │
+      │  Receives structs → Renders them                  │
+      │  DUMB RENDERER                                    │
+      │  ZERO filtering logic                             │
+      │  ZERO business rules                              │
+      └───────────────────────────────────────────────────┘
 ```
-
-### 5.3 LAYOUT ENGINE DEFICIENCIES
-
-| Deficiency | Description | Required Fix |
-|------------|-------------|--------------|
-| **No hierarchy awareness** | Doesn't follow ownership/control edges | Need tree layout algorithm |
-| **No edge routing** | Straight lines cause overlaps | Need edge bundling/orthogonal routing |
-| **Fixed tier spacing** | 120px between all tiers | Need dynamic spacing based on content |
-| **No grouping/containers** | Can't group subfunds under umbrella | Need compound node support |
-| **No force-directed option** | Only tier-based layout | Add force-directed for exploration |
-| **No semantic zoom** | Same detail at all zoom levels | Collapse nodes at distance |
-| **No layout caching** | Recomputed every request | Cache layouts, invalidate on change |
-| **Canvas size hardcoded** | 1200px width assumed | Need responsive canvas |
 
 ---
 
-## 6. VIEWPORT & ZOOM ANALYSIS
+## FRACTAL ZOOM: TAXONOMY OF TAXONOMIES
 
-### 6.1 Current Viewport System
+Each node can expand into its own sub-taxonomy. Zoom level determines expansion.
 
-```rust
-pub struct ViewportContext {
-    pub zoom: f32,                      // 0.1 - 2.0
-    pub zoom_name: ZoomName,            // Overview/Standard/Detail
-    pub pan_offset: (f32, f32),         // Pixels from center
-    pub canvas_size: (f32, f32),        // Canvas dimensions
-    pub visible_entities: HashSet<Uuid>,// Currently visible
-    pub off_screen: OffScreenSummary,   // What's not visible
-    pub is_default: bool,               // Has user adjusted?
-}
+### Example: Allianz Lux Book (40 CBUs) - Trading View
 
-pub enum ZoomName {
-    Overview,   // 0.1 - 0.3: See entire structure
-    Standard,   // 0.3 - 0.7: Normal working view
-    Detail,     // 0.7 - 2.0: Close-up with all labels
-}
+**Zoomed Out (zoom 0.3) - Book Level:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Allianz Lux Book                                               │
+│  Trading View                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐      │
+│  │CBU 1│ │CBU 2│ │CBU 3│ │CBU 4│ │CBU 5│ │CBU 6│ │CBU 7│ ...  │
+│  └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘ └─────┘      │
+│                                                                 │
+│  Each CBU = COLLAPSED (just name label)                         │
+│  No sub-taxonomy loaded yet                                     │
+│                                                                 │
+│  session.selection = [all 40 CBU ids]                          │
+│  REPL "add CUSTODY" → operates on all 40                        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 Viewport Commands
+**Zoomed In (zoom 0.8) - CBU 3 Expanded:**
 
-```rust
-impl ViewportContext {
-    fn pan(&mut self, direction: PanDirection, amount: f32);
-    fn zoom_in(&mut self);      // * 1.25, max 2.0
-    fn zoom_out(&mut self);     // / 1.25, min 0.1
-    fn fit_all(&mut self);      // Reset to 0.25, (0,0)
-    fn center_on(&mut self, x: f32, y: f32);
-    fn center_on_entity(&mut self, entity_id, graph);
-}
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Allianz Lux Book > CBU 3                                       │
+│  Trading View                                                   │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │                        CBU 3                             │   │
+│  │                                                          │   │
+│  │  ┌────────────────┐       ┌────────────────────────┐    │   │
+│  │  │ Trading Profile│       │ Entity: Asset Owner    │    │   │
+│  │  │                │       │         │              │    │   │
+│  │  │  ┌──────────┐  │       │    ownership (60%)     │    │   │
+│  │  │  │Instrument│  │       │         │              │    │   │
+│  │  │  │ Matrix   │  │       │         ▼              │    │   │
+│  │  │  │          │  │       │ Entity: Holding Co     │    │   │
+│  │  │  │ Equities │  │       │         │              │    │   │
+│  │  │  │ FI       │  │       │    ownership (100%)    │    │   │
+│  │  │  │ FX       │  │       │         │              │    │   │
+│  │  │  └──────────┘  │       │         ▼              │    │   │
+│  │  └────────────────┘       │ Entity: J. Smith (UBO) │    │   │
+│  │                           └────────────────────────┘    │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  ┌─────┐ ┌─────┐        ┌─────┐ ┌─────┐  (siblings collapsed)  │
+│  │CBU 2│ │CBU 4│  ...   │CBU39│ │CBU40│                        │
+│  └─────┘ └─────┘        └─────┘ └─────┘                        │
+│                                                                 │
+│  session.selection = [CBU 3]                                   │
+│  session.focused_node = CBU 3                                  │
+│  REPL "add signatory @john" → operates on CBU 3                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.3 VIEWPORT GAPS
-
-| Gap | Description | Impact |
-|-----|-------------|--------|
-| **No LOD (Level of Detail)** | Same rendering at all zoom levels | Cluttered at overview zoom |
-| **No semantic zoom** | Zoom doesn't affect what's visible | Just scales pixels |
-| **No fit-to-selection** | Can only fit all | Can't zoom to filtered subset |
-| **Off-screen hints weak** | Just counts, no navigation | User can't quickly navigate to off-screen |
-| **No animation** | Zoom/pan is instant | Jarring UX |
-| **Viewport not persisted** | Lost on reload | User must re-navigate each time |
-
----
-
-## 7. PROPOSED ARCHITECTURE CHANGES
-
-### 7.1 Unified Graph System
-
-**Action**: Migrate from `CbuGraph` to `EntityGraph` completely.
+### TaxonomyNode Structure for Fractal Zoom
 
 ```rust
-// BEFORE: Two systems
-pub type CbuGraph = LegacyCbuGraph;  // layout.rs uses this
-pub struct EntityGraph { ... }        // types.rs defines this
-
-// AFTER: One system
-pub struct EntityGraph {
-    // Unified structure with all capabilities
-}
-
-// layout.rs updated to use EntityGraph
-impl LayoutEngine {
-    pub fn layout(&self, graph: &mut EntityGraph) { ... }
-}
-```
-
-### 7.2 Hierarchical Layout Algorithm
-
-**Replace tier-based with proper tree layout**:
-
-```rust
-pub enum LayoutAlgorithm {
-    /// Tier-based (current) - for flat views
-    Tiered { config: TieredConfig },
-    
-    /// Tree layout (new) - for ownership chains
-    Tree { 
-        root_at: TreeRoot,          // Top, Bottom, Left, Right
-        sibling_spacing: f32,
-        level_spacing: f32,
-        compact: bool,              // Minimize width
-    },
-    
-    /// Force-directed (new) - for exploration
-    Force {
-        repulsion: f32,
-        attraction: f32,
-        iterations: u32,
-        constrain_to_roles: bool,   // Keep role groups together
-    },
-    
-    /// Radial (new) - for trust structures
-    Radial {
-        center_entity: Uuid,
-        ring_spacing: f32,
-    },
-    
-    /// Sugiyama/DAG (new) - for complex graphs
-    Sugiyama {
-        layer_spacing: f32,
-        node_spacing: f32,
-        minimize_crossings: bool,
-    },
-}
-```
-
-### 7.3 View Mode → Layout Algorithm Mapping
-
-```rust
-impl ViewMode {
-    pub fn default_algorithm(&self) -> LayoutAlgorithm {
-        match self {
-            ViewMode::KycUbo | ViewMode::UboOnly => LayoutAlgorithm::Tree {
-                root_at: TreeRoot::Top,       // UBOs at top
-                sibling_spacing: 160.0,
-                level_spacing: 120.0,
-                compact: false,
-            },
-            ViewMode::Trading => LayoutAlgorithm::Tiered {
-                config: TieredConfig::trading_default(),
-            },
-            ViewMode::FundStructure => LayoutAlgorithm::Tree {
-                root_at: TreeRoot::Top,       // Umbrella at top
-                sibling_spacing: 180.0,
-                level_spacing: 100.0,
-                compact: true,
-            },
-            ViewMode::ServiceDelivery => LayoutAlgorithm::Sugiyama {
-                layer_spacing: 100.0,
-                node_spacing: 150.0,
-                minimize_crossings: true,
-            },
-        }
-    }
-}
-```
-
-### 7.4 Edge Routing System
-
-```rust
-pub struct EdgeRouter {
-    pub algorithm: EdgeRoutingAlgorithm,
-}
-
-pub enum EdgeRoutingAlgorithm {
-    /// Straight lines (current)
-    Direct,
-    
-    /// Right-angle paths avoiding nodes
-    Orthogonal {
-        bend_penalty: f32,
-        crossing_penalty: f32,
-    },
-    
-    /// Curved Bezier paths
-    Curved {
-        curvature: f32,
-    },
-    
-    /// Bundle edges with similar sources/targets
-    Bundled {
-        bundle_strength: f32,
-    },
-}
-
-impl EdgeRouter {
-    pub fn route(&self, graph: &EntityGraph) -> Vec<EdgePath> {
-        // Returns paths for each edge, not just start/end points
-    }
-}
-
-pub struct EdgePath {
-    pub edge_id: Uuid,
-    pub points: Vec<(f32, f32)>,  // Control points
-    pub path_type: PathType,      // Line, Quadratic, Cubic
-}
-```
-
-### 7.5 Semantic Zoom System
-
-```rust
-pub struct SemanticZoomLevel {
-    pub min_zoom: f32,
-    pub max_zoom: f32,
-    pub visible_node_types: Vec<NodeType>,
-    pub visible_edge_types: Vec<EdgeType>,
-    pub label_detail: LabelDetail,
-    pub collapse_threshold: usize,  // Collapse groups > N nodes
-}
-
-pub enum LabelDetail {
-    None,           // No labels
-    Name,           // Just name
-    NameAndType,    // Name + entity type
-    Full,           // All details
-}
-
-impl ViewportContext {
-    pub fn get_semantic_level(&self) -> SemanticZoomLevel {
-        match self.zoom_name {
-            ZoomName::Overview => SemanticZoomLevel {
-                visible_node_types: vec![Cbu, Entity],  // No products/services
-                label_detail: LabelDetail::Name,
-                collapse_threshold: 5,
-            },
-            ZoomName::Standard => SemanticZoomLevel {
-                visible_node_types: vec![Cbu, Entity, Product],
-                label_detail: LabelDetail::NameAndType,
-                collapse_threshold: 15,
-            },
-            ZoomName::Detail => SemanticZoomLevel {
-                visible_node_types: all_types(),
-                label_detail: LabelDetail::Full,
-                collapse_threshold: 100,
-            },
-        }
-    }
-}
-```
-
-### 7.6 Compound Node / Grouping
-
-```rust
-pub struct CompoundNode {
+pub struct TaxonomyNode {
     pub id: Uuid,
-    pub parent_id: Option<Uuid>,      // For nesting
-    pub children: Vec<Uuid>,          // Child node IDs
-    pub group_type: GroupType,
-    pub layout: GroupLayout,
-    pub collapsed: bool,
+    pub name: String,
+    pub node_type: NodeType,
     
-    // Bounds computed from children
-    pub bounds: Option<Rect>,
+    // Static children (always present at this level)
+    pub children: Vec<TaxonomyNode>,
+    
+    // ═══════════════════════════════════════════════════════════
+    // FRACTAL EXPANSION
+    // ═══════════════════════════════════════════════════════════
+    
+    /// Can this node expand into a sub-taxonomy?
+    pub is_expandable: bool,
+    
+    /// What context builds the sub-taxonomy?
+    /// e.g., TaxonomyContext::CbuTrading { cbu_id: self.id }
+    pub expansion_context: Option<TaxonomyContext>,
+    
+    /// The expanded sub-taxonomy (loaded on demand)
+    pub expanded: Option<Box<TaxonomyNode>>,
+    
+    // ═══════════════════════════════════════════════════════════
+    // ZOOM THRESHOLDS (from node_types config!)
+    // ═══════════════════════════════════════════════════════════
+    
+    /// Collapse this node when zoom < this value
+    pub collapse_below_zoom: f32,  // e.g., 0.3
+    
+    /// Auto-expand this node when zoom > this value  
+    pub expand_above_zoom: f32,    // e.g., 0.7
+    
+    /// Hide label when zoom < this value
+    pub hide_label_below_zoom: f32, // e.g., 0.2
 }
+```
 
-pub enum GroupType {
-    UmbrellaFund { umbrella_id: Uuid },
-    Jurisdiction { code: String },
-    RoleCategory { category: RoleCategory },
-    OwnershipTier { depth: u32 },
-    Custom { label: String },
+---
+
+## WHAT NEEDS WIRING
+
+### Current State (Hardcoded)
+
+```rust
+// rust/src/taxonomy/rules.rs - HARDCODED EDGE TYPES!
+
+impl MembershipRules {
+    pub fn cbu_ubo(cbu_id: Uuid) -> Self {
+        Self {
+            edge_types: vec![
+                EdgeType::Owns,      // ← HARDCODED!
+                EdgeType::Controls,  // ← HARDCODED!
+                EdgeType::TrustRole, // ← HARDCODED!
+            ],
+            // ...
+        }
+    }
+    
+    pub fn cbu_trading(cbu_id: Uuid) -> Self {
+        Self {
+            edge_types: vec![
+                EdgeType::HasRole,   // ← HARDCODED!
+                EdgeType::ManagedBy, // ← HARDCODED!
+                // ...
+            ],
+        }
+    }
 }
+```
 
-pub enum GroupLayout {
-    /// Children stacked vertically
-    Vertical,
-    /// Children in a row
-    Horizontal,
-    /// Children in a grid
-    Grid { columns: usize },
-    /// Children placed by their own positions
-    Free,
+### Target State (Config-Driven)
+
+```rust
+impl MembershipRules {
+    /// Build rules from ViewConfigService + session context
+    pub async fn from_session_context(
+        pool: &PgPool,
+        session: &Session,
+    ) -> Result<Self> {
+        // Get edge types from DB config based on view_mode
+        let edge_configs = ViewConfigService::get_view_edge_types(
+            pool, 
+            &session.view_mode
+        ).await?;
+        
+        // Convert to EdgeType enum
+        let edge_types: Vec<EdgeType> = edge_configs.iter()
+            .filter_map(|ec| EdgeType::from_code(&ec.edge_type_code))
+            .collect();
+        
+        // Get node type config for zoom thresholds
+        let node_configs = ViewConfigService::get_view_node_types(
+            pool,
+            &session.view_mode
+        ).await?;
+        
+        // Get hierarchy direction from view_modes config
+        let view_config = ViewConfigService::get_view_mode_config(
+            pool,
+            &session.view_mode
+        ).await?;
+        
+        Ok(Self {
+            root_filter: RootFilter::from_session_keys(&session.keys),
+            entity_filter: EntityFilter::from_session_filters(&session.filters),
+            edge_types,  // ← FROM DATABASE CONFIG!
+            direction: view_config.primary_traversal_direction.into(),
+            // ... rest from config
+        })
+    }
 }
 ```
 
 ---
 
-## 8. DSL VERB ADDITIONS
+## DATABASE TABLES (Config, Not Code)
 
-### 8.1 View Control Verbs
+### edge_types - Which edges appear in which views
 
-```yaml
-# verbs/view.yaml additions
+```sql
+CREATE TABLE "ob-poc".edge_types (
+    edge_type_code VARCHAR(50) PRIMARY KEY,
+    
+    -- VIEW APPLICABILITY (the core config!)
+    show_in_ubo_view BOOLEAN DEFAULT false,
+    show_in_trading_view BOOLEAN DEFAULT false,
+    show_in_fund_structure_view BOOLEAN DEFAULT false,
+    show_in_service_view BOOLEAN DEFAULT false,
+    
+    -- Layout hints
+    layout_direction VARCHAR(20),  -- UP, DOWN
+    tier_delta INTEGER,            -- How many levels
+    is_hierarchical BOOLEAN,       -- Creates tree structure
+    
+    -- ... (full schema in migration file)
+);
 
-view.set-mode:
-  domain: view
-  description: "Change view mode for current scope"
-  behavior: PLUGIN
-  arguments:
-    - name: mode
-      type: STRING
-      required: true
-      values: [KYC_UBO, UBO_ONLY, TRADING, FUND_STRUCTURE, SERVICE_DELIVERY]
-  output: ViewOpResult
-
-view.set-layout:
-  domain: view
-  description: "Change layout algorithm"
-  behavior: PLUGIN
-  arguments:
-    - name: algorithm
-      type: STRING
-      required: true
-      values: [TIERED, TREE, FORCE, RADIAL, SUGIYAMA]
-    - name: config
-      type: JSON
-      required: false
-  output: LayoutResult
-
-view.set-orientation:
-  domain: view
-  description: "Change layout orientation"
-  behavior: PLUGIN
-  arguments:
-    - name: orientation
-      type: STRING
-      required: true
-      values: [VERTICAL, HORIZONTAL]
-  output: ViewOpResult
+-- Example data:
+-- OWNERSHIP:     show_in_ubo_view=true,  direction=UP
+-- CONTROL:       show_in_ubo_view=true,  show_in_trading_view=true
+-- HAS_ROLE:      show_in_trading_view=true
+-- USES_PRODUCT:  show_in_service_view=true
 ```
 
-### 8.2 Filter Verbs
+### node_types - Which nodes + zoom thresholds
 
-```yaml
-# verbs/view.yaml additions
-
-view.filter-add:
-  domain: view
-  description: "Add a filter refinement"
-  behavior: PLUGIN
-  arguments:
-    - name: filter-type
-      type: STRING
-      required: true
-      values: [JURISDICTION, STATUS, FUND_TYPE, ROLE_CATEGORY, MIN_OWNERSHIP]
-    - name: values
-      type: LIST
-      required: true
-  output: ViewOpResult
-
-view.filter-remove:
-  domain: view
-  description: "Remove a filter by type"
-  behavior: PLUGIN
-  arguments:
-    - name: filter-type
-      type: STRING
-      required: true
-  output: ViewOpResult
-
-view.filter-clear:
-  domain: view
-  description: "Clear all filters"
-  behavior: PLUGIN
-  output: ViewOpResult
+```sql
+CREATE TABLE "ob-poc".node_types (
+    node_type_code VARCHAR(30) PRIMARY KEY,
+    
+    -- VIEW APPLICABILITY
+    show_in_ubo_view BOOLEAN DEFAULT false,
+    show_in_trading_view BOOLEAN DEFAULT false,
+    -- ...
+    
+    -- ZOOM THRESHOLDS (for fractal rendering)
+    collapse_below_zoom NUMERIC(3,2) DEFAULT 0.3,
+    hide_label_below_zoom NUMERIC(3,2) DEFAULT 0.2,
+    expand_above_zoom NUMERIC(3,2) DEFAULT 0.7,
+    
+    -- ... (full schema in migration file)
+);
 ```
 
-### 8.3 Navigation Verbs
+### view_modes - Per-view configuration
 
-```yaml
-# verbs/view.yaml additions
-
-view.focus:
-  domain: view
-  description: "Focus on a specific entity, centering viewport"
-  behavior: PLUGIN
-  arguments:
-    - name: entity-id
-      type: UUID
-      required: true
-    - name: expand-depth
-      type: INTEGER
-      required: false
-      default: 2
-  output: ViewOpResult
-
-view.expand:
-  domain: view
-  description: "Expand a collapsed group or entity"
-  behavior: PLUGIN
-  arguments:
-    - name: node-id
-      type: UUID
-      required: true
-  output: ViewOpResult
-
-view.collapse:
-  domain: view
-  description: "Collapse a node into a summary"
-  behavior: PLUGIN
-  arguments:
-    - name: node-id
-      type: UUID
-      required: true
-  output: ViewOpResult
-
-view.zoom-to-fit:
-  domain: view
-  description: "Zoom viewport to fit current selection or all"
-  behavior: PLUGIN
-  arguments:
-    - name: target
-      type: STRING
-      required: false
-      values: [ALL, SELECTION, FILTERED]
-      default: ALL
-  output: ViewportState
+```sql
+CREATE TABLE "ob-poc".view_modes (
+    view_mode_code VARCHAR(30) PRIMARY KEY,
+    
+    -- Root identification
+    root_identification_rule VARCHAR(50),  -- 'CBU', 'TERMINUS_ENTITIES', etc.
+    
+    -- Traversal
+    primary_traversal_direction VARCHAR(10),  -- UP, DOWN
+    
+    -- Which edges create hierarchy vs overlay
+    hierarchy_edge_types JSONB,  -- ["OWNERSHIP", "TRUST_BENEFICIARY"]
+    overlay_edge_types JSONB,    -- ["CONTROL", "BOARD_MEMBER"]
+);
 ```
 
 ---
 
-## 9. IMPLEMENTATION PLAN
+## MIGRATION SQL
 
-### Phase 1: Unify Graph Types (2 days)
+Files:
+- `rust/migrations/20260105_visualization_config.sql` - Schema definition
+- `rust/migrations/20260105_visualization_layout.sql` - Layout config table
 
-1. **Migrate LayoutEngine to EntityGraph**
-   - Update `layout.rs` to accept `&mut EntityGraph`
-   - Map LegacyGraphNode fields to EntityGraph fields
-   - Remove CbuGraph/LegacyGraphNode after migration
+**Status**: ✅ COMPLETE - Migrations run 2026-01-05
 
-2. **Update CbuGraphBuilder**
-   - Output EntityGraph instead of CbuGraph
-   - Wire up typed edges (OwnershipEdge, ControlEdge, etc.)
-   - Populate `depth_from_terminus` during build
-
-3. **Update GraphQueryEngine**
-   - Use EntityGraph throughout
-   - Return EntityGraph from queries
-
-### Phase 2: Tree Layout for UBO View (3 days)
-
-1. **Implement TreeLayoutEngine**
-   - Walk ownership edges to build tree structure
-   - Handle cycles (mark as "complex structure")
-   - Compute positions top-down (UBOs at apex)
-
-2. **Handle Multi-Parent Nodes**
-   - Entity owned by multiple parents
-   - Options: duplicate node, draw to first parent + crosslinks, or use DAG layout
-
-3. **Integrate with ViewMode**
-   - `ViewMode::UboOnly` uses TreeLayoutEngine
-   - `ViewMode::KycUbo` uses TreeLayoutEngine + role overlays
-
-### Phase 3: Edge Routing (2 days)
-
-1. **Implement OrthogonalRouter**
-   - A* pathfinding avoiding node rectangles
-   - Minimize bends and crossings
-
-2. **Edge Path Representation**
-   - Return control points, not just endpoints
-   - Client renders paths (lines, beziers)
-
-3. **Edge Bundling (optional)**
-   - Group edges with common source/target regions
-
-### Phase 4: Semantic Zoom (2 days)
-
-1. **Define Zoom Levels**
-   - Overview, Standard, Detail configurations
-   - Node visibility rules per level
-
-2. **Implement Collapse Logic**
-   - Auto-collapse groups at zoom-out
-   - Expand on zoom-in or click
-
-3. **Label LOD**
-   - No labels at overview
-   - Short labels at standard
-   - Full details at detail
-
-### Phase 5: Grouping / Compound Nodes (2 days)
-
-1. **Implement CompoundNode**
-   - Parent-child relationships
-   - Bounds computation from children
-
-2. **Umbrella Fund Grouping**
-   - Auto-group subfunds under umbrella
-   - Jurisdiction grouping option
-
-3. **Manual Grouping**
-   - DSL verb to create custom groups
-   - Persist group definitions
-
-### Phase 6: Filter Integration (1 day)
-
-1. **Wire Filters to Layout**
-   - Filtered-out nodes excluded from layout
-   - Re-layout on filter change
-
-2. **Filter DSL Verbs**
-   - `view.filter-add`, `view.filter-remove`, `view.filter-clear`
-
-3. **Filter Persistence**
-   - Store active filters in session
-   - Restore on reconnect
+```bash
+# Verification (already run):
+SELECT COUNT(*) FROM "ob-poc".node_types;    -- 13 rows
+SELECT COUNT(*) FROM "ob-poc".edge_types;    -- 20 rows  
+SELECT COUNT(*) FROM "ob-poc".view_modes;    -- 8 rows
+SELECT COUNT(*) FROM "ob-poc".layout_config; -- 1 row
+```
 
 ---
 
-## 10. VALIDATION CRITERIA
+## LEGACY CODE REMOVED (2026-01-05)
 
-### Layout Quality Metrics
+The following legacy code has been deleted as part of the migration to config-driven approach:
 
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| Node overlaps | 0 | Count of overlapping node rectangles |
-| Edge crossings | < 10% of edges | Count of edge intersections |
-| Aspect ratio | 0.5 - 2.0 | Canvas width / height |
-| Edge length variance | < 50% | StdDev / Mean of edge lengths |
-| Parent-child alignment | 80%+ | Children centered under parents |
+| File | Status | Notes |
+|------|--------|-------|
+| `rust/src/graph/layout.rs` | DELETED | ~700 lines of hardcoded LayoutEngine |
+| `rust/src/graph/builder.rs` | DELETED | Old CbuGraphBuilder replaced by ConfigDrivenGraphBuilder |
+| `types.rs` methods | REMOVED | `is_ubo_relevant()`, `is_trading_relevant()`, `filter_to_*()` |
 
-### Performance Targets
-
-| Operation | Target Latency | Max Graph Size |
-|-----------|----------------|----------------|
-| Initial layout | < 500ms | 1000 nodes |
-| Filter update | < 100ms | 1000 nodes |
-| Zoom/pan | < 16ms (60 FPS) | Any |
-| Edge routing | < 1s | 500 edges |
-
-### UX Criteria
-
-- [ ] UBO view shows clear ownership hierarchy from apex to CBU
-- [ ] Trading view shows CBU as container with trading roles inside
-- [ ] User can navigate from UBO view to Trading view without losing context
-- [ ] Zoom to overview shows entire structure, labels readable
-- [ ] Zoom to detail shows all attributes, no overlaps
-- [ ] Filtering reduces visual clutter, layout adjusts
-- [ ] Back/forward navigation works intuitively
+**Replacement architecture:**
+- `ConfigDrivenGraphBuilder` - queries DB config for node/edge visibility
+- `LayoutEngineV2` - BFS-based layout with config from `layout_config` table
+- `ViewConfigService` - service layer for querying view configuration
 
 ---
 
-## 11. APPENDIX: FILE LOCATIONS
+## IMPLEMENTATION CHECKLIST
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `rust/src/graph/types.rs` | All graph types (EntityGraph + Legacy) | ~2500 |
-| `rust/src/graph/layout.rs` | LayoutEngine implementation | ~880 |
-| `rust/src/graph/filters.rs` | GraphFilterOps trait + FilterBuilder | ~450 |
-| `rust/src/graph/viewport.rs` | ViewportContext, zoom handling | ~440 |
-| `rust/src/graph/view_model.rs` | GraphViewModel for DSL output | ~650 |
-| `rust/src/graph/builder.rs` | CbuGraphBuilder from DB | ~1100 |
-| `rust/src/session/view_state.rs` | ViewState, Refinement, selection | ~800 |
-| `rust/src/session/scope.rs` | SessionScope, LoadStatus | ~380 |
-| `rust/src/dsl_v2/custom_ops/view_ops.rs` | view.* verb handlers | ~1160 |
+### Phase 1: Database (DONE)
+- [x] Migration file created
+- [x] Migration run against database (2026-01-05)
+- [x] Tables populated with seed data (13 node_types, 20 edge_types, 8 view_modes)
+- [x] Verify queries work
+
+### Phase 2: Config Service + Graph Builder (DONE)
+- [x] `ViewConfigService` created (`rust/src/graph/view_config_service.rs`)
+- [x] `get_view_edge_types()` implemented
+- [x] `get_view_node_types()` implemented
+- [x] `get_view_mode_config()` implemented
+- [x] `ConfigDrivenGraphBuilder` implemented (`rust/src/graph/config_driven_builder.rs`)
+- [x] `LayoutEngineV2` implemented (`rust/src/graph/layout_v2.rs`)
+- [x] Graph routes updated to use new builders (`graph_routes.rs`, `ob-poc-web/routes/api.rs`)
+
+### Phase 3: Remove Hardcoded Logic (PARTIAL - Legacy Deleted, MembershipRules Pending)
+- [x] Delete `rust/src/graph/layout.rs` (legacy LayoutEngine)
+- [x] Delete `rust/src/graph/builder.rs` (legacy CbuGraphBuilder)
+- [x] Delete `is_ubo_relevant()` from types.rs
+- [x] Delete `is_trading_relevant()` from types.rs
+- [x] Delete `filter_to_ubo_only()` from types.rs
+- [x] Delete `filter_to_trading_entities()` from types.rs
+- [x] Update `rust/src/graph/mod.rs` to remove legacy exports
+- [ ] Update `MembershipRules::cbu_ubo()` to use ViewConfigService
+- [ ] Update `MembershipRules::cbu_trading()` to use ViewConfigService
+- [ ] Update `MembershipRules::cbu_kyc()` to use ViewConfigService
+
+### Phase 4: Session Integration
+- [ ] Add `view_mode` to Session (if not present)
+- [ ] Add `zoom_level` to Session
+- [ ] Add `expanded_nodes: HashSet<Uuid>` to Session
+- [ ] `MembershipRules::from_session_context()` method
+
+### Phase 5: TaxonomyNode Fractal Support
+- [ ] Add `collapse_below_zoom` to TaxonomyNode
+- [ ] Add `expand_above_zoom` to TaxonomyNode
+- [ ] Add `expansion_context` to TaxonomyNode
+- [ ] Add `expanded: Option<Box<TaxonomyNode>>` to TaxonomyNode
+- [ ] TaxonomyBuilder populates zoom thresholds from node_types config
+
+### Phase 6: Verify REPL/View Alignment
+- [ ] REPL reads `session.selection`
+- [ ] View renders from same `session` state
+- [ ] Changing view updates `session.selection`
+- [ ] REPL operations target what user sees
 
 ---
 
-## 12. RELATED TODOS
+## FILES TO MODIFY
 
-- [ ] TODO_VERB_CONTRACT_LAYER.md - Verb execution contracts
-- [ ] TODO_GHOST_PERSON_STATE.md - Ghost entity handling
-- [ ] TODO_DOCUMENT_ATTRIBUTE_CATALOGUE_COMPLETION.md - Data gaps
-- [ ] TODO_INVESTMENT_VEHICLE_ROLE.md - Pooled fund role (not yet created)
+| File | Change |
+|------|--------|
+| `rust/src/taxonomy/rules.rs` | `MembershipRules::from_session_context()` uses ViewConfigService |
+| `rust/src/taxonomy/node.rs` | Add zoom threshold fields to TaxonomyNode |
+| `rust/src/taxonomy/builder.rs` | Populate zoom thresholds from config |
+| `rust/src/session/mod.rs` | Ensure view_mode, zoom_level, expanded_nodes present |
+| `rust/src/session/view_state.rs` | Verify selection sync with visual state |
 
 ---
 
-**Next Action**: Begin Phase 1 - Unify Graph Types
+## VERIFICATION TESTS
+
+### Test 1: REPL/View Alignment
+
+```
+1. Set session to Book view (Allianz, 40 CBUs)
+2. Visual shows 40 CBU boxes
+3. REPL: "add CUSTODY to those"
+4. Verify: All 40 CBUs get CUSTODY product
+
+5. Zoom into CBU 3
+6. Visual shows CBU 3 expanded, others collapsed
+7. session.selection now = [CBU 3]
+8. REPL: "add signatory @john"
+9. Verify: Only CBU 3 gets signatory, not all 40
+```
+
+### Test 2: Config-Driven Edge Filtering
+
+```
+1. Set view_mode = "KYC_UBO"
+2. Query edge_types WHERE show_in_ubo_view = true
+3. Build taxonomy
+4. Verify: Only ownership/control/trust edges appear
+5. Switch view_mode = "TRADING"
+6. Verify: Different edges appear (has_role, managed_by, etc.)
+```
+
+### Test 3: Zoom Threshold Behavior
+
+```
+1. Book view, zoom = 0.2
+2. All CBUs show as collapsed boxes (no labels)
+3. Zoom to 0.4
+4. CBUs show labels but no expansion
+5. Zoom to 0.8
+6. Focused CBU auto-expands, shows sub-taxonomy
+```
+
+---
+
+## SUMMARY
+
+**The core principle:**
+
+```
+SESSION is the single source of truth.
+REPL reads from SESSION.
+VIEW renders from SESSION.
+WHAT USER SEES === WHAT AGENT OPERATES ON.
+
+If this invariant breaks, the REPL is unusable.
+```
+
+**The config principle:**
+
+```
+View filtering rules live in DATABASE (edge_types, node_types, view_modes).
+MembershipRules queries ViewConfigService.
+No hardcoded is_ubo_relevant() or edge lists in Rust code.
+
+Config, not code.
+```
+
+---
+
+## CURRENT STATUS (2026-01-05)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1: Database | ✅ DONE | Tables created with seed data |
+| Phase 2: Config Service | ✅ DONE | ViewConfigService, ConfigDrivenGraphBuilder, LayoutEngineV2 |
+| Phase 3: Remove Hardcoded | 🟡 PARTIAL | Legacy deleted, MembershipRules pending |
+| Phase 4: Session Integration | ⬜ TODO | view_mode, zoom_level, expanded_nodes |
+| Phase 5: TaxonomyNode Fractal | ⬜ TODO | Zoom thresholds, expansion context |
+| Phase 6: REPL/View Alignment | ⬜ TODO | Verification tests |
+
+**What's working now:**
+- Graph visualization uses `ConfigDrivenGraphBuilder` which queries database config
+- Node/edge visibility driven by `view_modes.node_types` and `view_modes.edge_types` JSONB
+- Layout computed by `LayoutEngineV2` with config from `layout_config` table
+- All legacy hardcoded filtering code removed
+
+**Next action:** Wire `MembershipRules` to use `ViewConfigService` with session context.

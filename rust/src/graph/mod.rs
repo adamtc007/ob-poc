@@ -12,21 +12,23 @@
 //! - `viewport`: Viewport state (zoom, pan, visible/off-screen tracking)
 //! - `view_model`: GraphViewModel - output of graph.* DSL verbs
 //! - `query_engine`: GraphQueryEngine for executing graph.* verbs
-//! - `builder`: CbuGraphBuilder for constructing graphs from DB data
-//! - `layout`: LayoutEngine for computing node positions
+//! - `config_driven_builder`: ConfigDrivenGraphBuilder for constructing graphs from DB config
+//! - `layout_v2`: LayoutEngineV2 for computing node positions from DB config
 
-pub mod builder;
+#[cfg(feature = "database")]
+pub mod config_driven_builder;
 pub mod filters;
-pub mod layout;
+pub mod layout_v2;
 #[cfg(feature = "database")]
 pub mod query_engine;
 pub mod types;
 pub mod view_model;
 pub mod viewport;
 
-pub use builder::CbuGraphBuilder;
+#[cfg(feature = "database")]
+pub use config_driven_builder::{ConfigDrivenGraphBuilder, EdgeLayoutHints, NodeRenderingHints};
 pub use filters::{FilterBuilder, GraphFilterOps};
-pub use layout::{LayoutConfig, LayoutEngine, Orientation, ViewMode};
+pub use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
 #[cfg(feature = "database")]
 pub use query_engine::GraphQueryEngine;
 pub use types::*;
