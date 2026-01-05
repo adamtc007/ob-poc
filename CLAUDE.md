@@ -3919,15 +3919,67 @@ The `trading-profile` domain provides a document-centric approach to CBU trading
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### Versioned Document Lifecycle
+
+Trading profiles follow a versioned document lifecycle with strict state transitions:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Document Lifecycle States                     │
+│                                                                  │
+│  DRAFT ──────► VALIDATED ──────► PENDING_REVIEW ──────► ACTIVE  │
+│    │               │                   │                   │    │
+│    │               │                   │                   │    │
+│    └───────────────┴───────────────────┴───────────────────┘    │
+│                            │                                     │
+│                            ▼                                     │
+│                       SUPERSEDED                                 │
+│                       (immutable)                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**State Transitions:**
+
+| From | To | Verb | Description |
+|------|-----|------|-------------|
+| (new) | DRAFT | `create-new-version` | Create new draft from scratch or clone |
+| DRAFT | VALIDATED | `mark-validated` | Pass automated validation |
+| VALIDATED | PENDING_REVIEW | (manual) | Submit for approval |
+| PENDING_REVIEW | ACTIVE | `activate` | Approve and materialize |
+| ACTIVE | SUPERSEDED | (automatic) | When new version activates |
+| any working | DRAFT | (edit) | Edits reset to DRAFT |
+
+**Key Constraints:**
+- Only ONE working version (DRAFT/VALIDATED/PENDING_REVIEW) per CBU at a time
+- Only ONE ACTIVE version per CBU at a time
+- SUPERSEDED versions are immutable (audit trail)
+- Database constraint: `idx_trading_profiles_one_working_version`
+
 ### Trading Profile Verbs
 
 | Verb | Description |
 |------|-------------|
 | `trading-profile.import` | Import trading profile from YAML file |
 | `trading-profile.get-active` | Get active profile for a CBU |
-| `trading-profile.activate` | Activate a draft profile (supersedes previous) |
+| `trading-profile.create-new-version` | Create new DRAFT version (increments version number) |
+| `trading-profile.mark-validated` | Transition DRAFT → VALIDATED after validation passes |
+| `trading-profile.activate` | Activate a validated profile (supersedes previous ACTIVE) |
 | `trading-profile.materialize` | Sync document to operational tables |
 | `trading-profile.validate` | Validate document without importing |
+| `trading-profile.clone-to` | Clone profile to another CBU (idempotent) |
+
+### Batch Cloning
+
+The `clone-to` verb supports batch operations for cloning a template profile to multiple CBUs:
+
+```clojure
+;; Clone a template profile to multiple funds
+(trading-profile.clone-to :profile-id "source-uuid" :target-cbu-id "target-uuid-1")
+(trading-profile.clone-to :profile-id "source-uuid" :target-cbu-id "target-uuid-2")
+;; ... repeat for each target CBU
+```
+
+**Idempotency:** If the target CBU already has a working version (DRAFT/VALIDATED/PENDING_REVIEW), the existing profile is returned instead of creating a duplicate. This allows safe re-runs of batch operations.
 
 ### Document Structure
 

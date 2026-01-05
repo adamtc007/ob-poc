@@ -3,16 +3,14 @@ domains:
     description: ISDA and CSA agreement management for OTC derivatives
     verbs:
       create:
-        description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty)
+        description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date)
         behavior: crud
         crud:
           operation: upsert
           table: isda_agreements
           schema: custody
           returning: isda_id
-          conflict_keys:
-            - cbu_id
-            - counterparty_entity_id
+          conflict_constraint: isda_agreements_cbu_id_counterparty_entity_id_agreement_dat_key
         args:
           - name: cbu-id
             type: uuid
@@ -105,9 +103,7 @@ domains:
           table: csa_agreements
           schema: custody
           returning: csa_id
-          conflict_keys:
-            - isda_id
-            - csa_type
+          conflict_constraint: csa_agreements_isda_id_csa_type_key
         args:
           - name: isda-id
             type: uuid

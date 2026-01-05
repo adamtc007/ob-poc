@@ -194,6 +194,10 @@ pub struct CrudConfig {
     pub returning: Option<String>,
     #[serde(default)]
     pub conflict_keys: Option<Vec<String>>,
+    /// Named constraint for ON CONFLICT (used when conflict_keys has computed columns)
+    /// Format: ON CONFLICT ON CONSTRAINT {conflict_constraint}
+    #[serde(default)]
+    pub conflict_constraint: Option<String>,
     // For junction operations
     #[serde(default)]
     pub junction: Option<String>,

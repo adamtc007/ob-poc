@@ -36,8 +36,11 @@ domains:
             default: DRAFT
             valid_values:
               - DRAFT
+              - VALIDATED
               - PENDING_REVIEW
               - ACTIVE
+              - SUPERSEDED
+              - ARCHIVED
           - name: notes
             type: string
             required: false
@@ -199,6 +202,828 @@ domains:
             description: Path to write output (if omitted, returns content)
         returns:
           type: record
+
+      # =========================================================================
+      # DOCUMENT CONSTRUCTION VERBS
+      # These verbs modify the JSONB document directly (source of truth)
+      # =========================================================================
+
+      create-draft:
+        description: Create a new draft trading profile for a CBU
+        behavior: plugin
+        handler: create_draft_trading_profile
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: base-currency
+            type: string
+            required: true
+            description: Base currency for the profile (e.g., EUR, USD)
+          - name: copy-from-profile
+            type: uuid
+            required: false
+            description: Clone from an existing profile
+          - name: notes
+            type: string
+            required: false
+            description: Notes about this draft
+        returns:
+          type: uuid
+          name: profile_id
+          capture: true
+
+      clone-to:
+        description: Clone a trading profile to another CBU, creating a new DRAFT profile
+        behavior: plugin
+        handler: clone_trading_profile_to_cbu
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            description: Source profile to clone from
+          - name: target-cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+            description: Target CBU to clone the profile to
+          - name: cloned-by
+            type: string
+            required: false
+            description: User or system that performed the clone
+          - name: adapt-base-currency
+            type: string
+            required: false
+            description: Optionally change the base currency in the cloned profile
+          - name: include-isda
+            type: boolean
+            required: false
+            default: true
+            description: Include ISDA agreements (may need counterparty adjustment)
+          - name: notes
+            type: string
+            required: false
+            description: Notes about the cloned profile
+        returns:
+          type: uuid
+          name: profile_id
+          capture: true
+
+      create-new-version:
+        description: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
+        behavior: plugin
+        handler: create_new_version_trading_profile
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+            description: CBU to create new version for (must have an ACTIVE profile)
+          - name: created-by
+            type: string
+            required: false
+            description: User or system creating the new version
+          - name: notes
+            type: string
+            required: false
+            description: Notes about why a new version is being created
+        returns:
+          type: uuid
+          name: profile_id
+          capture: true
+          description: The new DRAFT profile ID (version = previous + 1)
+
+      # --- Universe Section ---
+
+      add-instrument-class:
+        description: Add instrument class to trading profile universe
+        behavior: plugin
+        handler: add_instrument_class_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: class-code
+            type: string
+            required: true
+            description: "Instrument class code (EQUITY, FIXED_INCOME, IRS, FX_FORWARD, etc.)"
+          - name: cfi-prefixes
+            type: string_list
+            required: false
+            description: CFI code prefixes for matching
+          - name: isda-asset-classes
+            type: string_list
+            required: false
+            description: ISDA taxonomy codes if OTC (RATES, CREDIT, FX, EQUITY, COMMODITY)
+          - name: is-held
+            type: boolean
+            required: false
+            default: true
+            description: Whether positions are held
+          - name: is-traded
+            type: boolean
+            required: false
+            default: true
+            description: Whether actively traded
+        returns:
+          type: record
+          description: Updated universe section
+
+      remove-instrument-class:
+        description: Remove instrument class from trading profile universe
+        behavior: plugin
+        handler: remove_instrument_class_from_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: class-code
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      add-market:
+        description: Add market to trading profile universe
+        behavior: plugin
+        handler: add_market_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: mic
+            type: string
+            required: true
+            description: "Market Identifier Code (ISO 10383), e.g., XNYS, XLON"
+          - name: currencies
+            type: string_list
+            required: true
+            description: Currencies traded on this market
+          - name: settlement-types
+            type: string_list
+            required: false
+            default: [DVP]
+            description: Settlement types (DVP, FOP, RVP)
+        returns:
+          type: record
+          description: Updated universe section
+
+      remove-market:
+        description: Remove market from trading profile universe
+        behavior: plugin
+        handler: remove_market_from_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: mic
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      set-base-currency:
+        description: Set base currency for trading profile
+        behavior: plugin
+        handler: set_profile_base_currency
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: currency
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      add-allowed-currency:
+        description: Add currency to allowed currencies list
+        behavior: plugin
+        handler: add_allowed_currency_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: currency
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      # --- Standing Instructions Section ---
+
+      add-standing-instruction:
+        description: Add SSI to trading profile standing instructions
+        behavior: plugin
+        handler: add_ssi_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: category
+            type: string
+            required: true
+            valid_values: [SECURITIES, CASH, OTC_COLLATERAL, FUND_ACCOUNTING]
+            description: SSI category
+          - name: name
+            type: string
+            required: true
+            description: Unique SSI name within category
+          - name: mic
+            type: string
+            required: false
+            description: Market this SSI serves
+          - name: currency
+            type: string
+            required: false
+          - name: custody-account
+            type: string
+            required: false
+          - name: custody-bic
+            type: string
+            required: false
+          - name: cash-account
+            type: string
+            required: false
+          - name: cash-bic
+            type: string
+            required: false
+          - name: settlement-model
+            type: string
+            required: false
+            valid_values: [DVP, FOP, RVP]
+          - name: cutoff-time
+            type: string
+            required: false
+            description: "Cutoff time (e.g., 16:00)"
+          - name: cutoff-timezone
+            type: string
+            required: false
+            description: "Timezone (e.g., Europe/London)"
+        returns:
+          type: affected
+
+      remove-standing-instruction:
+        description: Remove SSI from trading profile
+        behavior: plugin
+        handler: remove_ssi_from_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: category
+            type: string
+            required: true
+          - name: name
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      # --- Booking Rules Section ---
+
+      add-booking-rule:
+        description: Add ALERT-style booking rule to trading profile
+        behavior: plugin
+        handler: add_booking_rule_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: name
+            type: string
+            required: true
+            description: Unique rule name
+          - name: priority
+            type: integer
+            required: true
+            description: Lower priority = evaluated first
+          - name: ssi-ref
+            type: string
+            required: true
+            description: Reference to SSI name in standing_instructions
+          - name: match-counterparty-ref
+            type: string
+            required: false
+            description: Counterparty LEI/BIC/name to match
+          - name: match-counterparty-ref-type
+            type: string
+            required: false
+            valid_values: [LEI, BIC, NAME, UUID]
+          - name: match-instrument-class
+            type: string
+            required: false
+          - name: match-security-type
+            type: string
+            required: false
+          - name: match-mic
+            type: string
+            required: false
+          - name: match-currency
+            type: string
+            required: false
+          - name: match-settlement-type
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      remove-booking-rule:
+        description: Remove booking rule from trading profile
+        behavior: plugin
+        handler: remove_booking_rule_from_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: name
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      # --- ISDA/CSA Section ---
+
+      add-isda-config:
+        description: Add ISDA agreement configuration to trading profile
+        behavior: plugin
+        handler: add_isda_config_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: counterparty-ref
+            type: string
+            required: true
+            description: Counterparty LEI or name
+          - name: counterparty-ref-type
+            type: string
+            required: true
+            valid_values: [LEI, BIC, NAME, UUID]
+          - name: agreement-date
+            type: string
+            required: true
+            description: "Agreement date (YYYY-MM-DD)"
+          - name: governing-law
+            type: string
+            required: true
+            valid_values: [NY, ENGLISH]
+          - name: effective-date
+            type: string
+            required: false
+            description: "Effective date if different from agreement date"
+        returns:
+          type: record
+          description: Updated ISDA agreements list
+
+      add-isda-product-coverage:
+        description: Add product coverage to ISDA config
+        behavior: plugin
+        handler: add_isda_coverage_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: counterparty-ref
+            type: string
+            required: true
+            description: Identifies which ISDA
+          - name: asset-class
+            type: string
+            required: true
+            description: "ISDA asset class (RATES, CREDIT, FX, EQUITY, COMMODITY)"
+          - name: base-products
+            type: string_list
+            required: false
+            description: "Specific products (IRS, CDS, FX_FORWARD, etc.)"
+        returns:
+          type: affected
+
+      add-csa-config:
+        description: Add CSA configuration to ISDA
+        behavior: plugin
+        handler: add_csa_config_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: counterparty-ref
+            type: string
+            required: true
+            description: Identifies which ISDA
+          - name: csa-type
+            type: string
+            required: true
+            valid_values: [VM, VM_IM]
+          - name: threshold-amount
+            type: decimal
+            required: false
+          - name: threshold-currency
+            type: string
+            required: false
+          - name: mta
+            type: decimal
+            required: false
+            description: Minimum Transfer Amount
+          - name: rounding
+            type: decimal
+            required: false
+          - name: valuation-time
+            type: string
+            required: false
+            description: "e.g., 16:00"
+          - name: valuation-timezone
+            type: string
+            required: false
+            description: "e.g., Europe/London"
+          - name: settlement-days
+            type: integer
+            required: false
+            default: 1
+        returns:
+          type: record
+          description: Updated CSA config
+
+      add-csa-eligible-collateral:
+        description: Add eligible collateral to CSA
+        behavior: plugin
+        handler: add_csa_collateral_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: counterparty-ref
+            type: string
+            required: true
+          - name: collateral-type
+            type: string
+            required: true
+            valid_values: [CASH, GOVT_BOND, CORP_BOND, EQUITY, MONEY_MARKET]
+          - name: currencies
+            type: string_list
+            required: false
+          - name: issuers
+            type: string_list
+            required: false
+            description: Allowed issuer countries or entities
+          - name: min-rating
+            type: string
+            required: false
+            description: "Minimum credit rating (e.g., A-)"
+          - name: haircut-pct
+            type: decimal
+            required: true
+            description: "Haircut percentage (e.g., 2.0 for 2%)"
+        returns:
+          type: affected
+
+      link-csa-ssi:
+        description: Link CSA to collateral SSI in standing instructions
+        behavior: plugin
+        handler: link_csa_ssi_in_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: counterparty-ref
+            type: string
+            required: true
+          - name: ssi-name
+            type: string
+            required: true
+            description: SSI name from OTC_COLLATERAL category
+        returns:
+          type: affected
+
+      # --- Investment Managers Section ---
+
+      add-im-mandate:
+        description: Add investment manager mandate to trading profile
+        behavior: plugin
+        handler: add_im_mandate_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: manager-ref
+            type: string
+            required: true
+            description: "Manager reference (LEI, BIC, or name)"
+          - name: manager-ref-type
+            type: string
+            required: true
+            valid_values: [LEI, BIC, NAME, UUID]
+          - name: priority
+            type: integer
+            required: true
+          - name: role
+            type: string
+            required: false
+            default: INVESTMENT_MANAGER
+          - name: scope-all
+            type: boolean
+            required: false
+            default: false
+            description: If true, IM can trade all universe
+          - name: scope-mics
+            type: string_list
+            required: false
+            description: Markets this IM can trade
+          - name: scope-instrument-classes
+            type: string_list
+            required: false
+          - name: instruction-method
+            type: string
+            required: false
+            valid_values: [SWIFT, CTM, FIX, API, ALERT, MANUAL]
+          - name: can-trade
+            type: boolean
+            required: false
+            default: true
+          - name: can-settle
+            type: boolean
+            required: false
+            default: true
+        returns:
+          type: record
+          description: Updated IM mandates list
+
+      update-im-scope:
+        description: Update scope for existing IM mandate
+        behavior: plugin
+        handler: update_im_scope_in_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: manager-ref
+            type: string
+            required: true
+          - name: scope-all
+            type: boolean
+            required: false
+          - name: scope-mics
+            type: string_list
+            required: false
+          - name: scope-instrument-classes
+            type: string_list
+            required: false
+        returns:
+          type: affected
+
+      remove-im-mandate:
+        description: Remove investment manager mandate from profile
+        behavior: plugin
+        handler: remove_im_mandate_from_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: manager-ref
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      # --- Sync Verbs ---
+
+      sync-to-operational:
+        description: Materialize document sections to operational tables
+        behavior: plugin
+        handler: sync_profile_to_operational
+        lifecycle:
+          writes_tables:
+            - custody.cbu_instrument_universe
+            - custody.cbu_ssi
+            - custody.ssi_booking_rules
+            - custody.isda_agreements
+            - custody.csa_agreements
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: sections
+            type: string_list
+            required: false
+            default: [all]
+            valid_values:
+              [all, universe, ssis, booking_rules, isda, im_assignments]
+          - name: mode
+            type: string
+            required: false
+            default: MERGE
+            valid_values:
+              - MERGE # Add/update, don't delete
+              - REPLACE # Delete and recreate
+              - DIFF_ONLY # Show what would change
+        returns:
+          type: record
+          description: Sync result with counts
+
+      sync-from-operational:
+        description: Rebuild document sections from operational tables
+        behavior: plugin
+        handler: sync_operational_to_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: sections
+            type: string_list
+            required: false
+            default: [all]
+          - name: mode
+            type: string
+            required: false
+            default: MERGE
+            valid_values: [MERGE, REPLACE, DIFF_ONLY]
+        returns:
+          type: record
+
+      diff-vs-operational:
+        description: Show differences between document and operational tables
+        behavior: plugin
+        handler: diff_profile_vs_operational
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: sections
+            type: string_list
+            required: false
+            default: [all]
+        returns:
+          type: record
+          description: "{ section: { in_document_only: [...], in_operational_only: [...], different: [...] } }"
+
+      # --- Validation Verbs ---
+
+      validate-go-live-ready:
+        description: Full validation for production readiness
+        behavior: plugin
+        handler: validate_profile_go_live_ready
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: strictness
+            type: string
+            required: false
+            default: STRICT
+            valid_values: [STRICT, STANDARD, PERMISSIVE]
+        returns:
+          type: record
+          description: "{ ready: bool, blockers: [...], warnings: [...], coverage_pct: float }"
+
+      validate-universe-coverage:
+        description: Validate all universe entries have required SSIs and booking rules
+        behavior: plugin
+        handler: validate_universe_coverage
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+          description: "{ complete: bool, gaps: [...] }"
+
+      validate-ssi-refs:
+        description: Validate all booking rules reference valid SSIs
+        behavior: plugin
+        handler: validate_booking_rule_ssi_refs
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+
+      # =========================================================================
+      # DOCUMENT LIFECYCLE VERBS (Phase 6)
+      # State machine: DRAFT -> VALIDATED -> PENDING_REVIEW -> ACTIVE -> SUPERSEDED/ARCHIVED
+      #   - DRAFT: Initial editing, can have errors
+      #   - VALIDATED: Ops team cleanup complete, structurally valid, ready for client
+      #   - PENDING_REVIEW: Sent to client for approval
+      #   - ACTIVE: Client approved, materialized to operational tables
+      #   - SUPERSEDED: Replaced by newer active version
+      #   - ARCHIVED: Soft deleted
+      # =========================================================================
+
+      validate:
+        description: Validate and mark a draft trading profile as ready for client review (transitions DRAFT -> VALIDATED)
+        behavior: plugin
+        handler: validate_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: validated-by
+            type: string
+            required: false
+            description: User or system that validated the profile
+          - name: notes
+            type: string
+            required: false
+            description: Validation notes
+        returns:
+          type: record
+          description: Updated profile with VALIDATED status and validation results
+
+      submit:
+        description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
+        behavior: plugin
+        handler: submit_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: submitted-by
+            type: string
+            required: false
+            description: User or system submitting the profile
+          - name: notes
+            type: string
+            required: false
+            description: Submission notes
+        returns:
+          type: record
+          description: Updated profile with PENDING_REVIEW status
+
+      approve:
+        description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
+        behavior: plugin
+        handler: approve_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: approved-by
+            type: string
+            required: false
+            description: User or system approving the profile
+          - name: notes
+            type: string
+            required: false
+            description: Approval notes
+        returns:
+          type: record
+          description: Updated profile with ACTIVE status
+
+      reject:
+        description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
+        behavior: plugin
+        handler: reject_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: rejection-reason
+            type: string
+            required: true
+            description: Reason for rejection
+          - name: rejected-by
+            type: string
+            required: false
+            description: User or system rejecting the profile
+        returns:
+          type: record
+          description: Updated profile with DRAFT status and rejection notes
+
+      archive:
+        description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
+        behavior: plugin
+        handler: archive_trading_profile
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: archived-by
+            type: string
+            required: false
+            description: User or system archiving the profile
+          - name: notes
+            type: string
+            required: false
+            description: Archive reason/notes
+        returns:
+          type: record
+          description: Updated profile with ARCHIVED status
 
       # =========================================================================
       # FULL MATRIX EXPORT (Phase 4)

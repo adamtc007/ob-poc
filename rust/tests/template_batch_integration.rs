@@ -603,4 +603,276 @@ mod template_batch_tests {
 
         Ok(())
     }
+
+    // =========================================================================
+    // TRADING-PROFILE.CLONE-TO BATCH TESTS
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_trading_profile_clone_to_batch() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        // Create source CBU with trading profile
+        let source_cbu_id = Uuid::new_v4();
+        let source_cbu_name = db.name("SourceCBU");
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, client_type)
+               VALUES ($1, $2, 'LU', 'FUND')"#,
+        )
+        .bind(source_cbu_id)
+        .bind(&source_cbu_name)
+        .execute(&db.pool)
+        .await?;
+
+        // Create a DRAFT trading profile for source CBU
+        let source_profile_id = Uuid::new_v4();
+        let profile_doc = serde_json::json!({
+            "universe": {
+                "base_currency": "EUR",
+                "allowed_currencies": ["EUR", "USD"],
+                "allowed_markets": [{"mic": "XETR", "currencies": ["EUR"]}],
+                "instrument_classes": [{"class_code": "EQUITY", "is_held": true, "is_traded": true}]
+            },
+            "investment_managers": [],
+            "isda_agreements": [],
+            "booking_rules": [],
+            "standing_instructions": {},
+            "pricing_matrix": [],
+            "valuation_config": null,
+            "constraints": null,
+            "settlement_config": null
+        });
+
+        // Compute hash for the document using sha256
+        use sha2::{Digest, Sha256};
+        let doc_string = serde_json::to_string(&profile_doc)?;
+        let mut hasher = Sha256::new();
+        hasher.update(doc_string.as_bytes());
+        let document_hash = format!("{:x}", hasher.finalize());
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbu_trading_profiles
+               (profile_id, cbu_id, version, status, document, document_hash, created_by)
+               VALUES ($1, $2, 1, 'DRAFT', $3, $4, 'test')"#,
+        )
+        .bind(source_profile_id)
+        .bind(source_cbu_id)
+        .bind(&profile_doc)
+        .bind(&document_hash)
+        .execute(&db.pool)
+        .await?;
+
+        // Create multiple target CBUs
+        let mut target_cbu_ids = Vec::new();
+        for i in 1..=5 {
+            let cbu_id = Uuid::new_v4();
+            let cbu_name = db.name(&format!("TargetCBU_{}", i));
+
+            sqlx::query(
+                r#"INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, client_type)
+                   VALUES ($1, $2, 'LU', 'FUND')"#,
+            )
+            .bind(cbu_id)
+            .bind(&cbu_name)
+            .execute(&db.pool)
+            .await?;
+
+            target_cbu_ids.push(cbu_id);
+        }
+
+        let executor = DslExecutor::new(db.pool.clone());
+        let mut ctx = ExecutionContext::new();
+
+        // Generate batch clone DSL - this simulates what an agent would generate
+        // by looping through CBUs in context
+        let mut dsl_statements = Vec::new();
+        for target_id in &target_cbu_ids {
+            dsl_statements.push(format!(
+                r#"(trading-profile.clone-to :profile-id "{}" :target-cbu-id "{}")"#,
+                source_profile_id, target_id
+            ));
+        }
+        let dsl = dsl_statements.join("\n");
+
+        // Execute batch clone
+        let results = executor.execute_dsl(&dsl, &mut ctx).await;
+
+        assert!(
+            results.is_ok(),
+            "Batch clone-to should succeed: {:?}",
+            results.err()
+        );
+
+        // Verify profiles were created for all targets
+        let profile_count: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".cbu_trading_profiles
+               WHERE cbu_id = ANY($1) AND status = 'DRAFT'"#,
+        )
+        .bind(&target_cbu_ids)
+        .fetch_one(&db.pool)
+        .await?;
+
+        assert_eq!(
+            profile_count, 5,
+            "Should have created 5 profiles, got {}",
+            profile_count
+        );
+
+        // Test idempotency: run again - should succeed without duplicates
+        let mut ctx2 = ExecutionContext::new();
+        let results2 = executor.execute_dsl(&dsl, &mut ctx2).await;
+
+        assert!(
+            results2.is_ok(),
+            "Idempotent re-run should succeed: {:?}",
+            results2.err()
+        );
+
+        // Verify still only 5 profiles (no duplicates due to idempotency)
+        let profile_count_after: i64 = sqlx::query_scalar(
+            r#"SELECT COUNT(*) FROM "ob-poc".cbu_trading_profiles
+               WHERE cbu_id = ANY($1)"#,
+        )
+        .bind(&target_cbu_ids)
+        .fetch_one(&db.pool)
+        .await?;
+
+        assert_eq!(
+            profile_count_after, 5,
+            "Idempotent re-run should not create duplicates, got {}",
+            profile_count_after
+        );
+
+        // Cleanup
+        sqlx::query(r#"DELETE FROM "ob-poc".cbu_trading_profiles WHERE cbu_id = ANY($1)"#)
+            .bind(&target_cbu_ids)
+            .execute(&db.pool)
+            .await?;
+
+        sqlx::query(r#"DELETE FROM "ob-poc".cbu_trading_profiles WHERE cbu_id = $1"#)
+            .bind(source_cbu_id)
+            .execute(&db.pool)
+            .await?;
+
+        db.cleanup().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_trading_profile_clone_to_single() -> Result<()> {
+        let db = TestDb::new().await?;
+
+        // Create source CBU with trading profile
+        let source_cbu_id = Uuid::new_v4();
+        let source_cbu_name = db.name("CloneSourceCBU");
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, client_type)
+               VALUES ($1, $2, 'LU', 'FUND')"#,
+        )
+        .bind(source_cbu_id)
+        .bind(&source_cbu_name)
+        .execute(&db.pool)
+        .await?;
+
+        // Create a DRAFT trading profile
+        let source_profile_id = Uuid::new_v4();
+        let profile_doc = serde_json::json!({
+            "universe": {
+                "base_currency": "USD",
+                "allowed_currencies": ["USD", "GBP"],
+                "allowed_markets": [{"mic": "XNYS", "currencies": ["USD"]}],
+                "instrument_classes": [{"class_code": "EQUITY", "is_held": true, "is_traded": true}]
+            },
+            "investment_managers": [],
+            "isda_agreements": [],
+            "booking_rules": [],
+            "standing_instructions": {},
+            "pricing_matrix": [],
+            "valuation_config": null,
+            "constraints": null,
+            "settlement_config": null
+        });
+
+        // Compute hash for the document using sha256
+        use sha2::{Digest, Sha256};
+        let doc_string = serde_json::to_string(&profile_doc)?;
+        let mut hasher = Sha256::new();
+        hasher.update(doc_string.as_bytes());
+        let document_hash = format!("{:x}", hasher.finalize());
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbu_trading_profiles
+               (profile_id, cbu_id, version, status, document, document_hash, created_by)
+               VALUES ($1, $2, 1, 'DRAFT', $3, $4, 'test')"#,
+        )
+        .bind(source_profile_id)
+        .bind(source_cbu_id)
+        .bind(&profile_doc)
+        .bind(&document_hash)
+        .execute(&db.pool)
+        .await?;
+
+        // Create target CBU
+        let target_cbu_id = Uuid::new_v4();
+        let target_cbu_name = db.name("CloneTargetCBU");
+
+        sqlx::query(
+            r#"INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, client_type)
+               VALUES ($1, $2, 'LU', 'FUND')"#,
+        )
+        .bind(target_cbu_id)
+        .bind(&target_cbu_name)
+        .execute(&db.pool)
+        .await?;
+
+        let executor = DslExecutor::new(db.pool.clone());
+        let mut ctx = ExecutionContext::new();
+
+        // Execute single clone
+        let dsl = format!(
+            r#"(trading-profile.clone-to :profile-id "{}" :target-cbu-id "{}")"#,
+            source_profile_id, target_cbu_id
+        );
+
+        let results = executor.execute_dsl(&dsl, &mut ctx).await;
+
+        assert!(
+            results.is_ok(),
+            "Single clone-to should succeed: {:?}",
+            results.err()
+        );
+
+        // Verify profile was created
+        let cloned_profile: Option<(Uuid, String, i32)> = sqlx::query_as(
+            r#"SELECT profile_id, status, version
+               FROM "ob-poc".cbu_trading_profiles
+               WHERE cbu_id = $1"#,
+        )
+        .bind(target_cbu_id)
+        .fetch_optional(&db.pool)
+        .await?;
+
+        assert!(cloned_profile.is_some(), "Cloned profile should exist");
+        let (_, status, version) = cloned_profile.unwrap();
+        assert_eq!(status, "DRAFT", "Cloned profile should be DRAFT");
+        assert_eq!(version, 1, "Cloned profile should be version 1");
+
+        // Cleanup
+        sqlx::query(r#"DELETE FROM "ob-poc".cbu_trading_profiles WHERE cbu_id = $1"#)
+            .bind(target_cbu_id)
+            .execute(&db.pool)
+            .await?;
+
+        sqlx::query(r#"DELETE FROM "ob-poc".cbu_trading_profiles WHERE cbu_id = $1"#)
+            .bind(source_cbu_id)
+            .execute(&db.pool)
+            .await?;
+
+        db.cleanup().await?;
+
+        Ok(())
+    }
 }

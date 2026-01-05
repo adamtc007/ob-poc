@@ -9,11 +9,7 @@ domains:
           operation: upsert
           table: cbu_instrument_universe
           schema: custody
-          conflict_keys:
-            - cbu_id
-            - instrument_class_id
-            - market_id
-            - counterparty_key
+          conflict_constraint: cbu_instrument_universe_natural_key
           returning: universe_id
         args:
           - name: cbu-id

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NX9zrPRf7VuwglW1rkrc9vqyqzdT4QtuLNgj3obYg7IE0gtRySpSxb0XRgpPgea
+\restrict 1xVOUnk2cnN1BcW998blzznTWD3SM1VLP4vP6R8QN0Ze0aAqfvqUuClUq3ymA32
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -5536,7 +5536,16 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
     materialized_at timestamp with time zone,
     materialization_hash text,
     sla_profile_id uuid,
-    CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PENDING_REVIEW'::character varying, 'ACTIVE'::character varying, 'SUPERSEDED'::character varying, 'ARCHIVED'::character varying])::text[])))
+    validated_at timestamp with time zone,
+    validated_by character varying(255),
+    submitted_at timestamp with time zone,
+    submitted_by character varying(255),
+    rejected_at timestamp with time zone,
+    rejected_by character varying(255),
+    rejection_reason text,
+    superseded_at timestamp with time zone,
+    superseded_by_version integer,
+    CONSTRAINT cbu_trading_profiles_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'VALIDATED'::character varying, 'PENDING_REVIEW'::character varying, 'ACTIVE'::character varying, 'SUPERSEDED'::character varying, 'ARCHIVED'::character varying])::text[])))
 );
 
 
@@ -12309,6 +12318,14 @@ ALTER TABLE ONLY custody.cfi_codes
 
 
 --
+-- Name: csa_agreements csa_agreements_isda_id_csa_type_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.csa_agreements
+    ADD CONSTRAINT csa_agreements_isda_id_csa_type_key UNIQUE (isda_id, csa_type);
+
+
+--
 -- Name: csa_agreements csa_agreements_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
 --
 
@@ -18043,6 +18060,20 @@ CREATE INDEX idx_trading_profiles_cbu_version ON "ob-poc".cbu_trading_profiles U
 
 
 --
+-- Name: idx_trading_profiles_one_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_trading_profiles_one_active ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
+-- Name: idx_trading_profiles_one_working_version; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_trading_profiles_one_working_version ON "ob-poc".cbu_trading_profiles USING btree (cbu_id) WHERE ((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'VALIDATED'::character varying, 'PENDING_REVIEW'::character varying])::text[]));
+
+
+--
 -- Name: idx_trust_parties_entity; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -21813,5 +21844,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NX9zrPRf7VuwglW1rkrc9vqyqzdT4QtuLNgj3obYg7IE0gtRySpSxb0XRgpPgea
+\unrestrict 1xVOUnk2cnN1BcW998blzznTWD3SM1VLP4vP6R8QN0Ze0aAqfvqUuClUq3ymA32
 

@@ -1010,8 +1010,9 @@ impl GenericCrudExecutor {
         crud: &RuntimeCrudConfig,
         args: &HashMap<String, JsonValue>,
     ) -> Result<GenericExecutionResult> {
-        if crud.conflict_keys.is_empty() {
-            bail!("Upsert requires conflict_keys in config");
+        // Must have either conflict_keys or conflict_constraint
+        if crud.conflict_keys.is_empty() && crud.conflict_constraint.is_none() {
+            bail!("Upsert requires conflict_keys or conflict_constraint in config");
         }
 
         let pk_col = crud
@@ -1118,47 +1119,55 @@ impl GenericCrudExecutor {
             }
         }
 
-        let conflict_cols: Vec<String> = crud
-            .conflict_keys
-            .iter()
-            .map(|c| format!("\"{}\"", c))
-            .collect();
-
         let returning = crud.returning.as_deref().unwrap_or(pk_col);
 
-        // If no columns to update, use DO UPDATE SET <first_conflict_key> = EXCLUDED.<first_conflict_key>
+        // Build the ON CONFLICT clause - prefer named constraint if provided
+        tracing::debug!(
+            "execute_upsert: table={}.{}, conflict_constraint={:?}, conflict_keys={:?}",
+            crud.schema,
+            crud.table,
+            crud.conflict_constraint,
+            crud.conflict_keys
+        );
+        let conflict_clause = if let Some(constraint_name) = &crud.conflict_constraint {
+            format!("ON CONSTRAINT \"{}\"", constraint_name)
+        } else {
+            let conflict_cols: Vec<String> = crud
+                .conflict_keys
+                .iter()
+                .map(|c| format!("\"{}\"", c))
+                .collect();
+            format!("({})", conflict_cols.join(", "))
+        };
+
+        // If no columns to update, use DO UPDATE SET <pk_col> = EXCLUDED.<pk_col>
         // This is a harmless no-op that returns the existing row.
         // We can't use DO NOTHING because it doesn't return the existing row.
         let sql = if updates.is_empty() {
-            // Use first conflict key for the no-op update
-            let first_conflict = crud
-                .conflict_keys
-                .first()
-                .map(|c| c.as_str())
-                .unwrap_or(pk_col);
+            // Use pk_col for the no-op update (always present)
             format!(
                 r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
-                   ON CONFLICT ({}) DO UPDATE SET "{}" = EXCLUDED."{}"
+                   ON CONFLICT {} DO UPDATE SET "{}" = EXCLUDED."{}"
                    RETURNING "{}""#,
                 crud.schema,
                 crud.table,
                 columns.join(", "),
                 placeholders.join(", "),
-                conflict_cols.join(", "),
-                first_conflict,
-                first_conflict,
+                conflict_clause,
+                pk_col,
+                pk_col,
                 returning
             )
         } else {
             format!(
                 r#"INSERT INTO "{}"."{}" ({}) VALUES ({})
-                   ON CONFLICT ({}) DO UPDATE SET {}
+                   ON CONFLICT {} DO UPDATE SET {}
                    RETURNING "{}""#,
                 crud.schema,
                 crud.table,
                 columns.join(", "),
                 placeholders.join(", "),
-                conflict_cols.join(", "),
+                conflict_clause,
                 updates.join(", "),
                 returning
             )

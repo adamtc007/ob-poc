@@ -143,6 +143,66 @@ pub struct DocumentAttributeView {
 }
 
 // =============================================================================
+// TRADING VIEW MODELS
+// =============================================================================
+
+/// Trading profile view for graph building
+#[derive(Debug, Clone)]
+pub struct TradingProfileView {
+    pub profile_id: Uuid,
+    pub version: i32,
+    pub status: String,
+    pub activated_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+/// Universe entry view for graph building - represents tradeable instrument/market combinations
+#[derive(Debug, Clone)]
+pub struct UniverseEntryView {
+    pub universe_id: Uuid,
+    pub instrument_class_id: Uuid,
+    pub class_code: String,
+    pub class_name: String,
+    pub market_id: Option<Uuid>,
+    pub mic: Option<String>,
+    pub market_name: Option<String>,
+    pub counterparty_id: Option<Uuid>,
+    pub counterparty_name: Option<String>,
+    pub currencies: Vec<String>,
+    pub is_otc: bool,
+}
+
+/// ISDA agreement view for graph building
+#[derive(Debug, Clone)]
+pub struct IsdaAgreementView {
+    pub isda_id: Uuid,
+    pub counterparty_entity_id: Uuid,
+    pub counterparty_name: Option<String>,
+    pub governing_law: Option<String>,
+    pub agreement_date: Option<chrono::NaiveDate>,
+}
+
+/// CSA (Credit Support Annex) view for graph building
+#[derive(Debug, Clone)]
+pub struct CsaAgreementView {
+    pub csa_id: Uuid,
+    pub csa_type: String,
+    pub threshold_amount: Option<f64>,
+    pub threshold_currency: Option<String>,
+}
+
+/// Investment Manager assignment view for graph building
+#[derive(Debug, Clone)]
+pub struct InvestmentManagerView {
+    pub entity_id: Uuid,
+    pub entity_name: String,
+    pub can_trade: bool,
+    pub can_settle: bool,
+    pub scope_mics: Vec<String>,
+    pub scope_classes: Vec<String>,
+    pub scope_description: String,
+}
+
+// =============================================================================
 // MCP VIEW MODELS
 // =============================================================================
 
@@ -2018,5 +2078,169 @@ impl VisualizationRepository {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    // =========================================================================
+    // TRADING LAYER QUERIES
+    // =========================================================================
+
+    /// Get active trading profile for CBU
+    pub async fn get_active_trading_profile(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<Option<TradingProfileView>> {
+        let row = sqlx::query!(
+            r#"SELECT profile_id, version, status, activated_at
+               FROM "ob-poc".cbu_trading_profiles
+               WHERE cbu_id = $1 AND status = 'ACTIVE'
+               ORDER BY version DESC
+               LIMIT 1"#,
+            cbu_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| TradingProfileView {
+            profile_id: r.profile_id,
+            version: r.version,
+            status: r.status,
+            activated_at: r.activated_at,
+        }))
+    }
+
+    /// Get instrument universe entries for CBU (from materialized custody tables)
+    pub async fn get_cbu_instrument_universe(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<Vec<UniverseEntryView>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                u.universe_id,
+                u.instrument_class_id,
+                ic.code as class_code,
+                ic.name as class_name,
+                u.market_id,
+                m.mic as "mic?",
+                m.name as "market_name?",
+                u.counterparty_entity_id as counterparty_id,
+                e.name as "counterparty_name?",
+                u.currencies,
+                COALESCE(ic.requires_isda, false) as "is_otc!"
+               FROM custody.cbu_instrument_universe u
+               JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
+               LEFT JOIN custody.markets m ON m.market_id = u.market_id
+               LEFT JOIN "ob-poc".entities e ON e.entity_id = u.counterparty_entity_id
+               WHERE u.cbu_id = $1 AND u.is_active = true
+               ORDER BY ic.code, m.mic, e.name"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| UniverseEntryView {
+                universe_id: r.universe_id,
+                instrument_class_id: r.instrument_class_id,
+                class_code: r.class_code,
+                class_name: r.class_name,
+                market_id: r.market_id,
+                mic: r.mic,
+                market_name: r.market_name,
+                counterparty_id: r.counterparty_id,
+                counterparty_name: r.counterparty_name,
+                currencies: r.currencies,
+                is_otc: r.is_otc,
+            })
+            .collect())
+    }
+
+    /// Get ISDA agreements for CBU
+    pub async fn get_cbu_isda_agreements(&self, cbu_id: Uuid) -> Result<Vec<IsdaAgreementView>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                i.isda_id,
+                i.counterparty_entity_id,
+                e.name as counterparty_name,
+                i.governing_law,
+                i.agreement_date
+               FROM custody.isda_agreements i
+               JOIN "ob-poc".entities e ON e.entity_id = i.counterparty_entity_id
+               WHERE i.cbu_id = $1 AND i.is_active = true
+               ORDER BY e.name"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| IsdaAgreementView {
+                isda_id: r.isda_id,
+                counterparty_entity_id: r.counterparty_entity_id,
+                counterparty_name: Some(r.counterparty_name),
+                governing_law: r.governing_law,
+                agreement_date: Some(r.agreement_date),
+            })
+            .collect())
+    }
+
+    /// Get CSA for ISDA agreement
+    pub async fn get_isda_csa(&self, isda_id: Uuid) -> Result<Option<CsaAgreementView>> {
+        let row = sqlx::query!(
+            r#"SELECT
+                csa_id,
+                csa_type,
+                threshold_amount::float8 as "threshold_amount: f64",
+                threshold_currency
+               FROM custody.csa_agreements
+               WHERE isda_id = $1 AND is_active = true"#,
+            isda_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| CsaAgreementView {
+            csa_id: r.csa_id,
+            csa_type: r.csa_type,
+            threshold_amount: r.threshold_amount,
+            threshold_currency: r.threshold_currency,
+        }))
+    }
+
+    /// Get investment managers for CBU (entities with IM role assignment)
+    pub async fn get_cbu_investment_managers(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<Vec<InvestmentManagerView>> {
+        // Get entities assigned as investment managers via cbu_entity_roles
+        let rows = sqlx::query!(
+            r#"SELECT
+                e.entity_id,
+                e.name as entity_name,
+                r.name as role_name
+               FROM "ob-poc".cbu_entity_roles cer
+               JOIN "ob-poc".entities e ON e.entity_id = cer.entity_id
+               JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+               WHERE cer.cbu_id = $1
+                 AND r.name IN ('INVESTMENT_MANAGER', 'DELEGATED_IM', 'SUB_ADVISOR')
+               ORDER BY e.name"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| InvestmentManagerView {
+                entity_id: r.entity_id,
+                entity_name: r.entity_name,
+                can_trade: true, // Default - could be enhanced with scope data
+                can_settle: true,
+                scope_mics: vec![],
+                scope_classes: vec![],
+                scope_description: r.role_name,
+            })
+            .collect())
     }
 }

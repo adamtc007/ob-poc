@@ -111,8 +111,44 @@ pub use temporal_ops::{
 pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
 pub use trading_matrix::{FindImForTradeOp, FindPricingForInstrumentOp, ListOpenSlaBreachesOp};
 pub use trading_profile::{
-    TradingProfileActivateOp, TradingProfileGetActiveOp, TradingProfileImportOp,
-    TradingProfileMaterializeOp, TradingProfileValidateOp,
+    TradingProfileActivateOp,
+    TradingProfileAddAllowedCurrencyOp,
+    TradingProfileAddBookingRuleOp,
+    TradingProfileAddCsaCollateralOp,
+    TradingProfileAddCsaConfigOp,
+    TradingProfileAddImMandateOp,
+    TradingProfileAddInstrumentClassOp,
+    TradingProfileAddIsdaConfigOp,
+    TradingProfileAddIsdaCoverageOp,
+    TradingProfileAddMarketOp,
+    TradingProfileAddSsiOp,
+    TradingProfileApproveOp,
+    TradingProfileArchiveOp,
+    TradingProfileCloneToOp,
+    TradingProfileCreateDraftOp,
+    // Versioned lifecycle: create new version from ACTIVE
+    TradingProfileCreateNewVersionOp,
+    TradingProfileDiffOp,
+    TradingProfileGetActiveOp,
+    TradingProfileImportOp,
+    TradingProfileLinkCsaSsiOp,
+    // Versioned lifecycle: mark as ops-validated (DRAFT → VALIDATED)
+    TradingProfileMarkValidatedOp,
+    TradingProfileMaterializeOp,
+    TradingProfileRejectOp,
+    TradingProfileRemoveBookingRuleOp,
+    TradingProfileRemoveImMandateOp,
+    TradingProfileRemoveInstrumentClassOp,
+    TradingProfileRemoveMarketOp,
+    TradingProfileRemoveSsiOp,
+    TradingProfileSetBaseCurrencyOp,
+    // Phase 6: Lifecycle operations
+    TradingProfileSubmitOp,
+    TradingProfileSyncFromOperationalOp,
+    TradingProfileUpdateImScopeOp,
+    TradingProfileValidateCoverageOp,
+    TradingProfileValidateGoLiveReadyOp,
+    TradingProfileValidateOp,
 };
 pub use ubo_analysis::{
     UboCalculateOp, UboCheckCompletenessOp, UboCompareSnapshotOp, UboDiscoverOwnerOp,
@@ -392,6 +428,47 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(TradingProfileActivateOp));
         registry.register(Arc::new(TradingProfileMaterializeOp));
         registry.register(Arc::new(TradingProfileValidateOp));
+        // Document construction operations (Phase 1)
+        registry.register(Arc::new(TradingProfileCreateDraftOp));
+        registry.register(Arc::new(TradingProfileAddInstrumentClassOp));
+        registry.register(Arc::new(TradingProfileRemoveInstrumentClassOp));
+        registry.register(Arc::new(TradingProfileAddMarketOp));
+        registry.register(Arc::new(TradingProfileRemoveMarketOp));
+        registry.register(Arc::new(TradingProfileAddSsiOp));
+        registry.register(Arc::new(TradingProfileRemoveSsiOp));
+        registry.register(Arc::new(TradingProfileAddBookingRuleOp));
+        registry.register(Arc::new(TradingProfileRemoveBookingRuleOp));
+        // ISDA/CSA construction operations (Phase 2)
+        registry.register(Arc::new(TradingProfileAddIsdaConfigOp));
+        registry.register(Arc::new(TradingProfileAddIsdaCoverageOp));
+        registry.register(Arc::new(TradingProfileAddCsaConfigOp));
+        registry.register(Arc::new(TradingProfileAddCsaCollateralOp));
+        registry.register(Arc::new(TradingProfileLinkCsaSsiOp));
+        // IM mandate and settlement config operations (Phase 3)
+        registry.register(Arc::new(TradingProfileAddImMandateOp));
+        registry.register(Arc::new(TradingProfileUpdateImScopeOp));
+        registry.register(Arc::new(TradingProfileRemoveImMandateOp));
+        registry.register(Arc::new(TradingProfileSetBaseCurrencyOp));
+        registry.register(Arc::new(TradingProfileAddAllowedCurrencyOp));
+        // Sync operations (Phase 4)
+        registry.register(Arc::new(TradingProfileDiffOp));
+        registry.register(Arc::new(TradingProfileSyncFromOperationalOp));
+        // Validation operations (Phase 5)
+        registry.register(Arc::new(TradingProfileValidateCoverageOp));
+        registry.register(Arc::new(TradingProfileValidateGoLiveReadyOp));
+
+        // Lifecycle operations (Phase 6)
+        registry.register(Arc::new(TradingProfileSubmitOp));
+        registry.register(Arc::new(TradingProfileApproveOp));
+        registry.register(Arc::new(TradingProfileRejectOp));
+        registry.register(Arc::new(TradingProfileArchiveOp));
+
+        // Versioned document lifecycle operations (Phase 7)
+        registry.register(Arc::new(TradingProfileCreateNewVersionOp));
+        registry.register(Arc::new(TradingProfileMarkValidatedOp));
+
+        // Clone operation
+        registry.register(Arc::new(TradingProfileCloneToOp));
 
         // Entity query for batch template execution
         registry.register(Arc::new(EntityQueryOp));
@@ -771,6 +848,19 @@ mod tests {
         assert!(registry.has("control", "identify-ubos"));
         assert!(registry.has("control", "trace-chain"));
         assert!(registry.has("control", "reconcile-ownership"));
+        // Trading Profile document construction operations (Phase 1)
+        assert!(registry.has("trading-profile", "create-draft"));
+        assert!(registry.has("trading-profile", "add-instrument-class"));
+        assert!(registry.has("trading-profile", "remove-instrument-class"));
+        assert!(registry.has("trading-profile", "add-market"));
+        assert!(registry.has("trading-profile", "remove-market"));
+        assert!(registry.has("trading-profile", "add-standing-instruction"));
+        assert!(registry.has("trading-profile", "remove-standing-instruction"));
+        assert!(registry.has("trading-profile", "add-booking-rule"));
+        assert!(registry.has("trading-profile", "remove-booking-rule"));
+        // Versioned document lifecycle operations (Phase 7)
+        assert!(registry.has("trading-profile", "create-new-version"));
+        assert!(registry.has("trading-profile", "mark-validated"));
     }
 
     #[test]

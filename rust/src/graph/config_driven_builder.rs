@@ -207,10 +207,26 @@ impl ConfigDrivenGraphBuilder {
             // TODO: Add dedicated KYC edge types to database if needed
 
             // Check for services-related edges
-            if self.visible_edge_types.contains("PRODUCT_PROVIDES_SERVICE")
-                || self.visible_edge_types.contains("CBU_HAS_TRADING_PROFILE")
-            {
+            if self.visible_edge_types.contains("PRODUCT_PROVIDES_SERVICE") {
                 layers.push("services".to_string());
+            }
+
+            // Check for trading-related edges
+            if self.visible_edge_types.contains("CBU_HAS_TRADING_PROFILE")
+                || self
+                    .visible_edge_types
+                    .contains("TRADING_PROFILE_HAS_MATRIX")
+                || self.visible_edge_types.contains("MATRIX_INCLUDES_CLASS")
+                || self.visible_edge_types.contains("CLASS_TRADED_ON_MARKET")
+                || self.visible_edge_types.contains("OTC_WITH_COUNTERPARTY")
+                || self.visible_edge_types.contains("OTC_COVERED_BY_ISDA")
+                || self.visible_edge_types.contains("ISDA_HAS_CSA")
+                || self.visible_edge_types.contains("CBU_IM_MANDATE")
+                || self
+                    .visible_edge_types
+                    .contains("ENTITY_AUTHORIZES_TRADING")
+            {
+                layers.push("trading".to_string());
             }
 
             // Check for fund structure edges
@@ -269,6 +285,10 @@ impl ConfigDrivenGraphBuilder {
 
         if included_layers.contains(&"services".to_string()) {
             self.load_services_layer(&mut graph, repo).await?;
+        }
+
+        if included_layers.contains(&"trading".to_string()) {
+            self.load_trading_layer(&mut graph, repo).await?;
         }
 
         if included_layers.contains(&"fund_structure".to_string()) {
@@ -1038,6 +1058,291 @@ impl ConfigDrivenGraphBuilder {
                         }
                     }
                 }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Load trading layer data
+    ///
+    /// Structure:
+    /// CBU → TradingProfile → InstrumentMatrix
+    ///                           ├── InstrumentClass nodes
+    ///                           │     ├── Market nodes (exchange traded)
+    ///                           │     └── Counterparty nodes (OTC)
+    ///                           │           └── ISDA → CSA
+    ///                           └── IM links (entities doing the trading)
+    async fn load_trading_layer(
+        &self,
+        graph: &mut CbuGraph,
+        repo: &VisualizationRepository,
+    ) -> Result<()> {
+        // Note: Uses module-level type aliases (GraphNode = LegacyGraphNode)
+        // EdgeType, NodeType, etc. are already imported at module level
+
+        // 1. Load active trading profile
+        let Some(profile) = repo.get_active_trading_profile(self.cbu_id).await? else {
+            return Ok(()); // No trading profile = no trading layer
+        };
+
+        // 2. Add Trading Profile node
+        let profile_node_id = format!("profile-{}", profile.profile_id);
+        if self.is_node_type_visible("TRADING_PROFILE") {
+            graph.add_node(GraphNode {
+                id: profile_node_id.clone(),
+                node_type: NodeType::TradingProfile,
+                layer: LayerType::Trading,
+                label: "Trading Profile".into(),
+                sublabel: Some(format!("v{} - {}", profile.version, profile.status)),
+                status: match profile.status.as_str() {
+                    "ACTIVE" => NodeStatus::Active,
+                    "DRAFT" => NodeStatus::Draft,
+                    _ => NodeStatus::Suspended,
+                },
+                ..Default::default()
+            });
+
+            // Edge: CBU → Trading Profile
+            if self.is_edge_type_visible("CBU_HAS_TRADING_PROFILE") {
+                graph.add_edge(GraphEdge {
+                    id: format!("cbu->profile-{}", profile.profile_id),
+                    source: self.cbu_id.to_string(),
+                    target: profile_node_id.clone(),
+                    edge_type: EdgeType::HasTradingProfile,
+                    label: None,
+                });
+            }
+        }
+
+        // 3. Add Instrument Matrix node (container)
+        let matrix_node_id = format!("matrix-{}", profile.profile_id);
+        if self.is_node_type_visible("INSTRUMENT_MATRIX") {
+            graph.add_node(GraphNode {
+                id: matrix_node_id.clone(),
+                node_type: NodeType::InstrumentMatrix,
+                layer: LayerType::Trading,
+                label: "Instrument Matrix".into(),
+                sublabel: None,
+                status: NodeStatus::Active,
+                ..Default::default()
+            });
+
+            // Edge: Trading Profile → Matrix
+            if self.is_edge_type_visible("TRADING_PROFILE_HAS_MATRIX") {
+                graph.add_edge(GraphEdge {
+                    id: format!("{}->{}", profile_node_id, matrix_node_id),
+                    source: profile_node_id.clone(),
+                    target: matrix_node_id.clone(),
+                    edge_type: EdgeType::HasMatrix,
+                    label: None,
+                });
+            }
+        }
+
+        // 4. Load instrument universe and build class/market/counterparty nodes
+        let universe = repo.get_cbu_instrument_universe(self.cbu_id).await?;
+
+        // Group by instrument class
+        let mut classes_added: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+        let mut markets_added: std::collections::HashSet<Uuid> = std::collections::HashSet::new();
+        let mut counterparties_added: std::collections::HashSet<Uuid> =
+            std::collections::HashSet::new();
+
+        for entry in &universe {
+            // Add Instrument Class node (deduplicated)
+            let class_node_id = format!("class-{}", entry.instrument_class_id);
+            if !classes_added.contains(&entry.instrument_class_id) {
+                if self.is_node_type_visible("INSTRUMENT_CLASS") {
+                    graph.add_node(GraphNode {
+                        id: class_node_id.clone(),
+                        node_type: NodeType::InstrumentClass,
+                        layer: LayerType::Trading,
+                        label: entry.class_name.clone(),
+                        sublabel: Some(entry.class_code.clone()),
+                        status: NodeStatus::Active,
+                        data: serde_json::json!({
+                            "class_id": entry.instrument_class_id,
+                            "class_code": entry.class_code,
+                            "is_otc": entry.is_otc,
+                        }),
+                        ..Default::default()
+                    });
+
+                    // Edge: Matrix → Class
+                    if self.is_edge_type_visible("MATRIX_INCLUDES_CLASS") {
+                        graph.add_edge(GraphEdge {
+                            id: format!("{}->{}", matrix_node_id, class_node_id),
+                            source: matrix_node_id.clone(),
+                            target: class_node_id.clone(),
+                            edge_type: EdgeType::IncludesClass,
+                            label: None,
+                        });
+                    }
+                }
+                classes_added.insert(entry.instrument_class_id);
+            }
+
+            // Add Market node for exchange-traded (deduplicated)
+            if let Some(market_id) = entry.market_id {
+                if !markets_added.contains(&market_id) {
+                    if self.is_node_type_visible("MARKET") {
+                        let market_node_id = format!("market-{}", market_id);
+                        graph.add_node(GraphNode {
+                            id: market_node_id.clone(),
+                            node_type: NodeType::Market,
+                            layer: LayerType::Trading,
+                            label: entry
+                                .market_name
+                                .clone()
+                                .unwrap_or_else(|| "Unknown".into()),
+                            sublabel: entry.mic.clone(),
+                            status: NodeStatus::Active,
+                            data: serde_json::json!({
+                                "market_id": market_id,
+                                "mic": entry.mic,
+                            }),
+                            ..Default::default()
+                        });
+
+                        // Edge: Class → Market
+                        if self.is_edge_type_visible("CLASS_TRADED_ON_MARKET") {
+                            graph.add_edge(GraphEdge {
+                                id: format!("{}->{}", class_node_id, market_node_id),
+                                source: class_node_id.clone(),
+                                target: market_node_id,
+                                edge_type: EdgeType::TradedOn,
+                                label: None,
+                            });
+                        }
+                    }
+                    markets_added.insert(market_id);
+                }
+            }
+
+            // Add OTC Counterparty node (deduplicated)
+            if let Some(counterparty_id) = entry.counterparty_id {
+                if !counterparties_added.contains(&counterparty_id) {
+                    let cp_node_id = format!("counterparty-{}", counterparty_id);
+                    // Note: counterparty is an entity, may already exist in graph
+                    if !graph.has_node(&cp_node_id) {
+                        graph.add_node(GraphNode {
+                            id: cp_node_id.clone(),
+                            node_type: NodeType::Entity,
+                            layer: LayerType::Trading,
+                            label: entry
+                                .counterparty_name
+                                .clone()
+                                .unwrap_or_else(|| "Unknown".into()),
+                            sublabel: Some("OTC Counterparty".into()),
+                            status: NodeStatus::Active,
+                            data: serde_json::json!({
+                                "entity_id": counterparty_id,
+                                "role": "OTC_COUNTERPARTY",
+                            }),
+                            ..Default::default()
+                        });
+                    }
+
+                    // Edge: Class → Counterparty (OTC trading relationship)
+                    if self.is_edge_type_visible("OTC_WITH_COUNTERPARTY") {
+                        graph.add_edge(GraphEdge {
+                            id: format!("{}->{}", class_node_id, cp_node_id),
+                            source: class_node_id.clone(),
+                            target: cp_node_id,
+                            edge_type: EdgeType::OtcCounterparty,
+                            label: None,
+                        });
+                    }
+                    counterparties_added.insert(counterparty_id);
+                }
+            }
+        }
+
+        // 5. Load ISDA agreements and link to counterparties
+        let isdas = repo.get_cbu_isda_agreements(self.cbu_id).await?;
+        for isda in isdas {
+            let isda_node_id = format!("isda-{}", isda.isda_id);
+            let cp_node_id = format!("counterparty-{}", isda.counterparty_entity_id);
+
+            if self.is_node_type_visible("ISDA_AGREEMENT") {
+                graph.add_node(GraphNode {
+                    id: isda_node_id.clone(),
+                    node_type: NodeType::IsdaAgreement,
+                    layer: LayerType::Trading,
+                    label: format!("ISDA {}", isda.governing_law.as_deref().unwrap_or("?")),
+                    sublabel: isda.counterparty_name.clone(),
+                    status: NodeStatus::Active,
+                    data: serde_json::json!({
+                        "isda_id": isda.isda_id,
+                        "governing_law": isda.governing_law,
+                        "agreement_date": isda.agreement_date,
+                    }),
+                    ..Default::default()
+                });
+
+                // Edge: Counterparty → ISDA
+                if self.is_edge_type_visible("OTC_COVERED_BY_ISDA") {
+                    graph.add_edge(GraphEdge {
+                        id: format!("{}->{}", cp_node_id, isda_node_id),
+                        source: cp_node_id,
+                        target: isda_node_id.clone(),
+                        edge_type: EdgeType::CoveredByIsda,
+                        label: None,
+                    });
+                }
+            }
+
+            // 6. Load CSA under ISDA
+            if let Some(csa) = repo.get_isda_csa(isda.isda_id).await? {
+                let csa_node_id = format!("csa-{}", csa.csa_id);
+
+                if self.is_node_type_visible("CSA_AGREEMENT") {
+                    graph.add_node(GraphNode {
+                        id: csa_node_id.clone(),
+                        node_type: NodeType::CsaAgreement,
+                        layer: LayerType::Trading,
+                        label: format!("CSA ({})", csa.csa_type),
+                        sublabel: None,
+                        status: NodeStatus::Active,
+                        data: serde_json::json!({
+                            "csa_id": csa.csa_id,
+                            "csa_type": csa.csa_type,
+                            "threshold_amount": csa.threshold_amount,
+                            "threshold_currency": csa.threshold_currency,
+                        }),
+                        ..Default::default()
+                    });
+
+                    // Edge: ISDA → CSA
+                    if self.is_edge_type_visible("ISDA_HAS_CSA") {
+                        graph.add_edge(GraphEdge {
+                            id: format!("{}->{}", isda_node_id, csa_node_id),
+                            source: isda_node_id,
+                            target: csa_node_id,
+                            edge_type: EdgeType::HasCsa,
+                            label: None,
+                        });
+                    }
+                }
+            }
+        }
+
+        // 7. Load Investment Managers and link to CBU
+        let ims = repo.get_cbu_investment_managers(self.cbu_id).await?;
+        for im in ims {
+            // IM is an entity - may already exist in graph from core layer
+            let im_entity_node_id = format!("entity-{}", im.entity_id);
+
+            // Edge: CBU → IM Entity with trading mandate
+            if self.is_edge_type_visible("CBU_IM_MANDATE") {
+                graph.add_edge(GraphEdge {
+                    id: format!("cbu->im-{}", im.entity_id),
+                    source: self.cbu_id.to_string(),
+                    target: im_entity_node_id,
+                    edge_type: EdgeType::ImMandate,
+                    label: Some(format!("IM: {}", im.scope_description)),
+                });
             }
         }
 

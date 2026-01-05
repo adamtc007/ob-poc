@@ -22,8 +22,8 @@ use super::{CustomOperation, ExecutionResult};
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::ExecutionContext;
 use crate::trading_profile::{
-    resolve::resolve_entity_ref, BookingRule, IsdaAgreementConfig, MaterializationResult,
-    StandingInstruction, TradingProfileDocument, TradingProfileImport,
+    document_ops, resolve::resolve_entity_ref, BookingRule, IsdaAgreementConfig,
+    MaterializationResult, StandingInstruction, TradingProfileDocument, TradingProfileImport,
 };
 
 #[cfg(feature = "database")]
@@ -727,16 +727,21 @@ async fn materialize_universe(
                 market_cfg.settlement_types.clone()
             };
 
-            // Uses partial unique index: cbu_instrument_universe_no_counterparty_key
-            // Column list + WHERE clause for partial index inference
+            // Uses natural key unique constraint: (cbu_id, instrument_class_id, market_id, counterparty_key)
+            // counterparty_key defaults to nil UUID for non-OTC entries
             tracing::debug!(mic = %market_cfg.mic, class = %inst_cfg.class_code, "materialize_universe: inserting");
+            let nil_uuid = Uuid::nil();
             let result = sqlx::query(
                 r#"INSERT INTO custody.cbu_instrument_universe
                    (cbu_id, instrument_class_id, market_id, currencies, settlement_types,
-                    is_held, is_traded, effective_date)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE)
-                   ON CONFLICT (cbu_id, instrument_class_id, market_id) WHERE counterparty_entity_id IS NULL
-                   DO NOTHING"#,
+                    is_held, is_traded, effective_date, counterparty_key)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_DATE, $8)
+                   ON CONFLICT (cbu_id, instrument_class_id, market_id, counterparty_key)
+                   DO UPDATE SET
+                       currencies = EXCLUDED.currencies,
+                       settlement_types = EXCLUDED.settlement_types,
+                       is_held = EXCLUDED.is_held,
+                       is_traded = EXCLUDED.is_traded"#,
             )
             .bind(cbu_id)
             .bind(class_id)
@@ -745,6 +750,7 @@ async fn materialize_universe(
             .bind(&settlement_types)
             .bind(inst_cfg.is_held)
             .bind(inst_cfg.is_traded)
+            .bind(nil_uuid)
             .execute(&mut **tx)
             .await
             .map_err(|e| {
@@ -981,6 +987,1916 @@ async fn materialize_isda_agreements(
 }
 
 // =============================================================================
+// DOCUMENT CONSTRUCTION OPERATIONS
+// =============================================================================
+
+/// Create a new draft trading profile for a CBU
+pub struct TradingProfileCreateDraftOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileCreateDraftOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "create-draft"
+    }
+    fn rationale(&self) -> &'static str {
+        "Creates new DRAFT profile document with optional cloning from existing"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cbu-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+
+        let base_currency = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "base-currency")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "EUR".to_string());
+
+        let copy_from = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "copy-from-profile")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            });
+
+        let notes = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "notes")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let profile_id =
+            document_ops::create_draft_profile(pool, cbu_id, base_currency, copy_from, notes)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create draft: {}", e))?;
+
+        ctx.bind("profile", profile_id);
+
+        Ok(ExecutionResult::Uuid(profile_id))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+    }
+}
+
+/// Add instrument class to trading profile universe
+pub struct TradingProfileAddInstrumentClassOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddInstrumentClassOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "add-instrument-class"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to add instrument class"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let class_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "class-code")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing class-code argument"))?;
+
+        let cfi_prefixes = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cfi-prefixes")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let isda_asset_classes = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "isda-asset-classes")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let is_held = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "is-held")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(true);
+
+        let is_traded = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "is-traded")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(true);
+
+        let result = document_ops::add_instrument_class(
+            pool,
+            profile_id,
+            class_code,
+            cfi_prefixes,
+            isda_asset_classes,
+            is_held,
+            is_traded,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add instrument class: {}", e))?;
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({})))
+    }
+}
+
+/// Remove instrument class from trading profile universe
+pub struct TradingProfileRemoveInstrumentClassOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "remove-instrument-class"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to remove instrument class"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let class_code = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "class-code")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing class-code argument"))?;
+
+        let affected = document_ops::remove_instrument_class(pool, profile_id, class_code)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to remove instrument class: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Add market to trading profile universe
+pub struct TradingProfileAddMarketOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddMarketOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "add-market"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to add market"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let mic = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "mic")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing mic argument"))?;
+
+        let currencies = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "currencies")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            })
+            .unwrap_or_default();
+
+        let settlement_types = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "settlement-types")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let result = document_ops::add_market(pool, profile_id, mic, currencies, settlement_types)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to add market: {}", e))?;
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({})))
+    }
+}
+
+/// Remove market from trading profile universe
+pub struct TradingProfileRemoveMarketOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveMarketOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "remove-market"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to remove market"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let mic = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "mic")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing mic argument"))?;
+
+        let affected = document_ops::remove_market(pool, profile_id, mic)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to remove market: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Add standing instruction to trading profile
+pub struct TradingProfileAddSsiOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddSsiOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "add-standing-instruction"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to add SSI"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let category = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "category")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing category argument"))?;
+
+        let name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "name")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+
+        let mic = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "mic")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let currency = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "currency")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let custody_account = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "custody-account")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let custody_bic = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "custody-bic")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let cash_account = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cash-account")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let cash_bic = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cash-bic")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let settlement_model = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "settlement-model")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let cutoff_time = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cutoff-time")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let cutoff_timezone = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cutoff-timezone")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let affected = document_ops::add_standing_instruction(
+            pool,
+            profile_id,
+            category,
+            name,
+            mic,
+            currency,
+            custody_account,
+            custody_bic,
+            cash_account,
+            cash_bic,
+            settlement_model,
+            cutoff_time,
+            cutoff_timezone,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add SSI: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Remove standing instruction from trading profile
+pub struct TradingProfileRemoveSsiOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveSsiOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "remove-standing-instruction"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to remove SSI"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let category = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "category")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing category argument"))?;
+
+        let name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "name")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+
+        let affected = document_ops::remove_standing_instruction(pool, profile_id, category, name)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to remove SSI: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Add booking rule to trading profile
+pub struct TradingProfileAddBookingRuleOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddBookingRuleOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "add-booking-rule"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to add booking rule"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "name")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+
+        let priority = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "priority")
+            .and_then(|a| a.value.as_integer())
+            .ok_or_else(|| anyhow::anyhow!("Missing priority argument"))?
+            as i32;
+
+        let ssi_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "ssi-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing ssi-ref argument"))?;
+
+        let match_counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "match-counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let match_counterparty_ref_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "match-counterparty-ref-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let match_instrument_class = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "match-instrument-class")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let match_security_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "match-security-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let match_mic = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "match-mic")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let match_currency = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "match-currency")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let match_settlement_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "match-settlement-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let affected = document_ops::add_booking_rule(
+            pool,
+            profile_id,
+            name,
+            priority,
+            ssi_ref,
+            match_counterparty_ref,
+            match_counterparty_ref_type,
+            match_instrument_class,
+            match_security_type,
+            match_mic,
+            match_currency,
+            match_settlement_type,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add booking rule: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Remove booking rule from trading profile
+pub struct TradingProfileRemoveBookingRuleOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveBookingRuleOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "remove-booking-rule"
+    }
+    fn rationale(&self) -> &'static str {
+        "Modifies JSONB document to remove booking rule"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::trading_profile::document_ops;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "name")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+
+        let affected = document_ops::remove_booking_rule(pool, profile_id, name)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to remove booking rule: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+// =============================================================================
+// ISDA/CSA CONSTRUCTION OPERATIONS (Phase 2)
+// =============================================================================
+
+/// Add ISDA configuration to a trading profile document
+pub struct TradingProfileAddIsdaConfigOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddIsdaConfigOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-isda-config"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Adds ISDA master agreement configuration to the document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+
+        let counterparty_ref_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "NAME".to_string());
+
+        let agreement_date = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "agreement-date")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing agreement-date argument"))?;
+
+        let governing_law = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "governing-law")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing governing-law argument"))?;
+
+        let effective_date = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "effective-date")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let result = document_ops::add_isda_config(
+            pool,
+            profile_id,
+            counterparty_ref,
+            counterparty_ref_type,
+            agreement_date,
+            governing_law,
+            effective_date,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add ISDA config: {}", e))?;
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Add product coverage to an ISDA agreement
+pub struct TradingProfileAddIsdaCoverageOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddIsdaCoverageOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-isda-coverage"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Adds product coverage to an ISDA master agreement"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+
+        let asset_class = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "asset-class")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing asset-class argument"))?;
+
+        let base_products = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "base-products")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let affected = document_ops::add_isda_product_coverage(
+            pool,
+            profile_id,
+            counterparty_ref,
+            asset_class,
+            base_products,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add ISDA coverage: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Add CSA configuration to an ISDA agreement
+pub struct TradingProfileAddCsaConfigOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddCsaConfigOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-csa-config"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Adds Credit Support Annex configuration to an ISDA agreement"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+
+        let csa_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "csa-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing csa-type argument"))?;
+
+        let threshold_amount = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "threshold-amount")
+            .and_then(|a| a.value.as_integer());
+
+        let threshold_currency = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "threshold-currency")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let mta = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "minimum-transfer-amount")
+            .and_then(|a| a.value.as_integer());
+
+        let rounding = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "rounding-amount")
+            .and_then(|a| a.value.as_integer());
+
+        let valuation_time = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "valuation-time")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let valuation_timezone = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "valuation-timezone")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let settlement_days = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "settlement-days")
+            .and_then(|a| a.value.as_integer())
+            .map(|i| i as i32);
+
+        let result = document_ops::add_csa_config(
+            pool,
+            profile_id,
+            counterparty_ref,
+            csa_type,
+            threshold_amount,
+            threshold_currency,
+            mta,
+            rounding,
+            valuation_time,
+            valuation_timezone,
+            settlement_days,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add CSA config: {}", e))?;
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Add eligible collateral to a CSA
+pub struct TradingProfileAddCsaCollateralOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddCsaCollateralOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-csa-collateral"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Adds eligible collateral type to a Credit Support Annex"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use rust_decimal::prelude::ToPrimitive;
+
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+
+        let collateral_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "collateral-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing collateral-type argument"))?;
+
+        let currencies = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "currencies")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let issuers = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "issuers")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let min_rating = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "min-rating")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let haircut_pct = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "haircut-pct")
+            .and_then(|a| a.value.as_decimal())
+            .and_then(|d| d.to_f64())
+            .unwrap_or(0.0);
+
+        let affected = document_ops::add_csa_eligible_collateral(
+            pool,
+            profile_id,
+            counterparty_ref,
+            collateral_type,
+            currencies,
+            issuers,
+            min_rating,
+            haircut_pct,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add CSA collateral: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Link CSA to collateral SSI
+pub struct TradingProfileLinkCsaSsiOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileLinkCsaSsiOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "link-csa-ssi"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Links a CSA to a collateral SSI for margin transfers"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+
+        let ssi_name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "ssi-name")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing ssi-name argument"))?;
+
+        let affected = document_ops::link_csa_ssi(pool, profile_id, counterparty_ref, ssi_name)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to link CSA SSI: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+// =============================================================================
+// IM MANDATE OPERATIONS (Phase 3)
+// =============================================================================
+
+/// Add Investment Manager mandate to trading profile
+pub struct TradingProfileAddImMandateOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddImMandateOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-im-mandate"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Adds Investment Manager mandate configuration to the document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let manager_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "manager-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
+
+        let manager_ref_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "manager-ref-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "NAME".to_string());
+
+        let priority = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "priority")
+            .and_then(|a| a.value.as_integer())
+            .map(|i| i as i32)
+            .unwrap_or(50);
+
+        let role = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "role")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "INVESTMENT_MANAGER".to_string());
+
+        let scope_all = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "scope-all")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(true);
+
+        let scope_mics = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "scope-mics")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let scope_instrument_classes = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "scope-instrument-classes")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let instruction_method = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "instruction-method")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        let can_trade = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "can-trade")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(true);
+
+        let can_settle = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "can-settle")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(true);
+
+        let result = document_ops::add_im_mandate(
+            pool,
+            profile_id,
+            manager_ref,
+            manager_ref_type,
+            priority,
+            role,
+            scope_all,
+            scope_mics,
+            scope_instrument_classes,
+            instruction_method,
+            can_trade,
+            can_settle,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add IM mandate: {}", e))?;
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Update Investment Manager scope
+pub struct TradingProfileUpdateImScopeOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileUpdateImScopeOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "update-im-scope"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Updates the scope of an existing Investment Manager mandate"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let manager_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "manager-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
+
+        let scope_all = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "scope-all")
+            .and_then(|a| a.value.as_boolean());
+
+        let scope_mics = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "scope-mics")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let scope_instrument_classes = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "scope-instrument-classes")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            });
+
+        let affected = document_ops::update_im_scope(
+            pool,
+            profile_id,
+            manager_ref,
+            scope_all,
+            scope_mics,
+            scope_instrument_classes,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to update IM scope: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Remove Investment Manager mandate
+pub struct TradingProfileRemoveImMandateOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveImMandateOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "remove-im-mandate"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Removes an Investment Manager mandate from the document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let manager_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "manager-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
+
+        let affected = document_ops::remove_im_mandate(pool, profile_id, manager_ref)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to remove IM mandate: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+// =============================================================================
+// SETTLEMENT CONFIG OPERATIONS (Phase 3)
+// =============================================================================
+
+/// Set base currency for the trading profile
+/// Verb: trading-profile.set-base-currency
+pub struct TradingProfileSetBaseCurrencyOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileSetBaseCurrencyOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-base-currency"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Sets the base currency for the trading profile document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let currency = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "currency")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
+
+        let affected = document_ops::set_base_currency(pool, profile_id, currency)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to set base currency: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Add allowed currency to the trading profile
+/// Verb: trading-profile.add-allowed-currency
+pub struct TradingProfileAddAllowedCurrencyOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-allowed-currency"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Adds an allowed currency to the trading profile document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let currency = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "currency")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
+
+        let affected = document_ops::add_allowed_currency(pool, profile_id, currency)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to add allowed currency: {}", e))?;
+
+        Ok(ExecutionResult::Affected(affected as u64))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+// =============================================================================
+// SYNC OPERATIONS (Phase 4)
+// =============================================================================
+
+/// Compare document with operational tables to show differences
+/// Verb: trading-profile.diff
+pub struct TradingProfileDiffOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileDiffOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "diff"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Compares document with operational tables to identify sync differences"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let result = document_ops::diff_document_vs_operational(pool, profile_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to diff document: {}", e))?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(0))
+    }
+}
+
+/// Sync from operational tables to document (reverse sync)
+/// Verb: trading-profile.sync-from-operational
+pub struct TradingProfileSyncFromOperationalOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileSyncFromOperationalOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "sync-from-operational"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Reads operational tables and adds missing items to document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let sections: Vec<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "sections")
+            .and_then(|a| {
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
+            })
+            .unwrap_or_default();
+
+        let result = document_ops::sync_from_operational(pool, profile_id, sections)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to sync from operational: {}", e))?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(&result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(0))
+    }
+}
+
+// =============================================================================
 // VALIDATE OPERATION
 // =============================================================================
 
@@ -1116,5 +3032,717 @@ impl CustomOperation for TradingProfileValidateOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(json!({"valid": true})))
+    }
+}
+
+// =============================================================================
+// PHASE 5: VALIDATION OPERATIONS
+// =============================================================================
+
+/// Validate that booking rules cover all universe combinations
+pub struct TradingProfileValidateCoverageOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileValidateCoverageOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "validate-universe-coverage"
+    }
+    fn rationale(&self) -> &'static str {
+        "Validates that booking rules cover all market/instrument/currency combinations in the universe"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        let result = document_ops::validate_coverage(pool, profile_id).await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(
+            json!({"is_valid": true, "coverage_percentage": 100.0}),
+        ))
+    }
+}
+
+/// Validate that a profile is ready for go-live
+pub struct TradingProfileValidateGoLiveReadyOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+    fn verb(&self) -> &'static str {
+        "validate-go-live-ready"
+    }
+    fn rationale(&self) -> &'static str {
+        "Validates that a trading profile has all required components for production use"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        let result = document_ops::validate_go_live_ready(pool, profile_id).await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"is_ready": true})))
+    }
+}
+
+// =============================================================================
+// PHASE 6: Document Lifecycle Operations
+// =============================================================================
+
+/// Submit a draft profile for review
+/// Transitions: Draft → PendingReview
+pub struct TradingProfileSubmitOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileSubmitOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "submit"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Submits a draft trading profile for review. Validates the profile is ready before transitioning from Draft to PendingReview status."
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        let submitted_by: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "submitted-by")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let notes: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "notes")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let result = document_ops::submit_for_review(pool, profile_id, submitted_by, notes).await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"status": "submitted"})))
+    }
+}
+
+/// Approve a profile pending review
+/// Transitions: PendingReview → Active
+pub struct TradingProfileApproveOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileApproveOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "approve"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Approves a trading profile pending review, transitioning it to Active status. Any previously active profile for the same CBU is superseded."
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        let approved_by: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "approved-by")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let notes: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "notes")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        // First, approve the profile (transitions PENDING_REVIEW -> ACTIVE)
+        let approve_result =
+            document_ops::approve_profile(pool, profile_id, approved_by, notes).await?;
+
+        // After approval, automatically materialize the document to operational tables
+        // This ensures the Trading Matrix API can read the activated configuration
+        let row = sqlx::query!(
+            r#"SELECT cbu_id, document FROM "ob-poc".cbu_trading_profiles WHERE profile_id = $1"#,
+            profile_id
+        )
+        .fetch_one(pool)
+        .await?;
+
+        let cbu_id = row.cbu_id;
+        let document: TradingProfileDocument = serde_json::from_value(row.document)?;
+
+        // Start transaction for materialization
+        let mut tx = pool.begin().await?;
+
+        // Build lookup caches
+        let instrument_class_map = build_instrument_class_map(&mut tx).await?;
+        let market_map = build_market_map(&mut tx).await?;
+
+        // Materialize SSIs first (booking rules reference them)
+        let mut ssi_name_to_id: HashMap<String, Uuid> = HashMap::new();
+        for (category, ssis) in &document.standing_instructions {
+            for ssi in ssis {
+                let ssi_id =
+                    materialize_ssi(&mut tx, cbu_id, category, ssi, &market_map, true).await?;
+                ssi_name_to_id.insert(ssi.name.clone(), ssi_id);
+            }
+        }
+
+        // Materialize universe
+        materialize_universe(
+            &mut tx,
+            cbu_id,
+            &document.universe,
+            &instrument_class_map,
+            &market_map,
+            true,
+        )
+        .await?;
+
+        // Materialize booking rules
+        materialize_booking_rules(
+            &mut tx,
+            cbu_id,
+            &document.booking_rules,
+            &ssi_name_to_id,
+            &instrument_class_map,
+            &market_map,
+            true,
+        )
+        .await?;
+
+        // Materialize ISDA agreements if present
+        if !document.isda_agreements.is_empty() {
+            materialize_isda_agreements(
+                &mut tx,
+                pool,
+                cbu_id,
+                &document.isda_agreements,
+                &ssi_name_to_id,
+            )
+            .await?;
+        }
+
+        // Commit transaction
+        tx.commit().await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(
+            approve_result,
+        )?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"status": "approved"})))
+    }
+}
+
+/// Reject a profile pending review
+/// Transitions: PendingReview → Draft
+pub struct TradingProfileRejectOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRejectOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "reject"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Rejects a trading profile pending review, transitioning it back to Draft status with a rejection reason for remediation."
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        let rejection_reason: String = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "reason")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()))
+            .ok_or_else(|| anyhow::anyhow!("reason is required"))?;
+
+        let rejected_by: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "rejected-by")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let result =
+            document_ops::reject_profile(pool, profile_id, rejection_reason, rejected_by).await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"status": "rejected"})))
+    }
+}
+
+/// Archive an active or superseded profile
+/// Transitions: Active|Superseded → Archived
+pub struct TradingProfileArchiveOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileArchiveOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "archive"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Archives an active or superseded trading profile, removing it from operational use while preserving the audit trail."
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        let archived_by: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "archived-by")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let notes: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "notes")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let result = document_ops::archive_profile(pool, profile_id, archived_by, notes).await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"status": "archived"})))
+    }
+}
+
+// =============================================================================
+// CLONE OPERATION
+// =============================================================================
+
+/// Clone a trading profile to another CBU
+///
+/// Creates a new DRAFT profile for the target CBU with the document content
+/// from the source profile. Useful for:
+/// - Setting up new funds with similar trading configuration
+/// - Creating templates from production profiles
+/// - Migrating config during fund family restructuring
+///
+/// DSL: (trading-profile.clone-to :profile-id @source :target-cbu-id @target-cbu)
+pub struct TradingProfileCloneToOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileCloneToOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "clone-to"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Clones a trading profile document to another CBU, creating a new DRAFT profile that can be customized before activation."
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Source profile ID (required)
+        let source_profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        // Target CBU ID (required)
+        let target_cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "target-cbu-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("target-cbu-id is required"))?;
+
+        // Optional: cloned-by (user identifier)
+        let cloned_by: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cloned-by")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        // Optional: adapt-base-currency (change base currency for target)
+        let adapt_base_currency: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "adapt-base-currency")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        // Optional: include-isda (default false - ISDA agreements are counterparty-specific)
+        let include_isda: bool = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "include-isda")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(false);
+
+        // Optional: notes
+        let notes: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "notes")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let result = document_ops::clone_to_cbu(
+            pool,
+            source_profile_id,
+            target_cbu_id,
+            cloned_by,
+            adapt_base_currency,
+            include_isda,
+            notes,
+        )
+        .await?;
+
+        // Bind target profile ID if :as binding specified
+        if let Some(binding_name) = verb_call.binding.as_ref() {
+            ctx.bind(binding_name, result.target_profile_id);
+        }
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"status": "cloned"})))
+    }
+}
+
+// =============================================================================
+// CREATE NEW VERSION OPERATION
+// =============================================================================
+
+/// Create a new draft version from the current ACTIVE profile
+/// Used when modifications are needed to a live trading matrix
+pub struct TradingProfileCreateNewVersionOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileCreateNewVersionOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "create-new-version"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Creates a new DRAFT version from the current ACTIVE profile. Enforces that only one working version exists at a time."
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "cbu-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("cbu-id is required"))?;
+
+        let created_by: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "created-by")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let notes: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "notes")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let result = document_ops::create_new_version(pool, cbu_id, created_by, notes).await?;
+
+        // Bind new profile ID if :as binding specified
+        if let Some(binding_name) = verb_call.binding.as_ref() {
+            ctx.bind(binding_name, result.new_profile_id);
+        }
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(
+            json!({"status": "new_version_created"}),
+        ))
+    }
+}
+
+// =============================================================================
+// VALIDATE LIFECYCLE OPERATION (DRAFT → VALIDATED)
+// =============================================================================
+
+/// Mark a draft profile as validated (ops team cleanup complete)
+/// Transitions: DRAFT → VALIDATED
+/// Note: This is distinct from `validate` which validates file/document structure.
+/// This operation marks the profile as ops-validated and ready for client review.
+pub struct TradingProfileMarkValidatedOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileMarkValidatedOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "mark-validated"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Marks a draft profile as validated by ops team and transitions it to VALIDATED status, ready for client review."
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("profile-id is required"))?;
+
+        let validated_by: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "validated-by")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let notes: Option<String> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "notes")
+            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
+
+        let result = document_ops::validate_profile(pool, profile_id, validated_by, notes).await?;
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(json!({"status": "validated"})))
     }
 }

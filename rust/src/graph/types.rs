@@ -1988,6 +1988,12 @@ pub enum NodeType {
     ServiceInstance,
     InvestorHolding,
     ServiceResource,
+    // Trading view node types
+    TradingProfile,
+    InstrumentMatrix,
+    InstrumentClass,
+    IsdaAgreement,
+    CsaAgreement,
 }
 
 /// Legacy layer types
@@ -2000,6 +2006,7 @@ pub enum LayerType {
     Kyc,
     Ubo,
     Services,
+    Trading,
 }
 
 /// Legacy node status
@@ -2049,6 +2056,26 @@ pub enum EdgeType {
     DelegatesTo,
     /// UBO chain terminus - ownership tracing stops here (public company, government, etc.)
     UboTerminus,
+    // Trading view edge types
+    /// CBU -> TradingProfile
+    HasTradingProfile,
+    /// TradingProfile -> InstrumentMatrix
+    HasMatrix,
+    /// InstrumentMatrix -> InstrumentClass
+    IncludesClass,
+    /// InstrumentClass -> Market (exchange traded)
+    TradedOn,
+    /// InstrumentClass -> Entity (OTC counterparty)
+    OtcCounterparty,
+    /// Entity -> IsdaAgreement
+    CoveredByIsda,
+    /// IsdaAgreement -> CsaAgreement
+    HasCsa,
+    /// CBU -> Entity (IM mandate)
+    ImMandate,
+    /// Undefined/unmapped relationship type (e.g., from GLEIF import)
+    /// Allows imports to proceed even when we don't have a specific mapping
+    Undefined,
 }
 
 impl EdgeType {
@@ -2074,10 +2101,24 @@ impl EdgeType {
             "PRODUCT_PROVIDES_SERVICE" => Some(Self::Delivers),
             "SERVICE_USES_RESOURCE" => Some(Self::ProvisionedFor),
             "ENTITY_AUTHORIZES_TRADING" => Some(Self::DelegatesTo),
-            "CBU_HAS_TRADING_PROFILE" => Some(Self::BelongsTo),
-            "TRADING_PROFILE_HAS_MATRIX" => Some(Self::BelongsTo),
+            // Trading view edge types
+            "CBU_HAS_TRADING_PROFILE" => Some(Self::HasTradingProfile),
+            "TRADING_PROFILE_HAS_MATRIX" => Some(Self::HasMatrix),
+            "MATRIX_INCLUDES_CLASS" => Some(Self::IncludesClass),
+            "CLASS_TRADED_ON_MARKET" => Some(Self::TradedOn),
+            "OTC_WITH_COUNTERPARTY" => Some(Self::OtcCounterparty),
+            "OTC_COVERED_BY_ISDA" => Some(Self::CoveredByIsda),
+            "ISDA_HAS_CSA" => Some(Self::HasCsa),
+            "CBU_IM_MANDATE" => Some(Self::ImMandate),
+            "UNDEFINED" => Some(Self::Undefined),
             _ => None,
         }
+    }
+
+    /// Parse edge type from code, returning Undefined for unknown codes.
+    /// Use this for GLEIF imports where we want to proceed even without a mapping.
+    pub fn from_code_or_undefined(code: &str) -> Self {
+        Self::from_code(code).unwrap_or(Self::Undefined)
     }
 
     /// Convert to database edge_type_code (SCREAMING_SNAKE_CASE)
@@ -2114,6 +2155,16 @@ impl EdgeType {
             Self::ProvisionedFor => "SERVICE_USES_RESOURCE",
             Self::DelegatesTo => "ENTITY_AUTHORIZES_TRADING",
             Self::UboTerminus => "OWNERSHIP", // Terminus is an ownership termination
+            // Trading view edge types
+            Self::HasTradingProfile => "CBU_HAS_TRADING_PROFILE",
+            Self::HasMatrix => "TRADING_PROFILE_HAS_MATRIX",
+            Self::IncludesClass => "MATRIX_INCLUDES_CLASS",
+            Self::TradedOn => "CLASS_TRADED_ON_MARKET",
+            Self::OtcCounterparty => "OTC_WITH_COUNTERPARTY",
+            Self::CoveredByIsda => "OTC_COVERED_BY_ISDA",
+            Self::HasCsa => "ISDA_HAS_CSA",
+            Self::ImMandate => "CBU_IM_MANDATE",
+            Self::Undefined => "UNDEFINED",
         }
     }
 
@@ -2183,6 +2234,20 @@ impl EdgeType {
         )
     }
 
+    pub fn is_trading(&self) -> bool {
+        matches!(
+            self,
+            EdgeType::HasTradingProfile
+                | EdgeType::HasMatrix
+                | EdgeType::IncludesClass
+                | EdgeType::TradedOn
+                | EdgeType::OtcCounterparty
+                | EdgeType::CoveredByIsda
+                | EdgeType::HasCsa
+                | EdgeType::ImMandate
+        )
+    }
+
     pub fn display_label(&self) -> &'static str {
         match self {
             EdgeType::HasRole => "has role",
@@ -2215,6 +2280,16 @@ impl EdgeType {
             EdgeType::ProvisionedFor => "provisioned for",
             EdgeType::DelegatesTo => "delegates to",
             EdgeType::UboTerminus => "UBO terminus",
+            // Trading view edge labels
+            EdgeType::HasTradingProfile => "has trading profile",
+            EdgeType::HasMatrix => "has matrix",
+            EdgeType::IncludesClass => "includes class",
+            EdgeType::TradedOn => "traded on",
+            EdgeType::OtcCounterparty => "OTC with",
+            EdgeType::CoveredByIsda => "covered by ISDA",
+            EdgeType::HasCsa => "has CSA",
+            EdgeType::ImMandate => "IM mandate",
+            EdgeType::Undefined => "related to",
         }
     }
 }
