@@ -256,8 +256,8 @@ impl CustomOperation for ViewUniverseOp {
             TaxonomyContext::Universe
         };
 
-        // Build taxonomy from database
-        let rules = taxonomy_ctx.to_rules();
+        // Build taxonomy from database using config-driven rules
+        let rules = taxonomy_ctx.to_rules_from_config(pool).await?;
         let taxonomy = TaxonomyBuilder::new(rules).build(pool).await?;
 
         // Create view state
@@ -348,7 +348,7 @@ impl CustomOperation for ViewBookOp {
             .ok_or_else(|| anyhow::anyhow!("client argument is required"))?;
 
         let taxonomy_ctx = TaxonomyContext::Book { client_id };
-        let rules = taxonomy_ctx.to_rules();
+        let rules = taxonomy_ctx.to_rules_from_config(pool).await?;
         let taxonomy = TaxonomyBuilder::new(rules).build(pool).await?;
 
         let view = ViewState::from_taxonomy(taxonomy, taxonomy_ctx);
@@ -412,7 +412,7 @@ impl CustomOperation for ViewCbuOp {
             _ => TaxonomyContext::CbuTrading { cbu_id },
         };
 
-        let rules = taxonomy_ctx.to_rules();
+        let rules = taxonomy_ctx.to_rules_from_config(pool).await?;
         let taxonomy = TaxonomyBuilder::new(rules).build(pool).await?;
 
         let view = ViewState::from_taxonomy(taxonomy, taxonomy_ctx);
@@ -478,7 +478,7 @@ impl CustomOperation for ViewEntityForestOp {
         let taxonomy_ctx = TaxonomyContext::EntityForest {
             filters: filters.clone(),
         };
-        let rules = taxonomy_ctx.to_rules();
+        let rules = taxonomy_ctx.to_rules_from_config(pool).await?;
         let taxonomy = TaxonomyBuilder::new(rules).build(pool).await?;
 
         let view = ViewState::from_taxonomy(taxonomy, taxonomy_ctx);

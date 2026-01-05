@@ -280,6 +280,97 @@ impl TaxonomyNode {
     }
 
     // =========================================================================
+    // FRACTAL ZOOM BEHAVIOR
+    // =========================================================================
+
+    /// Check if this node should auto-collapse at the given zoom level.
+    ///
+    /// Returns true if:
+    /// - `collapse_at_zoom` is set AND
+    /// - current zoom is less than the threshold
+    pub fn should_collapse_at_zoom(&self, current_zoom: f32) -> bool {
+        self.collapse_at_zoom
+            .map(|threshold| current_zoom < threshold)
+            .unwrap_or(false)
+    }
+
+    /// Check if this node should auto-expand at the given zoom level.
+    ///
+    /// Returns true if:
+    /// - `expand_at_zoom` is set AND
+    /// - current zoom is greater than the threshold AND
+    /// - node is currently collapsed
+    pub fn should_expand_at_zoom(&self, current_zoom: f32) -> bool {
+        self.is_collapsed
+            && self
+                .expand_at_zoom
+                .map(|threshold| current_zoom > threshold)
+                .unwrap_or(false)
+    }
+
+    /// Update collapse state based on zoom level.
+    /// Returns true if state changed.
+    pub fn update_collapse_for_zoom(&mut self, current_zoom: f32) -> bool {
+        let was_collapsed = self.is_collapsed;
+
+        if self.should_expand_at_zoom(current_zoom) {
+            self.is_collapsed = false;
+        } else if self.should_collapse_at_zoom(current_zoom) {
+            self.is_collapsed = true;
+        }
+
+        self.is_collapsed != was_collapsed
+    }
+
+    /// Set zoom thresholds for this node.
+    /// Typically called when loading node type config from database.
+    pub fn set_zoom_thresholds(&mut self, collapse_at: Option<f32>, expand_at: Option<f32>) {
+        self.collapse_at_zoom = collapse_at;
+        self.expand_at_zoom = expand_at;
+    }
+
+    /// Compute aggregate summary for collapsed display.
+    /// Updates `aggregate_summary` field.
+    pub fn compute_aggregate_summary(&mut self) {
+        if self.children.is_empty() {
+            self.aggregate_summary = None;
+            return;
+        }
+
+        // Count children by type
+        let mut by_type: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for child in &self.children {
+            let type_name = match child.node_type {
+                NodeType::Cbu => "CBU",
+                NodeType::Entity => "entity",
+                NodeType::Client => "client",
+                NodeType::Cluster => "group",
+                NodeType::Product => "product",
+                NodeType::Service => "service",
+                NodeType::Root => "root",
+                NodeType::Position => "position",
+                NodeType::Document => "document",
+                NodeType::Observation => "observation",
+            };
+            *by_type.entry(type_name).or_insert(0) += 1;
+        }
+
+        // Build summary string
+        let parts: Vec<String> = by_type
+            .iter()
+            .map(|(t, n)| {
+                if *n == 1 {
+                    format!("1 {}", t)
+                } else {
+                    format!("{} {}s", n, t)
+                }
+            })
+            .collect();
+
+        self.aggregate_summary = Some(parts.join(", "));
+    }
+
+    // =========================================================================
     // TREE OPERATIONS
     // =========================================================================
 

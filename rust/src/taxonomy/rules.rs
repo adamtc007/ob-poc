@@ -55,7 +55,10 @@ pub enum TaxonomyContext {
 }
 
 impl TaxonomyContext {
-    /// Build membership rules from this context
+    /// Build membership rules from this context (sync, uses hardcoded rules)
+    ///
+    /// **Deprecated**: Use `to_rules_from_config()` instead for config-driven
+    /// edge types from database.
     pub fn to_rules(&self) -> MembershipRules {
         match self {
             TaxonomyContext::Universe => MembershipRules::universe(),
@@ -80,6 +83,59 @@ impl TaxonomyContext {
             TaxonomyContext::CbuKyc { .. } => "CBU KYC view".into(),
             TaxonomyContext::EntityForest { .. } => "Entity forest".into(),
             TaxonomyContext::Custom { .. } => "Custom view".into(),
+        }
+    }
+
+    /// Get the view mode code for this context
+    pub fn view_mode_code(&self) -> &'static str {
+        match self {
+            TaxonomyContext::Universe => "UNIVERSE",
+            TaxonomyContext::Book { .. } => "BOOK",
+            TaxonomyContext::CbuTrading { .. } => "TRADING",
+            TaxonomyContext::CbuUbo { .. } => "KYC_UBO",
+            TaxonomyContext::CbuKyc { .. } => "KYC",
+            TaxonomyContext::EntityForest { .. } => "ENTITY_FOREST",
+            TaxonomyContext::Custom { .. } => "CUSTOM",
+        }
+    }
+
+    /// Get the CBU ID if this context is for a single CBU
+    pub fn cbu_id(&self) -> Option<Uuid> {
+        match self {
+            TaxonomyContext::CbuTrading { cbu_id } => Some(*cbu_id),
+            TaxonomyContext::CbuUbo { cbu_id } => Some(*cbu_id),
+            TaxonomyContext::CbuKyc { cbu_id, .. } => Some(*cbu_id),
+            _ => None,
+        }
+    }
+}
+
+// =============================================================================
+// CONFIG-DRIVEN TAXONOMY CONTEXT (Database Feature)
+// =============================================================================
+
+#[cfg(feature = "database")]
+impl TaxonomyContext {
+    /// Build membership rules from database configuration
+    ///
+    /// This is the **recommended** way to get rules from a context. It queries
+    /// the `edge_types` and `view_modes` tables to determine which edges
+    /// to traverse based on the context's view mode.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let ctx = TaxonomyContext::CbuUbo { cbu_id };
+    /// let rules = ctx.to_rules_from_config(&pool).await?;
+    /// ```
+    pub async fn to_rules_from_config(&self, pool: &PgPool) -> Result<MembershipRules> {
+        match self {
+            TaxonomyContext::Custom { rules } => Ok((**rules).clone()),
+            _ => {
+                let view_mode = self.view_mode_code();
+                let cbu_id = self.cbu_id();
+                MembershipRules::from_view_config(pool, view_mode, cbu_id).await
+            }
         }
     }
 }

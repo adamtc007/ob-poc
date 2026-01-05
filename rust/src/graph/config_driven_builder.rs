@@ -1259,10 +1259,10 @@ mod tests {
     fn test_node_type_to_code() {
         let builder = ConfigDrivenGraphBuilder {
             cbu_id: Uuid::new_v4(),
-            view_mode: "KYC_UBO".to_string(),
+            _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
             edge_type_configs: HashMap::new(),
-            view_mode_config: None,
+            _view_mode_config: None,
             visible_node_types: HashSet::new(),
             visible_edge_types: HashSet::new(),
             hierarchy_edge_types: HashSet::new(),
@@ -1279,10 +1279,10 @@ mod tests {
     fn test_edge_type_to_code() {
         let builder = ConfigDrivenGraphBuilder {
             cbu_id: Uuid::new_v4(),
-            view_mode: "KYC_UBO".to_string(),
+            _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
             edge_type_configs: HashMap::new(),
-            view_mode_config: None,
+            _view_mode_config: None,
             visible_node_types: HashSet::new(),
             visible_edge_types: HashSet::new(),
             hierarchy_edge_types: HashSet::new(),
@@ -1312,10 +1312,10 @@ mod tests {
 
         let builder = ConfigDrivenGraphBuilder {
             cbu_id: Uuid::new_v4(),
-            view_mode: "KYC_UBO".to_string(),
+            _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
             edge_type_configs: HashMap::new(),
-            view_mode_config: None,
+            _view_mode_config: None,
             visible_node_types: visible_nodes,
             visible_edge_types: visible_edges,
             hierarchy_edge_types: HashSet::new(),
