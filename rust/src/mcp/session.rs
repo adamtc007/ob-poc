@@ -15,7 +15,8 @@ use std::sync::{LazyLock, RwLock};
 
 use uuid::Uuid;
 
-use super::types::{BindingInfo, SessionAction, SessionState};
+use super::types::{BindingInfo, SessionAction, SessionState, StageInfo};
+use crate::ontology::SemanticStageRegistry;
 
 /// Session data stored in memory (legacy - for standalone MCP mode only)
 #[derive(Debug, Clone)]
@@ -24,6 +25,8 @@ pub struct Session {
     bindings: HashMap<String, (Uuid, String)>,
     /// History of binding snapshots for undo
     history: Vec<HashMap<String, (Uuid, String)>>,
+    /// Currently focused semantic stage (e.g., "GLEIF_RESEARCH")
+    stage_focus: Option<String>,
 }
 
 impl Session {
@@ -31,7 +34,18 @@ impl Session {
         Self {
             bindings: HashMap::new(),
             history: Vec::new(),
+            stage_focus: None,
         }
+    }
+
+    /// Set stage focus (filters available verbs)
+    pub fn set_stage_focus(&mut self, stage_code: Option<String>) {
+        self.stage_focus = stage_code;
+    }
+
+    /// Get current stage focus
+    pub fn stage_focus(&self) -> Option<&str> {
+        self.stage_focus.as_deref()
     }
 
     /// Record a new binding
@@ -131,6 +145,9 @@ pub fn session_context(action: SessionAction) -> Result<SessionState, String> {
                 bindings: HashMap::new(),
                 history_count: 0,
                 can_undo: false,
+                stage_focus: None,
+                relevant_verbs: None,
+                available_stages: None,
             })
         }
 
@@ -186,6 +203,56 @@ pub fn session_context(action: SessionAction) -> Result<SessionState, String> {
 
             Ok(to_session_state(&session_id, session))
         }
+
+        SessionAction::SetStageFocus {
+            session_id,
+            stage_code,
+        } => {
+            let mut sessions = SESSIONS.write().map_err(|e| e.to_string())?;
+            let session = sessions
+                .get_mut(&session_id)
+                .ok_or_else(|| format!("Session not found: {}", session_id))?;
+
+            // Validate stage exists if setting (not clearing)
+            if let Some(ref code) = stage_code {
+                let registry = SemanticStageRegistry::load_default()
+                    .map_err(|e| format!("Failed to load stage registry: {}", e))?;
+                if registry.get_stage(code).is_none() {
+                    return Err(format!("Unknown stage: {}", code));
+                }
+            }
+
+            session.set_stage_focus(stage_code);
+
+            Ok(to_session_state(&session_id, session))
+        }
+
+        SessionAction::ListStages => {
+            let registry = SemanticStageRegistry::load_default()
+                .map_err(|e| format!("Failed to load stage registry: {}", e))?;
+
+            let stages: Vec<StageInfo> = registry
+                .stages_in_order()
+                .map(|s| StageInfo {
+                    code: s.code.clone(),
+                    name: s.name.clone(),
+                    description: s.description.clone(),
+                    relevant_verbs: s.relevant_verbs.clone().unwrap_or_default(),
+                })
+                .collect();
+
+            // Return a "virtual" session state with stages info
+            // The caller should extract stages from the response
+            Ok(SessionState {
+                session_id: String::new(),
+                bindings: HashMap::new(),
+                history_count: 0,
+                can_undo: false,
+                stage_focus: None,
+                relevant_verbs: None,
+                available_stages: Some(stages),
+            })
+        }
     }
 }
 
@@ -212,11 +279,21 @@ pub fn update_session_from_execution(
 }
 
 fn to_session_state(id: &str, session: &Session) -> SessionState {
+    // Get relevant verbs if stage is focused
+    let relevant_verbs: Option<Vec<String>> = session.stage_focus().and_then(|code| {
+        SemanticStageRegistry::load_default()
+            .ok()
+            .and_then(|reg| reg.get_stage(code).and_then(|s| s.relevant_verbs.clone()))
+    });
+
     SessionState {
         session_id: id.to_string(),
         bindings: session.binding_info(),
         history_count: session.history_len(),
         can_undo: session.can_undo(),
+        stage_focus: session.stage_focus().map(|s| s.to_string()),
+        relevant_verbs,
+        available_stages: None,
     }
 }
 

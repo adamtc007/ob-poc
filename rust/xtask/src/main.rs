@@ -339,6 +339,16 @@ enum VerbsAction {
         #[arg(long)]
         errors_only: bool,
     },
+
+    /// Check if verb configs are up-to-date (CI check)
+    ///
+    /// Compares YAML config hashes to database compiled hashes.
+    /// Exits with code 1 if any verbs need recompilation.
+    Check {
+        /// Show details even when all verbs are up-to-date
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -471,6 +481,7 @@ fn main() -> Result<()> {
                 VerbsAction::Diagnostics { errors_only } => {
                     rt.block_on(verbs::verbs_diagnostics(errors_only))
                 }
+                VerbsAction::Check { verbose } => rt.block_on(verbs::verbs_check(verbose)),
             }
         }
     }

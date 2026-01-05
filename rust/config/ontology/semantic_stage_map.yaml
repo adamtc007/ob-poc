@@ -11,6 +11,89 @@
 #   - SemanticState: DERIVED at runtime (computed from entity tables, not stored)
 
 stages:
+  # =========================================================================
+  # Research & Enrichment Stages (can be entered at any point)
+  # These are "utility" stages for data discovery, not part of linear flow
+  # =========================================================================
+
+  - code: GLEIF_RESEARCH
+    name: "GLEIF Research"
+    description: "Research entities via GLEIF API - find LEIs, corporate trees, fund structures"
+    required_entities: []
+    depends_on: []
+    relevant_verbs:
+      - gleif.search
+      - gleif.get-record
+      - gleif.enrich
+      - gleif.get-parent
+      - gleif.get-children
+      - gleif.get-umbrella
+      - gleif.get-manager
+      - gleif.get-master-fund
+      - gleif.get-managed-funds
+      - gleif.lookup-by-isin
+      - gleif.trace-ownership
+      - gleif.resolve-successor
+      - gleif.import-tree
+      - gleif.import-managed-funds
+      - gleif.refresh
+
+  - code: UBO_ANALYSIS
+    name: "UBO Analysis"
+    description: "Trace ownership chains and identify beneficial owners"
+    required_entities: []
+    depends_on: []
+    relevant_verbs:
+      - ubo.add-ownership
+      - ubo.update-ownership
+      - ubo.end-ownership
+      - ubo.list-owners
+      - ubo.list-owned
+      - ubo.trace-chains
+      - ubo.infer-chain
+      - ubo.register-ubo
+      - ubo.verify-ubo
+      - ubo.list-ubos
+      - ubo.check-completeness
+      - ubo.snapshot-cbu
+      - ubo.compare-snapshot
+      - control.add
+      - control.list
+
+  - code: ENTITY_ENRICHMENT
+    name: "Entity Enrichment"
+    description: "Enrich entities from external registries (GLEIF, BODS, Companies House)"
+    required_entities: []
+    depends_on: []
+    relevant_verbs:
+      - gleif.enrich
+      - gleif.get-record
+      - bods.discover-ubos
+      - bods.import-ownership
+      - verify.verify-against-registry
+      - verify.calculate-confidence
+      - verify.detect-patterns
+
+  - code: GRAPH_EXPLORATION
+    name: "Graph Exploration"
+    description: "Navigate and analyze the entity relationship graph"
+    required_entities: []
+    depends_on: []
+    relevant_verbs:
+      - graph.view
+      - graph.focus
+      - graph.filter
+      - graph.group-by
+      - graph.path
+      - graph.find-connected
+      - graph.ancestors
+      - graph.descendants
+      - graph.compare
+
+  # =========================================================================
+  # Onboarding Journey Stages (linear flow with dependencies)
+  # =========================================================================
+
   - code: CLIENT_SETUP
     name: "Client Setup"
     description: "Establish the client entity and basic structure"

@@ -495,9 +495,9 @@ impl CustomOperation for GleifGetParentOp {
 
         match parent {
             Some(rel) => Ok(ExecutionResult::Record(serde_json::json!({
-                "parent_lei": rel.attributes.relationship.end_node.node_id,
+                "parent_lei": rel.attributes.relationship.end_node.id,
                 "relationship_type": rel.attributes.relationship.relationship_type,
-                "relationship_status": rel.attributes.relationship.relationship_status,
+                "relationship_status": rel.attributes.relationship.status,
             }))),
             None => Ok(ExecutionResult::Record(serde_json::json!({
                 "parent_lei": null,
@@ -1071,7 +1071,7 @@ impl CustomOperation for GleifTraceOwnershipOp {
         for _depth in 0..10 {
             match client.get_direct_parent(&current_lei).await? {
                 Some(rel) => {
-                    let parent_lei = rel.attributes.relationship.end_node.node_id.clone();
+                    let parent_lei = rel.attributes.relationship.end_node.id.clone();
                     let parent_record = client.get_lei_record(&parent_lei).await?;
 
                     chain.push(ChainLink {

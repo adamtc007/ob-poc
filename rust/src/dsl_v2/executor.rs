@@ -119,6 +119,13 @@ pub struct ExecutionContext {
     /// This solves the "session state side door" where ViewState was being discarded
     /// because CustomOperation only receives ExecutionContext, not UnifiedSessionContext.
     pub pending_view_state: Option<ViewState>,
+    /// Source attribution for audit trail
+    ///
+    /// Tracks where the execution originated (api, cli, mcp, etc.),
+    /// correlation ID for distributed tracing, and actor information.
+    pub source_attribution: super::idempotency::SourceAttribution,
+    /// Session ID for view state audit linkage
+    pub session_id: Option<Uuid>,
 }
 
 impl Default for ExecutionContext {
@@ -136,6 +143,8 @@ impl Default for ExecutionContext {
             idempotency_enabled: true,
             current_selection: None,
             pending_view_state: None,
+            source_attribution: super::idempotency::SourceAttribution::default(),
+            session_id: None,
         }
     }
 }
@@ -229,7 +238,7 @@ impl ExecutionContext {
     /// The child has:
     /// - Fresh local symbols (empty)
     /// - Parent symbols inherited from this context's effective symbols
-    /// - Same execution_id and other settings
+    /// - Same execution_id, source_attribution, session_id and other settings
     pub fn child_for_iteration(&self, index: usize) -> Self {
         Self {
             symbols: HashMap::new(),
@@ -245,6 +254,10 @@ impl ExecutionContext {
             current_selection: self.current_selection.clone(),
             // Don't inherit pending_view_state - each iteration starts fresh
             pending_view_state: None,
+            // Inherit source attribution for audit trail consistency
+            source_attribution: self.source_attribution.clone(),
+            // Inherit session ID for view state linkage
+            session_id: self.session_id,
         }
     }
 
@@ -410,8 +423,6 @@ pub struct DslExecutor {
     idempotency: super::idempotency::IdempotencyManager,
     #[cfg(feature = "database")]
     verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService,
-    #[cfg(feature = "database")]
-    view_state_audit: crate::database::ViewStateAuditRepository,
 }
 
 impl DslExecutor {
@@ -424,7 +435,6 @@ impl DslExecutor {
             verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService::new(
                 pool.clone(),
             ),
-            view_state_audit: crate::database::ViewStateAuditRepository::new(pool.clone()),
             pool,
             custom_ops: CustomOperationRegistry::new(),
         }
@@ -831,7 +841,7 @@ impl DslExecutor {
                 "DSL step completed"
             );
 
-            // Record in idempotency table if enabled
+            // Record in idempotency table if enabled (atomically with view state if present)
             if ctx.idempotency_enabled {
                 // Look up verb hash for audit trail
                 let verb_hash = self
@@ -841,40 +851,22 @@ impl DslExecutor {
                     .ok()
                     .flatten();
 
-                // Get idempotency key for view state audit linkage
-                let idempotency_key = self
+                // Use atomic recording that commits idempotency + view state in single transaction
+                // This ensures consistency: either both are recorded or neither is
+                let _atomic_result = self
                     .idempotency
-                    .record(
+                    .record_with_view_state(
                         ctx.execution_id,
                         step_index,
                         &verb_name,
                         &json_args,
                         &result,
                         verb_hash.as_deref(),
+                        &ctx.source_attribution,
+                        ctx.pending_view_state.as_ref(),
+                        ctx.session_id,
                     )
                     .await?;
-
-                // Record view state change if this verb produced one (view.* operations)
-                if let Some(ref view_state) = ctx.pending_view_state {
-                    if let Err(e) = self
-                        .view_state_audit
-                        .record_view_state_change(crate::database::RecordViewStateChange {
-                            idempotency_key: idempotency_key.clone(),
-                            session_id: None, // Session ID propagated from caller if available
-                            verb_name: verb_name.clone(),
-                            view_state: view_state.clone(),
-                            audit_user_id: None,
-                        })
-                        .await
-                    {
-                        // Log but don't fail execution - audit is secondary to execution
-                        tracing::warn!(
-                            "Failed to record view state change for {}: {}",
-                            verb_name,
-                            e
-                        );
-                    }
-                }
             }
 
             // Handle explicit :as binding (in addition to verb's default capture)

@@ -503,3 +503,127 @@ domains:
           type: entity_query_result
           description: List of (entity_id, name) tuples for batch iteration
           capture: true
+
+      # =========================================================================
+      # GHOST ENTITY VERBS - Progressive refinement workflow
+      # =========================================================================
+
+      ghost:
+        description: Create a ghost person entity (name only, minimal attributes)
+        behavior: plugin
+        plugin:
+          handler: entity_ghost
+        produces:
+          type: entity
+          subtype: proper_person
+          resolved: false
+        args:
+          - name: name
+            type: string
+            required: true
+            description: Full name as discovered (e.g., "John Smith" from document)
+          - name: source
+            type: string
+            required: false
+            description: Discovery source (document, ownership_chain, allegation, gleif)
+          - name: source-reference
+            type: string
+            required: false
+            description: Reference to source (document_id, relationship_id, etc.)
+          - name: notes
+            type: string
+            required: false
+            description: Context notes about the ghost entity
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true
+
+      identify:
+        description: Add identifying attributes to a ghost entity (transitions to IDENTIFIED state)
+        behavior: plugin
+        plugin:
+          handler: entity_identify
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_proper_persons
+              entity_type: proper_person
+              schema: ob-poc
+              # Composite search: name + nationality (usually captured first) + DOB (year approx or exact)
+              search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
+              primary_key: entity_id
+          - name: first-name
+            type: string
+            required: false
+            description: First name (if splitting from full name)
+          - name: last-name
+            type: string
+            required: false
+            description: Last name (if splitting from full name)
+          - name: date-of-birth
+            type: date
+            required: false
+            description: Date of birth
+          - name: nationality
+            type: string
+            required: false
+            description: Nationality/citizenship
+          - name: id-document-type
+            type: string
+            required: false
+            description: ID document type (PASSPORT, NATIONAL_ID, etc.)
+          - name: id-document-number
+            type: string
+            required: false
+            description: ID document number
+        returns:
+          type: uuid
+          name: entity_id
+
+      verify:
+        description: Mark an identified entity as verified (transitions to VERIFIED state)
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_proper_persons
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entity_proper_persons
+              entity_type: proper_person
+              schema: ob-poc
+              # Composite search: name + nationality + DOB discriminators
+              search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
+              primary_key: entity_id
+          - name: verification-notes
+            type: string
+            required: false
+            description: Notes about how verification was completed
+        returns:
+          type: affected
+
+      list-ghosts:
+        description: List ghost entities requiring identification
+        behavior: crud
+        crud:
+          operation: select
+          table: entity_proper_persons
+          schema: ob-poc
+          where_clause: "person_state = 'GHOST'"
+        args:
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+          - name: offset
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set

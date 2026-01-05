@@ -49,7 +49,7 @@ domains:
               table: entities
               entity_type: proper_person
               schema: ob-poc
-              search_key: name
+              search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
               primary_key: entity_id
           - name: role-id
             type: uuid
@@ -176,7 +176,7 @@ domains:
               table: entities
               entity_type: proper_person
               schema: ob-poc
-              search_key: name
+              search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
               primary_key: entity_id
           - name: include-inactive
             type: boolean

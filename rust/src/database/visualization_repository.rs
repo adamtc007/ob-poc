@@ -255,6 +255,9 @@ pub struct GraphEntityView {
     pub ubo_treatment: Option<String>,
     /// KYC obligation level (e.g., "FULL_KYC", "SIMPLIFIED")
     pub kyc_obligation: Option<String>,
+    /// Person state for proper_person entities: GHOST, IDENTIFIED, or VERIFIED
+    /// Ghost entities have minimal info (name only) and render with dashed/faded style
+    pub person_state: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -366,6 +369,26 @@ pub struct UboEdgeView {
     pub to_type_code: Option<String>,
     pub from_category: Option<String>,
     pub to_category: Option<String>,
+}
+
+/// Fund structure edges from entity_parent_relationships table
+/// Used for trading view: fund manager, umbrella fund, master fund relationships
+#[derive(Debug, Clone)]
+pub struct FundStructureEdgeView {
+    pub relationship_id: Uuid,
+    /// Child entity (the fund being managed, subfund, or feeder)
+    pub child_entity_id: Uuid,
+    pub child_name: String,
+    pub child_type_code: Option<String>,
+    /// Parent entity (manager, umbrella, or master fund)
+    pub parent_entity_id: Option<Uuid>,
+    pub parent_lei: Option<String>,
+    pub parent_name: Option<String>,
+    pub parent_type_code: Option<String>,
+    /// Relationship type: FUND_MANAGER, UMBRELLA_FUND, MASTER_FUND
+    pub relationship_type: String,
+    pub relationship_status: Option<String>,
+    pub source: Option<String>,
 }
 
 /// UBO registry entries (legacy - prefer UboEdgeView)
@@ -1130,23 +1153,26 @@ impl VisualizationRepository {
     /// Uses v_cbu_entity_with_roles view for aggregated role data
     pub async fn get_graph_entities(&self, cbu_id: Uuid) -> Result<Vec<GraphEntityView>> {
         // Use the view that aggregates roles and computes primary role
+        // LEFT JOIN to entity_proper_persons to get person_state for ghost rendering
         let rows = sqlx::query!(
             r#"SELECT
-                entity_id as "entity_id!",
-                entity_name as "entity_name!",
-                entity_type as "entity_type!",
-                entity_category,
-                jurisdiction,
-                roles,
-                role_categories,
-                primary_role,
-                max_role_priority as role_priority,
-                primary_role_category,
-                primary_layout_category,
-                effective_ubo_treatment,
-                effective_kyc_obligation
-               FROM "ob-poc".v_cbu_entity_with_roles
-               WHERE cbu_id = $1"#,
+                v.entity_id as "entity_id!",
+                v.entity_name as "entity_name!",
+                v.entity_type as "entity_type!",
+                v.entity_category,
+                v.jurisdiction,
+                v.roles,
+                v.role_categories,
+                v.primary_role,
+                v.max_role_priority as role_priority,
+                v.primary_role_category,
+                v.primary_layout_category,
+                v.effective_ubo_treatment,
+                v.effective_kyc_obligation,
+                pp.person_state as "person_state?"
+               FROM "ob-poc".v_cbu_entity_with_roles v
+               LEFT JOIN "ob-poc".entity_proper_persons pp ON v.entity_id = pp.entity_id
+               WHERE v.cbu_id = $1"#,
             cbu_id
         )
         .fetch_all(&self.pool)
@@ -1173,6 +1199,8 @@ impl VisualizationRepository {
                 layout_category: r.primary_layout_category,
                 ubo_treatment: r.effective_ubo_treatment,
                 kyc_obligation: r.effective_kyc_obligation,
+                // Person state for ghost entity rendering (None for non-person entities)
+                person_state: r.person_state,
             })
             .collect())
     }
@@ -1611,6 +1639,59 @@ impl VisualizationRepository {
                 is_active: Some(true),
                 controller_name: r.controller_name,
                 controlled_name: r.controlled_name,
+            })
+            .collect())
+    }
+
+    /// Get fund structure edges from entity_parent_relationships table
+    /// These are GLEIF-sourced relationships: FUND_MANAGER, UMBRELLA_FUND, MASTER_FUND
+    /// Used for Trading View to show operational structure
+    pub async fn get_fund_structure_edges(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<Vec<FundStructureEdgeView>> {
+        let rows = sqlx::query!(
+            r#"SELECT
+                epr.relationship_id,
+                epr.child_entity_id,
+                child_e.name as "child_name!",
+                child_et.type_code as "child_type_code?",
+                epr.parent_entity_id,
+                epr.parent_lei,
+                epr.parent_name,
+                parent_et.type_code as "parent_type_code?",
+                epr.relationship_type as "relationship_type!",
+                epr.relationship_status,
+                epr.source
+               FROM "ob-poc".entity_parent_relationships epr
+               JOIN "ob-poc".entities child_e ON epr.child_entity_id = child_e.entity_id
+               JOIN "ob-poc".entity_types child_et ON child_e.entity_type_id = child_et.entity_type_id
+               LEFT JOIN "ob-poc".entities parent_e ON epr.parent_entity_id = parent_e.entity_id
+               LEFT JOIN "ob-poc".entity_types parent_et ON parent_e.entity_type_id = parent_et.entity_type_id
+               WHERE epr.relationship_type IN ('FUND_MANAGER', 'UMBRELLA_FUND', 'MASTER_FUND')
+               AND epr.child_entity_id IN (
+                   SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+               )
+               ORDER BY epr.relationship_type, child_e.name"#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| FundStructureEdgeView {
+                relationship_id: r.relationship_id,
+                child_entity_id: r.child_entity_id,
+                child_name: r.child_name,
+                child_type_code: r.child_type_code,
+                parent_entity_id: r.parent_entity_id,
+                parent_lei: r.parent_lei,
+                parent_name: r.parent_name,
+                parent_type_code: r.parent_type_code,
+                relationship_type: r.relationship_type,
+                relationship_status: r.relationship_status,
+                source: r.source,
             })
             .collect())
     }

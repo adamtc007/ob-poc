@@ -1,0 +1,304 @@
+# verbs/attribute.yaml
+# Attribute dictionary management for document-attribute catalogue
+
+domains:
+  attribute:
+    description: "Attribute dictionary management - define attributes and map them to document types"
+
+    verbs:
+      define:
+        description: "Define a new attribute in the registry"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: attribute_registry
+          schema: ob-poc
+          conflict_keys: [id]
+          returning: uuid
+        args:
+          - name: id
+            type: string
+            required: true
+            description: "Semantic ID (e.g., attr.identity.passport_number)"
+            maps_to: id
+          - name: display-name
+            type: string
+            required: true
+            maps_to: display_name
+          - name: category
+            type: string
+            required: true
+            valid_values:
+              [
+                identity,
+                financial,
+                compliance,
+                document,
+                risk,
+                contact,
+                address,
+                tax,
+                employment,
+                product,
+                entity,
+                ubo,
+                isda,
+                resource,
+                cbu,
+                trust,
+                fund,
+                partnership,
+              ]
+            maps_to: category
+          - name: value-type
+            type: string
+            required: true
+            valid_values:
+              [
+                string,
+                integer,
+                number,
+                boolean,
+                date,
+                datetime,
+                email,
+                phone,
+                address,
+                currency,
+                percentage,
+                tax_id,
+                json,
+              ]
+            maps_to: value_type
+          - name: domain
+            type: string
+            required: false
+            maps_to: domain
+          - name: validation-rules
+            type: json
+            required: false
+            maps_to: validation_rules
+          - name: applicability
+            type: json
+            required: false
+            maps_to: applicability
+          - name: requires-authoritative-source
+            type: boolean
+            required: false
+            default: false
+            maps_to: requires_authoritative_source
+        returns:
+          type: uuid
+          capture: true
+
+      update:
+        description: "Update an existing attribute"
+        behavior: crud
+        crud:
+          operation: update
+          table: attribute_registry
+          schema: ob-poc
+          key: id
+        args:
+          - name: id
+            type: string
+            required: true
+            maps_to: id
+          - name: display-name
+            type: string
+            required: false
+            maps_to: display_name
+          - name: validation-rules
+            type: json
+            required: false
+            maps_to: validation_rules
+          - name: applicability
+            type: json
+            required: false
+            maps_to: applicability
+          - name: requires-authoritative-source
+            type: boolean
+            required: false
+            maps_to: requires_authoritative_source
+
+      read:
+        description: "Read an attribute by semantic ID"
+        behavior: crud
+        crud:
+          operation: select
+          table: attribute_registry
+          schema: ob-poc
+          key: id
+        args:
+          - name: id
+            type: string
+            required: true
+            maps_to: id
+
+      list:
+        description: "List attributes, optionally filtered by category or domain"
+        behavior: crud
+        crud:
+          operation: select
+          table: attribute_registry
+          schema: ob-poc
+        args:
+          - name: category
+            type: string
+            required: false
+            maps_to: category
+          - name: domain
+            type: string
+            required: false
+            maps_to: domain
+
+      map-to-document:
+        description: "Map attribute to document type (source or sink relationship)"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: document_attribute_links
+          schema: ob-poc
+          conflict_keys: [document_type_id, attribute_id, direction]
+          returning: link_id
+        args:
+          - name: document-type
+            type: lookup
+            required: true
+            description: "Document type code"
+            lookup:
+              table: document_types
+              schema: ob-poc
+              entity_type: document_type
+              search_key: type_code
+              primary_key: type_id
+            maps_to: document_type_id
+          - name: attribute
+            type: lookup
+            required: true
+            description: "Attribute semantic ID (e.g., attr.identity.full_name)"
+            lookup:
+              table: attribute_registry
+              schema: ob-poc
+              entity_type: attribute
+              search_key: id
+              primary_key: uuid
+            maps_to: attribute_id
+          - name: direction
+            type: string
+            required: true
+            valid_values: [SOURCE, SINK, BOTH]
+            description: "SOURCE = document provides this attribute, SINK = document requires this attribute, BOTH = bidirectional"
+            maps_to: direction
+          - name: extraction-method
+            type: string
+            required: false
+            valid_values: [OCR, AI, MRZ, IMAGE, MANUAL, DERIVED]
+            description: "How the attribute is extracted from the document"
+            maps_to: extraction_method
+          - name: extraction-field-path
+            type: string
+            required: false
+            description: "JSON path or field name for extraction"
+            maps_to: extraction_field_path
+          - name: is-authoritative
+            type: boolean
+            required: false
+            default: false
+            description: "Whether this document is an authoritative source for this attribute"
+            maps_to: is_authoritative
+          - name: proof-strength
+            type: string
+            required: false
+            valid_values: [PRIMARY, SECONDARY, SUPPORTING]
+            description: "Evidential strength when used as proof"
+            maps_to: proof_strength
+          - name: extraction-confidence-default
+            type: decimal
+            required: false
+            description: "Default confidence score for extractions (0.0-1.0)"
+            maps_to: extraction_confidence_default
+
+      unmap-from-document:
+        description: "Remove attribute mapping from document type"
+        behavior: crud
+        crud:
+          operation: delete
+          table: document_attribute_links
+          schema: ob-poc
+        args:
+          - name: document-type
+            type: lookup
+            required: true
+            lookup:
+              table: document_types
+              schema: ob-poc
+              entity_type: document_type
+              search_key: type_code
+              primary_key: type_id
+            maps_to: document_type_id
+          - name: attribute
+            type: lookup
+            required: true
+            lookup:
+              table: attribute_registry
+              schema: ob-poc
+              entity_type: attribute
+              search_key: id
+              primary_key: uuid
+            maps_to: attribute_id
+
+      list-sources:
+        description: "List all document types that provide (source) a given attribute"
+        behavior: plugin
+        handler: attribute_list_sources
+        args:
+          - name: attribute
+            type: string
+            required: true
+            description: "Attribute semantic ID"
+
+      list-sinks:
+        description: "List all document types that require (sink) a given attribute"
+        behavior: plugin
+        handler: attribute_list_sinks
+        args:
+          - name: attribute
+            type: string
+            required: true
+            description: "Attribute semantic ID"
+
+      trace-lineage:
+        description: "Show complete lineage for an attribute - sources, sinks, and resources that require it"
+        behavior: plugin
+        handler: attribute_trace_lineage
+        args:
+          - name: attribute
+            type: string
+            required: true
+            description: "Attribute semantic ID"
+
+      list-by-document:
+        description: "List all attributes linked to a document type"
+        behavior: plugin
+        handler: attribute_list_by_document
+        args:
+          - name: document-type
+            type: string
+            required: true
+            description: "Document type code"
+          - name: direction
+            type: string
+            required: false
+            valid_values: [SOURCE, SINK, BOTH]
+            description: "Filter by direction"
+
+      check-coverage:
+        description: "Check attribute coverage for a document type - what's mapped vs what's required"
+        behavior: plugin
+        handler: attribute_check_coverage
+        args:
+          - name: document-type
+            type: string
+            required: true
+            description: "Document type code"

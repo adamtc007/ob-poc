@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict NcWLZLHwwgnlKctp0gqCmYWU3npd4XFBssEWR07BP8Q0cqsFFrNwomIekEoyuGG
+\restrict co440W0X5j8k44FRAUchysiL8ZIcXqhfDbLqjnQSPkS39S1QeSo20xOUGtmyXLh
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -1932,6 +1932,162 @@ BEGIN
       AND (r.effective_to IS NULL OR r.effective_to > p_as_of_date);
 END;
 $$;
+
+
+--
+-- Name: record_execution_with_view_state(text, uuid, integer, character varying, character varying, character varying, uuid, jsonb, bigint, bytea, character varying, uuid, uuid, character varying, uuid, jsonb, uuid[], jsonb, integer, jsonb); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".record_execution_with_view_state(p_idempotency_key text, p_execution_id uuid, p_statement_index integer, p_verb character varying, p_args_hash character varying, p_result_type character varying, p_result_id uuid DEFAULT NULL::uuid, p_result_json jsonb DEFAULT NULL::jsonb, p_result_affected bigint DEFAULT NULL::bigint, p_verb_hash bytea DEFAULT NULL::bytea, p_source character varying DEFAULT 'unknown'::character varying, p_request_id uuid DEFAULT NULL::uuid, p_actor_id uuid DEFAULT NULL::uuid, p_actor_type character varying DEFAULT 'user'::character varying, p_session_id uuid DEFAULT NULL::uuid, p_view_taxonomy_context jsonb DEFAULT NULL::jsonb, p_view_selection uuid[] DEFAULT NULL::uuid[], p_view_refinements jsonb DEFAULT NULL::jsonb, p_view_stack_depth integer DEFAULT NULL::integer, p_view_state_snapshot jsonb DEFAULT NULL::jsonb) RETURNS TABLE(idempotency_key text, view_state_change_id uuid, was_cached boolean)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_existing_key TEXT;
+    v_change_id UUID;
+BEGIN
+    -- Check if already executed (idempotency check)
+    SELECT i.idempotency_key INTO v_existing_key
+    FROM "ob-poc".dsl_idempotency i
+    WHERE i.idempotency_key = p_idempotency_key;
+
+    IF v_existing_key IS NOT NULL THEN
+        -- Already executed - return cached indicator
+        RETURN QUERY SELECT v_existing_key, NULL::UUID, TRUE;
+        RETURN;
+    END IF;
+
+    -- Record idempotency entry with source attribution
+    INSERT INTO "ob-poc".dsl_idempotency (
+        idempotency_key,
+        execution_id,
+        statement_index,
+        verb,
+        args_hash,
+        result_type,
+        result_id,
+        result_json,
+        result_affected,
+        verb_hash,
+        source,
+        request_id,
+        actor_id,
+        actor_type
+    ) VALUES (
+        p_idempotency_key,
+        p_execution_id,
+        p_statement_index,
+        p_verb,
+        p_args_hash,
+        p_result_type,
+        p_result_id,
+        p_result_json,
+        p_result_affected,
+        p_verb_hash,
+        p_source,
+        p_request_id,
+        p_actor_id,
+        p_actor_type
+    );
+
+    -- If view state provided, record it atomically
+    IF p_view_state_snapshot IS NOT NULL THEN
+        INSERT INTO "ob-poc".dsl_view_state_changes (
+            idempotency_key,
+            session_id,
+            verb_name,
+            taxonomy_context,
+            selection,
+            refinements,
+            stack_depth,
+            view_state_snapshot,
+            source,
+            request_id,
+            audit_user_id
+        ) VALUES (
+            p_idempotency_key,
+            p_session_id,
+            p_verb,
+            p_view_taxonomy_context,
+            COALESCE(p_view_selection, '{}'),
+            COALESCE(p_view_refinements, '[]'::jsonb),
+            COALESCE(p_view_stack_depth, 1),
+            p_view_state_snapshot,
+            p_source,
+            p_request_id,
+            p_actor_id
+        ) RETURNING change_id INTO v_change_id;
+
+        -- Also update session's current view state
+        IF p_session_id IS NOT NULL THEN
+            UPDATE "ob-poc".dsl_sessions
+            SET current_view_state = p_view_state_snapshot,
+                view_updated_at = now()
+            WHERE session_id = p_session_id;
+        END IF;
+    END IF;
+
+    RETURN QUERY SELECT p_idempotency_key, v_change_id, FALSE;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION record_execution_with_view_state(p_idempotency_key text, p_execution_id uuid, p_statement_index integer, p_verb character varying, p_args_hash character varying, p_result_type character varying, p_result_id uuid, p_result_json jsonb, p_result_affected bigint, p_verb_hash bytea, p_source character varying, p_request_id uuid, p_actor_id uuid, p_actor_type character varying, p_session_id uuid, p_view_taxonomy_context jsonb, p_view_selection uuid[], p_view_refinements jsonb, p_view_stack_depth integer, p_view_state_snapshot jsonb); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".record_execution_with_view_state(p_idempotency_key text, p_execution_id uuid, p_statement_index integer, p_verb character varying, p_args_hash character varying, p_result_type character varying, p_result_id uuid, p_result_json jsonb, p_result_affected bigint, p_verb_hash bytea, p_source character varying, p_request_id uuid, p_actor_id uuid, p_actor_type character varying, p_session_id uuid, p_view_taxonomy_context jsonb, p_view_selection uuid[], p_view_refinements jsonb, p_view_stack_depth integer, p_view_state_snapshot jsonb) IS 'Atomically records execution result and view state change in single transaction';
+
+
+--
+-- Name: record_view_state_change(text, uuid, character varying, jsonb, uuid[], jsonb, integer, jsonb, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".record_view_state_change(p_idempotency_key text, p_session_id uuid, p_verb_name character varying, p_taxonomy_context jsonb, p_selection uuid[], p_refinements jsonb, p_stack_depth integer, p_view_state_snapshot jsonb, p_audit_user_id uuid DEFAULT NULL::uuid) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_change_id UUID;
+BEGIN
+    INSERT INTO "ob-poc".dsl_view_state_changes (
+        idempotency_key,
+        session_id,
+        verb_name,
+        taxonomy_context,
+        selection,
+        refinements,
+        stack_depth,
+        view_state_snapshot,
+        audit_user_id
+    ) VALUES (
+        p_idempotency_key,
+        p_session_id,
+        p_verb_name,
+        p_taxonomy_context,
+        p_selection,
+        p_refinements,
+        p_stack_depth,
+        p_view_state_snapshot,
+        p_audit_user_id
+    ) RETURNING change_id INTO v_change_id;
+
+    -- Also update the session's current view state
+    IF p_session_id IS NOT NULL THEN
+        UPDATE "ob-poc".dsl_sessions
+        SET current_view_state = p_view_state_snapshot,
+            view_updated_at = now()
+        WHERE session_id = p_session_id;
+    END IF;
+
+    RETURN v_change_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION record_view_state_change(p_idempotency_key text, p_session_id uuid, p_verb_name character varying, p_taxonomy_context jsonb, p_selection uuid[], p_refinements jsonb, p_stack_depth integer, p_view_state_snapshot jsonb, p_audit_user_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".record_view_state_change(p_idempotency_key text, p_session_id uuid, p_verb_name character varying, p_taxonomy_context jsonb, p_selection uuid[], p_refinements jsonb, p_stack_depth integer, p_view_state_snapshot jsonb, p_audit_user_id uuid) IS 'Atomically records view state change and updates session - called from DSL pipeline';
 
 
 --
@@ -6017,7 +6173,14 @@ CREATE TABLE "ob-poc".dsl_idempotency (
     result_json jsonb,
     result_affected bigint,
     created_at timestamp with time zone DEFAULT now(),
-    verb_hash bytea
+    verb_hash bytea,
+    input_view_state jsonb,
+    input_selection uuid[] DEFAULT '{}'::uuid[],
+    output_view_state jsonb,
+    source character varying(30) DEFAULT 'unknown'::character varying,
+    request_id uuid,
+    actor_id uuid,
+    actor_type character varying(20) DEFAULT 'user'::character varying
 );
 
 
@@ -6026,6 +6189,55 @@ CREATE TABLE "ob-poc".dsl_idempotency (
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_idempotency.verb_hash IS 'SHA256 compiled_hash of the verb config used for this execution. Links to dsl_verbs.compiled_hash.';
+
+
+--
+-- Name: COLUMN dsl_idempotency.input_view_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.input_view_state IS 'View state snapshot before execution - what selection was targeted';
+
+
+--
+-- Name: COLUMN dsl_idempotency.input_selection; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.input_selection IS 'Selection array before execution - entities affected by batch ops';
+
+
+--
+-- Name: COLUMN dsl_idempotency.output_view_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.output_view_state IS 'View state snapshot after execution - result of view.* operations';
+
+
+--
+-- Name: COLUMN dsl_idempotency.source; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.source IS 'Origin of execution: api, cli, mcp, repl, batch, test, migration';
+
+
+--
+-- Name: COLUMN dsl_idempotency.request_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.request_id IS 'Correlation ID for distributed tracing - groups related executions';
+
+
+--
+-- Name: COLUMN dsl_idempotency.actor_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.actor_id IS 'ID of user or system that initiated this execution';
+
+
+--
+-- Name: COLUMN dsl_idempotency.actor_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_idempotency.actor_type IS 'Type of actor: user, system, agent, service';
 
 
 --
@@ -6169,8 +6381,24 @@ CREATE TABLE "ob-poc".dsl_sessions (
     error_count integer DEFAULT 0 NOT NULL,
     last_error text,
     last_error_at timestamp with time zone,
+    current_view_state jsonb,
+    view_updated_at timestamp with time zone,
     CONSTRAINT dsl_sessions_status_check CHECK (((status)::text = ANY ((ARRAY['active'::character varying, 'completed'::character varying, 'aborted'::character varying, 'expired'::character varying, 'error'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN dsl_sessions.current_view_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_sessions.current_view_state IS 'Current view state for session - enables session restore with full context';
+
+
+--
+-- Name: COLUMN dsl_sessions.view_updated_at; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_sessions.view_updated_at IS 'When view state was last updated';
 
 
 --
@@ -6261,7 +6489,9 @@ CREATE TABLE "ob-poc".dsl_verbs (
     compiled_json jsonb,
     effective_config_json jsonb,
     diagnostics_json jsonb DEFAULT '{"errors": [], "warnings": []}'::jsonb,
-    compiled_hash bytea
+    compiled_hash bytea,
+    compiler_version character varying(50),
+    compiled_at timestamp with time zone
 );
 
 
@@ -6298,6 +6528,56 @@ COMMENT ON COLUMN "ob-poc".dsl_verbs.diagnostics_json IS 'Compilation diagnostic
 --
 
 COMMENT ON COLUMN "ob-poc".dsl_verbs.compiled_hash IS 'SHA256 of canonical compiled_json for integrity verification';
+
+
+--
+-- Name: COLUMN dsl_verbs.compiler_version; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_verbs.compiler_version IS 'Semantic version of the DSL compiler that generated compiled_json (e.g., 0.1.0)';
+
+
+--
+-- Name: COLUMN dsl_verbs.compiled_at; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_verbs.compiled_at IS 'Timestamp when compiled_json was last generated (NULL if never compiled)';
+
+
+--
+-- Name: dsl_view_state_changes; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".dsl_view_state_changes (
+    change_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    idempotency_key text NOT NULL,
+    session_id uuid,
+    verb_name character varying(100) NOT NULL,
+    taxonomy_context jsonb NOT NULL,
+    selection uuid[] DEFAULT '{}'::uuid[] NOT NULL,
+    selection_count integer GENERATED ALWAYS AS (COALESCE(array_length(selection, 1), 0)) STORED,
+    refinements jsonb DEFAULT '[]'::jsonb,
+    stack_depth integer DEFAULT 1 NOT NULL,
+    view_state_snapshot jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    audit_user_id uuid,
+    source character varying(30) DEFAULT 'unknown'::character varying,
+    request_id uuid
+);
+
+
+--
+-- Name: COLUMN dsl_view_state_changes.source; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_view_state_changes.source IS 'Origin of view state change: api, cli, mcp, repl, batch, test';
+
+
+--
+-- Name: COLUMN dsl_view_state_changes.request_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".dsl_view_state_changes.request_id IS 'Correlation ID for distributed tracing';
 
 
 --
@@ -6729,8 +7009,16 @@ CREATE TABLE "ob-poc".entity_proper_persons (
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
     search_name text GENERATED ALWAYS AS ((((COALESCE(first_name, ''::character varying))::text || ' '::text) || (COALESCE(last_name, ''::character varying))::text)) STORED,
-    entity_id uuid
+    entity_id uuid,
+    person_state character varying(20) DEFAULT 'GHOST'::character varying NOT NULL
 );
+
+
+--
+-- Name: COLUMN entity_proper_persons.person_state; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_proper_persons.person_state IS 'Person entity state: GHOST (name only), IDENTIFIED (has identifying attributes like DOB/nationality/ID numbers), VERIFIED (confirmed by official documents)';
 
 
 --
@@ -9771,6 +10059,39 @@ CREATE VIEW "ob-poc".v_entity_regulatory_status AS
 
 
 --
+-- Name: v_execution_audit_with_view; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_execution_audit_with_view AS
+ SELECT e.idempotency_key,
+    e.execution_id,
+    e.verb_hash,
+    e.verb AS verb_name,
+    e.result_id,
+    e.created_at AS executed_at,
+    e.input_selection,
+    COALESCE(array_length(e.input_selection, 1), 0) AS selection_count,
+    (e.input_view_state ->> 'context'::text) AS view_context,
+    (e.output_view_state IS NOT NULL) AS produced_view_state,
+    e.source,
+    e.request_id,
+    e.actor_id,
+    e.actor_type,
+    v.domain,
+    v.description
+   FROM ("ob-poc".dsl_idempotency e
+     LEFT JOIN "ob-poc".dsl_verbs v ON ((e.verb_hash = v.compiled_hash)))
+  ORDER BY e.created_at DESC;
+
+
+--
+-- Name: VIEW v_execution_audit_with_view; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_execution_audit_with_view IS 'Complete execution audit trail with view state and source attribution';
+
+
+--
 -- Name: v_execution_verb_audit; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -9846,6 +10167,37 @@ CREATE VIEW "ob-poc".v_open_discrepancies AS
 
 
 --
+-- Name: v_request_execution_trace; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_request_execution_trace AS
+ SELECT e.request_id,
+    e.idempotency_key,
+    e.execution_id,
+    e.statement_index,
+    e.verb,
+    e.result_type,
+    e.result_id,
+    e.source,
+    e.actor_id,
+    e.actor_type,
+    e.created_at,
+    v.change_id AS view_state_change_id,
+    v.selection_count AS view_selection_count
+   FROM ("ob-poc".dsl_idempotency e
+     LEFT JOIN "ob-poc".dsl_view_state_changes v ON ((e.idempotency_key = v.idempotency_key)))
+  WHERE (e.request_id IS NOT NULL)
+  ORDER BY e.request_id, e.created_at;
+
+
+--
+-- Name: VIEW v_request_execution_trace; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_request_execution_trace IS 'Trace all executions and view state changes for a single request';
+
+
+--
 -- Name: v_role_taxonomy; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -9881,6 +10233,34 @@ CREATE VIEW "ob-poc".v_role_taxonomy AS
 --
 
 COMMENT ON VIEW "ob-poc".v_role_taxonomy IS 'Complete role taxonomy reference with category and treatment details.';
+
+
+--
+-- Name: v_session_view_history; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_session_view_history AS
+ SELECT c.session_id,
+    c.change_id,
+    c.verb_name,
+    c.selection_count,
+    c.stack_depth,
+    (c.taxonomy_context ->> 'node_type'::text) AS node_type,
+    (c.taxonomy_context ->> 'label'::text) AS label,
+    c.refinements,
+    c.created_at,
+    s.status AS session_status,
+    s.primary_domain
+   FROM ("ob-poc".dsl_view_state_changes c
+     LEFT JOIN "ob-poc".dsl_sessions s ON ((c.session_id = s.session_id)))
+  ORDER BY c.session_id, c.created_at DESC;
+
+
+--
+-- Name: VIEW v_session_view_history; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_session_view_history IS 'View state change history per session - shows navigation path through data';
 
 
 --
@@ -9986,6 +10366,37 @@ CREATE VIEW "ob-poc".v_verb_discovery AS
    FROM ("ob-poc".dsl_verbs v
      LEFT JOIN "ob-poc".dsl_verb_categories c ON ((v.category = c.category_code)))
   ORDER BY c.display_order, v.domain, v.verb_name;
+
+
+--
+-- Name: v_verbs_needing_recompile; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_verbs_needing_recompile AS
+ SELECT verb_id,
+    full_name,
+    domain,
+    verb_name,
+    yaml_hash,
+    (compiled_hash IS NOT NULL) AS has_compiled,
+    compiler_version,
+    compiled_at,
+    updated_at,
+        CASE
+            WHEN (compiled_hash IS NULL) THEN 'never_compiled'::text
+            WHEN (compiled_at IS NULL) THEN 'missing_compiled_at'::text
+            WHEN (compiled_at < updated_at) THEN 'source_changed'::text
+            ELSE 'up_to_date'::text
+        END AS recompile_reason
+   FROM "ob-poc".dsl_verbs
+  ORDER BY domain, verb_name;
+
+
+--
+-- Name: VIEW v_verbs_needing_recompile; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_verbs_needing_recompile IS 'Shows verbs that may need recompilation with current compiler version';
 
 
 --
@@ -12586,6 +12997,14 @@ ALTER TABLE ONLY "ob-poc".dsl_versions
 
 ALTER TABLE ONLY "ob-poc".dsl_versions
     ADD CONSTRAINT dsl_versions_pkey PRIMARY KEY (version_id);
+
+
+--
+-- Name: dsl_view_state_changes dsl_view_state_changes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_view_state_changes
+    ADD CONSTRAINT dsl_view_state_changes_pkey PRIMARY KEY (change_id);
 
 
 --
@@ -15823,6 +16242,13 @@ CREATE INDEX idx_dsl_verbs_category ON "ob-poc".dsl_verbs USING btree (category)
 
 
 --
+-- Name: idx_dsl_verbs_compiler_version; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_dsl_verbs_compiler_version ON "ob-poc".dsl_verbs USING btree (compiler_version) WHERE (compiler_version IS NOT NULL);
+
+
+--
 -- Name: idx_dsl_verbs_domain; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -16422,6 +16848,20 @@ CREATE INDEX idx_government_name_trgm ON "ob-poc".entity_government USING gin (e
 --
 
 CREATE INDEX idx_government_type ON "ob-poc".entity_government USING btree (government_type);
+
+
+--
+-- Name: idx_idempotency_actor; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_idempotency_actor ON "ob-poc".dsl_idempotency USING btree (actor_id, actor_type) WHERE (actor_id IS NOT NULL);
+
+
+--
+-- Name: idx_idempotency_request_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_idempotency_request_id ON "ob-poc".dsl_idempotency USING btree (request_id) WHERE (request_id IS NOT NULL);
 
 
 --
@@ -17416,6 +17856,41 @@ CREATE INDEX idx_verification_escalations_level ON "ob-poc".verification_escalat
 --
 
 CREATE INDEX idx_verification_escalations_status ON "ob-poc".verification_escalations USING btree (status);
+
+
+--
+-- Name: idx_view_state_changes_created; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_view_state_changes_created ON "ob-poc".dsl_view_state_changes USING btree (created_at DESC);
+
+
+--
+-- Name: idx_view_state_changes_idempotency; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_view_state_changes_idempotency ON "ob-poc".dsl_view_state_changes USING btree (idempotency_key);
+
+
+--
+-- Name: idx_view_state_changes_selection_gin; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_view_state_changes_selection_gin ON "ob-poc".dsl_view_state_changes USING gin (selection);
+
+
+--
+-- Name: idx_view_state_changes_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_view_state_changes_session ON "ob-poc".dsl_view_state_changes USING btree (session_id);
+
+
+--
+-- Name: idx_view_state_changes_verb; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_view_state_changes_verb ON "ob-poc".dsl_view_state_changes USING btree (verb_name);
 
 
 --
@@ -19866,6 +20341,14 @@ ALTER TABLE ONLY "ob-poc".entities
 
 
 --
+-- Name: dsl_view_state_changes fk_idempotency; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_view_state_changes
+    ADD CONSTRAINT fk_idempotency FOREIGN KEY (idempotency_key) REFERENCES "ob-poc".dsl_idempotency(idempotency_key) ON DELETE CASCADE;
+
+
+--
 -- Name: dsl_instance_versions fk_instance; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -19903,6 +20386,14 @@ ALTER TABLE ONLY "ob-poc".role_incompatibilities
 
 ALTER TABLE ONLY "ob-poc".role_incompatibilities
     ADD CONSTRAINT fk_role_b FOREIGN KEY (role_b) REFERENCES "ob-poc".roles(name);
+
+
+--
+-- Name: dsl_view_state_changes fk_session; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".dsl_view_state_changes
+    ADD CONSTRAINT fk_session FOREIGN KEY (session_id) REFERENCES "ob-poc".dsl_sessions(session_id) ON DELETE SET NULL;
 
 
 --
@@ -20893,5 +21384,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict NcWLZLHwwgnlKctp0gqCmYWU3npd4XFBssEWR07BP8Q0cqsFFrNwomIekEoyuGG
+\unrestrict co440W0X5j8k44FRAUchysiL8ZIcXqhfDbLqjnQSPkS39S1QeSo20xOUGtmyXLh
 

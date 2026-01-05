@@ -64,16 +64,27 @@ pub struct EntityConfig {
     /// Template for display value (e.g., "{first_name} {last_name}")
     #[serde(default)]
     pub display_template: Option<String>,
+    /// Full template with discriminators (e.g., "{first_name} {last_name} ({nationality}, b.{birth_year})")
+    #[serde(default)]
+    pub display_template_full: Option<String>,
     /// Index mode: trigram for names, exact for codes
     #[serde(default)]
     pub index_mode: IndexMode,
     /// Optional WHERE clause filter (e.g., "is_active = true")
     #[serde(default)]
     pub filter: Option<String>,
+    /// Composite search schema (s-expression) for disambiguation
+    /// e.g., "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95))"
+    #[serde(default)]
+    pub composite_search: Option<String>,
     /// Available search keys for this entity
     pub search_keys: Vec<SearchKeyConfig>,
+    /// Discriminator fields for filtering/scoring (used with composite_search)
+    #[serde(default)]
+    pub discriminators: Vec<EntityDiscriminatorConfig>,
     /// Sharding configuration
-    pub shard: ShardConfig,
+    #[serde(default)]
+    pub shard: Option<ShardConfig>,
 }
 
 /// Configuration for a search key (simple single-column)
@@ -122,6 +133,46 @@ pub struct DiscriminatorConfig {
     pub selectivity: f32,
 }
 
+/// Entity-level discriminator configuration (from entity_index.yaml)
+/// Similar to DiscriminatorConfig but with additional match mode for dates
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EntityDiscriminatorConfig {
+    /// Name of the discriminator (used in API/display)
+    pub name: String,
+    /// Database column name
+    pub column: String,
+    /// Selectivity score (0.0-1.0, higher = more unique)
+    #[serde(default = "default_selectivity")]
+    pub selectivity: f32,
+    /// Match mode for special types (e.g., "year_or_exact" for dates)
+    #[serde(default)]
+    pub match_mode: Option<String>,
+}
+
+/// Match mode for date discriminators
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DateMatchMode {
+    /// Exact date match required
+    Exact,
+    /// Year match only (for approximate DOB)
+    YearOnly,
+    /// Match if year matches OR exact date matches (progressive refinement)
+    YearOrExact,
+}
+
+impl std::str::FromStr for DateMatchMode {
+    type Err = std::convert::Infallible;
+
+    /// Parse from string, defaulting to Exact if unrecognized
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
+            "year_only" | "year-only" => Self::YearOnly,
+            "year_or_exact" | "year-or-exact" => Self::YearOrExact,
+            _ => Self::Exact,
+        })
+    }
+}
+
 fn default_selectivity() -> f32 {
     0.5
 }
@@ -157,29 +208,58 @@ impl EntityConfig {
         self.search_keys.iter().find(|k| k.name == name)
     }
 
+    /// Get a discriminator by name
+    pub fn get_discriminator(&self, name: &str) -> Option<&EntityDiscriminatorConfig> {
+        self.discriminators.iter().find(|d| d.name == name)
+    }
+
+    /// Check if this entity has composite search enabled
+    pub fn has_composite_search(&self) -> bool {
+        self.composite_search.is_some() && !self.discriminators.is_empty()
+    }
+
     /// Get all column names needed for this entity
     pub fn all_columns(&self) -> Vec<&str> {
         let mut cols: Vec<&str> = vec![&self.return_key];
 
+        // Add search key columns
         for key in &self.search_keys {
             if !cols.contains(&key.column.as_str()) {
                 cols.push(&key.column);
             }
         }
 
-        // Add columns from display template if present
-        if let Some(template) = &self.display_template {
-            // Extract {column_name} patterns
-            for cap in template.split('{').skip(1) {
-                if let Some(col) = cap.split('}').next() {
-                    if !cols.contains(&col) {
-                        cols.push(col);
-                    }
-                }
+        // Add discriminator columns
+        for disc in &self.discriminators {
+            if !cols.contains(&disc.column.as_str()) {
+                cols.push(&disc.column);
             }
         }
 
+        // Add columns from display template if present
+        if let Some(template) = &self.display_template {
+            Self::extract_template_columns(template, &mut cols);
+        }
+
+        // Add columns from full display template if present
+        if let Some(template) = &self.display_template_full {
+            Self::extract_template_columns(template, &mut cols);
+        }
+
         cols
+    }
+
+    /// Extract column names from a template string like "{first_name} {last_name}"
+    fn extract_template_columns<'a>(template: &'a str, cols: &mut Vec<&'a str>) {
+        for cap in template.split('{').skip(1) {
+            if let Some(col) = cap.split('}').next() {
+                // Handle special computed columns like birth_year
+                let col = col.trim();
+                if !col.is_empty() && !cols.contains(&col) {
+                    cols.push(col);
+                }
+            }
+        }
     }
 }
 
@@ -236,7 +316,7 @@ entities:
         let person = config.entities.get("person").unwrap();
         assert_eq!(person.nickname, "person");
         assert_eq!(person.default_search_key().name, "name");
-        assert!(person.shard.enabled);
+        assert!(person.shard.as_ref().map(|s| s.enabled).unwrap_or(false));
     }
 
     #[test]
@@ -246,17 +326,17 @@ entities:
             source_table: "persons".to_string(),
             return_key: "person_id".to_string(),
             display_template: Some("{first_name} {last_name}".to_string()),
+            display_template_full: None,
             index_mode: IndexMode::Trigram,
             filter: None,
+            composite_search: None,
             search_keys: vec![SearchKeyConfig {
                 name: "name".to_string(),
                 column: "search_name".to_string(),
                 default: true,
             }],
-            shard: ShardConfig {
-                enabled: false,
-                prefix_len: 0,
-            },
+            discriminators: vec![],
+            shard: None,
         };
 
         let cols = entity.all_columns();
@@ -264,5 +344,96 @@ entities:
         assert!(cols.contains(&"search_name"));
         assert!(cols.contains(&"first_name"));
         assert!(cols.contains(&"last_name"));
+    }
+
+    #[test]
+    fn test_all_columns_with_discriminators() {
+        let entity = EntityConfig {
+            nickname: "person".to_string(),
+            source_table: "persons".to_string(),
+            return_key: "entity_id".to_string(),
+            display_template: Some("{first_name} {last_name}".to_string()),
+            display_template_full: Some(
+                "{first_name} {last_name} ({nationality}, b.{birth_year})".to_string(),
+            ),
+            index_mode: IndexMode::Trigram,
+            filter: None,
+            composite_search: Some(
+                "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95))"
+                    .to_string(),
+            ),
+            search_keys: vec![SearchKeyConfig {
+                name: "name".to_string(),
+                column: "search_name".to_string(),
+                default: true,
+            }],
+            discriminators: vec![
+                EntityDiscriminatorConfig {
+                    name: "nationality".to_string(),
+                    column: "nationality".to_string(),
+                    selectivity: 0.7,
+                    match_mode: None,
+                },
+                EntityDiscriminatorConfig {
+                    name: "date_of_birth".to_string(),
+                    column: "date_of_birth".to_string(),
+                    selectivity: 0.95,
+                    match_mode: Some("year_or_exact".to_string()),
+                },
+            ],
+            shard: Some(ShardConfig {
+                enabled: true,
+                prefix_len: 1,
+            }),
+        };
+
+        let cols = entity.all_columns();
+        // Core columns
+        assert!(cols.contains(&"entity_id"));
+        assert!(cols.contains(&"search_name"));
+        // Template columns
+        assert!(cols.contains(&"first_name"));
+        assert!(cols.contains(&"last_name"));
+        // Discriminator columns
+        assert!(cols.contains(&"nationality"));
+        assert!(cols.contains(&"date_of_birth"));
+        // Full template columns
+        assert!(cols.contains(&"birth_year"));
+
+        // Check composite search is enabled
+        assert!(entity.has_composite_search());
+
+        // Check discriminator lookup
+        let dob = entity.get_discriminator("date_of_birth").unwrap();
+        assert_eq!(dob.selectivity, 0.95);
+        assert_eq!(dob.match_mode.as_deref(), Some("year_or_exact"));
+    }
+
+    #[test]
+    fn test_date_match_mode_parsing() {
+        assert_eq!(
+            "exact".parse::<DateMatchMode>().unwrap(),
+            DateMatchMode::Exact
+        );
+        assert_eq!(
+            "year_only".parse::<DateMatchMode>().unwrap(),
+            DateMatchMode::YearOnly
+        );
+        assert_eq!(
+            "year-only".parse::<DateMatchMode>().unwrap(),
+            DateMatchMode::YearOnly
+        );
+        assert_eq!(
+            "year_or_exact".parse::<DateMatchMode>().unwrap(),
+            DateMatchMode::YearOrExact
+        );
+        assert_eq!(
+            "year-or-exact".parse::<DateMatchMode>().unwrap(),
+            DateMatchMode::YearOrExact
+        );
+        assert_eq!(
+            "unknown".parse::<DateMatchMode>().unwrap(),
+            DateMatchMode::Exact
+        ); // default
     }
 }

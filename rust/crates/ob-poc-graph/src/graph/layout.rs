@@ -314,6 +314,7 @@ impl LayoutEngine {
                 verification_summary: hints.verification_summary,
                 needs_attention: hints.needs_attention,
                 entity_category: hints.entity_category,
+                person_state: hints.person_state,
                 // Container fields (from server graph data)
                 is_container: node.is_container,
                 contains_type: node.contains_type.clone(),
@@ -524,6 +525,7 @@ impl LayoutEngine {
                 verification_summary: hints.verification_summary,
                 needs_attention: hints.needs_attention,
                 entity_category: hints.entity_category,
+                person_state: hints.person_state,
                 // Container fields
                 is_container: node.is_container,
                 contains_type: node.contains_type.clone(),
@@ -580,6 +582,7 @@ impl LayoutEngine {
                 verification_summary: hints.verification_summary,
                 needs_attention: hints.needs_attention,
                 entity_category: hints.entity_category,
+                person_state: hints.person_state,
                 // Container fields
                 is_container: node.is_container,
                 contains_type: node.contains_type.clone(),
@@ -679,6 +682,7 @@ impl LayoutEngine {
                     verification_summary: hints.verification_summary,
                     needs_attention: hints.needs_attention,
                     entity_category: hints.entity_category,
+                    person_state: hints.person_state,
                     // Container fields (products are not containers in template layout)
                     is_container: false,
                     contains_type: None,
@@ -733,6 +737,7 @@ impl LayoutEngine {
                             verification_summary: svc_hints.verification_summary,
                             needs_attention: svc_hints.needs_attention,
                             entity_category: svc_hints.entity_category,
+                            person_state: svc_hints.person_state,
                             // Container fields (services are not containers in template layout)
                             is_container: false,
                             contains_type: None,
@@ -787,6 +792,7 @@ impl LayoutEngine {
                                     verification_summary: res_hints.verification_summary,
                                     needs_attention: res_hints.needs_attention,
                                     entity_category: res_hints.entity_category,
+                                    person_state: res_hints.person_state,
                                     // Container fields (resources are not containers in template layout)
                                     is_container: false,
                                     contains_type: None,
@@ -856,6 +862,7 @@ impl LayoutEngine {
                     verification_summary: hints.verification_summary,
                     needs_attention: hints.needs_attention,
                     entity_category: hints.entity_category,
+                    person_state: hints.person_state,
                     // Container fields
                     is_container: false,
                     contains_type: None,
@@ -921,6 +928,7 @@ impl LayoutEngine {
                     verification_summary: hints.verification_summary,
                     needs_attention: hints.needs_attention,
                     entity_category: hints.entity_category,
+                    person_state: hints.person_state,
                     // Container fields
                     is_container: false,
                     contains_type: None,
@@ -1399,6 +1407,7 @@ struct NodeVisualHints {
     verification_summary: Option<VerificationSummary>,
     needs_attention: bool,
     entity_category: Option<String>,
+    person_state: Option<String>,
 }
 
 impl NodeVisualHints {
@@ -1411,6 +1420,7 @@ impl NodeVisualHints {
             verification_summary: node.verification_summary.clone(),
             needs_attention: node.needs_attention,
             entity_category: node.entity_category.clone(),
+            person_state: node.person_state.clone(),
         }
     }
 
@@ -1423,6 +1433,7 @@ impl NodeVisualHints {
             verification_summary: None,
             needs_attention: false,
             entity_category: None,
+            person_state: None,
         }
     }
 }

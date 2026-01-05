@@ -84,7 +84,7 @@ impl GleifEnrichmentService {
 
         // Fetch direct parent
         if let Ok(Some(direct_parent)) = self.client.get_direct_parent(lei).await {
-            let parent_lei = &direct_parent.attributes.relationship.end_node.node_id;
+            let parent_lei = &direct_parent.attributes.relationship.end_node.id;
             let parent_record = self.client.get_lei_record(parent_lei).await.ok();
             let parent_name = parent_record
                 .as_ref()
@@ -117,7 +117,7 @@ impl GleifEnrichmentService {
 
         // Fetch ultimate parent
         if let Ok(Some(ultimate_parent)) = self.client.get_ultimate_parent(lei).await {
-            let parent_lei = &ultimate_parent.attributes.relationship.end_node.node_id;
+            let parent_lei = &ultimate_parent.attributes.relationship.end_node.id;
             let parent_record = self.client.get_lei_record(parent_lei).await.ok();
             let parent_name = parent_record
                 .as_ref()
@@ -146,6 +146,82 @@ impl GleifEnrichmentService {
             .bind(parent_lei)
             .execute(self.repository.pool.as_ref())
             .await?;
+        }
+
+        // Fetch and insert fund relationships (for fund entities)
+        // These are trading-relevant: fund manager, umbrella fund, master fund
+        let mut fund_relationships_added = 0;
+
+        // Fund manager (IS_FUND-MANAGED_BY) -> INVESTMENT_MANAGER role
+        if let Ok(Some(fund_manager)) = self.client.get_fund_manager(lei).await {
+            if let Some(ref manager_lei) = fund_manager.attributes.lei {
+                let manager_name = fund_manager.attributes.entity.legal_name.name.as_str();
+
+                self.repository
+                    .insert_parent_relationship(
+                        entity_id,
+                        manager_lei,
+                        Some(manager_name),
+                        "FUND_MANAGER",
+                        None,
+                    )
+                    .await?;
+                fund_relationships_added += 1;
+                tracing::info!(
+                    entity_id = %entity_id,
+                    manager_lei = %manager_lei,
+                    manager_name = %manager_name,
+                    "Added fund manager relationship from GLEIF"
+                );
+            }
+        }
+
+        // Umbrella fund (IS_SUBFUND_OF) -> fund structure
+        if let Ok(Some(umbrella)) = self.client.get_umbrella_fund(lei).await {
+            if let Some(ref umbrella_lei) = umbrella.attributes.lei {
+                let umbrella_name = umbrella.attributes.entity.legal_name.name.as_str();
+
+                self.repository
+                    .insert_parent_relationship(
+                        entity_id,
+                        umbrella_lei,
+                        Some(umbrella_name),
+                        "UMBRELLA_FUND",
+                        None,
+                    )
+                    .await?;
+                fund_relationships_added += 1;
+                tracing::info!(
+                    entity_id = %entity_id,
+                    umbrella_lei = %umbrella_lei,
+                    umbrella_name = %umbrella_name,
+                    "Added umbrella fund relationship from GLEIF"
+                );
+            }
+        }
+
+        // Master fund (IS_FEEDER_TO) -> master-feeder structure
+        if let Ok(Some(master)) = self.client.get_master_fund(lei).await {
+            if let Some(ref master_lei) = master.attributes.lei {
+                let master_name = master.attributes.entity.legal_name.name.as_str();
+
+                self.repository
+                    .insert_parent_relationship(
+                        entity_id,
+                        master_lei,
+                        Some(master_name),
+                        "MASTER_FUND",
+                        None,
+                    )
+                    .await?;
+                fund_relationships_added += 1;
+                tracing::info!(
+                    entity_id = %entity_id,
+                    master_lei = %master_lei,
+                    master_name = %master_name,
+                    "Added master fund relationship from GLEIF"
+                );
+            }
         }
 
         // Check for reporting exceptions (when no parent is found)
@@ -208,6 +284,7 @@ impl GleifEnrichmentService {
             addresses_added,
             identifiers_added,
             parent_relationships_added,
+            fund_relationships_added,
             events_added,
             direct_parent_exception: direct_exception,
             ultimate_parent_exception: ultimate_exception,

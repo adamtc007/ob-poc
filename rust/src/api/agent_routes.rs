@@ -1871,6 +1871,7 @@ async fn auto_resolve_entity_refs(
             search_key: None,
             mode: SearchMode::Exact as i32, // Exact mode for precise matching
             limit: Some(1),
+            discriminators: std::collections::HashMap::new(),
         };
 
         if let Ok(response) = client.search(search_request).await {
@@ -2735,6 +2736,7 @@ async fn execute_tool(_pool: &PgPool, tool_name: &str, input: &serde_json::Value
             search_key: None,
             mode: SearchMode::Fuzzy as i32,
             limit: Some(limit),
+            discriminators: std::collections::HashMap::new(),
         };
 
         let response = client
@@ -3200,6 +3202,7 @@ async fn complete_entity(
         search_key: None,
         mode: SearchMode::Fuzzy as i32,
         limit: Some(req.limit),
+        discriminators: std::collections::HashMap::new(),
     };
 
     let response = match client.search(search_request).await {

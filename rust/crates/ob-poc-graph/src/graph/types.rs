@@ -303,6 +303,11 @@ pub struct GraphNodeData {
     #[serde(default)]
     pub entity_category: Option<String>,
 
+    /// Person state: GHOST, IDENTIFIED, or VERIFIED
+    /// Ghost entities have minimal info (name only) and render with dashed/faded style
+    #[serde(default)]
+    pub person_state: Option<String>,
+
     // =========================================================================
     // CONTAINER FIELDS - for nodes that contain browseable children
     // =========================================================================
@@ -410,6 +415,10 @@ pub struct LayoutNode {
 
     /// Entity category: "PERSON" or "SHELL"
     pub entity_category: Option<String>,
+
+    /// Person state: GHOST, IDENTIFIED, or VERIFIED
+    /// Ghost entities render with dashed borders and faded fill
+    pub person_state: Option<String>,
 
     // =========================================================================
     // CONTAINER FIELDS - for nodes that contain browseable children
@@ -734,6 +743,7 @@ impl From<ob_poc_types::GraphNode> for GraphNodeData {
             }),
             needs_attention: node.needs_attention,
             entity_category: node.entity_category,
+            person_state: node.person_state,
             // Container fields
             is_container: node.is_container,
             contains_type: node.contains_type,

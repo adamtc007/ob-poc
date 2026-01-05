@@ -44,6 +44,10 @@ use crate::dsl_v2::RuntimeVerbRegistry;
 use super::canonical_hash::canonical_json_hash;
 use super::verb_contract::{codes, VerbDiagnostics};
 
+/// Compiler version for contract versioning
+/// Update this when making changes to verb compilation logic
+pub const COMPILER_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Compiled verb contract with all metadata
 #[derive(Debug)]
 pub struct CompiledVerbContract {
@@ -87,6 +91,27 @@ impl VerbSyncService {
     /// Create a new VerbSyncService
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    /// Compute hash for a single verb (public for CI checks)
+    ///
+    /// This uses the same hashing logic as sync_all, allowing external
+    /// tools like `cargo x verbs check` to compare YAML hashes without syncing.
+    pub fn hash_verb(&self, verb: &RuntimeVerb) -> String {
+        self.compute_verb_hash(verb)
+    }
+
+    /// Compute hashes for all verbs in a registry (public for CI checks)
+    ///
+    /// Returns a map of full_name -> hash for comparison with database.
+    pub fn hash_registry(
+        &self,
+        registry: &RuntimeVerbRegistry,
+    ) -> std::collections::HashMap<String, String> {
+        registry
+            .all_verbs()
+            .map(|v| (v.full_name.clone(), self.compute_verb_hash(v)))
+            .collect()
     }
 
     /// Sync all verbs from registry to database
@@ -526,8 +551,9 @@ impl VerbSyncService {
                 category, produces_type, produces_subtype, consumes,
                 lifecycle_entity_arg, requires_states, transitions_to,
                 source, yaml_hash,
-                compiled_json, effective_config_json, diagnostics_json, compiled_hash
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+                compiled_json, effective_config_json, diagnostics_json, compiled_hash,
+                compiler_version, compiled_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
             ON CONFLICT (domain, verb_name) DO UPDATE SET
                 description = EXCLUDED.description,
                 behavior = EXCLUDED.behavior,
@@ -543,6 +569,8 @@ impl VerbSyncService {
                 effective_config_json = EXCLUDED.effective_config_json,
                 diagnostics_json = EXCLUDED.diagnostics_json,
                 compiled_hash = EXCLUDED.compiled_hash,
+                compiler_version = EXCLUDED.compiler_version,
+                compiled_at = EXCLUDED.compiled_at,
                 updated_at = now()
         "#,
         )
@@ -563,6 +591,7 @@ impl VerbSyncService {
         .bind(&contract.effective_config_json)
         .bind(&diagnostics_json)
         .bind(&contract.compiled_hash[..])
+        .bind(COMPILER_VERSION)
         .execute(&self.pool)
         .await?;
 

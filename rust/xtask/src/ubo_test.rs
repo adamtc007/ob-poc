@@ -1458,22 +1458,17 @@ struct ConvergenceStatus {
     proven_edges: i64,
     alleged_edges: i64,
     pending_edges: i64,
-    disputed_edges: i64,
     is_converged: bool,
 }
 
 async fn get_convergence_status(pool: &PgPool, cbu_id: Uuid) -> Result<ConvergenceStatus> {
-    // ═══════════════════════════════════════════════════════════════════════
-    // NEW ARCHITECTURE: Query cbu_convergence_status view (updated schema)
-    // ═══════════════════════════════════════════════════════════════════════
-    let row = sqlx::query_as::<_, (i64, i64, i64, i64, i64, bool)>(
+    let row = sqlx::query_as::<_, (i64, i64, i64, i64, bool)>(
         r#"
         SELECT
             total_relationships,
             proven_count,
             alleged_count,
             pending_count,
-            disputed_count,
             is_converged
         FROM "ob-poc".cbu_convergence_status
         WHERE cbu_id = $1
@@ -1484,12 +1479,11 @@ async fn get_convergence_status(pool: &PgPool, cbu_id: Uuid) -> Result<Convergen
     .await?;
 
     match row {
-        Some((total, proven, alleged, pending, disputed, converged)) => Ok(ConvergenceStatus {
+        Some((total, proven, alleged, pending, converged)) => Ok(ConvergenceStatus {
             total_edges: total,
             proven_edges: proven,
             alleged_edges: alleged,
             pending_edges: pending,
-            disputed_edges: disputed,
             is_converged: converged,
         }),
         None => Ok(ConvergenceStatus {
@@ -1497,8 +1491,7 @@ async fn get_convergence_status(pool: &PgPool, cbu_id: Uuid) -> Result<Convergen
             proven_edges: 0,
             alleged_edges: 0,
             pending_edges: 0,
-            disputed_edges: 0,
-            is_converged: true, // Empty graph is trivially converged
+            is_converged: true,
         }),
     }
 }

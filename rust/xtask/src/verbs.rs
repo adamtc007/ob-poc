@@ -194,6 +194,152 @@ pub async fn verbs_show(verb_name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Check if verb configs are up-to-date (CI check)
+///
+/// Compares YAML config hashes to database compiled hashes.
+/// Exits with code 1 if any verbs need recompilation.
+pub async fn verbs_check(verbose: bool) -> Result<()> {
+    println!("===========================================");
+    println!("  Verb Contract Hash Check (CI)");
+    println!("===========================================\n");
+
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let pool = PgPool::connect(&database_url)
+        .await
+        .context("Failed to connect to database")?;
+
+    // Load verb registry from YAML and compute hashes
+    println!("Loading verb registry from YAML...");
+    let loader = ConfigLoader::from_env();
+    let verbs_config = loader.load_verbs().context("Failed to load verb config")?;
+    let registry = RuntimeVerbRegistry::from_config(&verbs_config);
+
+    // Use VerbSyncService to compute hashes (same logic as sync_all)
+    let sync_service = VerbSyncService::new(pool.clone());
+    let yaml_hashes = sync_service.hash_registry(&registry);
+
+    println!("  Found {} verbs in YAML\n", yaml_hashes.len());
+
+    // Query database for current hashes
+    println!("Checking database compiled hashes...");
+
+    #[derive(sqlx::FromRow)]
+    #[allow(dead_code)]
+    struct VerbHashRow {
+        full_name: String,
+        yaml_hash: Option<String>,
+        compiled_hash: Option<Vec<u8>>,
+        compiler_version: Option<String>,
+    }
+
+    let db_verbs: Vec<VerbHashRow> = sqlx::query_as(
+        r#"
+        SELECT full_name, yaml_hash, compiled_hash, compiler_version
+        FROM "ob-poc".dsl_verbs
+        ORDER BY full_name
+        "#,
+    )
+    .fetch_all(&pool)
+    .await
+    .context("Failed to query verb hashes")?;
+
+    // Compare hashes
+    // The check compares:
+    // - Current YAML hash (computed from disk) vs DB yaml_hash (set during last compile)
+    // - If they match, the verb config is up-to-date
+    // - If they differ, YAML was modified since last compile
+    let mut missing_in_db: Vec<String> = Vec::new();
+    let mut hash_mismatch: Vec<(String, String, String)> = Vec::new(); // (name, current_hash, db_hash)
+    let mut never_synced: Vec<String> = Vec::new();
+    let mut up_to_date = 0;
+
+    // Check verbs in YAML
+    for (verb_name, current_hash) in &yaml_hashes {
+        if let Some(db_verb) = db_verbs.iter().find(|v| &v.full_name == verb_name) {
+            if let Some(ref db_yaml_hash) = db_verb.yaml_hash {
+                if db_yaml_hash != current_hash {
+                    // YAML was modified since last compile
+                    hash_mismatch.push((
+                        verb_name.clone(),
+                        current_hash[..8].to_string(),
+                        db_yaml_hash[..8].to_string(),
+                    ));
+                } else {
+                    up_to_date += 1;
+                }
+            } else {
+                // No yaml_hash in DB means never synced
+                never_synced.push(verb_name.clone());
+            }
+        } else {
+            missing_in_db.push(verb_name.clone());
+        }
+    }
+
+    // Check for verbs in DB but not in YAML (orphaned)
+    let orphaned: Vec<String> = db_verbs
+        .iter()
+        .filter(|v| !yaml_hashes.contains_key(&v.full_name))
+        .map(|v| v.full_name.clone())
+        .collect();
+
+    // Report results
+    println!("\n===========================================");
+    println!("  Hash Check Results");
+    println!("===========================================");
+    println!("  Up-to-date:      {}", up_to_date);
+    println!("  Hash mismatch:   {}", hash_mismatch.len());
+    println!("  Never synced:    {}", never_synced.len());
+    println!("  Missing in DB:   {}", missing_in_db.len());
+    println!("  Orphaned in DB:  {}", orphaned.len());
+
+    let has_issues =
+        !hash_mismatch.is_empty() || !never_synced.is_empty() || !missing_in_db.is_empty();
+
+    if has_issues || verbose {
+        if !hash_mismatch.is_empty() {
+            println!("\n--- Hash Mismatches (YAML changed since compile) ---");
+            for (name, yaml, db) in &hash_mismatch {
+                println!("  {} : yaml={} db={}", name, yaml, db);
+            }
+        }
+
+        if !never_synced.is_empty() {
+            println!("\n--- Never Synced (no yaml_hash in DB) ---");
+            for name in &never_synced {
+                println!("  {}", name);
+            }
+        }
+
+        if !missing_in_db.is_empty() {
+            println!("\n--- Missing in Database ---");
+            for name in &missing_in_db {
+                println!("  {}", name);
+            }
+        }
+
+        if !orphaned.is_empty() && verbose {
+            println!("\n--- Orphaned in Database (not in YAML) ---");
+            for name in &orphaned {
+                println!("  {}", name);
+            }
+        }
+    }
+
+    if has_issues {
+        println!("\n===========================================");
+        println!("  FAILED: Verbs need recompilation");
+        println!("  Run: cargo x verbs compile");
+        println!("===========================================");
+        std::process::exit(1);
+    } else {
+        println!("\n  All verb contracts are up-to-date.");
+    }
+
+    Ok(())
+}
+
 /// Show all verbs with diagnostics (errors or warnings)
 pub async fn verbs_diagnostics(errors_only: bool) -> Result<()> {
     let database_url =

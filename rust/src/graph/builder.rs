@@ -26,6 +26,7 @@ pub struct CbuGraphBuilder {
     include_ubo: bool,
     include_services: bool,
     include_entities: bool,
+    include_fund_structure: bool,
     /// Optional role category filter for entities (e.g., "TRADING_EXECUTION", "OWNERSHIP_CONTROL")
     entity_role_category_filter: Option<String>,
 }
@@ -40,6 +41,7 @@ impl CbuGraphBuilder {
             include_ubo: false,
             include_services: false,
             include_entities: true, // Entities are loaded by default
+            include_fund_structure: false,
             entity_role_category_filter: None,
         }
     }
@@ -71,6 +73,12 @@ impl CbuGraphBuilder {
     /// Include core entities linked via cbu_entity_roles
     pub fn with_entities(mut self, include: bool) -> Self {
         self.include_entities = include;
+        self
+    }
+
+    /// Include fund structure layer (GLEIF relationships: fund manager, umbrella, master-feeder)
+    pub fn with_fund_structure(mut self, include: bool) -> Self {
+        self.include_fund_structure = include;
         self
     }
 
@@ -147,6 +155,11 @@ impl CbuGraphBuilder {
             self.load_services_layer(&mut graph, repo).await?;
         }
 
+        // Load fund structure layer (GLEIF relationships)
+        if self.include_fund_structure {
+            self.load_fund_structure_layer(&mut graph, repo).await?;
+        }
+
         // Compute final stats and visual hints
         graph.compute_stats();
         graph.compute_visual_hints();
@@ -208,6 +221,8 @@ impl CbuGraphBuilder {
                     layout_behavior,
                     ubo_treatment: ent.ubo_treatment.clone(),
                     kyc_obligation: ent.kyc_obligation.clone(),
+                    // Person state for ghost entity rendering
+                    person_state: ent.person_state.clone(),
                     data: serde_json::json!({
                         "entity_id": ent.entity_id,
                         "entity_category": ent.entity_category,
@@ -218,7 +233,8 @@ impl CbuGraphBuilder {
                         "role_priority": ent.role_priority,
                         "primary_role_category": ent.primary_role_category,
                         "ubo_treatment": ent.ubo_treatment,
-                        "kyc_obligation": ent.kyc_obligation
+                        "kyc_obligation": ent.kyc_obligation,
+                        "person_state": ent.person_state
                     }),
                     ..Default::default()
                 });
@@ -990,6 +1006,101 @@ impl CbuGraphBuilder {
                 target: inst_id,
                 edge_type: EdgeType::Delivers,
                 label: Some("provisioned".to_string()),
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Load fund structure layer from entity_parent_relationships
+    /// GLEIF-sourced relationships: FUND_MANAGER, UMBRELLA_FUND, MASTER_FUND
+    /// Used for Trading View to show operational fund structure
+    async fn load_fund_structure_layer(
+        &self,
+        graph: &mut CbuGraph,
+        repo: &VisualizationRepository,
+    ) -> Result<()> {
+        let edges = repo.get_fund_structure_edges(self.cbu_id).await?;
+
+        for edge in &edges {
+            let child_id = edge.child_entity_id.to_string();
+
+            // Parent may be external (LEI only, no entity_id)
+            let parent_id = match edge.parent_entity_id {
+                Some(id) => id.to_string(),
+                None => {
+                    // Use LEI as node ID for external entities
+                    match &edge.parent_lei {
+                        Some(lei) => format!("lei-{}", lei),
+                        None => continue, // Skip if no parent identifier
+                    }
+                }
+            };
+
+            // Add child node if not present (should already exist from load_entities)
+            if !graph.has_node(&child_id) {
+                graph.add_node(GraphNode {
+                    id: child_id.clone(),
+                    node_type: NodeType::Entity,
+                    layer: LayerType::Core,
+                    label: edge.child_name.clone(),
+                    sublabel: edge.child_type_code.clone(),
+                    status: NodeStatus::Active,
+                    data: serde_json::json!({
+                        "entity_type": edge.child_type_code,
+                        "source": "fund_structure"
+                    }),
+                    ..Default::default()
+                });
+            }
+
+            // Add parent node if not present
+            if !graph.has_node(&parent_id) {
+                let parent_label = edge.parent_name.clone().unwrap_or_else(|| {
+                    edge.parent_lei
+                        .clone()
+                        .unwrap_or_else(|| "Unknown".to_string())
+                });
+
+                graph.add_node(GraphNode {
+                    id: parent_id.clone(),
+                    node_type: NodeType::Entity,
+                    layer: LayerType::Core,
+                    label: parent_label,
+                    sublabel: edge.parent_type_code.clone(),
+                    status: if edge.relationship_status.as_deref() == Some("ACTIVE") {
+                        NodeStatus::Active
+                    } else {
+                        NodeStatus::Pending
+                    },
+                    data: serde_json::json!({
+                        "entity_type": edge.parent_type_code,
+                        "lei": edge.parent_lei,
+                        "source": edge.source
+                    }),
+                    ..Default::default()
+                });
+            }
+
+            // Determine edge type from GLEIF relationship type
+            let edge_type = EdgeType::from_fund_structure_type(&edge.relationship_type)
+                .unwrap_or(EdgeType::ManagedBy);
+
+            // Create edge label based on relationship type
+            let label = match edge.relationship_type.as_str() {
+                "FUND_MANAGER" => Some("managed by".to_string()),
+                "UMBRELLA_FUND" => Some("subfund of".to_string()),
+                "MASTER_FUND" => Some("feeds into".to_string()),
+                _ => None,
+            };
+
+            // Add edge: child → parent (fund → manager, subfund → umbrella, feeder → master)
+            graph.add_edge(GraphEdge {
+                id: edge.relationship_id.to_string(),
+                source: child_id,
+                target: parent_id,
+                edge_type,
+                label,
             });
         }
 

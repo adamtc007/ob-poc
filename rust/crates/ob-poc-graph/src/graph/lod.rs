@@ -18,17 +18,25 @@ struct RenderContext {
     border: Color32,
     text_color: Color32,
     opacity: f32,
+    /// Whether this is a ghost entity (minimal info, needs identification)
+    is_ghost: bool,
 }
 
 impl RenderContext {
     fn new(node: &LayoutNode, pos: Pos2, size: Vec2, opacity: f32) -> Self {
+        // Ghost entities get reduced opacity for faded appearance
+        let is_ghost = node.person_state.as_deref() == Some("GHOST");
+        let ghost_opacity_multiplier = if is_ghost { 0.55 } else { 1.0 };
+        let effective_opacity = opacity * ghost_opacity_multiplier;
+
         Self {
             pos,
             size,
-            fill: apply_opacity(node.style.fill_color, opacity),
-            border: apply_opacity(node.style.border_color, opacity),
-            text_color: apply_opacity(node.style.text_color, opacity),
+            fill: apply_opacity(node.style.fill_color, effective_opacity),
+            border: apply_opacity(node.style.border_color, opacity), // Keep border visible
+            text_color: apply_opacity(node.style.text_color, effective_opacity),
             opacity,
+            is_ghost,
         }
     }
 
@@ -124,19 +132,28 @@ fn render_micro(painter: &egui::Painter, ctx: &RenderContext) {
 /// Icon: Shape with entity type color - NO TEXT
 fn render_icon(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
     let radius = ctx.radius();
+    let stroke = Stroke::new(2.0, ctx.border);
 
     match node.entity_type {
         EntityType::ProperPerson => {
             painter.circle_filled(ctx.pos, radius, ctx.fill);
-            painter.circle_stroke(ctx.pos, radius, Stroke::new(2.0, ctx.border));
+            if ctx.is_ghost {
+                draw_dashed_circle(painter, ctx.pos, radius, stroke);
+            } else {
+                painter.circle_stroke(ctx.pos, radius, stroke);
+            }
         }
         EntityType::Trust => {
-            render_triangle(painter, ctx.pos, radius, ctx.fill, ctx.border);
+            render_triangle(painter, ctx.pos, radius, ctx.fill, ctx.border, ctx.is_ghost);
         }
         _ => {
             let rect = egui::Rect::from_center_size(ctx.pos, Vec2::splat(radius * 1.8));
             painter.rect_filled(rect, 4.0, ctx.fill);
-            painter.rect_stroke(rect, 4.0, Stroke::new(2.0, ctx.border));
+            if ctx.is_ghost {
+                draw_dashed_rect(painter, rect, 4.0, stroke);
+            } else {
+                painter.rect_stroke(rect, 4.0, stroke);
+            }
         }
     }
 
@@ -158,9 +175,14 @@ fn render_icon(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) 
 /// Compact: Shape + truncated name
 fn render_compact(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
     let rect = ctx.rect();
+    let stroke = Stroke::new(1.5, ctx.border);
 
     painter.rect_filled(rect, 6.0, ctx.fill);
-    painter.rect_stroke(rect, 6.0, Stroke::new(1.5, ctx.border));
+    if ctx.is_ghost {
+        draw_dashed_rect(painter, rect, 6.0, stroke);
+    } else {
+        painter.rect_stroke(rect, 6.0, stroke);
+    }
 
     // Truncated name
     let name = truncate_name(&node.label, 12);
@@ -188,9 +210,14 @@ fn render_compact(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContex
 fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
     let rect = ctx.rect();
     let border_width = if node.is_cbu_root { 3.0 } else { 2.0 };
+    let stroke = Stroke::new(border_width, ctx.border);
 
     painter.rect_filled(rect, 8.0, ctx.fill);
-    painter.rect_stroke(rect, 8.0, Stroke::new(border_width, ctx.border));
+    if ctx.is_ghost {
+        draw_dashed_rect(painter, rect, 8.0, stroke);
+    } else {
+        painter.rect_stroke(rect, 8.0, stroke);
+    }
 
     // Name at top - wrapped to fit
     let font_size = (ctx.size.y * 0.18).clamp(10.0, 14.0);
@@ -421,16 +448,31 @@ fn render_triangle(
     radius: f32,
     fill: Color32,
     border: Color32,
+    is_ghost: bool,
 ) {
     let top = center - Vec2::new(0.0, radius);
     let bottom_left = center + Vec2::new(-radius * 0.866, radius * 0.5);
     let bottom_right = center + Vec2::new(radius * 0.866, radius * 0.5);
 
-    painter.add(egui::Shape::convex_polygon(
-        vec![top, bottom_left, bottom_right],
-        fill,
-        Stroke::new(1.5, border),
-    ));
+    if is_ghost {
+        // Fill without stroke, then draw dashed edges
+        painter.add(egui::Shape::convex_polygon(
+            vec![top, bottom_left, bottom_right],
+            fill,
+            Stroke::NONE,
+        ));
+        let stroke = Stroke::new(1.5, border);
+        // Draw dashed triangle edges
+        draw_dashed_line_segment(painter, top, bottom_right, stroke);
+        draw_dashed_line_segment(painter, bottom_right, bottom_left, stroke);
+        draw_dashed_line_segment(painter, bottom_left, top, stroke);
+    } else {
+        painter.add(egui::Shape::convex_polygon(
+            vec![top, bottom_left, bottom_right],
+            fill,
+            Stroke::new(1.5, border),
+        ));
+    }
 }
 
 fn render_focus_ring(painter: &egui::Painter, ctx: &RenderContext) {
@@ -525,6 +567,165 @@ fn truncate_name(name: &str, max_chars: usize) -> String {
 fn apply_opacity(color: Color32, opacity: f32) -> Color32 {
     let [r, g, b, a] = color.to_array();
     Color32::from_rgba_unmultiplied(r, g, b, (a as f32 * opacity) as u8)
+}
+
+/// Draw a dashed rectangle for ghost entities
+/// Uses individual line segments to create a dashed effect
+fn draw_dashed_rect(painter: &egui::Painter, rect: egui::Rect, rounding: f32, stroke: Stroke) {
+    let dash_len = 6.0;
+    let gap_len = 4.0;
+    let segment = dash_len + gap_len;
+
+    // Helper to draw dashed line between two points
+    let draw_dashed_line = |p1: Pos2, p2: Pos2| {
+        let delta = p2 - p1;
+        let length = delta.length();
+        let dir = delta / length;
+
+        let mut pos = 0.0;
+        while pos < length {
+            let start = p1 + dir * pos;
+            let end_pos = (pos + dash_len).min(length);
+            let end = p1 + dir * end_pos;
+            painter.line_segment([start, end], stroke);
+            pos += segment;
+        }
+    };
+
+    // Get corners with rounding offset
+    let r = rounding.min(rect.width() / 2.0).min(rect.height() / 2.0);
+
+    // Top edge (excluding corners)
+    draw_dashed_line(
+        Pos2::new(rect.left() + r, rect.top()),
+        Pos2::new(rect.right() - r, rect.top()),
+    );
+    // Right edge
+    draw_dashed_line(
+        Pos2::new(rect.right(), rect.top() + r),
+        Pos2::new(rect.right(), rect.bottom() - r),
+    );
+    // Bottom edge
+    draw_dashed_line(
+        Pos2::new(rect.right() - r, rect.bottom()),
+        Pos2::new(rect.left() + r, rect.bottom()),
+    );
+    // Left edge
+    draw_dashed_line(
+        Pos2::new(rect.left(), rect.bottom() - r),
+        Pos2::new(rect.left(), rect.top() + r),
+    );
+
+    // Draw corner arcs as short segments (approximation)
+    // Top-left corner
+    painter.line_segment(
+        [
+            Pos2::new(rect.left(), rect.top() + r),
+            Pos2::new(rect.left() + r * 0.3, rect.top() + r * 0.3),
+        ],
+        stroke,
+    );
+    painter.line_segment(
+        [
+            Pos2::new(rect.left() + r * 0.3, rect.top() + r * 0.3),
+            Pos2::new(rect.left() + r, rect.top()),
+        ],
+        stroke,
+    );
+    // Top-right corner
+    painter.line_segment(
+        [
+            Pos2::new(rect.right() - r, rect.top()),
+            Pos2::new(rect.right() - r * 0.3, rect.top() + r * 0.3),
+        ],
+        stroke,
+    );
+    painter.line_segment(
+        [
+            Pos2::new(rect.right() - r * 0.3, rect.top() + r * 0.3),
+            Pos2::new(rect.right(), rect.top() + r),
+        ],
+        stroke,
+    );
+    // Bottom-right corner
+    painter.line_segment(
+        [
+            Pos2::new(rect.right(), rect.bottom() - r),
+            Pos2::new(rect.right() - r * 0.3, rect.bottom() - r * 0.3),
+        ],
+        stroke,
+    );
+    painter.line_segment(
+        [
+            Pos2::new(rect.right() - r * 0.3, rect.bottom() - r * 0.3),
+            Pos2::new(rect.right() - r, rect.bottom()),
+        ],
+        stroke,
+    );
+    // Bottom-left corner
+    painter.line_segment(
+        [
+            Pos2::new(rect.left() + r, rect.bottom()),
+            Pos2::new(rect.left() + r * 0.3, rect.bottom() - r * 0.3),
+        ],
+        stroke,
+    );
+    painter.line_segment(
+        [
+            Pos2::new(rect.left() + r * 0.3, rect.bottom() - r * 0.3),
+            Pos2::new(rect.left(), rect.bottom() - r),
+        ],
+        stroke,
+    );
+}
+
+/// Draw a dashed line segment between two points
+fn draw_dashed_line_segment(painter: &egui::Painter, p1: Pos2, p2: Pos2, stroke: Stroke) {
+    let dash_len = 6.0;
+    let gap_len = 4.0;
+    let segment = dash_len + gap_len;
+
+    let delta = p2 - p1;
+    let length = delta.length();
+    if length < 0.001 {
+        return;
+    }
+    let dir = delta / length;
+
+    let mut pos = 0.0;
+    while pos < length {
+        let start = p1 + dir * pos;
+        let end_pos = (pos + dash_len).min(length);
+        let end = p1 + dir * end_pos;
+        painter.line_segment([start, end], stroke);
+        pos += segment;
+    }
+}
+
+/// Draw a dashed circle for ghost entities
+fn draw_dashed_circle(painter: &egui::Painter, center: Pos2, radius: f32, stroke: Stroke) {
+    let dash_arc = 0.3; // Radians per dash
+    let gap_arc = 0.2; // Radians per gap
+    let segment_arc = dash_arc + gap_arc;
+    let total = std::f32::consts::TAU;
+
+    let mut angle = 0.0;
+    while angle < total {
+        let start_angle = angle;
+        let end_angle = (angle + dash_arc).min(total);
+
+        // Draw arc segment as short lines
+        let segments = 4;
+        for i in 0..segments {
+            let a1 = start_angle + (end_angle - start_angle) * (i as f32 / segments as f32);
+            let a2 = start_angle + (end_angle - start_angle) * ((i + 1) as f32 / segments as f32);
+            let p1 = center + Vec2::new(a1.cos(), a1.sin()) * radius;
+            let p2 = center + Vec2::new(a2.cos(), a2.sin()) * radius;
+            painter.line_segment([p1, p2], stroke);
+        }
+
+        angle += segment_arc;
+    }
 }
 
 fn role_badge_text(role: &PrimaryRole) -> &'static str {

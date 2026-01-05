@@ -19,6 +19,7 @@
 //! 4. Ensure operations are testable in isolation
 
 mod access_review_ops;
+mod attribute_ops;
 pub mod batch_control_ops;
 mod board_ops;
 mod bods_ops;
@@ -119,13 +120,18 @@ pub use ubo_analysis::{
 };
 
 // Domain-specific operation modules
+pub use attribute_ops::{
+    AttributeCheckCoverageOp, AttributeListByDocumentOp, AttributeListSinksOp,
+    AttributeListSourcesOp, AttributeTraceLineageOp, DocumentCheckExtractionCoverageOp,
+    DocumentListAttributesOp,
+};
 pub use cbu_ops::{CbuAddProductOp, CbuDecideOp, CbuDeleteCascadeOp, CbuShowOp};
 pub use cbu_role_ops::{
     CbuRoleAssignControlOp, CbuRoleAssignFundOp, CbuRoleAssignOp, CbuRoleAssignOwnershipOp,
     CbuRoleAssignServiceOp, CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
 };
 pub use document_ops::{DocumentCatalogOp, DocumentExtractOp};
-pub use entity_ops::EntityCreateOp;
+pub use entity_ops::{EntityCreateOp, EntityGhostOp, EntityIdentifyOp, EntityRenameOp};
 pub use observation_ops::{
     DocumentExtractObservationsOp, ObservationFromDocumentOp, ObservationGetCurrentOp,
     ObservationReconcileOp, ObservationVerifyAllegationsOp,
@@ -256,8 +262,21 @@ impl CustomOperationRegistry {
 
         // Register built-in custom operations
         registry.register(Arc::new(EntityCreateOp));
+        registry.register(Arc::new(EntityGhostOp));
+        registry.register(Arc::new(EntityIdentifyOp));
+        registry.register(Arc::new(EntityRenameOp));
         registry.register(Arc::new(DocumentCatalogOp));
         registry.register(Arc::new(DocumentExtractOp));
+
+        // Attribute operations (document-attribute catalogue management)
+        registry.register(Arc::new(AttributeListSourcesOp));
+        registry.register(Arc::new(AttributeListSinksOp));
+        registry.register(Arc::new(AttributeTraceLineageOp));
+        registry.register(Arc::new(AttributeListByDocumentOp));
+        registry.register(Arc::new(AttributeCheckCoverageOp));
+        registry.register(Arc::new(DocumentListAttributesOp));
+        registry.register(Arc::new(DocumentCheckExtractionCoverageOp));
+
         registry.register(Arc::new(UboCalculateOp));
         registry.register(Arc::new(ScreeningPepOp));
         registry.register(Arc::new(ScreeningSanctionsOp));
@@ -588,8 +607,20 @@ mod tests {
     #[test]
     fn test_registry_creation() {
         let registry = CustomOperationRegistry::new();
+        // Entity ghost lifecycle operations
+        assert!(registry.has("entity", "ghost"));
+        assert!(registry.has("entity", "identify"));
+        assert!(registry.has("entity", "rename"));
         assert!(registry.has("document", "catalog"));
         assert!(registry.has("document", "extract"));
+        // Attribute operations (document-attribute catalogue)
+        assert!(registry.has("attribute", "list-sources"));
+        assert!(registry.has("attribute", "list-sinks"));
+        assert!(registry.has("attribute", "trace-lineage"));
+        assert!(registry.has("attribute", "list-by-document"));
+        assert!(registry.has("attribute", "check-coverage"));
+        assert!(registry.has("document", "list-attributes"));
+        assert!(registry.has("document", "check-extraction-coverage"));
         assert!(registry.has("ubo", "calculate"));
         assert!(registry.has("screening", "pep"));
         assert!(registry.has("screening", "sanctions"));

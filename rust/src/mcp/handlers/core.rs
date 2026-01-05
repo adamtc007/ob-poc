@@ -67,6 +67,11 @@ impl ToolHandlers {
         })
     }
 
+    /// Get the database pool
+    fn require_pool(&self) -> Result<&PgPool> {
+        Ok(&self.pool)
+    }
+
     /// Get or create EntityGateway client
     async fn get_gateway_client(&self) -> Result<EntityGatewayClient<Channel>> {
         let mut guard = self.gateway_client.lock().await;
@@ -102,6 +107,7 @@ impl ToolHandlers {
                 SearchMode::Exact as i32
             },
             limit: Some(limit),
+            discriminators: std::collections::HashMap::new(),
         };
 
         let response = client

@@ -264,6 +264,8 @@ pub struct DiscriminatorDef {
     pub selectivity: f32,
     /// Is this field required for resolution?
     pub required: bool,
+    /// Match mode for special types (e.g., "year-or-exact" for dates)
+    pub match_mode: Option<String>,
 }
 
 impl SearchSchema {
@@ -326,6 +328,7 @@ impl SearchSchema {
                         field: s.clone(),
                         selectivity: 0.5,
                         required: false,
+                        match_mode: None,
                     });
                     i += 1;
                 }
@@ -364,6 +367,7 @@ impl SearchSchema {
 
         let mut selectivity = 0.5f32;
         let mut required = false;
+        let mut match_mode = None;
 
         let mut i = 1;
         while i < list.len() {
@@ -384,6 +388,14 @@ impl SearchSchema {
                                 required = s == "true";
                             }
                         }
+                        "match-mode" => {
+                            // Accept both symbol and string for match mode
+                            if let Some(s) = list[i].as_symbol() {
+                                match_mode = Some(s.to_string());
+                            } else if let Some(s) = list[i].as_string() {
+                                match_mode = Some(s.to_string());
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -395,6 +407,7 @@ impl SearchSchema {
             field,
             selectivity,
             required,
+            match_mode,
         })
     }
 
@@ -591,5 +604,28 @@ mod tests {
         let query = SearchQuery::parse("(search_name \"John Smith\")").unwrap();
         assert_eq!(query.primary_value, "John Smith");
         assert!(query.discriminators.is_empty());
+    }
+
+    #[test]
+    fn test_parse_schema_with_match_mode() {
+        let schema = SearchSchema::parse(
+            "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))",
+        )
+        .unwrap();
+        assert_eq!(schema.primary_field, "search_name");
+        assert_eq!(schema.discriminators.len(), 2);
+
+        // First discriminator - no match mode
+        assert_eq!(schema.discriminators[0].field, "nationality");
+        assert!((schema.discriminators[0].selectivity - 0.7).abs() < 0.01);
+        assert!(schema.discriminators[0].match_mode.is_none());
+
+        // Second discriminator - with match mode
+        assert_eq!(schema.discriminators[1].field, "date_of_birth");
+        assert!((schema.discriminators[1].selectivity - 0.95).abs() < 0.01);
+        assert_eq!(
+            schema.discriminators[1].match_mode,
+            Some("year-or-exact".to_string())
+        );
     }
 }

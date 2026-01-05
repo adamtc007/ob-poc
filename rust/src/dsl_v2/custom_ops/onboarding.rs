@@ -18,8 +18,6 @@ use uuid::Uuid;
 use super::helpers::{extract_string_list, extract_uuid, extract_uuid_opt, resolve_cbu_id};
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 use crate::dsl_v2::entity_deps::EntityDependencyRegistry;
-#[allow(unused_imports)]
-use crate::dsl_v2::entity_deps::{topological_sort_unified, EntityInstance};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -263,86 +261,6 @@ async fn build_resource_dependency_graph_unified(
     }
 
     Ok((graph, registry))
-}
-
-/// Build EntityInstance list for unified topological sort
-/// This will be used when we fully migrate to the unified DAG
-#[allow(dead_code)]
-fn build_entity_instances(
-    resources: &[ResourceToProvision],
-    registry: &EntityDependencyRegistry,
-) -> Vec<EntityInstance> {
-    // Build code -> binding name mapping
-    let code_to_binding: HashMap<&str, String> = resources
-        .iter()
-        .map(|r| {
-            (
-                r.resource_code.as_str(),
-                format!("res_{}", r.resource_code.to_lowercase()),
-            )
-        })
-        .collect();
-
-    resources
-        .iter()
-        .map(|r| {
-            let binding = format!("res_{}", r.resource_code.to_lowercase());
-
-            // Get dependencies from registry
-            // Note: The unified table uses "resource_instance" as the type
-            let deps = registry.dependencies_of("resource_instance", Some(&r.resource_code));
-            let depends_on: Vec<String> = deps
-                .iter()
-                .filter_map(|dep| {
-                    dep.to_subtype
-                        .as_ref()
-                        .and_then(|to_subtype| code_to_binding.get(to_subtype.as_str()).cloned())
-                })
-                .collect();
-
-            EntityInstance {
-                id: binding,
-                entity_type: "resource".to_string(),
-                subtype: Some(r.resource_code.clone()),
-                depends_on,
-            }
-        })
-        .collect()
-}
-
-/// Legacy: Build resource dependency graph from old resource_dependencies table
-/// This is deprecated and will be removed once migration to entity_type_dependencies is complete
-#[cfg(feature = "database")]
-#[allow(dead_code)]
-async fn build_resource_dependency_graph_legacy(
-    pool: &PgPool,
-    resources: &[ResourceToProvision],
-) -> Result<ResourceDependencyGraph> {
-    let resource_ids: Vec<Uuid> = resources.iter().map(|r| r.resource_type_id).collect();
-
-    let edges: Vec<(Uuid, Uuid, String, String)> = sqlx::query_as(
-        r#"SELECT resource_type_id, depends_on_type_id, dependency_type, inject_arg
-           FROM "ob-poc".resource_dependencies
-           WHERE resource_type_id = ANY($1) AND is_active = true"#,
-    )
-    .bind(&resource_ids)
-    .fetch_all(pool)
-    .await?;
-
-    let mut graph = ResourceDependencyGraph::new();
-
-    for r in resources {
-        graph.add_node(r.resource_type_id, r.resource_code.clone());
-    }
-
-    for (from, to, dep_type, inject_arg) in edges {
-        // Only add edge if the dependency is also in our resource set
-        if resource_ids.contains(&to) {
-            graph.add_edge(from, to, dep_type, inject_arg);
-        }
-    }
-
-    Ok(graph)
 }
 
 /// Build resource dependency graph - uses unified entity_type_dependencies

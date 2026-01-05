@@ -34,6 +34,12 @@ pub struct EntitySearchQuery {
 
     /// Optional jurisdiction filter (e.g., "LU", "US")
     pub jurisdiction: Option<String>,
+
+    /// Optional nationality discriminator for person search (ISO 2-letter code, e.g., "DE", "US")
+    pub nationality: Option<String>,
+
+    /// Optional date of birth discriminator for person search (YYYY-MM-DD or just YYYY)
+    pub dob: Option<String>,
 }
 
 fn default_limit() -> u32 {
@@ -116,12 +122,22 @@ async fn search_entities(
     // Map common type aliases to gateway nicknames (UPPERCASE)
     let nickname = normalize_entity_type(&query.entity_type);
 
+    // Build discriminators for composite person search
+    let mut discriminators = std::collections::HashMap::new();
+    if let Some(ref nationality) = query.nationality {
+        discriminators.insert("nationality".to_string(), nationality.to_uppercase());
+    }
+    if let Some(ref dob) = query.dob {
+        discriminators.insert("date_of_birth".to_string(), dob.clone());
+    }
+
     let request = SearchRequest {
         nickname,
         values: vec![query.q.clone()],
         search_key: None,
         mode: SearchMode::Fuzzy as i32,
         limit: Some(query.limit.min(50) as i32 + 1), // +1 to detect truncation
+        discriminators,
     };
 
     let response = client.search(request).await.map_err(|e| {
@@ -251,6 +267,8 @@ async fn search_entities_legacy(
         q: query.q,
         limit: query.limit,
         jurisdiction: None,
+        nationality: None,
+        dob: None,
     };
     search_entities(Query(new_query)).await
 }

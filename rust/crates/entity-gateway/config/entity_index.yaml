@@ -15,12 +15,18 @@ database:
 
 entities:
   # Natural persons - maps to existing entity_proper_persons table
+  # Uses composite search with nationality and DOB discriminators for disambiguation
   person:
     nickname: "PERSON"
     source_table: '"ob-poc".entity_proper_persons'
-    return_key: "search_name" # Return name for DSL source (resolved to UUID at execution)
+    return_key: "entity_id" # Return UUID for binding
     display_template: "{first_name} {last_name}"
+    # Enhanced display with discriminators when available
+    display_template_full: "{first_name} {last_name} ({nationality}, b.{birth_year})"
     index_mode: trigram # Names need fuzzy substring search
+    # Composite search schema: name + nationality + DOB
+    # Nationality is usually captured first, then DOB (year approx or exact)
+    composite_search: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
     search_keys:
       - name: "name"
         column: "search_name"
@@ -31,6 +37,18 @@ entities:
         column: "last_name"
       - name: "id_document"
         column: "id_document_number"
+    # Discriminator columns for filtering/scoring
+    discriminators:
+      - name: "nationality"
+        column: "nationality"
+        selectivity: 0.7
+      - name: "date_of_birth"
+        column: "date_of_birth"
+        selectivity: 0.95
+        match_mode: "year_or_exact" # Match if year matches OR exact date matches
+      - name: "person_state"
+        column: "person_state"
+        selectivity: 0.3 # Filter only, not disambiguation
     shard:
       enabled: true
       prefix_len: 1

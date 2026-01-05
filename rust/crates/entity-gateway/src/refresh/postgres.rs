@@ -59,6 +59,13 @@ impl RefreshPipeline {
             }
         }
 
+        // Add discriminator columns for composite search
+        for disc in &entity_config.discriminators {
+            if !columns.contains(&disc.column) {
+                columns.push(disc.column.clone());
+            }
+        }
+
         // Build query
         let column_list = columns.join(", ");
         let mut query = format!("SELECT {} FROM {}", column_list, entity_config.source_table);
@@ -130,10 +137,34 @@ impl RefreshPipeline {
                     }
                 }
 
+                // Add discriminator values (for composite search scoring)
+                let mut discriminator_values = HashMap::new();
+                for disc in &entity_config.discriminators {
+                    // Try as String first
+                    if let Ok(value) = row.try_get::<String, _>(disc.column.as_str()) {
+                        discriminator_values.insert(disc.name.clone(), value);
+                    } else if let Ok(Some(v)) =
+                        row.try_get::<Option<String>, _>(disc.column.as_str())
+                    {
+                        discriminator_values.insert(disc.name.clone(), v);
+                    }
+                    // Try as Date for date_of_birth etc.
+                    else if let Ok(date) =
+                        row.try_get::<chrono::NaiveDate, _>(disc.column.as_str())
+                    {
+                        discriminator_values.insert(disc.name.clone(), date.to_string());
+                    } else if let Ok(Some(date)) =
+                        row.try_get::<Option<chrono::NaiveDate>, _>(disc.column.as_str())
+                    {
+                        discriminator_values.insert(disc.name.clone(), date.to_string());
+                    }
+                }
+
                 Some(IndexRecord {
                     token,
                     display,
                     search_values,
+                    discriminator_values,
                 })
             })
             .collect();
@@ -240,8 +271,6 @@ pub async fn run_refresh_loop(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_display_template() {
         // This test would require a mock row, which is complex

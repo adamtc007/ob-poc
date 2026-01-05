@@ -41,6 +41,8 @@ pub struct SearchQuery {
     pub mode: MatchMode,
     /// Maximum results per input value
     pub limit: usize,
+    /// Discriminator values for composite search (e.g., nationality, date_of_birth)
+    pub discriminators: HashMap<String, String>,
 }
 
 /// The main search index trait
@@ -73,6 +75,8 @@ pub struct IndexRecord {
     pub display: String,
     /// Map of search_key -> value for indexing
     pub search_values: HashMap<String, String>,
+    /// Discriminator values for composite search scoring (e.g., nationality, date_of_birth)
+    pub discriminator_values: HashMap<String, String>,
 }
 
 /// Errors that can occur during index operations

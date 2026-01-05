@@ -2,6 +2,8 @@
 //!
 //! This module generates DSL from the GLEIF JSON files and executes it.
 
+#![allow(dead_code)] // Struct fields used for JSON deserialization from GLEIF API
+
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::collections::HashMap;

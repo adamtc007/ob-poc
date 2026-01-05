@@ -106,7 +106,7 @@ domains:
         returns:
           type: affected
       end-ownership:
-        description: End an ownership relationship
+        description: End an ownership relationship (soft delete - sets effective_to date)
         behavior: crud
         crud:
           operation: update
@@ -127,6 +127,269 @@ domains:
             type: date
             required: true
             maps_to: effective_to
+        returns:
+          type: affected
+
+      delete-ownership:
+        description: Hard delete an ownership relationship (removes row from entity_relationships)
+        behavior: crud
+        crud:
+          operation: delete
+          table: entity_relationships
+          schema: ob-poc
+          key: relationship_id
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            maps_to: relationship_id
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
+        returns:
+          type: affected
+
+      add-control:
+        description: Add control relationship between entities (board, voting rights, etc.)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_relationships
+          schema: ob-poc
+          returning: relationship_id
+          conflict_keys:
+            - from_entity_id
+            - to_entity_id
+            - relationship_type
+            - control_type
+          set_values:
+            relationship_type: control
+        args:
+          - name: controller-entity-id
+            type: uuid
+            required: true
+            maps_to: from_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: controlled-entity-id
+            type: uuid
+            required: true
+            maps_to: to_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: control-type
+            type: string
+            required: true
+            maps_to: control_type
+            valid_values:
+              - board_member
+              - executive
+              - voting_rights
+              - veto_rights
+              - appointee
+              - other
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: relationship_id
+          capture: true
+
+      end-control:
+        description: End a control relationship (soft delete - sets effective_to date)
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_relationships
+          schema: ob-poc
+          key: relationship_id
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            maps_to: relationship_id
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
+          - name: effective-to
+            type: date
+            required: true
+            maps_to: effective_to
+        returns:
+          type: affected
+
+      delete-control:
+        description: Hard delete a control relationship (removes row from entity_relationships)
+        behavior: crud
+        crud:
+          operation: delete
+          table: entity_relationships
+          schema: ob-poc
+          key: relationship_id
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            maps_to: relationship_id
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
+        returns:
+          type: affected
+
+      add-trust-role:
+        description: Add trust role relationship (settlor, trustee, beneficiary, protector)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_relationships
+          schema: ob-poc
+          returning: relationship_id
+          conflict_keys:
+            - from_entity_id
+            - to_entity_id
+            - relationship_type
+            - trust_role
+          set_values:
+            relationship_type: trust_role
+        args:
+          - name: person-entity-id
+            type: uuid
+            required: true
+            maps_to: from_entity_id
+            description: The person holding the trust role
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: trust-entity-id
+            type: uuid
+            required: true
+            maps_to: to_entity_id
+            description: The trust entity
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: trust-role
+            type: string
+            required: true
+            maps_to: trust_role
+            valid_values:
+              - settlor
+              - trustee
+              - beneficiary
+              - protector
+          - name: trust-interest-type
+            type: string
+            required: false
+            maps_to: trust_interest_type
+            description: For beneficiaries - type of interest
+            valid_values:
+              - fixed
+              - discretionary
+              - contingent
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: relationship_id
+          capture: true
+
+      end-trust-role:
+        description: End a trust role relationship (soft delete - sets effective_to date)
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_relationships
+          schema: ob-poc
+          key: relationship_id
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            maps_to: relationship_id
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
+          - name: effective-to
+            type: date
+            required: true
+            maps_to: effective_to
+        returns:
+          type: affected
+
+      delete-trust-role:
+        description: Hard delete a trust role relationship (removes row from entity_relationships)
+        behavior: crud
+        crud:
+          operation: delete
+          table: entity_relationships
+          schema: ob-poc
+          key: relationship_id
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            maps_to: relationship_id
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
+        returns:
+          type: affected
+
+      delete-relationship:
+        description: Hard delete any entity relationship by ID (generic fallback)
+        behavior: crud
+        crud:
+          operation: delete
+          table: entity_relationships
+          schema: ob-poc
+          key: relationship_id
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            maps_to: relationship_id
+            lookup:
+              table: entity_relationships
+              schema: ob-poc
+              search_key: relationship_id
+              primary_key: relationship_id
         returns:
           type: affected
       list-owners:
@@ -504,7 +767,7 @@ domains:
               table: entities
               entity_type: proper_person
               schema: ob-poc
-              search_key: name
+              search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95 :match-mode year-or-exact))"
               primary_key: entity_id
           - name: date-of-death
             type: date

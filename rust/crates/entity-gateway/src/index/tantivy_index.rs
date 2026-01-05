@@ -55,6 +55,8 @@ pub struct TantivyIndex {
     search_fields: HashMap<String, Field>,
     /// Field handles for exact match (word tokenized)
     exact_fields: HashMap<String, Field>,
+    /// Field handles for discriminator values (stored only, for post-search filtering)
+    discriminator_fields: HashMap<String, Field>,
     /// Whether the index is ready
     ready: AtomicBool,
 }
@@ -118,6 +120,15 @@ impl TantivyIndex {
             }
         }
 
+        // Add discriminator fields (stored only, not indexed - used for post-search filtering)
+        let stored_opts = TextOptions::default().set_stored();
+        let mut discriminator_fields = HashMap::new();
+        for disc in &config.discriminators {
+            let field_name = format!("disc_{}", disc.name);
+            let field = schema_builder.add_text_field(&field_name, stored_opts.clone());
+            discriminator_fields.insert(disc.name.clone(), field);
+        }
+
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema.clone());
 
@@ -143,6 +154,7 @@ impl TantivyIndex {
             display_field,
             search_fields,
             exact_fields,
+            discriminator_fields,
             ready: AtomicBool::new(false),
         })
     }
@@ -191,6 +203,120 @@ impl TantivyIndex {
                 Box::new(TermQuery::new(term, Default::default()))
             }
         }
+    }
+
+    /// Calculate score boost based on discriminator matching
+    ///
+    /// Discriminators boost the score when they match:
+    /// - nationality: exact match (case-insensitive)
+    /// - date_of_birth: year-or-exact matching (year match = 0.8, exact = 1.0)
+    ///
+    /// Selectivity weights from config determine boost magnitude.
+    fn calculate_discriminator_score(
+        &self,
+        base_score: f32,
+        doc: &tantivy::TantivyDocument,
+        query_discriminators: &HashMap<String, String>,
+    ) -> f32 {
+        let mut total_boost = 0.0f32;
+        let mut total_weight = 0.0f32;
+
+        for disc_config in &self.config.discriminators {
+            // Check if query has this discriminator
+            if let Some(query_value) = query_discriminators.get(&disc_config.name) {
+                // Get stored value from document
+                if let Some(field) = self.discriminator_fields.get(&disc_config.name) {
+                    if let Some(stored_value) = doc.get_first(*field).and_then(|v| v.as_str()) {
+                        let match_score = self.compare_discriminator(
+                            &disc_config.name,
+                            query_value,
+                            stored_value,
+                        );
+
+                        total_weight += disc_config.selectivity;
+                        total_boost += disc_config.selectivity * match_score;
+                    }
+                }
+            }
+        }
+
+        // Apply weighted boost (up to 30% boost for perfect discriminator matches)
+        if total_weight > 0.0 {
+            let boost_factor = (total_boost / total_weight) * 0.3;
+            base_score * (1.0 + boost_factor)
+        } else {
+            base_score
+        }
+    }
+
+    /// Compare discriminator values with appropriate matching logic
+    fn compare_discriminator(&self, name: &str, query_value: &str, stored_value: &str) -> f32 {
+        // Date fields use year-or-exact matching
+        if name.contains("date") || name.contains("dob") || name.contains("birth") {
+            return self.compare_dates(query_value, stored_value);
+        }
+
+        // Standard string comparison (case-insensitive)
+        let query_lower = query_value.to_lowercase();
+        let stored_lower = stored_value.to_lowercase();
+
+        if stored_lower == query_lower {
+            1.0 // Exact match
+        } else if stored_lower.contains(&query_lower) || query_lower.contains(&stored_lower) {
+            0.5 // Partial match
+        } else {
+            0.0 // No match
+        }
+    }
+
+    /// Compare date values with year-or-exact matching
+    ///
+    /// - Exact date match: 1.0
+    /// - Year-only match: 0.8 (allows "1980" to match "1980-03-15")
+    /// - No match: 0.0
+    fn compare_dates(&self, query_value: &str, stored_value: &str) -> f32 {
+        // Exact match first
+        if query_value == stored_value {
+            return 1.0;
+        }
+
+        // Extract years for year-only matching
+        let query_year = Self::extract_year(query_value);
+        let stored_year = Self::extract_year(stored_value);
+
+        match (query_year, stored_year) {
+            (Some(qy), Some(sy)) if qy == sy => 0.8, // Year match
+            _ => 0.0,                                // No match
+        }
+    }
+
+    /// Extract year from various date formats
+    /// Supports: "1980-01-15", "1980", "15/01/1980", etc.
+    fn extract_year(date_str: &str) -> Option<u16> {
+        let trimmed = date_str.trim();
+
+        // Just a year
+        if trimmed.len() == 4 {
+            return trimmed.parse().ok();
+        }
+
+        // ISO format (YYYY-MM-DD)
+        if trimmed.len() >= 10 && trimmed.chars().nth(4) == Some('-') {
+            if let Ok(year) = trimmed[0..4].parse::<u16>() {
+                return Some(year);
+            }
+        }
+
+        // Try to find 4-digit year (1900-2100)
+        for i in 0..=trimmed.len().saturating_sub(4) {
+            if let Ok(year) = trimmed[i..i + 4].parse::<u16>() {
+                if (1900..=2100).contains(&year) {
+                    return Some(year);
+                }
+            }
+        }
+
+        None
     }
 }
 
@@ -284,7 +410,14 @@ impl SearchIndex for TantivyIndex {
                 }
             };
 
-            let top_docs = match searcher.search(&tantivy_query, &TopDocs::with_limit(query.limit))
+            // Request more results if we have discriminators to filter by
+            let fetch_limit = if query.discriminators.is_empty() {
+                query.limit
+            } else {
+                query.limit * 3 // Fetch more candidates for filtering
+            };
+
+            let top_docs = match searcher.search(&tantivy_query, &TopDocs::with_limit(fetch_limit))
             {
                 Ok(docs) => docs,
                 Err(e) => {
@@ -314,11 +447,18 @@ impl SearchIndex for TantivyIndex {
                             .unwrap_or("")
                             .to_string();
 
+                        // Calculate discriminator boost if we have query discriminators
+                        let final_score = if query.discriminators.is_empty() {
+                            score
+                        } else {
+                            self.calculate_discriminator_score(score, &doc, &query.discriminators)
+                        };
+
                         results.push(SearchMatch {
                             input: input.clone(),
                             display,
                             token,
-                            score,
+                            score: final_score,
                         });
                     }
                     Err(e) => {
@@ -393,6 +533,13 @@ impl SearchIndex for TantivyIndex {
                 }
             }
 
+            // Add discriminator values (stored only, for post-search filtering)
+            for (disc_name, disc_value) in &record.discriminator_values {
+                if let Some(field) = self.discriminator_fields.get(disc_name) {
+                    doc.add_text(*field, disc_value);
+                }
+            }
+
             writer
                 .add_document(doc)
                 .map_err(|e| IndexError::BuildFailed(e.to_string()))?;
@@ -446,10 +593,13 @@ mod tests {
                 column: "name".to_string(),
                 default: true,
             }],
-            shard: ShardConfig {
+            shard: Some(ShardConfig {
                 enabled: false,
                 prefix_len: 0,
-            },
+            }),
+            display_template_full: None,
+            composite_search: None,
+            discriminators: vec![],
         }
     }
 
@@ -462,6 +612,7 @@ mod tests {
                     "name".to_string(),
                     "asia pacific growth fund".to_string(),
                 )]),
+                discriminator_values: HashMap::new(),
             },
             IndexRecord {
                 token: "uuid-2".to_string(),
@@ -470,6 +621,7 @@ mod tests {
                     "name".to_string(),
                     "luxembourg investment sicav".to_string(),
                 )]),
+                discriminator_values: HashMap::new(),
             },
             IndexRecord {
                 token: "uuid-3".to_string(),
@@ -478,6 +630,7 @@ mod tests {
                     "name".to_string(),
                     "pacific capital partners".to_string(),
                 )]),
+                discriminator_values: HashMap::new(),
             },
             IndexRecord {
                 token: "uuid-4".to_string(),
@@ -486,6 +639,7 @@ mod tests {
                     "name".to_string(),
                     "apex fund services".to_string(),
                 )]),
+                discriminator_values: HashMap::new(),
             },
         ]
     }
@@ -517,6 +671,7 @@ mod tests {
             search_key: "name".to_string(),
             mode: MatchMode::Fuzzy,
             limit: 10,
+            discriminators: HashMap::new(),
         };
 
         let results = index.search(&query).await;
@@ -548,6 +703,7 @@ mod tests {
             search_key: "name".to_string(),
             mode: MatchMode::Fuzzy,
             limit: 10,
+            discriminators: HashMap::new(),
         };
 
         let results = index.search(&query).await;
@@ -570,6 +726,7 @@ mod tests {
             search_key: "name".to_string(),
             mode: MatchMode::Fuzzy,
             limit: 10,
+            discriminators: HashMap::new(),
         };
 
         let results = index.search(&query).await;
@@ -592,6 +749,7 @@ mod tests {
             search_key: "name".to_string(),
             mode: MatchMode::Fuzzy,
             limit: 10,
+            discriminators: HashMap::new(),
         };
 
         let results = index.search(&query).await;
@@ -614,6 +772,7 @@ mod tests {
             search_key: "name".to_string(),
             mode: MatchMode::Exact,
             limit: 10,
+            discriminators: HashMap::new(),
         };
 
         let results = index.search(&query).await;
@@ -633,6 +792,7 @@ mod tests {
             search_key: "name".to_string(),
             mode: MatchMode::Fuzzy,
             limit: 10,
+            discriminators: HashMap::new(),
         };
 
         // Measure search time
@@ -654,6 +814,9 @@ mod tests {
 
 #[tokio::test]
 async fn test_exact_search_with_underscore() {
+    use crate::config::{SearchKeyConfig, ShardConfig};
+    use std::collections::HashMap;
+
     // Simulate PRODUCT config with exact mode - product_code is default
     let config = EntityConfig {
         nickname: "PRODUCT".to_string(),
@@ -674,10 +837,13 @@ async fn test_exact_search_with_underscore() {
                 default: true, // DSL uses product codes like FUND_ACCOUNTING
             },
         ],
-        shard: ShardConfig {
+        shard: Some(ShardConfig {
             enabled: false,
             prefix_len: 0,
-        },
+        }),
+        display_template_full: None,
+        composite_search: None,
+        discriminators: vec![],
     };
 
     let index = TantivyIndex::new(config).unwrap();
@@ -691,6 +857,7 @@ async fn test_exact_search_with_underscore() {
                 ("name".to_string(), "Custody".to_string()),
                 ("product_code".to_string(), "CUSTODY".to_string()),
             ]),
+            discriminator_values: HashMap::new(),
         },
         IndexRecord {
             token: "FUND_ACCOUNTING".to_string(),
@@ -699,6 +866,7 @@ async fn test_exact_search_with_underscore() {
                 ("name".to_string(), "Fund Accounting".to_string()),
                 ("product_code".to_string(), "FUND_ACCOUNTING".to_string()),
             ]),
+            discriminator_values: HashMap::new(),
         },
     ];
 
@@ -710,6 +878,7 @@ async fn test_exact_search_with_underscore() {
         search_key: "product_code".to_string(),
         mode: MatchMode::Exact,
         limit: 10,
+        discriminators: HashMap::new(),
     };
 
     let results = index.search(&query).await;

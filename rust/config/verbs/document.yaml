@@ -245,3 +245,278 @@ domains:
         example: |
           (document.waive-request :workstream-id @ws-003 :type "SOURCE_OF_WEALTH"
              :reason "Low value account, low risk" :approved-by @senior-analyst)
+
+      # ═══════════════════════════════════════════════════════════════════════════
+      # Document-Attribute Catalogue Operations
+      # ═══════════════════════════════════════════════════════════════════════════
+
+      list-attributes:
+        description: List all attributes linked to a document type with extraction/requirement details
+        behavior: plugin
+        handler: document_list_attributes
+        args:
+          - name: document-type
+            type: string
+            required: true
+            description: Document type code (e.g., PASSPORT, CERT_OF_INCORPORATION)
+          - name: direction
+            type: string
+            required: false
+            valid_values: [SOURCE, SINK, BOTH]
+            description: Filter by direction - SOURCE (provides), SINK (requires), or BOTH
+        returns:
+          type: record_set
+          description: List of attributes with direction, extraction_method, is_authoritative, proof_strength
+        example: |
+          (document.list-attributes :document-type "PASSPORT")
+          (document.list-attributes :document-type "UBO_DECLARATION" :direction "SINK")
+
+      set-required-attributes:
+        description: Set required_attributes JSONB for a document type (validation rules)
+        behavior: crud
+        crud:
+          operation: update
+          table: document_types
+          schema: ob-poc
+          code_column: type_code
+        args:
+          - name: document-type
+            type: string
+            required: true
+            description: Document type code
+            maps_to: type_code
+          - name: required-attributes
+            type: json
+            required: true
+            description: |
+              JSONB object defining validation rules. Structure:
+              {
+                "mandatory": ["attr.identity.full_name", "attr.identity.date_of_birth"],
+                "conditional": {
+                  "if_jurisdiction_in": ["US", "CA"],
+                  "then_require": ["attr.tax.ssn_itin"]
+                },
+                "at_least_one": [["attr.identity.passport_number", "attr.identity.national_id_number"]]
+              }
+            maps_to: required_attributes
+        example: |
+          (document.set-required-attributes
+            :document-type "PASSPORT"
+            :required-attributes {
+              "mandatory": ["attr.identity.full_name", "attr.identity.date_of_birth",
+                           "attr.identity.passport_number", "attr.identity.nationality"],
+              "conditional": {},
+              "at_least_one": []
+            })
+
+      get-type:
+        description: Get document type details including required_attributes and applicability
+        behavior: crud
+        crud:
+          operation: select
+          table: document_types
+          schema: ob-poc
+          code_column: type_code
+        args:
+          - name: document-type
+            type: string
+            required: true
+            maps_to: type_code
+        returns:
+          type: record
+
+      list-types:
+        description: List document types, optionally filtered by category or domain
+        behavior: crud
+        crud:
+          operation: select
+          table: document_types
+          schema: ob-poc
+        args:
+          - name: category
+            type: string
+            required: false
+            description: Filter by category (IDENTITY, CORPORATE, FINANCIAL, ADDRESS_PROOF, TAX, UBO, REGULATORY)
+            maps_to: category
+          - name: domain
+            type: string
+            required: false
+            description: Filter by domain
+            maps_to: domain
+        returns:
+          type: record_set
+
+      check-extraction-coverage:
+        description: Check what percentage of attributes can be extracted from available documents for an entity
+        behavior: plugin
+        handler: document_check_extraction_coverage
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: cbu-id
+            type: uuid
+            required: false
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          description: |
+            Returns coverage stats: total_required, total_sourced, coverage_percentage,
+            missing_attributes, available_documents
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Document Type Reference Data Management
+  # ═══════════════════════════════════════════════════════════════════════════
+  document-type:
+    description: Document type reference data management (for catalogue population)
+    verbs:
+      ensure:
+        description: Create or update a document type in the catalogue (upsert by type_code)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: document_types
+          schema: ob-poc
+          code_column: type_code
+          conflict_keys: [type_code]
+          returning: type_id
+        args:
+          - name: type-code
+            type: string
+            required: true
+            description: Unique document type code (e.g., PASSPORT, CERT_OF_INCORPORATION)
+            maps_to: type_code
+          - name: display-name
+            type: string
+            required: true
+            description: Human-readable name
+            maps_to: display_name
+          - name: category
+            type: string
+            required: true
+            description: Document category
+            valid_values:
+              [
+                IDENTITY,
+                CORPORATE,
+                FINANCIAL,
+                ADDRESS_PROOF,
+                TAX,
+                UBO,
+                REGULATORY,
+                CONTRACT,
+                COMPLIANCE,
+                SCREENING,
+                FUND,
+                TRUST,
+                PARTNERSHIP,
+              ]
+            maps_to: category
+          - name: domain
+            type: string
+            required: false
+            description: Domain grouping (e.g., kyc, custody, fund)
+            maps_to: domain
+          - name: description
+            type: string
+            required: false
+            description: Detailed description of the document type
+            maps_to: description
+          - name: applicability
+            type: json
+            required: false
+            description: |
+              CSG applicability rules as JSONB:
+              {
+                "entity_types": ["PROPER_PERSON", "LIMITED_COMPANY"],
+                "jurisdictions": ["US", "GB"],
+                "client_types": ["FUND", "CORPORATE"],
+                "required_for": ["KYC_ONBOARDING"],
+                "excludes": []
+              }
+            maps_to: applicability
+          - name: required-attributes
+            type: json
+            required: false
+            description: |
+              Required attributes for document validation:
+              {
+                "mandatory": ["attr.identity.full_name"],
+                "conditional": {},
+                "at_least_one": []
+              }
+            maps_to: required_attributes
+        returns:
+          type: uuid
+          name: type_id
+          capture: true
+        example: |
+          (document-type.ensure
+            :type-code "PASSPORT"
+            :display-name "Passport"
+            :category "IDENTITY"
+            :domain "kyc"
+            :description "Government-issued passport document"
+            :applicability {"entity_types": ["PROPER_PERSON"]})
+
+      read:
+        description: Read a document type by code
+        behavior: crud
+        crud:
+          operation: select
+          table: document_types
+          schema: ob-poc
+          code_column: type_code
+        args:
+          - name: type-code
+            type: string
+            required: true
+            maps_to: type_code
+        returns:
+          type: record
+
+      list:
+        description: List document types with optional filters
+        behavior: crud
+        crud:
+          operation: select
+          table: document_types
+          schema: ob-poc
+        args:
+          - name: category
+            type: string
+            required: false
+            maps_to: category
+          - name: domain
+            type: string
+            required: false
+            maps_to: domain
+        returns:
+          type: record_set
+
+      delete:
+        description: Delete a document type (will fail if documents exist)
+        behavior: crud
+        crud:
+          operation: delete
+          table: document_types
+          schema: ob-poc
+          code_column: type_code
+        args:
+          - name: type-code
+            type: string
+            required: true
+            maps_to: type_code
+        returns:
+          type: affected

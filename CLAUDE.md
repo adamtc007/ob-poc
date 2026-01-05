@@ -5018,6 +5018,149 @@ Per-entity KYC status within a CBU context.
 
 **Unique constraint**: (entity_id, cbu_id)
 
+## Document & Attribute Catalogue
+
+The Document & Attribute Catalogue defines which documents provide (SOURCE) or require (SINK) which attributes. This drives automated document collection, extraction pipelines, and threshold-based KYC requirements.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    document_types                                │
+│  PASSPORT, CERT_OF_INC, BANK_STATEMENT, etc.                    │
+│  Categories: IDENTITY, CORPORATE, FINANCIAL, TAX, REGULATORY    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ document_attribute_links
+                              │ (direction: SOURCE or SINK)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    attribute_registry                            │
+│  attr.identity.full_name, attr.corporate.reg_number, etc.       │
+│  Domains: identity, corporate, financial, address, tax          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| `document_types` | Document type definitions with categories |
+| `attribute_registry` | Semantic attribute definitions |
+| `document_attribute_links` | SOURCE/SINK relationships with extraction metadata |
+
+### document_types
+
+| Column | Type | Description |
+|--------|------|-------------|
+| type_id | uuid | Primary key |
+| type_code | varchar(100) | Unique code (PASSPORT, CERT_OF_INC) |
+| display_name | varchar(200) | Human-readable name |
+| category | varchar(50) | IDENTITY, CORPORATE, FINANCIAL, TAX, REGULATORY |
+| description | text | Detailed description |
+| applicability | jsonb | Entity type applicability rules |
+
+### attribute_registry
+
+| Column | Type | Description |
+|--------|------|-------------|
+| uuid | uuid | Primary key |
+| id | varchar(100) | Semantic ID (attr.identity.full_name) |
+| name | varchar(200) | Display name |
+| domain | varchar(50) | identity, corporate, financial, address, tax |
+| data_type | varchar(30) | string, date, decimal, boolean, jsonb |
+| is_pii | boolean | Contains personally identifiable information |
+| verification_required | boolean | Requires documentary proof |
+
+### document_attribute_links
+
+| Column | Type | Description |
+|--------|------|-------------|
+| link_id | uuid | Primary key |
+| document_type_id | uuid | FK to document_types |
+| attribute_id | uuid | FK to attribute_registry |
+| direction | varchar(10) | SOURCE (provides) or SINK (requires) |
+| extraction_method | varchar(30) | MRZ, OCR, AI, IMAGE, MANUAL, DERIVED |
+| extraction_confidence_default | decimal(3,2) | Default confidence score |
+| is_authoritative | boolean | Primary proof for this attribute |
+| proof_strength | varchar(20) | PRIMARY, SECONDARY, SUPPORTING |
+
+**Unique constraint**: (document_type_id, attribute_id, direction)
+
+### Direction Semantics
+
+| Direction | Meaning | Example |
+|-----------|---------|---------|
+| SOURCE | Document provides this attribute | PASSPORT → full_name (via MRZ) |
+| SINK | Document requires this attribute | KYC_FORM → identity proof required |
+
+### Extraction Methods
+
+| Method | Description |
+|--------|-------------|
+| MRZ | Machine Readable Zone (passports, ID cards) |
+| OCR | Optical Character Recognition |
+| AI | AI/ML extraction (GPT-4V, Claude) |
+| IMAGE | Image analysis (photo matching) |
+| MANUAL | Human data entry |
+| DERIVED | Calculated from other attributes |
+
+### DSL Verbs
+
+| Verb | Description |
+|------|-------------|
+| `document-type.ensure` | Create or update document type (idempotent by type_code) |
+| `document-type.read` | Read document type by code |
+| `document-type.list` | List document types with optional category filter |
+| `document-type.delete` | Delete document type |
+| `attribute.define` | Create or update attribute (idempotent by semantic ID) |
+| `attribute.update` | Update attribute properties |
+| `attribute.read` | Read attribute by semantic ID |
+| `attribute.list` | List attributes with optional domain filter |
+| `attribute.delete` | Delete attribute |
+| `attribute.map-to-document` | Create SOURCE/SINK link between attribute and document |
+| `attribute.unmap-from-document` | Remove attribute-document link |
+
+### DSL Seed Files
+
+Reference data is loaded via idempotent DSL seed files:
+
+```
+rust/dsl/seeds/
+├── document_types.dsl          # 50 document type definitions
+├── attributes.dsl              # 50 attribute definitions
+└── document_attribute_links.dsl # 128 source/sink mappings
+```
+
+### Example DSL
+
+```clojure
+;; Define a document type
+(document-type.ensure
+  :code "PASSPORT"
+  :name "Passport"
+  :category "IDENTITY"
+  :description "Government-issued passport with MRZ")
+
+;; Define an attribute
+(attribute.define
+  :id "attr.identity.full_name"
+  :name "Full Legal Name"
+  :domain "identity"
+  :data-type "string"
+  :is-pii true
+  :verification-required true)
+
+;; Link: PASSPORT provides full_name via MRZ extraction
+(attribute.map-to-document
+  :document-type "PASSPORT"
+  :attribute "attr.identity.full_name"
+  :direction "SOURCE"
+  :extraction-method "MRZ"
+  :is-authoritative true
+  :proof-strength "PRIMARY")
+```
+
 ## Observation Model (KYC Evidence)
 
 The observation model captures the reality of KYC: multiple sources may provide different observations about the same attribute. Allegations from clients are verified against documentary evidence.

@@ -1,6 +1,17 @@
 //! Lifecycle state machine utilities.
 //!
 //! Provides functions for validating state transitions and querying valid states.
+//!
+//! ## Public API (used by production code)
+//! - `is_valid_transition` - Check if a state transition is allowed
+//! - `valid_next_states` - Get valid next states from current state
+//! - `is_valid_state` - Check if a state is valid for a lifecycle
+//!
+//! ## Test Utilities (used by tests only, marked #[allow(dead_code)])
+//! - `validate_required_state` - Validate entity is in required state
+//! - `validate_transition` - Validate state transition with detailed result
+//! - `is_terminal_state` - Check if state has no outbound transitions
+//! - `terminal_states` - Get all terminal states for a lifecycle
 
 use crate::ontology::types::EntityLifecycle;
 

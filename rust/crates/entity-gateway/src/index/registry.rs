@@ -99,17 +99,20 @@ mod tests {
             source_table: "test_table".to_string(),
             return_key: "id".to_string(),
             display_template: None,
+            display_template_full: None,
             index_mode: crate::config::IndexMode::Trigram,
             filter: None,
+            composite_search: None,
             search_keys: vec![SearchKeyConfig {
                 name: "name".to_string(),
                 column: "name".to_string(),
                 default: true,
             }],
-            shard: ShardConfig {
+            discriminators: vec![],
+            shard: Some(ShardConfig {
                 enabled: false,
                 prefix_len: 0,
-            },
+            }),
         }
     }
 

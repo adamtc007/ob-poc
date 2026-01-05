@@ -77,6 +77,7 @@ impl GatewayRefResolver {
             search_key,
             mode: SearchMode::Exact as i32,
             limit: Some(5), // Get suggestions if not found
+            discriminators: std::collections::HashMap::new(),
         };
 
         let response = self
@@ -153,6 +154,7 @@ impl GatewayRefResolver {
             search_key: None,
             mode: SearchMode::Exact as i32,
             limit: None, // Return all matches
+            discriminators: std::collections::HashMap::new(),
         };
 
         let response = self
@@ -220,6 +222,7 @@ impl GatewayRefResolver {
             search_key: None,
             mode: SearchMode::Fuzzy as i32,
             limit: Some(limit as i32),
+            discriminators: std::collections::HashMap::new(),
         };
 
         let response = self

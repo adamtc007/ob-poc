@@ -25,6 +25,10 @@ message SearchRequest {
 
   // Optional: max results per input value (defaults to 10)
   optional int32 limit = 5;
+
+  // Optional: discriminator values for composite search (e.g., nationality, date_of_birth)
+  // Keys are discriminator names, values are the discriminator values
+  map<string, string> discriminators = 6;
 }
 
 enum SearchMode {

@@ -689,6 +689,11 @@ pub struct GraphNode {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity_category: Option<String>,
 
+    /// Person state: GHOST, IDENTIFIED, or VERIFIED
+    /// Ghost entities have minimal info (name only) and render with dashed/faded style
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person_state: Option<String>,
+
     // =========================================================================
     // CONTAINER FIELDS - for nodes that contain browseable children
     // =========================================================================

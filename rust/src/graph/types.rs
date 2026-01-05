@@ -1194,6 +1194,96 @@ impl EntityType {
     }
 }
 
+// =============================================================================
+// ENTITY VERIFICATION STATE
+// =============================================================================
+
+/// Person/Entity verification state - progressive refinement from Ghost to Verified
+///
+/// Ghost entities allow the system to capture "we know someone exists" before
+/// we have full identifying attributes. This prevents blocking imports while
+/// maintaining explicit tracking of incomplete data.
+///
+/// Sources that create Ghost entities:
+/// - Document extraction ("John Smith mentioned as director")
+/// - Ownership chain discovery ("UBO identified but not yet contacted")
+/// - Client allegations ("Client says X is a shareholder")
+/// - GLEIF parent chains (natural person at terminus)
+///
+/// ```text
+/// Ghost → Identified → Verified
+///   │          │           │
+///   │          │           └── KYC complete, documents verified
+///   │          └── Has identifying attributes (DOB, nationality, etc.)
+///   └── Name only, discovered from document/relationship
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PersonState {
+    /// Ghost - name only, minimal attributes
+    /// Discovered from document mention, ownership chain, or allegation
+    /// Cannot complete KYC until identified
+    #[default]
+    Ghost,
+    /// Identified - has identifying attributes (DOB, nationality, residence, ID docs)
+    /// Can proceed with KYC screening
+    Identified,
+    /// Verified - identity confirmed by official documents (passport, license, tax returns)
+    Verified,
+}
+
+impl FromStr for PersonState {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_uppercase().as_str() {
+            "GHOST" => Self::Ghost,
+            "IDENTIFIED" => Self::Identified,
+            "VERIFIED" => Self::Verified,
+            _ => Self::Ghost, // Default to Ghost for unknown values (safest assumption)
+        })
+    }
+}
+
+impl PersonState {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Ghost => "GHOST",
+            Self::Identified => "IDENTIFIED",
+            Self::Verified => "VERIFIED",
+        }
+    }
+
+    pub fn is_ghost(&self) -> bool {
+        matches!(self, Self::Ghost)
+    }
+
+    pub fn is_verified(&self) -> bool {
+        matches!(self, Self::Verified)
+    }
+
+    /// Can this entity proceed to KYC screening?
+    /// Ghost entities need identification first.
+    pub fn can_screen(&self) -> bool {
+        !self.is_ghost()
+    }
+
+    /// Can this entity complete KYC?
+    /// Only verified entities can complete.
+    pub fn can_complete_kyc(&self) -> bool {
+        self.is_verified()
+    }
+
+    /// Display label for UI
+    pub fn display_label(&self) -> &str {
+        match self {
+            Self::Ghost => "👻 Ghost",
+            Self::Identified => "Identified",
+            Self::Verified => "✓ Verified",
+        }
+    }
+}
+
 /// Ownership type
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -1406,6 +1496,10 @@ pub enum RoleCategory {
     InvestorChain,
     /// Related parties - peripheral
     RelatedParty,
+    /// Investment vehicle - pooled funds AO invests in (Umbrella, ETF, Unit Trust)
+    /// Layout: TreeDown below AO, shows fund structure
+    /// Trading View only (not UBO)
+    InvestmentVehicle,
     // Legacy categories
     OwnershipControl,
     Both,
@@ -1428,6 +1522,7 @@ impl FromStr for RoleCategory {
             "TRADING_EXECUTION" => Ok(Self::TradingExecution),
             "INVESTOR_CHAIN" => Ok(Self::InvestorChain),
             "RELATED_PARTY" => Ok(Self::RelatedParty),
+            "INVESTMENT_VEHICLE" => Ok(Self::InvestmentVehicle),
             "OWNERSHIP_CONTROL" => Ok(Self::OwnershipControl),
             "BOTH" => Ok(Self::Both),
             "FUND_OPERATIONS" => Ok(Self::FundOperations),
@@ -1443,7 +1538,7 @@ impl RoleCategory {
         match self {
             Self::OwnershipChain | Self::OwnershipControl => LayoutBehavior::PyramidUp,
             Self::ControlChain => LayoutBehavior::Overlay,
-            Self::FundStructure => LayoutBehavior::TreeDown,
+            Self::FundStructure | Self::InvestmentVehicle => LayoutBehavior::TreeDown,
             Self::FundManagement => LayoutBehavior::Satellite,
             Self::TrustRoles => LayoutBehavior::Radial,
             Self::ServiceProvider => LayoutBehavior::FlatBottom,
@@ -1463,6 +1558,37 @@ impl RoleCategory {
                 | Self::ControlChain
                 | Self::OwnershipControl
                 | Self::TrustRoles
+                | Self::Both
+        )
+    }
+
+    /// Returns true if this category is relevant for UBO/KYC views
+    /// Includes ownership chains, control chains, and trust structures
+    pub fn is_ubo_relevant(&self) -> bool {
+        matches!(
+            self,
+            Self::OwnershipChain
+                | Self::ControlChain
+                | Self::OwnershipControl
+                | Self::TrustRoles
+                | Self::InvestorChain
+                | Self::Both
+        )
+    }
+
+    /// Returns true if this category is relevant for Trading views
+    /// Some categories (like ControlChain) appear in BOTH UBO and Trading
+    pub fn is_trading_relevant(&self) -> bool {
+        matches!(
+            self,
+            Self::FundManagement
+                | Self::FundStructure
+                | Self::TradingExecution
+                | Self::FundOperations
+                | Self::Distribution
+                | Self::Financing
+                | Self::InvestmentVehicle  // Pooled funds AO invests in (Umbrella, ETF, Unit Trust)
+                | Self::ControlChain  // Directors, officers appear in trading view too
                 | Self::Both
         )
     }
@@ -1844,6 +1970,10 @@ pub struct LegacyGraphNode {
     pub browse_nickname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_key: Option<String>,
+    /// Person state for proper_person entities: GHOST, IDENTIFIED, or VERIFIED
+    /// Ghost entities have minimal info (name only) and render with dashed/faded style
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub person_state: Option<String>,
 }
 
 fn is_false(b: &bool) -> bool {
@@ -1963,10 +2093,16 @@ impl EdgeType {
     }
 
     pub fn from_fund_structure_type(rel_type: &str) -> Option<Self> {
-        match rel_type.to_lowercase().as_str() {
-            "contains" => Some(EdgeType::Contains),
-            "master_feeder" | "feeder_to" => Some(EdgeType::FeederTo),
-            "invests_in" => Some(EdgeType::InvestsIn),
+        match rel_type.to_uppercase().as_str() {
+            // GLEIF relationship types from entity_parent_relationships
+            "FUND_MANAGER" => Some(EdgeType::ManagedBy),
+            "UMBRELLA_FUND" => Some(EdgeType::Contains),
+            "MASTER_FUND" => Some(EdgeType::FeederTo),
+            // Legacy/internal relationship types
+            "CONTAINS" => Some(EdgeType::Contains),
+            "MASTER_FEEDER" | "FEEDER_TO" => Some(EdgeType::FeederTo),
+            "INVESTS_IN" => Some(EdgeType::InvestsIn),
+            "MANAGED_BY" => Some(EdgeType::ManagedBy),
             _ => None,
         }
     }
@@ -2139,45 +2275,29 @@ impl LegacyCbuGraph {
     }
 
     pub fn filter_to_ubo_only(&mut self) {
-        let control_roles = [
-            "DIRECTOR",
-            "NOMINEE_DIRECTOR",
-            "INDEPENDENT_TRUSTEE",
-            "INTERESTED_TRUSTEE",
-            "UBO",
-            "BENEFICIAL_OWNER",
-            "SHAREHOLDER",
-            "SETTLOR",
-            "TRUSTEE",
-            "BENEFICIARY",
-            "PROTECTOR",
-            "GENERAL_PARTNER",
-            "LIMITED_PARTNER",
-            "MANAGING_PARTNER",
-            "ASSET_OWNER",
-            "AUTHORIZED_SIGNATORY",
-            "CHIEF_COMPLIANCE_OFFICER",
-            "CONDUCTING_OFFICER",
-            "CORPORATE_SECRETARY",
-            "HOLDING_COMPANY",
-            "SUBSIDIARY",
-            "SPONSOR",
-            "MANCO",
-            "MANAGEMENT_COMPANY",
-            "PRINCIPAL",
-            "COMMERCIAL_CLIENT",
-        ];
+        // Use RoleCategory::is_ubo_relevant() for consistent filtering
+        let ubo_entity_ids: std::collections::HashSet<String> = self
+            .nodes
+            .iter()
+            .filter(|n| {
+                n.node_type == NodeType::Entity
+                    && n.role_categories.iter().any(|cat| {
+                        RoleCategory::from_str(cat)
+                            .map(|rc| rc.is_ubo_relevant())
+                            .unwrap_or(false)
+                    })
+            })
+            .map(|n| n.id.clone())
+            .collect();
 
+        // Keep edges that are ownership/control relationships or connect UBO-relevant entities
         self.edges.retain(|e| match e.edge_type {
             EdgeType::Owns | EdgeType::Controls => true,
-            EdgeType::HasRole => e
-                .label
-                .as_ref()
-                .map(|role| control_roles.contains(&role.as_str()))
-                .unwrap_or(false),
+            EdgeType::HasRole => ubo_entity_ids.contains(&e.target),
             _ => false,
         });
 
+        // Recompute connected nodes after edge filtering
         let connected_node_ids: std::collections::HashSet<String> = self
             .edges
             .iter()
@@ -2189,39 +2309,44 @@ impl LegacyCbuGraph {
     }
 
     pub fn filter_to_trading_entities(&mut self) {
-        let trading_categories = [
-            "FUND_MANAGEMENT",
-            "FUND_STRUCTURE",
-            "TRADING_EXECUTION",
-            "FUND_OPERATIONS",
-            "DISTRIBUTION",
-            "FINANCING",
-            "INVESTMENT",
-            "BOTH",
-        ];
-
+        // Use RoleCategory::is_trading_relevant() for consistent filtering
         let trading_entity_ids: std::collections::HashSet<String> = self
             .nodes
             .iter()
             .filter(|n| {
                 n.node_type == NodeType::Entity
-                    && n.role_categories
-                        .iter()
-                        .any(|cat| trading_categories.contains(&cat.as_str()))
+                    && n.role_categories.iter().any(|cat| {
+                        RoleCategory::from_str(cat)
+                            .map(|rc| rc.is_trading_relevant())
+                            .unwrap_or(false)
+                    })
             })
             .map(|n| n.id.clone())
             .collect();
 
-        self.nodes
-            .retain(|n| n.node_type != NodeType::Entity || trading_entity_ids.contains(&n.id));
-
-        self.edges.retain(|e| {
-            if e.edge_type != EdgeType::HasRole {
-                true
-            } else {
-                trading_entity_ids.contains(&e.target)
-            }
+        // Keep edges that are:
+        // 1. Fund structure edges (ManagedBy, FeederTo, Contains) - trading view shows fund structure
+        // 2. HasRole edges to trading-relevant entities
+        // 3. Other non-role edges
+        self.edges.retain(|e| match e.edge_type {
+            EdgeType::ManagedBy
+            | EdgeType::FeederTo
+            | EdgeType::Contains
+            | EdgeType::AdministeredBy
+            | EdgeType::CustodiedBy => true,
+            EdgeType::HasRole => trading_entity_ids.contains(&e.target),
+            _ => true,
         });
+
+        // Recompute connected nodes after edge filtering
+        let connected_node_ids: std::collections::HashSet<String> = self
+            .edges
+            .iter()
+            .flat_map(|e| [e.source.clone(), e.target.clone()])
+            .collect();
+
+        self.nodes
+            .retain(|n| matches!(n.node_type, NodeType::Cbu) || connected_node_ids.contains(&n.id));
     }
 
     pub fn compute_visual_hints(&mut self) {

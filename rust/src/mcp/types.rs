@@ -134,6 +134,14 @@ pub enum SessionAction {
     Undo { session_id: String },
     /// Clear all bindings
     Clear { session_id: String },
+    /// Set stage focus (e.g., "GLEIF_RESEARCH", "UBO_ANALYSIS")
+    /// When set, agent prioritizes verbs relevant to that stage
+    SetStageFocus {
+        session_id: String,
+        stage_code: Option<String>,
+    },
+    /// List available stages with their relevant verbs
+    ListStages,
 }
 
 /// Current session state
@@ -143,6 +151,22 @@ pub struct SessionState {
     pub bindings: HashMap<String, BindingInfo>,
     pub history_count: usize,
     pub can_undo: bool,
+    /// Currently focused stage (e.g., "GLEIF_RESEARCH")
+    pub stage_focus: Option<String>,
+    /// Verbs relevant to current stage focus
+    pub relevant_verbs: Option<Vec<String>>,
+    /// Available stages (only populated for ListStages action)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub available_stages: Option<Vec<StageInfo>>,
+}
+
+/// Available semantic stage with its relevant verbs
+#[derive(Debug, Serialize)]
+pub struct StageInfo {
+    pub code: String,
+    pub name: String,
+    pub description: String,
+    pub relevant_verbs: Vec<String>,
 }
 
 /// Information about a single binding

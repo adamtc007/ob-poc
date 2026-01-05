@@ -25,9 +25,6 @@ use std::time::Instant;
 /// Allianz Global Investors GmbH - Fund manager with managed funds
 pub const ALLIANZ_GI_LEI: &str = "529900FAHFDMSXCPII15";
 
-/// Allianz SE (Head Office) - Large corporate with many children
-pub const ALLIANZ_SE_LEI: &str = "529900K9B0N5BT694847";
-
 /// Configuration for DSL-based GLEIF crawl
 #[derive(Debug, Clone)]
 pub struct DslCrawlConfig {

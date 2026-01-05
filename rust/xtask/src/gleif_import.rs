@@ -12,6 +12,8 @@
 //!   cargo x gleif-import --manager-lei OJ2TIQSVQND4IZYYK658 --limit 10
 //!   cargo x gleif-import -m OJ2TIQSVQND4IZYYK658 --create-cbus
 
+#![allow(dead_code)] // Struct fields used for JSON deserialization from GLEIF API
+
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -58,6 +60,7 @@ pub struct GleifPagination {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
 pub struct GleifRecord {
     pub attributes: GleifAttributes,
     #[serde(default)]
@@ -117,17 +120,20 @@ pub struct GleifRegistration {
 
 #[derive(Debug, Deserialize, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
+#[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
 pub struct GleifRelationships {
     pub direct_parent: Option<GleifRelationshipLink>,
     pub ultimate_parent: Option<GleifRelationshipLink>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
 pub struct GleifRelationshipLink {
     pub links: Option<GleifLinks>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)] // Fields used for JSON deserialization from GLEIF API
 pub struct GleifLinks {
     pub related: Option<String>,
 }
