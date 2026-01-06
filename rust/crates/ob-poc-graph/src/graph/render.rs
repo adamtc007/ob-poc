@@ -650,6 +650,14 @@ impl GraphRenderer {
             EntityType::Product => "PRODUCT",
             EntityType::Service => "SERVICE",
             EntityType::Resource => "RESOURCE",
+            // Trading layer types
+            EntityType::TradingProfile => "TRADING_PROFILE",
+            EntityType::InstrumentMatrix => "INSTRUMENT_MATRIX",
+            EntityType::InstrumentClass => "INSTRUMENT_CLASS",
+            EntityType::Market => "MARKET",
+            EntityType::Counterparty => "COUNTERPARTY",
+            EntityType::IsdaAgreement => "ISDA_AGREEMENT",
+            EntityType::CsaAgreement => "CSA_AGREEMENT",
             EntityType::Unknown => "ENTITY",
         };
 
@@ -689,6 +697,20 @@ impl GraphRenderer {
                     if matches!(
                         node.entity_type,
                         EntityType::Product | EntityType::Service | EntityType::Resource
+                    ) {
+                        return true;
+                    }
+                }
+                "TRADING_LAYER" => {
+                    if matches!(
+                        node.entity_type,
+                        EntityType::TradingProfile
+                            | EntityType::InstrumentMatrix
+                            | EntityType::InstrumentClass
+                            | EntityType::Market
+                            | EntityType::Counterparty
+                            | EntityType::IsdaAgreement
+                            | EntityType::CsaAgreement
                     ) {
                         return true;
                     }

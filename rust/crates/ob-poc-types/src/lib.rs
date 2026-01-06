@@ -19,6 +19,7 @@
 
 pub mod resolution;
 pub mod semantic_stage;
+pub mod trading_matrix;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

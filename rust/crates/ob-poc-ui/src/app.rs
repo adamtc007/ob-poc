@@ -1380,7 +1380,7 @@ impl App {
                 } else {
                     node_key.split('/').map(|s| s.to_string()).collect()
                 };
-                let node_id = ob_poc_graph::TradingMatrixNodeId { path };
+                let node_id = ob_poc_graph::TradingMatrixNodeId::new(path);
                 self.state.trading_matrix_state.toggle(&node_id);
             }
             TradingMatrixPanelAction::SelectNode { node_key } => {
@@ -1390,7 +1390,7 @@ impl App {
                 } else {
                     node_key.split('/').map(|s| s.to_string()).collect()
                 };
-                let node_id = ob_poc_graph::TradingMatrixNodeId { path };
+                let node_id = ob_poc_graph::TradingMatrixNodeId::new(path);
                 self.state.trading_matrix_state.select(Some(&node_id));
             }
             TradingMatrixPanelAction::ClearSelection => {
@@ -1427,7 +1427,10 @@ impl App {
                             expand_all_nodes(state, child);
                         }
                     }
-                    expand_all_nodes(&mut self.state.trading_matrix_state, &matrix.root);
+                    // Expand all children (category nodes and their descendants)
+                    for child in matrix.children() {
+                        expand_all_nodes(&mut self.state.trading_matrix_state, child);
+                    }
                 }
             }
             TradingMatrixPanelAction::CollapseAll => {

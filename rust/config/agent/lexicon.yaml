@@ -111,6 +111,34 @@ verbs:
     - settle
     - book
 
+  # Trading profile lifecycle
+  trading_profile:
+    - import
+    - export
+    - materialize
+    - sync
+    - clone
+    - validate
+    - submit
+    - approve
+    - reject
+    - archive
+
+  # Document workflow
+  document_workflow:
+    - draft
+    - review
+    - pending review
+    - pending
+    - validated
+    - approved
+    - rejected
+    - superseded
+    - archived
+    - go live
+    - golive
+    - go-live
+
 entities:
   # CBU indicators
   cbu:

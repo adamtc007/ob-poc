@@ -153,8 +153,62 @@ stages:
       - cbu_instrument_universe # At least one entry
     depends_on: [PRODUCT_SELECTION]
     relevant_verbs:
+      # Trading profile document lifecycle
+      - trading-profile.create-draft
       - trading-profile.import
+      - trading-profile.validate
+      - trading-profile.submit
+      - trading-profile.approve
+      - trading-profile.reject
       - trading-profile.activate
+      - trading-profile.archive
+      - trading-profile.clone-to
+      - trading-profile.create-new-version
+      - trading-profile.get-active
+      - trading-profile.list-versions
+      # Trading profile universe construction
+      - trading-profile.add-instrument-class
+      - trading-profile.remove-instrument-class
+      - trading-profile.add-market
+      - trading-profile.remove-market
+      - trading-profile.set-base-currency
+      - trading-profile.add-allowed-currency
+      # Trading profile SSI construction
+      - trading-profile.add-standing-instruction
+      - trading-profile.remove-standing-instruction
+      # Trading profile booking rules
+      - trading-profile.add-booking-rule
+      - trading-profile.remove-booking-rule
+      # Trading profile ISDA/CSA
+      - trading-profile.add-isda-config
+      - trading-profile.add-isda-product-coverage
+      - trading-profile.add-csa-config
+      - trading-profile.add-csa-eligible-collateral
+      - trading-profile.link-csa-ssi
+      # Trading profile IM mandates
+      - trading-profile.add-im-mandate
+      - trading-profile.update-im-scope
+      - trading-profile.remove-im-mandate
+      # Trading profile sync & validation
+      - trading-profile.materialize
+      - trading-profile.sync-to-operational
+      - trading-profile.sync-from-operational
+      - trading-profile.diff-vs-operational
+      - trading-profile.validate-go-live-ready
+      - trading-profile.validate-universe-coverage
+      - trading-profile.validate-ssi-refs
+      # Trading profile export
+      - trading-profile.export-full-matrix
+      - trading-profile.export-instruction-section
+      - trading-profile.export-gateway-section
+      - trading-profile.export-settlement-section
+      - trading-profile.export-pricing-section
+      - trading-profile.export-tax-section
+      - trading-profile.export-corporate-actions-section
+      # Gap analysis
+      - trading-profile.validate-matrix-completeness
+      - trading-profile.generate-gap-remediation-plan
+      # Legacy cbu-custody verbs (also valid)
       - cbu-custody.add-universe
       - cbu-custody.list-universe
 

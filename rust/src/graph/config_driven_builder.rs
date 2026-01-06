@@ -1081,8 +1081,8 @@ impl ConfigDrivenGraphBuilder {
         // Note: Uses module-level type aliases (GraphNode = LegacyGraphNode)
         // EdgeType, NodeType, etc. are already imported at module level
 
-        // 1. Load active trading profile
-        let Some(profile) = repo.get_active_trading_profile(self.cbu_id).await? else {
+        // 1. Load current trading profile (latest version regardless of status)
+        let Some(profile) = repo.get_current_trading_profile(self.cbu_id).await? else {
             return Ok(()); // No trading profile = no trading layer
         };
 

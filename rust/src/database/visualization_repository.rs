@@ -2108,6 +2108,37 @@ impl VisualizationRepository {
         }))
     }
 
+    /// Get current working trading profile for CBU (ACTIVE preferred, then DRAFT/VALIDATED/PENDING_REVIEW)
+    /// This is used for visualization to show profiles that are being worked on
+    pub async fn get_current_trading_profile(
+        &self,
+        cbu_id: Uuid,
+    ) -> Result<Option<TradingProfileView>> {
+        // First try to get ACTIVE profile
+        if let Some(active) = self.get_active_trading_profile(cbu_id).await? {
+            return Ok(Some(active));
+        }
+
+        // Fall back to most recent working version (DRAFT, VALIDATED, or PENDING_REVIEW)
+        let row = sqlx::query!(
+            r#"SELECT profile_id, version, status, activated_at
+               FROM "ob-poc".cbu_trading_profiles
+               WHERE cbu_id = $1 AND status IN ('DRAFT', 'VALIDATED', 'PENDING_REVIEW')
+               ORDER BY version DESC
+               LIMIT 1"#,
+            cbu_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.map(|r| TradingProfileView {
+            profile_id: r.profile_id,
+            version: r.version,
+            status: r.status,
+            activated_at: r.activated_at,
+        }))
+    }
+
     /// Get instrument universe entries for CBU (from materialized custody tables)
     pub async fn get_cbu_instrument_universe(
         &self,

@@ -3897,17 +3897,23 @@ Measurement → Compare to Target → Breach Detected → Record → Remediate �
 
 ## Trading Profile DSL
 
-The `trading-profile` domain provides a document-centric approach to CBU trading configuration. A single JSONB document is the source of truth, which is then materialized to operational tables.
+The `trading-profile` domain provides a document-centric approach to CBU trading configuration using an **AST-based document model**. The `TradingMatrixDocument` stores a hierarchical tree of `TradingMatrixNode` objects, enabling structured visualization and programmatic manipulation.
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                  Trading Profile Document                        │
-│  YAML/JSON source of truth for CBU trading configuration        │
-│  Stored in: ob-poc.cbu_trading_profiles                         │
+│                  TradingMatrixDocument (AST)                     │
+│  Hierarchical tree of TradingMatrixNode objects                 │
+│  Stored as JSONB in: ob-poc.cbu_trading_profiles.document       │
 └─────────────────────────────────────────────────────────────────┘
                               │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+       DSL Verbs        AST Builder      Visualization
+       (custom_ops)     (ast_builder)    (graph render)
+              │               │               │
+              └───────────────┼───────────────┘
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Materialization                               │
@@ -3918,6 +3924,46 @@ The `trading-profile` domain provides a document-centric approach to CBU trading
 │  - custody.isda_agreements + csa_agreements                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### AST Document Model
+
+The `TradingMatrixDocument` uses a tree structure with 7 category nodes:
+
+| Category | Node Types | Description |
+|----------|------------|-------------|
+| `UNIVERSE` | Market, InstrumentClass | What the CBU trades |
+| `SSI` | Ssi | Standing Settlement Instructions |
+| `BOOKING` | BookingRule | ALERT-style trade routing rules |
+| `ISDA` | IsdaAgreement, Csa, EligibleCollateral | OTC derivative agreements |
+| `MANAGERS` | InvestmentManagerMandate | IM assignments and scope |
+| `SETTLEMENT` | SettlementChain, SettlementHop | Multi-hop settlement paths |
+| `TAX` | TaxJurisdiction, TreatyRate | Withholding tax configuration |
+
+### Key Types
+
+| Type | File | Description |
+|------|------|-------------|
+| `TradingMatrixDocument` | `types.rs` | Root document with metadata + category nodes |
+| `TradingMatrixNode` | `types.rs` | Tree node with id, label, status, children |
+| `TradingMatrixNodeType` | `types.rs` | Enum of all node types (Market, Ssi, etc.) |
+| `TradingMatrixOp` | `ops.rs` | Operations that can be applied to the document |
+| `NodePath` | `types.rs` | Hierarchical path for node addressing |
+
+### AST Pipeline (No Side Doors)
+
+All modifications to trading profiles flow through the AST pipeline:
+
+```
+DSL Verb → TradingMatrixOp → ast_builder::apply() → ast_db::save()
+                                    │
+                                    ▼
+                          TradingMatrixDocument (mutated)
+                                    │
+                                    ▼
+                          JSONB in cbu_trading_profiles
+```
+
+**Key principle:** No direct SQL updates to the document. All changes go through `TradingMatrixOp` operations.
 
 ### Versioned Document Lifecycle
 
@@ -4066,11 +4112,27 @@ csa:
 
 | File | Purpose |
 |------|---------|
-| `rust/src/trading_profile/types.rs` | Document type definitions |
-| `rust/src/trading_profile/resolve.rs` | EntityRef → UUID resolution |
-| `rust/src/trading_profile/validate.rs` | SSI reference validation |
-| `rust/src/dsl_v2/custom_ops/trading_profile.rs` | Verb implementations |
-| `rust/config/seed/trading_profiles/` | Example YAML profiles |
+| `rust/src/trading_profile/types.rs` | `TradingMatrixDocument`, `TradingMatrixNode`, `TradingMatrixNodeType` |
+| `rust/src/trading_profile/ops.rs` | `TradingMatrixOp` enum - all document operations |
+| `rust/src/trading_profile/ast_builder.rs` | Pure functions that apply ops to document |
+| `rust/src/trading_profile/ast_db.rs` | Database operations (load, save, clone_to_draft) |
+| `rust/src/trading_profile/document_ops.rs` | Legacy document operations (being phased out) |
+| `rust/src/dsl_v2/custom_ops/trading_profile.rs` | DSL verb handlers using AST pipeline |
+| `rust/crates/ob-poc-types/src/trading_matrix.rs` | Shared types for UI (StatusColor, etc.) |
+
+### Module Structure
+
+```
+rust/src/trading_profile/
+├── mod.rs              # Module exports
+├── types.rs            # TradingMatrixDocument, Node, NodeType, NodePath
+├── ops.rs              # TradingMatrixOp enum (AddMarket, AddSsi, etc.)
+├── ast_builder.rs      # apply() dispatcher + per-op builder functions
+├── ast_db.rs           # load(), save(), clone_to_draft(), apply_and_save()
+├── document_ops.rs     # Legacy ops (validation, materialization)
+├── resolve.rs          # EntityRef → UUID resolution
+└── validate.rs         # SSI reference validation
+```
 
 ## KYC & UBO DSL
 

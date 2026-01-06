@@ -1707,7 +1707,7 @@ pub async fn validate_profile(
         .map(|i| i.message.clone())
         .collect();
 
-    let warnings: Vec<String> = validation_result
+    let _warnings: Vec<String> = validation_result
         .issues
         .iter()
         .filter(|i| matches!(i.severity, ValidationSeverity::Warning))

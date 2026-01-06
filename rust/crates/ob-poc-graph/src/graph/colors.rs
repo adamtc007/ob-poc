@@ -109,7 +109,15 @@ pub fn entity_type_fill(entity_type: EntityType) -> Color32 {
         EntityType::Product => Color32::from_rgb(168, 85, 247),       // Purple (service layer)
         EntityType::Service => Color32::from_rgb(96, 165, 250),       // Blue (service layer)
         EntityType::Resource => Color32::from_rgb(74, 222, 128),      // Green (service layer)
-        EntityType::Unknown => Color32::from_rgb(176, 190, 197),      // Gray
+        // Trading layer types - Orange/Amber family
+        EntityType::TradingProfile => Color32::from_rgb(251, 191, 36), // Amber-400
+        EntityType::InstrumentMatrix => Color32::from_rgb(253, 224, 71), // Yellow-300
+        EntityType::InstrumentClass => Color32::from_rgb(254, 215, 170), // Orange-200
+        EntityType::Market => Color32::from_rgb(134, 239, 172),        // Green-300 (exchanges)
+        EntityType::Counterparty => Color32::from_rgb(196, 181, 253),  // Violet-300
+        EntityType::IsdaAgreement => Color32::from_rgb(252, 165, 165), // Red-300 (legal)
+        EntityType::CsaAgreement => Color32::from_rgb(253, 186, 186),  // Red-200 (legal, lighter)
+        EntityType::Unknown => Color32::from_rgb(176, 190, 197),       // Gray
     }
 }
 
@@ -124,7 +132,15 @@ pub fn entity_type_border(entity_type: EntityType) -> Color32 {
         EntityType::Product => Color32::from_rgb(88, 28, 135),       // Purple dark (service layer)
         EntityType::Service => Color32::from_rgb(30, 58, 138),       // Blue dark (service layer)
         EntityType::Resource => Color32::from_rgb(20, 83, 45),       // Green dark (service layer)
-        EntityType::Unknown => Color32::from_rgb(96, 125, 139),      // Gray dark
+        // Trading layer types - darker versions
+        EntityType::TradingProfile => Color32::from_rgb(217, 119, 6), // Amber-600
+        EntityType::InstrumentMatrix => Color32::from_rgb(202, 138, 4), // Yellow-600
+        EntityType::InstrumentClass => Color32::from_rgb(234, 88, 12), // Orange-600
+        EntityType::Market => Color32::from_rgb(22, 163, 74),         // Green-600
+        EntityType::Counterparty => Color32::from_rgb(124, 58, 237),  // Violet-600
+        EntityType::IsdaAgreement => Color32::from_rgb(220, 38, 38),  // Red-600
+        EntityType::CsaAgreement => Color32::from_rgb(239, 68, 68),   // Red-500
+        EntityType::Unknown => Color32::from_rgb(96, 125, 139),       // Gray dark
     }
 }
 
@@ -198,11 +214,25 @@ use super::types::EdgeType;
 /// Get color for edge type
 pub fn edge_color(edge_type: EdgeType) -> Color32 {
     match edge_type {
+        // Core edge types
         EdgeType::HasRole => Color32::from_rgb(107, 114, 128), // Gray
         EdgeType::Owns => Color32::from_rgb(34, 197, 94),      // Green
         EdgeType::Controls => Color32::from_rgb(251, 191, 36), // Amber
         EdgeType::UboTerminus => Color32::from_rgb(239, 68, 68), // Red - terminus marker
-        EdgeType::Other => Color32::from_rgb(156, 163, 175),   // Light gray
+        // Service layer edge types
+        EdgeType::UsesProduct => Color32::from_rgb(168, 85, 247), // Purple
+        EdgeType::DeliversService => Color32::from_rgb(96, 165, 250), // Blue
+        EdgeType::ProvidesResource => Color32::from_rgb(74, 222, 128), // Green
+        // Trading layer edge types
+        EdgeType::HasTradingProfile => Color32::from_rgb(217, 119, 6), // Amber-600
+        EdgeType::HasMatrix => Color32::from_rgb(202, 138, 4),         // Yellow-600
+        EdgeType::IncludesClass => Color32::from_rgb(234, 88, 12),     // Orange-600
+        EdgeType::TradedOn => Color32::from_rgb(22, 163, 74),          // Green-600
+        EdgeType::OtcCounterparty => Color32::from_rgb(124, 58, 237),  // Violet-600 (dashed)
+        EdgeType::CoveredByIsda => Color32::from_rgb(220, 38, 38),     // Red-600 (dashed)
+        EdgeType::HasCsa => Color32::from_rgb(239, 68, 68),            // Red-500
+        EdgeType::ImMandate => Color32::from_rgb(59, 130, 246),        // Blue-500 (dashed)
+        EdgeType::Other => Color32::from_rgb(156, 163, 175),           // Light gray
     }
 }
 

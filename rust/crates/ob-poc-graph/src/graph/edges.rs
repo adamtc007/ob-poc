@@ -96,6 +96,19 @@ pub fn curve_strength_for_edge(edge_type: EdgeType, _role: Option<&PrimaryRole>)
         EdgeType::Controls => 0.25,
         EdgeType::HasRole => 0.0,     // straight lines for role edges
         EdgeType::UboTerminus => 0.0, // straight lines for terminus markers
+        // Service layer edges
+        EdgeType::UsesProduct => 0.12,
+        EdgeType::DeliversService => 0.12,
+        EdgeType::ProvidesResource => 0.12,
+        // Trading layer edges - slight curves for visual distinction
+        EdgeType::HasTradingProfile => 0.0, // straight from CBU to profile
+        EdgeType::HasMatrix => 0.0,         // straight hierarchy
+        EdgeType::IncludesClass => 0.0,     // straight hierarchy
+        EdgeType::TradedOn => 0.15,         // curved market connections
+        EdgeType::OtcCounterparty => 0.20,  // curved OTC relationships
+        EdgeType::CoveredByIsda => 0.18,    // curved legal relationships
+        EdgeType::HasCsa => 0.10,           // slight curve for CSA
+        EdgeType::ImMandate => 0.22,        // curved IM mandates
         EdgeType::Other => 0.10,
     }
 }
@@ -128,6 +141,19 @@ pub fn edge_priority(edge_type: EdgeType) -> u32 {
         EdgeType::Controls => 90,
         EdgeType::UboTerminus => 80, // High priority for terminus markers
         EdgeType::HasRole => 50,
+        // Service layer edges
+        EdgeType::UsesProduct => 60,
+        EdgeType::DeliversService => 55,
+        EdgeType::ProvidesResource => 55,
+        // Trading layer edges
+        EdgeType::HasTradingProfile => 70, // Core structure
+        EdgeType::HasMatrix => 65,
+        EdgeType::IncludesClass => 60,
+        EdgeType::TradedOn => 55,
+        EdgeType::OtcCounterparty => 75, // OTC relationships stand out
+        EdgeType::CoveredByIsda => 72,
+        EdgeType::HasCsa => 68,
+        EdgeType::ImMandate => 78, // IM mandates are important
         EdgeType::Other => 30,
     }
 }

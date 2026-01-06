@@ -16,203 +16,63 @@
 //! - No callbacks, pure render functions
 //! - Expand/collapse state is UI-only (TradingMatrixState)
 //!
-//! # Taxonomy Structure
-//! ```text
-//! CBU (root)
-//! └── InstrumentClass (EQUITY, GOVT_BOND, CORP_BOND, ETF, OTC_IRS, OTC_FX)
-//!     └── Market (XETR, XLON, XNYS) OR Counterparty (for OTC)
-//!         └── UniverseEntry (currency, settlement_type, is_held, is_traded)
-//!             ├── SSI (ssi_name, ssi_type, status)
-//!             │   └── BookingRule (priority, specificity)
-//!             ├── SettlementChain (chain_name, hop_count)
-//!             │   └── Hop (sequence, location_bic, instruction_type)
-//!             ├── TaxConfig (jurisdiction, applicable_rate)
-//!             │   └── TreatyRate (source, investor, rate)
-//!             └── IsdaAgreement (counterparty, governing_law) [OTC only]
-//!                 └── CsaAgreement (csa_type, collateral_currency)
-//! ```
+//! # Type Architecture
+//!
+//! This module re-exports unified types from `ob_poc_types::trading_matrix` and
+//! adds UI-specific extensions:
+//!
+//! - **Re-exported from ob_poc_types**: `TradingMatrixNodeId`, `TradingMatrixNodeType`,
+//!   `TradingMatrixNode`, `StatusColor`, `TradingMatrixDocument`, `TradingMatrixResponse`,
+//!   `BookingMatchCriteria`
+//! - **UI-only (local)**: `TradingMatrixState`, `TradingMatrixAction`, colors, render functions
 
 use std::collections::{HashMap, HashSet};
 
 use egui::{Color32, Rect, RichText, Ui, Vec2};
-use serde::{Deserialize, Serialize};
 
 use super::animation::{SpringConfig, SpringF32};
 
 // =============================================================================
-// NODE TYPES
+// RE-EXPORT UNIFIED TYPES FROM ob-poc-types
 // =============================================================================
 
-/// Unique identifier for a node in the trading matrix tree
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TradingMatrixNodeId {
-    /// Path from root (e.g., ["EQUITY", "XNYS", "USD"])
-    pub path: Vec<String>,
+pub use ob_poc_types::trading_matrix::{
+    BookingMatchCriteria, DocumentStatus, StatusColor, TradingMatrixDocument,
+    TradingMatrixMetadata, TradingMatrixNode, TradingMatrixNodeId, TradingMatrixNodeType,
+    TradingMatrixOp, TradingMatrixResponse,
+};
+
+// =============================================================================
+// UI EXTENSIONS FOR UNIFIED TYPES
+// =============================================================================
+
+/// Extension trait for TradingMatrixNodeId to add UI-specific methods
+pub trait TradingMatrixNodeIdExt {
+    /// Get a string key for HashMap storage (used by TradingMatrixState)
+    fn as_key(&self) -> String;
+
+    /// Create a root node ID
+    fn root() -> TradingMatrixNodeId;
 }
 
-impl TradingMatrixNodeId {
-    pub fn root() -> Self {
-        Self { path: Vec::new() }
+impl TradingMatrixNodeIdExt for TradingMatrixNodeId {
+    fn as_key(&self) -> String {
+        self.0.join("/")
     }
 
-    pub fn child(&self, segment: &str) -> Self {
-        let mut path = self.path.clone();
-        path.push(segment.to_string());
-        Self { path }
-    }
-
-    pub fn as_key(&self) -> String {
-        self.path.join("/")
-    }
-
-    pub fn depth(&self) -> usize {
-        self.path.len()
+    fn root() -> TradingMatrixNodeId {
+        TradingMatrixNodeId(Vec::new())
     }
 }
 
-/// The type of a node in the trading matrix hierarchy
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum TradingMatrixNodeType {
-    /// Root CBU node
-    Cbu { cbu_id: String, cbu_name: String },
-    /// Instrument class (EQUITY, GOVT_BOND, OTC_IRS, etc.)
-    InstrumentClass {
-        class_code: String,
-        cfi_prefix: Option<String>,
-        is_otc: bool,
-    },
-    /// Exchange/market for listed instruments
-    Market {
-        mic: String,
-        market_name: String,
-        country_code: String,
-    },
-    /// Counterparty for OTC instruments
-    Counterparty {
-        entity_id: String,
-        entity_name: String,
-        lei: Option<String>,
-    },
-    /// Universe entry (instrument + market/counterparty + currency)
-    UniverseEntry {
-        universe_id: String,
-        currencies: Vec<String>,
-        settlement_types: Vec<String>,
-        is_held: bool,
-        is_traded: bool,
-    },
-    /// Standing Settlement Instruction
-    Ssi {
-        ssi_id: String,
-        ssi_name: String,
-        ssi_type: String, // SECURITIES, CASH, COLLATERAL
-        status: String,   // PENDING, ACTIVE, SUSPENDED
-        safekeeping_account: Option<String>,
-        safekeeping_bic: Option<String>,
-        cash_account: Option<String>,
-        cash_bic: Option<String>,
-    },
-    /// Booking rule that routes to an SSI
-    BookingRule {
-        rule_id: String,
-        rule_name: String,
-        priority: i32,
-        specificity_score: i32,
-        is_active: bool,
-    },
-    /// Settlement chain for multi-hop settlement
-    SettlementChain {
-        chain_id: String,
-        chain_name: String,
-        hop_count: usize,
-        is_active: bool,
-    },
-    /// A hop in a settlement chain
-    SettlementHop {
-        hop_id: String,
-        sequence: i32,
-        location_bic: String,
-        location_name: String,
-        instruction_type: String,
-    },
-    /// Tax configuration for a jurisdiction
-    TaxConfig {
-        config_id: String,
-        jurisdiction_code: String,
-        jurisdiction_name: String,
-        applicable_rate: Option<f64>,
-        has_reclaim: bool,
-    },
-    /// Treaty rate between jurisdictions
-    TreatyRate {
-        treaty_id: String,
-        source_jurisdiction: String,
-        investor_jurisdiction: String,
-        rate_percent: f64,
-        income_type: String,
-    },
-    /// ISDA master agreement (for OTC)
-    IsdaAgreement {
-        isda_id: String,
-        counterparty_name: String,
-        governing_law: String,
-        agreement_date: Option<String>,
-    },
-    /// CSA under an ISDA
-    CsaAgreement {
-        csa_id: String,
-        csa_type: String, // VM, IM
-        collateral_currency: String,
-        threshold: Option<f64>,
-    },
-    /// Investment Manager assignment
-    InvestmentManager {
-        assignment_id: String,
-        im_name: String,
-        im_entity_id: String,
-        scope_description: Option<String>,
-    },
-    /// Pricing configuration
-    PricingConfig {
-        config_id: String,
-        pricing_source: String,
-        priority: i32,
-    },
+/// Extension trait for StatusColor to add egui color conversion
+pub trait StatusColorExt {
+    /// Convert to egui Color32
+    fn to_color32(self) -> Color32;
 }
 
-/// A node in the trading matrix hierarchy
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TradingMatrixNode {
-    /// Unique identifier for this node
-    pub id: TradingMatrixNodeId,
-    /// Node type with type-specific data
-    pub node_type: TradingMatrixNodeType,
-    /// Display label
-    pub label: String,
-    /// Optional sublabel (e.g., jurisdiction, status)
-    pub sublabel: Option<String>,
-    /// Child nodes
-    pub children: Vec<TradingMatrixNode>,
-    /// Aggregate count of leaf nodes below this node
-    pub leaf_count: usize,
-    /// Status indicator color (green=active, yellow=pending, red=suspended)
-    pub status_color: Option<StatusColor>,
-    /// Whether this node has been expanded (for lazy loading)
-    pub is_loaded: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum StatusColor {
-    Green,
-    Yellow,
-    Red,
-    Gray,
-}
-
-impl StatusColor {
-    pub fn to_color32(self) -> Color32 {
+impl StatusColorExt for StatusColor {
+    fn to_color32(self) -> Color32 {
         match self {
             StatusColor::Green => Color32::from_rgb(34, 197, 94), // green-500
             StatusColor::Yellow => Color32::from_rgb(234, 179, 8), // yellow-500
@@ -222,113 +82,24 @@ impl StatusColor {
     }
 }
 
-impl TradingMatrixNode {
-    /// Create a new node
-    pub fn new(id: TradingMatrixNodeId, node_type: TradingMatrixNodeType, label: &str) -> Self {
-        Self {
-            id,
-            node_type,
-            label: label.to_string(),
-            sublabel: None,
-            children: Vec::new(),
-            leaf_count: 0,
-            status_color: None,
-            is_loaded: true,
-        }
-    }
-
-    /// Builder: add sublabel
-    pub fn with_sublabel(mut self, sublabel: &str) -> Self {
-        self.sublabel = Some(sublabel.to_string());
-        self
-    }
-
-    /// Builder: add status color
-    pub fn with_status(mut self, status: StatusColor) -> Self {
-        self.status_color = Some(status);
-        self
-    }
-
-    /// Builder: add a child
-    pub fn with_child(mut self, child: TradingMatrixNode) -> Self {
-        self.children.push(child);
-        self
-    }
-
-    /// Builder: set children
-    pub fn with_children(mut self, children: Vec<TradingMatrixNode>) -> Self {
-        self.children = children;
-        self
-    }
-
-    /// Check if this is a leaf node (no children)
-    pub fn is_leaf(&self) -> bool {
-        self.children.is_empty()
-    }
-
-    /// Get depth in tree
-    pub fn depth(&self) -> usize {
-        self.id.depth()
-    }
-
-    /// Recursively compute leaf counts
-    pub fn compute_leaf_counts(&mut self) {
-        if self.is_leaf() {
-            self.leaf_count = 1;
-        } else {
-            for child in &mut self.children {
-                child.compute_leaf_counts();
-            }
-            self.leaf_count = self.children.iter().map(|c| c.leaf_count).sum();
-        }
-    }
-
-    /// Find a node by ID
-    pub fn find(&self, id: &TradingMatrixNodeId) -> Option<&TradingMatrixNode> {
-        if &self.id == id {
-            return Some(self);
-        }
-        for child in &self.children {
-            if let Some(found) = child.find(id) {
-                return Some(found);
-            }
-        }
-        None
-    }
-
-    /// Find a mutable node by ID
-    pub fn find_mut(&mut self, id: &TradingMatrixNodeId) -> Option<&mut TradingMatrixNode> {
-        if &self.id == id {
-            return Some(self);
-        }
-        for child in &mut self.children {
-            if let Some(found) = child.find_mut(id) {
-                return Some(found);
-            }
-        }
-        None
-    }
-}
-
 // =============================================================================
-// TRADING MATRIX (Complete Tree)
+// UI WRAPPER FOR TRADING MATRIX
 // =============================================================================
 
-/// The complete trading matrix tree for a CBU
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// UI wrapper around TradingMatrixDocument with computed metadata for display.
+///
+/// This provides a simpler interface for the UI while the document holds the full AST.
+#[derive(Debug, Clone)]
 pub struct TradingMatrix {
-    /// Root node (the CBU)
-    pub root: TradingMatrixNode,
-    /// Metadata about the matrix
-    pub metadata: TradingMatrixMetadata,
+    /// The underlying document (the AST)
+    pub document: TradingMatrixDocument,
+    /// Computed display metadata
+    pub display_metadata: DisplayMetadata,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TradingMatrixMetadata {
-    /// CBU ID
-    pub cbu_id: String,
-    /// CBU name
-    pub cbu_name: String,
+/// Display-focused metadata computed from the document
+#[derive(Debug, Clone, Default)]
+pub struct DisplayMetadata {
     /// Total instrument classes
     pub instrument_class_count: usize,
     /// Total markets
@@ -343,84 +114,81 @@ pub struct TradingMatrixMetadata {
     pub settlement_chain_count: usize,
     /// Total ISDA agreements
     pub isda_count: usize,
-    /// Last updated timestamp
-    pub last_updated: Option<String>,
 }
 
 impl TradingMatrix {
-    /// Create a new trading matrix with a CBU root
-    pub fn new(cbu_id: &str, cbu_name: &str) -> Self {
-        let root_id = TradingMatrixNodeId::root();
-        let root = TradingMatrixNode::new(
-            root_id,
-            TradingMatrixNodeType::Cbu {
-                cbu_id: cbu_id.to_string(),
-                cbu_name: cbu_name.to_string(),
-            },
-            cbu_name,
-        );
-
+    /// Create a new trading matrix from a document
+    pub fn from_document(document: TradingMatrixDocument) -> Self {
+        let display_metadata = Self::compute_display_metadata(&document);
         Self {
-            root,
-            metadata: TradingMatrixMetadata {
-                cbu_id: cbu_id.to_string(),
-                cbu_name: cbu_name.to_string(),
-                ..Default::default()
-            },
+            document,
+            display_metadata,
         }
     }
 
-    /// Add an instrument class to the root
-    pub fn add_instrument_class(&mut self, node: TradingMatrixNode) {
-        self.root.children.push(node);
-        self.metadata.instrument_class_count = self.root.children.len();
+    /// Create a new empty trading matrix for a CBU
+    pub fn new(cbu_id: &str, cbu_name: &str) -> Self {
+        let document = TradingMatrixDocument::new(cbu_id, cbu_name);
+        Self::from_document(document)
     }
 
-    /// Recompute all counts
+    /// Create from API response
+    pub fn from_response(response: TradingMatrixResponse) -> Self {
+        let document = TradingMatrixDocument {
+            cbu_id: response.cbu_id,
+            cbu_name: response.cbu_name,
+            version: 1,
+            status: DocumentStatus::default(),
+            children: response.children,
+            total_leaf_count: response.total_leaf_count,
+            metadata: TradingMatrixMetadata::default(),
+            created_at: None,
+            updated_at: None,
+        };
+        Self::from_document(document)
+    }
+
+    /// Get the root children (category nodes)
+    pub fn children(&self) -> &[TradingMatrixNode] {
+        &self.document.children
+    }
+
+    /// Compute display metadata from document
+    fn compute_display_metadata(document: &TradingMatrixDocument) -> DisplayMetadata {
+        let mut metadata = DisplayMetadata::default();
+
+        fn visit_node(node: &TradingMatrixNode, metadata: &mut DisplayMetadata) {
+            match &node.node_type {
+                TradingMatrixNodeType::InstrumentClass { .. } => {
+                    metadata.instrument_class_count += 1
+                }
+                TradingMatrixNodeType::Market { .. } => metadata.market_count += 1,
+                TradingMatrixNodeType::Counterparty { .. } => metadata.market_count += 1,
+                TradingMatrixNodeType::UniverseEntry { .. } => metadata.universe_entry_count += 1,
+                TradingMatrixNodeType::Ssi { .. } => metadata.ssi_count += 1,
+                TradingMatrixNodeType::BookingRule { .. } => metadata.booking_rule_count += 1,
+                TradingMatrixNodeType::SettlementChain { .. } => {
+                    metadata.settlement_chain_count += 1
+                }
+                TradingMatrixNodeType::IsdaAgreement { .. } => metadata.isda_count += 1,
+                _ => {}
+            }
+            for child in &node.children {
+                visit_node(child, metadata);
+            }
+        }
+
+        for child in &document.children {
+            visit_node(child, &mut metadata);
+        }
+
+        metadata
+    }
+
+    /// Recompute counts after modifications
     pub fn recompute_counts(&mut self) {
-        self.root.compute_leaf_counts();
-        self.metadata.instrument_class_count = self.root.children.len();
-        // Additional counts computed from tree traversal
-        self.compute_metadata_counts();
-    }
-
-    fn compute_metadata_counts(&mut self) {
-        let mut market_count = 0;
-        let mut universe_count = 0;
-        let mut ssi_count = 0;
-        let mut rule_count = 0;
-        let mut chain_count = 0;
-        let mut isda_count = 0;
-
-        self.visit_all(&mut |node| match &node.node_type {
-            TradingMatrixNodeType::Market { .. } => market_count += 1,
-            TradingMatrixNodeType::Counterparty { .. } => market_count += 1,
-            TradingMatrixNodeType::UniverseEntry { .. } => universe_count += 1,
-            TradingMatrixNodeType::Ssi { .. } => ssi_count += 1,
-            TradingMatrixNodeType::BookingRule { .. } => rule_count += 1,
-            TradingMatrixNodeType::SettlementChain { .. } => chain_count += 1,
-            TradingMatrixNodeType::IsdaAgreement { .. } => isda_count += 1,
-            _ => {}
-        });
-
-        self.metadata.market_count = market_count;
-        self.metadata.universe_entry_count = universe_count;
-        self.metadata.ssi_count = ssi_count;
-        self.metadata.booking_rule_count = rule_count;
-        self.metadata.settlement_chain_count = chain_count;
-        self.metadata.isda_count = isda_count;
-    }
-
-    /// Visit all nodes with a callback
-    fn visit_all<F: FnMut(&TradingMatrixNode)>(&self, f: &mut F) {
-        Self::visit_node(&self.root, f);
-    }
-
-    fn visit_node<F: FnMut(&TradingMatrixNode)>(node: &TradingMatrixNode, f: &mut F) {
-        f(node);
-        for child in &node.children {
-            Self::visit_node(child, f);
-        }
+        self.document.compute_leaf_counts();
+        self.display_metadata = Self::compute_display_metadata(&self.document);
     }
 }
 
@@ -440,6 +208,7 @@ pub struct TradingMatrixState {
     /// Currently hovered node
     hovered_node: Option<String>,
     /// Scroll position
+    #[allow(dead_code)]
     scroll_offset: f32,
 }
 
@@ -495,6 +264,7 @@ impl TradingMatrixState {
     }
 
     /// Get expand animation progress (0.0 - 1.0)
+    #[allow(dead_code)]
     pub fn get_expand_progress(&self, node_id: &TradingMatrixNodeId) -> f32 {
         self.expand_progress
             .get(&node_id.as_key())
@@ -513,6 +283,7 @@ impl TradingMatrixState {
     }
 
     /// Set hovered node
+    #[allow(dead_code)]
     pub fn set_hover(&mut self, node_id: Option<&TradingMatrixNodeId>) {
         self.hovered_node = node_id.map(|id| id.as_key());
     }
@@ -523,12 +294,11 @@ impl TradingMatrixState {
     }
 
     /// Expand to a node (expands all ancestors)
+    #[allow(dead_code)]
     pub fn expand_to(&mut self, node_id: &TradingMatrixNodeId) {
         // Expand all ancestors
-        for i in 0..node_id.path.len() {
-            let ancestor = TradingMatrixNodeId {
-                path: node_id.path[..i].to_vec(),
-            };
+        for i in 0..node_id.0.len() {
+            let ancestor = TradingMatrixNodeId(node_id.0[..i].to_vec());
             self.expand(&ancestor);
         }
     }
@@ -544,10 +314,13 @@ impl TradingMatrixState {
         self.expanded.clear();
     }
 
-    /// Expand first level (instrument classes)
+    /// Expand first level (root categories)
+    #[allow(dead_code)]
     pub fn expand_first_level(&mut self, matrix: &TradingMatrix) {
-        // Expand root
-        self.expand(&matrix.root.id);
+        // Expand each top-level category
+        for child in &matrix.document.children {
+            self.expand(&child.id);
+        }
     }
 
     /// Update animations (call each frame)
@@ -621,10 +394,6 @@ pub mod matrix_colors {
         Color32::from_rgb(140, 140, 150)
     }
 
-    pub fn count_badge() -> Color32 {
-        Color32::from_rgb(80, 80, 90)
-    }
-
     pub fn count_text() -> Color32 {
         Color32::from_rgb(160, 160, 170)
     }
@@ -686,7 +455,7 @@ pub mod matrix_colors {
 /// Get color for a node type
 pub fn get_node_type_color(node_type: &TradingMatrixNodeType) -> Color32 {
     match node_type {
-        TradingMatrixNodeType::Cbu { .. } => Color32::WHITE,
+        TradingMatrixNodeType::Category { .. } => matrix_colors::header_text(),
         TradingMatrixNodeType::InstrumentClass { .. } => matrix_colors::instrument_class(),
         TradingMatrixNodeType::Market { .. } => matrix_colors::market(),
         TradingMatrixNodeType::Counterparty { .. } => matrix_colors::counterparty(),
@@ -696,18 +465,19 @@ pub fn get_node_type_color(node_type: &TradingMatrixNodeType) -> Color32 {
         TradingMatrixNodeType::SettlementChain { .. } => matrix_colors::settlement_chain(),
         TradingMatrixNodeType::SettlementHop { .. } => matrix_colors::settlement_chain(),
         TradingMatrixNodeType::TaxConfig { .. } => matrix_colors::tax_config(),
-        TradingMatrixNodeType::TreatyRate { .. } => matrix_colors::tax_config(),
+        TradingMatrixNodeType::TaxJurisdiction { .. } => matrix_colors::tax_config(),
         TradingMatrixNodeType::IsdaAgreement { .. } => matrix_colors::isda(),
         TradingMatrixNodeType::CsaAgreement { .. } => matrix_colors::isda(),
-        TradingMatrixNodeType::InvestmentManager { .. } => matrix_colors::counterparty(),
-        TradingMatrixNodeType::PricingConfig { .. } => matrix_colors::universe_entry(),
+        TradingMatrixNodeType::ProductCoverage { .. } => matrix_colors::isda(),
+        TradingMatrixNodeType::InvestmentManagerMandate { .. } => matrix_colors::counterparty(),
+        TradingMatrixNodeType::PricingRule { .. } => matrix_colors::universe_entry(),
     }
 }
 
 /// Get icon for a node type
 pub fn get_node_type_icon(node_type: &TradingMatrixNodeType) -> &'static str {
     match node_type {
-        TradingMatrixNodeType::Cbu { .. } => "🏢",
+        TradingMatrixNodeType::Category { .. } => "📁",
         TradingMatrixNodeType::InstrumentClass { is_otc, .. } => {
             if *is_otc {
                 "📊"
@@ -723,11 +493,12 @@ pub fn get_node_type_icon(node_type: &TradingMatrixNodeType) -> &'static str {
         TradingMatrixNodeType::SettlementChain { .. } => "🔗",
         TradingMatrixNodeType::SettlementHop { .. } => "➡",
         TradingMatrixNodeType::TaxConfig { .. } => "💰",
-        TradingMatrixNodeType::TreatyRate { .. } => "📜",
+        TradingMatrixNodeType::TaxJurisdiction { .. } => "🌍",
         TradingMatrixNodeType::IsdaAgreement { .. } => "📝",
         TradingMatrixNodeType::CsaAgreement { .. } => "🛡",
-        TradingMatrixNodeType::InvestmentManager { .. } => "👔",
-        TradingMatrixNodeType::PricingConfig { .. } => "💹",
+        TradingMatrixNodeType::ProductCoverage { .. } => "📦",
+        TradingMatrixNodeType::InvestmentManagerMandate { .. } => "👔",
+        TradingMatrixNodeType::PricingRule { .. } => "💹",
     }
 }
 
@@ -787,10 +558,20 @@ pub fn render_trading_matrix_browser(
             // Stats bar
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 12.0;
-                stat_badge(ui, "📈", matrix.metadata.instrument_class_count, "Classes");
-                stat_badge(ui, "🏛", matrix.metadata.market_count, "Markets");
-                stat_badge(ui, "📋", matrix.metadata.ssi_count, "SSIs");
-                stat_badge(ui, "📐", matrix.metadata.booking_rule_count, "Rules");
+                stat_badge(
+                    ui,
+                    "📈",
+                    matrix.display_metadata.instrument_class_count,
+                    "Classes",
+                );
+                stat_badge(ui, "🏛", matrix.display_metadata.market_count, "Markets");
+                stat_badge(ui, "📋", matrix.display_metadata.ssi_count, "SSIs");
+                stat_badge(
+                    ui,
+                    "📐",
+                    matrix.display_metadata.booking_rule_count,
+                    "Rules",
+                );
             });
 
             ui.add_space(4.0);
@@ -801,8 +582,8 @@ pub fn render_trading_matrix_browser(
             egui::ScrollArea::vertical()
                 .max_height(max_height - 80.0)
                 .show(ui, |ui| {
-                    // Render from root's children (skip CBU root in display)
-                    for child in &matrix.root.children {
+                    // Render from root's children (the category nodes)
+                    for child in matrix.children() {
                         let child_action = render_matrix_node(ui, child, state, 0);
                         if child_action != TradingMatrixAction::None {
                             action = child_action;
@@ -1011,6 +792,9 @@ pub fn render_node_detail_panel(ui: &mut Ui, node: &TradingMatrixNode) -> Tradin
 
             // Type-specific details
             match &node.node_type {
+                TradingMatrixNodeType::Category { name } => {
+                    detail_row(ui, "Category", name);
+                }
                 TradingMatrixNodeType::InstrumentClass {
                     class_code,
                     cfi_prefix,
@@ -1114,41 +898,49 @@ pub fn render_node_detail_panel(ui: &mut Ui, node: &TradingMatrixNode) -> Tradin
                 }
                 TradingMatrixNodeType::SettlementHop {
                     sequence,
-                    location_bic,
-                    location_name,
-                    instruction_type,
+                    intermediary_bic,
+                    intermediary_name,
+                    role,
                     ..
                 } => {
                     detail_row(ui, "Sequence", &sequence.to_string());
-                    detail_row(ui, "Location", location_name);
-                    detail_row(ui, "BIC", location_bic);
-                    detail_row(ui, "Instruction", instruction_type);
+                    detail_row(ui, "Role", role);
+                    if let Some(name) = intermediary_name {
+                        detail_row(ui, "Intermediary", name);
+                    }
+                    if let Some(bic) = intermediary_bic {
+                        detail_row(ui, "BIC", bic);
+                    }
                 }
                 TradingMatrixNodeType::TaxConfig {
+                    investor_type,
+                    tax_exempt,
+                    documentation_status,
+                    ..
+                } => {
+                    detail_row(ui, "Investor Type", investor_type);
+                    detail_row(ui, "Tax Exempt", if *tax_exempt { "Yes" } else { "No" });
+                    if let Some(doc_status) = documentation_status {
+                        detail_row(ui, "Documentation", doc_status);
+                    }
+                }
+                TradingMatrixNodeType::TaxJurisdiction {
                     jurisdiction_code,
                     jurisdiction_name,
-                    applicable_rate,
-                    has_reclaim,
+                    default_withholding_rate,
+                    reclaim_available,
                     ..
                 } => {
                     detail_row(ui, "Jurisdiction", jurisdiction_name);
                     detail_row(ui, "Code", jurisdiction_code);
-                    if let Some(rate) = applicable_rate {
-                        detail_row(ui, "Rate", &format!("{:.1}%", rate));
+                    if let Some(rate) = default_withholding_rate {
+                        detail_row(ui, "Default Rate", &format!("{:.1}%", rate));
                     }
-                    detail_row(ui, "Reclaim", if *has_reclaim { "Yes" } else { "No" });
-                }
-                TradingMatrixNodeType::TreatyRate {
-                    source_jurisdiction,
-                    investor_jurisdiction,
-                    rate_percent,
-                    income_type,
-                    ..
-                } => {
-                    detail_row(ui, "Source", source_jurisdiction);
-                    detail_row(ui, "Investor", investor_jurisdiction);
-                    detail_row(ui, "Rate", &format!("{:.1}%", rate_percent));
-                    detail_row(ui, "Income Type", income_type);
+                    detail_row(
+                        ui,
+                        "Reclaim Available",
+                        if *reclaim_available { "Yes" } else { "No" },
+                    );
                 }
                 TradingMatrixNodeType::IsdaAgreement {
                     isda_id,
@@ -1158,7 +950,9 @@ pub fn render_node_detail_panel(ui: &mut Ui, node: &TradingMatrixNode) -> Tradin
                     ..
                 } => {
                     detail_row(ui, "Counterparty", counterparty_name);
-                    detail_row(ui, "Law", governing_law);
+                    if let Some(law) = governing_law {
+                        detail_row(ui, "Law", law);
+                    }
                     if let Some(date) = agreement_date {
                         detail_row(ui, "Date", date);
                     }
@@ -1170,36 +964,53 @@ pub fn render_node_detail_panel(ui: &mut Ui, node: &TradingMatrixNode) -> Tradin
                 }
                 TradingMatrixNodeType::CsaAgreement {
                     csa_type,
-                    collateral_currency,
-                    threshold,
+                    threshold_currency,
+                    threshold_amount,
                     ..
                 } => {
                     detail_row(ui, "Type", csa_type);
-                    detail_row(ui, "Currency", collateral_currency);
-                    if let Some(thresh) = threshold {
-                        detail_row(ui, "Threshold", &format!("{:.0}", thresh));
+                    if let Some(currency) = threshold_currency {
+                        detail_row(ui, "Currency", currency);
+                    }
+                    if let Some(amount) = threshold_amount {
+                        detail_row(ui, "Threshold", &format!("{:.0}", amount));
                     }
                 }
-                TradingMatrixNodeType::InvestmentManager {
-                    im_name,
-                    scope_description,
+                TradingMatrixNodeType::ProductCoverage {
+                    asset_class,
+                    base_products,
                     ..
                 } => {
-                    detail_row(ui, "Name", im_name);
-                    if let Some(scope) = scope_description {
-                        detail_row(ui, "Scope", scope);
-                    }
+                    detail_row(ui, "Asset Class", asset_class);
+                    detail_row(ui, "Products", &base_products.join(", "));
                 }
-                TradingMatrixNodeType::PricingConfig {
-                    pricing_source,
+                TradingMatrixNodeType::InvestmentManagerMandate {
+                    manager_name,
+                    role,
+                    can_trade,
+                    can_settle,
+                    ..
+                } => {
+                    detail_row(ui, "Manager", manager_name);
+                    detail_row(ui, "Role", role);
+                    detail_row(ui, "Can Trade", if *can_trade { "Yes" } else { "No" });
+                    detail_row(ui, "Can Settle", if *can_settle { "Yes" } else { "No" });
+                }
+                TradingMatrixNodeType::PricingRule {
+                    source,
                     priority,
+                    fallback_source,
+                    price_type,
                     ..
                 } => {
-                    detail_row(ui, "Source", pricing_source);
+                    detail_row(ui, "Source", source);
                     detail_row(ui, "Priority", &priority.to_string());
-                }
-                TradingMatrixNodeType::Cbu { cbu_name, .. } => {
-                    detail_row(ui, "CBU", cbu_name);
+                    if let Some(fallback) = fallback_source {
+                        detail_row(ui, "Fallback", fallback);
+                    }
+                    if let Some(pt) = price_type {
+                        detail_row(ui, "Price Type", pt);
+                    }
                 }
             }
         });
@@ -1233,16 +1044,16 @@ mod tests {
 
     #[test]
     fn test_node_id_path() {
-        let root = TradingMatrixNodeId::root();
+        let root = TradingMatrixNodeIdExt::root();
         assert_eq!(root.depth(), 0);
         assert_eq!(root.as_key(), "");
 
         let child = root.child("EQUITY");
-        assert_eq!(child.depth(), 1);
+        assert_eq!(child.depth(), 0); // depth is len() - 1
         assert_eq!(child.as_key(), "EQUITY");
 
         let grandchild = child.child("XNYS");
-        assert_eq!(grandchild.depth(), 2);
+        assert_eq!(grandchild.depth(), 1);
         assert_eq!(grandchild.as_key(), "EQUITY/XNYS");
     }
 
@@ -1250,7 +1061,7 @@ mod tests {
     fn test_trading_matrix_creation() {
         let mut matrix = TradingMatrix::new("cbu-123", "Test Fund");
 
-        let equity_id = TradingMatrixNodeId::root().child("EQUITY");
+        let equity_id = TradingMatrixNodeId::category("UNIVERSE").child("EQUITY");
         let equity = TradingMatrixNode::new(
             equity_id.clone(),
             TradingMatrixNodeType::InstrumentClass {
@@ -1261,14 +1072,20 @@ mod tests {
             "Equities",
         );
 
-        matrix.add_instrument_class(equity);
-        assert_eq!(matrix.metadata.instrument_class_count, 1);
+        // Ensure universe category exists and add equity
+        matrix.document.ensure_category("Trading Universe");
+        if let Some(universe) = matrix.document.children.first_mut() {
+            universe.children.push(equity);
+        }
+        matrix.recompute_counts();
+
+        assert_eq!(matrix.display_metadata.instrument_class_count, 1);
     }
 
     #[test]
     fn test_state_expand_collapse() {
         let mut state = TradingMatrixState::new();
-        let id = TradingMatrixNodeId::root().child("EQUITY");
+        let id = TradingMatrixNodeId::category("UNIVERSE").child("EQUITY");
 
         assert!(!state.is_expanded(&id));
 
@@ -1283,43 +1100,16 @@ mod tests {
     }
 
     #[test]
-    fn test_find_node() {
-        let mut matrix = TradingMatrix::new("cbu-123", "Test Fund");
+    fn test_from_response() {
+        let response = TradingMatrixResponse {
+            cbu_id: "cbu-123".to_string(),
+            cbu_name: "Test Fund".to_string(),
+            children: vec![],
+            total_leaf_count: 0,
+        };
 
-        let equity_id = TradingMatrixNodeId::root().child("EQUITY");
-        let xnys_id = equity_id.child("XNYS");
-
-        let xnys = TradingMatrixNode::new(
-            xnys_id.clone(),
-            TradingMatrixNodeType::Market {
-                mic: "XNYS".to_string(),
-                market_name: "New York Stock Exchange".to_string(),
-                country_code: "US".to_string(),
-            },
-            "NYSE",
-        );
-
-        let equity = TradingMatrixNode::new(
-            equity_id.clone(),
-            TradingMatrixNodeType::InstrumentClass {
-                class_code: "EQUITY".to_string(),
-                cfi_prefix: None,
-                is_otc: false,
-            },
-            "Equities",
-        )
-        .with_child(xnys);
-
-        matrix.add_instrument_class(equity);
-
-        // Find EQUITY
-        let found = matrix.root.find(&equity_id);
-        assert!(found.is_some());
-        assert_eq!(found.unwrap().label, "Equities");
-
-        // Find XNYS
-        let found = matrix.root.find(&xnys_id);
-        assert!(found.is_some());
-        assert_eq!(found.unwrap().label, "NYSE");
+        let matrix = TradingMatrix::from_response(response);
+        assert_eq!(matrix.document.cbu_id, "cbu-123");
+        assert_eq!(matrix.document.cbu_name, "Test Fund");
     }
 }

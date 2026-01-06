@@ -1154,5 +1154,36 @@ Supports pagination and filtering by name."#.into(),
                 "required": ["session_id"]
             }),
         },
+        // =====================================================================
+        // Trading Matrix Tools
+        // =====================================================================
+        Tool {
+            name: "trading_matrix_get".into(),
+            description: r#"Get trading matrix summary and status for a CBU.
+
+Returns a summary of the CBU's trading configuration:
+- Trading profile status (DRAFT, VALIDATED, ACTIVE, etc.)
+- Universe entries count with instrument classes and markets
+- SSI count and booking rules count
+- Settlement chains and ISDA/CSA agreements
+- Completeness indicator
+
+Use this to understand what trading configuration exists before
+using trading-profile.* verbs to create, edit, or validate.
+
+For the full hierarchical tree, use the REST endpoint returned
+in the response."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "CBU UUID to get trading matrix for"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
     ]
 }

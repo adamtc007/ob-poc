@@ -22,8 +22,11 @@ use super::{CustomOperation, ExecutionResult};
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::ExecutionContext;
 use crate::trading_profile::{
-    document_ops, resolve::resolve_entity_ref, BookingRule, IsdaAgreementConfig,
+    ast_db, document_ops, resolve::resolve_entity_ref, BookingRule, IsdaAgreementConfig,
     MaterializationResult, StandingInstruction, TradingProfileDocument, TradingProfileImport,
+};
+use ob_poc_types::trading_matrix::{
+    categories, BookingMatchCriteria, TradingMatrixNodeId, TradingMatrixOp,
 };
 
 #[cfg(feature = "database")]
@@ -1012,7 +1015,7 @@ impl CustomOperation for TradingProfileCreateDraftOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
+        use crate::trading_profile::ast_db;
 
         let cbu_id: Uuid = verb_call
             .arguments
@@ -1027,26 +1030,6 @@ impl CustomOperation for TradingProfileCreateDraftOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
 
-        let base_currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "base-currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "EUR".to_string());
-
-        let copy_from = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "copy-from-profile")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            });
-
         let notes = verb_call
             .arguments
             .iter()
@@ -1054,10 +1037,9 @@ impl CustomOperation for TradingProfileCreateDraftOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let profile_id =
-            document_ops::create_draft_profile(pool, cbu_id, base_currency, copy_from, notes)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to create draft: {}", e))?;
+        let (profile_id, _doc) = ast_db::create_draft(pool, cbu_id, notes)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create draft: {}", e))?;
 
         ctx.bind("profile", profile_id);
 
@@ -1096,8 +1078,6 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
-
         let profile_id: Uuid = verb_call
             .arguments
             .iter()
@@ -1119,57 +1099,42 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing class-code argument"))?;
 
-        let cfi_prefixes = verb_call
+        let cfi_prefix = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "cfi-prefixes")
             .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
+                a.value.as_list().and_then(|list| {
+                    list.first()
+                        .and_then(|node| node.as_string().map(|s| s.to_string()))
                 })
             });
 
-        let isda_asset_classes = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "isda-asset-classes")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            });
+        // Determine if OTC based on class code (IRS, FX, etc. are OTC)
+        let is_otc = matches!(
+            class_code.as_str(),
+            "OTC_IRS" | "OTC_FX" | "OTC_CREDIT" | "OTC_EQUITY" | "OTC_COMMODITY"
+        ) || class_code.starts_with("OTC_");
 
-        let is_held = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "is-held")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
-
-        let is_traded = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "is-traded")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(true);
-
-        let result = document_ops::add_instrument_class(
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            class_code,
-            cfi_prefixes,
-            isda_asset_classes,
-            is_held,
-            is_traded,
+            TradingMatrixOp::AddInstrumentClass {
+                class_code: class_code.clone(),
+                cfi_prefix,
+                is_otc,
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add instrument class: {}", e))?;
 
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "class_code": class_code,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1204,7 +1169,8 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
+        use crate::trading_profile::ast_db;
+        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
         let profile_id: Uuid = verb_call
             .arguments
@@ -1227,11 +1193,19 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing class-code argument"))?;
 
-        let affected = document_ops::remove_instrument_class(pool, profile_id, class_code)
+        // Build node ID: _Trading Universe / {class_code}
+        let node_id = TradingMatrixNodeId::category(categories::UNIVERSE).child(&class_code);
+
+        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove instrument class: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "removed": class_code,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1244,7 +1218,7 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
     }
 }
 
-/// Add market to trading profile universe
+/// Add market to trading profile universe under an instrument class
 pub struct TradingProfileAddMarketOp;
 
 #[async_trait]
@@ -1256,7 +1230,7 @@ impl CustomOperation for TradingProfileAddMarketOp {
         "add-market"
     }
     fn rationale(&self) -> &'static str {
-        "Modifies JSONB document to add market"
+        "Modifies JSONB document to add market under instrument class"
     }
 
     #[cfg(feature = "database")]
@@ -1266,8 +1240,6 @@ impl CustomOperation for TradingProfileAddMarketOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
-
         let profile_id: Uuid = verb_call
             .arguments
             .iter()
@@ -1281,6 +1253,14 @@ impl CustomOperation for TradingProfileAddMarketOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
+        let instrument_class = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "instrument-class")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
+
         let mic = verb_call
             .arguments
             .iter()
@@ -1289,36 +1269,64 @@ impl CustomOperation for TradingProfileAddMarketOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing mic argument"))?;
 
-        let currencies = verb_call
+        // Get market name from argument or look up from reference data
+        let market_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "currencies")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            })
-            .unwrap_or_default();
+            .find(|a| a.key == "market-name")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
 
-        let settlement_types = verb_call
+        let country_code = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "settlement-types")
-            .and_then(|a| {
-                a.value.as_list().map(|list| {
-                    list.iter()
-                        .filter_map(|node| node.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
-            });
+            .find(|a| a.key == "country-code")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
 
-        let result = document_ops::add_market(pool, profile_id, mic, currencies, settlement_types)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to add market: {}", e))?;
+        // Look up market metadata from reference data if not provided
+        let (resolved_name, resolved_country) = if market_name.is_none() || country_code.is_none() {
+            let row =
+                sqlx::query(r#"SELECT name, country_code FROM custody.markets WHERE mic = $1"#)
+                    .bind(&mic)
+                    .fetch_optional(pool)
+                    .await?;
 
-        Ok(ExecutionResult::Record(result))
+            match row {
+                Some(r) => (
+                    market_name.unwrap_or_else(|| r.get::<String, _>("name")),
+                    country_code.unwrap_or_else(|| r.get::<String, _>("country_code")),
+                ),
+                None => (
+                    market_name.unwrap_or_else(|| mic.clone()),
+                    country_code.unwrap_or_else(|| "XX".to_string()),
+                ),
+            }
+        } else {
+            (market_name.unwrap(), country_code.unwrap())
+        };
+
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
+            pool,
+            profile_id,
+            TradingMatrixOp::AddMarket {
+                parent_class: instrument_class.clone(),
+                mic: mic.clone(),
+                market_name: resolved_name,
+                country_code: resolved_country,
+            },
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add market: {}", e))?;
+
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "instrument_class": instrument_class,
+            "mic": mic,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1353,7 +1361,8 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
+        use crate::trading_profile::ast_db;
+        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
         let profile_id: Uuid = verb_call
             .arguments
@@ -1368,6 +1377,14 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
+        let instrument_class = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "instrument-class")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing instrument-class argument"))?;
+
         let mic = verb_call
             .arguments
             .iter()
@@ -1376,11 +1393,22 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing mic argument"))?;
 
-        let affected = document_ops::remove_market(pool, profile_id, mic)
+        // Build node ID: _Trading Universe / {instrument_class} / {mic}
+        let node_id = TradingMatrixNodeId::category(categories::UNIVERSE)
+            .child(&instrument_class)
+            .child(&mic);
+
+        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove market: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "instrument_class": instrument_class,
+            "removed": mic,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1415,8 +1443,6 @@ impl CustomOperation for TradingProfileAddSsiOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
-
         let profile_id: Uuid = verb_call
             .arguments
             .iter()
@@ -1430,47 +1456,36 @@ impl CustomOperation for TradingProfileAddSsiOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
-        let category = verb_call
+        let ssi_type = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "category")
+            .find(|a| a.key == "ssi-type")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing category argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing ssi-type argument"))?;
 
-        let name = verb_call
+        let ssi_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "name")
+            .find(|a| a.key == "ssi-name")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing ssi-name argument"))?;
 
-        let mic = verb_call
+        // Generate ssi_id from type and name
+        let ssi_id = format!("{}:{}", ssi_type, ssi_name);
+
+        let safekeeping_account = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "mic")
+            .find(|a| a.key == "safekeeping-account")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let currency = verb_call
+        let safekeeping_bic = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let custody_account = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "custody-account")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let custody_bic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "custody-bic")
+            .find(|a| a.key == "safekeeping-bic")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
@@ -1488,46 +1503,45 @@ impl CustomOperation for TradingProfileAddSsiOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let settlement_model = verb_call
+        let cash_currency = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "settlement-model")
+            .find(|a| a.key == "cash-currency")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let cutoff_time = verb_call
+        let pset_bic = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "cutoff-time")
+            .find(|a| a.key == "pset-bic")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let cutoff_timezone = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cutoff-timezone")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let affected = document_ops::add_standing_instruction(
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            category,
-            name,
-            mic,
-            currency,
-            custody_account,
-            custody_bic,
-            cash_account,
-            cash_bic,
-            settlement_model,
-            cutoff_time,
-            cutoff_timezone,
+            TradingMatrixOp::AddSsi {
+                ssi_id: ssi_id.clone(),
+                ssi_name: ssi_name.clone(),
+                ssi_type,
+                safekeeping_account,
+                safekeeping_bic,
+                cash_account,
+                cash_bic,
+                cash_currency,
+                pset_bic,
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add SSI: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "ssi_id": ssi_id,
+            "ssi_name": ssi_name,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1536,7 +1550,7 @@ impl CustomOperation for TradingProfileAddSsiOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+        Ok(ExecutionResult::Record(json!({})))
     }
 }
 
@@ -1562,7 +1576,8 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
+        use crate::trading_profile::ast_db;
+        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
         let profile_id: Uuid = verb_call
             .arguments
@@ -1577,27 +1592,27 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
-        let category = verb_call
+        let ssi_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "category")
+            .find(|a| a.key == "ssi-name")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing category argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing ssi-name argument"))?;
 
-        let name = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "name")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+        // Build node ID: _Standing Settlement Instructions / {ssi_name}
+        let node_id = TradingMatrixNodeId::category(categories::SSI).child(&ssi_name);
 
-        let affected = document_ops::remove_standing_instruction(pool, profile_id, category, name)
+        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove SSI: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "removed": ssi_name,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1632,8 +1647,6 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
-
         let profile_id: Uuid = verb_call
             .arguments
             .iter()
@@ -1647,13 +1660,13 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
-        let name = verb_call
+        let rule_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "name")
+            .find(|a| a.key == "rule-name")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing rule-name argument"))?;
 
         let priority = verb_call
             .arguments
@@ -1671,73 +1684,72 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing ssi-ref argument"))?;
 
-        let match_counterparty_ref = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "match-counterparty-ref")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        // Generate rule_id from ssi_ref and rule_name
+        let rule_id = format!("{}:{}", ssi_ref, rule_name);
 
-        let match_counterparty_ref_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "match-counterparty-ref-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        // Build match criteria
+        let match_criteria = BookingMatchCriteria {
+            instrument_class: verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "match-instrument-class")
+                .and_then(|a| a.value.as_string())
+                .map(|s| s.to_string()),
+            security_type: verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "match-security-type")
+                .and_then(|a| a.value.as_string())
+                .map(|s| s.to_string()),
+            mic: verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "match-mic")
+                .and_then(|a| a.value.as_string())
+                .map(|s| s.to_string()),
+            currency: verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "match-currency")
+                .and_then(|a| a.value.as_string())
+                .map(|s| s.to_string()),
+            settlement_type: verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "match-settlement-type")
+                .and_then(|a| a.value.as_string())
+                .map(|s| s.to_string()),
+            counterparty_entity_id: verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "match-counterparty-id")
+                .and_then(|a| a.value.as_string())
+                .map(|s| s.to_string()),
+        };
 
-        let match_instrument_class = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "match-instrument-class")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let match_security_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "match-security-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let match_mic = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "match-mic")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let match_currency = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "match-currency")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let match_settlement_type = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "match-settlement-type")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
-
-        let affected = document_ops::add_booking_rule(
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            name,
-            priority,
-            ssi_ref,
-            match_counterparty_ref,
-            match_counterparty_ref_type,
-            match_instrument_class,
-            match_security_type,
-            match_mic,
-            match_currency,
-            match_settlement_type,
+            TradingMatrixOp::AddBookingRule {
+                ssi_ref: ssi_ref.clone(),
+                rule_id: rule_id.clone(),
+                rule_name: rule_name.clone(),
+                priority,
+                match_criteria,
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add booking rule: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "rule_id": rule_id,
+            "rule_name": rule_name,
+            "ssi_ref": ssi_ref,
+            "priority": priority,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1746,7 +1758,7 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Affected(1))
+        Ok(ExecutionResult::Record(json!({})))
     }
 }
 
@@ -1772,7 +1784,8 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        use crate::trading_profile::document_ops;
+        use crate::trading_profile::ast_db;
+        use ob_poc_types::trading_matrix::{categories, TradingMatrixNodeId, TradingMatrixOp};
 
         let profile_id: Uuid = verb_call
             .arguments
@@ -1787,19 +1800,38 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
-        let name = verb_call
+        let ssi_ref = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "name")
+            .find(|a| a.key == "ssi-ref")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing name argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing ssi-ref argument"))?;
 
-        let affected = document_ops::remove_booking_rule(pool, profile_id, name)
+        let rule_id = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "rule-id")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing rule-id argument"))?;
+
+        // Build node ID: _Standing Settlement Instructions / {ssi_ref} / {rule_id}
+        let node_id = TradingMatrixNodeId::category(categories::SSI)
+            .child(&ssi_ref)
+            .child(&rule_id);
+
+        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove booking rule: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "ssi_ref": ssi_ref,
+            "removed": rule_id,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1853,58 +1885,69 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
-        let counterparty_ref = verb_call
+        let counterparty_entity_id = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "counterparty-ref")
+            .find(|a| a.key == "counterparty-entity-id")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-entity-id argument"))?;
 
-        let counterparty_ref_type = verb_call
+        let counterparty_name = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "counterparty-ref-type")
+            .find(|a| a.key == "counterparty-name")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .unwrap_or_else(|| "NAME".to_string());
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-name argument"))?;
 
-        let agreement_date = verb_call
+        let counterparty_lei = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "agreement-date")
+            .find(|a| a.key == "counterparty-lei")
             .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing agreement-date argument"))?;
+            .map(|s| s.to_string());
 
         let governing_law = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "governing-law")
             .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing governing-law argument"))?;
+            .map(|s| s.to_string());
 
-        let effective_date = verb_call
+        let agreement_date = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "effective-date")
+            .find(|a| a.key == "agreement-date")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let result = document_ops::add_isda_config(
+        // Generate isda_id from counterparty name
+        let isda_id = counterparty_name.clone();
+
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            counterparty_ref,
-            counterparty_ref_type,
-            agreement_date,
-            governing_law,
-            effective_date,
+            TradingMatrixOp::AddIsda {
+                isda_id: isda_id.clone(),
+                counterparty_entity_id: counterparty_entity_id.clone(),
+                counterparty_name: counterparty_name.clone(),
+                counterparty_lei,
+                governing_law,
+                agreement_date,
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add ISDA config: {}", e))?;
 
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "isda_id": isda_id,
+            "counterparty_name": counterparty_name,
+            "counterparty_entity_id": counterparty_entity_id,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1954,13 +1997,13 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
-        let counterparty_ref = verb_call
+        let isda_ref = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "counterparty-ref")
+            .find(|a| a.key == "isda-ref")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing isda-ref argument"))?;
 
         let asset_class = verb_call
             .arguments
@@ -1980,19 +2023,33 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
                         .filter_map(|node| node.as_string().map(|s| s.to_string()))
                         .collect()
                 })
-            });
+            })
+            .unwrap_or_default();
 
-        let affected = document_ops::add_isda_product_coverage(
+        // Generate coverage_id from isda_ref and asset_class
+        let coverage_id = format!("{}:{}", isda_ref, asset_class);
+
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            counterparty_ref,
-            asset_class,
-            base_products,
+            TradingMatrixOp::AddProductCoverage {
+                isda_ref: isda_ref.clone(),
+                coverage_id: coverage_id.clone(),
+                asset_class: asset_class.clone(),
+                base_products,
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add ISDA coverage: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "isda_ref": isda_ref,
+            "coverage_id": coverage_id,
+            "asset_class": asset_class,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2042,13 +2099,13 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
             })
             .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
 
-        let counterparty_ref = verb_call
+        let isda_ref = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "counterparty-ref")
+            .find(|a| a.key == "isda-ref")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing isda-ref argument"))?;
 
         let csa_type = verb_call
             .arguments
@@ -2058,12 +2115,6 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing csa-type argument"))?;
 
-        let threshold_amount = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "threshold-amount")
-            .and_then(|a| a.value.as_integer());
-
         let threshold_currency = verb_call
             .arguments
             .iter()
@@ -2071,56 +2122,54 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let mta = verb_call
+        let threshold_amount = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "threshold-amount")
+            .and_then(|a| a.value.as_decimal())
+            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0));
+
+        let minimum_transfer_amount = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "minimum-transfer-amount")
-            .and_then(|a| a.value.as_integer());
+            .and_then(|a| a.value.as_decimal())
+            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0));
 
-        let rounding = verb_call
+        let collateral_ssi_ref = verb_call
             .arguments
             .iter()
-            .find(|a| a.key == "rounding-amount")
-            .and_then(|a| a.value.as_integer());
-
-        let valuation_time = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "valuation-time")
+            .find(|a| a.key == "collateral-ssi-ref")
             .and_then(|a| a.value.as_string())
             .map(|s| s.to_string());
 
-        let valuation_timezone = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "valuation-timezone")
-            .and_then(|a| a.value.as_string())
-            .map(|s| s.to_string());
+        // Generate csa_id from isda_ref and csa_type
+        let csa_id = format!("{}:{}", isda_ref, csa_type);
 
-        let settlement_days = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "settlement-days")
-            .and_then(|a| a.value.as_integer())
-            .map(|i| i as i32);
-
-        let result = document_ops::add_csa_config(
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            counterparty_ref,
-            csa_type,
-            threshold_amount,
-            threshold_currency,
-            mta,
-            rounding,
-            valuation_time,
-            valuation_timezone,
-            settlement_days,
+            TradingMatrixOp::AddCsa {
+                isda_ref: isda_ref.clone(),
+                csa_id: csa_id.clone(),
+                csa_type: csa_type.clone(),
+                threshold_currency,
+                threshold_amount,
+                minimum_transfer_amount,
+                collateral_ssi_ref,
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add CSA config: {}", e))?;
 
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "isda_ref": isda_ref,
+            "csa_id": csa_id,
+            "csa_type": csa_type,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2188,7 +2237,7 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing collateral-type argument"))?;
 
-        let currencies = verb_call
+        let currencies: Option<Vec<String>> = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "currencies")
@@ -2200,7 +2249,7 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
                 })
             });
 
-        let issuers = verb_call
+        let _issuers: Option<Vec<String>> = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "issuers")
@@ -2212,7 +2261,7 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
                 })
             });
 
-        let min_rating = verb_call
+        let _min_rating = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "min-rating")
@@ -2224,23 +2273,52 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
             .iter()
             .find(|a| a.key == "haircut-pct")
             .and_then(|a| a.value.as_decimal())
-            .and_then(|d| d.to_f64())
-            .unwrap_or(0.0);
+            .and_then(|d| d.to_f64());
 
-        let affected = document_ops::add_csa_eligible_collateral(
+        // CSA type defaults to "VM" (Variation Margin) if not specified
+        let csa_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "csa-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "VM".to_string());
+
+        // Generate a collateral ID from type and optional currency
+        let collateral_id = if let Some(ref currs) = currencies {
+            format!(
+                "{}:{}",
+                collateral_type,
+                currs.first().unwrap_or(&"ANY".to_string())
+            )
+        } else {
+            collateral_type.clone()
+        };
+
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            counterparty_ref,
-            collateral_type,
-            currencies,
-            issuers,
-            min_rating,
-            haircut_pct,
+            TradingMatrixOp::AddCsaEligibleCollateral {
+                isda_ref: counterparty_ref.clone(),
+                csa_ref: csa_type.clone(),
+                collateral_id,
+                collateral_type,
+                currency: currencies.as_ref().and_then(|c| c.first().cloned()),
+                haircut_pct,
+                concentration_limit_pct: None,
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add CSA collateral: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "counterparty_ref": counterparty_ref,
+            "csa_type": csa_type,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2306,11 +2384,36 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing ssi-name argument"))?;
 
-        let affected = document_ops::link_csa_ssi(pool, profile_id, counterparty_ref, ssi_name)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to link CSA SSI: {}", e))?;
+        // CSA type defaults to "VM" (Variation Margin) if not specified
+        let csa_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "csa-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "VM".to_string());
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
+            pool,
+            profile_id,
+            TradingMatrixOp::LinkCsaSsi {
+                isda_ref: counterparty_ref.clone(),
+                csa_ref: csa_type.clone(),
+                ssi_ref: ssi_name.clone(),
+            },
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to link CSA SSI: {}", e))?;
+
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "counterparty_ref": counterparty_ref,
+            "csa_type": csa_type,
+            "ssi_name": ssi_name,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2396,7 +2499,7 @@ impl CustomOperation for TradingProfileAddImMandateOp {
             .map(|s| s.to_string())
             .unwrap_or_else(|| "INVESTMENT_MANAGER".to_string());
 
-        let scope_all = verb_call
+        let _scope_all = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "scope-all")
@@ -2427,7 +2530,7 @@ impl CustomOperation for TradingProfileAddImMandateOp {
                 })
             });
 
-        let instruction_method = verb_call
+        let _instruction_method = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "instruction-method")
@@ -2448,24 +2551,54 @@ impl CustomOperation for TradingProfileAddImMandateOp {
             .and_then(|a| a.value.as_boolean())
             .unwrap_or(true);
 
-        let result = document_ops::add_im_mandate(
+        // Generate a unique mandate ID
+        let mandate_id = Uuid::new_v4().to_string();
+
+        // Resolve manager entity if needed - for now use manager_ref as both ID and name
+        // In a fuller implementation, we'd look up the entity by LEI/BIC/UUID/NAME
+        let manager_entity_id = if manager_ref_type == "UUID" {
+            manager_ref.clone()
+        } else {
+            // Use manager_ref as the entity ID for now
+            manager_ref.clone()
+        };
+
+        // Extract manager LEI if provided
+        let manager_lei = if manager_ref_type == "LEI" {
+            Some(manager_ref.clone())
+        } else {
+            None
+        };
+
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            manager_ref,
-            manager_ref_type,
-            priority,
-            role,
-            scope_all,
-            scope_mics,
-            scope_instrument_classes,
-            instruction_method,
-            can_trade,
-            can_settle,
+            TradingMatrixOp::AddImMandate {
+                manager_id: mandate_id,
+                manager_entity_id,
+                manager_name: manager_ref.clone(),
+                manager_lei,
+                priority,
+                role: role.clone(),
+                can_trade,
+                can_settle,
+                scope_instrument_classes: scope_instrument_classes.unwrap_or_default(),
+                scope_markets: scope_mics.unwrap_or_default(),
+                scope_currencies: vec![], // Not in current API
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to add IM mandate: {}", e))?;
 
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "manager_ref": manager_ref,
+            "role": role,
+            "priority": priority,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2523,7 +2656,7 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
 
-        let scope_all = verb_call
+        let _scope_all = verb_call
             .arguments
             .iter()
             .find(|a| a.key == "scope-all")
@@ -2553,18 +2686,26 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
                 })
             });
 
-        let affected = document_ops::update_im_scope(
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
             pool,
             profile_id,
-            manager_ref,
-            scope_all,
-            scope_mics,
-            scope_instrument_classes,
+            TradingMatrixOp::UpdateImScope {
+                manager_ref: manager_ref.clone(),
+                scope_instrument_classes,
+                scope_markets: scope_mics,
+                scope_currencies: None, // Not in current API
+            },
         )
         .await
         .map_err(|e| anyhow::anyhow!("Failed to update IM scope: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "manager_ref": manager_ref,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2622,11 +2763,20 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing manager-ref argument"))?;
 
-        let affected = document_ops::remove_im_mandate(pool, profile_id, manager_ref)
+        // Build node ID: _Managers / {manager_ref}
+        let node_id = TradingMatrixNodeId::category(categories::MANAGERS).child(&manager_ref);
+
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(pool, profile_id, TradingMatrixOp::RemoveNode { node_id })
             .await
             .map_err(|e| anyhow::anyhow!("Failed to remove IM mandate: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "removed": manager_ref,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2689,11 +2839,23 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
 
-        let affected = document_ops::set_base_currency(pool, profile_id, currency)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to set base currency: {}", e))?;
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
+            pool,
+            profile_id,
+            TradingMatrixOp::SetBaseCurrency {
+                currency: currency.clone(),
+            },
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to set base currency: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "base_currency": currency,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -2752,11 +2914,23 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
             .map(|s| s.to_string())
             .ok_or_else(|| anyhow::anyhow!("Missing currency argument"))?;
 
-        let affected = document_ops::add_allowed_currency(pool, profile_id, currency)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to add allowed currency: {}", e))?;
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
+            pool,
+            profile_id,
+            TradingMatrixOp::AddAllowedCurrency {
+                currency: currency.clone(),
+            },
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to add allowed currency: {}", e))?;
 
-        Ok(ExecutionResult::Affected(affected as u64))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "currency": currency,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -3542,28 +3716,6 @@ impl CustomOperation for TradingProfileCloneToOp {
             })
             .ok_or_else(|| anyhow::anyhow!("target-cbu-id is required"))?;
 
-        // Optional: cloned-by (user identifier)
-        let cloned_by: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "cloned-by")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        // Optional: adapt-base-currency (change base currency for target)
-        let adapt_base_currency: Option<String> = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "adapt-base-currency")
-            .and_then(|a| a.value.as_string().map(|s| s.to_string()));
-
-        // Optional: include-isda (default false - ISDA agreements are counterparty-specific)
-        let include_isda: bool = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "include-isda")
-            .and_then(|a| a.value.as_boolean())
-            .unwrap_or(false);
-
         // Optional: notes
         let notes: Option<String> = verb_call
             .arguments
@@ -3571,23 +3723,24 @@ impl CustomOperation for TradingProfileCloneToOp {
             .find(|a| a.key == "notes")
             .and_then(|a| a.value.as_string().map(|s| s.to_string()));
 
-        let result = document_ops::clone_to_cbu(
-            pool,
-            source_profile_id,
-            target_cbu_id,
-            cloned_by,
-            adapt_base_currency,
-            include_isda,
-            notes,
-        )
-        .await?;
+        // Use ast_db::clone_to_draft for new AST-based document format
+        let (profile_id, doc) =
+            ast_db::clone_to_draft(pool, source_profile_id, target_cbu_id, notes)
+                .await
+                .map_err(|e| anyhow::anyhow!("Clone failed: {}", e))?;
 
         // Bind target profile ID if :as binding specified
         if let Some(binding_name) = verb_call.binding.as_ref() {
-            ctx.bind(binding_name, result.target_profile_id);
+            ctx.bind(binding_name, profile_id);
         }
 
-        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "cbu_id": target_cbu_id,
+            "cbu_name": doc.cbu_name,
+            "status": "DRAFT",
+            "version": doc.version
+        })))
     }
 
     #[cfg(not(feature = "database"))]

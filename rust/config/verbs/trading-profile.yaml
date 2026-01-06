@@ -209,7 +209,7 @@ domains:
       # =========================================================================
 
       create-draft:
-        description: Create a new draft trading profile for a CBU
+        description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
         behavior: plugin
         handler: create_draft_trading_profile
         args:
@@ -222,14 +222,6 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
-          - name: base-currency
-            type: string
-            required: true
-            description: Base currency for the profile (e.g., EUR, USD)
-          - name: copy-from-profile
-            type: uuid
-            required: false
-            description: Clone from an existing profile
           - name: notes
             type: string
             required: false
@@ -360,29 +352,32 @@ domains:
           type: affected
 
       add-market:
-        description: Add market to trading profile universe
+        description: Add market to trading profile universe under an instrument class
         behavior: plugin
         handler: add_market_to_profile
         args:
           - name: profile-id
             type: uuid
             required: true
+          - name: instrument-class
+            type: string
+            required: true
+            description: "Parent instrument class code (e.g., EQUITY, GOVT_BOND)"
           - name: mic
             type: string
             required: true
             description: "Market Identifier Code (ISO 10383), e.g., XNYS, XLON"
-          - name: currencies
-            type: string_list
-            required: true
-            description: Currencies traded on this market
-          - name: settlement-types
-            type: string_list
+          - name: market-name
+            type: string
             required: false
-            default: [DVP]
-            description: Settlement types (DVP, FOP, RVP)
+            description: "Human-readable market name (looked up from reference data if not provided)"
+          - name: country-code
+            type: string
+            required: false
+            description: "ISO 2-letter country code (looked up from reference data if not provided)"
         returns:
           type: record
-          description: Updated universe section
+          description: Updated document version and status
 
       remove-market:
         description: Remove market from trading profile universe
@@ -392,11 +387,17 @@ domains:
           - name: profile-id
             type: uuid
             required: true
+          - name: instrument-class
+            type: string
+            required: true
+            description: "Parent instrument class code (e.g., EQUITY)"
           - name: mic
             type: string
             required: true
+            description: "Market MIC code to remove"
         returns:
-          type: affected
+          type: record
+          description: "Removed market info with version"
 
       set-base-currency:
         description: Set base currency for trading profile
@@ -436,48 +437,41 @@ domains:
           - name: profile-id
             type: uuid
             required: true
-          - name: category
+          - name: ssi-type
             type: string
             required: true
             valid_values: [SECURITIES, CASH, OTC_COLLATERAL, FUND_ACCOUNTING]
-            description: SSI category
-          - name: name
+            description: "SSI type (category)"
+          - name: ssi-name
             type: string
             required: true
-            description: Unique SSI name within category
-          - name: mic
+            description: "Unique SSI name (will be prefixed with type to create ssi-id)"
+          - name: safekeeping-account
             type: string
             required: false
-            description: Market this SSI serves
-          - name: currency
+            description: "Securities safekeeping account number"
+          - name: safekeeping-bic
             type: string
             required: false
-          - name: custody-account
-            type: string
-            required: false
-          - name: custody-bic
-            type: string
-            required: false
+            description: "Securities custodian BIC"
           - name: cash-account
             type: string
             required: false
+            description: "Cash account number"
           - name: cash-bic
             type: string
             required: false
-          - name: settlement-model
+            description: "Cash correspondent BIC"
+          - name: cash-currency
             type: string
             required: false
-            valid_values: [DVP, FOP, RVP]
-          - name: cutoff-time
+            description: "Settlement currency (ISO 4217)"
+          - name: pset-bic
             type: string
             required: false
-            description: "Cutoff time (e.g., 16:00)"
-          - name: cutoff-timezone
-            type: string
-            required: false
-            description: "Timezone (e.g., Europe/London)"
+            description: "Place of settlement BIC (CSD/ICSD)"
         returns:
-          type: affected
+          type: record
 
       remove-standing-instruction:
         description: Remove SSI from trading profile
@@ -487,14 +481,13 @@ domains:
           - name: profile-id
             type: uuid
             required: true
-          - name: category
+          - name: ssi-name
             type: string
             required: true
-          - name: name
-            type: string
-            required: true
+            description: "SSI name to remove"
         returns:
-          type: affected
+          type: record
+          description: "Removed SSI info with version"
 
       # --- Booking Rules Section ---
 
@@ -506,43 +499,44 @@ domains:
           - name: profile-id
             type: uuid
             required: true
-          - name: name
+          - name: rule-name
             type: string
             required: true
-            description: Unique rule name
+            description: "Unique rule name (combined with ssi-ref to create rule-id)"
           - name: priority
             type: integer
             required: true
-            description: Lower priority = evaluated first
+            description: "Lower priority = evaluated first"
           - name: ssi-ref
             type: string
             required: true
-            description: Reference to SSI name in standing_instructions
-          - name: match-counterparty-ref
-            type: string
-            required: false
-            description: Counterparty LEI/BIC/name to match
-          - name: match-counterparty-ref-type
-            type: string
-            required: false
-            valid_values: [LEI, BIC, NAME, UUID]
+            description: "Reference to SSI name in standing_instructions"
           - name: match-instrument-class
             type: string
             required: false
+            description: "Instrument class to match (e.g., EQUITY, GOVT_BOND)"
           - name: match-security-type
             type: string
             required: false
+            description: "Security type to match"
           - name: match-mic
             type: string
             required: false
+            description: "Market MIC to match"
           - name: match-currency
             type: string
             required: false
+            description: "Currency to match"
           - name: match-settlement-type
             type: string
             required: false
+            description: "Settlement type to match (DVP, FOP, RVP)"
+          - name: match-counterparty-id
+            type: string
+            required: false
+            description: "Counterparty entity ID for OTC matching"
         returns:
-          type: affected
+          type: record
 
       remove-booking-rule:
         description: Remove booking rule from trading profile
@@ -552,45 +546,53 @@ domains:
           - name: profile-id
             type: uuid
             required: true
-          - name: name
+          - name: ssi-ref
             type: string
             required: true
+            description: "Parent SSI name that contains this booking rule"
+          - name: rule-id
+            type: string
+            required: true
+            description: "Booking rule ID to remove"
         returns:
-          type: affected
+          type: record
+          description: "Removed booking rule info with version"
 
       # --- ISDA/CSA Section ---
 
       add-isda-config:
-        description: Add ISDA agreement configuration to trading profile
+        description: Add ISDA master agreement to trading profile
         behavior: plugin
         handler: add_isda_config_to_profile
         args:
           - name: profile-id
             type: uuid
             required: true
-          - name: counterparty-ref
+            description: "Trading profile ID"
+          - name: counterparty-entity-id
             type: string
             required: true
-            description: Counterparty LEI or name
-          - name: counterparty-ref-type
+            description: "Counterparty entity UUID"
+          - name: counterparty-name
             type: string
             required: true
-            valid_values: [LEI, BIC, NAME, UUID]
-          - name: agreement-date
-            type: string
-            required: true
-            description: "Agreement date (YYYY-MM-DD)"
-          - name: governing-law
-            type: string
-            required: true
-            valid_values: [NY, ENGLISH]
-          - name: effective-date
+            description: "Counterparty display name"
+          - name: counterparty-lei
             type: string
             required: false
-            description: "Effective date if different from agreement date"
+            description: "Counterparty LEI (optional)"
+          - name: governing-law
+            type: string
+            required: false
+            valid_values: [NY, ENGLISH]
+            description: "Governing law jurisdiction"
+          - name: agreement-date
+            type: string
+            required: false
+            description: "Agreement date (YYYY-MM-DD)"
         returns:
           type: record
-          description: Updated ISDA agreements list
+          description: Created ISDA config with isda_id
 
       add-isda-product-coverage:
         description: Add product coverage to ISDA config
@@ -600,10 +602,11 @@ domains:
           - name: profile-id
             type: uuid
             required: true
-          - name: counterparty-ref
+            description: "Trading profile ID"
+          - name: isda-ref
             type: string
             required: true
-            description: Identifies which ISDA
+            description: "ISDA counterparty name or ID to add coverage to"
           - name: asset-class
             type: string
             required: true
@@ -613,52 +616,46 @@ domains:
             required: false
             description: "Specific products (IRS, CDS, FX_FORWARD, etc.)"
         returns:
-          type: affected
+          type: record
+          description: Created product coverage with coverage_id
 
       add-csa-config:
-        description: Add CSA configuration to ISDA
+        description: Add CSA (Credit Support Annex) to ISDA agreement
         behavior: plugin
         handler: add_csa_config_to_profile
         args:
           - name: profile-id
             type: uuid
             required: true
-          - name: counterparty-ref
+            description: "Trading profile ID"
+          - name: isda-ref
             type: string
             required: true
-            description: Identifies which ISDA
+            description: "ISDA counterparty name or ID to add CSA to"
           - name: csa-type
             type: string
             required: true
-            valid_values: [VM, VM_IM]
-          - name: threshold-amount
-            type: decimal
-            required: false
+            valid_values: [VM, VM_IM, IM]
+            description: "CSA type (VM=Variation Margin, IM=Initial Margin)"
           - name: threshold-currency
             type: string
             required: false
-          - name: mta
+            description: "Threshold currency (ISO 4217)"
+          - name: threshold-amount
             type: decimal
             required: false
-            description: Minimum Transfer Amount
-          - name: rounding
+            description: "Threshold amount before margin call triggered"
+          - name: minimum-transfer-amount
             type: decimal
             required: false
-          - name: valuation-time
+            description: "Minimum transfer amount (MTA)"
+          - name: collateral-ssi-ref
             type: string
             required: false
-            description: "e.g., 16:00"
-          - name: valuation-timezone
-            type: string
-            required: false
-            description: "e.g., Europe/London"
-          - name: settlement-days
-            type: integer
-            required: false
-            default: 1
+            description: "Reference to SSI for collateral transfers"
         returns:
           type: record
-          description: Updated CSA config
+          description: Created CSA config with csa_id
 
       add-csa-eligible-collateral:
         description: Add eligible collateral to CSA

@@ -166,6 +166,7 @@ impl EntityTypeOntology {
             match category.to_uppercase().as_str() {
                 "PERSON" => return "PERSON".to_string(),
                 "SHELL" => return "SHELL".to_string(),
+                "TRADING" => return "TRADING_LAYER".to_string(),
                 _ => {}
             }
         }
@@ -180,6 +181,14 @@ impl EntityTypeOntology {
             EntityType::Product => "PRODUCT".to_string(),
             EntityType::Service => "SERVICE".to_string(),
             EntityType::Resource => "RESOURCE".to_string(),
+            // Trading layer types
+            EntityType::TradingProfile => "TRADING_PROFILE".to_string(),
+            EntityType::InstrumentMatrix => "INSTRUMENT_MATRIX".to_string(),
+            EntityType::InstrumentClass => "INSTRUMENT_CLASS".to_string(),
+            EntityType::Market => "MARKET".to_string(),
+            EntityType::Counterparty => "COUNTERPARTY".to_string(),
+            EntityType::IsdaAgreement => "ISDA_AGREEMENT".to_string(),
+            EntityType::CsaAgreement => "CSA_AGREEMENT".to_string(),
             EntityType::Unknown => "ENTITY".to_string(),
         }
     }

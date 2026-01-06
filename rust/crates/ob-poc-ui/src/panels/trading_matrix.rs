@@ -10,7 +10,10 @@
 
 use crate::state::AppState;
 use egui::Ui;
-use ob_poc_graph::{render_node_detail_panel, render_trading_matrix_browser, TradingMatrixAction};
+use ob_poc_graph::{
+    render_node_detail_panel, render_trading_matrix_browser, TradingMatrixAction,
+    TradingMatrixNodeIdExt,
+};
 
 /// Action returned from trading matrix panel interactions
 #[derive(Debug, Clone)]
@@ -135,7 +138,13 @@ pub fn trading_matrix_detail_panel(ui: &mut Ui, state: &AppState) -> TradingMatr
         None
     }
 
-    let Some(node) = find_node_by_key(&matrix.root, selected_key) else {
+    // Search across all root children
+    let node = matrix
+        .children()
+        .iter()
+        .find_map(|child| find_node_by_key(child, selected_key));
+
+    let Some(node) = node else {
         ui.label("Selected node not found");
         return TradingMatrixPanelAction::None;
     };

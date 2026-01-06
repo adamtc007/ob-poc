@@ -63,8 +63,8 @@ pub use render::GraphRenderer;
 pub use trading_matrix::{
     get_node_type_color, get_node_type_icon, render_node_detail_panel,
     render_trading_matrix_browser, StatusColor, TradingMatrix, TradingMatrixAction,
-    TradingMatrixMetadata, TradingMatrixNode, TradingMatrixNodeId, TradingMatrixNodeType,
-    TradingMatrixState,
+    TradingMatrixMetadata, TradingMatrixNode, TradingMatrixNodeId, TradingMatrixNodeIdExt,
+    TradingMatrixNodeType, TradingMatrixResponse, TradingMatrixState,
 };
 pub use types::*;
 

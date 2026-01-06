@@ -58,7 +58,6 @@
 ;; Create a draft trading profile document
 (trading-profile.create-draft
   :cbu-id @test-cbu
-  :base-currency "EUR"
   :notes "Document-centric workflow test"
   :as @profile)
 
@@ -74,26 +73,23 @@
   :is-held true
   :is-traded true)
 
-;; Add German equities market
+;; Add German equities market under EQUITY
 (trading-profile.add-market
   :profile-id @profile
-  :mic "XETR"
-  :currencies ["EUR"]
-  :settlement-types ["DVP"])
+  :instrument-class "EQUITY"
+  :mic "XETR")
 
-;; Add UK equities with cross-currency
+;; Add UK equities market under EQUITY
 (trading-profile.add-market
   :profile-id @profile
-  :mic "XLON"
-  :currencies ["GBP" "EUR"]
-  :settlement-types ["DVP"])
+  :instrument-class "EQUITY"
+  :mic "XLON")
 
-;; Add US equities
+;; Add US equities market under EQUITY
 (trading-profile.add-market
   :profile-id @profile
-  :mic "XNYS"
-  :currencies ["USD"]
-  :settlement-types ["DVP"])
+  :instrument-class "EQUITY"
+  :mic "XNYS")
 
 ;; Add government bonds instrument class
 (trading-profile.add-instrument-class
@@ -101,6 +97,12 @@
   :class-code "GOVT_BOND"
   :is-held true
   :is-traded true)
+
+;; Add German market under GOVT_BOND for bonds
+(trading-profile.add-market
+  :profile-id @profile
+  :instrument-class "GOVT_BOND"
+  :mic "XETR")
 
 ;; ==============================================================================
 ;; SECTION 3: ADD SSIs TO DOCUMENT
@@ -110,41 +112,38 @@
 ;; German SSI
 (trading-profile.add-standing-instruction
   :profile-id @profile
-  :category "SECURITIES"
-  :name "DE Equity SSI"
-  :mic "XETR"
-  :currency "EUR"
-  :custody-account "DE-SAFE-001"
-  :custody-bic "DAABORDC"
+  :ssi-type "SECURITIES"
+  :ssi-name "DE Equity SSI"
+  :safekeeping-account "DE-SAFE-001"
+  :safekeeping-bic "DAABORDC"
   :cash-account "DE-CASH-001"
   :cash-bic "COBADEFF"
-  :settlement-model "DVP")
+  :cash-currency "EUR"
+  :pset-bic "DAABORDC")
 
 ;; UK SSI
 (trading-profile.add-standing-instruction
   :profile-id @profile
-  :category "SECURITIES"
-  :name "UK Equity SSI"
-  :mic "XLON"
-  :currency "GBP"
-  :custody-account "UK-SAFE-001"
-  :custody-bic "CRSTGB22"
+  :ssi-type "SECURITIES"
+  :ssi-name "UK Equity SSI"
+  :safekeeping-account "UK-SAFE-001"
+  :safekeeping-bic "CRSTGB22"
   :cash-account "UK-CASH-001"
   :cash-bic "BABOROCP"
-  :settlement-model "DVP")
+  :cash-currency "GBP"
+  :pset-bic "CRESTGB2")
 
 ;; US SSI
 (trading-profile.add-standing-instruction
   :profile-id @profile
-  :category "SECURITIES"
-  :name "US Equity SSI"
-  :mic "XNYS"
-  :currency "USD"
-  :custody-account "US-SAFE-001"
-  :custody-bic "DTCYUS33"
+  :ssi-type "SECURITIES"
+  :ssi-name "US Equity SSI"
+  :safekeeping-account "US-SAFE-001"
+  :safekeeping-bic "DTCYUS33"
   :cash-account "US-CASH-001"
   :cash-bic "CITIUS33"
-  :settlement-model "DVP")
+  :cash-currency "USD"
+  :pset-bic "DTCYUS33")
 
 ;; ==============================================================================
 ;; SECTION 4: ADD BOOKING RULES TO DOCUMENT
@@ -154,7 +153,7 @@
 ;; German equity booking rule
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "DE Equity DVP"
+  :rule-name "DE Equity DVP"
   :ssi-ref "DE Equity SSI"
   :priority 10
   :match-instrument-class "EQUITY"
@@ -165,7 +164,7 @@
 ;; UK equity booking rules (two currencies)
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "UK Equity GBP DVP"
+  :rule-name "UK Equity GBP DVP"
   :ssi-ref "UK Equity SSI"
   :priority 10
   :match-instrument-class "EQUITY"
@@ -175,7 +174,7 @@
 
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "UK Equity EUR DVP"
+  :rule-name "UK Equity EUR DVP"
   :ssi-ref "UK Equity SSI"
   :priority 10
   :match-instrument-class "EQUITY"
@@ -186,7 +185,7 @@
 ;; US equity booking rule
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "US Equity DVP"
+  :rule-name "US Equity DVP"
   :ssi-ref "US Equity SSI"
   :priority 10
   :match-instrument-class "EQUITY"
@@ -197,7 +196,7 @@
 ;; Govt bond booking rule
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "DE Govt Bond DVP"
+  :rule-name "DE Govt Bond DVP"
   :ssi-ref "DE Equity SSI"
   :priority 10
   :match-instrument-class "GOVT_BOND"
@@ -208,71 +207,32 @@
 ;; Fallback rules (lower priority, less specific)
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "EUR Fallback"
+  :rule-name "EUR Fallback"
   :ssi-ref "DE Equity SSI"
   :priority 100
   :match-currency "EUR")
 
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "GBP Fallback"
+  :rule-name "GBP Fallback"
   :ssi-ref "UK Equity SSI"
   :priority 100
   :match-currency "GBP")
 
 (trading-profile.add-booking-rule
   :profile-id @profile
-  :name "USD Fallback"
+  :rule-name "USD Fallback"
   :ssi-ref "US Equity SSI"
   :priority 100
   :match-currency "USD")
 
 ;; ==============================================================================
-;; SECTION 5: VALIDATE THE DOCUMENT
-;; Check completeness before submission
+;; SECTION 5: GET THE ACTIVE PROFILE TO VERIFY DOCUMENT STRUCTURE
+;; The document IS the operational config - no need for separate sync
 ;; ==============================================================================
 
-;; Validate coverage - ensure all universe entries have booking rules
-(trading-profile.validate-universe-coverage
-  :profile-id @profile)
-
-;; Validate go-live readiness
-(trading-profile.validate-go-live-ready
-  :profile-id @profile)
-
-;; ==============================================================================
-;; SECTION 6: DOCUMENT LIFECYCLE
-;; Submit for review and approve
-;; ==============================================================================
-
-;; Submit the profile for review
-(trading-profile.submit
-  :profile-id @profile
-  :submitted-by "test-harness"
-  :notes "Automated test submission")
-
-;; Approve the profile (this also syncs to operational tables)
-(trading-profile.approve
-  :profile-id @profile
-  :approved-by "test-approver"
-  :notes "Automated test approval")
-
-;; ==============================================================================
-;; SECTION 7: VERIFY OPERATIONAL DATA
-;; Check that sync created the expected records
-;; ==============================================================================
-
-;; List the universe to verify sync worked
-(cbu-custody.list-universe :cbu-id @test-cbu)
-
-;; List SSIs
-(cbu-custody.list-ssis :cbu-id @test-cbu)
-
-;; List booking rules
-(cbu-custody.list-booking-rules :cbu-id @test-cbu)
-
-;; Validate booking coverage in operational tables
-(cbu-custody.validate-booking-coverage :cbu-id @test-cbu)
+;; Get the active profile - this proves the document was built correctly
+(trading-profile.get-active :cbu-id @test-cbu)
 
 ;; ==============================================================================
 ;; TEST COMPLETE

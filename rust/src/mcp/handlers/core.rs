@@ -183,6 +183,8 @@ impl ToolHandlers {
             "taxonomy_reset" => self.taxonomy_reset(args).await,
             "taxonomy_position" => self.taxonomy_position(args).await,
             "taxonomy_entities" => self.taxonomy_entities(args).await,
+            // Trading matrix tools
+            "trading_matrix_get" => self.trading_matrix_get(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -3155,6 +3157,163 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             "count": entity_list.len(),
             "limit": limit,
             "offset": offset
+        }))
+    }
+
+    // =========================================================================
+    // Trading Matrix Tools
+    // =========================================================================
+
+    /// Get the trading matrix tree for a CBU
+    ///
+    /// Returns the hierarchical trading configuration:
+    /// - Trading Universe (instrument classes → markets → currencies)
+    /// - Standing Settlement Instructions (SSIs with booking rules)
+    /// - Settlement Chains (multi-hop paths)
+    /// - Tax Configuration (jurisdictions and statuses)
+    /// - ISDA/CSA Agreements (OTC counterparties)
+    async fn trading_matrix_get(&self, args: Value) -> Result<Value> {
+        let cbu_id_str = args["cbu_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("cbu_id required"))?;
+        let cbu_id = Uuid::parse_str(cbu_id_str).map_err(|_| anyhow!("Invalid cbu_id"))?;
+
+        // Check if CBU exists
+        let cbu = sqlx::query!(
+            r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_optional(&self.pool)
+        .await?
+        .ok_or_else(|| anyhow!("CBU not found: {}", cbu_id))?;
+
+        // Get trading profile status
+        let profile = sqlx::query!(
+            r#"
+            SELECT profile_id, status, version, created_at, updated_at
+            FROM "ob-poc".cbu_trading_profiles
+            WHERE cbu_id = $1 AND status = 'ACTIVE'
+            ORDER BY version DESC
+            LIMIT 1
+            "#,
+            cbu_id
+        )
+        .fetch_optional(&self.pool)
+        .await?;
+
+        // Count universe entries
+        let universe_count: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) FROM custody.cbu_instrument_universe WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .unwrap_or(0);
+
+        // Count SSIs
+        let ssi_count: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) FROM custody.cbu_ssi WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .unwrap_or(0);
+
+        // Count booking rules
+        let rule_count: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) FROM custody.ssi_booking_rules WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .unwrap_or(0);
+
+        // Count settlement chains
+        let chain_count: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) FROM custody.cbu_settlement_chains WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .unwrap_or(0);
+
+        // Count ISDA agreements
+        let isda_count: i64 = sqlx::query_scalar!(
+            r#"SELECT COUNT(*) FROM custody.isda_agreements WHERE cbu_id = $1"#,
+            cbu_id
+        )
+        .fetch_one(&self.pool)
+        .await?
+        .unwrap_or(0);
+
+        // Get instrument classes in universe
+        let instrument_classes: Vec<String> = sqlx::query_scalar!(
+            r#"
+            SELECT DISTINCT ic.code
+            FROM custody.cbu_instrument_universe u
+            JOIN custody.instrument_classes ic ON ic.class_id = u.instrument_class_id
+            WHERE u.cbu_id = $1
+            ORDER BY ic.code
+            "#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .filter_map(|s| s)
+        .collect();
+
+        // Get markets in universe
+        let markets: Vec<String> = sqlx::query_scalar!(
+            r#"
+            SELECT DISTINCT m.mic
+            FROM custody.cbu_instrument_universe u
+            JOIN custody.markets m ON m.market_id = u.market_id
+            WHERE u.cbu_id = $1 AND u.market_id IS NOT NULL
+            ORDER BY m.mic
+            "#,
+            cbu_id
+        )
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .filter_map(|s| s)
+        .collect();
+
+        // Build summary
+        let has_profile = profile.is_some();
+        let profile_info = profile.map(|p| {
+            json!({
+                "profile_id": p.profile_id.to_string(),
+                "status": p.status,
+                "version": p.version,
+                "updated_at": p.updated_at.map(|t| t.to_rfc3339())
+            })
+        });
+
+        // Determine completeness
+        let is_complete = universe_count > 0 && ssi_count > 0 && rule_count > 0;
+
+        Ok(json!({
+            "success": true,
+            "cbu_id": cbu_id.to_string(),
+            "cbu_name": cbu.name,
+            "has_trading_profile": has_profile,
+            "trading_profile": profile_info,
+            "summary": {
+                "universe_entries": universe_count,
+                "instrument_classes": instrument_classes,
+                "markets": markets,
+                "ssis": ssi_count,
+                "booking_rules": rule_count,
+                "settlement_chains": chain_count,
+                "isda_agreements": isda_count,
+                "is_complete": is_complete
+            },
+            "endpoints": {
+                "full_tree": format!("/api/cbu/{}/trading-matrix", cbu_id),
+                "trading_profile_verbs": "Use verbs_list with domain='trading-profile' to see available operations"
+            }
         }))
     }
 }

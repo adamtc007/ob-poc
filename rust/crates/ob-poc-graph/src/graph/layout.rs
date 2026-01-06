@@ -1368,28 +1368,62 @@ fn node_style_for_role(role: PrimaryRole, is_cbu: bool) -> NodeStyle {
 }
 
 fn edge_style_for_type(edge_type: EdgeType) -> EdgeStyle {
-    use egui::Color32;
+    use super::colors::edge_color;
+
+    let color = edge_color(edge_type);
+    let dashed = edge_type.is_dashed();
 
     match edge_type {
         EdgeType::HasRole => EdgeStyle {
-            color: Color32::from_rgb(107, 114, 128),
+            color,
             width: 1.5,
-            dashed: false,
+            dashed,
         },
         EdgeType::Owns => EdgeStyle {
-            color: Color32::from_rgb(34, 197, 94),
+            color,
+            width: 2.0,
+            dashed,
+        },
+        EdgeType::Controls => EdgeStyle {
+            color,
+            width: 2.0,
+            dashed: true, // Controls always dashed
+        },
+        EdgeType::UboTerminus => EdgeStyle {
+            color,
+            width: 2.5,
+            dashed: true,
+        },
+        // Service layer edges
+        EdgeType::UsesProduct | EdgeType::DeliversService | EdgeType::ProvidesResource => {
+            EdgeStyle {
+                color,
+                width: 1.8,
+                dashed,
+            }
+        }
+        // Trading layer edges - hierarchy (solid)
+        EdgeType::HasTradingProfile | EdgeType::HasMatrix | EdgeType::IncludesClass => EdgeStyle {
+            color,
             width: 2.0,
             dashed: false,
         },
-        EdgeType::Controls => EdgeStyle {
-            color: Color32::from_rgb(251, 191, 36),
+        // Trading layer edges - markets (solid)
+        EdgeType::TradedOn => EdgeStyle {
+            color,
+            width: 1.8,
+            dashed: false,
+        },
+        // Trading layer edges - OTC/legal (dashed)
+        EdgeType::OtcCounterparty | EdgeType::CoveredByIsda | EdgeType::ImMandate => EdgeStyle {
+            color,
             width: 2.0,
             dashed: true,
         },
-        EdgeType::UboTerminus => EdgeStyle {
-            color: Color32::from_rgb(239, 68, 68), // Red - terminus marker
-            width: 2.5,
-            dashed: true,
+        EdgeType::HasCsa => EdgeStyle {
+            color,
+            width: 1.5,
+            dashed: false,
         },
         EdgeType::Other => EdgeStyle::default(),
     }

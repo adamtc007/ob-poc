@@ -207,6 +207,14 @@ pub enum EntityType {
     Product,
     Service,
     Resource,
+    // Trading layer types
+    TradingProfile,
+    InstrumentMatrix,
+    InstrumentClass,
+    Market,
+    Counterparty,
+    IsdaAgreement,
+    CsaAgreement,
 }
 
 impl std::str::FromStr for EntityType {
@@ -222,7 +230,7 @@ impl std::str::FromStr for EntityType {
             Self::Partnership
         } else if lower.contains("trust") {
             Self::Trust
-        } else if lower.contains("fund") {
+        } else if lower.contains("fund") && !lower.contains("instrument") {
             Self::Fund
         } else if lower == "product" {
             Self::Product
@@ -230,6 +238,21 @@ impl std::str::FromStr for EntityType {
             Self::Service
         } else if lower == "resource" {
             Self::Resource
+        // Trading layer types - exact matches
+        } else if lower == "trading_profile" || lower == "tradingprofile" {
+            Self::TradingProfile
+        } else if lower == "instrument_matrix" || lower == "instrumentmatrix" {
+            Self::InstrumentMatrix
+        } else if lower == "instrument_class" || lower == "instrumentclass" {
+            Self::InstrumentClass
+        } else if lower == "market" {
+            Self::Market
+        } else if lower == "counterparty" {
+            Self::Counterparty
+        } else if lower == "isda_agreement" || lower == "isdaagreement" || lower == "isda" {
+            Self::IsdaAgreement
+        } else if lower == "csa_agreement" || lower == "csaagreement" || lower == "csa" {
+            Self::CsaAgreement
         } else {
             Self::Unknown
         })
@@ -494,11 +517,25 @@ pub struct LayoutEdge {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EdgeType {
+    // Core edge types
     HasRole,
     Owns,
     Controls,
     /// UBO chain terminus - ownership tracing stops here (public company, government, etc.)
     UboTerminus,
+    // Service layer edge types
+    UsesProduct,
+    DeliversService,
+    ProvidesResource,
+    // Trading layer edge types
+    HasTradingProfile,
+    HasMatrix,
+    IncludesClass,
+    TradedOn,
+    OtcCounterparty,
+    CoveredByIsda,
+    HasCsa,
+    ImMandate,
     Other,
 }
 
@@ -506,13 +543,36 @@ impl std::str::FromStr for EdgeType {
     type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.to_lowercase().as_str() {
+        Ok(match s.to_lowercase().replace('-', "_").as_str() {
             "has_role" | "hasrole" => Self::HasRole,
             "owns" => Self::Owns,
             "controls" => Self::Controls,
             "ubo_terminus" | "uboterminus" => Self::UboTerminus,
+            // Service layer
+            "uses_product" | "usesproduct" => Self::UsesProduct,
+            "delivers_service" | "deliversservice" => Self::DeliversService,
+            "provides_resource" | "providesresource" => Self::ProvidesResource,
+            // Trading layer
+            "has_trading_profile" | "hastradingprofile" => Self::HasTradingProfile,
+            "has_matrix" | "hasmatrix" => Self::HasMatrix,
+            "includes_class" | "includesclass" => Self::IncludesClass,
+            "traded_on" | "tradedon" => Self::TradedOn,
+            "otc_counterparty" | "otccounterparty" => Self::OtcCounterparty,
+            "covered_by_isda" | "coveredbyisda" => Self::CoveredByIsda,
+            "has_csa" | "hascsa" => Self::HasCsa,
+            "im_mandate" | "immandate" => Self::ImMandate,
             _ => Self::Other,
         })
+    }
+}
+
+impl EdgeType {
+    /// Whether this edge type should render with dashed style
+    pub fn is_dashed(&self) -> bool {
+        matches!(
+            self,
+            EdgeType::OtcCounterparty | EdgeType::ImMandate | EdgeType::CoveredByIsda
+        )
     }
 }
 
