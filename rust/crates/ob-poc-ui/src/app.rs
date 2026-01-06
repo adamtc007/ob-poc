@@ -401,10 +401,8 @@ impl App {
             }
             NavigationVerb::Illuminate { aspect } => {
                 // Highlight specific aspect using agent state
-                if let Some(ref aspect_type) = aspect {
-                    web_sys::console::log_1(&format!("Illuminating: {}", aspect_type).into());
-                    // Could set agent mode to highlight specific relationships
-                }
+                web_sys::console::log_1(&format!("Illuminating: {}", aspect).into());
+                // Could set agent mode to highlight specific relationships
             }
             NavigationVerb::Shadow => {
                 // Dim background entities - toggle focus mode
@@ -434,9 +432,7 @@ impl App {
             // Context
             NavigationVerb::SetContext { context } => {
                 // Switch investigation context
-                if let Some(ref ctx) = context {
-                    web_sys::console::log_1(&format!("Switching context to: {}", ctx).into());
-                }
+                web_sys::console::log_1(&format!("Switching context to: {}", context).into());
             }
         }
     }
