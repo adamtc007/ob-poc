@@ -54,6 +54,59 @@ impl SpringConfig {
         stiffness: 500.0,
         damping: 1.0,
     };
+
+    // =========================================================================
+    // GALAXY NAVIGATION SPRING CONFIGS (Phase 8 Polish)
+    // =========================================================================
+
+    /// Snappy response for UI elements and node interactions
+    /// High stiffness, higher damping to prevent overshoot
+    pub const SNAPPY: Self = Self {
+        stiffness: 300.0,
+        damping: 1.25, // Slightly overdamped for crisp feel
+    };
+
+    /// Organic, natural-feeling motion for node expansions
+    /// Lower damping allows subtle overshoot for lifelike feel
+    pub const ORGANIC: Self = Self {
+        stiffness: 180.0,
+        damping: 0.85,
+    };
+
+    /// Gentle transitions for level changes and deep navigation
+    /// Slower, more contemplative motion
+    pub const GENTLE: Self = Self {
+        stiffness: 120.0,
+        damping: 1.0,
+    };
+
+    /// Camera-specific spring for smooth fly-to animations
+    /// Balanced for smooth tracking without lag
+    pub const CAMERA: Self = Self {
+        stiffness: 150.0,
+        damping: 1.1, // Slightly overdamped to avoid camera jitter
+    };
+
+    /// Agent speech and UI overlay animations
+    /// Quick fade-in, holds, gentle fade-out
+    pub const AGENT_UI: Self = Self {
+        stiffness: 200.0,
+        damping: 1.0,
+    };
+
+    /// Autopilot camera following
+    /// Slightly looser to allow for anticipatory camera lead
+    pub const AUTOPILOT: Self = Self {
+        stiffness: 120.0,
+        damping: 0.95,
+    };
+
+    /// Anomaly pulse animation (continuous, subtle)
+    /// Low stiffness for slow, organic pulse
+    pub const PULSE: Self = Self {
+        stiffness: 60.0,
+        damping: 0.8,
+    };
 }
 
 // =============================================================================

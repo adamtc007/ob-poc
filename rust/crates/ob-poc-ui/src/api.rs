@@ -5,12 +5,12 @@
 
 use ob_poc_graph::{CbuGraphData, TradingMatrix, ViewMode};
 use ob_poc_types::{
-    CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse, ConfirmAllRequest,
-    ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse, ExecuteRequest,
-    ExecuteResponse, GetContextResponse, ResolutionSearchRequest, ResolutionSearchResponse,
-    ResolutionSessionResponse, SelectResolutionRequest, SelectResolutionResponse, SessionContext,
-    SessionStateResponse, SetBindingRequest, SetBindingResponse, StartResolutionRequest,
-    ValidateDslRequest, ValidateDslResponse,
+    galaxy::UniverseGraph, CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse,
+    ConfirmAllRequest, ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse,
+    ExecuteRequest, ExecuteResponse, GetContextResponse, ResolutionSearchRequest,
+    ResolutionSearchResponse, ResolutionSessionResponse, SelectResolutionRequest,
+    SelectResolutionResponse, SessionContext, SessionStateResponse, SetBindingRequest,
+    SetBindingResponse, StartResolutionRequest, ValidateDslRequest, ValidateDslResponse,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
@@ -250,6 +250,20 @@ pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraph
     // Use shared CbuGraphResponse type, then convert to CbuGraphData
     let response: ob_poc_types::CbuGraphResponse = get(&url).await?;
     Ok(response.into())
+}
+
+// =============================================================================
+// Galaxy Navigation API
+// =============================================================================
+
+/// Get universe graph (all clusters for galaxy view)
+pub async fn get_universe_graph() -> Result<UniverseGraph, String> {
+    get("/api/universe").await
+}
+
+/// Get cluster details (CBUs within a cluster)
+pub async fn get_cluster(cluster_id: &str) -> Result<ob_poc_types::galaxy::ClusterNode, String> {
+    get(&format!("/api/cluster/{}", cluster_id)).await
 }
 
 /// Get trading matrix (hierarchical custody configuration) for a CBU

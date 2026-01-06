@@ -17,6 +17,7 @@
 //! 2. Tagged enums only: `#[serde(tag = "type")]`
 //! 3. UUIDs as strings for JSON compatibility
 
+pub mod galaxy;
 pub mod resolution;
 pub mod semantic_stage;
 pub mod trading_matrix;

@@ -30,6 +30,9 @@ use crate::graph::{
     CbuGraph, CbuSummary, ConfigDrivenGraphBuilder, EntityGraph, GraphScope, LayoutEngineV2,
     LayoutOverride, NodeOffset, NodeSizeOverride,
 };
+use ob_poc_types::galaxy::{
+    NodeType, Route, RouteRequest, RouteResponse, RouteWaypoint, ViewLevel,
+};
 
 /// Query parameters for graph endpoint
 #[derive(Debug, Deserialize)]
@@ -399,6 +402,428 @@ pub async fn get_entity_neighborhood_graph(
     Ok(Json(graph))
 }
 
+// =============================================================================
+// ROUTE CALCULATION (for autopilot navigation)
+// =============================================================================
+
+/// Query parameters for route endpoint
+#[derive(Debug, Deserialize)]
+pub struct RouteQuery {
+    /// Starting node ID (current location if omitted)
+    pub from: Option<String>,
+    /// Destination node ID or name
+    pub to: String,
+    /// Destination type hint (helps resolve names)
+    pub to_type: Option<String>,
+    /// Whether to pause at decision points
+    #[serde(default)]
+    pub pause_at_forks: bool,
+}
+
+/// GET /api/route?to=X&from=Y
+///
+/// Calculate a navigation route through the taxonomy graph.
+/// Returns waypoints with positions for autopilot animation.
+pub async fn get_route(
+    State(pool): State<PgPool>,
+    Query(params): Query<RouteQuery>,
+) -> Result<Json<RouteResponse>, (StatusCode, String)> {
+    // Parse destination - could be UUID or name
+    let destination_id = parse_node_id(&pool, &params.to, params.to_type.as_deref()).await?;
+
+    // Parse origin (defaults to universe root if not specified)
+    let origin_id = if let Some(from) = &params.from {
+        Some(parse_node_id(&pool, from, None).await?)
+    } else {
+        None
+    };
+
+    // Calculate the route through the graph
+    let route = calculate_route(&pool, origin_id, destination_id, params.pause_at_forks).await?;
+
+    // Estimate duration based on waypoint count and level transitions
+    let estimated_duration = estimate_route_duration(&route);
+
+    Ok(Json(RouteResponse {
+        route,
+        estimated_duration_secs: estimated_duration,
+        alternatives: vec![], // Future: implement alternative routes
+    }))
+}
+
+/// Parse a node ID - could be UUID or name requiring lookup
+async fn parse_node_id(
+    pool: &PgPool,
+    id_or_name: &str,
+    type_hint: Option<&str>,
+) -> Result<(String, NodeType), (StatusCode, String)> {
+    // Try parsing as UUID first
+    if let Ok(uuid) = Uuid::parse_str(id_or_name) {
+        // Determine node type from database
+        let node_type = determine_node_type(pool, uuid).await?;
+        return Ok((uuid.to_string(), node_type));
+    }
+
+    // Not a UUID - search by name based on type hint
+    let node_type = type_hint
+        .and_then(|t| match t.to_lowercase().as_str() {
+            "cbu" => Some(NodeType::Cbu),
+            "entity" => Some(NodeType::Entity),
+            "cluster" => Some(NodeType::Cluster),
+            "document" => Some(NodeType::Document),
+            "kyc_case" | "kyccase" => Some(NodeType::KycCase),
+            _ => None,
+        })
+        .unwrap_or(NodeType::Cbu); // Default to CBU search
+
+    // Search for the node by name
+    let node_id = search_node_by_name(pool, id_or_name, node_type).await?;
+    Ok((node_id, node_type))
+}
+
+/// Determine node type from UUID by checking various tables
+async fn determine_node_type(pool: &PgPool, id: Uuid) -> Result<NodeType, (StatusCode, String)> {
+    // Check if it's a CBU
+    let cbu_exists: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT 1 FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if cbu_exists.is_some() {
+        return Ok(NodeType::Cbu);
+    }
+
+    // Check if it's an entity
+    let entity_exists: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1"#)
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if entity_exists.is_some() {
+        return Ok(NodeType::Entity);
+    }
+
+    // Check if it's a document
+    let doc_exists: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT 1 FROM "ob-poc".document_catalog WHERE doc_id = $1"#)
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if doc_exists.is_some() {
+        return Ok(NodeType::Document);
+    }
+
+    // Check if it's a KYC case
+    let case_exists: Option<(i64,)> =
+        sqlx::query_as(r#"SELECT 1 FROM "kyc".cases WHERE case_id = $1"#)
+            .bind(id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if case_exists.is_some() {
+        return Ok(NodeType::KycCase);
+    }
+
+    Err((StatusCode::NOT_FOUND, format!("Node not found: {}", id)))
+}
+
+/// Search for a node by name and type
+async fn search_node_by_name(
+    pool: &PgPool,
+    name: &str,
+    node_type: NodeType,
+) -> Result<String, (StatusCode, String)> {
+    let search_pattern = format!("%{}%", name);
+
+    match node_type {
+        NodeType::Cbu => {
+            let result: Option<(Uuid,)> =
+                sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE $1 LIMIT 1"#)
+                    .bind(&search_pattern)
+                    .fetch_optional(pool)
+                    .await
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            result
+                .map(|(id,)| id.to_string())
+                .ok_or_else(|| (StatusCode::NOT_FOUND, format!("CBU not found: {}", name)))
+        }
+        NodeType::Entity => {
+            let result: Option<(Uuid,)> = sqlx::query_as(
+                r#"SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE $1 LIMIT 1"#,
+            )
+            .bind(&search_pattern)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+            result
+                .map(|(id,)| id.to_string())
+                .ok_or_else(|| (StatusCode::NOT_FOUND, format!("Entity not found: {}", name)))
+        }
+        _ => Err((
+            StatusCode::BAD_REQUEST,
+            format!("Search not supported for type: {:?}", node_type),
+        )),
+    }
+}
+
+/// Calculate a route through the graph from origin to destination
+async fn calculate_route(
+    pool: &PgPool,
+    origin: Option<(String, NodeType)>,
+    destination: (String, NodeType),
+    pause_at_forks: bool,
+) -> Result<Route, (StatusCode, String)> {
+    let route_id = Uuid::new_v4().to_string();
+    let mut waypoints = Vec::new();
+    let mut level_transitions = 0;
+
+    // If no origin, start from universe
+    let start_level = origin
+        .as_ref()
+        .map(|(_, t)| node_type_to_view_level(t))
+        .unwrap_or(ViewLevel::Universe);
+
+    let dest_level = node_type_to_view_level(&destination.1);
+
+    // Build waypoints based on navigation path
+    // For now, create a direct path - future: use taxonomy tree for proper path finding
+
+    // Add origin waypoint if specified
+    if let Some((origin_id, origin_type)) = &origin {
+        let origin_info = get_node_info(pool, origin_id, origin_type).await?;
+        waypoints.push(RouteWaypoint {
+            node_id: origin_id.clone(),
+            node_type: origin_type.clone(),
+            label: origin_info.0,
+            position: origin_info.1,
+            view_level: start_level,
+            is_fork: false,
+            context_hint: None,
+        });
+    } else {
+        // Start from universe root
+        waypoints.push(RouteWaypoint {
+            node_id: "universe".to_string(),
+            node_type: NodeType::Universe,
+            label: "Universe".to_string(),
+            position: (0.0, 0.0),
+            view_level: ViewLevel::Universe,
+            is_fork: false,
+            context_hint: Some("Starting from universe view".to_string()),
+        });
+    }
+
+    // Add intermediate waypoints for level transitions
+    let intermediate_levels = get_intermediate_levels(start_level, dest_level);
+    for level in &intermediate_levels {
+        level_transitions += 1;
+        // Add a transitional waypoint (these would be refined with actual data)
+        waypoints.push(RouteWaypoint {
+            node_id: format!("transition_{:?}", level),
+            node_type: view_level_to_node_type(level),
+            label: format!("Navigating to {:?}", level),
+            position: calculate_transition_position(&waypoints, level),
+            view_level: *level,
+            is_fork: pause_at_forks && is_fork_level(level),
+            context_hint: Some(format!("Transitioning through {:?} level", level)),
+        });
+    }
+
+    // Add destination waypoint
+    let dest_info = get_node_info(pool, &destination.0, &destination.1).await?;
+    waypoints.push(RouteWaypoint {
+        node_id: destination.0.clone(),
+        node_type: destination.1.clone(),
+        label: dest_info.0.clone(),
+        position: dest_info.1,
+        view_level: dest_level,
+        is_fork: false,
+        context_hint: Some(format!("Destination: {}", dest_info.0)),
+    });
+
+    // Calculate total distance
+    let total_distance = calculate_total_distance(&waypoints);
+
+    // Build description
+    let description = if let Some((origin_id, _)) = &origin {
+        format!("Route from {} to {}", origin_id, dest_info.0)
+    } else {
+        format!("Route to {}", dest_info.0)
+    };
+
+    Ok(Route {
+        route_id,
+        waypoints,
+        total_distance,
+        level_transitions,
+        description,
+    })
+}
+
+/// Get node info (label, position) from database
+async fn get_node_info(
+    pool: &PgPool,
+    node_id: &str,
+    node_type: &NodeType,
+) -> Result<(String, (f32, f32)), (StatusCode, String)> {
+    let uuid = Uuid::parse_str(node_id).ok();
+
+    match node_type {
+        NodeType::Cbu => {
+            if let Some(id) = uuid {
+                let result: Option<(String,)> =
+                    sqlx::query_as(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                        .bind(id)
+                        .fetch_optional(pool)
+                        .await
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+                if let Some((name,)) = result {
+                    // Position would ideally come from layout, use hash-based position for now
+                    let pos = hash_to_position(node_id);
+                    return Ok((name, pos));
+                }
+            }
+            Err((StatusCode::NOT_FOUND, format!("CBU not found: {}", node_id)))
+        }
+        NodeType::Entity => {
+            if let Some(id) = uuid {
+                let result: Option<(String,)> =
+                    sqlx::query_as(r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#)
+                        .bind(id)
+                        .fetch_optional(pool)
+                        .await
+                        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+                if let Some((name,)) = result {
+                    let pos = hash_to_position(node_id);
+                    return Ok((name, pos));
+                }
+            }
+            Err((
+                StatusCode::NOT_FOUND,
+                format!("Entity not found: {}", node_id),
+            ))
+        }
+        NodeType::Universe => Ok(("Universe".to_string(), (0.0, 0.0))),
+        NodeType::Cluster => Ok((format!("Cluster {}", node_id), hash_to_position(node_id))),
+        NodeType::Document => Ok((format!("Document {}", node_id), hash_to_position(node_id))),
+        NodeType::KycCase => Ok((format!("KYC Case {}", node_id), hash_to_position(node_id))),
+    }
+}
+
+/// Convert node type to view level
+fn node_type_to_view_level(node_type: &NodeType) -> ViewLevel {
+    match node_type {
+        NodeType::Universe => ViewLevel::Universe,
+        NodeType::Cluster => ViewLevel::Cluster,
+        NodeType::Cbu => ViewLevel::System,
+        NodeType::Entity => ViewLevel::Planet,
+        NodeType::Document | NodeType::KycCase => ViewLevel::Surface,
+    }
+}
+
+/// Convert view level to typical node type
+fn view_level_to_node_type(level: &ViewLevel) -> NodeType {
+    match level {
+        ViewLevel::Universe => NodeType::Universe,
+        ViewLevel::Cluster => NodeType::Cluster,
+        ViewLevel::System => NodeType::Cbu,
+        ViewLevel::Planet => NodeType::Entity,
+        ViewLevel::Surface | ViewLevel::Core => NodeType::Entity,
+    }
+}
+
+/// Get intermediate levels between two view levels
+fn get_intermediate_levels(from: ViewLevel, to: ViewLevel) -> Vec<ViewLevel> {
+    let all_levels = [
+        ViewLevel::Universe,
+        ViewLevel::Cluster,
+        ViewLevel::System,
+        ViewLevel::Planet,
+        ViewLevel::Surface,
+        ViewLevel::Core,
+    ];
+
+    let from_idx = all_levels.iter().position(|l| *l == from).unwrap_or(0);
+    let to_idx = all_levels.iter().position(|l| *l == to).unwrap_or(0);
+
+    if from_idx < to_idx {
+        // Going deeper
+        all_levels[from_idx + 1..to_idx].to_vec()
+    } else if from_idx > to_idx {
+        // Going shallower
+        all_levels[to_idx + 1..from_idx]
+            .iter()
+            .rev()
+            .cloned()
+            .collect()
+    } else {
+        vec![]
+    }
+}
+
+/// Check if a level is typically a fork/decision point
+fn is_fork_level(level: &ViewLevel) -> bool {
+    matches!(level, ViewLevel::Cluster | ViewLevel::System)
+}
+
+/// Calculate transition position based on previous waypoints
+fn calculate_transition_position(waypoints: &[RouteWaypoint], _level: &ViewLevel) -> (f32, f32) {
+    if let Some(last) = waypoints.last() {
+        // Move in a direction based on the transition
+        (last.position.0 + 100.0, last.position.1 + 50.0)
+    } else {
+        (0.0, 0.0)
+    }
+}
+
+/// Calculate total distance for a route
+fn calculate_total_distance(waypoints: &[RouteWaypoint]) -> f32 {
+    let mut total = 0.0;
+    for i in 1..waypoints.len() {
+        let prev = &waypoints[i - 1];
+        let curr = &waypoints[i];
+        let dx = curr.position.0 - prev.position.0;
+        let dy = curr.position.1 - prev.position.1;
+        total += (dx * dx + dy * dy).sqrt();
+    }
+    total
+}
+
+/// Estimate route duration in seconds
+fn estimate_route_duration(route: &Route) -> f32 {
+    // Base: 1 second per waypoint + 0.5 seconds per level transition
+    let base_time = route.waypoints.len() as f32 * 1.0;
+    let transition_time = route.level_transitions as f32 * 0.5;
+    // Distance factor (roughly 100 units per second flight speed)
+    let distance_time = route.total_distance / 100.0;
+
+    base_time + transition_time + distance_time
+}
+
+/// Generate a deterministic position from a node ID hash
+fn hash_to_position(id: &str) -> (f32, f32) {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    id.hash(&mut hasher);
+    let hash = hasher.finish();
+
+    // Map hash to reasonable coordinate range
+    let x = ((hash & 0xFFFF) as f32 / 65535.0) * 2000.0 - 1000.0;
+    let y = (((hash >> 16) & 0xFFFF) as f32 / 65535.0) * 2000.0 - 1000.0;
+    (x, y)
+}
+
 /// Create the graph router
 pub fn create_graph_router(pool: PgPool) -> Router {
     Router::new()
@@ -416,6 +841,8 @@ pub fn create_graph_router(pool: PgPool) -> Router {
             "/api/graph/entity/:entity_id/neighborhood",
             get(get_entity_neighborhood_graph),
         )
+        // Galaxy navigation route endpoint
+        .route("/api/route", get(get_route))
         .with_state(pool)
 }
 

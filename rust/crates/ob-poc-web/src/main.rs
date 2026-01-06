@@ -27,7 +27,7 @@ use ob_poc::api::{
     create_agent_router_with_sessions, create_attribute_router, create_client_router,
     create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
     create_session_graph_router, create_session_store, create_taxonomy_router,
-    create_trading_matrix_router, create_verb_discovery_router,
+    create_trading_matrix_router, create_universe_router, create_verb_discovery_router,
 };
 
 // Import resolution store from services
@@ -351,7 +351,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Graph visualization (legacy CBU endpoints)
         .merge(create_graph_router(pool.clone()))
         // Session-scoped graph (shares state with REPL and taxonomy)
-        .merge(create_session_graph_router(pool.clone(), sessions.clone()));
+        .merge(create_session_graph_router(pool.clone(), sessions.clone()))
+        // Galaxy navigation - universe view and cluster detail
+        .merge(create_universe_router(pool.clone()));
 
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());
@@ -411,6 +413,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/verbs/agent-context - Agent verb context");
     tracing::info!("  /api/voice/match      - Semantic voice matching");
     tracing::info!("  /api/voice/health     - Voice matcher health");
+    tracing::info!("  /api/universe         - Galaxy universe view");
+    tracing::info!("  /api/cluster/:type/:id - Cluster detail view");
     tracing::info!("");
     tracing::info!("Client Portal API:");
     tracing::info!("  /api/client/login     - Client authentication");

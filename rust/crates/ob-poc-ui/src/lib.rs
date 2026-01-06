@@ -12,6 +12,7 @@
 mod api;
 mod app;
 pub mod command;
+pub mod navigation;
 mod panels;
 pub mod state;
 pub mod tokens;

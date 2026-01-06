@@ -62,6 +62,12 @@ impl App {
             type_filter: None,
             trading_matrix_state: ob_poc_graph::TradingMatrixState::new(),
             selected_matrix_node: None,
+            // Galaxy navigation state
+            galaxy_view: ob_poc_graph::GalaxyView::new(),
+            navigation_scope: ob_poc_types::galaxy::NavigationScope::default(),
+            view_level: ob_poc_types::galaxy::ViewLevel::default(),
+            navigation_stack: Vec::new(),
+            universe_graph: None,
             last_known_version: None,
             last_version_check: None,
         };
@@ -218,39 +224,79 @@ impl App {
                 self.state.graph_widget.clear_highlight();
             }
 
-            // Scale navigation (astronomical metaphor)
+            // Scale navigation (astronomical metaphor) - wired to GalaxyView
             NavigationVerb::ScaleUniverse => {
-                self.state.graph_widget.zoom_to_fit();
+                // Return to universe view in galaxy navigation
+                self.state.galaxy_view.return_to_universe();
+                self.state.navigation_scope = ob_poc_types::galaxy::NavigationScope::Universe;
+                self.state.view_level = ob_poc_types::galaxy::ViewLevel::Universe;
+                self.state.fetch_universe_graph();
             }
-            NavigationVerb::ScaleGalaxy { segment: _ } => {
-                // Zoom to segment level
-                self.state.graph_widget.set_zoom(0.3);
+            NavigationVerb::ScaleGalaxy { segment } => {
+                // Drill into a cluster/segment in galaxy view
+                if let Some(cluster_id) = segment {
+                    self.state.galaxy_view.drill_into_cluster(&cluster_id);
+                    self.state.navigation_scope = ob_poc_types::galaxy::NavigationScope::Cluster {
+                        cluster_id: cluster_id.clone(),
+                        cluster_type: ob_poc_types::galaxy::ClusterType::default(),
+                    };
+                    self.state.view_level = ob_poc_types::galaxy::ViewLevel::Cluster;
+                }
             }
             NavigationVerb::ScaleSystem { cbu_id } => {
+                // Select a specific CBU (solar system level)
                 if let Some(ref id) = cbu_id {
                     if let Ok(uuid) = Uuid::parse_str(id) {
                         self.state.select_cbu(uuid, id);
+                        self.state.view_level = ob_poc_types::galaxy::ViewLevel::System;
                     }
                 }
             }
             NavigationVerb::ScalePlanet { entity_id } => {
-                if let Some(id) = entity_id {
-                    self.state.graph_widget.focus_on_entity(&id);
+                // Focus on a specific entity (planet level)
+                if let Some(ref id) = entity_id {
+                    // Use galaxy focus stack for inline expansion
+                    self.state.galaxy_view.push_focus(
+                        id.clone(),
+                        "entity".to_string(),
+                        id.clone(), // Use ID as label for now
+                    );
+                    self.state.view_level = ob_poc_types::galaxy::ViewLevel::Planet;
                 }
             }
             NavigationVerb::ScaleSurface => {
+                // Surface level - deep focus with high zoom
                 self.state.graph_widget.set_zoom(1.5);
+                self.state.view_level = ob_poc_types::galaxy::ViewLevel::Surface;
             }
             NavigationVerb::ScaleCore => {
+                // Core level - deepest zoom into entity details
                 self.state.graph_widget.set_zoom(3.0);
+                self.state.view_level = ob_poc_types::galaxy::ViewLevel::Core;
             }
 
-            // Depth navigation
+            // Depth navigation - uses galaxy focus stack
             NavigationVerb::DrillThrough => {
-                self.state.graph_widget.zoom_in(Some(1.5));
+                // Drill deeper into current focus
+                if let Some(focus) = self.state.galaxy_view.current_focus() {
+                    // Trigger expansion of current focus
+                    let node_id = focus.node_id.clone();
+                    self.state.galaxy_view.expand_node(
+                        node_id,
+                        ob_poc_types::galaxy::ExpansionType::Children,
+                        vec![], // Children will be fetched
+                    );
+                } else {
+                    self.state.graph_widget.zoom_in(Some(1.5));
+                }
             }
             NavigationVerb::SurfaceReturn => {
-                self.state.graph_widget.zoom_to_fit();
+                // Pop focus stack or return to universe
+                if self.state.galaxy_view.pop_focus().is_none() {
+                    self.state.galaxy_view.return_to_universe();
+                    self.state.navigation_scope = ob_poc_types::galaxy::NavigationScope::Universe;
+                    self.state.view_level = ob_poc_types::galaxy::ViewLevel::Universe;
+                }
             }
             NavigationVerb::Xray => {
                 // Toggle transparency mode
@@ -302,41 +348,95 @@ impl App {
                 web_sys::console::log_1(&"Showing time trail".into());
             }
 
-            // Investigation patterns (these are navigation, not agent)
+            // Investigation patterns - use galaxy focus stack for deep navigation
             NavigationVerb::FollowRabbit { from_entity } => {
+                // "Follow the rabbit" - trace ownership chain to terminus
                 if let Some(ref id) = from_entity {
-                    self.state.graph_widget.focus_on_entity(id);
+                    // Push focus onto entity
+                    self.state.galaxy_view.push_focus(
+                        id.clone(),
+                        "ownership_chain".to_string(),
+                        format!("Following ownership from {}", id),
+                    );
+                    // Request ownership chain expansion
+                    self.state.galaxy_view.expand_node(
+                        id.clone(),
+                        ob_poc_types::galaxy::ExpansionType::Ownership,
+                        vec![],
+                    );
+                    self.state.view_level = ob_poc_types::galaxy::ViewLevel::Planet;
                 }
-                // TODO: Highlight ownership chain to terminus
             }
             NavigationVerb::DiveInto { entity_id } => {
+                // Dive into entity - push focus and expand children
                 if let Some(ref id) = entity_id {
-                    self.state.graph_widget.focus_on_entity(id);
-                    self.state.graph_widget.zoom_in(Some(1.5));
+                    self.state.galaxy_view.push_focus(
+                        id.clone(),
+                        "entity".to_string(),
+                        format!("Diving into {}", id),
+                    );
+                    self.state.galaxy_view.expand_node(
+                        id.clone(),
+                        ob_poc_types::galaxy::ExpansionType::Children,
+                        vec![],
+                    );
+                    self.state.view_level = ob_poc_types::galaxy::ViewLevel::Surface;
                 }
             }
             NavigationVerb::WhoControls { entity_id } => {
-                if let Some(id) = entity_id {
-                    self.state.graph_widget.focus_on_entity(&id);
+                // "Who controls this?" - trace control chain
+                if let Some(ref id) = entity_id {
+                    self.state.galaxy_view.push_focus(
+                        id.clone(),
+                        "control_chain".to_string(),
+                        format!("Control chain for {}", id),
+                    );
+                    // Request control relationships
+                    self.state.galaxy_view.expand_node(
+                        id.clone(),
+                        ob_poc_types::galaxy::ExpansionType::Control,
+                        vec![],
+                    );
                 }
-                // TODO: Trace control chain visually
             }
-            NavigationVerb::Illuminate { aspect: _ } => {
-                // Highlight specific aspect
+            NavigationVerb::Illuminate { aspect } => {
+                // Highlight specific aspect using agent state
+                if let Some(ref aspect_type) = aspect {
+                    web_sys::console::log_1(&format!("Illuminating: {}", aspect_type).into());
+                    // Could set agent mode to highlight specific relationships
+                }
             }
             NavigationVerb::Shadow => {
-                // Dim background entities
+                // Dim background entities - toggle focus mode
+                web_sys::console::log_1(&"Shadowing background entities".into());
             }
             NavigationVerb::RedFlagScan => {
-                // Highlight red flag entities
+                // Highlight entities with anomalies
+                if self.state.galaxy_view.has_anomalies() {
+                    let count = self.state.galaxy_view.total_anomaly_count();
+                    web_sys::console::log_1(
+                        &format!("Red flag scan: {} anomalies found", count).into(),
+                    );
+                    // Agent mode could highlight anomaly nodes
+                    self.state
+                        .galaxy_view
+                        .set_agent_mode(ob_poc_graph::AgentMode::Scanning);
+                }
             }
             NavigationVerb::BlackHole => {
                 // Highlight entities with missing data
+                web_sys::console::log_1(&"Black hole scan: finding missing data".into());
+                self.state
+                    .galaxy_view
+                    .set_agent_mode(ob_poc_graph::AgentMode::Scanning);
             }
 
             // Context
-            NavigationVerb::SetContext { context: _ } => {
+            NavigationVerb::SetContext { context } => {
                 // Switch investigation context
+                if let Some(ref ctx) = context {
+                    web_sys::console::log_1(&format!("Switching context to: {}", ctx).into());
+                }
             }
         }
     }
@@ -863,6 +963,127 @@ impl eframe::App for App {
             web_sys::console::log_1(&"update: taxonomy clear filter".into());
             // TODO: Implement taxonomy filter clearing via API
             web_sys::console::warn_1(&"Taxonomy clear filter not yet implemented".into());
+        }
+
+        // =================================================================
+        // Process Galaxy Navigation Commands (universe/cluster drill-down)
+        // =================================================================
+
+        // Handle universe graph result (from GET /api/universe)
+        if let Some(result) = self.state.take_pending_universe_graph() {
+            match result {
+                Ok(universe) => {
+                    web_sys::console::log_1(
+                        &format!(
+                            "update: received universe graph with {} clusters",
+                            universe.clusters.len()
+                        )
+                        .into(),
+                    );
+                    // Update galaxy view with new data
+                    self.state.galaxy_view.set_universe_data(&universe);
+                    self.state.universe_graph = Some(universe);
+                }
+                Err(e) => {
+                    web_sys::console::error_1(
+                        &format!("update: failed to fetch universe: {}", e).into(),
+                    );
+                }
+            }
+        }
+
+        // Handle universe refetch flag
+        if self.state.take_pending_universe_refetch() {
+            web_sys::console::log_1(&"update: fetching universe graph".into());
+            self.state.fetch_universe_graph();
+        }
+
+        // Handle drill into cluster command
+        if let Some(cluster_id) = self.state.take_pending_drill_cluster() {
+            web_sys::console::log_1(
+                &format!("update: drilling into cluster {}", cluster_id).into(),
+            );
+            // Push current scope to navigation stack
+            self.state
+                .navigation_stack
+                .push(self.state.navigation_scope.clone());
+            // Update navigation scope to cluster
+            self.state.navigation_scope = ob_poc_types::galaxy::NavigationScope::Cluster {
+                cluster_id: cluster_id.clone(),
+                cluster_type: ob_poc_types::galaxy::ClusterType::default(),
+            };
+            self.state.view_level = ob_poc_types::galaxy::ViewLevel::Cluster;
+            // Trigger cluster fetch via galaxy view
+            self.state.galaxy_view.drill_into_cluster(&cluster_id);
+        }
+
+        // Handle drill into CBU command (from galaxy view)
+        if let Some(cbu_id) = self.state.take_pending_drill_cbu() {
+            web_sys::console::log_1(
+                &format!("update: drilling into CBU {} from galaxy", cbu_id).into(),
+            );
+            // Push current scope to navigation stack
+            self.state
+                .navigation_stack
+                .push(self.state.navigation_scope.clone());
+            // Update navigation scope to CBU (System level in astronomical metaphor)
+            self.state.navigation_scope = ob_poc_types::galaxy::NavigationScope::Cbu {
+                cbu_id: cbu_id.clone(),
+                cbu_name: String::new(), // Will be populated when CBU data is fetched
+            };
+            self.state.view_level = ob_poc_types::galaxy::ViewLevel::System;
+            // Switch to CBU graph view by selecting the CBU
+            if let Ok(uuid) = uuid::Uuid::parse_str(&cbu_id) {
+                self.state.select_cbu(uuid, ""); // Name populated on fetch
+            }
+        }
+
+        // Handle drill up command
+        if self.state.take_pending_drill_up() {
+            web_sys::console::log_1(&"update: drilling up one level".into());
+            // Pop from navigation stack
+            if let Some(prev_scope) = self.state.navigation_stack.pop() {
+                self.state.navigation_scope = prev_scope.clone();
+                // Update view level based on scope (using astronomical metaphor)
+                self.state.view_level = match &prev_scope {
+                    ob_poc_types::galaxy::NavigationScope::Universe => {
+                        ob_poc_types::galaxy::ViewLevel::Universe
+                    }
+                    ob_poc_types::galaxy::NavigationScope::Book { .. } => {
+                        ob_poc_types::galaxy::ViewLevel::Cluster
+                    }
+                    ob_poc_types::galaxy::NavigationScope::Cluster { .. } => {
+                        ob_poc_types::galaxy::ViewLevel::Cluster
+                    }
+                    ob_poc_types::galaxy::NavigationScope::Cbu { .. } => {
+                        ob_poc_types::galaxy::ViewLevel::System
+                    }
+                    ob_poc_types::galaxy::NavigationScope::Entity { .. } => {
+                        ob_poc_types::galaxy::ViewLevel::Planet
+                    }
+                    ob_poc_types::galaxy::NavigationScope::Deep { .. } => {
+                        ob_poc_types::galaxy::ViewLevel::Core
+                    }
+                };
+                // If back to universe, trigger galaxy view refresh
+                if matches!(prev_scope, ob_poc_types::galaxy::NavigationScope::Universe) {
+                    self.state.galaxy_view.return_to_universe();
+                }
+            }
+        }
+
+        // Handle go to universe command
+        if self.state.take_pending_go_to_universe() {
+            web_sys::console::log_1(&"update: jumping to universe view".into());
+            // Clear navigation stack
+            self.state.navigation_stack.clear();
+            // Reset to universe scope
+            self.state.navigation_scope = ob_poc_types::galaxy::NavigationScope::Universe;
+            self.state.view_level = ob_poc_types::galaxy::ViewLevel::Universe;
+            // Reset galaxy view
+            self.state.galaxy_view.return_to_universe();
+            // Fetch fresh universe data
+            self.state.fetch_universe_graph();
         }
 
         // =================================================================

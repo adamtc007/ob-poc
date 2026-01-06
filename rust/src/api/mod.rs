@@ -52,6 +52,9 @@ pub mod trading_matrix_routes;
 pub mod taxonomy_routes;
 
 #[cfg(feature = "server")]
+pub mod universe_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -91,3 +94,6 @@ pub use trading_matrix_routes::create_trading_matrix_router;
 
 #[cfg(feature = "server")]
 pub use taxonomy_routes::create_taxonomy_router;
+
+#[cfg(feature = "server")]
+pub use universe_routes::create_universe_router;

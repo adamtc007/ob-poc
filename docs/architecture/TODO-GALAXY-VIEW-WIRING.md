@@ -1,33 +1,34 @@
 # TODO: Wire Galaxy View (Client-Level CBU Visualization)
 
-## Status: READY TO IMPLEMENT
+## Status: SUPERSEDED
 
-**Dependency Cleared:** Trading Matrix AST refactoring complete (2026-01-06).
+**This document has been superseded by:**
 
-Patterns now established:
-- ✅ Document-as-source-of-truth (`TradingMatrixDocument` tree)
-- ✅ Hierarchical taxonomy traversal (path-based node IDs)
-- ✅ `ast_db::apply_and_save` pattern for mutations
-- ✅ API returns document directly (no SQL reconstruction)
+### → `TODO-GALAXY-NAVIGATION-SYSTEM.md` ← 
 
-These patterns should guide Galaxy View implementation.
+**The definitive brief for Claude Code.** 1127 lines covering:
+- The experience (piloting, not clicking)
+- Agent intelligence (anticipation, autopilot, loiter)
+- Visual language (depth, risk, state encoding)
+- Navigation mechanics (physics, input, voice)
+- Data structures (shared types for server + client)
+- Server API (all endpoints)
+- Implementation phases (8 weeks)
+- Success criteria (what users should/shouldn't say)
+- Complete file checklist
+
+**Supporting documents (reference only):**
+- `TUNNEL-NAVIGATION-EXPERIENCE.md` - The experiential feel
+- `GALAXY-NODE-EDGE-TAXONOMY.md` - Node/edge type details
+- `ESPER-NAVIGATION-MODEL.md` - Soft focus, inline expansion
+- `NATURAL-TREE-TRAVERSAL.md` - Animation timing, spring physics
+- `TODO-GALAXY-SERVER-API.md` - Server SQL details
+
+**Start with the main brief. It has everything.**
 
 ---
 
-## Reference Documents
-
-| Document | Purpose |
-|----------|---------|
-| **`TUNNEL-NAVIGATION-EXPERIENCE.md`** | **START HERE** - The experiential brief. How it should FEEL. |
-| `GALAXY-NODE-EDGE-TAXONOMY.md` | Node types, edge types, LOD levels, response structures |
-| `ESPER-NAVIGATION-MODEL.md` | Soft focus, inline expansion, voice commands, camera behavior |
-| `NATURAL-TREE-TRAVERSAL.md` | Animation timing, spring physics, organic growth rendering |
-| `TODO-GALAXY-SERVER-API.md` | Server endpoints, SQL queries, repository/routes code |
-| `brain-dump/GALAXY-VIEW-RESEARCH.md` | Analysis of existing infrastructure |
-
-**Read order:** TUNNEL first (the feel), then TAXONOMY (the structure), then ESPER (the commands), then TREE (the animations), then SERVER-API (the implementation).
-
----
+## Original Content Below (Historical Reference)
 
 ## Context
 

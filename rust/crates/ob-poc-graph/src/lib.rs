@@ -51,3 +51,6 @@ pub use graph::{
     ViewMode,
     ViewTransition,
 };
+
+// Re-export galaxy types from ob-poc-types for convenience
+pub use ob_poc_types::galaxy::AgentMode;

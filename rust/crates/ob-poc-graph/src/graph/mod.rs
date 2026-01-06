@@ -52,9 +52,13 @@ pub use animation::{SpringConfig, SpringF32, SpringVec2};
 pub use astronomy::{AstronomyView, NavigationEntry, TransitionAction, ViewTransition};
 pub use camera::Camera2D;
 pub use force_sim::{ClusterNode, ForceConfig, ForceSimulation};
+#[allow(deprecated)]
 pub use galaxy::{ClusterData, ClusterType, GalaxyAction, GalaxyView, RiskSummary};
+
+// Re-export NavigationAction from shared types for galaxy navigation
 pub use input::{InputHandler, InputState};
 pub use layout::LayoutEngine;
+pub use ob_poc_types::galaxy::NavigationAction;
 pub use ontology::{
     entity_matches_type, get_entities_for_type, render_type_browser, EntityTypeOntology,
     TaxonomyState, TypeBrowserAction, TypeNode,

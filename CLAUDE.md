@@ -1229,6 +1229,95 @@ match action {
 }
 ```
 
+## Galaxy Navigation System
+
+The Galaxy view provides a high-level "universe" visualization where CBUs are clustered by jurisdiction, client type, risk rating, or product. Users can drill from universe → cluster → individual CBU entity graph.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Galaxy View (Universe Level)                  │
+│  All CBUs clustered by dimension (jurisdiction, client, etc.)  │
+│  rust/crates/ob-poc-graph/src/graph/galaxy.rs                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │ drill-in
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Cluster Detail View                           │
+│  CBUs within a cluster with shared entity edges                 │
+│  Anomaly indicators (risk, pending KYC, gaps)                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │ drill-in
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Entity Graph View                             │
+│  Existing CBU entity graph (ownership, roles, documents)        │
+│  rust/crates/ob-poc-graph/src/graph/render.rs                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/ob-poc-graph/src/graph/galaxy.rs` | GalaxyView widget with force simulation |
+| `rust/crates/ob-poc-graph/src/graph/simulation.rs` | Force-directed layout (Barnes-Hut) |
+| `rust/crates/ob-poc-types/src/galaxy.rs` | Shared types (UniverseGraph, ClusterNode, etc.) |
+| `rust/src/api/universe_routes.rs` | API endpoints for universe/cluster data |
+
+### API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/universe?cluster_by=jurisdiction` | All CBUs clustered by dimension |
+| `GET /api/cluster/:type/:id` | Expanded cluster with CBU nodes and edges |
+
+### GalaxyView Features
+
+| Feature | Description |
+|---------|-------------|
+| **Force Simulation** | Barnes-Hut N-body with spring physics for smooth 60fps |
+| **Depth Particles** | Atmospheric cosmic dust effect in background |
+| **LOD Rendering** | Detail scaling based on zoom level (labels, edges, particles) |
+| **Soft Focus** | Loiter-based focus with gold dashed ring indicator |
+| **Keyboard Navigation** | Tab cycling, arrow keys spatial nav, Enter to drill |
+| **Screen Reader Support** | Accessibility labels for cluster state |
+
+### Navigation Actions
+
+The GalaxyView returns `NavigationAction` enum for parent handling:
+
+```rust
+pub enum NavigationAction {
+    DrillIntoCluster { cluster_id: String },
+    DrillIntoCbu { cbu_id: Uuid },
+    PopToUniverse,
+    Hover { cluster_id: Option<String> },
+    Select { cluster_id: String },
+}
+```
+
+### Keyboard Controls
+
+| Key | Action |
+|-----|--------|
+| Tab / Shift+Tab | Cycle through clusters |
+| Arrow Keys | Spatial navigation to nearest cluster |
+| Enter / Space | Drill into selected cluster |
+| Escape | Clear selection |
+| Home | Select first cluster |
+
+### Types (ob-poc-types/galaxy.rs)
+
+| Type | Description |
+|------|-------------|
+| `UniverseGraph` | Complete universe with clusters, edges, stats |
+| `ClusterNode` | A cluster (jurisdiction, client type, etc.) with CBU count |
+| `ClusterDetailGraph` | Expanded cluster with CBU nodes and shared entity edges |
+| `CbuNode` | Individual CBU with risk status, entity count, anomalies |
+| `Anomaly` | Risk indicator (HIGH_RISK, PENDING_KYC, COVERAGE_GAP, etc.) |
+
 ## egui State Management & Best Practices
 
 > **⛔ STOP: Read the 5 rules below before writing ANY egui/WASM code. Violations cause frozen UI, state drift, and impossible-to-debug bugs.**

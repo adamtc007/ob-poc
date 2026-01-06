@@ -15,10 +15,11 @@
 use crate::panels::ContainerBrowseState;
 use crate::tokens::TokenRegistry;
 use ob_poc_graph::{
-    CbuGraphData, CbuGraphWidget, EntityTypeOntology, TaxonomyState, TradingMatrix,
+    CbuGraphData, CbuGraphWidget, EntityTypeOntology, GalaxyView, TaxonomyState, TradingMatrix,
     TradingMatrixNode, TradingMatrixState, ViewMode,
 };
 use ob_poc_types::{
+    galaxy::{NavigationAction, NavigationScope, UniverseGraph, ViewLevel},
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
     SessionContext, SessionStateResponse, ValidateDslResponse,
 };
@@ -94,6 +95,10 @@ pub struct AppState {
     /// Set via fetch_trading_matrix(), never modified directly
     pub trading_matrix: Option<TradingMatrix>,
 
+    /// Universe graph data (galaxy navigation - clusters of CBUs)
+    /// Set via fetch_universe(), never modified directly
+    pub universe_graph: Option<UniverseGraph>,
+
     // =========================================================================
     // UI-ONLY STATE (ephemeral, not persisted)
     // =========================================================================
@@ -144,6 +149,19 @@ pub struct AppState {
     /// Currently selected trading matrix node (for detail panel)
     pub selected_matrix_node: Option<TradingMatrixNode>,
 
+    /// Galaxy view widget (universe navigation - force-directed cluster layout)
+    /// Owns camera, force simulation - call tick() BEFORE render() per egui rules
+    pub galaxy_view: GalaxyView,
+
+    /// Current navigation scope (Universe, Cluster, Cbu, Entity, etc.)
+    pub navigation_scope: NavigationScope,
+
+    /// Current view level (astronomical metaphor)
+    pub view_level: ViewLevel,
+
+    /// Navigation breadcrumb stack for drill-up
+    pub navigation_stack: Vec<NavigationScope>,
+
     /// Last known session version (for detecting external changes from MCP/REPL)
     /// When server version differs from this, we refetch the full session
     pub last_known_version: Option<String>,
@@ -175,6 +193,7 @@ impl Default for AppState {
             cbu_list: Vec::new(),
             session_context: None,
             trading_matrix: None,
+            universe_graph: None,
 
             // UI-only state
             buffers: TextBuffers::default(),
@@ -197,6 +216,10 @@ impl Default for AppState {
             type_filter: None,
             trading_matrix_state: TradingMatrixState::new(),
             selected_matrix_node: None,
+            galaxy_view: GalaxyView::new(),
+            navigation_scope: NavigationScope::default(),
+            view_level: ViewLevel::default(),
+            navigation_stack: Vec::new(),
             last_known_version: None,
             last_version_check: None,
 
@@ -415,6 +438,15 @@ pub struct AsyncState {
         Option<Result<crate::api::TaxonomyBreadcrumbsResponse, String>>,
     pub pending_taxonomy_zoom_response: Option<Result<crate::api::TaxonomyZoomResponse, String>>,
     pub loading_taxonomy: bool, // loading flag for taxonomy operations
+
+    // Galaxy navigation (universe/cluster drill-down)
+    pub pending_universe_graph: Option<Result<UniverseGraph, String>>, // From GET /api/universe
+    pub pending_drill_cluster: Option<String>,                         // Cluster ID to drill into
+    pub pending_drill_cbu: Option<String>, // CBU ID to drill into (from galaxy)
+    pub pending_drill_up: bool,            // Go up one level in navigation stack
+    pub pending_go_to_universe: bool,      // Jump to universe view
+    pub needs_universe_refetch: bool,      // Flag to trigger universe fetch
+    pub loading_universe: bool,            // Loading flag for universe fetch
 
     // State change flags (set by actions, processed centrally in update loop)
     // These are checked ONCE in update() AFTER process_async_results()
@@ -1273,6 +1305,68 @@ impl AppState {
         }
     }
 
+    // === Galaxy Navigation take_pending_* methods ===
+
+    /// Take pending universe graph result (from GET /api/universe)
+    pub fn take_pending_universe_graph(&self) -> Option<Result<UniverseGraph, String>> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_universe_graph.take()
+        } else {
+            None
+        }
+    }
+
+    /// Take pending drill into cluster action
+    pub fn take_pending_drill_cluster(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_drill_cluster.take()
+        } else {
+            None
+        }
+    }
+
+    /// Take pending drill into CBU action (from galaxy view)
+    pub fn take_pending_drill_cbu(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_drill_cbu.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if drill up is pending
+    pub fn take_pending_drill_up(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_drill_up;
+            state.pending_drill_up = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if go to universe is pending
+    pub fn take_pending_go_to_universe(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_go_to_universe;
+            state.pending_go_to_universe = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if universe refetch is needed
+    pub fn take_pending_universe_refetch(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.needs_universe_refetch;
+            state.needs_universe_refetch = false;
+            pending
+        } else {
+            false
+        }
+    }
+
     /// Add a user message to the chat history
     pub fn add_user_message(&mut self, content: String) {
         self.messages.push(ChatMessage {
@@ -1605,5 +1699,73 @@ impl AppState {
                 ctx.request_repaint();
             }
         });
+    }
+}
+
+// =============================================================================
+// GALAXY NAVIGATION METHODS
+// =============================================================================
+
+impl AppState {
+    /// Fetch universe graph (all clusters) from server
+    pub fn fetch_universe_graph(&mut self) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_universe = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_universe_graph().await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_universe_graph = Some(result);
+                state.loading_universe = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Request drill into a specific cluster
+    pub fn request_drill_cluster(&mut self, cluster_id: String) {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_drill_cluster = Some(cluster_id);
+        }
+    }
+
+    /// Request drill into a specific CBU (from galaxy view)
+    pub fn request_drill_cbu(&mut self, cbu_id: String) {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_drill_cbu = Some(cbu_id);
+        }
+    }
+
+    /// Request drill up one level in navigation stack
+    pub fn request_drill_up(&mut self) {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_drill_up = true;
+        }
+    }
+
+    /// Request jump to universe view
+    pub fn request_go_to_universe(&mut self) {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_go_to_universe = true;
+        }
+    }
+
+    /// Check if universe is currently loading
+    pub fn is_loading_universe(&self) -> bool {
+        if let Ok(state) = self.async_state.lock() {
+            state.loading_universe
+        } else {
+            false
+        }
     }
 }
