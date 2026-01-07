@@ -8888,17 +8888,38 @@ The GLEIF integration provides comprehensive verbs for entity enrichment, corpor
 
 ### Fund Import Crawler
 
-The `gleif.import-managed-funds` verb provides a complete fund onboarding pipeline:
+The `gleif.import-managed-funds` verb provides a complete fund onboarding pipeline via DSL.
+
+**CLI Usage:**
+
+```bash
+# Import all funds managed by Aviva Investors Luxembourg
+cargo x gleif-import --manager-lei "549300V8JA4BMYPQUJ49" --create-cbus
+
+# Import all funds managed by Allianz Global Investors GmbH
+cargo x gleif-import --manager-lei "OJ2TIQSVQND4IZYYK658" --create-cbus
+
+# Dry run (show what would be imported)
+cargo x gleif-import --manager-lei "..." --create-cbus --dry-run
+
+# Limit for testing
+cargo x gleif-import --manager-lei "..." --create-cbus --limit 10
+```
+
+**DSL Equivalent:**
 
 ```clojure
-;; Import all funds managed by Allianz Global Investors
 (gleif.import-managed-funds
-  :manager-lei "529900CJLGA97K34T894"
-  :ultimate-client-lei "529900CJLGA97K34T894"
-  :create-cbus true
-  :limit 10
-  :dry-run false)
+  :manager-lei "OJ2TIQSVQND4IZYYK658"
+  :create-cbus true)
 ```
+
+**Production Statistics:**
+
+| Manager | Funds | CBUs | Roles | Time |
+|---------|-------|------|-------|------|
+| Aviva Investors Luxembourg | 44 | 44 | 132 | 0.8s |
+| Allianz Global Investors GmbH | 417 | 417 | 1,251 | 3.7s |
 
 **What it creates for each fund:**
 1. **Fund Entity** - `entity_funds` record with LEI, GLEIF metadata, legal form
@@ -8910,6 +8931,8 @@ The `gleif.import-managed-funds` verb provides a complete fund onboarding pipeli
    - `SICAV` - For SICAV umbrella funds
 
 **Name-based fallback:** When the GLEIF relationship API returns empty results, the crawler falls back to searching for funds by the manager's name.
+
+**Idempotency:** Uses upsert logic - re-running the import is safe and will update existing records.
 
 ### BODS DSL Verbs
 

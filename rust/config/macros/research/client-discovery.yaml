@@ -2,121 +2,94 @@
 # Researches institutional client structure using web search and LLM reasoning
 # Outputs structured JSON for human review before generating GLEIF DSL verbs
 
-name: client-discovery
-version: "1.0"
+macro:
+  name: client-discovery
+  version: "1.0"
 
-description: |
-  Research an institutional client's corporate structure using web search.
-  Discovers the apex entity, management companies, investment managers,
-  and fund structures. Outputs structured JSON with LEIs where available.
+  description: |
+    Research an institutional client's corporate structure using web search.
+    Discovers the apex entity, management companies, investment managers,
+    and fund structures. Outputs structured JSON with LEIs where available.
 
-parameters:
-  - name: client_name
-    type: string
-    required: true
-    description: Name of the client to research (e.g., "Allianz Global Investors")
+  parameters:
+    - name: client_name
+      type: string
+      required: true
+      description: Name of the client to research (e.g., "Allianz Global Investors")
 
-  - name: jurisdiction_hint
-    type: string
-    required: false
-    description: Hint about primary jurisdiction (e.g., "LU", "DE", "GB")
-    default: null
+    - name: jurisdiction_hint
+      type: string
+      required: false
+      description: Hint about primary jurisdiction (e.g., "LU", "DE", "GB")
+      default: null
 
-  - name: focus_area
-    type: string
-    required: false
-    description: Specific focus area for research
-    enum:
-      - fund_structure
-      - corporate_hierarchy
-      - regulatory_status
-      - all
-    default: all
+    - name: focus_area
+      type: string
+      required: false
+      description: Specific focus area for research
+      enum:
+        - fund_structure
+        - corporate_hierarchy
+        - regulatory_status
+        - all
+      default: all
 
-  - name: max_entities
-    type: integer
-    required: false
-    description: Maximum number of entities to discover
-    default: 20
+    - name: max_entities
+      type: integer
+      required: false
+      description: Maximum number of entities to discover
+      default: 20
 
-# Tools available to the LLM during research
-tools:
-  - web_search
+  tools:
+    - web_search
 
-# Prompt template (Handlebars syntax)
-prompt: |
-  You are researching the corporate structure of "{{client_name}}" for KYC/AML onboarding purposes.
+  prompt: |
+    You are researching the corporate structure of "{{client_name}}" for KYC/AML onboarding purposes.
 
-  {{#if jurisdiction_hint}}
-  Focus on entities in or related to {{jurisdiction_hint}} jurisdiction.
-  {{/if}}
+    {{#if jurisdiction_hint}}
+    Focus on entities in or related to {{jurisdiction_hint}} jurisdiction.
+    {{/if}}
 
-  {{#if focus_area}}
-  {{#unless (eq focus_area "all")}}
-  Focus specifically on: {{focus_area}}
-  {{/unless}}
-  {{/if}}
+    {{#if focus_area}}
+    {{#unless (eq focus_area "all")}}
+    Focus specifically on: {{focus_area}}
+    {{/unless}}
+    {{/if}}
 
-  Use web_search to find authoritative information about:
-  1. The apex/parent entity (holding company or ultimate parent)
-  2. Management companies (ManCos) - entities that manage funds
-  3. Investment managers - entities that make investment decisions
-  4. Fund structures - SICAVs, unit trusts, etc.
-  5. LEIs (Legal Entity Identifiers) for each entity when available
-  6. Regulatory status (UCITS, AIF, etc.)
-  7. Jurisdictions of incorporation
+    Use web_search to find authoritative information about:
+    1. The apex/parent entity (holding company or ultimate parent)
+    2. Management companies (ManCos) - entities that manage funds
+    3. Investment managers - entities that make investment decisions
+    4. Fund structures - SICAVs, unit trusts, etc.
+    5. LEIs (Legal Entity Identifiers) for each entity when available
+    6. Regulatory status (UCITS, AIF, etc.)
+    7. Jurisdictions of incorporation
 
-  Search for:
-  - "[client name] LEI"
-  - "[client name] corporate structure"
-  - "[client name] management company"
-  - "[client name] fund list"
-  - "[client name] regulatory registration"
+    Search for:
+    - "[client name] LEI"
+    - "[client name] corporate structure"
+    - "[client name] management company"
+    - "[client name] fund list"
+    - "[client name] regulatory registration"
 
-  Return your findings as a JSON object matching the output schema.
-  For each entity, include the LEI if you found it. Mark confidence as:
-  - "high" if from official registry (GLEIF, SEC, FCA, CSSF)
-  - "medium" if from reputable financial news/filings
-  - "low" if from general web sources
+    Return your findings as a JSON object matching the output schema.
+    For each entity, include the LEI if you found it. Mark confidence as:
+    - "high" if from official registry (GLEIF, SEC, FCA, CSSF)
+    - "medium" if from reputable financial news/filings
+    - "low" if from general web sources
 
-output:
-  review_requirement: required
-  schema:
-    type: object
-    required:
-      - apex_entity
-      - research_summary
-    properties:
-      apex_entity:
-        type: object
-        description: The ultimate parent or holding company
-        required:
-          - name
-          - jurisdiction
-        properties:
-          name:
-            type: string
-          lei:
-            type: string
-            pattern: "^[A-Z0-9]{20}$"
-          jurisdiction:
-            type: string
-          entity_type:
-            type: string
-            enum: [holding_company, corporation, partnership, other]
-          regulatory_status:
-            type: string
-          listing_status:
-            type: string
-            enum: [public, private, unknown]
-          confidence:
-            type: string
-            enum: [high, medium, low]
-
-      management_companies:
-        type: array
-        items:
+  output:
+    schema_name: client-discovery-result
+    review: required
+    schema:
+      type: object
+      required:
+        - apex_entity
+        - research_summary
+      properties:
+        apex_entity:
           type: object
+          description: The ultimate parent or holding company
           required:
             - name
             - jurisdiction
@@ -125,144 +98,170 @@ output:
               type: string
             lei:
               type: string
+              pattern: "^[A-Z0-9]{20}$"
             jurisdiction:
               type: string
-            regulatory_id:
+            entity_type:
               type: string
-            regulator:
-              type: string
-            parent_entity:
-              type: string
-            confidence:
-              type: string
-              enum: [high, medium, low]
-
-      investment_managers:
-        type: array
-        items:
-          type: object
-          required:
-            - name
-          properties:
-            name:
-              type: string
-            lei:
-              type: string
-            jurisdiction:
-              type: string
-            aum_usd:
-              type: number
+              enum: [holding_company, corporation, partnership, other]
             regulatory_status:
               type: string
+            listing_status:
+              type: string
+              enum: [public, private, unknown]
             confidence:
               type: string
               enum: [high, medium, low]
 
-      funds:
-        type: array
-        items:
+        management_companies:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+              - jurisdiction
+            properties:
+              name:
+                type: string
+              lei:
+                type: string
+              jurisdiction:
+                type: string
+              regulatory_id:
+                type: string
+              regulator:
+                type: string
+              parent_entity:
+                type: string
+              confidence:
+                type: string
+                enum: [high, medium, low]
+
+        investment_managers:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+            properties:
+              name:
+                type: string
+              lei:
+                type: string
+              jurisdiction:
+                type: string
+              aum_usd:
+                type: number
+              regulatory_status:
+                type: string
+              confidence:
+                type: string
+                enum: [high, medium, low]
+
+        funds:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+              - fund_type
+            properties:
+              name:
+                type: string
+              lei:
+                type: string
+              isin:
+                type: string
+              fund_type:
+                type: string
+                enum: [ucits, aif, hedge_fund, private_equity, other]
+              structure:
+                type: string
+                enum: [sicav, fcp, unit_trust, oeic, other]
+              jurisdiction:
+                type: string
+              umbrella_fund:
+                type: string
+              management_company:
+                type: string
+              investment_manager:
+                type: string
+              confidence:
+                type: string
+                enum: [high, medium, low]
+
+        research_summary:
           type: object
           required:
-            - name
-            - fund_type
+            - total_entities_found
+            - data_quality_assessment
           properties:
-            name:
+            total_entities_found:
+              type: integer
+            entities_with_lei:
+              type: integer
+            data_quality_assessment:
               type: string
-            lei:
-              type: string
-            isin:
-              type: string
-            fund_type:
-              type: string
-              enum: [ucits, aif, hedge_fund, private_equity, other]
-            structure:
-              type: string
-              enum: [sicav, fcp, unit_trust, oeic, other]
-            jurisdiction:
-              type: string
-            umbrella_fund:
-              type: string
-            management_company:
-              type: string
-            investment_manager:
-              type: string
-            confidence:
-              type: string
-              enum: [high, medium, low]
+              enum: [excellent, good, fair, poor]
+            key_findings:
+              type: array
+              items:
+                type: string
+            data_gaps:
+              type: array
+              items:
+                type: string
+            recommended_verifications:
+              type: array
+              items:
+                type: string
 
-      research_summary:
-        type: object
-        required:
-          - total_entities_found
-          - data_quality_assessment
-        properties:
-          total_entities_found:
-            type: integer
-          entities_with_lei:
-            type: integer
-          data_quality_assessment:
-            type: string
-            enum: [excellent, good, fair, poor]
-          key_findings:
-            type: array
-            items:
-              type: string
-          data_gaps:
-            type: array
-            items:
-              type: string
-          recommended_verifications:
-            type: array
-            items:
-              type: string
+  suggested_verbs: |
+    ;; Client Discovery Results for {{client_name}}
+    ;; Generated from research macro - REVIEW BEFORE EXECUTING
 
-# Template for suggested DSL verbs (Handlebars)
-suggested_verbs: |
-  ;; Client Discovery Results for {{client_name}}
-  ;; Generated from research macro - REVIEW BEFORE EXECUTING
+    {{#if apex_entity}}
+    ;; Apex Entity: {{apex_entity.name}}
+    {{#if apex_entity.lei}}
+    (gleif.enrich :lei "{{apex_entity.lei}}" :as @apex)
+    {{else}}
+    ;; WARNING: No LEI found for apex entity - manual lookup required
+    (entity.ensure-limited-company :name "{{apex_entity.name}}" :jurisdiction "{{apex_entity.jurisdiction}}" :as @apex)
+    {{/if}}
+    {{/if}}
 
-  {{#if apex_entity}}
-  ;; Apex Entity: {{apex_entity.name}}
-  {{#if apex_entity.lei}}
-  (gleif.enrich :lei "{{apex_entity.lei}}" :as @apex)
-  {{else}}
-  ;; WARNING: No LEI found for apex entity - manual lookup required
-  (entity.ensure-limited-company :name "{{apex_entity.name}}" :jurisdiction "{{apex_entity.jurisdiction}}" :as @apex)
-  {{/if}}
-  {{/if}}
+    {{#each management_companies}}
+    ;; ManCo: {{this.name}}
+    {{#if this.lei}}
+    (gleif.enrich :lei "{{this.lei}}" :as @manco_{{@index}})
+    {{else}}
+    (entity.ensure-limited-company :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @manco_{{@index}})
+    {{/if}}
+    {{/each}}
 
-  {{#each management_companies}}
-  ;; ManCo: {{this.name}}
-  {{#if this.lei}}
-  (gleif.enrich :lei "{{this.lei}}" :as @manco_{{@index}})
-  {{else}}
-  (entity.ensure-limited-company :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @manco_{{@index}})
-  {{/if}}
-  {{/each}}
+    {{#each investment_managers}}
+    ;; Investment Manager: {{this.name}}
+    {{#if this.lei}}
+    (gleif.enrich :lei "{{this.lei}}" :as @im_{{@index}})
+    {{else}}
+    (entity.ensure-limited-company :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @im_{{@index}})
+    {{/if}}
+    {{/each}}
 
-  {{#each investment_managers}}
-  ;; Investment Manager: {{this.name}}
-  {{#if this.lei}}
-  (gleif.enrich :lei "{{this.lei}}" :as @im_{{@index}})
-  {{else}}
-  (entity.ensure-limited-company :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :as @im_{{@index}})
-  {{/if}}
-  {{/each}}
+    {{#each funds}}
+    ;; Fund: {{this.name}}
+    {{#if this.lei}}
+    (gleif.enrich :lei "{{this.lei}}" :as @fund_{{@index}})
+    (cbu.ensure :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :client-type "fund" :as @cbu_{{@index}})
+    {{else}}
+    ;; WARNING: No LEI for fund - manual verification needed
+    (cbu.ensure :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :client-type "fund" :as @cbu_{{@index}})
+    {{/if}}
+    {{/each}}
 
-  {{#each funds}}
-  ;; Fund: {{this.name}}
-  {{#if this.lei}}
-  (gleif.enrich :lei "{{this.lei}}" :as @fund_{{@index}})
-  (cbu.ensure :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :client-type "fund" :as @cbu_{{@index}})
-  {{else}}
-  ;; WARNING: No LEI for fund - manual verification needed
-  (cbu.ensure :name "{{this.name}}" :jurisdiction "{{this.jurisdiction}}" :client-type "fund" :as @cbu_{{@index}})
-  {{/if}}
-  {{/each}}
-
-tags:
-  - client
-  - discovery
-  - gleif
-  - corporate-structure
-  - onboarding
+  tags:
+    - client
+    - discovery
+    - gleif
+    - corporate-structure
+    - onboarding

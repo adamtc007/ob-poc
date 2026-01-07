@@ -15,7 +15,8 @@ use crate::panels::{
     ToolbarData, TradingMatrixPanelAction,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
-use ob_poc_graph::{CbuGraphWidget, ViewMode};
+use ob_poc_graph::{CbuGraphWidget, GalaxyView, ViewMode};
+use ob_poc_types::galaxy::ViewLevel;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use wasm_bindgen_futures::spawn_local;
@@ -1712,7 +1713,12 @@ impl App {
 
                             // Graph takes remaining space
                             ui.vertical(|ui| {
-                                self.state.graph_widget.ui(ui);
+                                // Render galaxy view at Universe level, otherwise render CBU graph
+                                if self.state.view_level == ViewLevel::Universe {
+                                    self.render_galaxy_view(ui);
+                                } else {
+                                    self.state.graph_widget.ui(ui);
+                                }
                             });
 
                             (tax_action, matrix_action)
@@ -1834,7 +1840,12 @@ impl App {
             // Graph (70% width)
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width() * 0.7);
-                self.state.graph_widget.ui(ui);
+                // Render galaxy view at Universe level, otherwise render CBU graph
+                if self.state.view_level == ViewLevel::Universe {
+                    self.render_galaxy_view(ui);
+                } else {
+                    self.state.graph_widget.ui(ui);
+                }
             });
 
             ui.separator();
@@ -1862,8 +1873,50 @@ impl App {
             .inner_margin(0.0)
             .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
             .show(ui, |ui| {
-                self.state.graph_widget.ui(ui);
+                // Render galaxy view at Universe level, otherwise render CBU graph
+                if self.state.view_level == ViewLevel::Universe {
+                    self.render_galaxy_view(ui);
+                } else {
+                    self.state.graph_widget.ui(ui);
+                }
             });
+    }
+
+    /// Render the galaxy view widget
+    fn render_galaxy_view(&mut self, ui: &mut egui::Ui) {
+        // Tick animations before rendering (egui-rules: tick BEFORE ui)
+        let dt = ui.input(|i| i.stable_dt);
+        let zoom = 1.0; // TODO: Get from camera if needed
+        let _threshold_crossed = self.state.galaxy_view.tick(dt, zoom);
+
+        // Load mock data if not already loaded
+        if !self.state.galaxy_view.has_data() {
+            self.state.galaxy_view.load_mock_data();
+        }
+
+        // Allocate space and get response
+        let (response, painter) =
+            ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
+        let screen_rect = response.rect;
+
+        // Create a simple camera for rendering
+        use ob_poc_graph::Camera2D;
+        let camera = Camera2D::new();
+
+        // Render the galaxy
+        self.state
+            .galaxy_view
+            .render(&painter, &camera, screen_rect);
+
+        // Handle input and get any navigation action
+        if let Some(action) =
+            self.state
+                .galaxy_view
+                .handle_input_v2(&response, &camera, screen_rect)
+        {
+            web_sys::console::log_1(&format!("Galaxy navigation action: {:?}", action).into());
+            // TODO: Handle navigation actions (drill into cluster, etc.)
+        }
     }
 }
 

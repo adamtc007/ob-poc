@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict zvhtkgPw76XYqdBCvuDKy6KIM2uNb7s2QVNHugcuNnRq2QO8ATLMxXwFFbnAHXz
+\restrict pf3wukrb5CpdDVMpSX0oXeGguoJxqUBr2OLDvKfrIllBTuOTtyT8Gbzalkv5wGV
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -8217,6 +8217,29 @@ CREATE TABLE "ob-poc".kyc_service_agreements (
 
 
 --
+-- Name: layout_cache; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".layout_cache (
+    cache_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    view_mode character varying(30) NOT NULL,
+    user_id uuid,
+    input_hash character varying(64) NOT NULL,
+    algorithm_version character varying(20) DEFAULT 'v1.0'::character varying,
+    node_positions jsonb NOT NULL,
+    edge_paths jsonb NOT NULL,
+    bounding_box jsonb,
+    tier_info jsonb,
+    computation_time_ms integer,
+    node_count integer,
+    edge_count integer,
+    computed_at timestamp with time zone DEFAULT now(),
+    valid_until timestamp with time zone
+);
+
+
+--
 -- Name: layout_config; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -14167,6 +14190,14 @@ ALTER TABLE ONLY "ob-poc".kyc_service_agreements
 
 
 --
+-- Name: layout_cache layout_cache_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".layout_cache
+    ADD CONSTRAINT layout_cache_pkey PRIMARY KEY (cache_id);
+
+
+--
 -- Name: layout_config layout_config_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -17667,6 +17698,20 @@ CREATE INDEX idx_kyc_decisions_review ON "ob-poc".kyc_decisions USING btree (nex
 --
 
 CREATE INDEX idx_kyc_decisions_status ON "ob-poc".kyc_decisions USING btree (status);
+
+
+--
+-- Name: idx_layout_cache_lookup; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_layout_cache_lookup ON "ob-poc".layout_cache USING btree (cbu_id, view_mode);
+
+
+--
+-- Name: idx_layout_cache_unique; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_layout_cache_unique ON "ob-poc".layout_cache USING btree (cbu_id, view_mode, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid));
 
 
 --
@@ -22189,5 +22234,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict zvhtkgPw76XYqdBCvuDKy6KIM2uNb7s2QVNHugcuNnRq2QO8ATLMxXwFFbnAHXz
+\unrestrict pf3wukrb5CpdDVMpSX0oXeGguoJxqUBr2OLDvKfrIllBTuOTtyT8Gbzalkv5wGV
 

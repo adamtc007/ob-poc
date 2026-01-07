@@ -952,8 +952,6 @@ impl LoiterState {
 /// Unlike navigation (which changes levels), focus keeps you at the same level
 /// but highlights a specific entity and potentially shows expanded details.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct FocusFrame {
     /// The focused node ID
     pub node_id: String,
@@ -990,8 +988,6 @@ impl FocusFrame {
 
 /// Type of expansion to show for a focused node
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum ExpansionType {
     /// Show ownership chain (UBO tracing upward)
@@ -1013,8 +1009,6 @@ pub enum ExpansionType {
 /// Tracks whether a node is expanded inline to show children/details,
 /// and manages the animation phase for smooth transitions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct ExpansionState {
     /// Current animation phase (0.0 = collapsed, 1.0 = expanded)
     pub progress: f32,
@@ -1096,8 +1090,6 @@ impl ExpansionState {
 
 /// Animation phase for organic growth/collapse
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum AnimationPhase {
     /// Not visible
@@ -1122,8 +1114,6 @@ pub enum AnimationPhase {
 /// This allows focusing on entities without navigating away.
 /// "show ownership" pushes a focus frame, "pull back" pops it.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct FocusStack {
     /// Stack of focus frames (most recent at end)
     pub frames: Vec<FocusFrame>,
@@ -1196,8 +1186,6 @@ impl FocusStack {
 
 /// Agent state for intelligent assistance
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct AgentState {
     /// Current agent mode
     pub mode: AgentMode,
@@ -1214,8 +1202,6 @@ pub struct AgentState {
 
 /// Agent operating mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum AgentMode {
     /// Only responds to explicit commands
@@ -1233,8 +1219,6 @@ pub enum AgentMode {
 
 /// Agent speech bubble for contextual guidance
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct AgentSpeech {
     /// Speech text
     pub text: String,
@@ -1252,8 +1236,6 @@ pub struct AgentSpeech {
 
 /// Urgency level for agent speech
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum SpeechUrgency {
     /// Casual information
@@ -1269,8 +1251,6 @@ pub enum SpeechUrgency {
 
 /// Agent insight about the current view
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct AgentInsight {
     /// Insight type
     pub insight_type: InsightType,
@@ -1288,8 +1268,6 @@ pub struct AgentInsight {
 
 /// Type of agent insight
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum InsightType {
     /// Pattern detected (e.g., circular ownership)
@@ -1308,8 +1286,6 @@ pub enum InsightType {
 
 /// Hint for speculative prefetching
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct PrefetchHint {
     /// Endpoint to prefetch
     pub endpoint: String,
@@ -1324,8 +1300,6 @@ pub struct PrefetchHint {
 
 /// Priority for prefetch operations
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum PrefetchPriority {
     /// Load when idle
@@ -1383,28 +1357,8 @@ impl<T> EnrichedResponse<T> {
 // PHASE 6: Autopilot Route Types
 // ============================================================================
 
-/// Request for route calculation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
-pub struct RouteRequest {
-    /// Starting node ID (or current location if None)
-    #[serde(default)]
-    pub from: Option<String>,
-    /// Destination node ID
-    pub to: String,
-    /// Destination type hint (helps with name resolution)
-    #[serde(default)]
-    pub to_type: Option<NodeType>,
-    /// Whether to pause at decision points (forks)
-    #[serde(default)]
-    pub pause_at_forks: bool,
-}
-
 /// Response with calculated route
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct RouteResponse {
     /// The calculated route
     pub route: Route,
@@ -1417,8 +1371,6 @@ pub struct RouteResponse {
 
 /// A navigation route through the galaxy
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct Route {
     /// Unique route ID
     pub route_id: String,
@@ -1446,8 +1398,6 @@ impl Route {
 
 /// A waypoint along a route
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct RouteWaypoint {
     /// Node ID at this waypoint
     pub node_id: String,
@@ -1468,8 +1418,6 @@ pub struct RouteWaypoint {
 
 /// Type of node in the navigation graph
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum NodeType {
     /// Universe root
@@ -1489,8 +1437,6 @@ pub enum NodeType {
 
 /// Autopilot mission state for client-side execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 pub struct AutopilotMission {
     /// The route being followed
     pub route: Route,
@@ -1568,8 +1514,6 @@ impl AutopilotMission {
 
 /// Status of an autopilot mission
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(TS))]
-#[cfg_attr(feature = "ts", ts(export))]
 #[serde(rename_all = "snake_case")]
 pub enum AutopilotStatus {
     /// Actively flying toward destination

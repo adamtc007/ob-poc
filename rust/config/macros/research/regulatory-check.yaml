@@ -2,395 +2,433 @@
 # Researches regulatory status, sanctions exposure, and compliance concerns
 # Critical for onboarding risk assessment
 
-name: regulatory-check
-version: "1.0"
+macro:
+  name: regulatory-check
+  version: "1.0"
 
-description: |
-  Research regulatory status, sanctions exposure, and compliance concerns
-  for an entity or group of entities. Checks regulatory registrations,
-  enforcement actions, sanctions lists, and adverse media.
+  description: |
+    Research regulatory status, sanctions exposure, and compliance concerns
+    for an entity or group of entities. Checks regulatory registrations,
+    enforcement actions, sanctions lists, and adverse media.
 
-parameters:
-  - name: entity_name
-    type: string
-    required: true
-    description: Name of the entity to check
-
-  - name: entity_lei
-    type: string
-    required: false
-    description: LEI of the entity if known
-    pattern: "^[A-Z0-9]{20}$"
-
-  - name: jurisdiction
-    type: string
-    required: false
-    description: Primary jurisdiction for regulatory checks
-
-  - name: check_types
-    type: array
-    required: false
-    description: Types of checks to perform
-    items:
+  parameters:
+    - name: entity_name
       type: string
-      enum:
+      required: true
+      description: Name of the entity to check
+
+    - name: entity_lei
+      type: string
+      required: false
+      description: LEI of the entity if known
+
+    - name: jurisdiction
+      type: string
+      required: false
+      description: Primary jurisdiction for regulatory checks
+
+    - name: check_types
+      type: array
+      required: false
+      description: Types of checks to perform
+      default:
         - regulatory_registration
         - enforcement_actions
         - sanctions
-        - pep_connections
-        - adverse_media
-        - litigation
-    default:
-      - regulatory_registration
-      - enforcement_actions
-      - sanctions
 
-  - name: include_related_parties
-    type: boolean
-    required: false
-    description: Also check key related parties (directors, UBOs)
-    default: false
+    - name: include_related_parties
+      type: boolean
+      required: false
+      description: Also check key related parties (directors, UBOs)
+      default: false
 
-tools:
-  - web_search
+  tools:
+    - web_search
 
-prompt: |
-  You are conducting regulatory and compliance checks for "{{entity_name}}" for KYC/AML purposes.
+  prompt: |
+    You are conducting regulatory and compliance checks for "{{entity_name}}" for KYC/AML purposes.
 
-  {{#if entity_lei}}
-  Entity LEI: {{entity_lei}}
-  {{/if}}
+    {{#if entity_lei}}
+    Entity LEI: {{entity_lei}}
+    {{/if}}
 
-  {{#if jurisdiction}}
-  Primary jurisdiction: {{jurisdiction}}
-  {{/if}}
+    {{#if jurisdiction}}
+    Primary jurisdiction: {{jurisdiction}}
+    {{/if}}
 
-  Perform the following checks:
-  {{#each check_types}}
-  - {{this}}
-  {{/each}}
+    Perform the following checks:
+    {{#each check_types}}
+    - {{this}}
+    {{/each}}
 
-  Use web_search to find:
+    Use web_search to find:
 
-  {{#if (includes check_types "regulatory_registration")}}
-  1. REGULATORY REGISTRATIONS:
-     - Financial services licenses/registrations
-     - Fund manager registrations (AIFM, UCITS ManCo)
-     - Investment advisor registrations
-     - Passporting arrangements
-     Search: "[entity name] regulatory registration", "[entity name] FCA register", "[entity name] SEC registration", "[entity name] CSSF"
-  {{/if}}
+    1. REGULATORY REGISTRATIONS:
+       - Financial services licenses/registrations
+       - Fund manager registrations (AIFM, UCITS ManCo)
+       - Investment advisor registrations
+       - Passporting arrangements
+       Search: "[entity name] regulatory registration", "[entity name] FCA register", "[entity name] SEC registration", "[entity name] CSSF"
 
-  {{#if (includes check_types "enforcement_actions")}}
-  2. ENFORCEMENT ACTIONS:
-     - Regulatory fines or penalties
-     - License suspensions or revocations
-     - Consent orders or settlements
-     - Warning notices
-     Search: "[entity name] fine", "[entity name] enforcement", "[entity name] regulatory action", "[entity name] penalty"
-  {{/if}}
+    2. ENFORCEMENT ACTIONS:
+       - Regulatory fines or penalties
+       - License suspensions or revocations
+       - Consent orders or settlements
+       - Warning notices
+       Search: "[entity name] fine", "[entity name] enforcement", "[entity name] regulatory action", "[entity name] penalty"
 
-  {{#if (includes check_types "sanctions")}}
-  3. SANCTIONS EXPOSURE:
-     - OFAC SDN list mentions
-     - EU sanctions list
-     - UN sanctions
-     - Country-specific sanctions
-     - Sectoral sanctions exposure
-     Search: "[entity name] sanctions", "[entity name] OFAC", "[entity name] designated"
-  {{/if}}
+    3. SANCTIONS EXPOSURE:
+       - OFAC SDN list mentions
+       - EU sanctions list
+       - UN sanctions
+       - Country-specific sanctions
+       - Sectoral sanctions exposure
+       Search: "[entity name] sanctions", "[entity name] OFAC", "[entity name] designated"
 
-  {{#if (includes check_types "pep_connections")}}
-  4. PEP CONNECTIONS:
-     - Politically exposed persons in leadership
-     - Government ownership or connections
-     - State-owned enterprise relationships
-     Search: "[entity name] board members", "[entity name] political", "[entity name] government"
-  {{/if}}
+    4. PEP CONNECTIONS:
+       - Politically exposed persons in leadership
+       - Government ownership or connections
+       - State-owned enterprise relationships
+       Search: "[entity name] board members", "[entity name] political", "[entity name] government"
 
-  {{#if (includes check_types "adverse_media")}}
-  5. ADVERSE MEDIA:
-     - Negative news coverage
-     - Fraud allegations
-     - Money laundering mentions
-     - Tax evasion
-     - Corruption allegations
-     Search: "[entity name] fraud", "[entity name] investigation", "[entity name] scandal", "[entity name] money laundering"
-  {{/if}}
+    5. ADVERSE MEDIA:
+       - Negative news coverage
+       - Fraud allegations
+       - Money laundering mentions
+       - Tax evasion
+       - Corruption allegations
+       Search: "[entity name] fraud", "[entity name] investigation", "[entity name] scandal", "[entity name] money laundering"
 
-  {{#if (includes check_types "litigation")}}
-  6. LITIGATION:
-     - Major lawsuits
-     - Class actions
-     - Regulatory proceedings
-     Search: "[entity name] lawsuit", "[entity name] litigation", "[entity name] court case"
-  {{/if}}
+    6. LITIGATION:
+       - Major lawsuits
+       - Class actions
+       - Regulatory proceedings
+       Search: "[entity name] lawsuit", "[entity name] litigation", "[entity name] court case"
 
-  For each finding:
-  - Note the date of the event/article
-  - Classify severity (critical, high, medium, low, informational)
-  - Assess current status (ongoing, resolved, historical)
-  - Provide the source URL or reference
+    For each finding:
+    - Note the date of the event/article
+    - Classify severity (critical, high, medium, low, informational)
+    - Assess current status (ongoing, resolved, historical)
+    - Provide the source URL or reference
 
-  Return findings as JSON matching the output schema.
-  Be thorough but distinguish between confirmed issues and mere allegations.
+    Return findings as JSON matching the output schema.
+    Be thorough but distinguish between confirmed issues and mere allegations.
 
-output:
-  review_requirement: required
-  schema:
-    type: object
-    required:
-      - entity
-      - overall_risk_assessment
-    properties:
-      entity:
-        type: object
-        properties:
-          name:
-            type: string
-          lei:
-            type: string
-          jurisdiction:
-            type: string
-
-      regulatory_registrations:
-        type: array
-        items:
+  output:
+    schema_name: regulatory-check-result
+    review: required
+    schema:
+      type: object
+      required:
+        - entity
+        - overall_risk_assessment
+      properties:
+        entity:
           type: object
           properties:
-            regulator:
+            name:
               type: string
-            registration_type:
+            lei:
               type: string
-            registration_number:
-              type: string
-            status:
-              type: string
-              enum: [active, suspended, revoked, expired, unknown]
             jurisdiction:
               type: string
-            scope:
-              type: string
-            effective_date:
-              type: string
-            source_url:
-              type: string
-            confidence:
-              type: string
-              enum: [high, medium, low]
 
-      enforcement_actions:
-        type: array
-        items:
+        regulatory_registrations:
+          type: array
+          items:
+            type: object
+            properties:
+              regulator:
+                type: string
+              registration_type:
+                type: string
+              registration_number:
+                type: string
+              status:
+                type: string
+                enum: [active, suspended, revoked, expired, unknown]
+              jurisdiction:
+                type: string
+              scope:
+                type: string
+              effective_date:
+                type: string
+              source_url:
+                type: string
+              confidence:
+                type: string
+                enum: [high, medium, low]
+
+        enforcement_actions:
+          type: array
+          items:
+            type: object
+            properties:
+              regulator:
+                type: string
+              action_type:
+                type: string
+                enum:
+                  [
+                    fine,
+                    suspension,
+                    revocation,
+                    warning,
+                    consent_order,
+                    investigation,
+                    other,
+                  ]
+              description:
+                type: string
+              date:
+                type: string
+              amount:
+                type: number
+                description: Fine amount in USD if applicable
+              status:
+                type: string
+                enum: [ongoing, resolved, appealed, historical]
+              severity:
+                type: string
+                enum: [critical, high, medium, low]
+              source_url:
+                type: string
+
+        sanctions_findings:
+          type: array
+          items:
+            type: object
+            properties:
+              list_type:
+                type: string
+                enum:
+                  [
+                    ofac_sdn,
+                    ofac_sectoral,
+                    eu_sanctions,
+                    un_sanctions,
+                    uk_sanctions,
+                    other,
+                  ]
+              match_type:
+                type: string
+                enum:
+                  [
+                    exact_match,
+                    possible_match,
+                    false_positive,
+                    indirect_exposure,
+                  ]
+              description:
+                type: string
+              date_listed:
+                type: string
+              current_status:
+                type: string
+                enum: [active, delisted, under_review]
+              severity:
+                type: string
+                enum: [critical, high, medium, low]
+              source_url:
+                type: string
+
+        pep_connections:
+          type: array
+          items:
+            type: object
+            properties:
+              person_name:
+                type: string
+              pep_category:
+                type: string
+                enum:
+                  [
+                    head_of_state,
+                    senior_government,
+                    senior_judicial,
+                    senior_military,
+                    state_enterprise,
+                    political_party,
+                    international_org,
+                    family_member,
+                    close_associate,
+                  ]
+              position:
+                type: string
+              country:
+                type: string
+              relationship_to_entity:
+                type: string
+              current_status:
+                type: string
+                enum: [current, former]
+              source_url:
+                type: string
+
+        adverse_media:
+          type: array
+          items:
+            type: object
+            properties:
+              headline:
+                type: string
+              summary:
+                type: string
+              category:
+                type: string
+                enum:
+                  [
+                    fraud,
+                    money_laundering,
+                    tax_evasion,
+                    corruption,
+                    market_manipulation,
+                    insider_trading,
+                    sanctions_violation,
+                    other,
+                  ]
+              publication:
+                type: string
+              date:
+                type: string
+              severity:
+                type: string
+                enum: [critical, high, medium, low]
+              status:
+                type: string
+                enum:
+                  [
+                    allegation,
+                    under_investigation,
+                    confirmed,
+                    resolved,
+                    retracted,
+                  ]
+              source_url:
+                type: string
+
+        litigation:
+          type: array
+          items:
+            type: object
+            properties:
+              case_name:
+                type: string
+              court:
+                type: string
+              case_type:
+                type: string
+                enum: [regulatory, civil, criminal, class_action, arbitration]
+              description:
+                type: string
+              filing_date:
+                type: string
+              status:
+                type: string
+                enum: [pending, ongoing, settled, dismissed, judgment_entered]
+              amount_at_stake:
+                type: number
+              severity:
+                type: string
+                enum: [critical, high, medium, low]
+              source_url:
+                type: string
+
+        overall_risk_assessment:
           type: object
+          required:
+            - risk_level
+            - recommendation
           properties:
-            regulator:
+            risk_level:
               type: string
-            action_type:
+              enum: [low, medium, high, very_high, prohibited]
+            risk_factors:
+              type: array
+              items:
+                type: string
+            mitigating_factors:
+              type: array
+              items:
+                type: string
+            recommendation:
               type: string
-              enum: [fine, suspension, revocation, warning, consent_order, investigation, other]
-            description:
-              type: string
-            date:
-              type: string
-            amount:
-              type: number
-              description: Fine amount in USD if applicable
-            status:
-              type: string
-              enum: [ongoing, resolved, appealed, historical]
-            severity:
-              type: string
-              enum: [critical, high, medium, low]
-            source_url:
-              type: string
+              enum:
+                [
+                  proceed,
+                  proceed_with_edd,
+                  escalate_to_compliance,
+                  reject,
+                  needs_more_information,
+                ]
+            key_concerns:
+              type: array
+              items:
+                type: string
+            recommended_actions:
+              type: array
+              items:
+                type: string
+            sources_consulted:
+              type: array
+              items:
+                type: string
 
-      sanctions_findings:
-        type: array
-        items:
-          type: object
-          properties:
-            list_type:
-              type: string
-              enum: [ofac_sdn, ofac_sectoral, eu_sanctions, un_sanctions, uk_sanctions, other]
-            match_type:
-              type: string
-              enum: [exact_match, possible_match, false_positive, indirect_exposure]
-            description:
-              type: string
-            date_listed:
-              type: string
-            current_status:
-              type: string
-              enum: [active, delisted, under_review]
-            severity:
-              type: string
-              enum: [critical, high, medium, low]
-            source_url:
-              type: string
+  suggested_verbs: |
+    ;; Regulatory Check Results for {{entity.name}}
+    ;; Risk Level: {{overall_risk_assessment.risk_level}}
+    ;; Recommendation: {{overall_risk_assessment.recommendation}}
 
-      pep_connections:
-        type: array
-        items:
-          type: object
-          properties:
-            person_name:
-              type: string
-            pep_category:
-              type: string
-              enum: [head_of_state, senior_government, senior_judicial, senior_military, state_enterprise, political_party, international_org, family_member, close_associate]
-            position:
-              type: string
-            country:
-              type: string
-            relationship_to_entity:
-              type: string
-            current_status:
-              type: string
-              enum: [current, former]
-            source_url:
-              type: string
+    {{#if (eq overall_risk_assessment.risk_level "prohibited")}}
+    ;; === PROHIBITED - DO NOT PROCEED ===
+    ;; This entity appears on sanctions lists or has critical regulatory issues
+    ;; Escalate to MLRO immediately
+    {{/if}}
 
-      adverse_media:
-        type: array
-        items:
-          type: object
-          properties:
-            headline:
-              type: string
-            summary:
-              type: string
-            category:
-              type: string
-              enum: [fraud, money_laundering, tax_evasion, corruption, market_manipulation, insider_trading, sanctions_violation, other]
-            publication:
-              type: string
-            date:
-              type: string
-            severity:
-              type: string
-              enum: [critical, high, medium, low]
-            status:
-              type: string
-              enum: [allegation, under_investigation, confirmed, resolved, retracted]
-            source_url:
-              type: string
+    {{#if (eq overall_risk_assessment.risk_level "very_high")}}
+    ;; === VERY HIGH RISK - ESCALATION REQUIRED ===
+    ;; Senior compliance approval required before proceeding
+    {{/if}}
 
-      litigation:
-        type: array
-        items:
-          type: object
-          properties:
-            case_name:
-              type: string
-            court:
-              type: string
-            case_type:
-              type: string
-              enum: [regulatory, civil, criminal, class_action, arbitration]
-            description:
-              type: string
-            filing_date:
-              type: string
-            status:
-              type: string
-              enum: [pending, ongoing, settled, dismissed, judgment_entered]
-            amount_at_stake:
-              type: number
-            severity:
-              type: string
-              enum: [critical, high, medium, low]
-            source_url:
-              type: string
+    {{#each enforcement_actions}}
+    {{#if (eq this.status "ongoing")}}
+    ;; ONGOING ENFORCEMENT: {{this.regulator}} - {{this.action_type}}
+    ;; {{this.description}}
+    (red-flag.raise :cbu-id @cbu :flag-type "REGULATORY_ENFORCEMENT" :severity "{{this.severity}}" :description "{{this.description}}")
+    {{/if}}
+    {{/each}}
 
-      overall_risk_assessment:
-        type: object
-        required:
-          - risk_level
-          - recommendation
-        properties:
-          risk_level:
-            type: string
-            enum: [low, medium, high, very_high, prohibited]
-          risk_factors:
-            type: array
-            items:
-              type: string
-          mitigating_factors:
-            type: array
-            items:
-              type: string
-          recommendation:
-            type: string
-            enum: [proceed, proceed_with_edd, escalate_to_compliance, reject, needs_more_information]
-          key_concerns:
-            type: array
-            items:
-              type: string
-          recommended_actions:
-            type: array
-            items:
-              type: string
-          sources_consulted:
-            type: array
-            items:
-              type: string
+    {{#each sanctions_findings}}
+    {{#if (eq this.match_type "exact_match")}}
+    ;; === SANCTIONS HIT: {{this.list_type}} ===
+    ;; {{this.description}}
+    (red-flag.raise :cbu-id @cbu :flag-type "SANCTIONS_HIT" :severity "HARD_STOP" :description "{{this.description}}")
+    {{/if}}
+    {{/each}}
 
-suggested_verbs: |
-  ;; Regulatory Check Results for {{entity.name}}
-  ;; Risk Level: {{overall_risk_assessment.risk_level}}
-  ;; Recommendation: {{overall_risk_assessment.recommendation}}
+    {{#each pep_connections}}
+    ;; PEP Connection: {{this.person_name}} ({{this.pep_category}})
+    ;; Relationship: {{this.relationship_to_entity}}
+    (red-flag.raise :cbu-id @cbu :flag-type "PEP_EXPOSURE" :severity "ESCALATE" :description "PEP: {{this.person_name}} - {{this.position}}")
+    {{/each}}
 
-  {{#if (eq overall_risk_assessment.risk_level "prohibited")}}
-  ;; === PROHIBITED - DO NOT PROCEED ===
-  ;; This entity appears on sanctions lists or has critical regulatory issues
-  ;; Escalate to MLRO immediately
-  {{/if}}
+    {{#if regulatory_registrations}}
+    ;; Regulatory Registrations Found:
+    {{#each regulatory_registrations}}
+    ;; - {{this.regulator}}: {{this.registration_type}} ({{this.status}})
+    {{/each}}
+    {{/if}}
 
-  {{#if (eq overall_risk_assessment.risk_level "very_high")}}
-  ;; === VERY HIGH RISK - ESCALATION REQUIRED ===
-  ;; Senior compliance approval required before proceeding
-  {{/if}}
+    ;; === RECOMMENDED ACTIONS ===
+    {{#each overall_risk_assessment.recommended_actions}}
+    ;; - {{this}}
+    {{/each}}
 
-  {{#each enforcement_actions}}
-  {{#if (eq this.status "ongoing")}}
-  ;; ONGOING ENFORCEMENT: {{this.regulator}} - {{this.action_type}}
-  ;; {{this.description}}
-  (red-flag.raise :cbu-id @cbu :flag-type "REGULATORY_ENFORCEMENT" :severity "{{this.severity}}" :description "{{this.description}}")
-  {{/if}}
-  {{/each}}
-
-  {{#each sanctions_findings}}
-  {{#if (eq this.match_type "exact_match")}}
-  ;; === SANCTIONS HIT: {{this.list_type}} ===
-  ;; {{this.description}}
-  (red-flag.raise :cbu-id @cbu :flag-type "SANCTIONS_HIT" :severity "HARD_STOP" :description "{{this.description}}")
-  {{/if}}
-  {{/each}}
-
-  {{#each pep_connections}}
-  ;; PEP Connection: {{this.person_name}} ({{this.pep_category}})
-  ;; Relationship: {{this.relationship_to_entity}}
-  (red-flag.raise :cbu-id @cbu :flag-type "PEP_EXPOSURE" :severity "ESCALATE" :description "PEP: {{this.person_name}} - {{this.position}}")
-  {{/each}}
-
-  {{#if regulatory_registrations}}
-  ;; Regulatory Registrations Found:
-  {{#each regulatory_registrations}}
-  ;; - {{this.regulator}}: {{this.registration_type}} ({{this.status}})
-  {{/each}}
-  {{/if}}
-
-  ;; === RECOMMENDED ACTIONS ===
-  {{#each overall_risk_assessment.recommended_actions}}
-  ;; - {{this}}
-  {{/each}}
-
-tags:
-  - regulatory
-  - sanctions
-  - pep
-  - adverse-media
-  - compliance
-  - risk-assessment
-  - aml
+  tags:
+    - regulatory
+    - sanctions
+    - pep
+    - adverse-media
+    - compliance
+    - risk-assessment
+    - aml

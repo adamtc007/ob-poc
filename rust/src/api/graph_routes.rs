@@ -30,9 +30,7 @@ use crate::graph::{
     CbuGraph, CbuSummary, ConfigDrivenGraphBuilder, EntityGraph, GraphScope, LayoutEngineV2,
     LayoutOverride, NodeOffset, NodeSizeOverride,
 };
-use ob_poc_types::galaxy::{
-    NodeType, Route, RouteRequest, RouteResponse, RouteWaypoint, ViewLevel,
-};
+use ob_poc_types::galaxy::{NodeType, Route, RouteResponse, RouteWaypoint, ViewLevel};
 
 /// Query parameters for graph endpoint
 #[derive(Debug, Deserialize)]
