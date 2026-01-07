@@ -199,6 +199,61 @@ pub struct CompleteResponse {
 }
 
 // ============================================================================
+// Session Watch Types (Long-Polling)
+// ============================================================================
+
+/// Query parameters for session watch endpoint
+#[derive(Debug, Deserialize)]
+pub struct WatchQuery {
+    /// Timeout in milliseconds (default 30000, max 60000)
+    #[serde(default = "default_watch_timeout")]
+    pub timeout_ms: u64,
+}
+
+fn default_watch_timeout() -> u64 {
+    30000
+}
+
+/// Response from session watch endpoint
+#[derive(Debug, Serialize)]
+pub struct WatchResponse {
+    /// Session ID
+    pub session_id: Uuid,
+    /// Version number (incremented on each update)
+    pub version: u64,
+    /// Current scope path as string
+    pub scope_path: String,
+    /// Whether struct_mass has been computed
+    pub has_mass: bool,
+    /// Current effective view mode (if set)
+    pub view_mode: Option<String>,
+    /// Active CBU ID (if bound)
+    pub active_cbu_id: Option<Uuid>,
+    /// Timestamp of last update (RFC3339)
+    pub updated_at: String,
+    /// Whether this is the initial snapshot (no wait) or a change notification
+    pub is_initial: bool,
+}
+
+impl WatchResponse {
+    fn from_snapshot(
+        snapshot: &crate::api::session_manager::SessionSnapshot,
+        is_initial: bool,
+    ) -> Self {
+        Self {
+            session_id: snapshot.session_id,
+            version: snapshot.version,
+            scope_path: snapshot.scope_path.clone(),
+            has_mass: snapshot.has_mass,
+            view_mode: snapshot.view_mode.clone(),
+            active_cbu_id: snapshot.active_cbu_id,
+            updated_at: snapshot.updated_at.to_rfc3339(),
+            is_initial,
+        }
+    }
+}
+
+// ============================================================================
 // Entity Reference Resolution Types
 // ============================================================================
 
@@ -298,6 +353,8 @@ pub struct AgentState {
     pub pool: PgPool,
     pub dsl_v2_executor: Arc<DslExecutor>,
     pub sessions: SessionStore,
+    /// Session manager with watch channel support for reactive updates
+    pub session_manager: crate::api::session_manager::SessionManager,
     pub generation_log: Arc<GenerationLogRepository>,
     pub session_repo: Arc<crate::database::SessionRepository>,
     pub dsl_repo: Arc<crate::database::DslRepository>,
@@ -319,10 +376,13 @@ impl AgentState {
         let agent_service = Arc::new(crate::api::agent_service::AgentService::with_pool(
             pool.clone(),
         ));
+        // Create SessionManager wrapping the same session store
+        let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
         Self {
             pool,
             dsl_v2_executor,
             sessions,
+            session_manager,
             generation_log,
             session_repo,
             dsl_repo,
@@ -355,6 +415,7 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         .route("/api/session/:id/context", get(get_session_context))
         .route("/api/session/:id/focus", post(set_session_focus))
         .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
+        .route("/api/session/:id/watch", get(watch_session))
         // DSL parsing and entity reference resolution
         .route("/api/dsl/parse", post(parse_dsl))
         .route("/api/dsl/resolve-ref", post(resolve_entity_ref))
@@ -480,6 +541,77 @@ async fn delete_session(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// GET /api/session/:id/watch - Long-poll for session changes
+///
+/// This endpoint uses tokio::sync::watch channels to efficiently wait for
+/// session updates. Clients can use this to react to changes made by
+/// other consumers (MCP, REPL, other browser tabs).
+///
+/// ## Query Parameters
+///
+/// - `timeout_ms`: Maximum time to wait for changes (default 30000, max 60000)
+///
+/// ## Response
+///
+/// Returns a `WatchResponse` with:
+/// - `is_initial: true` if this is the first call (returns current state immediately)
+/// - `is_initial: false` if a change was detected within the timeout
+///
+/// If the timeout expires with no changes, returns the current state with `is_initial: false`.
+///
+/// ## Usage Pattern
+///
+/// ```javascript
+/// async function watchSession(sessionId) {
+///   while (true) {
+///     const resp = await fetch(`/api/session/${sessionId}/watch?timeout_ms=30000`);
+///     const data = await resp.json();
+///     handleUpdate(data);
+///   }
+/// }
+/// ```
+async fn watch_session(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Query(query): Query<WatchQuery>,
+) -> Result<Json<WatchResponse>, StatusCode> {
+    // Cap timeout at 60 seconds
+    let timeout_ms = query.timeout_ms.min(60000);
+    let timeout = std::time::Duration::from_millis(timeout_ms);
+
+    // Subscribe to session changes
+    let mut watcher = state
+        .session_manager
+        .subscribe(session_id)
+        .await
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Get initial snapshot
+    let initial_snapshot = watcher.borrow().clone();
+
+    // Wait for a change or timeout
+    let result = tokio::time::timeout(timeout, watcher.changed()).await;
+
+    // Unsubscribe when done (cleanup)
+    state.session_manager.unsubscribe(session_id).await;
+
+    match result {
+        Ok(Ok(())) => {
+            // Change detected - return the new snapshot
+            let snapshot = watcher.borrow();
+            Ok(Json(WatchResponse::from_snapshot(&snapshot, false)))
+        }
+        Ok(Err(_)) => {
+            // Watch channel closed (session was deleted)
+            Err(StatusCode::GONE)
+        }
+        Err(_) => {
+            // Timeout - return current state
+            Ok(Json(WatchResponse::from_snapshot(&initial_snapshot, false)))
+        }
+    }
+}
+
 /// POST /api/session/:id/chat - Process chat message and generate DSL via LLM
 ///
 /// Pipeline: User message → Intent extraction (tool call) → DSL builder → Linter → Feedback loop
@@ -588,6 +720,9 @@ async fn chat_session(
         let mut sessions = state.sessions.write().await;
         sessions.insert(session_id, session.clone());
     }
+
+    // Notify watchers that session changed
+    state.session_manager.notify(session_id).await;
 
     // Build assembled DSL for response
     let assembled = response
@@ -1408,6 +1543,9 @@ async fn execute_session_dsl(
         }
     };
 
+    // Notify watchers that session changed after execution
+    state.session_manager.notify(session_id).await;
+
     Ok(Json(ExecuteResponse {
         success: all_success,
         results,
@@ -1590,6 +1728,9 @@ async fn set_session_binding(
     let actual_name_clone = actual_name.clone();
     drop(sessions);
 
+    // Notify watchers that session changed
+    state.session_manager.notify(session_id).await;
+
     Ok(Json(SetBindingResponse {
         success: true,
         binding_name: actual_name_clone,
@@ -1643,6 +1784,9 @@ async fn set_session_focus(
         stage_code,
         relevant_verbs.len()
     );
+
+    // Notify watchers that session changed
+    state.session_manager.notify(session_id).await;
 
     Ok(Json(SetFocusResponse {
         success: true,

@@ -1333,31 +1333,27 @@ impl eframe::App for App {
         });
 
         // =================================================================
-        // STEP 6: Periodic session version polling (detect MCP/REPL changes)
+        // STEP 6: Session watch via long-polling (detect MCP/REPL changes)
         // =================================================================
-        // Poll every 2 seconds when we have a session
-        const VERSION_POLL_INTERVAL_SECS: f64 = 2.0;
+        // Start long-poll watch if we have a session and aren't already watching
         if let Some(session_id) = self.state.session_id {
-            let now = ctx.input(|i| i.time);
-            let should_poll = match self.state.last_version_check {
-                Some(last_check) => (now - last_check) >= VERSION_POLL_INTERVAL_SECS,
-                None => self.state.last_known_version.is_some(), // Only poll after initial session load
+            // Check if we have a known version (initial session load complete)
+            // and are not currently watching
+            let should_start_watch = {
+                let async_state = self.state.async_state.lock().unwrap();
+                self.state.last_known_version.is_some() && !async_state.watching_session
             };
 
-            if should_poll {
-                self.state.last_version_check = Some(now);
-                self.state.check_session_version(session_id);
+            if should_start_watch {
+                self.state.start_session_watch(session_id);
             }
         }
 
         // =================================================================
-        // STEP 7: Request repaint if async operations in progress or polling active
+        // STEP 7: Request repaint if async operations in progress
         // =================================================================
         if self.state.is_loading() {
             ctx.request_repaint_after(std::time::Duration::from_millis(100));
-        } else if self.state.session_id.is_some() && self.state.last_known_version.is_some() {
-            // Keep polling for version changes even when not loading
-            ctx.request_repaint_after(std::time::Duration::from_millis(2000));
         }
     }
 }
@@ -1900,7 +1896,7 @@ impl App {
         let screen_rect = response.rect;
 
         // Create a simple camera for rendering
-        use ob_poc_graph::Camera2D;
+        use ob_poc_graph::graph::Camera2D;
         let camera = Camera2D::new();
 
         // Render the galaxy

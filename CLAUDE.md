@@ -1190,6 +1190,51 @@ The graph visualization (`rust/crates/ob-poc-graph/`) includes several specializ
 | `camera` | `camera.rs` | Camera2D with animated fly_to/zoom_to methods |
 | `input` | `input.rs` | Mouse/keyboard input handling, scroll-to-zoom |
 | `lod` | `lod.rs` | Level of detail rendering based on zoom level |
+| `viewport` | `viewport.rs` | Viewport state with responsive breakpoints and DPI support |
+
+### Viewport & Responsive Layout
+
+The `viewport` module (`rust/src/graph/viewport.rs`) provides viewport state tracking with responsive layout support.
+
+**Key Types:**
+
+| Type | Description |
+|------|-------------|
+| `ViewportContext` | Complete viewport state (zoom, pan, canvas size, visibility, display config) |
+| `Breakpoint` | Responsive breakpoints: Phone (<600px), Tablet (600-1024px), Desktop (1024-1440px), Large (>1440px) |
+| `DisplayConfig` | Display configuration with scale factor, breakpoint, min dimensions, layout hints |
+| `LayoutHint` | Panel layout suggestions: SinglePanel, TwoPanel, FourPanel |
+| `ZoomName` | Named zoom levels: Overview, Standard, Detail |
+| `OffScreenSummary` | Tracks entities off-screen by direction (above, below, left, right) |
+
+**Breakpoint Behavior:**
+
+| Breakpoint | Width | Node Scale | Font Scale | LOD Threshold |
+|------------|-------|------------|------------|---------------|
+| Phone | <600px | 0.6 | 0.8 | 50 nodes |
+| Tablet | 600-1024px | 0.8 | 0.9 | 100 nodes |
+| Desktop | 1024-1440px | 1.0 | 1.0 | 200 nodes |
+| Large | >1440px | 1.2 | 1.1 | 500 nodes |
+
+**Usage:**
+```rust
+// Create viewport with scale factor (for HiDPI displays)
+let viewport = ViewportContext::with_scale_factor(1200.0, 800.0, 2.0);
+
+// Check responsive hints
+if viewport.display.breakpoint.is_compact() {
+    // Use simplified layout
+}
+
+// Get effective sizes accounting for breakpoint and scale
+let node_radius = viewport.display.effective_node_radius(20.0);
+let font_size = viewport.display.effective_font_size(14.0);
+
+// Check if LOD reduction needed
+if viewport.display.should_reduce_lod(visible_count) {
+    // Skip rendering labels, simplify edges
+}
+```
 
 ### Entity Type Ontology Browser
 

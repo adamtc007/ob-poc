@@ -33,4 +33,7 @@ pub use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
 pub use query_engine::GraphQueryEngine;
 pub use types::*;
 pub use view_model::*;
-pub use viewport::{OffScreenSummary, PanDirection, ViewportContext, ZoomName};
+pub use viewport::{
+    Breakpoint, DisplayConfig, LayoutHint, OffScreenSummary, PanDirection, ViewportContext,
+    ZoomName,
+};

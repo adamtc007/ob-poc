@@ -160,6 +160,38 @@ pub async fn get_session_version(session_id: Uuid) -> Result<String, String> {
         .ok_or_else(|| "Session has no version".to_string())
 }
 
+// =============================================================================
+// Session Watch API (Long-Polling for Changes)
+// =============================================================================
+
+/// Response from session watch endpoint
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct WatchSessionResponse {
+    pub session_id: Uuid,
+    pub version: u64,
+    pub scope_path: String,
+    pub has_mass: bool,
+    pub view_mode: Option<String>,
+    pub active_cbu_id: Option<Uuid>,
+    pub updated_at: String,
+    pub is_initial: bool,
+}
+
+/// Long-poll for session changes
+/// Returns when session changes or timeout occurs
+/// Uses the /api/session/:id/watch endpoint
+pub async fn watch_session(
+    session_id: Uuid,
+    timeout_ms: Option<u64>,
+) -> Result<WatchSessionResponse, String> {
+    let timeout = timeout_ms.unwrap_or(30000);
+    get(&format!(
+        "/api/session/{}/watch?timeout_ms={}",
+        session_id, timeout
+    ))
+    .await
+}
+
 /// Bind an entity to the session context
 pub async fn bind_entity(
     session_id: Uuid,

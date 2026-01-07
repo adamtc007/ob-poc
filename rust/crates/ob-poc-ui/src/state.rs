@@ -352,6 +352,8 @@ pub struct AsyncState {
     pub pending_session_id: Option<Uuid>,
     /// Pending version check result (just the version string, not full session)
     pub pending_version_check: Option<Result<String, String>>,
+    /// Pending watch result (from long-polling /api/session/:id/watch)
+    pub pending_watch: Option<Result<crate::api::WatchSessionResponse, String>>,
     pub pending_graph: Option<Result<CbuGraphData, String>>,
     pub pending_validation: Option<Result<ValidateDslResponse, String>>,
     pub pending_execution: Option<Result<ExecuteResponse, String>>,
@@ -469,6 +471,7 @@ pub struct AsyncState {
     pub loading_session_context: bool,
     pub loading_trading_matrix: bool,
     pub checking_version: bool, // Version poll in progress
+    pub watching_session: bool, // Long-poll watch in progress
 
     // Chat focus tracking - set when chat completes to refocus input
     pub chat_just_finished: bool,
@@ -543,6 +546,49 @@ impl AppState {
                         );
                         state.needs_session_refetch = true;
                         state.needs_graph_refetch = true;
+                    }
+                }
+            }
+        }
+
+        // Process watch result - reactive session updates via long-polling
+        if let Some(result) = state.pending_watch.take() {
+            state.watching_session = false;
+            match result {
+                Ok(watch_response) => {
+                    // Check if session actually changed (version comparison)
+                    let version_str = watch_response.version.to_string();
+                    let changed = self
+                        .last_known_version
+                        .as_ref()
+                        .map(|v| v != &version_str)
+                        .unwrap_or(true);
+
+                    if changed {
+                        web_sys::console::log_1(
+                            &format!(
+                                "Session watch: version changed to {}, scope={}, triggering refetch",
+                                watch_response.version, watch_response.scope_path
+                            )
+                            .into(),
+                        );
+                        // Update last known version
+                        self.last_known_version = Some(version_str);
+
+                        // Trigger refetches based on what changed
+                        state.needs_session_refetch = true;
+
+                        // If active_cbu changed, refetch graph
+                        if watch_response.active_cbu_id.is_some() {
+                            state.needs_graph_refetch = true;
+                            state.pending_cbu_id = watch_response.active_cbu_id;
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Don't show error for timeout - that's expected
+                    if !e.contains("timeout") && !e.contains("Timeout") {
+                        web_sys::console::warn_1(&format!("Session watch failed: {}", e).into());
                     }
                 }
             }
@@ -1514,6 +1560,42 @@ impl AppState {
             if let Ok(mut state) = async_state.lock() {
                 state.pending_version_check = Some(result);
                 state.checking_version = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Start long-poll watch for session changes
+    /// Uses /api/session/:id/watch which blocks until changes occur or timeout
+    /// This replaces periodic polling with reactive updates
+    pub fn start_session_watch(&mut self, session_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        // Don't start another watch if one is in progress
+        {
+            let state = async_state.lock().unwrap();
+            if state.watching_session {
+                return;
+            }
+        }
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.watching_session = true;
+        }
+
+        spawn_local(async move {
+            // Long-poll with 30 second timeout
+            let result = api::watch_session(session_id, Some(30000)).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_watch = Some(result);
+                state.watching_session = false;
             }
             if let Some(ctx) = ctx {
                 ctx.request_repaint();

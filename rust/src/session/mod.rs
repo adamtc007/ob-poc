@@ -21,6 +21,8 @@ pub mod canonical_hash;
 pub mod enhanced_context;
 pub mod research_context;
 pub mod scope;
+pub mod scope_path;
+pub mod struct_mass;
 pub mod verb_contract;
 pub mod verb_discovery;
 pub mod verb_hash_lookup;
@@ -46,6 +48,10 @@ pub use enhanced_context::{
 };
 pub use research_context::{ResearchContext, ResearchState};
 pub use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
+pub use scope_path::{ScopePath, ScopeSegment};
+pub use struct_mass::{
+    MassBreakdown, MassContributions, MassThresholds, MassViewMode, MassWeights, StructMass,
+};
 pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostic, VerbDiagnostics};
 pub use verb_discovery::{
     AgentVerbContext, CategoryInfo, DiscoveryQuery, SuggestionReason, VerbDiscoveryError,

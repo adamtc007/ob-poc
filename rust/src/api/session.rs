@@ -1035,6 +1035,32 @@ pub struct SessionContext {
     #[serde(default)]
     pub taxonomy_stack: crate::taxonomy::TaxonomyStack,
 
+    // =========================================================================
+    // Taxonomy-Driven Layout Fields
+    // =========================================================================
+    /// Current navigation scope path (e.g., /Universe/Book/CBU/Entity)
+    /// Tracks where the user is in the hierarchical navigation
+    #[serde(default)]
+    pub scope_path: crate::session::ScopePath,
+
+    /// Structural mass of the current scope - weighted complexity measure
+    /// Used for automatic view mode selection (Detail < SolarSystem < Universe)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub struct_mass: Option<crate::session::StructMass>,
+
+    /// Cached mass breakdown for quick access without recomputing
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mass_breakdown: Option<crate::session::MassBreakdown>,
+
+    /// Auto-selected view mode based on structural mass
+    /// Overridden if user manually selects a view mode
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_view_mode: Option<crate::session::MassViewMode>,
+
+    /// Whether the current view_mode was manually selected (overrides auto)
+    #[serde(default)]
+    pub view_mode_manual: bool,
+
     /// Most recently created CBU
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_cbu_id: Option<Uuid>,
@@ -1489,6 +1515,146 @@ impl SessionContext {
     /// Set multiple expanded nodes at once (replaces existing)
     pub fn set_expanded_nodes(&mut self, nodes: impl IntoIterator<Item = Uuid>) {
         self.expanded_nodes = nodes.into_iter().collect();
+    }
+
+    // =========================================================================
+    // SCOPE PATH METHODS - Hierarchical navigation
+    // =========================================================================
+
+    /// Get the current scope path
+    pub fn scope_path(&self) -> &crate::session::ScopePath {
+        &self.scope_path
+    }
+
+    /// Get mutable reference to scope path
+    pub fn scope_path_mut(&mut self) -> &mut crate::session::ScopePath {
+        &mut self.scope_path
+    }
+
+    /// Navigate into universe view (cluster by dimension)
+    pub fn navigate_to_universe(&mut self, cluster_by: &str) {
+        self.scope_path = crate::session::ScopePath::universe(cluster_by);
+        // Clear mass cache - will be recomputed
+        self.struct_mass = None;
+        self.mass_breakdown = None;
+        self.auto_view_mode = None;
+    }
+
+    /// Navigate into a specific book within a clustering dimension
+    pub fn navigate_to_book(&mut self, cluster_by: &str, book_id: &str, label: &str) {
+        self.scope_path = crate::session::ScopePath::book(cluster_by, book_id, label);
+        self.struct_mass = None;
+        self.mass_breakdown = None;
+        self.auto_view_mode = None;
+    }
+
+    /// Navigate into a specific CBU
+    pub fn navigate_to_cbu(&mut self, cbu_id: Uuid, name: &str) {
+        self.scope_path = crate::session::ScopePath::cbu(cbu_id, name);
+        self.struct_mass = None;
+        self.mass_breakdown = None;
+        self.auto_view_mode = None;
+    }
+
+    /// Navigate into a specific entity within current scope
+    pub fn navigate_to_entity(&mut self, entity_id: Uuid, name: &str, entity_type: &str) {
+        self.scope_path.push(crate::session::ScopeSegment::Entity {
+            entity_id,
+            name: name.to_string(),
+            entity_type: entity_type.to_string(),
+        });
+        self.struct_mass = None;
+        self.mass_breakdown = None;
+        self.auto_view_mode = None;
+    }
+
+    /// Navigate up one level in the scope hierarchy
+    pub fn navigate_up(&mut self) -> bool {
+        let popped = self.scope_path.pop();
+        if popped.is_some() {
+            self.struct_mass = None;
+            self.mass_breakdown = None;
+            self.auto_view_mode = None;
+        }
+        popped.is_some()
+    }
+
+    /// Get breadcrumbs for current scope
+    pub fn scope_breadcrumbs(&self) -> Vec<String> {
+        self.scope_path
+            .breadcrumbs()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
+    }
+
+    /// Get current scope depth
+    pub fn scope_depth(&self) -> usize {
+        self.scope_path.depth()
+    }
+
+    // =========================================================================
+    // STRUCTURAL MASS METHODS - Complexity-based view selection
+    // =========================================================================
+
+    /// Set structural mass (computed externally from graph data)
+    pub fn set_struct_mass(&mut self, mass: crate::session::StructMass) {
+        self.mass_breakdown = Some(mass.breakdown.clone());
+        self.auto_view_mode = Some(mass.suggested_view_mode());
+        self.struct_mass = Some(mass);
+    }
+
+    /// Get the current structural mass
+    pub fn struct_mass(&self) -> Option<&crate::session::StructMass> {
+        self.struct_mass.as_ref()
+    }
+
+    /// Get the mass breakdown
+    pub fn mass_breakdown(&self) -> Option<&crate::session::MassBreakdown> {
+        self.mass_breakdown.as_ref()
+    }
+
+    /// Get the effective view mode (manual override or auto-selected)
+    pub fn effective_view_mode(&self) -> Option<&crate::session::MassViewMode> {
+        if self.view_mode_manual {
+            // Manual mode takes precedence - but we return auto for type consistency
+            // The actual string view_mode field is used directly
+            self.auto_view_mode.as_ref()
+        } else {
+            self.auto_view_mode.as_ref()
+        }
+    }
+
+    /// Set view mode manually (overrides auto-selection)
+    pub fn set_view_mode_manual(&mut self, mode: &str) {
+        self.view_mode = Some(mode.to_string());
+        self.view_mode_manual = true;
+    }
+
+    /// Clear manual view mode override (revert to auto-selection)
+    pub fn clear_view_mode_manual(&mut self) {
+        self.view_mode_manual = false;
+        // Restore auto mode if available
+        if let Some(ref auto_mode) = self.auto_view_mode {
+            self.view_mode = Some(auto_mode.as_str().to_string());
+        }
+    }
+
+    /// Check if view mode is manually overridden
+    pub fn is_view_mode_manual(&self) -> bool {
+        self.view_mode_manual
+    }
+
+    /// Get total mass value (convenience method)
+    pub fn total_mass(&self) -> Option<f32> {
+        self.struct_mass.as_ref().map(|m| m.total)
+    }
+
+    /// Clear all mass-related cached data
+    pub fn clear_mass_cache(&mut self) {
+        self.struct_mass = None;
+        self.mass_breakdown = None;
+        self.auto_view_mode = None;
     }
 }
 

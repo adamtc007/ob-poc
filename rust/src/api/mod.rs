@@ -19,6 +19,9 @@ pub mod dsl_builder;
 pub mod session;
 
 #[cfg(feature = "server")]
+pub mod session_manager;
+
+#[cfg(feature = "server")]
 pub mod dsl_session_file;
 
 #[cfg(feature = "server")]
@@ -71,6 +74,9 @@ pub use graph_routes::{create_graph_router, create_session_graph_router};
 
 #[cfg(feature = "server")]
 pub use session::{create_session_store, SessionStore};
+
+#[cfg(feature = "server")]
+pub use session_manager::{SessionManager, SessionSnapshot, SessionWatcher};
 
 #[cfg(feature = "server")]
 pub use intent::{AssembledDsl, IntentSequence, VerbIntent};

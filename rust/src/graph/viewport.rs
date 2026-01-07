@@ -2,12 +2,219 @@
 //!
 //! Tracks zoom, pan, and visibility state for the graph viewport.
 //! This is UI state separate from the graph data itself.
+//!
+//! # Responsive Layout
+//!
+//! The viewport supports responsive breakpoints and DPI scaling:
+//! - **Breakpoints**: Phone (<600px), Tablet (600-1024px), Desktop (1024-1440px), Large (>1440px)
+//! - **Scale Factor**: Device pixel ratio for HiDPI displays
+//! - **Min Viewport**: Minimum viable dimensions for the graph
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use uuid::Uuid;
 
 use super::EntityGraph;
+
+// =============================================================================
+// RESPONSIVE BREAKPOINTS
+// =============================================================================
+
+/// Responsive breakpoint based on viewport width
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum Breakpoint {
+    /// < 600px - Mobile phones
+    Phone,
+    /// 600-1024px - Tablets
+    Tablet,
+    /// 1024-1440px - Desktop monitors
+    #[default]
+    Desktop,
+    /// > 1440px - Large/4K displays
+    Large,
+}
+
+impl Breakpoint {
+    /// Determine breakpoint from viewport width (in logical pixels)
+    pub fn from_width(width: f32) -> Self {
+        match width {
+            w if w < 600.0 => Breakpoint::Phone,
+            w if w < 1024.0 => Breakpoint::Tablet,
+            w if w < 1440.0 => Breakpoint::Desktop,
+            _ => Breakpoint::Large,
+        }
+    }
+
+    /// Get recommended node size multiplier for this breakpoint
+    pub fn node_scale(&self) -> f32 {
+        match self {
+            Breakpoint::Phone => 0.6,
+            Breakpoint::Tablet => 0.8,
+            Breakpoint::Desktop => 1.0,
+            Breakpoint::Large => 1.2,
+        }
+    }
+
+    /// Get recommended font size multiplier for this breakpoint
+    pub fn font_scale(&self) -> f32 {
+        match self {
+            Breakpoint::Phone => 0.75,
+            Breakpoint::Tablet => 0.9,
+            Breakpoint::Desktop => 1.0,
+            Breakpoint::Large => 1.1,
+        }
+    }
+
+    /// Get recommended label visibility threshold (zoom level below which labels hide)
+    pub fn label_hide_threshold(&self) -> f32 {
+        match self {
+            Breakpoint::Phone => 0.6, // Hide labels earlier on small screens
+            Breakpoint::Tablet => 0.5,
+            Breakpoint::Desktop => 0.4,
+            Breakpoint::Large => 0.3,
+        }
+    }
+
+    /// Get recommended max visible nodes before LOD reduction
+    pub fn lod_threshold(&self) -> usize {
+        match self {
+            Breakpoint::Phone => 30,
+            Breakpoint::Tablet => 60,
+            Breakpoint::Desktop => 100,
+            Breakpoint::Large => 150,
+        }
+    }
+
+    /// Check if this is a "compact" layout (phone/tablet)
+    pub fn is_compact(&self) -> bool {
+        matches!(self, Breakpoint::Phone | Breakpoint::Tablet)
+    }
+
+    /// Get as human-readable string
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Breakpoint::Phone => "Phone",
+            Breakpoint::Tablet => "Tablet",
+            Breakpoint::Desktop => "Desktop",
+            Breakpoint::Large => "Large",
+        }
+    }
+}
+
+// =============================================================================
+// DISPLAY CONFIGURATION
+// =============================================================================
+
+/// Display configuration for responsive layout
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DisplayConfig {
+    /// Device pixel ratio (1.0 for standard, 2.0 for Retina/HiDPI)
+    pub scale_factor: f32,
+
+    /// Current breakpoint based on viewport width
+    pub breakpoint: Breakpoint,
+
+    /// Minimum viable viewport width (below this, show scroll/zoom prompt)
+    pub min_width: f32,
+
+    /// Minimum viable viewport height
+    pub min_height: f32,
+
+    /// Whether viewport is below minimum size
+    pub is_undersized: bool,
+
+    /// Preferred layout mode based on breakpoint
+    pub preferred_layout: LayoutHint,
+}
+
+impl Default for DisplayConfig {
+    fn default() -> Self {
+        Self {
+            scale_factor: 1.0,
+            breakpoint: Breakpoint::Desktop,
+            min_width: 320.0,
+            min_height: 480.0,
+            is_undersized: false,
+            preferred_layout: LayoutHint::FourPanel,
+        }
+    }
+}
+
+impl DisplayConfig {
+    /// Create display config from viewport dimensions and scale factor
+    pub fn from_viewport(width: f32, height: f32, scale_factor: f32) -> Self {
+        let breakpoint = Breakpoint::from_width(width);
+        let is_undersized = width < 320.0 || height < 480.0;
+
+        let preferred_layout = match breakpoint {
+            Breakpoint::Phone => LayoutHint::SinglePanel,
+            Breakpoint::Tablet => LayoutHint::TwoPanel,
+            Breakpoint::Desktop => LayoutHint::FourPanel,
+            Breakpoint::Large => LayoutHint::FourPanel,
+        };
+
+        Self {
+            scale_factor,
+            breakpoint,
+            min_width: 320.0,
+            min_height: 480.0,
+            is_undersized,
+            preferred_layout,
+        }
+    }
+
+    /// Convert logical pixels to physical pixels
+    pub fn to_physical(&self, logical: f32) -> f32 {
+        logical * self.scale_factor
+    }
+
+    /// Convert physical pixels to logical pixels
+    pub fn to_logical(&self, physical: f32) -> f32 {
+        physical / self.scale_factor
+    }
+
+    /// Get effective node radius accounting for breakpoint and scale
+    pub fn effective_node_radius(&self, base_radius: f32) -> f32 {
+        base_radius * self.breakpoint.node_scale()
+    }
+
+    /// Get effective font size accounting for breakpoint and scale
+    pub fn effective_font_size(&self, base_size: f32) -> f32 {
+        base_size * self.breakpoint.font_scale()
+    }
+
+    /// Check if labels should be visible at current zoom
+    pub fn should_show_labels(&self, zoom: f32) -> bool {
+        zoom >= self.breakpoint.label_hide_threshold()
+    }
+
+    /// Check if we should use reduced LOD (level of detail)
+    pub fn should_reduce_lod(&self, visible_count: usize) -> bool {
+        visible_count > self.breakpoint.lod_threshold()
+    }
+}
+
+/// Layout hint based on viewport size
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LayoutHint {
+    /// Single panel - graph only (phone)
+    SinglePanel,
+    /// Two panels - graph + one side panel (tablet)
+    TwoPanel,
+    /// Four panels - full layout (desktop/large)
+    #[default]
+    FourPanel,
+}
+
+impl LayoutHint {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LayoutHint::SinglePanel => "SinglePanel",
+            LayoutHint::TwoPanel => "TwoPanel",
+            LayoutHint::FourPanel => "FourPanel",
+        }
+    }
+}
 
 /// Viewport state for graph visualization
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +239,9 @@ pub struct ViewportContext {
 
     /// Whether viewport has been explicitly set
     pub is_default: bool,
+
+    /// Display configuration for responsive layout
+    pub display: DisplayConfig,
 }
 
 /// Named zoom levels for agent context
@@ -140,6 +350,11 @@ impl Default for ViewportContext {
 impl ViewportContext {
     /// Create a new viewport with given canvas dimensions
     pub fn new(canvas_width: f32, canvas_height: f32) -> Self {
+        Self::with_scale_factor(canvas_width, canvas_height, 1.0)
+    }
+
+    /// Create a new viewport with given canvas dimensions and scale factor
+    pub fn with_scale_factor(canvas_width: f32, canvas_height: f32, scale_factor: f32) -> Self {
         Self {
             zoom: 0.5,
             zoom_name: ZoomName::Standard,
@@ -148,7 +363,14 @@ impl ViewportContext {
             visible_entities: HashSet::new(),
             off_screen: OffScreenSummary::default(),
             is_default: true,
+            display: DisplayConfig::from_viewport(canvas_width, canvas_height, scale_factor),
         }
+    }
+
+    /// Update display config when viewport resizes
+    pub fn update_display(&mut self, canvas_width: f32, canvas_height: f32, scale_factor: f32) {
+        self.canvas_size = (canvas_width, canvas_height);
+        self.display = DisplayConfig::from_viewport(canvas_width, canvas_height, scale_factor);
     }
 
     /// Compute what's visible given current zoom/pan and node positions
