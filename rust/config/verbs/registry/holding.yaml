@@ -1,6 +1,6 @@
 domains:
   holding:
-    description: Investor position management in share classes
+    description: Investor position management in share classes (supports both TA KYC-as-a-Service and UBO intra-group holdings)
     verbs:
       create:
         description: Create a new investor holding in a share class (idempotent by share_class+investor)
@@ -51,6 +51,89 @@ domains:
           type: uuid
           name: holding_id
           capture: true
+
+      create-for-investor:
+        description: Create holding linked to an investor record (for TA KYC-as-a-Service)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: holdings
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - share_class_id
+            - investor_id
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: share_class_id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: usage-type
+            type: string
+            required: true
+            maps_to: usage_type
+            description: "Purpose of holding: ta_kyc (TA KYC-as-a-Service) or ubo_tracking (UBO intra-group)"
+            validation:
+              enum:
+                - ta_kyc
+                - ubo_tracking
+          - name: provider
+            type: string
+            required: false
+            maps_to: provider
+            description: "Data source: clearstream, euroclear, manual, csv_import, api"
+          - name: provider-reference
+            type: string
+            required: false
+            maps_to: provider_reference
+            description: "External reference ID from data provider"
+          - name: units
+            type: decimal
+            required: false
+            maps_to: units
+            default: 0
+          - name: cost-basis
+            type: decimal
+            required: false
+            maps_to: cost_basis
+          - name: acquisition-date
+            type: date
+            required: false
+            maps_to: acquisition_date
+          - name: holding-status
+            type: string
+            required: false
+            maps_to: holding_status
+            default: pending
+            validation:
+              enum:
+                - pending
+                - active
+                - suspended
+                - redeemed
+                - transferred_out
+                - closed
+        returns:
+          type: uuid
+          name: holding_id
+          capture: true
+
       ensure:
         description: Ensure investor holding exists (upsert)
         behavior: crud
@@ -83,6 +166,32 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
+          - name: investor-id
+            type: uuid
+            required: false
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: usage-type
+            type: string
+            required: false
+            maps_to: usage_type
+            validation:
+              enum:
+                - ta_kyc
+                - ubo_tracking
+          - name: provider
+            type: string
+            required: false
+            maps_to: provider
+          - name: provider-reference
+            type: string
+            required: false
+            maps_to: provider_reference
           - name: units
             type: decimal
             required: false
@@ -95,10 +204,23 @@ domains:
             type: date
             required: false
             maps_to: acquisition_date
+          - name: holding-status
+            type: string
+            required: false
+            maps_to: holding_status
+            validation:
+              enum:
+                - pending
+                - active
+                - suspended
+                - redeemed
+                - transferred_out
+                - closed
         returns:
           type: uuid
           name: holding_id
           capture: true
+
       update-units:
         description: Update holding units (for position adjustments)
         behavior: crud
@@ -128,6 +250,41 @@ domains:
             maps_to: cost_basis
         returns:
           type: affected
+
+      update-status:
+        description: Update holding status
+        behavior: crud
+        crud:
+          operation: update
+          table: holdings
+          schema: kyc
+          key: id
+        args:
+          - name: holding-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: holdings
+              entity_type: holding
+              schema: kyc
+              search_key: id
+              primary_key: id
+          - name: holding-status
+            type: string
+            required: true
+            maps_to: holding_status
+            validation:
+              enum:
+                - pending
+                - active
+                - suspended
+                - redeemed
+                - transferred_out
+                - closed
+        returns:
+          type: affected
+
       read:
         description: Read a holding by ID
         behavior: crud
@@ -148,6 +305,7 @@ domains:
               primary_key: id
         returns:
           type: record
+
       list-by-share-class:
         description: List holdings for a share class
         behavior: crud
@@ -170,8 +328,13 @@ domains:
             type: string
             required: false
             maps_to: status
+          - name: usage-type
+            type: string
+            required: false
+            maps_to: usage_type
         returns:
           type: record_set
+
       list-by-investor:
         description: List holdings for an investor across all share classes
         behavior: crud
@@ -192,6 +355,44 @@ domains:
               primary_key: entity_id
         returns:
           type: record_set
+
+      list-by-investor-record:
+        description: List holdings for an investor record (TA workflow)
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: holdings
+          schema: kyc
+          fk_col: investor_id
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+        returns:
+          type: record_set
+
+      list-ubo-holdings:
+        description: List holdings that qualify for UBO tracking (>=25% ownership)
+        behavior: plugin
+        args:
+          - name: share-class-id
+            type: uuid
+            required: false
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+        returns:
+          type: record_set
+
       close:
         description: Close a holding (mark as inactive)
         behavior: crud
@@ -202,6 +403,7 @@ domains:
           key: id
           set_values:
             status: closed
+            holding_status: closed
         args:
           - name: holding-id
             type: uuid

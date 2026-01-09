@@ -1,0 +1,612 @@
+domains:
+  investor:
+    description: |
+      Investor lifecycle management for TA KYC-as-a-Service.
+      Implements full investor lifecycle from ENQUIRY through OFFBOARDED.
+      Transitions are validated by database trigger to ensure valid state machine flow.
+    verbs:
+      # ============================================
+      # Core CRUD operations
+      # ============================================
+      create:
+        description: Create a new investor record (starts in ENQUIRY state)
+        behavior: crud
+        crud:
+          operation: insert
+          table: investors
+          schema: kyc
+          returning: investor_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: investor-name
+            type: string
+            required: true
+            maps_to: investor_name
+          - name: investor-type
+            type: string
+            required: true
+            maps_to: investor_type
+            validation:
+              enum:
+                - natural_person
+                - legal_entity
+                - nominee
+                - omnibus
+          - name: tax-residence
+            type: string
+            required: false
+            maps_to: tax_residence
+          - name: provider
+            type: string
+            required: false
+            maps_to: provider
+            description: "Data source: clearstream, euroclear, manual, csv_import, api"
+          - name: provider-reference
+            type: string
+            required: false
+            maps_to: provider_reference
+        returns:
+          type: uuid
+          name: investor_id
+          capture: true
+
+      ensure:
+        description: Create or update investor by entity_id + cbu_id (idempotent)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: investors
+          schema: kyc
+          returning: investor_id
+          conflict_keys:
+            - entity_id
+            - cbu_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: investor-name
+            type: string
+            required: true
+            maps_to: investor_name
+          - name: investor-type
+            type: string
+            required: true
+            maps_to: investor_type
+            validation:
+              enum:
+                - natural_person
+                - legal_entity
+                - nominee
+                - omnibus
+          - name: tax-residence
+            type: string
+            required: false
+            maps_to: tax_residence
+          - name: provider
+            type: string
+            required: false
+            maps_to: provider
+          - name: provider-reference
+            type: string
+            required: false
+            maps_to: provider_reference
+        returns:
+          type: uuid
+          name: investor_id
+          capture: true
+
+      read:
+        description: Read investor by ID
+        behavior: crud
+        crud:
+          operation: select
+          table: investors
+          schema: kyc
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+        returns:
+          type: record
+
+      list-by-cbu:
+        description: List investors for a CBU (fund)
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: investors
+          schema: kyc
+          fk_col: cbu_id
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: lifecycle-state
+            type: string
+            required: false
+            maps_to: lifecycle_state
+        returns:
+          type: record_set
+
+      list-by-entity:
+        description: List investor records for an entity across all CBUs
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: investors
+          schema: kyc
+          fk_col: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      # ============================================
+      # Lifecycle state transitions (plugin behavior)
+      # These use plugin handlers to validate transitions
+      # ============================================
+      request-documents:
+        description: Transition from ENQUIRY to PENDING_DOCUMENTS
+        behavior: plugin
+        plugin_handler: investor_request_documents
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: required-documents
+            type: string_list
+            required: false
+            description: List of required document types
+        returns:
+          type: affected
+
+      start-kyc:
+        description: Transition from PENDING_DOCUMENTS to KYC_IN_PROGRESS
+        behavior: plugin
+        plugin_handler: investor_start_kyc
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: case-id
+            type: uuid
+            required: false
+            maps_to: kyc_case_id
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+            description: Link to existing KYC case (optional - can create new)
+        returns:
+          type: affected
+
+      approve-kyc:
+        description: Transition from KYC_IN_PROGRESS to KYC_APPROVED
+        behavior: plugin
+        plugin_handler: investor_approve_kyc
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: risk-rating
+            type: string
+            required: false
+            maps_to: risk_rating
+            validation:
+              enum:
+                - low
+                - medium
+                - high
+                - very_high
+          - name: next-review-date
+            type: date
+            required: false
+            maps_to: next_review_date
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      reject-kyc:
+        description: Transition from KYC_IN_PROGRESS to KYC_REJECTED
+        behavior: plugin
+        plugin_handler: investor_reject_kyc
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: rejection-reason
+            type: string
+            required: true
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      mark-eligible:
+        description: Transition from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE
+        behavior: plugin
+        plugin_handler: investor_mark_eligible
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: eligible-share-classes
+            type: uuid_list
+            required: false
+            description: List of share class IDs investor is eligible for
+        returns:
+          type: affected
+
+      record-subscription:
+        description: Transition from ELIGIBLE_TO_SUBSCRIBE to SUBSCRIBED
+        behavior: plugin
+        plugin_handler: investor_record_subscription
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: holding-id
+            type: uuid
+            required: false
+            maps_to: initial_holding_id
+            lookup:
+              table: holdings
+              entity_type: holding
+              schema: kyc
+              search_key: id
+              primary_key: id
+            description: Initial holding created for investor
+        returns:
+          type: affected
+
+      activate:
+        description: Transition from SUBSCRIBED to ACTIVE_HOLDER
+        behavior: plugin
+        plugin_handler: investor_activate
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+        returns:
+          type: affected
+
+      start-redemption:
+        description: Transition from ACTIVE_HOLDER to REDEEMING
+        behavior: plugin
+        plugin_handler: investor_start_redemption
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: full-redemption
+            type: boolean
+            required: false
+            default: false
+            description: Whether this is a full redemption (leads to offboarding)
+        returns:
+          type: affected
+
+      complete-redemption:
+        description: Complete redemption - return to ACTIVE_HOLDER or proceed to OFFBOARDED
+        behavior: plugin
+        plugin_handler: investor_complete_redemption
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: remaining-balance
+            type: boolean
+            required: true
+            description: True if investor has remaining balance (stays ACTIVE_HOLDER)
+        returns:
+          type: affected
+
+      offboard:
+        description: Transition to OFFBOARDED (terminal state)
+        behavior: plugin
+        plugin_handler: investor_offboard
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: offboard-reason
+            type: string
+            required: true
+            validation:
+              enum:
+                - full_redemption
+                - transfer_out
+                - death
+                - regulatory
+                - voluntary
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      suspend:
+        description: Suspend investor (can be done from most states)
+        behavior: plugin
+        plugin_handler: investor_suspend
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: suspension-reason
+            type: string
+            required: true
+            validation:
+              enum:
+                - aml_concern
+                - sanctions_match
+                - document_expired
+                - regulatory_hold
+                - other
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      reinstate:
+        description: Reinstate suspended investor to previous state
+        behavior: plugin
+        plugin_handler: investor_reinstate
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: reinstate-to-state
+            type: string
+            required: true
+            description: State to reinstate to
+            validation:
+              enum:
+                - pending_documents
+                - kyc_in_progress
+                - kyc_approved
+                - eligible_to_subscribe
+                - subscribed
+                - active_holder
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      # ============================================
+      # Periodic review verbs
+      # ============================================
+      schedule-review:
+        description: Schedule periodic KYC review
+        behavior: crud
+        crud:
+          operation: update
+          table: investors
+          schema: kyc
+          key: investor_id
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            maps_to: investor_id
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+          - name: next-review-date
+            type: date
+            required: true
+            maps_to: next_review_date
+        returns:
+          type: affected
+
+      list-due-for-review:
+        description: List investors due for periodic review
+        behavior: plugin
+        plugin_handler: investor_list_due_for_review
+        args:
+          - name: cbu-id
+            type: uuid
+            required: false
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+
+      # ============================================
+      # Query/reporting verbs
+      # ============================================
+      get-lifecycle-history:
+        description: Get lifecycle state change history for an investor
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: investor_lifecycle_audit
+          schema: kyc
+          fk_col: investor_id
+          order_by: changed_at DESC
+        args:
+          - name: investor-id
+            type: uuid
+            required: true
+            lookup:
+              table: investors
+              entity_type: investor
+              schema: kyc
+              search_key: investor_name
+              primary_key: investor_id
+        returns:
+          type: record_set
+
+      count-by-state:
+        description: Count investors by lifecycle state for a CBU
+        behavior: plugin
+        plugin_handler: investor_count_by_state
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record

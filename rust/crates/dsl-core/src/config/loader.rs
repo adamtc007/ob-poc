@@ -23,37 +23,71 @@ impl ConfigLoader {
     ///
     /// Path resolution order:
     /// 1. DSL_CONFIG_DIR environment variable (explicit override)
-    /// 2. Relative "config" path (works when running from crate root)
-    /// 3. CARGO_MANIFEST_DIR/config (works in cargo test environments)
-    /// 4. Compile-time CARGO_MANIFEST_DIR embedded at build time
+    /// 2. Relative "config" path (works when running from workspace root)
+    /// 3. CARGO_MANIFEST_DIR/config (works if config is in crate directory)
+    /// 4. Workspace root config (traverse up from CARGO_MANIFEST_DIR to find rust/config)
+    /// 5. Compile-time workspace detection (for test binaries)
     pub fn from_env() -> Self {
         // Try explicit override first
         if let Ok(dir) = std::env::var("DSL_CONFIG_DIR") {
             return Self::new(dir);
         }
 
-        // Try relative "config" (works when running from crate root)
+        // Try relative "config" (works when running from workspace root)
         if Path::new("config/verbs").exists() {
             return Self::new("config");
         }
 
         // Try runtime CARGO_MANIFEST_DIR (set by cargo during build/test)
         if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            // First try config in the crate itself
             let config_path = format!("{}/config", manifest_dir);
             if Path::new(&config_path).join("verbs").exists() {
                 return Self::new(config_path);
             }
+
+            // Try workspace root config (traverse up to find rust/config)
+            if let Some(workspace_config) = Self::find_workspace_config(&manifest_dir) {
+                return Self::new(workspace_config);
+            }
         }
 
-        // Use compile-time CARGO_MANIFEST_DIR (embedded when library is built)
-        // This is the most reliable for test binaries
+        // Use compile-time path - for workspace crates, traverse up to find config
+        // CARGO_MANIFEST_DIR at compile time points to the crate directory (e.g., crates/dsl-core)
+        let compile_time_manifest = env!("CARGO_MANIFEST_DIR");
+
+        // Try crate-local config first
         let compile_time_config = concat!(env!("CARGO_MANIFEST_DIR"), "/config");
         if Path::new(compile_time_config).join("verbs").exists() {
             return Self::new(compile_time_config);
         }
 
+        // Try workspace root config (traverse up from crate directory)
+        if let Some(workspace_config) = Self::find_workspace_config(compile_time_manifest) {
+            return Self::new(workspace_config);
+        }
+
         // Last resort - return "config" and let it fail with clear error
         Self::new("config")
+    }
+
+    /// Find config directory by traversing up from a manifest directory
+    /// Looks for a parent directory containing "config/verbs"
+    fn find_workspace_config(start_dir: &str) -> Option<String> {
+        let mut current = Path::new(start_dir);
+
+        // Traverse up to 5 levels looking for config/verbs
+        for _ in 0..5 {
+            let config_path = current.join("config");
+            if config_path.join("verbs").exists() {
+                return Some(config_path.to_string_lossy().into_owned());
+            }
+
+            // Move up one directory
+            current = current.parent()?;
+        }
+
+        None
     }
 
     /// Get the config directory path as string slice
@@ -289,10 +323,30 @@ mod tests {
     }
 
     #[test]
-    fn test_from_env_default() {
+    fn test_from_env_finds_workspace_config() {
         std::env::remove_var("DSL_CONFIG_DIR");
         let loader = ConfigLoader::from_env();
-        assert_eq!(loader.config_dir, "config");
+
+        // Debug output
+        println!("Resolved config_dir: {}", loader.config_dir);
+        println!(
+            "Compile-time CARGO_MANIFEST_DIR: {}",
+            env!("CARGO_MANIFEST_DIR")
+        );
+
+        // Should find workspace config (rust/config/verbs exists)
+        let verbs_path = Path::new(&loader.config_dir).join("verbs");
+        println!(
+            "Checking verbs path: {} -> exists: {}",
+            verbs_path.display(),
+            verbs_path.exists()
+        );
+
+        assert!(
+            verbs_path.exists(),
+            "ConfigLoader should find workspace config/verbs directory. Got config_dir: {}",
+            loader.config_dir
+        );
     }
 }
 

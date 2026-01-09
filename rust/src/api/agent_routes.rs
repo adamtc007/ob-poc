@@ -954,8 +954,154 @@ fn generate_commands_help() -> String {
 | "switch to kyc" / "switch to service" | Switch view modes |
 
 ---
-*Type `/commands` or `/help` to see this list again.*"#
+*Type `/commands` or `/help` to see this list again.*
+*Type `/verbs` to see all DSL verbs, or `/verbs <domain>` for a specific domain.*"#
         .to_string()
+}
+
+/// Generate help text showing all available DSL verbs
+///
+/// This shows the same information the agent "sees" when generating DSL:
+/// - Verb name and description
+/// - Required and optional arguments with types
+/// - Lookup info for entity resolution
+fn generate_verbs_help(domain_filter: Option<&str>) -> String {
+    let reg = registry();
+    let mut output = String::new();
+
+    // Group verbs by domain
+    let mut domains: std::collections::BTreeMap<
+        &str,
+        Vec<&crate::dsl_v2::verb_registry::UnifiedVerbDef>,
+    > = std::collections::BTreeMap::new();
+
+    for verb in reg.all_verbs() {
+        if let Some(filter) = domain_filter {
+            if verb.domain != filter {
+                continue;
+            }
+        }
+        domains.entry(&verb.domain).or_default().push(verb);
+    }
+
+    if domains.is_empty() {
+        if let Some(filter) = domain_filter {
+            return format!(
+                "No verbs found for domain '{}'\n\nAvailable domains: {}",
+                filter,
+                reg.domains().join(", ")
+            );
+        }
+        return "No verbs loaded in registry.".to_string();
+    }
+
+    // Header
+    if let Some(filter) = domain_filter {
+        output.push_str(&format!("# DSL Verbs: {} domain\n\n", filter));
+    } else {
+        output.push_str(&format!(
+            "# DSL Verbs ({} verbs across {} domains)\n\n",
+            reg.len(),
+            reg.domains().len()
+        ));
+        output.push_str("*Use `/verbs <domain>` for detailed view of a specific domain.*\n\n");
+        output.push_str("## Available Domains\n\n");
+        for domain in reg.domains() {
+            let count = domains.get(domain.as_str()).map(|v| v.len()).unwrap_or(0);
+            output.push_str(&format!("- **{}** ({} verbs)\n", domain, count));
+        }
+        output.push_str("\n---\n\n");
+    }
+
+    // Verb details
+    for (domain, verbs) in &domains {
+        if domain_filter.is_none() {
+            // Summary view - just list verbs with descriptions
+            output.push_str(&format!("## {}\n\n", domain));
+            for verb in verbs {
+                output.push_str(&format!(
+                    "- `{}.{}` - {}\n",
+                    verb.domain, verb.verb, verb.description
+                ));
+            }
+            output.push_str("\n");
+        } else {
+            // Detailed view - show full prompt helper info
+            for verb in verbs {
+                output.push_str(&format!("## `{}.{}`\n\n", verb.domain, verb.verb));
+                output.push_str(&format!("{}\n\n", verb.description));
+
+                // Arguments table
+                if !verb.args.is_empty() {
+                    output.push_str("### Arguments\n\n");
+                    output.push_str("| Name | Type | Required | Description |\n");
+                    output.push_str("|------|------|----------|-------------|\n");
+
+                    for arg in &verb.args {
+                        let req = if arg.required { "✓" } else { "" };
+                        let desc = if arg.description.is_empty() {
+                            "-".to_string()
+                        } else {
+                            arg.description.replace('\n', " ")
+                        };
+                        let type_info = if let Some(ref lookup) = arg.lookup {
+                            if let Some(ref entity_type) = lookup.entity_type {
+                                format!("{} (→{})", arg.arg_type, entity_type)
+                            } else {
+                                arg.arg_type.clone()
+                            }
+                        } else {
+                            arg.arg_type.clone()
+                        };
+                        output.push_str(&format!(
+                            "| `{}` | {} | {} | {} |\n",
+                            arg.name, type_info, req, desc
+                        ));
+                    }
+                    output.push_str("\n");
+                }
+
+                // Example DSL
+                let required_args: Vec<_> = verb
+                    .args
+                    .iter()
+                    .filter(|a| a.required)
+                    .map(|a| format!(":{} ...", a.name))
+                    .collect();
+                let optional_args: Vec<_> = verb
+                    .args
+                    .iter()
+                    .filter(|a| !a.required)
+                    .take(2) // Show first 2 optional args
+                    .map(|a| format!(":{} ...", a.name))
+                    .collect();
+
+                output.push_str("### Example\n\n");
+                output.push_str("```clojure\n");
+                if optional_args.is_empty() {
+                    output.push_str(&format!(
+                        "({}.{} {})\n",
+                        verb.domain,
+                        verb.verb,
+                        required_args.join(" ")
+                    ));
+                } else {
+                    output.push_str(&format!(
+                        "({}.{} {} {})\n",
+                        verb.domain,
+                        verb.verb,
+                        required_args.join(" "),
+                        optional_args.join(" ")
+                    ));
+                }
+                output.push_str("```\n\n");
+
+                output.push_str("---\n\n");
+            }
+        }
+    }
+
+    output
 }
 
 /// POST /api/session/:id/chat - Process chat message and generate DSL via LLM
@@ -1009,6 +1155,22 @@ async fn chat_session(
         let commands_help = generate_commands_help();
         return Ok(Json(ChatResponse {
             message: commands_help,
+            dsl: None,
+            session_state: to_session_state_enum(&session.state),
+            commands: None,
+        }));
+    }
+
+    // Handle /verbs or /verbs <domain> - show DSL verb vocabulary
+    if trimmed_msg == "/verbs" || trimmed_msg.starts_with("/verbs ") {
+        let domain_filter = if trimmed_msg == "/verbs" {
+            None
+        } else {
+            Some(trimmed_msg.strip_prefix("/verbs ").unwrap_or("").trim())
+        };
+        let verbs_help = generate_verbs_help(domain_filter);
+        return Ok(Json(ChatResponse {
+            message: verbs_help,
             dsl: None,
             session_state: to_session_state_enum(&session.state),
             commands: None,

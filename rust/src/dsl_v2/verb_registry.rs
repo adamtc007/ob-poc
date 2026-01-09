@@ -285,7 +285,6 @@ mod tests {
     fn test_registry_loads() {
         let reg = UnifiedVerbRegistry::global();
         assert!(!reg.is_empty(), "Registry should have verbs");
-        println!("Registry has {} verbs", reg.len());
     }
 
     #[test]

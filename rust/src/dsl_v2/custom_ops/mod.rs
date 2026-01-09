@@ -33,6 +33,7 @@ mod entity_ops;
 pub mod entity_query;
 mod gleif_ops;
 pub mod helpers;
+mod investor_ops;
 mod kyc_case_ops;
 mod lifecycle_ops;
 mod matrix_overlay_ops;
@@ -696,6 +697,9 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ControlTraceChainOp));
         registry.register(Arc::new(ControlReconcileOwnershipOp));
 
+        // Investor lifecycle operations (TA KYC-as-a-Service)
+        investor_ops::register_investor_ops(&mut registry);
+
         registry
     }
 
@@ -938,6 +942,20 @@ mod tests {
         // Versioned document lifecycle operations (Phase 7)
         assert!(registry.has("trading-profile", "create-new-version"));
         assert!(registry.has("trading-profile", "mark-validated"));
+        // Investor lifecycle operations (TA KYC-as-a-Service)
+        assert!(registry.has("investor", "request-documents"));
+        assert!(registry.has("investor", "start-kyc"));
+        assert!(registry.has("investor", "approve-kyc"));
+        assert!(registry.has("investor", "reject-kyc"));
+        assert!(registry.has("investor", "mark-eligible"));
+        assert!(registry.has("investor", "record-subscription"));
+        assert!(registry.has("investor", "activate"));
+        assert!(registry.has("investor", "start-redemption"));
+        assert!(registry.has("investor", "complete-redemption"));
+        assert!(registry.has("investor", "offboard"));
+        assert!(registry.has("investor", "suspend"));
+        assert!(registry.has("investor", "reinstate"));
+        assert!(registry.has("investor", "count-by-state"));
     }
 
     #[test]

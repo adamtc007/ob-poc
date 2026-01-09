@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Zh78Q7k6iRiQlrgnxsU3ZXjcf2ogl6R2kZcrFNBbhbOOl6y4o7UYOwACwqtsPtn
+\restrict noGZcOieiHhvMxm3FBCUVqQfiT39sxtLkf2I9HVurJDFSp0MLGn5R2ahVlr3MhZ
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -446,6 +446,98 @@ $$;
 
 
 --
+-- Name: log_investor_lifecycle_change(); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.log_investor_lifecycle_change() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    INSERT INTO kyc.investor_lifecycle_history (
+        investor_id, from_state, to_state, triggered_by, notes
+    ) VALUES (
+        NEW.investor_id, OLD.lifecycle_state, NEW.lifecycle_state,
+        current_setting('app.current_user', true),
+        NEW.lifecycle_notes
+    );
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: sync_holding_to_ubo_relationship(); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.sync_holding_to_ubo_relationship() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_total_units NUMERIC;
+    v_ownership_pct NUMERIC;
+    v_fund_entity_id UUID;
+BEGIN
+    -- Get total units for percentage calculation
+    SELECT COALESCE(SUM(units), 0) INTO v_total_units
+    FROM kyc.holdings
+    WHERE share_class_id = NEW.share_class_id
+      AND COALESCE(holding_status, status) = 'active';
+
+    -- Calculate ownership percentage
+    IF v_total_units > 0 THEN
+        v_ownership_pct := (NEW.units / v_total_units) * 100;
+    ELSE
+        v_ownership_pct := 0;
+    END IF;
+
+    -- Get fund entity ID from share class
+    SELECT entity_id INTO v_fund_entity_id
+    FROM kyc.share_classes WHERE id = NEW.share_class_id;
+
+    -- Create/update ownership relationship if ≥25% and fund entity exists
+    IF v_ownership_pct >= 25 AND v_fund_entity_id IS NOT NULL THEN
+        INSERT INTO "ob-poc".entity_relationships (
+            from_entity_id, to_entity_id, relationship_type,
+            percentage, ownership_type, interest_type, direct_or_indirect,
+            effective_from, source, notes
+        ) VALUES (
+            NEW.investor_entity_id, v_fund_entity_id, 'ownership',
+            v_ownership_pct, 'DIRECT', 'shareholding', 'direct',
+            COALESCE(NEW.acquisition_date, CURRENT_DATE),
+            'INVESTOR_REGISTER',
+            'Synced from holding ' || NEW.id::text
+        )
+        ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
+        WHERE effective_to IS NULL
+        DO UPDATE SET
+            percentage = EXCLUDED.percentage,
+            updated_at = NOW(),
+            notes = EXCLUDED.notes;
+    ELSE
+        -- Remove relationship if dropped below 25%
+        UPDATE "ob-poc".entity_relationships
+        SET effective_to = CURRENT_DATE,
+            updated_at = NOW()
+        WHERE from_entity_id = NEW.investor_entity_id
+          AND to_entity_id = v_fund_entity_id
+          AND relationship_type = 'ownership'
+          AND source = 'INVESTOR_REGISTER'
+          AND effective_to IS NULL;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION sync_holding_to_ubo_relationship(); Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON FUNCTION kyc.sync_holding_to_ubo_relationship() IS 'Syncs holdings ≥25% to entity_relationships for UBO discovery';
+
+
+--
 -- Name: update_outstanding_request_timestamp(); Type: FUNCTION; Schema: kyc; Owner: -
 --
 
@@ -473,6 +565,32 @@ BEGIN
             EXTRACT(DAY FROM NOW() - COALESCE(OLD.blocked_at, NOW()))::INTEGER;
     END IF;
     RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: validate_investor_lifecycle_transition(); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.validate_investor_lifecycle_transition() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Allow if transition is valid
+    IF EXISTS (
+        SELECT 1 FROM kyc.investor_lifecycle_transitions
+        WHERE from_state = OLD.lifecycle_state
+          AND to_state = NEW.lifecycle_state
+    ) THEN
+        NEW.lifecycle_state_at := NOW();
+        NEW.updated_at := NOW();
+        RETURN NEW;
+    END IF;
+
+    -- Reject invalid transition
+    RAISE EXCEPTION 'Invalid lifecycle transition from % to % for investor %',
+        OLD.lifecycle_state, NEW.lifecycle_state, OLD.investor_id;
 END;
 $$;
 
@@ -4699,7 +4817,13 @@ CREATE TABLE kyc.holdings (
     acquisition_date date,
     status character varying(50) DEFAULT 'active'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    investor_id uuid,
+    holding_status character varying(50) DEFAULT 'ACTIVE'::character varying,
+    provider character varying(50) DEFAULT 'MANUAL'::character varying,
+    provider_reference character varying(100),
+    provider_sync_at timestamp with time zone,
+    usage_type character varying(20) DEFAULT 'TA'::character varying
 );
 
 
@@ -4708,6 +4832,166 @@ CREATE TABLE kyc.holdings (
 --
 
 COMMENT ON TABLE kyc.holdings IS 'Investor positions (units held) in fund share classes';
+
+
+--
+-- Name: COLUMN holdings.investor_id; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.holdings.investor_id IS 'Link to investor record (for TA use case - may be NULL for legacy data)';
+
+
+--
+-- Name: COLUMN holdings.holding_status; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.holdings.holding_status IS 'PENDING, ACTIVE, SUSPENDED, CLOSED';
+
+
+--
+-- Name: COLUMN holdings.provider; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.holdings.provider IS 'Data source: CLEARSTREAM, EUROCLEAR, CSV_IMPORT, API_FEED, MANUAL';
+
+
+--
+-- Name: COLUMN holdings.usage_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.holdings.usage_type IS 'TA (Transfer Agency - client investors) or UBO (intra-group ownership)';
+
+
+--
+-- Name: investor_lifecycle_history; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.investor_lifecycle_history (
+    history_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    investor_id uuid NOT NULL,
+    from_state character varying(50),
+    to_state character varying(50) NOT NULL,
+    transitioned_at timestamp with time zone DEFAULT now(),
+    triggered_by character varying(100),
+    notes text,
+    metadata jsonb
+);
+
+
+--
+-- Name: TABLE investor_lifecycle_history; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.investor_lifecycle_history IS 'Audit trail of all investor lifecycle state changes';
+
+
+--
+-- Name: investor_lifecycle_transitions; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.investor_lifecycle_transitions (
+    from_state character varying(50) NOT NULL,
+    to_state character varying(50) NOT NULL,
+    requires_kyc_approved boolean DEFAULT false,
+    requires_document text,
+    auto_trigger character varying(100)
+);
+
+
+--
+-- Name: TABLE investor_lifecycle_transitions; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.investor_lifecycle_transitions IS 'Valid state transitions for investor lifecycle with requirements';
+
+
+--
+-- Name: investors; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.investors (
+    investor_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    entity_id uuid NOT NULL,
+    investor_type character varying(50) NOT NULL,
+    investor_category character varying(50),
+    lifecycle_state character varying(50) DEFAULT 'ENQUIRY'::character varying NOT NULL,
+    lifecycle_state_at timestamp with time zone DEFAULT now(),
+    lifecycle_notes text,
+    kyc_status character varying(50) DEFAULT 'NOT_STARTED'::character varying NOT NULL,
+    kyc_case_id uuid,
+    kyc_approved_at timestamp with time zone,
+    kyc_expires_at timestamp with time zone,
+    kyc_risk_rating character varying(20),
+    tax_status character varying(50),
+    tax_jurisdiction character varying(10),
+    fatca_status character varying(50),
+    crs_status character varying(50),
+    eligible_fund_types text[],
+    restricted_jurisdictions text[],
+    provider character varying(50) DEFAULT 'MANUAL'::character varying,
+    provider_reference character varying(100),
+    provider_sync_at timestamp with time zone,
+    owning_cbu_id uuid,
+    rejection_reason text,
+    suspended_reason text,
+    pre_suspension_state character varying(50),
+    suspended_at timestamp with time zone,
+    offboard_reason text,
+    offboarded_at timestamp with time zone,
+    first_subscription_at timestamp with time zone,
+    redemption_type character varying(50),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE investors; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.investors IS 'Investor register linking entities to investor-specific lifecycle and KYC status';
+
+
+--
+-- Name: COLUMN investors.investor_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.investors.investor_type IS 'RETAIL, PROFESSIONAL, INSTITUTIONAL, NOMINEE, INTRA_GROUP';
+
+
+--
+-- Name: COLUMN investors.investor_category; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.investors.investor_category IS 'HIGH_NET_WORTH, PENSION_FUND, INSURANCE, SOVEREIGN_WEALTH, FAMILY_OFFICE, CORPORATE, INDIVIDUAL';
+
+
+--
+-- Name: COLUMN investors.lifecycle_state; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.investors.lifecycle_state IS 'ENQUIRY, PENDING_DOCUMENTS, KYC_IN_PROGRESS, KYC_APPROVED, KYC_REJECTED, ELIGIBLE_TO_SUBSCRIBE, SUBSCRIBED, ACTIVE_HOLDER, REDEEMING, OFFBOARDED, SUSPENDED, BLOCKED';
+
+
+--
+-- Name: COLUMN investors.kyc_status; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.investors.kyc_status IS 'NOT_STARTED, IN_PROGRESS, APPROVED, REJECTED, EXPIRED, REFRESH_REQUIRED';
+
+
+--
+-- Name: COLUMN investors.provider; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.investors.provider IS 'CLEARSTREAM, EUROCLEAR, CSV_IMPORT, API_FEED, MANUAL';
+
+
+--
+-- Name: COLUMN investors.owning_cbu_id; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.investors.owning_cbu_id IS 'The BNY client (fund manager) who owns this investor relationship';
 
 
 --
@@ -4729,7 +5013,10 @@ CREATE TABLE kyc.movements (
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT movements_movement_type_check CHECK (((movement_type)::text = ANY ((ARRAY['subscription'::character varying, 'redemption'::character varying, 'transfer_in'::character varying, 'transfer_out'::character varying, 'dividend'::character varying, 'adjustment'::character varying])::text[]))),
+    commitment_id uuid,
+    call_number integer,
+    distribution_type character varying(50),
+    CONSTRAINT movements_movement_type_check CHECK (((movement_type)::text = ANY ((ARRAY['subscription'::character varying, 'redemption'::character varying, 'transfer_in'::character varying, 'transfer_out'::character varying, 'dividend'::character varying, 'adjustment'::character varying, 'commitment'::character varying, 'capital_call'::character varying, 'distribution'::character varying, 'recallable'::character varying, 'initial_subscription'::character varying, 'additional_subscription'::character varying, 'partial_redemption'::character varying, 'full_redemption'::character varying, 'stock_split'::character varying, 'merger'::character varying, 'spinoff'::character varying])::text[]))),
     CONSTRAINT movements_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'confirmed'::character varying, 'settled'::character varying, 'cancelled'::character varying, 'failed'::character varying])::text[])))
 );
 
@@ -4739,6 +5026,27 @@ CREATE TABLE kyc.movements (
 --
 
 COMMENT ON TABLE kyc.movements IS 'Subscription, redemption, and transfer transactions';
+
+
+--
+-- Name: COLUMN movements.commitment_id; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.movements.commitment_id IS 'For capital_call and distribution: links to the original commitment movement';
+
+
+--
+-- Name: COLUMN movements.call_number; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.movements.call_number IS 'For capital_call: sequence number (1st call, 2nd call, etc.)';
+
+
+--
+-- Name: COLUMN movements.distribution_type; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.movements.distribution_type IS 'For distributions: INCOME, CAPITAL_GAIN, RETURN_OF_CAPITAL, RECALLABLE';
 
 
 --
@@ -4956,6 +5264,124 @@ SELECT
     NULL::bigint AS completed_workstreams,
     NULL::bigint AS open_red_flags,
     NULL::bigint AS pending_docs;
+
+
+--
+-- Name: cbus; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbus (
+    cbu_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    description text,
+    nature_purpose text,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    source_of_funds text,
+    client_type character varying(100),
+    jurisdiction character varying(50),
+    risk_context jsonb DEFAULT '{}'::jsonb,
+    onboarding_context jsonb DEFAULT '{}'::jsonb,
+    semantic_context jsonb DEFAULT '{}'::jsonb,
+    embedding public.vector(1536),
+    embedding_model character varying(100),
+    embedding_updated_at timestamp with time zone,
+    commercial_client_entity_id uuid,
+    cbu_category character varying(50),
+    product_id uuid,
+    status character varying(30) DEFAULT 'DISCOVERED'::character varying,
+    kyc_scope_template character varying(50),
+    CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying, 'INTERNAL_TEST'::character varying])::text[])))),
+    CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
+);
+
+
+--
+-- Name: COLUMN cbus.risk_context; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.risk_context IS 'Risk-related context: risk_rating, pep_exposure, sanctions_exposure, industry_codes[]';
+
+
+--
+-- Name: COLUMN cbus.onboarding_context; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.onboarding_context IS 'Onboarding state: stage, completed_steps[], pending_requirements[], override_rules[]';
+
+
+--
+-- Name: COLUMN cbus.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.semantic_context IS 'Rich semantic metadata: business_description, industry_keywords[], related_entities[]';
+
+
+--
+-- Name: COLUMN cbus.commercial_client_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.commercial_client_entity_id IS 'Head office entity that contracted with the bank (e.g., Blackrock Inc). Convenience field - actual ownership is in holdings chain.';
+
+
+--
+-- Name: COLUMN cbus.cbu_category; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".cbus.cbu_category IS 'Template discriminator for visualization layout: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, RETAIL_CLIENT, FAMILY_TRUST, CORRESPONDENT_BANK, INTERNAL_TEST';
+
+
+--
+-- Name: v_share_class_summary; Type: VIEW; Schema: kyc; Owner: -
+--
+
+CREATE VIEW kyc.v_share_class_summary AS
+ SELECT sc.id AS share_class_id,
+    sc.isin,
+    sc.name AS share_class_name,
+    sc.currency,
+    sc.nav_per_share,
+    sc.nav_date,
+    sc.fund_type,
+    sc.fund_structure,
+    sc.investor_eligibility,
+    sc.status,
+    c.cbu_id AS fund_cbu_id,
+    c.name AS fund_name,
+    c.jurisdiction AS fund_jurisdiction,
+    COALESCE(stats.investor_count, (0)::bigint) AS investor_count,
+    COALESCE(stats.total_units, (0)::numeric) AS total_units,
+        CASE
+            WHEN (sc.nav_per_share IS NOT NULL) THEN (COALESCE(stats.total_units, (0)::numeric) * sc.nav_per_share)
+            ELSE NULL::numeric
+        END AS assets_under_management,
+    COALESCE(activity.subscription_count, (0)::bigint) AS subscriptions_30d,
+    COALESCE(activity.redemption_count, (0)::bigint) AS redemptions_30d,
+    COALESCE(activity.net_flow_units, (0)::numeric) AS net_flow_units_30d
+   FROM (((kyc.share_classes sc
+     JOIN "ob-poc".cbus c ON ((sc.cbu_id = c.cbu_id)))
+     LEFT JOIN LATERAL ( SELECT count(DISTINCT h.investor_entity_id) AS investor_count,
+            sum(h.units) AS total_units
+           FROM kyc.holdings h
+          WHERE ((h.share_class_id = sc.id) AND ((COALESCE(h.holding_status, h.status))::text = 'active'::text))) stats ON (true))
+     LEFT JOIN LATERAL ( SELECT count(*) FILTER (WHERE ((m.movement_type)::text = ANY ((ARRAY['subscription'::character varying, 'initial_subscription'::character varying, 'additional_subscription'::character varying])::text[]))) AS subscription_count,
+            count(*) FILTER (WHERE ((m.movement_type)::text = ANY ((ARRAY['redemption'::character varying, 'partial_redemption'::character varying, 'full_redemption'::character varying])::text[]))) AS redemption_count,
+            COALESCE(sum(
+                CASE
+                    WHEN ((m.movement_type)::text = ANY ((ARRAY['subscription'::character varying, 'initial_subscription'::character varying, 'additional_subscription'::character varying, 'transfer_in'::character varying])::text[])) THEN m.units
+                    WHEN ((m.movement_type)::text = ANY ((ARRAY['redemption'::character varying, 'partial_redemption'::character varying, 'full_redemption'::character varying, 'transfer_out'::character varying])::text[])) THEN (- m.units)
+                    ELSE (0)::numeric
+                END), (0)::numeric) AS net_flow_units
+           FROM (kyc.movements m
+             JOIN kyc.holdings h ON ((m.holding_id = h.id)))
+          WHERE ((h.share_class_id = sc.id) AND (m.trade_date >= (CURRENT_DATE - '30 days'::interval)) AND ((m.status)::text = ANY ((ARRAY['confirmed'::character varying, 'settled'::character varying])::text[])))) activity ON (true));
+
+
+--
+-- Name: VIEW v_share_class_summary; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON VIEW kyc.v_share_class_summary IS 'Share class summary with investor counts, AUM, and recent activity metrics';
 
 
 --
@@ -5953,71 +6379,6 @@ booking_rules, standing_instructions, pricing_matrix, valuation_config, constrai
 --
 
 COMMENT ON COLUMN "ob-poc".cbu_trading_profiles.document_hash IS 'SHA-256 hash of document for change detection and idempotency';
-
-
---
--- Name: cbus; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".cbus (
-    cbu_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name character varying(255) NOT NULL,
-    description text,
-    nature_purpose text,
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    source_of_funds text,
-    client_type character varying(100),
-    jurisdiction character varying(50),
-    risk_context jsonb DEFAULT '{}'::jsonb,
-    onboarding_context jsonb DEFAULT '{}'::jsonb,
-    semantic_context jsonb DEFAULT '{}'::jsonb,
-    embedding public.vector(1536),
-    embedding_model character varying(100),
-    embedding_updated_at timestamp with time zone,
-    commercial_client_entity_id uuid,
-    cbu_category character varying(50),
-    product_id uuid,
-    status character varying(30) DEFAULT 'DISCOVERED'::character varying,
-    kyc_scope_template character varying(50),
-    CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying, 'INTERNAL_TEST'::character varying])::text[])))),
-    CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
-);
-
-
---
--- Name: COLUMN cbus.risk_context; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".cbus.risk_context IS 'Risk-related context: risk_rating, pep_exposure, sanctions_exposure, industry_codes[]';
-
-
---
--- Name: COLUMN cbus.onboarding_context; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".cbus.onboarding_context IS 'Onboarding state: stage, completed_steps[], pending_requirements[], override_rules[]';
-
-
---
--- Name: COLUMN cbus.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".cbus.semantic_context IS 'Rich semantic metadata: business_description, industry_keywords[], related_entities[]';
-
-
---
--- Name: COLUMN cbus.commercial_client_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".cbus.commercial_client_entity_id IS 'Head office entity that contracted with the bank (e.g., Blackrock Inc). Convenience field - actual ownership is in holdings chain.';
-
-
---
--- Name: COLUMN cbus.cbu_category; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".cbus.cbu_category IS 'Template discriminator for visualization layout: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, RETAIL_CLIENT, FAMILY_TRUST, CORRESPONDENT_BANK, INTERNAL_TEST';
 
 
 --
@@ -13230,6 +13591,38 @@ ALTER TABLE ONLY kyc.holdings
 
 
 --
+-- Name: investor_lifecycle_history investor_lifecycle_history_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.investor_lifecycle_history
+    ADD CONSTRAINT investor_lifecycle_history_pkey PRIMARY KEY (history_id);
+
+
+--
+-- Name: investor_lifecycle_transitions investor_lifecycle_transitions_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.investor_lifecycle_transitions
+    ADD CONSTRAINT investor_lifecycle_transitions_pkey PRIMARY KEY (from_state, to_state);
+
+
+--
+-- Name: investors investors_entity_id_owning_cbu_id_key; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.investors
+    ADD CONSTRAINT investors_entity_id_owning_cbu_id_key UNIQUE (entity_id, owning_cbu_id);
+
+
+--
+-- Name: investors investors_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.investors
+    ADD CONSTRAINT investors_pkey PRIMARY KEY (investor_id);
+
+
+--
 -- Name: movements movements_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -16010,6 +16403,13 @@ CREATE INDEX idx_doc_requests_workstream ON kyc.doc_requests USING btree (workst
 
 
 --
+-- Name: idx_holdings_active_usage; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_holdings_active_usage ON kyc.holdings USING btree (share_class_id, investor_entity_id, usage_type) WHERE ((COALESCE(holding_status, status))::text = 'active'::text);
+
+
+--
 -- Name: idx_holdings_investor; Type: INDEX; Schema: kyc; Owner: -
 --
 
@@ -16017,10 +16417,94 @@ CREATE INDEX idx_holdings_investor ON kyc.holdings USING btree (investor_entity_
 
 
 --
+-- Name: idx_holdings_provider; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_holdings_provider ON kyc.holdings USING btree (provider, provider_reference);
+
+
+--
 -- Name: idx_holdings_share_class; Type: INDEX; Schema: kyc; Owner: -
 --
 
 CREATE INDEX idx_holdings_share_class ON kyc.holdings USING btree (share_class_id);
+
+
+--
+-- Name: idx_holdings_status; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_holdings_status ON kyc.holdings USING btree (holding_status);
+
+
+--
+-- Name: idx_holdings_usage_type; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_holdings_usage_type ON kyc.holdings USING btree (usage_type);
+
+
+--
+-- Name: idx_investor_lifecycle_history; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investor_lifecycle_history ON kyc.investor_lifecycle_history USING btree (investor_id, transitioned_at DESC);
+
+
+--
+-- Name: idx_investors_entity; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investors_entity ON kyc.investors USING btree (entity_id);
+
+
+--
+-- Name: idx_investors_kyc_expires; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investors_kyc_expires ON kyc.investors USING btree (kyc_expires_at) WHERE (kyc_expires_at IS NOT NULL);
+
+
+--
+-- Name: idx_investors_kyc_expiring; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investors_kyc_expiring ON kyc.investors USING btree (kyc_expires_at) WHERE (((kyc_status)::text = 'APPROVED'::text) AND (kyc_expires_at IS NOT NULL));
+
+
+--
+-- Name: idx_investors_kyc_status; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investors_kyc_status ON kyc.investors USING btree (kyc_status);
+
+
+--
+-- Name: idx_investors_lifecycle; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investors_lifecycle ON kyc.investors USING btree (lifecycle_state);
+
+
+--
+-- Name: idx_investors_owning_cbu; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investors_owning_cbu ON kyc.investors USING btree (owning_cbu_id);
+
+
+--
+-- Name: idx_investors_provider; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_investors_provider ON kyc.investors USING btree (provider, provider_reference);
+
+
+--
+-- Name: idx_movements_commitment; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_movements_commitment ON kyc.movements USING btree (commitment_id) WHERE (commitment_id IS NOT NULL);
 
 
 --
@@ -19578,10 +20062,31 @@ CREATE TRIGGER update_tax_treaty_rates_updated_at BEFORE UPDATE ON custody.tax_t
 
 
 --
+-- Name: investors trg_log_investor_lifecycle; Type: TRIGGER; Schema: kyc; Owner: -
+--
+
+CREATE TRIGGER trg_log_investor_lifecycle AFTER UPDATE OF lifecycle_state ON kyc.investors FOR EACH ROW EXECUTE FUNCTION kyc.log_investor_lifecycle_change();
+
+
+--
 -- Name: outstanding_requests trg_outstanding_requests_updated; Type: TRIGGER; Schema: kyc; Owner: -
 --
 
 CREATE TRIGGER trg_outstanding_requests_updated BEFORE UPDATE ON kyc.outstanding_requests FOR EACH ROW EXECUTE FUNCTION kyc.update_outstanding_request_timestamp();
+
+
+--
+-- Name: holdings trg_sync_holding_to_ubo; Type: TRIGGER; Schema: kyc; Owner: -
+--
+
+CREATE TRIGGER trg_sync_holding_to_ubo AFTER INSERT OR UPDATE OF units, holding_status, status ON kyc.holdings FOR EACH ROW EXECUTE FUNCTION kyc.sync_holding_to_ubo_relationship();
+
+
+--
+-- Name: investors trg_validate_investor_lifecycle; Type: TRIGGER; Schema: kyc; Owner: -
+--
+
+CREATE TRIGGER trg_validate_investor_lifecycle BEFORE UPDATE OF lifecycle_state ON kyc.investors FOR EACH ROW WHEN (((old.lifecycle_state)::text IS DISTINCT FROM (new.lifecycle_state)::text)) EXECUTE FUNCTION kyc.validate_investor_lifecycle_transition();
 
 
 --
@@ -20514,11 +21019,43 @@ ALTER TABLE ONLY kyc.holdings
 
 
 --
+-- Name: holdings holdings_investor_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.holdings
+    ADD CONSTRAINT holdings_investor_id_fkey FOREIGN KEY (investor_id) REFERENCES kyc.investors(investor_id);
+
+
+--
 -- Name: holdings holdings_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
 --
 
 ALTER TABLE ONLY kyc.holdings
     ADD CONSTRAINT holdings_share_class_id_fkey FOREIGN KEY (share_class_id) REFERENCES kyc.share_classes(id);
+
+
+--
+-- Name: investor_lifecycle_history investor_lifecycle_history_investor_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.investor_lifecycle_history
+    ADD CONSTRAINT investor_lifecycle_history_investor_id_fkey FOREIGN KEY (investor_id) REFERENCES kyc.investors(investor_id);
+
+
+--
+-- Name: investors investors_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.investors
+    ADD CONSTRAINT investors_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: investors investors_owning_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.investors
+    ADD CONSTRAINT investors_owning_cbu_id_fkey FOREIGN KEY (owning_cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
 
 
 --
@@ -22597,5 +23134,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Zh78Q7k6iRiQlrgnxsU3ZXjcf2ogl6R2kZcrFNBbhbOOl6y4o7UYOwACwqtsPtn
+\unrestrict noGZcOieiHhvMxm3FBCUVqQfiT39sxtLkf2I9HVurJDFSp0MLGn5R2ahVlr3MhZ
 
