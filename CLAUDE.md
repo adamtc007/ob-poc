@@ -5,7 +5,7 @@
 > **Custom ops:** 44 plugin handlers
 > **Crates:** 13 fine-grained crates
 > **Migrations:** 12 schema migrations (latest: 012_session_scope_management.sql)
-> **Pending:** Session scope viewport/agent integration (see ai-thoughts/014-session-scope-unified-state.md)
+> **Pending:** DSL execution path consolidation (see ai-thoughts/015-consolidate-dsl-execution-path.md)
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -53,7 +53,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "agent", "MCP", "research macro" → `docs/strategy-patterns.md` §2
 
 **Working documents (TODOs, plans):**
-- `ai-thoughts/013-investor-register-ubo-integration.md` - Investor register + UBO implementation plan
+- `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
 
 ---
 
@@ -411,7 +411,8 @@ Never silently "guess and commit" on complex domain logic.
 | `custody` | 40 | Settlement, safekeeping |
 | `isda` | 12 | ISDA/CSA agreements |
 | `screening` | 10 | Sanctions, PEP screening |
-| `gleif` | 8 | GLEIF API integration |
+| `gleif` | 15 | GLEIF LEI lookup, hierarchy import |
+| `bods` | 9 | BODS 0.4 UBO discovery, import/export |
 | `trading-profile` | 15 | Trading matrix configuration |
 
 **Full verb reference:** See YAML files in `rust/config/verbs/`
