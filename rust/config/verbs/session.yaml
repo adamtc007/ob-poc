@@ -1,0 +1,271 @@
+# Session Scope Management Verbs
+#
+# Controls the session scope (what data the user is viewing/operating on).
+# Scope types: galaxy, book, cbu, jurisdiction, neighborhood
+#
+# Integration: UnifiedSessionContext, ViewState, AgentGraphContext
+
+domains:
+  session:
+    description: |
+      Session scope management for navigation and data windowing.
+      Controls what CBUs/entities are visible and what the agent context is.
+      Scope changes trigger viewport rebuild and agent context refresh.
+    verbs:
+      # ============================================
+      # Scope Setting Operations
+      # ============================================
+      set-galaxy:
+        description: Set scope to all CBUs under an apex entity (commercial client)
+        behavior: plugin
+        handler: SessionSetGalaxyOp
+        args:
+          - name: apex-entity-id
+            type: uuid
+            required: true
+            maps_to: apex_entity_id
+            description: The apex entity (e.g., Allianz SE, Blackrock Inc)
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          capture: false
+
+      set-book:
+        description: Set scope to filtered subset of a galaxy (by jurisdiction, entity type, etc.)
+        behavior: plugin
+        handler: SessionSetBookOp
+        args:
+          - name: apex-entity-id
+            type: uuid
+            required: true
+            maps_to: apex_entity_id
+            description: The apex entity for the book
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: jurisdictions
+            type: string_list
+            required: false
+            description: Filter to these jurisdiction codes (e.g., ["LU", "IE"])
+          - name: entity-types
+            type: string_list
+            required: false
+            description: Filter to these entity types
+          - name: cbu-types
+            type: string_list
+            required: false
+            description: Filter to these CBU types (fund, subfund, etc.)
+        returns:
+          type: record
+          capture: false
+
+      set-cbu:
+        description: Set scope to a single CBU
+        behavior: plugin
+        handler: SessionSetCbuOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            description: The CBU to focus on
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          capture: false
+
+      set-jurisdiction:
+        description: Set scope to all CBUs in a jurisdiction
+        behavior: plugin
+        handler: SessionSetJurisdictionOp
+        args:
+          - name: jurisdiction-code
+            type: string
+            required: true
+            maps_to: jurisdiction_code
+            description: ISO country code (e.g., LU, IE, DE)
+        returns:
+          type: record
+          capture: false
+
+      set-neighborhood:
+        description: Set scope to N hops from a focal entity
+        behavior: plugin
+        handler: SessionSetNeighborhoodOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: focal_entity_id
+            description: The focal entity to center on
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: hops
+            type: integer
+            required: false
+            default: 2
+            description: Number of relationship hops to include
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Cursor Operations (focus within scope)
+      # ============================================
+      focus:
+        description: Set cursor to a specific entity within the current scope
+        behavior: plugin
+        handler: SessionFocusOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: cursor_entity_id
+            description: Entity to focus on
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          capture: false
+
+      clear-focus:
+        description: Clear cursor (unfocus)
+        behavior: plugin
+        handler: SessionClearFocusOp
+        args: []
+        returns:
+          type: affected
+
+      # ============================================
+      # Navigation Operations
+      # ============================================
+      back:
+        description: Navigate back to previous scope
+        behavior: plugin
+        handler: SessionBackOp
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      forward:
+        description: Navigate forward (undo back)
+        behavior: plugin
+        handler: SessionForwardOp
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Query Operations
+      # ============================================
+      info:
+        description: Get current scope information
+        behavior: plugin
+        handler: SessionInfoOp
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      list-cbus:
+        description: List CBUs in current scope
+        behavior: plugin
+        handler: SessionListCbusOp
+        args:
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum number of CBUs to return
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Clear/Reset Operations
+      # ============================================
+      clear:
+        description: Clear scope (reset to empty)
+        behavior: plugin
+        handler: SessionClearOp
+        args: []
+        returns:
+          type: affected
+
+      # ============================================
+      # Bookmark Operations
+      # ============================================
+      save-bookmark:
+        description: Save current scope as a named bookmark
+        behavior: plugin
+        handler: SessionSaveBookmarkOp
+        args:
+          - name: name
+            type: string
+            required: true
+            description: Bookmark name
+          - name: description
+            type: string
+            required: false
+            description: Optional description
+        returns:
+          type: uuid
+          name: bookmark_id
+          capture: true
+
+      load-bookmark:
+        description: Load scope from a saved bookmark
+        behavior: plugin
+        handler: SessionLoadBookmarkOp
+        args:
+          - name: name
+            type: string
+            required: true
+            description: Bookmark name to load
+        returns:
+          type: record
+          capture: false
+
+      list-bookmarks:
+        description: List saved bookmarks
+        behavior: plugin
+        handler: SessionListBookmarksOp
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      delete-bookmark:
+        description: Delete a saved bookmark
+        behavior: plugin
+        handler: SessionDeleteBookmarkOp
+        args:
+          - name: name
+            type: string
+            required: true
+            description: Bookmark name to delete
+        returns:
+          type: affected

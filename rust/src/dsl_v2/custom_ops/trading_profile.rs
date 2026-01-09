@@ -1285,26 +1285,27 @@ impl CustomOperation for TradingProfileAddMarketOp {
             .map(|s| s.to_string());
 
         // Look up market metadata from reference data if not provided
-        let (resolved_name, resolved_country) = if market_name.is_none() || country_code.is_none() {
-            let row =
-                sqlx::query(r#"SELECT name, country_code FROM custody.markets WHERE mic = $1"#)
-                    .bind(&mic)
-                    .fetch_optional(pool)
-                    .await?;
+        let (resolved_name, resolved_country) =
+            if let (Some(name), Some(code)) = (market_name.clone(), country_code.clone()) {
+                (name, code)
+            } else {
+                let row =
+                    sqlx::query(r#"SELECT name, country_code FROM custody.markets WHERE mic = $1"#)
+                        .bind(&mic)
+                        .fetch_optional(pool)
+                        .await?;
 
-            match row {
-                Some(r) => (
-                    market_name.unwrap_or_else(|| r.get::<String, _>("name")),
-                    country_code.unwrap_or_else(|| r.get::<String, _>("country_code")),
-                ),
-                None => (
-                    market_name.unwrap_or_else(|| mic.clone()),
-                    country_code.unwrap_or_else(|| "XX".to_string()),
-                ),
-            }
-        } else {
-            (market_name.unwrap(), country_code.unwrap())
-        };
+                match row {
+                    Some(r) => (
+                        market_name.unwrap_or_else(|| r.get::<String, _>("name")),
+                        country_code.unwrap_or_else(|| r.get::<String, _>("country_code")),
+                    ),
+                    None => (
+                        market_name.unwrap_or_else(|| mic.clone()),
+                        country_code.unwrap_or_else(|| "XX".to_string()),
+                    ),
+                }
+            };
 
         // Apply operation to AST and save
         let doc = ast_db::apply_and_save(

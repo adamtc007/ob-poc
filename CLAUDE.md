@@ -1,11 +1,11 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-09
-> **Verb count:** ~720 verbs across 94 YAML files
-> **Custom ops:** 42 plugin handlers
+> **Verb count:** ~720 verbs across 95 YAML files
+> **Custom ops:** 44 plugin handlers
 > **Crates:** 13 fine-grained crates
-> **Migrations:** 11 schema migrations (latest: 011_investor_register.sql)
-> **Pending:** Investor Register + UBO integration (see ai-thoughts/013-investor-register-ubo-integration.md)
+> **Migrations:** 12 schema migrations (latest: 012_session_scope_management.sql)
+> **Pending:** Session scope viewport/agent integration (see ai-thoughts/014-session-scope-unified-state.md)
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -102,7 +102,7 @@ User/Agent → DSL Source → Parser → Compiler → Executor → PostgreSQL
 ```
 ob-poc/
 ├── rust/
-│   ├── config/verbs/           # Verb YAML definitions (94 files, ~720 verbs)
+│   ├── config/verbs/           # Verb YAML definitions (95 files, ~720 verbs)
 │   │   ├── cbu.yaml            # CBU domain
 │   │   ├── entity.yaml         # Entity domain
 │   │   ├── custody/            # Custody subdomain
@@ -117,14 +117,14 @@ ob-poc/
 │   ├── src/
 │   │   ├── dsl_v2/             # DSL execution layer
 │   │   │   ├── generic_executor.rs  # YAML-driven CRUD executor
-│   │   │   ├── custom_ops/     # Plugin handlers (~42 files)
+│   │   │   ├── custom_ops/     # Plugin handlers (~44 files)
 │   │   │   └── verb_registry.rs
 │   │   ├── api/                # REST API routes
 │   │   └── bin/
 │   │       ├── dsl_api.rs      # Main Axum server
 │   │       └── dsl_cli.rs      # CLI tool
 │   └── xtask/                  # Build automation
-├── migrations/                 # SQLx migrations (11 files)
+├── migrations/                 # SQLx migrations (12 files)
 ├── docs/                       # Architecture documentation
 ├── ai-thoughts/                # ADRs and working docs
 └── CLAUDE.md                   # This file
@@ -407,6 +407,7 @@ Never silently "guess and commit" on complex domain logic.
 | `entity` | 30 | Natural/legal person management |
 | `kyc` | 20 | KYC case management |
 | `investor` | 15 | Investor register, holdings |
+| `session` | 16 | Scope management, navigation, bookmarks |
 | `custody` | 40 | Settlement, safekeeping |
 | `isda` | 12 | ISDA/CSA agreements |
 | `screening` | 10 | Sanctions, PEP screening |

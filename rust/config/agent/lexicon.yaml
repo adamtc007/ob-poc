@@ -75,6 +75,25 @@ verbs:
     - which
     - who
 
+  # Scope/navigation - changes what data is in view
+  scope:
+    - focus
+    - focus on
+    - show me
+    - switch to
+    - go to
+    - navigate to
+    - zoom in
+    - zoom out
+    - drill into
+    - drill down
+    - back
+    - forward
+    - return to
+    - set scope
+    - change scope
+    - clear scope
+
   # Link/assign - creates relationship
   link:
     - assign
@@ -140,6 +159,15 @@ verbs:
     - go-live
 
 entities:
+  # Scope types
+  scope_type:
+    - galaxy
+    - book
+    - universe
+    - jurisdiction
+    - neighborhood
+    - all
+
   # CBU indicators
   cbu:
     - cbu

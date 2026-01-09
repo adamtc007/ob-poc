@@ -605,7 +605,7 @@ impl CustomOperation for ViewportCameraOp {
                 viewport.camera.y = y;
             }
             if let Some(zoom) = get_f32_arg(verb_call, "zoom") {
-                viewport.camera.zoom = zoom.max(0.1).min(10.0); // Clamp zoom
+                viewport.camera.zoom = zoom.clamp(0.1, 10.0);
             }
         }
 
@@ -806,7 +806,7 @@ impl CustomOperation for ViewportTrackOp {
             _ => FocusMode::Sticky, // Default
         };
 
-        viewport.focus.focus_mode = focus_mode.clone();
+        viewport.focus.focus_mode = focus_mode;
 
         let result = ViewportTrackResult {
             tracking: focus_mode != FocusMode::Manual,
@@ -976,24 +976,6 @@ impl CustomOperation for ViewportViewTypeOp {
     ) -> Result<ExecutionResult> {
         Err(anyhow!("viewport.view-type requires database feature"))
     }
-}
-
-// ============================================================================
-// PUBLIC EXPORTS
-// ============================================================================
-
-/// Register all viewport operations with the registry
-pub fn register_viewport_ops(registry: &mut crate::dsl_v2::custom_ops::CustomOperationRegistry) {
-    use std::sync::Arc;
-    registry.register(Arc::new(ViewportFocusOp));
-    registry.register(Arc::new(ViewportEnhanceOp));
-    registry.register(Arc::new(ViewportAscendOp));
-    registry.register(Arc::new(ViewportDescendOp));
-    registry.register(Arc::new(ViewportCameraOp));
-    registry.register(Arc::new(ViewportFilterOp));
-    registry.register(Arc::new(ViewportTrackOp));
-    registry.register(Arc::new(ViewportClearOp));
-    registry.register(Arc::new(ViewportViewTypeOp));
 }
 
 #[cfg(test)]

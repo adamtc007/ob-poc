@@ -29,7 +29,7 @@ pub enum EntityCategory {
 }
 
 impl EntityCategory {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "FUND" => Self::Fund,
             "GENERAL" => Self::General,
@@ -96,7 +96,7 @@ pub enum FundStructureType {
 }
 
 impl FundStructureType {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().replace(['-', ' '], "_").as_str() {
             "SICAV" => Self::Sicav,
             "ICAV" => Self::Icav,
@@ -178,7 +178,7 @@ pub enum FundType {
 }
 
 impl FundType {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().replace(['-', ' '], "_").as_str() {
             "UCITS" => Self::Ucits,
             "AIF" | "AIFMD" => Self::Aif,
@@ -264,7 +264,7 @@ pub enum EntityStatus {
 }
 
 impl EntityStatus {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "ACTIVE" => Self::Active,
             "INACTIVE" => Self::Inactive,
@@ -318,7 +318,7 @@ pub enum RegistrationStatus {
 }
 
 impl RegistrationStatus {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "ISSUED" => Self::Issued,
             "LAPSED" => Self::Lapsed,
@@ -381,7 +381,7 @@ pub enum CorroborationLevel {
 }
 
 impl CorroborationLevel {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().replace('-', "_").as_str() {
             "FULLY_CORROBORATED" => Self::FullyCorroborated,
             "PARTIALLY_CORROBORATED" => Self::PartiallyCorroborated,
@@ -432,7 +432,7 @@ pub enum RelationshipType {
 }
 
 impl RelationshipType {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().replace('-', "_").as_str() {
             "IS_DIRECTLY_CONSOLIDATED_BY" => Self::IsDirectlyConsolidatedBy,
             "IS_ULTIMATELY_CONSOLIDATED_BY" => Self::IsUltimatelyConsolidatedBy,
@@ -556,7 +556,7 @@ impl LeiRecord {
             .entity
             .category
             .as_deref()
-            .map(EntityCategory::from_str)
+            .map(EntityCategory::parse)
             .unwrap_or_default()
     }
 
@@ -566,7 +566,7 @@ impl LeiRecord {
             .entity
             .status
             .as_deref()
-            .map(EntityStatus::from_str)
+            .map(EntityStatus::parse)
             .unwrap_or_default()
     }
 
@@ -576,7 +576,7 @@ impl LeiRecord {
             .registration
             .status
             .as_deref()
-            .map(RegistrationStatus::from_str)
+            .map(RegistrationStatus::parse)
             .unwrap_or_default()
     }
 
@@ -586,7 +586,7 @@ impl LeiRecord {
             .registration
             .corroboration_level
             .as_deref()
-            .map(CorroborationLevel::from_str)
+            .map(CorroborationLevel::parse)
             .unwrap_or_default()
     }
 
@@ -883,7 +883,7 @@ pub struct RelationshipRecord {
 impl RelationshipRecord {
     /// Get relationship type as typed enum (never fails - unknown values captured)
     pub fn relationship_type(&self) -> RelationshipType {
-        RelationshipType::from_str(&self.attributes.relationship.relationship_type)
+        RelationshipType::parse(&self.attributes.relationship.relationship_type)
     }
 
     /// Get start node LEI
@@ -902,7 +902,7 @@ impl RelationshipRecord {
             .registration
             .corroboration_level
             .as_deref()
-            .map(CorroborationLevel::from_str)
+            .map(CorroborationLevel::parse)
             .unwrap_or_default()
     }
 
@@ -1056,7 +1056,7 @@ pub enum ReportingException {
 
 impl ReportingException {
     /// Parse from GLEIF API string. Never returns None - unknown codes become Unknown(code).
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "NO_KNOWN_PERSON" => Self::NoKnownPerson,
             "NATURAL_PERSONS" => Self::NaturalPersons,
@@ -1320,22 +1320,22 @@ mod tests {
 
     #[test]
     fn test_entity_category_known_values() {
-        assert_eq!(EntityCategory::from_str("FUND"), EntityCategory::Fund);
-        assert_eq!(EntityCategory::from_str("GENERAL"), EntityCategory::General);
-        assert_eq!(EntityCategory::from_str("BRANCH"), EntityCategory::Branch);
+        assert_eq!(EntityCategory::parse("FUND"), EntityCategory::Fund);
+        assert_eq!(EntityCategory::parse("GENERAL"), EntityCategory::General);
+        assert_eq!(EntityCategory::parse("BRANCH"), EntityCategory::Branch);
         assert_eq!(
-            EntityCategory::from_str("SOLE_PROPRIETOR"),
+            EntityCategory::parse("SOLE_PROPRIETOR"),
             EntityCategory::SoleProprietor
         );
 
         // Case insensitive
-        assert_eq!(EntityCategory::from_str("fund"), EntityCategory::Fund);
-        assert_eq!(EntityCategory::from_str("Fund"), EntityCategory::Fund);
+        assert_eq!(EntityCategory::parse("fund"), EntityCategory::Fund);
+        assert_eq!(EntityCategory::parse("Fund"), EntityCategory::Fund);
     }
 
     #[test]
     fn test_entity_category_unknown_captured() {
-        let unknown = EntityCategory::from_str("NEW_CATEGORY_2025");
+        let unknown = EntityCategory::parse("NEW_CATEGORY_2025");
         assert!(unknown.is_unknown());
         assert_eq!(unknown.as_str(), "NEW_CATEGORY_2025");
 
@@ -1345,15 +1345,15 @@ mod tests {
 
     #[test]
     fn test_entity_status_known_values() {
-        assert_eq!(EntityStatus::from_str("ACTIVE"), EntityStatus::Active);
-        assert_eq!(EntityStatus::from_str("INACTIVE"), EntityStatus::Inactive);
-        assert!(EntityStatus::from_str("ACTIVE").is_active());
-        assert!(!EntityStatus::from_str("INACTIVE").is_active());
+        assert_eq!(EntityStatus::parse("ACTIVE"), EntityStatus::Active);
+        assert_eq!(EntityStatus::parse("INACTIVE"), EntityStatus::Inactive);
+        assert!(EntityStatus::parse("ACTIVE").is_active());
+        assert!(!EntityStatus::parse("INACTIVE").is_active());
     }
 
     #[test]
     fn test_entity_status_unknown_captured() {
-        let unknown = EntityStatus::from_str("PENDING_REVIEW");
+        let unknown = EntityStatus::parse("PENDING_REVIEW");
         assert!(unknown.is_unknown());
         assert_eq!(unknown.as_str(), "PENDING_REVIEW");
         assert!(!unknown.is_active());
@@ -1362,24 +1362,24 @@ mod tests {
     #[test]
     fn test_registration_status_known_values() {
         assert_eq!(
-            RegistrationStatus::from_str("ISSUED"),
+            RegistrationStatus::parse("ISSUED"),
             RegistrationStatus::Issued
         );
         assert_eq!(
-            RegistrationStatus::from_str("LAPSED"),
+            RegistrationStatus::parse("LAPSED"),
             RegistrationStatus::Lapsed
         );
         assert_eq!(
-            RegistrationStatus::from_str("MERGED"),
+            RegistrationStatus::parse("MERGED"),
             RegistrationStatus::Merged
         );
-        assert!(RegistrationStatus::from_str("ISSUED").is_valid());
-        assert!(!RegistrationStatus::from_str("LAPSED").is_valid());
+        assert!(RegistrationStatus::parse("ISSUED").is_valid());
+        assert!(!RegistrationStatus::parse("LAPSED").is_valid());
     }
 
     #[test]
     fn test_registration_status_unknown_captured() {
-        let unknown = RegistrationStatus::from_str("SUSPENDED_2025");
+        let unknown = RegistrationStatus::parse("SUSPENDED_2025");
         assert!(unknown.is_unknown());
         assert_eq!(unknown.as_str(), "SUSPENDED_2025");
         assert!(!unknown.is_valid());
@@ -1388,19 +1388,19 @@ mod tests {
     #[test]
     fn test_corroboration_level_known_values() {
         assert_eq!(
-            CorroborationLevel::from_str("FULLY_CORROBORATED"),
+            CorroborationLevel::parse("FULLY_CORROBORATED"),
             CorroborationLevel::FullyCorroborated
         );
         assert_eq!(
-            CorroborationLevel::from_str("PARTIALLY_CORROBORATED"),
+            CorroborationLevel::parse("PARTIALLY_CORROBORATED"),
             CorroborationLevel::PartiallyCorroborated
         );
-        assert!(CorroborationLevel::from_str("FULLY_CORROBORATED").is_fully_corroborated());
+        assert!(CorroborationLevel::parse("FULLY_CORROBORATED").is_fully_corroborated());
     }
 
     #[test]
     fn test_corroboration_level_unknown_captured() {
-        let unknown = CorroborationLevel::from_str("SELF_ATTESTED");
+        let unknown = CorroborationLevel::parse("SELF_ATTESTED");
         assert!(unknown.is_unknown());
         assert_eq!(unknown.as_str(), "SELF_ATTESTED");
         assert!(!unknown.is_fully_corroborated());
@@ -1409,25 +1409,25 @@ mod tests {
     #[test]
     fn test_relationship_type_known_values() {
         assert_eq!(
-            RelationshipType::from_str("IS_DIRECTLY_CONSOLIDATED_BY"),
+            RelationshipType::parse("IS_DIRECTLY_CONSOLIDATED_BY"),
             RelationshipType::IsDirectlyConsolidatedBy
         );
         assert_eq!(
-            RelationshipType::from_str("IS_FUND-MANAGED_BY"),
+            RelationshipType::parse("IS_FUND-MANAGED_BY"),
             RelationshipType::IsFundManagedBy
         );
         assert_eq!(
-            RelationshipType::from_str("IS_SUBFUND_OF"),
+            RelationshipType::parse("IS_SUBFUND_OF"),
             RelationshipType::IsSubfundOf
         );
 
-        assert!(RelationshipType::from_str("IS_DIRECTLY_CONSOLIDATED_BY").is_parent_relationship());
-        assert!(RelationshipType::from_str("IS_FUND-MANAGED_BY").is_fund_relationship());
+        assert!(RelationshipType::parse("IS_DIRECTLY_CONSOLIDATED_BY").is_parent_relationship());
+        assert!(RelationshipType::parse("IS_FUND-MANAGED_BY").is_fund_relationship());
     }
 
     #[test]
     fn test_relationship_type_unknown_captured() {
-        let unknown = RelationshipType::from_str("IS_SPONSORED_BY");
+        let unknown = RelationshipType::parse("IS_SPONSORED_BY");
         assert!(unknown.is_unknown());
         assert_eq!(unknown.as_str(), "IS_SPONSORED_BY");
         assert!(!unknown.is_parent_relationship());
@@ -1437,20 +1437,20 @@ mod tests {
     #[test]
     fn test_reporting_exception_known_values() {
         assert_eq!(
-            ReportingException::from_str("NO_KNOWN_PERSON"),
+            ReportingException::parse("NO_KNOWN_PERSON"),
             ReportingException::NoKnownPerson
         );
         assert_eq!(
-            ReportingException::from_str("NATURAL_PERSONS"),
+            ReportingException::parse("NATURAL_PERSONS"),
             ReportingException::NaturalPersons
         );
-        assert!(ReportingException::from_str("NO_KNOWN_PERSON").is_public_float());
-        assert!(ReportingException::from_str("NATURAL_PERSONS").requires_bods_lookup());
+        assert!(ReportingException::parse("NO_KNOWN_PERSON").is_public_float());
+        assert!(ReportingException::parse("NATURAL_PERSONS").requires_bods_lookup());
     }
 
     #[test]
     fn test_reporting_exception_unknown_captured() {
-        let unknown = ReportingException::from_str("REGULATORY_RESTRICTION_2025");
+        let unknown = ReportingException::parse("REGULATORY_RESTRICTION_2025");
         assert!(unknown.is_unknown());
         assert_eq!(unknown.as_str(), "REGULATORY_RESTRICTION_2025");
         assert!(!unknown.is_public_float());

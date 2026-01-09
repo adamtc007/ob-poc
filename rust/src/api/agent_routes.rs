@@ -477,6 +477,10 @@ pub struct WatchResponse {
     pub updated_at: String,
     /// Whether this is the initial snapshot (no wait) or a change notification
     pub is_initial: bool,
+    /// Session scope type (galaxy, book, cbu, jurisdiction, neighborhood, empty)
+    pub scope_type: Option<String>,
+    /// Whether scope data is fully loaded
+    pub scope_loaded: bool,
 }
 
 impl WatchResponse {
@@ -484,6 +488,16 @@ impl WatchResponse {
         snapshot: &crate::api::session_manager::SessionSnapshot,
         is_initial: bool,
     ) -> Self {
+        // Extract scope type string from GraphScope
+        let scope_type = snapshot.scope_definition.as_ref().map(|s| match s {
+            crate::graph::GraphScope::Empty => "empty".to_string(),
+            crate::graph::GraphScope::SingleCbu { .. } => "cbu".to_string(),
+            crate::graph::GraphScope::Book { .. } => "book".to_string(),
+            crate::graph::GraphScope::Jurisdiction { .. } => "jurisdiction".to_string(),
+            crate::graph::GraphScope::EntityNeighborhood { .. } => "neighborhood".to_string(),
+            crate::graph::GraphScope::Custom { .. } => "custom".to_string(),
+        });
+
         Self {
             session_id: snapshot.session_id,
             version: snapshot.version,
@@ -493,6 +507,8 @@ impl WatchResponse {
             active_cbu_id: snapshot.active_cbu_id,
             updated_at: snapshot.updated_at.to_rfc3339(),
             is_initial,
+            scope_type,
+            scope_loaded: snapshot.scope_loaded,
         }
     }
 }
@@ -679,8 +695,6 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
             "/api/agent/generate-with-tools",
             post(generate_dsl_with_tools),
         )
-        // Direct DSL execution (no session required)
-        .route("/execute", post(direct_execute_dsl))
         // Batch operations (server-side DSL generation, no LLM)
         .route("/api/batch/add-products", post(batch_add_products))
         .with_state(state)
@@ -1024,7 +1038,7 @@ fn generate_verbs_help(domain_filter: Option<&str>) -> String {
                     verb.domain, verb.verb, verb.description
                 ));
             }
-            output.push_str("\n");
+            output.push('\n');
         } else {
             // Detailed view - show full prompt helper info
             for verb in verbs {
@@ -1058,7 +1072,7 @@ fn generate_verbs_help(domain_filter: Option<&str>) -> String {
                             arg.name, type_info, req, desc
                         ));
                     }
-                    output.push_str("\n");
+                    output.push('\n');
                 }
 
                 // Example DSL
@@ -1792,6 +1806,20 @@ async fn execute_session_dsl(
                     viewport_state.focus.focus_mode
                 );
                 context.set_viewport_state(viewport_state);
+            }
+
+            // =========================================================================
+            // PROPAGATE SCOPE CHANGE FROM EXECUTION CONTEXT
+            // =========================================================================
+            // Session scope operations (session.set-galaxy, session.set-cbu, etc.) store
+            // GraphScope in ExecutionContext.pending_scope_change. Propagate it to
+            // SessionContext so the UI can rebuild the viewport with new scope.
+            if let Some(scope_change) = exec_ctx.take_pending_scope_change() {
+                tracing::info!(
+                    "[EXEC] Propagating scope change to session context (scope: {:?})",
+                    scope_change
+                );
+                context.set_scope(crate::session::SessionScope::from_graph_scope(scope_change));
             }
 
             // =========================================================================
@@ -4148,32 +4176,8 @@ pub struct ExecuteDslRequest {
     pub dsl: Option<String>,
 }
 
-// ============================================================================
-// Direct Execute Handler (no session required)
-// ============================================================================
-
-/// Request for direct DSL execution
-#[derive(Debug, Deserialize)]
-pub struct DirectExecuteRequest {
-    pub dsl: String,
-    #[serde(default)]
-    pub bindings: Option<std::collections::HashMap<String, Uuid>>,
-}
-
-/// Primary key returned from DSL execution - derived from verb's `produces` metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PrimaryKey {
-    /// The entity type produced (from verb YAML `produces.type`: cbu, entity, case, workstream, etc.)
-    pub entity_type: String,
-    /// Optional subtype for entities (from verb YAML `produces.subtype`: proper_person, limited_company, etc.)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subtype: Option<String>,
-    /// The primary key UUID
-    pub id: Uuid,
-    /// Display name (from :name argument if available)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-}
+// NOTE: Direct /execute endpoint removed - use /api/session/:id/execute instead
+// All DSL execution now requires a session for proper binding persistence and audit trail
 
 /// Pipeline stage indicating where processing stopped
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -4210,422 +4214,6 @@ pub struct UnresolvedRef {
     pub search_text: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DirectExecuteResponse {
-    pub success: bool,
-    /// Pipeline stage reached (determines what data is available)
-    pub stage: PipelineStage,
-    pub results: Vec<ExecutionResult>,
-    pub bindings: std::collections::HashMap<String, Uuid>,
-    pub errors: Vec<String>,
-    /// The AST - available once stage >= Parsed
-    /// DSL source + AST are a tuple pair, persisted together
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ast: Option<Vec<crate::dsl_v2::ast::Statement>>,
-    /// Unresolved EntityRefs requiring user/agent resolution
-    /// UI should show search popup for each; use /api/dsl/resolve-ref to update
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub unresolved_refs: Vec<UnresolvedRef>,
-    /// Primary key(s) created/updated by this execution
-    /// Each domain returns its primary entity type PK
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub primary_keys: Vec<PrimaryKey>,
-    /// Whether statements were reordered by the planner
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
-    pub reordered: bool,
-    /// Synthetic steps injected by the planner (e.g., implicit entity creates)
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub synthetic_steps: Vec<SyntheticStepInfo>,
-    /// Planner diagnostics (warnings, lifecycle violations)
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    pub planner_diagnostics: Vec<PlannerDiagnosticInfo>,
-}
-
-/// Information about a synthetic step injected by the planner
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyntheticStepInfo {
-    pub binding: String,
-    pub verb: String,
-    pub entity_type: String,
-}
-
-/// Planner diagnostic information for API responses
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlannerDiagnosticInfo {
-    pub kind: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub binding: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub stmt_index: Option<usize>,
-}
-
-/// POST /execute - Direct DSL execution without session
-/// Used by Go UI and egui WASM for executing DSL directly
-async fn direct_execute_dsl(
-    State(state): State<AgentState>,
-    Json(req): Json<DirectExecuteRequest>,
-) -> Json<DirectExecuteResponse> {
-    use crate::dsl_v2::validation::{Severity, ValidationContext, ValidationRequest};
-    use crate::dsl_v2::{enrich_program, runtime_registry};
-
-    // Parse - if this fails, we're in Draft stage (no AST)
-    let raw_program = match parse_program(&req.dsl) {
-        Ok(p) => p,
-        Err(e) => {
-            return Json(DirectExecuteResponse {
-                success: false,
-                stage: PipelineStage::Draft,
-                results: vec![],
-                bindings: std::collections::HashMap::new(),
-                errors: vec![format!("Parse error: {}", e)],
-                ast: None,
-                unresolved_refs: vec![],
-                primary_keys: vec![],
-                reordered: false,
-                synthetic_steps: vec![],
-                planner_diagnostics: vec![],
-            });
-        }
-    };
-
-    // Enrich: convert string literals to EntityRefs based on YAML verb config
-    let registry = runtime_registry();
-    let enrichment_result = enrich_program(raw_program, registry);
-    let mut program = enrichment_result.program;
-
-    // Auto-resolve EntityRefs with exact matches via EntityGateway
-    // This handles cases like :jurisdiction "LU" or :umbrella-id "Fund Name"
-    program = auto_resolve_entity_refs(program).await;
-
-    // Validate with CSG linter (includes dataflow validation)
-    let validator_result = async {
-        let v = SemanticValidator::new(state.pool.clone()).await?;
-        v.with_csg_linter().await
-    }
-    .await;
-
-    if let Ok(mut validator) = validator_result {
-        let request = ValidationRequest {
-            source: req.dsl.clone(),
-            context: ValidationContext::default(),
-        };
-        if let crate::dsl_v2::validation::ValidationResult::Err(diagnostics) =
-            validator.validate(&request).await
-        {
-            let errors: Vec<String> = diagnostics
-                .iter()
-                .filter(|d| d.severity == Severity::Error)
-                .map(|d| format!("[{}] {}", d.code.as_str(), d.message))
-                .collect();
-            if !errors.is_empty() {
-                // Parsed but lint failed - AST exists, stage is Parsed
-                return Json(DirectExecuteResponse {
-                    success: false,
-                    stage: PipelineStage::Parsed,
-                    results: vec![],
-                    bindings: std::collections::HashMap::new(),
-                    errors,
-                    ast: Some(program.statements.clone()),
-                    primary_keys: vec![],
-                    reordered: false,
-                    synthetic_steps: vec![],
-                    planner_diagnostics: vec![],
-                    unresolved_refs: vec![],
-                });
-            }
-        }
-    }
-
-    // Check if planner is enabled via environment variable
-    let planner_enabled = std::env::var("PLANNER_ENABLED")
-        .map(|v| v == "1" || v.to_lowercase() == "true")
-        .unwrap_or(false);
-
-    // Track planner results for response
-    let mut reordered = false;
-    let mut synthetic_steps: Vec<SyntheticStepInfo> = vec![];
-    let mut planner_diagnostics: Vec<PlannerDiagnosticInfo> = vec![];
-
-    // Compile (with or without planning)
-    let plan = if planner_enabled {
-        // Create planning context from request bindings
-        let mut planning_context = crate::dsl_v2::PlanningContext::new();
-        if let Some(bindings) = &req.bindings {
-            for name in bindings.keys() {
-                // Add binding with unknown type (we don't track types in simple bindings)
-                planning_context.add_binding(name, "unknown");
-            }
-        }
-
-        match crate::dsl_v2::compile_with_planning(&program, &planning_context) {
-            Ok(result) => {
-                reordered = result.reordered;
-
-                // Convert synthetic steps to response format
-                synthetic_steps = result
-                    .synthetic_steps
-                    .iter()
-                    .map(|s| SyntheticStepInfo {
-                        binding: s.binding.clone(),
-                        verb: s.verb.clone(),
-                        entity_type: s.entity_type.clone(),
-                    })
-                    .collect();
-
-                // Convert diagnostics to response format
-                planner_diagnostics = result
-                    .diagnostics
-                    .iter()
-                    .map(|d| match d {
-                        crate::dsl_v2::PlannerDiagnostic::SyntheticStepInjected {
-                            binding,
-                            verb: _,
-                            entity_type,
-                            before_stmt,
-                        } => PlannerDiagnosticInfo {
-                            kind: "synthetic_step".to_string(),
-                            message: format!(
-                                "Injected synthetic {}.create for @{}",
-                                entity_type, binding
-                            ),
-                            binding: Some(binding.clone()),
-                            stmt_index: Some(*before_stmt),
-                        },
-                        crate::dsl_v2::PlannerDiagnostic::MissingProducer {
-                            binding,
-                            entity_type,
-                            required_by_stmt,
-                            reason,
-                        } => PlannerDiagnosticInfo {
-                            kind: "missing_producer".to_string(),
-                            message: format!(
-                                "Missing producer for @{} ({}): {}",
-                                binding, entity_type, reason
-                            ),
-                            binding: Some(binding.clone()),
-                            stmt_index: Some(*required_by_stmt),
-                        },
-                        crate::dsl_v2::PlannerDiagnostic::LifecycleViolation {
-                            binding,
-                            verb,
-                            current_state,
-                            required_states,
-                            stmt_index,
-                        } => PlannerDiagnosticInfo {
-                            kind: "lifecycle_violation".to_string(),
-                            message: format!(
-                                "{} requires @{} in state {:?}, but current state is '{}'",
-                                verb, binding, required_states, current_state
-                            ),
-                            binding: Some(binding.clone()),
-                            stmt_index: Some(*stmt_index),
-                        },
-                        crate::dsl_v2::PlannerDiagnostic::StatementsReordered {
-                            original_order,
-                            new_order,
-                            reason,
-                        } => PlannerDiagnosticInfo {
-                            kind: "reordered".to_string(),
-                            message: format!(
-                                "Statements reordered: {:?} -> {:?} ({})",
-                                original_order, new_order, reason
-                            ),
-                            binding: None,
-                            stmt_index: None,
-                        },
-                        crate::dsl_v2::PlannerDiagnostic::Warning {
-                            message,
-                            stmt_index,
-                        } => PlannerDiagnosticInfo {
-                            kind: "warning".to_string(),
-                            message: message.clone(),
-                            binding: None,
-                            stmt_index: *stmt_index,
-                        },
-                    })
-                    .collect();
-
-                result.plan
-            }
-            Err(e) => {
-                // Linted but compile failed - stage is Linted
-                return Json(DirectExecuteResponse {
-                    success: false,
-                    stage: PipelineStage::Linted,
-                    results: vec![],
-                    bindings: std::collections::HashMap::new(),
-                    errors: vec![format!("Compile error: {}", e)],
-                    ast: Some(program.statements.clone()),
-                    primary_keys: vec![],
-                    reordered: false,
-                    synthetic_steps: vec![],
-                    planner_diagnostics: vec![],
-                    unresolved_refs: vec![],
-                });
-            }
-        }
-    } else {
-        // Standard compile without planning
-        match compile(&program) {
-            Ok(p) => p,
-            Err(e) => {
-                // Linted but compile failed - stage is Linted
-                return Json(DirectExecuteResponse {
-                    success: false,
-                    stage: PipelineStage::Linted,
-                    results: vec![],
-                    bindings: std::collections::HashMap::new(),
-                    errors: vec![format!("Compile error: {}", e)],
-                    ast: Some(program.statements.clone()),
-                    primary_keys: vec![],
-                    reordered: false,
-                    synthetic_steps: vec![],
-                    planner_diagnostics: vec![],
-                    unresolved_refs: vec![],
-                });
-            }
-        }
-    };
-
-    // Execute
-    let mut ctx = ExecutionContext::new().with_audit_user("direct_execute");
-
-    // Pre-bind any symbols passed from previous executions
-    if let Some(bindings) = &req.bindings {
-        for (name, id) in bindings {
-            ctx.bind(name, *id);
-        }
-    }
-
-    match state.dsl_v2_executor.execute_plan(&plan, &mut ctx).await {
-        Ok(exec_results) => {
-            let results: Vec<ExecutionResult> = exec_results
-                .iter()
-                .enumerate()
-                .map(|(idx, r)| {
-                    let (entity_id, result_data) = match r {
-                        DslV2Result::Uuid(id) => (Some(*id), None),
-                        DslV2Result::Record(json) => (None, Some(json.clone())),
-                        DslV2Result::RecordSet(records) => {
-                            (None, Some(serde_json::Value::Array(records.clone())))
-                        }
-                        _ => (None, None),
-                    };
-                    ExecutionResult {
-                        statement_index: idx,
-                        dsl: req.dsl.clone(),
-                        success: true,
-                        message: format!("{:?}", r),
-                        entity_id,
-                        entity_type: None,
-                        result: result_data,
-                    }
-                })
-                .collect();
-
-            // Extract primary keys using verb's `produces` metadata from YAML config
-            // This is the same metadata used by entity resolution / dataflow validation
-            let mut bindings = ctx.symbols.clone();
-            let mut primary_keys: Vec<PrimaryKey> = Vec::new();
-            let runtime_reg = crate::dsl_v2::runtime_registry();
-
-            for (idx, r) in exec_results.iter().enumerate() {
-                if let DslV2Result::Uuid(id) = r {
-                    if let Some(step) = plan.steps.get(idx) {
-                        let domain = &step.verb_call.domain;
-                        let verb = &step.verb_call.verb;
-
-                        // Get the entity type from verb's `produces` metadata
-                        // This is authoritative - defined in verbs/*.yaml (same as entity resolution)
-                        let (entity_type, subtype) =
-                            if let Some(produces) = runtime_reg.get_produces(domain, verb) {
-                                (produces.produced_type.clone(), produces.subtype.clone())
-                            } else {
-                                // Fallback to domain if no produces defined
-                                (domain.clone(), None)
-                            };
-
-                        // Add to bindings with entity_type-specific key (e.g., cbu_id, entity_id)
-                        let binding_key = format!("{}_id", entity_type.replace('-', "_"));
-                        bindings.insert(binding_key, *id);
-
-                        // Extract display name from verb arguments
-                        // Look at the verb's args config to find the primary name field
-                        let name = if let Some(verb_def) = runtime_reg.get(domain, verb) {
-                            // Find the first string arg that looks like a name
-                            verb_def
-                                .args
-                                .iter()
-                                .find(|a| {
-                                    a.name == "name"
-                                        || a.name == "first-name"
-                                        || a.name.ends_with("-name")
-                                })
-                                .and_then(|name_arg| {
-                                    step.verb_call
-                                        .arguments
-                                        .iter()
-                                        .find(|arg| arg.key == name_arg.name)
-                                        .and_then(|arg| {
-                                            if let crate::dsl_v2::ast::AstNode::Literal(
-                                                crate::dsl_v2::ast::Literal::String(s),
-                                            ) = &arg.value
-                                            {
-                                                Some(s.clone())
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                })
-                        } else {
-                            None
-                        };
-
-                        primary_keys.push(PrimaryKey {
-                            entity_type: entity_type.clone(),
-                            subtype,
-                            id: *id,
-                            name,
-                        });
-                    }
-                }
-            }
-
-            // Full pipeline complete - stage is Executed
-            Json(DirectExecuteResponse {
-                success: true,
-                stage: PipelineStage::Executed,
-                results,
-                bindings,
-                errors: vec![],
-                ast: Some(program.statements.clone()),
-                primary_keys,
-                reordered,
-                synthetic_steps,
-                planner_diagnostics,
-                unresolved_refs: vec![],
-            })
-        }
-        Err(e) => {
-            // Compiled but execute failed - stage is Compiled
-            Json(DirectExecuteResponse {
-                success: false,
-                stage: PipelineStage::Compiled,
-                results: vec![],
-                bindings: ctx.symbols.clone(),
-                errors: vec![e.to_string()],
-                ast: Some(program.statements.clone()),
-                primary_keys: vec![],
-                reordered,
-                synthetic_steps,
-                planner_diagnostics,
-                unresolved_refs: vec![],
-            })
-        }
-    }
-}
-
 // ============================================================================
 // Batch Operations Handlers
 // ============================================================================
@@ -4643,8 +4231,6 @@ async fn batch_add_products(
     let mut success_count = 0;
     let mut failure_count = 0;
 
-    let executor = DslExecutor::new(state.pool.clone());
-
     // Process each CBU × product combination
     for cbu_id in &req.cbu_ids {
         for product in &req.products {
@@ -4654,7 +4240,7 @@ async fn batch_add_products(
                 cbu_id, product
             );
 
-            // Parse and execute
+            // Parse and execute using shared executor (singleton batch)
             match parse_program(&dsl) {
                 Ok(program) => {
                     let plan = match compile(&program) {
@@ -4672,8 +4258,8 @@ async fn batch_add_products(
                         }
                     };
 
-                    let mut ctx = ExecutionContext::new();
-                    match executor.execute_plan(&plan, &mut ctx).await {
+                    let mut ctx = ExecutionContext::new().with_audit_user("batch_add_products");
+                    match state.dsl_v2_executor.execute_plan(&plan, &mut ctx).await {
                         Ok(exec_results) => {
                             // Count services added from the result
                             let services_added = exec_results

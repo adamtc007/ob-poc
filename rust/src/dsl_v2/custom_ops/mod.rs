@@ -47,6 +47,7 @@ mod resource_ops;
 mod rfi;
 mod screening_ops;
 mod semantic_ops;
+mod session_ops;
 mod team_ops;
 pub mod template_ops;
 mod temporal_ops;
@@ -699,6 +700,9 @@ impl CustomOperationRegistry {
 
         // Investor lifecycle operations (TA KYC-as-a-Service)
         investor_ops::register_investor_ops(&mut registry);
+
+        // Session scope management operations
+        session_ops::register_session_ops(&mut registry);
 
         registry
     }

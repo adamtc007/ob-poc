@@ -195,6 +195,9 @@ pub enum VerbClass {
 
     /// Trade/execute - transaction-related actions
     Trade,
+
+    /// Scope/navigate - changes what data is in view
+    Scope,
 }
 
 impl VerbClass {
@@ -209,6 +212,7 @@ impl VerbClass {
             VerbClass::Unlink => "remove",
             VerbClass::Provision => "provision",
             VerbClass::Trade => "execute",
+            VerbClass::Scope => "session",
         }
     }
 }
@@ -242,6 +246,9 @@ pub enum EntityClass {
 
     /// Generic entity (resolved from context)
     Generic,
+
+    /// Scope type (galaxy, book, jurisdiction, neighborhood)
+    ScopeType,
 }
 
 impl EntityClass {
@@ -257,6 +264,7 @@ impl EntityClass {
             EntityClass::Product => "product",
             EntityClass::Service => "service",
             EntityClass::Generic => "entity",
+            EntityClass::ScopeType => "scope_type",
         }
     }
 }

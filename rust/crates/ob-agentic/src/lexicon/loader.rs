@@ -90,6 +90,8 @@ pub struct VerbsConfig {
     pub provision: Vec<String>,
     #[serde(default)]
     pub trade: Vec<String>,
+    #[serde(default)]
+    pub scope: Vec<String>,
 }
 
 /// Entity type indicators.
@@ -107,6 +109,8 @@ pub struct EntitiesConfig {
     pub isda: Vec<String>,
     #[serde(default)]
     pub csa: Vec<String>,
+    #[serde(default)]
+    pub scope_type: Vec<String>,
 }
 
 /// Instruments grouped by lifecycle domain.
@@ -271,6 +275,9 @@ impl Lexicon {
         for verb in &config.verbs.trade {
             add_entry(verb, TokenType::Verb(VerbClass::Trade), None);
         }
+        for verb in &config.verbs.scope {
+            add_entry(verb, TokenType::Verb(VerbClass::Scope), None);
+        }
 
         // Add entity indicators
         for word in &config.entities.cbu {
@@ -305,6 +312,9 @@ impl Lexicon {
                 Some(LifecycleDomain::Otc),
             );
             otc_keywords.push(word.to_lowercase());
+        }
+        for word in &config.entities.scope_type {
+            add_entry(word, TokenType::Entity(EntityClass::ScopeType), None);
         }
 
         // Add roles

@@ -369,6 +369,7 @@ impl IdempotencyManager {
     /// together, preventing inconsistency if the process crashes between writes.
     ///
     /// Returns (idempotency_key, view_state_change_id, was_cached)
+    #[allow(clippy::too_many_arguments)]
     pub async fn record_with_view_state(
         &self,
         execution_id: Uuid,

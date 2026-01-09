@@ -217,45 +217,53 @@ impl StructMass {
 
     /// Calculate mass from breakdown using provided weights
     pub fn calculate(breakdown: MassBreakdown, weights: &MassWeights) -> Self {
-        let mut contributions = MassContributions::default();
-
         // CBU contribution
-        contributions.from_cbus = breakdown.cbu_count as f32 * weights.cbu_weight;
+        let from_cbus = breakdown.cbu_count as f32 * weights.cbu_weight;
 
         // Entity contribution (with per-type weights)
-        contributions.from_entities = breakdown
+        let from_entities: f32 = breakdown
             .by_entity_type
             .iter()
             .map(|(t, c)| *c as f32 * weights.entity_weight_for(t))
             .sum();
 
         // Relationship contribution (with per-type weights)
-        contributions.from_relationships = breakdown
+        let from_relationships: f32 = breakdown
             .by_relationship_type
             .iter()
             .map(|(t, c)| *c as f32 * weights.relationship_weight_for(t))
             .sum();
 
         // Depth contribution
-        contributions.from_depth = breakdown.max_ownership_depth as f32 * weights.depth_weight;
+        let from_depth = breakdown.max_ownership_depth as f32 * weights.depth_weight;
 
         // Cycle contribution
-        contributions.from_cycles = breakdown.cycle_count as f32 * weights.cycle_weight;
+        let from_cycles = breakdown.cycle_count as f32 * weights.cycle_weight;
 
         // Document contribution
-        contributions.from_documents = breakdown.document_count as f32 * weights.document_weight;
+        let from_documents = breakdown.document_count as f32 * weights.document_weight;
 
         // Service contribution
-        contributions.from_services = breakdown.service_count as f32 * weights.service_weight;
+        let from_services = breakdown.service_count as f32 * weights.service_weight;
+
+        let contributions = MassContributions {
+            from_cbus,
+            from_entities,
+            from_relationships,
+            from_depth,
+            from_cycles,
+            from_documents,
+            from_services,
+        };
 
         // Total
-        let total = contributions.from_cbus
-            + contributions.from_entities
-            + contributions.from_relationships
-            + contributions.from_depth
-            + contributions.from_cycles
-            + contributions.from_documents
-            + contributions.from_services;
+        let total = from_cbus
+            + from_entities
+            + from_relationships
+            + from_depth
+            + from_cycles
+            + from_documents
+            + from_services;
 
         Self {
             total,

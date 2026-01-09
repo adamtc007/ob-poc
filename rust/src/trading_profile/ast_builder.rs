@@ -12,6 +12,10 @@
 //!
 //! No SQL tables are touched - all state lives in the document.
 
+// Allow complex function signatures - these are AST mutation operations
+// that naturally require many parameters to specify the full node construction.
+#![allow(clippy::too_many_arguments)]
+
 use ob_poc_types::trading_matrix::{
     categories, BookingMatchCriteria, StatusColor, TradingMatrixDocument, TradingMatrixNode,
     TradingMatrixNodeId, TradingMatrixNodeType, TradingMatrixOp,
@@ -1440,7 +1444,7 @@ mod tests {
         add_instrument_class(&mut doc, "EQUITY", Some("ES"), false).unwrap();
 
         let universe = doc
-            .find_by_id(&TradingMatrixNodeId::category("UNIVERSE"))
+            .find_by_id(&TradingMatrixNodeId::category(categories::UNIVERSE))
             .unwrap();
         assert_eq!(universe.children.len(), 1);
         assert_eq!(universe.children[0].label, "EQUITY");
@@ -1454,7 +1458,7 @@ mod tests {
         add_market(&mut doc, "EQUITY", "XNYS", "New York Stock Exchange", "US").unwrap();
 
         let universe = doc
-            .find_by_id(&TradingMatrixNodeId::category("UNIVERSE"))
+            .find_by_id(&TradingMatrixNodeId::category(categories::UNIVERSE))
             .unwrap();
         let equity = &universe.children[0];
         assert_eq!(equity.children.len(), 1);
@@ -1495,7 +1499,7 @@ mod tests {
         .unwrap();
 
         let ssi = doc
-            .find_by_id(&TradingMatrixNodeId::category("SSI"))
+            .find_by_id(&TradingMatrixNodeId::category(categories::SSI))
             .unwrap();
         let ssi_node = &ssi.children[0];
         assert_eq!(ssi_node.label, "US Equities");
@@ -1542,7 +1546,7 @@ mod tests {
         .unwrap();
 
         let universe = doc
-            .find_by_id(&TradingMatrixNodeId::category("UNIVERSE"))
+            .find_by_id(&TradingMatrixNodeId::category(categories::UNIVERSE))
             .unwrap();
         assert_eq!(universe.children.len(), 1);
         assert_eq!(universe.children[0].children.len(), 1);
@@ -1555,14 +1559,14 @@ mod tests {
         add_instrument_class(&mut doc, "EQUITY", None, false).unwrap();
         add_market(&mut doc, "EQUITY", "XNYS", "NYSE", "US").unwrap();
 
-        let node_id = TradingMatrixNodeId::category("UNIVERSE")
+        let node_id = TradingMatrixNodeId::category(categories::UNIVERSE)
             .child("EQUITY")
             .child("XNYS");
 
         remove_node(&mut doc, &node_id).unwrap();
 
         let equity = doc
-            .find_by_id(&TradingMatrixNodeId::category("UNIVERSE").child("EQUITY"))
+            .find_by_id(&TradingMatrixNodeId::category(categories::UNIVERSE).child("EQUITY"))
             .unwrap();
         assert_eq!(equity.children.len(), 0);
     }

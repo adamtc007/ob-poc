@@ -23,6 +23,12 @@ pub struct ToolbarData {
     pub last_error: Option<String>,
     /// Whether any loading is in progress
     pub is_loading: bool,
+    /// Session scope type (galaxy, book, cbu, jurisdiction, neighborhood)
+    pub scope_type: Option<String>,
+    /// Session scope path for display
+    pub scope_path: Option<String>,
+    /// Whether scope data is fully loaded
+    pub scope_loaded: bool,
 }
 
 /// Actions that can be triggered from the toolbar
@@ -48,7 +54,50 @@ pub fn toolbar(ui: &mut Ui, data: &ToolbarData) -> ToolbarAction {
     ui.horizontal(|ui| {
         ui.set_height(28.0);
 
-        // Navigation breadcrumb: Universe > Cluster > CBU
+        // Session scope breadcrumb (primary navigation context)
+        if let Some(ref scope_type) = data.scope_type {
+            let scope_icon = match scope_type.as_str() {
+                "galaxy" => "🌌",
+                "book" => "📖",
+                "cbu" => "🏢",
+                "jurisdiction" => "🌍",
+                "neighborhood" => "🔗",
+                _ => "📍",
+            };
+
+            let scope_color = if data.scope_loaded {
+                Color32::from_rgb(100, 180, 255) // Blue when loaded
+            } else {
+                Color32::from_rgb(180, 130, 50) // Amber when loading
+            };
+
+            // Scope icon and type
+            ui.label(RichText::new(scope_icon).size(16.0));
+            ui.label(
+                RichText::new(scope_type.to_uppercase())
+                    .strong()
+                    .color(scope_color),
+            );
+
+            // Scope path as breadcrumb segments
+            if let Some(ref path) = data.scope_path {
+                if !path.is_empty() {
+                    for segment in path.split(" > ") {
+                        ui.label(RichText::new(">").weak().small());
+                        ui.label(RichText::new(segment).color(scope_color));
+                    }
+                }
+            }
+
+            // Loading indicator for scope
+            if !data.scope_loaded {
+                ui.spinner();
+            }
+
+            ui.label(RichText::new("|").weak().small());
+        }
+
+        // Navigation breadcrumb: Universe > Cluster > CBU (view level)
         if data.view_level != ViewLevel::Universe {
             // Show breadcrumb back to universe
             if ui.small_button("Universe").clicked() {
@@ -57,8 +106,8 @@ pub fn toolbar(ui: &mut Ui, data: &ToolbarData) -> ToolbarAction {
             ui.label(RichText::new(">").weak().small());
         }
 
-        // Current scope indicator
-        let scope_text = match data.view_level {
+        // Current view level indicator
+        let level_text = match data.view_level {
             ViewLevel::Universe => "Universe".to_string(),
             ViewLevel::Cluster => "Cluster".to_string(),
             _ => data
@@ -66,7 +115,7 @@ pub fn toolbar(ui: &mut Ui, data: &ToolbarData) -> ToolbarAction {
                 .clone()
                 .unwrap_or_else(|| "CBU".to_string()),
         };
-        ui.label(RichText::new(scope_text).strong());
+        ui.label(RichText::new(level_text).strong());
 
         // View mode indicator (read-only, no dropdown)
         if matches!(

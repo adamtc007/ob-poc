@@ -175,6 +175,12 @@ pub struct WatchSessionResponse {
     pub active_cbu_id: Option<Uuid>,
     pub updated_at: String,
     pub is_initial: bool,
+    /// Session scope type (galaxy, book, cbu, jurisdiction, neighborhood, empty)
+    #[serde(default)]
+    pub scope_type: Option<String>,
+    /// Whether scope data is fully loaded
+    #[serde(default)]
+    pub scope_loaded: bool,
 }
 
 /// Long-poll for session changes

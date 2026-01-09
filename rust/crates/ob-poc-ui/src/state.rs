@@ -73,6 +73,17 @@ pub struct NavigationLogEntry {
     pub cbu_id: Option<Uuid>,
 }
 
+/// Current session scope (from watch response)
+#[derive(Clone, Debug)]
+pub struct CurrentScope {
+    /// Scope type: "galaxy", "book", "cbu", "jurisdiction", "neighborhood", "empty"
+    pub scope_type: String,
+    /// Scope path for display (e.g., "LU > Apex Capital")
+    pub scope_path: String,
+    /// Whether the scope data is fully loaded
+    pub is_loaded: bool,
+}
+
 // =============================================================================
 // SERVER DATA (fetched via API, NEVER modified locally)
 // =============================================================================
@@ -201,6 +212,10 @@ pub struct AppState {
     /// Capped at 1000 entries to prevent unbounded growth
     pub navigation_log: Vec<NavigationLogEntry>,
 
+    /// Current session scope (from watch response)
+    /// E.g., "galaxy", "book", "cbu", "jurisdiction", "neighborhood"
+    pub current_scope: Option<CurrentScope>,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -255,6 +270,7 @@ impl Default for AppState {
             last_known_version: None,
             last_version_check: None,
             navigation_log: Vec::new(),
+            current_scope: None,
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),
@@ -624,8 +640,8 @@ impl AppState {
                     if changed {
                         web_sys::console::log_1(
                             &format!(
-                                "Session watch: version changed to {}, scope={}, triggering refetch",
-                                watch_response.version, watch_response.scope_path
+                                "Session watch: version changed to {}, scope={}, scope_type={:?}, triggering refetch",
+                                watch_response.version, watch_response.scope_path, watch_response.scope_type
                             )
                             .into(),
                         );
@@ -640,6 +656,28 @@ impl AppState {
                             state.needs_graph_refetch = true;
                             state.pending_cbu_id = watch_response.active_cbu_id;
                         }
+
+                        // If scope type changed (session.set-* verb ran), trigger graph refetch
+                        // The new scope will be loaded from the session context
+                        if watch_response.scope_type.is_some() {
+                            web_sys::console::log_1(
+                                &format!(
+                                    "Session watch: scope changed to {:?}, triggering viewport rebuild",
+                                    watch_response.scope_type
+                                )
+                                .into(),
+                            );
+                            state.needs_graph_refetch = true;
+                        }
+                    }
+
+                    // Always update current scope from watch response
+                    if let Some(ref scope_type) = watch_response.scope_type {
+                        self.current_scope = Some(CurrentScope {
+                            scope_type: scope_type.clone(),
+                            scope_path: watch_response.scope_path.clone(),
+                            is_loaded: watch_response.scope_loaded,
+                        });
                     }
                 }
                 Err(e) => {

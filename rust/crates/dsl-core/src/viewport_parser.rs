@@ -144,7 +144,7 @@ fn parse_navigate_verb(verb_call: &VerbCall) -> ViewportParseResult<ViewportVerb
     // Try direction first
     if let Some(dir_arg) = get_optional_arg(verb_call, "direction") {
         let dir_str = extract_string_value(&dir_arg.value, "direction")?;
-        let direction = NavDirection::from_str(&dir_str).ok_or_else(|| {
+        let direction = NavDirection::parse(&dir_str).ok_or_else(|| {
             ViewportParseError::new(format!("Invalid navigation direction: '{}'", dir_str))
                 .with_span(dir_arg.span)
         })?;
@@ -200,7 +200,7 @@ fn parse_view_verb(verb_call: &VerbCall) -> ViewportParseResult<ViewportVerb> {
     let type_arg = get_required_arg(verb_call, "type")?;
     let type_str = extract_string_value(&type_arg.value, "type")?;
 
-    let view_type = ViewType::from_str(&type_str).ok_or_else(|| {
+    let view_type = ViewType::parse(&type_str).ok_or_else(|| {
         ViewportParseError::new(format!("Invalid view type: '{}'", type_str))
             .with_span(type_arg.span)
     })?;
@@ -216,7 +216,7 @@ fn parse_fit_verb(verb_call: &VerbCall) -> ViewportParseResult<ViewportVerb> {
     let zone = match get_optional_arg(verb_call, "zone") {
         Some(zone_arg) => {
             let zone_str = extract_string_value(&zone_arg.value, "zone")?;
-            Some(ConfidenceZone::from_str(&zone_str).ok_or_else(|| {
+            Some(ConfidenceZone::parse(&zone_str).ok_or_else(|| {
                 ViewportParseError::new(format!("Invalid confidence zone: '{}'", zone_str))
                     .with_span(zone_arg.span)
             })?)
@@ -235,7 +235,7 @@ fn parse_export_verb(verb_call: &VerbCall) -> ViewportParseResult<ViewportVerb> 
     let format_arg = get_required_arg(verb_call, "format")?;
     let format_str = extract_string_value(&format_arg.value, "format")?;
 
-    let format = ExportFormat::from_str(&format_str).ok_or_else(|| {
+    let format = ExportFormat::parse(&format_str).ok_or_else(|| {
         ViewportParseError::new(format!("Invalid export format: '{}'", format_str))
             .with_span(format_arg.span)
     })?;
@@ -292,9 +292,9 @@ fn extract_string_value(node: &AstNode, arg_name: &str) -> ViewportParseResult<S
 /// Parse a focus target string like "cbu:Acme" or "entity:John Smith"
 fn parse_focus_target(target: &str, span: Span) -> ViewportParseResult<FocusTarget> {
     // Handle symbol references
-    if target.starts_with('@') {
+    if let Some(stripped) = target.strip_prefix('@') {
         return Ok(FocusTarget::Symbol {
-            name: target[1..].to_string(),
+            name: stripped.to_string(),
             span,
         });
     }

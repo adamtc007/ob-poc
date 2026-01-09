@@ -474,6 +474,7 @@ impl CustomOperation for TemplateBatchOp {
             current_selection: ctx.current_selection.clone(),
             pending_view_state: None, // Batch operations don't produce view state
             pending_viewport_state: None, // Batch operations don't produce viewport state
+            pending_scope_change: None, // Batch operations don't produce scope changes
             source_attribution: ctx.source_attribution.clone(),
             session_id: ctx.session_id,
         };

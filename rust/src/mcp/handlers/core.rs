@@ -566,6 +566,9 @@ impl ToolHandlers {
                 // Include viewport_state if a viewport.* operation produced one
                 let viewport_state = ctx.take_pending_viewport_state();
 
+                // Include scope_change if a session.* operation produced one
+                let scope_change = ctx.take_pending_scope_change();
+
                 // Persist to session if session_id provided and sessions available
                 // This enables MCP → UI synchronization via watch channels
                 if let (Some(sid), Some(sessions)) = (session_id, &self.sessions) {
@@ -586,6 +589,12 @@ impl ToolHandlers {
                             session.context.viewport_state = Some(vps.clone());
                         }
 
+                        // Update scope if a session.* operation changed it
+                        if let Some(ref sc) = scope_change {
+                            session.context.scope =
+                                crate::session::SessionScope::from_graph_scope(sc.clone());
+                        }
+
                         // Touch updated_at to trigger watch notification
                         session.updated_at = chrono::Utc::now();
 
@@ -594,6 +603,7 @@ impl ToolHandlers {
                             bindings_count = ctx.symbols.len(),
                             has_view_state = view_state.is_some(),
                             has_viewport_state = viewport_state.is_some(),
+                            has_scope_change = scope_change.is_some(),
                             "MCP execution persisted to session"
                         );
                     }
@@ -604,7 +614,8 @@ impl ToolHandlers {
                     "steps_executed": results.len(),
                     "bindings": bindings,
                     "view_state": view_state,
-                    "viewport_state": viewport_state
+                    "viewport_state": viewport_state,
+                    "scope_change": scope_change
                 }))
             }
             Err(e) => {

@@ -1082,7 +1082,7 @@ impl NavDirection {
     }
 
     /// Parse a direction from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "left" => Some(NavDirection::Left),
             "right" => Some(NavDirection::Right),
@@ -1138,7 +1138,7 @@ impl ViewType {
     }
 
     /// Parse a view type from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "structure" => Some(ViewType::Structure),
             "ownership" => Some(ViewType::Ownership),
@@ -1199,7 +1199,7 @@ impl ConfidenceZone {
     }
 
     /// Parse a confidence zone from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "core" => Some(ConfidenceZone::Core),
             "shell" => Some(ConfidenceZone::Shell),
@@ -1261,7 +1261,7 @@ impl ExportFormat {
     }
 
     /// Parse an export format from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "png" => Some(ExportFormat::Png),
             "svg" => Some(ExportFormat::Svg),
@@ -1673,29 +1673,26 @@ mod tests {
     }
 
     #[test]
-    fn test_nav_direction_from_str() {
-        assert_eq!(NavDirection::from_str("left"), Some(NavDirection::Left));
-        assert_eq!(NavDirection::from_str("RIGHT"), Some(NavDirection::Right));
-        assert_eq!(NavDirection::from_str("Up"), Some(NavDirection::Up));
-        assert_eq!(NavDirection::from_str("down"), Some(NavDirection::Down));
-        assert_eq!(NavDirection::from_str("in"), Some(NavDirection::In));
-        assert_eq!(NavDirection::from_str("out"), Some(NavDirection::Out));
-        assert_eq!(NavDirection::from_str("invalid"), None);
+    fn test_nav_direction_parse() {
+        assert_eq!(NavDirection::parse("left"), Some(NavDirection::Left));
+        assert_eq!(NavDirection::parse("RIGHT"), Some(NavDirection::Right));
+        assert_eq!(NavDirection::parse("Up"), Some(NavDirection::Up));
+        assert_eq!(NavDirection::parse("down"), Some(NavDirection::Down));
+        assert_eq!(NavDirection::parse("in"), Some(NavDirection::In));
+        assert_eq!(NavDirection::parse("out"), Some(NavDirection::Out));
+        assert_eq!(NavDirection::parse("invalid"), None);
     }
 
     #[test]
-    fn test_view_type_from_str() {
-        assert_eq!(ViewType::from_str("structure"), Some(ViewType::Structure));
-        assert_eq!(ViewType::from_str("OWNERSHIP"), Some(ViewType::Ownership));
-        assert_eq!(ViewType::from_str("accounts"), Some(ViewType::Accounts));
-        assert_eq!(ViewType::from_str("Compliance"), Some(ViewType::Compliance));
-        assert_eq!(ViewType::from_str("geographic"), Some(ViewType::Geographic));
-        assert_eq!(ViewType::from_str("temporal"), Some(ViewType::Temporal));
-        assert_eq!(
-            ViewType::from_str("instruments"),
-            Some(ViewType::Instruments)
-        );
-        assert_eq!(ViewType::from_str("invalid"), None);
+    fn test_view_type_parse() {
+        assert_eq!(ViewType::parse("structure"), Some(ViewType::Structure));
+        assert_eq!(ViewType::parse("OWNERSHIP"), Some(ViewType::Ownership));
+        assert_eq!(ViewType::parse("accounts"), Some(ViewType::Accounts));
+        assert_eq!(ViewType::parse("Compliance"), Some(ViewType::Compliance));
+        assert_eq!(ViewType::parse("geographic"), Some(ViewType::Geographic));
+        assert_eq!(ViewType::parse("temporal"), Some(ViewType::Temporal));
+        assert_eq!(ViewType::parse("instruments"), Some(ViewType::Instruments));
+        assert_eq!(ViewType::parse("invalid"), None);
     }
 
     #[test]
@@ -1707,18 +1704,15 @@ mod tests {
     }
 
     #[test]
-    fn test_confidence_zone_from_str() {
-        assert_eq!(ConfidenceZone::from_str("core"), Some(ConfidenceZone::Core));
+    fn test_confidence_zone_parse() {
+        assert_eq!(ConfidenceZone::parse("core"), Some(ConfidenceZone::Core));
+        assert_eq!(ConfidenceZone::parse("SHELL"), Some(ConfidenceZone::Shell));
         assert_eq!(
-            ConfidenceZone::from_str("SHELL"),
-            Some(ConfidenceZone::Shell)
-        );
-        assert_eq!(
-            ConfidenceZone::from_str("Penumbra"),
+            ConfidenceZone::parse("Penumbra"),
             Some(ConfidenceZone::Penumbra)
         );
-        assert_eq!(ConfidenceZone::from_str("all"), Some(ConfidenceZone::All));
-        assert_eq!(ConfidenceZone::from_str("invalid"), None);
+        assert_eq!(ConfidenceZone::parse("all"), Some(ConfidenceZone::All));
+        assert_eq!(ConfidenceZone::parse("invalid"), None);
     }
 
     #[test]
@@ -1742,18 +1736,15 @@ mod tests {
     }
 
     #[test]
-    fn test_export_format_from_str() {
-        assert_eq!(ExportFormat::from_str("png"), Some(ExportFormat::Png));
-        assert_eq!(ExportFormat::from_str("SVG"), Some(ExportFormat::Svg));
+    fn test_export_format_parse() {
+        assert_eq!(ExportFormat::parse("png"), Some(ExportFormat::Png));
+        assert_eq!(ExportFormat::parse("SVG"), Some(ExportFormat::Svg));
+        assert_eq!(ExportFormat::parse("GraphML"), Some(ExportFormat::GraphMl));
         assert_eq!(
-            ExportFormat::from_str("GraphML"),
-            Some(ExportFormat::GraphMl)
-        );
-        assert_eq!(
-            ExportFormat::from_str("hardcopy"),
+            ExportFormat::parse("hardcopy"),
             Some(ExportFormat::Hardcopy)
         );
-        assert_eq!(ExportFormat::from_str("invalid"), None);
+        assert_eq!(ExportFormat::parse("invalid"), None);
     }
 
     #[test]

@@ -93,7 +93,7 @@ pub struct EntitySearchResponse {
 ///
 /// ## Example
 ///
-/// ```
+/// ```text
 /// GET /api/entity/search?type=entity&q=john&limit=10
 /// ```
 async fn search_entities(

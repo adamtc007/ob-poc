@@ -9,23 +9,37 @@ echo "=== Incremental DSL Accumulation Tests - CBU Domain ==="
 echo "API: $API_URL"
 echo ""
 
+# Create a session for the test run
+echo "Creating test session..."
+SESSION_RESPONSE=$(curl -s -X POST "$API_URL/api/session" \
+    -H "Content-Type: application/json" \
+    -d '{"source": "test_script"}')
+SESSION_ID=$(echo "$SESSION_RESPONSE" | jq -r '.id')
+
+if [ "$SESSION_ID" = "null" ] || [ -z "$SESSION_ID" ]; then
+    echo "Failed to create session: $SESSION_RESPONSE"
+    exit 1
+fi
+echo "Session ID: $SESSION_ID"
+echo ""
+
 run_dsl() {
     local dsl="$1"
     local desc="$2"
     echo "--- $desc ---"
     echo "$dsl"
     echo ""
-    
+
     # Write DSL to temp file for proper JSON encoding
     echo "$dsl" > /tmp/test_dsl.txt
     local json_dsl=$(jq -Rs '.' /tmp/test_dsl.txt)
-    
-    result=$(curl -s -X POST "$API_URL/execute" \
+
+    result=$(curl -s -X POST "$API_URL/api/session/$SESSION_ID/execute" \
         -H "Content-Type: application/json" \
         -d "{\"dsl\": $json_dsl}")
-    
+
     success=$(echo "$result" | jq -r '.success')
-    
+
     if [ "$success" = "true" ]; then
         echo "✓ PASS"
         ((PASS++))
@@ -84,6 +98,7 @@ run_dsl '(cbu.ensure :name "Incremental Test Fund" :jurisdiction "LU" :client-ty
 
 echo "==========================================="
 echo "RESULTS: $PASS passed, $FAIL failed"
+echo "Session: $SESSION_ID"
 echo "==========================================="
 
 [ $FAIL -eq 0 ]

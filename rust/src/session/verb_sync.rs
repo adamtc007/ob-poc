@@ -218,6 +218,7 @@ impl VerbSyncService {
     }
 
     /// Log a sync operation
+    #[allow(clippy::too_many_arguments)]
     async fn log_sync(
         &self,
         added: i32,
@@ -722,6 +723,7 @@ impl VerbSyncService {
     ///
     /// This is separate from sync_all because RAG metadata may be managed
     /// independently (e.g., via admin UI or separate YAML files).
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_rag_metadata(
         &self,
         domain: &str,

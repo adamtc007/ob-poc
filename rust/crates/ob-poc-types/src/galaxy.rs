@@ -18,10 +18,11 @@ use serde::{Deserialize, Serialize};
 
 /// What scope is currently being viewed
 /// This is the client-side equivalent of server's GraphScope
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum NavigationScope {
     /// Full universe - all CBUs clustered
+    #[default]
     Universe,
     /// A specific book (commercial client's CBUs)
     Book {
@@ -46,12 +47,6 @@ pub enum NavigationScope {
         entity_id: String,
         depth_type: DepthType,
     },
-}
-
-impl Default for NavigationScope {
-    fn default() -> Self {
-        Self::Universe
-    }
 }
 
 // ============================================================================

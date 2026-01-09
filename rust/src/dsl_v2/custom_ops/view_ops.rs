@@ -1651,7 +1651,7 @@ impl CustomOperation for ViewShadowOp {
         let threshold = match threshold_str.to_lowercase().as_str() {
             "high" => RiskThreshold::High,
             "medium" => RiskThreshold::Medium,
-            "any" | _ => RiskThreshold::Any,
+            _ => RiskThreshold::Any,
         };
 
         let off = get_bool_arg(verb_call, "off").unwrap_or(false);
@@ -1739,7 +1739,7 @@ impl CustomOperation for ViewRedFlagOp {
             "pep" => RedFlagCategory::Pep,
             "sanctions" => RedFlagCategory::Sanctions,
             "adverse-media" | "adversemedia" => RedFlagCategory::AdverseMedia,
-            "all" | _ => RedFlagCategory::All,
+            _ => RedFlagCategory::All,
         };
 
         let off = get_bool_arg(verb_call, "off").unwrap_or(false);
@@ -1826,7 +1826,7 @@ impl CustomOperation for ViewBlackHolesOp {
             "ownership" => GapType::Ownership,
             "documents" => GapType::Documents,
             "screening" => GapType::Screening,
-            "all" | _ => GapType::All,
+            _ => GapType::All,
         };
 
         let off = get_bool_arg(verb_call, "off").unwrap_or(false);

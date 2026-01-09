@@ -600,7 +600,7 @@ async fn calculate_route(
         let origin_info = get_node_info(pool, origin_id, origin_type).await?;
         waypoints.push(RouteWaypoint {
             node_id: origin_id.clone(),
-            node_type: origin_type.clone(),
+            node_type: *origin_type,
             label: origin_info.0,
             position: origin_info.1,
             view_level: start_level,
@@ -640,7 +640,7 @@ async fn calculate_route(
     let dest_info = get_node_info(pool, &destination.0, &destination.1).await?;
     waypoints.push(RouteWaypoint {
         node_id: destination.0.clone(),
-        node_type: destination.1.clone(),
+        node_type: destination.1,
         label: dest_info.0.clone(),
         position: dest_info.1,
         view_level: dest_level,

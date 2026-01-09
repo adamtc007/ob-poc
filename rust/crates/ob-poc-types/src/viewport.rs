@@ -144,10 +144,11 @@ impl ConfidenceZone {
 // ============================================================================
 
 /// How focus behaves during navigation
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum FocusMode {
     /// Focus stays on entity when panning
+    #[default]
     Sticky,
     /// Focus transfers to nearest entity within radius
     Proximity { radius: f32 },
@@ -155,12 +156,6 @@ pub enum FocusMode {
     CenterLock { region_pct: f32 },
     /// Explicit focus changes only
     Manual,
-}
-
-impl Default for FocusMode {
-    fn default() -> Self {
-        Self::Sticky
-    }
 }
 
 // ============================================================================
@@ -182,10 +177,11 @@ impl Default for FocusMode {
 ///               └── InstrumentType (L0-L3)
 ///                     └── ConfigNode (L0-L2)
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(tag = "focus_type", rename_all = "snake_case")]
 pub enum ViewportFocusState {
     /// No focus - overview mode
+    #[default]
     None,
 
     /// CBU container level focus
@@ -271,12 +267,6 @@ pub enum ViewportFocusState {
         /// Container enhance level
         container_enhance: u8,
     },
-}
-
-impl Default for ViewportFocusState {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl ViewportFocusState {
@@ -511,10 +501,11 @@ impl Default for CameraState {
 }
 
 /// View type for CBU visualization
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CbuViewType {
     /// Ownership and control structure
+    #[default]
     Structure,
     /// Beneficial ownership chains
     Ownership,
@@ -530,34 +521,19 @@ pub enum CbuViewType {
     Instruments,
 }
 
-impl Default for CbuViewType {
-    fn default() -> Self {
-        Self::Structure
-    }
-}
-
 /// Per-CBU view memory for persistence across navigation
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct CbuViewMemory {
     /// Last active view type
     pub last_view: CbuViewType,
     /// Last enhance level at container level
+    #[serde(default)]
     pub last_enhance: u8,
     /// Focus path for restore
+    #[serde(default)]
     pub last_focus_path: Vec<ViewportFocusState>,
     /// Camera state
     pub camera: CameraState,
-}
-
-impl Default for CbuViewMemory {
-    fn default() -> Self {
-        Self {
-            last_view: CbuViewType::default(),
-            last_enhance: 0,
-            last_focus_path: Vec::new(),
-            camera: CameraState::default(),
-        }
-    }
 }
 
 // ============================================================================
@@ -620,10 +596,9 @@ impl FocusManager {
 
     /// Ascend to previous focus level
     pub fn ascend(&mut self) -> Option<ViewportFocusState> {
-        self.focus_stack.pop().map(|prev| {
-            let current = std::mem::replace(&mut self.state, prev);
-            current
-        })
+        self.focus_stack
+            .pop()
+            .map(|prev| std::mem::replace(&mut self.state, prev))
     }
 
     /// Ascend all the way to root (None)

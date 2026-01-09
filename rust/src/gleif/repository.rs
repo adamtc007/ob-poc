@@ -486,6 +486,7 @@ impl GleifRepository {
     }
 
     /// Log a sync operation
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_sync(
         &self,
         entity_id: Option<Uuid>,

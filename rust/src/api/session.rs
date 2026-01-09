@@ -1139,6 +1139,12 @@ pub struct SessionContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub viewport_state: Option<ob_poc_types::ViewportState>,
 
+    /// Session scope from session.* DSL verbs (set-galaxy, set-cbu, set-jurisdiction, etc.)
+    /// This defines what data the user is operating on - the "where" for all operations.
+    /// Populated after DSL execution when session.* scope verbs run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<crate::session::SessionScope>,
+
     // =========================================================================
     // View State Fields - For REPL/View synchronization
     // =========================================================================
@@ -1487,6 +1493,40 @@ impl SessionContext {
             self.viewport_state = Some(ob_poc_types::ViewportState::default());
         }
         self.viewport_state.as_mut().unwrap()
+    }
+
+    // =========================================================================
+    // SCOPE METHODS - For session.* verb output propagation
+    // =========================================================================
+
+    /// Set the session scope from session.* operations
+    /// This is called after DSL execution when session.set-* verbs produce a scope change
+    pub fn set_scope(&mut self, scope: crate::session::SessionScope) {
+        self.scope = Some(scope);
+    }
+
+    /// Get the current session scope
+    pub fn scope(&self) -> Option<&crate::session::SessionScope> {
+        self.scope.as_ref()
+    }
+
+    /// Take the session scope (consumes it)
+    pub fn take_scope(&mut self) -> Option<crate::session::SessionScope> {
+        self.scope.take()
+    }
+
+    /// Check if there's a session scope set
+    pub fn has_scope(&self) -> bool {
+        self.scope.is_some()
+    }
+
+    /// Get or initialize the scope with empty
+    /// Useful for operations that need to modify scope
+    pub fn scope_or_default(&mut self) -> &mut crate::session::SessionScope {
+        if self.scope.is_none() {
+            self.scope = Some(crate::session::SessionScope::empty());
+        }
+        self.scope.as_mut().unwrap()
     }
 
     // =========================================================================

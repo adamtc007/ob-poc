@@ -3,6 +3,10 @@
 //! These handlers modify the JSONB document directly, not operational tables.
 //! The document is the source of truth; operational tables are materialized from it.
 
+// Allow complex function signatures - these are document mutation operations
+// that naturally require many parameters to specify the full mutation.
+#![allow(clippy::too_many_arguments)]
+
 use anyhow::Result;
 use serde_json::Value;
 use sqlx::PgPool;
@@ -401,13 +405,9 @@ pub async fn add_standing_instruction(
         cash_account,
         cash_bic,
         settlement_model,
-        cutoff: if cutoff_time.is_some() && cutoff_timezone.is_some() {
-            Some(CutoffConfig {
-                time: cutoff_time.unwrap(),
-                timezone: cutoff_timezone.unwrap(),
-            })
-        } else {
-            None
+        cutoff: match (cutoff_time, cutoff_timezone) {
+            (Some(time), Some(timezone)) => Some(CutoffConfig { time, timezone }),
+            _ => None,
         },
         counterparty: None,
         counterparty_lei: None,

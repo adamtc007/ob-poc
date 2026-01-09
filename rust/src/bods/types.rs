@@ -453,7 +453,7 @@ impl UboType {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_uppercase().as_str() {
             "NATURAL_PERSON" => UboType::NaturalPerson,
             "PUBLIC_FLOAT" => UboType::PublicFloat,

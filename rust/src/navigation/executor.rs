@@ -61,7 +61,7 @@ pub enum NavResult {
 
     /// Context information about current node
     ContextResult {
-        node: GraphNode,
+        node: Box<GraphNode>,
         roles: Vec<RoleAssignment>,
         owner_count: usize,
         owned_count: usize,
@@ -776,7 +776,7 @@ impl NavExecutor for EntityGraph {
                         .collect();
 
                     NavResult::ContextResult {
-                        node: node.clone(),
+                        node: Box::new(node.clone()),
                         roles,
                         owner_count: node.owners.len(),
                         owned_count: node.owned.len(),

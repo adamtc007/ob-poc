@@ -71,6 +71,7 @@ impl App {
             last_known_version: None,
             last_version_check: None,
             navigation_log: Vec::new(),
+            current_scope: None,
         };
 
         // Try to restore session from localStorage
@@ -1438,6 +1439,22 @@ impl eframe::App for App {
                 layout: self.state.panels.layout,
                 last_error,
                 is_loading: self.state.is_loading(),
+                scope_type: self
+                    .state
+                    .current_scope
+                    .as_ref()
+                    .map(|s| s.scope_type.clone()),
+                scope_path: self
+                    .state
+                    .current_scope
+                    .as_ref()
+                    .map(|s| s.scope_path.clone()),
+                scope_loaded: self
+                    .state
+                    .current_scope
+                    .as_ref()
+                    .map(|s| s.is_loaded)
+                    .unwrap_or(true),
             }
         };
 

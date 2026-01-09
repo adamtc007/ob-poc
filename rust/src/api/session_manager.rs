@@ -55,11 +55,24 @@ pub struct SessionSnapshot {
     pub active_cbu_id: Option<Uuid>,
     /// Timestamp of last update
     pub updated_at: chrono::DateTime<chrono::Utc>,
+    /// Session scope definition (galaxy, book, cbu, jurisdiction, neighborhood)
+    /// This is the primary scope from session.* verbs
+    pub scope_definition: Option<crate::graph::GraphScope>,
+    /// Whether scope has data loaded
+    pub scope_loaded: bool,
 }
 
 impl SessionSnapshot {
     /// Create a snapshot from a session
     pub fn from_session(session: &AgentSession) -> Self {
+        // Extract scope info from session context
+        let (scope_definition, scope_loaded) = session
+            .context
+            .scope
+            .as_ref()
+            .map(|s| (Some(s.definition.clone()), s.is_fully_loaded()))
+            .unwrap_or((None, false));
+
         Self {
             session_id: session.id,
             version: session.updated_at.timestamp_millis() as u64,
@@ -72,6 +85,8 @@ impl SessionSnapshot {
                 .map(|m| m.as_str().to_string()),
             active_cbu_id: session.context.active_cbu.as_ref().map(|c| c.id),
             updated_at: session.updated_at,
+            scope_definition,
+            scope_loaded,
         }
     }
 
@@ -85,6 +100,8 @@ impl SessionSnapshot {
             view_mode: None,
             active_cbu_id: None,
             updated_at: chrono::Utc::now(),
+            scope_definition: None,
+            scope_loaded: false,
         }
     }
 }

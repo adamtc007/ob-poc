@@ -102,6 +102,21 @@ impl SessionScope {
         }
     }
 
+    /// Create scope from a GraphScope definition (without graph data)
+    ///
+    /// This is used when session.* verbs change the scope definition but
+    /// graph data hasn't been loaded yet. Stats will be populated later
+    /// when the graph is loaded.
+    pub fn from_graph_scope(definition: GraphScope) -> Self {
+        Self {
+            definition,
+            stats: ScopeSummary::default(),
+            load_status: LoadStatus::SummaryOnly {
+                expandable_nodes: vec![],
+            },
+        }
+    }
+
     /// Create scope from a loaded graph
     pub fn from_graph(graph: &EntityGraph, definition: GraphScope) -> Self {
         let max_depth = graph

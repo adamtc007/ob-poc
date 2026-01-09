@@ -618,6 +618,33 @@ fn render_input_area(ui: &mut Ui, state: &mut AppState) {
             }
         }
 
+        // Show current scope
+        if let Some(ref scope) = state.current_scope {
+            let scope_icon = match scope.scope_type.as_str() {
+                "galaxy" => "🌌",
+                "book" => "📖",
+                "cbu" => "🏢",
+                "jurisdiction" => "🌍",
+                "neighborhood" => "🔗",
+                _ => "📍",
+            };
+            let scope_color = if scope.is_loaded {
+                Color32::from_rgb(100, 180, 255) // Blue when loaded
+            } else {
+                Color32::from_rgb(180, 130, 50) // Amber when loading
+            };
+            let scope_display = if scope.scope_path.is_empty() {
+                scope.scope_type.clone()
+            } else {
+                format!("{}: {}", scope.scope_type, scope.scope_path)
+            };
+            ui.label(
+                RichText::new(format!("| {} {}", scope_icon, scope_display))
+                    .small()
+                    .color(scope_color),
+            );
+        }
+
         // Show resolution status
         if let Some(ref resolution) = state.resolution {
             let status_text = match resolution.state {

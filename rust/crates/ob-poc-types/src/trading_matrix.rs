@@ -125,7 +125,7 @@ impl AsRef<[String]> for TradingMatrixNodeId {
 // ============================================================================
 
 /// Visual status indicator for nodes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum StatusColor {
     /// Good/active/verified
@@ -135,13 +135,8 @@ pub enum StatusColor {
     /// Error/suspended/blocked
     Red,
     /// Inactive/disabled/historical
+    #[default]
     Gray,
-}
-
-impl Default for StatusColor {
-    fn default() -> Self {
-        Self::Gray
-    }
 }
 
 // ============================================================================

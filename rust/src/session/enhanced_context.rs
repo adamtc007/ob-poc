@@ -33,6 +33,33 @@ pub struct EnhancedAgentContext {
     /// Formatted prompt section (ready for injection)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_section: Option<String>,
+
+    /// Current session scope (galaxy, book, cbu, jurisdiction, neighborhood)
+    /// Used for entity disambiguation - prefer entities within current scope
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<ScopeContextForAgent>,
+}
+
+/// Scope context formatted for agent consumption
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopeContextForAgent {
+    /// Scope type (galaxy, book, cbu, jurisdiction, neighborhood, empty)
+    pub scope_type: String,
+    /// Human-readable scope description
+    pub description: String,
+    /// Apex entity name (for galaxy/book scopes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub apex_name: Option<String>,
+    /// CBU name (for cbu scope)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cbu_name: Option<String>,
+    /// Jurisdiction code (for jurisdiction scope)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jurisdiction: Option<String>,
+    /// Total entities in scope
+    pub total_entities: usize,
+    /// Total CBUs in scope
+    pub total_cbus: usize,
 }
 
 /// Serializable version of AgentContext
@@ -86,6 +113,7 @@ pub struct EnhancedContextBuilder {
     workflow_phase: Option<String>,
     recent_verbs: Vec<String>,
     user_intent: Option<String>,
+    scope: Option<ScopeContextForAgent>,
 }
 
 impl EnhancedContextBuilder {
@@ -100,6 +128,7 @@ impl EnhancedContextBuilder {
             workflow_phase: None,
             recent_verbs: Vec::new(),
             user_intent: None,
+            scope: None,
         }
     }
 
@@ -141,6 +170,8 @@ impl EnhancedContextBuilder {
 
     /// Build from a UnifiedSessionContext
     pub fn from_session_context(pool: Arc<PgPool>, session: &UnifiedSessionContext) -> Self {
+        use crate::graph::GraphScope;
+
         let mut builder = Self::new(pool);
 
         // Extract bindings from execution context
@@ -167,6 +198,71 @@ impl EnhancedContextBuilder {
                 }
             }
         }
+
+        // Extract scope context for agent disambiguation
+        let scope_ctx = match &session.scope.definition {
+            GraphScope::Empty => ScopeContextForAgent {
+                scope_type: "empty".to_string(),
+                description: "No scope set - showing all data".to_string(),
+                apex_name: None,
+                cbu_name: None,
+                jurisdiction: None,
+                total_entities: 0,
+                total_cbus: 0,
+            },
+            GraphScope::SingleCbu {
+                cbu_id: _,
+                cbu_name,
+            } => ScopeContextForAgent {
+                scope_type: "cbu".to_string(),
+                description: format!("Single CBU: {}", cbu_name),
+                apex_name: None,
+                cbu_name: Some(cbu_name.clone()),
+                jurisdiction: None,
+                total_entities: session.scope.stats.total_entities,
+                total_cbus: 1,
+            },
+            GraphScope::Book {
+                apex_entity_id: _,
+                apex_name,
+            } => ScopeContextForAgent {
+                scope_type: "book".to_string(),
+                description: format!("Book (all CBUs under {})", apex_name),
+                apex_name: Some(apex_name.clone()),
+                cbu_name: None,
+                jurisdiction: None,
+                total_entities: session.scope.stats.total_entities,
+                total_cbus: session.scope.stats.total_cbus,
+            },
+            GraphScope::Jurisdiction { code } => ScopeContextForAgent {
+                scope_type: "jurisdiction".to_string(),
+                description: format!("All CBUs in jurisdiction {}", code),
+                apex_name: None,
+                cbu_name: None,
+                jurisdiction: Some(code.clone()),
+                total_entities: session.scope.stats.total_entities,
+                total_cbus: session.scope.stats.total_cbus,
+            },
+            GraphScope::EntityNeighborhood { entity_id, hops } => ScopeContextForAgent {
+                scope_type: "neighborhood".to_string(),
+                description: format!("{} hops from entity {}", hops, entity_id),
+                apex_name: None,
+                cbu_name: None,
+                jurisdiction: None,
+                total_entities: session.scope.stats.total_entities,
+                total_cbus: session.scope.stats.total_cbus,
+            },
+            GraphScope::Custom { description } => ScopeContextForAgent {
+                scope_type: "custom".to_string(),
+                description: description.clone(),
+                apex_name: None,
+                cbu_name: None,
+                jurisdiction: None,
+                total_entities: session.scope.stats.total_entities,
+                total_cbus: session.scope.stats.total_cbus,
+            },
+        };
+        builder.scope = Some(scope_ctx);
 
         // Note: workflow_phase and recent_verbs need to be set separately
         // as they're not stored in UnifiedSessionContext
@@ -209,6 +305,7 @@ impl EnhancedContextBuilder {
             base: SerializableAgentContext::from(&base_context),
             verb_context,
             prompt_section: Some(prompt_section),
+            scope: self.scope,
         })
     }
 }

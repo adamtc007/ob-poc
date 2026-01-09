@@ -21,6 +21,10 @@ use crate::session::ViewState;
 // This enables viewport operations to communicate ViewportState back to the session layer
 use ob_poc_types::ViewportState;
 
+// Import GraphScope for pending_scope_change field
+// This enables session.set-* operations to communicate scope changes back to the session layer
+use crate::graph::GraphScope;
+
 #[cfg(feature = "database")]
 use super::ast::{AstNode, Literal, VerbCall};
 #[cfg(feature = "database")]
@@ -130,6 +134,13 @@ pub struct ExecutionContext {
     /// store the ViewportState here. After execution completes, the caller should call
     /// `take_pending_viewport_state()` and propagate it via `session.set_viewport_state()`.
     pub pending_viewport_state: Option<ViewportState>,
+    /// Pending scope change from session.* operations
+    ///
+    /// Session scope operations (session.set-galaxy, session.set-cbu, etc.) change
+    /// the current scope but cannot directly access UnifiedSessionContext. Instead,
+    /// they store the new GraphScope here. After execution completes, the caller
+    /// should call `take_pending_scope_change()` and update the session scope.
+    pub pending_scope_change: Option<GraphScope>,
     /// Source attribution for audit trail
     ///
     /// Tracks where the execution originated (api, cli, mcp, etc.),
@@ -155,6 +166,7 @@ impl Default for ExecutionContext {
             current_selection: None,
             pending_view_state: None,
             pending_viewport_state: None,
+            pending_scope_change: None,
             source_attribution: super::idempotency::SourceAttribution::default(),
             session_id: None,
         }
@@ -268,6 +280,8 @@ impl ExecutionContext {
             pending_view_state: None,
             // Don't inherit pending_viewport_state - each iteration starts fresh
             pending_viewport_state: None,
+            // Don't inherit pending_scope_change - each iteration starts fresh
+            pending_scope_change: None,
             // Inherit source attribution for audit trail consistency
             source_attribution: self.source_attribution.clone(),
             // Inherit session ID for view state linkage
@@ -415,6 +429,38 @@ impl ExecutionContext {
             self.pending_viewport_state = Some(ViewportState::default());
         }
         self.pending_viewport_state.as_mut().unwrap()
+    }
+
+    // =========================================================================
+    // SCOPE CHANGE METHODS - For session.* verb output to session layer
+    // =========================================================================
+
+    /// Set pending scope change (called by session.* operations)
+    ///
+    /// Session scope operations (session.set-galaxy, session.set-cbu, etc.) change
+    /// the current scope but cannot directly access UnifiedSessionContext. Instead,
+    /// they store the new GraphScope here. After execution completes, the caller
+    /// should call `take_pending_scope_change()` and update the session scope.
+    pub fn set_pending_scope_change(&mut self, scope: GraphScope) {
+        self.pending_scope_change = Some(scope);
+    }
+
+    /// Take the pending scope change (consumes it)
+    ///
+    /// Called by the execution layer after DSL execution completes.
+    /// The caller should propagate this to UnifiedSessionContext:
+    /// ```ignore
+    /// if let Some(scope) = ctx.take_pending_scope_change() {
+    ///     session.set_scope(scope);
+    /// }
+    /// ```
+    pub fn take_pending_scope_change(&mut self) -> Option<GraphScope> {
+        self.pending_scope_change.take()
+    }
+
+    /// Check if there's a pending scope change
+    pub fn has_pending_scope_change(&self) -> bool {
+        self.pending_scope_change.is_some()
     }
 
     /// Create context from DomainContext (for submission execution)

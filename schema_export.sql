@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict noGZcOieiHhvMxm3FBCUVqQfiT39sxtLkf2I9HVurJDFSp0MLGn5R2ahVlr3MhZ
+\restrict 6hFED8hISa7MqgrdYXikT8RfZLf3VvAnPq9M7EIIrtwck6v8O8Iddxb9Pshe8ax
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -1278,6 +1278,36 @@ $$;
 
 
 --
+-- Name: cleanup_expired_session_scopes(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".cleanup_expired_session_scopes() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_deleted INTEGER;
+BEGIN
+    -- Delete expired scopes
+    WITH deleted AS (
+        DELETE FROM "ob-poc".session_scopes
+        WHERE expires_at < NOW()
+        RETURNING session_id
+    )
+    SELECT COUNT(*) INTO v_deleted FROM deleted;
+
+    -- Delete orphaned history
+    DELETE FROM "ob-poc".session_scope_history h
+    WHERE NOT EXISTS (
+        SELECT 1 FROM "ob-poc".session_scopes s
+        WHERE s.session_id = h.session_id
+    );
+
+    RETURN v_deleted;
+END;
+$$;
+
+
+--
 -- Name: cleanup_expired_sessions(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -1292,6 +1322,93 @@ BEGIN
     WHERE status = 'active' AND expires_at < now();
     GET DIAGNOSTICS cleaned = ROW_COUNT;
     RETURN cleaned;
+END;
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: session_scopes; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".session_scopes (
+    session_scope_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid NOT NULL,
+    user_id uuid,
+    scope_type character varying(50) DEFAULT 'empty'::character varying NOT NULL,
+    apex_entity_id uuid,
+    apex_entity_name character varying(255),
+    cbu_id uuid,
+    cbu_name character varying(255),
+    jurisdiction_code character varying(10),
+    focal_entity_id uuid,
+    focal_entity_name character varying(255),
+    neighborhood_hops integer DEFAULT 2,
+    scope_filters jsonb DEFAULT '{}'::jsonb,
+    cursor_entity_id uuid,
+    cursor_entity_name character varying(255),
+    total_entities integer DEFAULT 0,
+    total_cbus integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    expires_at timestamp with time zone DEFAULT (now() + '24:00:00'::interval)
+);
+
+
+--
+-- Name: TABLE session_scopes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".session_scopes IS 'Persistent storage for user session scope state (galaxy, book, CBU, jurisdiction, neighborhood)';
+
+
+--
+-- Name: COLUMN session_scopes.scope_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".session_scopes.scope_type IS 'Discriminator: empty, galaxy, book, cbu, jurisdiction, neighborhood, custom';
+
+
+--
+-- Name: COLUMN session_scopes.scope_filters; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".session_scopes.scope_filters IS 'Additional filters for book scope: jurisdictions[], entity_types[], etc.';
+
+
+--
+-- Name: clear_scope(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".clear_scope(p_session_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+BEGIN
+    UPDATE "ob-poc".session_scopes
+    SET scope_type = 'empty',
+        apex_entity_id = NULL,
+        apex_entity_name = NULL,
+        cbu_id = NULL,
+        cbu_name = NULL,
+        jurisdiction_code = NULL,
+        focal_entity_id = NULL,
+        focal_entity_name = NULL,
+        neighborhood_hops = NULL,
+        scope_filters = '{}',
+        cursor_entity_id = NULL,
+        cursor_entity_name = NULL,
+        total_entities = 0,
+        total_cbus = 0,
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
 END;
 $$;
 
@@ -1856,6 +1973,39 @@ BEGIN
     WHERE d.domain_name = domain_name_param;
 
     RETURN next_version;
+END;
+$$;
+
+
+--
+-- Name: get_or_create_session_scope(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_or_create_session_scope(p_session_id uuid, p_user_id uuid DEFAULT NULL::uuid) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_scope_id UUID;
+BEGIN
+    -- Try to find existing
+    SELECT session_scope_id INTO v_scope_id
+    FROM "ob-poc".session_scopes
+    WHERE session_id = p_session_id;
+
+    IF v_scope_id IS NULL THEN
+        -- Create new empty scope
+        INSERT INTO "ob-poc".session_scopes (session_id, user_id, scope_type)
+        VALUES (p_session_id, p_user_id, 'empty')
+        RETURNING session_scope_id INTO v_scope_id;
+    ELSE
+        -- Extend expiry
+        UPDATE "ob-poc".session_scopes
+        SET expires_at = NOW() + INTERVAL '24 hours',
+            updated_at = NOW()
+        WHERE session_scope_id = v_scope_id;
+    END IF;
+
+    RETURN v_scope_id;
 END;
 $$;
 
@@ -2730,6 +2880,289 @@ $$;
 
 
 --
+-- Name: set_scope_book(uuid, uuid, jsonb); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_book(p_session_id uuid, p_apex_entity_id uuid, p_filters jsonb DEFAULT '{}'::jsonb) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+    v_apex_name VARCHAR(255);
+    v_cbu_count INTEGER;
+BEGIN
+    SELECT name INTO v_apex_name
+    FROM "ob-poc".entities WHERE entity_id = p_apex_entity_id;
+
+    -- Count CBUs matching filters
+    -- For now, count all under apex (filter logic in application layer)
+    SELECT COUNT(*) INTO v_cbu_count
+    FROM "ob-poc".cbus
+    WHERE commercial_client_entity_id = p_apex_entity_id;
+
+    INSERT INTO "ob-poc".session_scopes (
+        session_id, scope_type,
+        apex_entity_id, apex_entity_name,
+        scope_filters, total_cbus,
+        updated_at, expires_at
+    ) VALUES (
+        p_session_id, 'book',
+        p_apex_entity_id, v_apex_name,
+        p_filters, v_cbu_count,
+        NOW(), NOW() + INTERVAL '24 hours'
+    )
+    ON CONFLICT (session_id) DO UPDATE SET
+        scope_type = 'book',
+        apex_entity_id = p_apex_entity_id,
+        apex_entity_name = v_apex_name,
+        cbu_id = NULL,
+        cbu_name = NULL,
+        jurisdiction_code = NULL,
+        focal_entity_id = NULL,
+        focal_entity_name = NULL,
+        scope_filters = p_filters,
+        total_cbus = v_cbu_count,
+        updated_at = NOW(),
+        expires_at = NOW() + INTERVAL '24 hours'
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_cbu(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_cbu(p_session_id uuid, p_cbu_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+    v_cbu_name VARCHAR(255);
+    v_entity_count INTEGER;
+BEGIN
+    SELECT name INTO v_cbu_name
+    FROM "ob-poc".cbus WHERE cbu_id = p_cbu_id;
+
+    -- Count entities in this CBU's ownership structure
+    -- Simplified: count direct ownership relationships
+    SELECT COUNT(DISTINCT e.entity_id) INTO v_entity_count
+    FROM "ob-poc".entities e
+    JOIN "ob-poc".entity_relationships er ON e.entity_id = er.from_entity_id OR e.entity_id = er.to_entity_id
+    WHERE er.from_entity_id IN (SELECT entity_id FROM "ob-poc".cbus WHERE cbu_id = p_cbu_id)
+       OR er.to_entity_id IN (SELECT entity_id FROM "ob-poc".cbus WHERE cbu_id = p_cbu_id);
+
+    INSERT INTO "ob-poc".session_scopes (
+        session_id, scope_type,
+        cbu_id, cbu_name,
+        total_cbus, total_entities,
+        updated_at, expires_at
+    ) VALUES (
+        p_session_id, 'cbu',
+        p_cbu_id, v_cbu_name,
+        1, COALESCE(v_entity_count, 0),
+        NOW(), NOW() + INTERVAL '24 hours'
+    )
+    ON CONFLICT (session_id) DO UPDATE SET
+        scope_type = 'cbu',
+        apex_entity_id = NULL,
+        apex_entity_name = NULL,
+        cbu_id = p_cbu_id,
+        cbu_name = v_cbu_name,
+        jurisdiction_code = NULL,
+        focal_entity_id = NULL,
+        focal_entity_name = NULL,
+        scope_filters = '{}',
+        total_cbus = 1,
+        total_entities = COALESCE(v_entity_count, 0),
+        updated_at = NOW(),
+        expires_at = NOW() + INTERVAL '24 hours'
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_cursor(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_cursor(p_session_id uuid, p_entity_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+    v_entity_name VARCHAR(255);
+BEGIN
+    SELECT name INTO v_entity_name
+    FROM "ob-poc".entities WHERE entity_id = p_entity_id;
+
+    UPDATE "ob-poc".session_scopes
+    SET cursor_entity_id = p_entity_id,
+        cursor_entity_name = v_entity_name,
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_galaxy(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_galaxy(p_session_id uuid, p_apex_entity_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+    v_apex_name VARCHAR(255);
+    v_cbu_count INTEGER;
+    v_entity_count INTEGER;
+BEGIN
+    -- Get apex name
+    SELECT name INTO v_apex_name
+    FROM "ob-poc".entities WHERE entity_id = p_apex_entity_id;
+
+    -- Count CBUs under this apex (via commercial_client_entity_id)
+    SELECT COUNT(*) INTO v_cbu_count
+    FROM "ob-poc".cbus
+    WHERE commercial_client_entity_id = p_apex_entity_id;
+
+    -- Estimate entity count (CBUs * avg entities per CBU)
+    -- For now, just use CBU count * 10 as estimate
+    v_entity_count := v_cbu_count * 10;
+
+    -- Upsert scope
+    INSERT INTO "ob-poc".session_scopes (
+        session_id, scope_type,
+        apex_entity_id, apex_entity_name,
+        total_cbus, total_entities,
+        updated_at, expires_at
+    ) VALUES (
+        p_session_id, 'galaxy',
+        p_apex_entity_id, v_apex_name,
+        v_cbu_count, v_entity_count,
+        NOW(), NOW() + INTERVAL '24 hours'
+    )
+    ON CONFLICT (session_id) DO UPDATE SET
+        scope_type = 'galaxy',
+        apex_entity_id = p_apex_entity_id,
+        apex_entity_name = v_apex_name,
+        cbu_id = NULL,
+        cbu_name = NULL,
+        jurisdiction_code = NULL,
+        focal_entity_id = NULL,
+        focal_entity_name = NULL,
+        scope_filters = '{}',
+        total_cbus = v_cbu_count,
+        total_entities = v_entity_count,
+        updated_at = NOW(),
+        expires_at = NOW() + INTERVAL '24 hours'
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_jurisdiction(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_jurisdiction(p_session_id uuid, p_jurisdiction_code character varying) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+    v_cbu_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO v_cbu_count
+    FROM "ob-poc".cbus
+    WHERE jurisdiction = p_jurisdiction_code;
+
+    INSERT INTO "ob-poc".session_scopes (
+        session_id, scope_type,
+        jurisdiction_code,
+        total_cbus,
+        updated_at, expires_at
+    ) VALUES (
+        p_session_id, 'jurisdiction',
+        p_jurisdiction_code,
+        v_cbu_count,
+        NOW(), NOW() + INTERVAL '24 hours'
+    )
+    ON CONFLICT (session_id) DO UPDATE SET
+        scope_type = 'jurisdiction',
+        apex_entity_id = NULL,
+        apex_entity_name = NULL,
+        cbu_id = NULL,
+        cbu_name = NULL,
+        jurisdiction_code = p_jurisdiction_code,
+        focal_entity_id = NULL,
+        focal_entity_name = NULL,
+        scope_filters = '{}',
+        total_cbus = v_cbu_count,
+        updated_at = NOW(),
+        expires_at = NOW() + INTERVAL '24 hours'
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_neighborhood(uuid, uuid, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_neighborhood(p_session_id uuid, p_entity_id uuid, p_hops integer DEFAULT 2) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+    v_entity_name VARCHAR(255);
+BEGIN
+    SELECT name INTO v_entity_name
+    FROM "ob-poc".entities WHERE entity_id = p_entity_id;
+
+    INSERT INTO "ob-poc".session_scopes (
+        session_id, scope_type,
+        focal_entity_id, focal_entity_name,
+        neighborhood_hops,
+        updated_at, expires_at
+    ) VALUES (
+        p_session_id, 'neighborhood',
+        p_entity_id, v_entity_name,
+        p_hops,
+        NOW(), NOW() + INTERVAL '24 hours'
+    )
+    ON CONFLICT (session_id) DO UPDATE SET
+        scope_type = 'neighborhood',
+        apex_entity_id = NULL,
+        apex_entity_name = NULL,
+        cbu_id = NULL,
+        cbu_name = NULL,
+        jurisdiction_code = NULL,
+        focal_entity_id = p_entity_id,
+        focal_entity_name = v_entity_name,
+        neighborhood_hops = p_hops,
+        scope_filters = '{}',
+        updated_at = NOW(),
+        expires_at = NOW() + INTERVAL '24 hours'
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
 -- Name: sync_commercial_client_role(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -3423,10 +3856,6 @@ CREATE FUNCTION teams.user_has_domain(p_user_id uuid, p_domain character varying
     SELECT p_domain = ANY(COALESCE(teams.get_user_access_domains(p_user_id), ARRAY[]::varchar[]));
 $$;
 
-
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
 
 --
 -- Name: clients; Type: TABLE; Schema: client_portal; Owner: -
@@ -9751,6 +10180,61 @@ CREATE TABLE "ob-poc".services (
 
 
 --
+-- Name: session_bookmarks; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".session_bookmarks (
+    bookmark_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid,
+    user_id uuid,
+    name character varying(100) NOT NULL,
+    description text,
+    scope_snapshot jsonb NOT NULL,
+    icon character varying(50),
+    color character varying(20),
+    created_at timestamp with time zone DEFAULT now(),
+    last_used_at timestamp with time zone,
+    use_count integer DEFAULT 0
+);
+
+
+--
+-- Name: TABLE session_bookmarks; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".session_bookmarks IS 'Named saved scopes for quick navigation';
+
+
+--
+-- Name: session_scope_history; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".session_scope_history (
+    history_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid NOT NULL,
+    "position" integer NOT NULL,
+    scope_snapshot jsonb NOT NULL,
+    change_source character varying(50) DEFAULT 'dsl'::character varying NOT NULL,
+    change_verb character varying(100),
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE session_scope_history; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".session_scope_history IS 'Navigation history for back/forward in session scope';
+
+
+--
+-- Name: COLUMN session_scope_history.change_source; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".session_scope_history.change_source IS 'dsl, api, lexicon, navigation, system';
+
+
+--
 -- Name: settlement_types; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -11166,6 +11650,55 @@ CREATE VIEW "ob-poc".v_cbu_validation_summary AS
    FROM ("ob-poc".cbus c
      LEFT JOIN "ob-poc".cbu_evidence e ON ((c.cbu_id = e.cbu_id)))
   GROUP BY c.cbu_id, c.name, c.status, c.client_type, c.jurisdiction;
+
+
+--
+-- Name: v_current_session_scope; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_current_session_scope AS
+ SELECT session_scope_id,
+    session_id,
+    user_id,
+    scope_type,
+    apex_entity_id,
+    apex_entity_name,
+    cbu_id,
+    cbu_name,
+    jurisdiction_code,
+    focal_entity_id,
+    focal_entity_name,
+    neighborhood_hops,
+    scope_filters,
+    cursor_entity_id,
+    cursor_entity_name,
+    total_entities,
+    total_cbus,
+        CASE scope_type
+            WHEN 'empty'::text THEN 'No scope set'::character varying
+            WHEN 'galaxy'::text THEN ((((('Galaxy: '::text || (apex_entity_name)::text) || ' ('::text) || total_cbus) || ' CBUs)'::text))::character varying
+            WHEN 'book'::text THEN ((('Book: '::text || (apex_entity_name)::text) || ' (filtered)'::text))::character varying
+            WHEN 'cbu'::text THEN (('CBU: '::text || (cbu_name)::text))::character varying
+            WHEN 'jurisdiction'::text THEN ((((('Jurisdiction: '::text || (jurisdiction_code)::text) || ' ('::text) || total_cbus) || ' CBUs)'::text))::character varying
+            WHEN 'neighborhood'::text THEN ((((('Neighborhood: '::text || (focal_entity_name)::text) || ' ('::text) || neighborhood_hops) || ' hops)'::text))::character varying
+            ELSE scope_type
+        END AS scope_display,
+        CASE
+            WHEN (cursor_entity_id IS NOT NULL) THEN ('@ '::text || (cursor_entity_name)::text)
+            ELSE NULL::text
+        END AS cursor_display,
+    created_at,
+    updated_at,
+    expires_at,
+    (expires_at < now()) AS is_expired
+   FROM "ob-poc".session_scopes ss;
+
+
+--
+-- Name: VIEW v_current_session_scope; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_current_session_scope IS 'Current session scope with display strings and enriched entity names';
 
 
 --
@@ -15367,6 +15900,46 @@ ALTER TABLE ONLY "ob-poc".services
 
 
 --
+-- Name: session_bookmarks session_bookmarks_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_bookmarks
+    ADD CONSTRAINT session_bookmarks_pkey PRIMARY KEY (bookmark_id);
+
+
+--
+-- Name: session_scope_history session_scope_history_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scope_history
+    ADD CONSTRAINT session_scope_history_pkey PRIMARY KEY (history_id);
+
+
+--
+-- Name: session_scope_history session_scope_history_session_id_position_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scope_history
+    ADD CONSTRAINT session_scope_history_session_id_position_key UNIQUE (session_id, "position");
+
+
+--
+-- Name: session_scopes session_scopes_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scopes
+    ADD CONSTRAINT session_scopes_pkey PRIMARY KEY (session_scope_id);
+
+
+--
+-- Name: session_scopes session_scopes_session_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scopes
+    ADD CONSTRAINT session_scopes_session_id_key UNIQUE (session_id);
+
+
+--
 -- Name: settlement_types settlement_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -16904,6 +17477,27 @@ CREATE INDEX idx_bods_ownership_subject_lei ON "ob-poc".bods_ownership_statement
 --
 
 CREATE INDEX idx_bods_person_name ON "ob-poc".bods_person_statements USING gin (to_tsvector('english'::regconfig, full_name));
+
+
+--
+-- Name: idx_bookmarks_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bookmarks_session ON "ob-poc".session_bookmarks USING btree (session_id) WHERE (session_id IS NOT NULL);
+
+
+--
+-- Name: idx_bookmarks_unique_name; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_bookmarks_unique_name ON "ob-poc".session_bookmarks USING btree (COALESCE(user_id, session_id), name);
+
+
+--
+-- Name: idx_bookmarks_user; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bookmarks_user ON "ob-poc".session_bookmarks USING btree (user_id) WHERE (user_id IS NOT NULL);
 
 
 --
@@ -19014,6 +19608,13 @@ CREATE INDEX idx_rps_profile ON "ob-poc".resource_profile_sources USING btree (p
 
 
 --
+-- Name: idx_scope_history_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_scope_history_session ON "ob-poc".session_scope_history USING btree (session_id, "position" DESC);
+
+
+--
 -- Name: idx_screening_lists_type; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -19130,6 +19731,27 @@ CREATE INDEX idx_services_name ON "ob-poc".services USING btree (name);
 --
 
 CREATE INDEX idx_services_service_code ON "ob-poc".services USING btree (service_code);
+
+
+--
+-- Name: idx_session_scopes_expires; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_session_scopes_expires ON "ob-poc".session_scopes USING btree (expires_at);
+
+
+--
+-- Name: idx_session_scopes_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_session_scopes_session ON "ob-poc".session_scopes USING btree (session_id);
+
+
+--
+-- Name: idx_session_scopes_user; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_session_scopes_user ON "ob-poc".session_scopes USING btree (user_id) WHERE (user_id IS NOT NULL);
 
 
 --
@@ -22643,6 +23265,38 @@ ALTER TABLE ONLY "ob-poc".service_resource_capabilities
 
 
 --
+-- Name: session_scopes session_scopes_apex_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scopes
+    ADD CONSTRAINT session_scopes_apex_entity_id_fkey FOREIGN KEY (apex_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: session_scopes session_scopes_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scopes
+    ADD CONSTRAINT session_scopes_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: session_scopes session_scopes_cursor_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scopes
+    ADD CONSTRAINT session_scopes_cursor_entity_id_fkey FOREIGN KEY (cursor_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: session_scopes session_scopes_focal_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".session_scopes
+    ADD CONSTRAINT session_scopes_focal_entity_id_fkey FOREIGN KEY (focal_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: sla_breaches sla_breaches_commitment_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23134,5 +23788,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict noGZcOieiHhvMxm3FBCUVqQfiT39sxtLkf2I9HVurJDFSp0MLGn5R2ahVlr3MhZ
+\unrestrict 6hFED8hISa7MqgrdYXikT8RfZLf3VvAnPq9M7EIIrtwck6v8O8Iddxb9Pshe8ax
 

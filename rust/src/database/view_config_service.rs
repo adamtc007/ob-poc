@@ -638,6 +638,7 @@ impl ViewConfigService {
     }
 
     /// Save or update a layout override for a node
+    #[allow(clippy::too_many_arguments)]
     pub async fn upsert_layout_override(
         pool: &PgPool,
         cbu_id: Uuid,
@@ -772,6 +773,7 @@ impl ViewConfigService {
     }
 
     /// Save layout cache
+    #[allow(clippy::too_many_arguments)]
     pub async fn save_layout_cache(
         pool: &PgPool,
         cbu_id: Uuid,

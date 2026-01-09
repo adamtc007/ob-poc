@@ -1,5 +1,12 @@
 //! Comprehensive integration tests for incremental DSL session management
 //!
+//! These tests require a running server at http://127.0.0.1:3000
+//! They are marked #[ignore] by default to avoid noise in regular test runs.
+//!
+//! To run these tests:
+//! 1. Start the server: cargo run -p ob-poc-web
+//! 2. Run tests: cargo test --features database --test incremental_session -- --ignored --test-threads=1
+//!
 //! Test categories:
 //! 1. Happy path - normal session lifecycle
 //! 2. Error handling - validation errors, execution failures
@@ -7,8 +14,6 @@
 //! 4. Concurrency - parallel sessions, race conditions
 //! 5. Domain detection - CBU, KYC, Onboarding context
 //! 6. Idempotency - re-execution produces same results
-//!
-//! Run with: cargo test --features database --test incremental_session -- --test-threads=1
 
 use reqwest::Client;
 use serde::Deserialize;
@@ -240,6 +245,7 @@ async fn test_03_multiple_bindings_accumulated() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_04_idempotent_cbu_ensure() {
     let session = TestSession::new("test04")
         .await
@@ -266,6 +272,7 @@ async fn test_04_idempotent_cbu_ensure() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_05_full_onboarding_flow() {
     let session = TestSession::new("test05")
         .await
@@ -561,6 +568,7 @@ async fn test_25_unicode_in_names() {
 }
 
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_26_binding_name_reuse() {
     let session = TestSession::new("test26")
         .await
@@ -1213,6 +1221,7 @@ async fn test_66_no_snapshot_on_failure() {
 
 /// Test 67: Verify error is recorded in session
 #[tokio::test]
+#[ignore] // Requires running server
 async fn test_67_error_recorded_in_session() {
     let session = TestSession::new("test67").await.expect("Session");
     let pool = get_db_pool().await;

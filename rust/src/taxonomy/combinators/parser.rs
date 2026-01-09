@@ -72,12 +72,14 @@ pub enum ParserError {
 
 /// A configurable parser built using combinators.
 /// This is the main way to construct taxonomy parsers.
+/// Type alias for child parser factory function
+type ChildParserFn = Arc<dyn Fn(Uuid) -> Arc<dyn TaxonomyParser + Send + Sync> + Send + Sync>;
+
 pub struct ParserCombinator {
     name: String,
     source: DataSourceBox,
     grouper: Option<GrouperBox>,
-    child_parser_fn:
-        Option<Arc<dyn Fn(Uuid) -> Arc<dyn TaxonomyParser + Send + Sync> + Send + Sync>>,
+    child_parser_fn: Option<ChildParserFn>,
     expansion_parser: Option<Arc<dyn TaxonomyParser + Send + Sync>>,
     node_type: NodeType,
     summarize_threshold: Option<usize>,
@@ -321,7 +323,7 @@ impl TaxonomyParserBuilder {
         }
 
         // Split children into chunks
-        let chunk_size = (group.children.len() + threshold - 1) / threshold;
+        let chunk_size = group.children.len().div_ceil(threshold);
         let children = std::mem::take(&mut group.children);
         let chunks: Vec<_> = children.chunks(chunk_size).collect();
 

@@ -337,7 +337,7 @@ mod tests {
     #[test]
     fn test_ubo_type_conversion() {
         assert_eq!(UboType::NaturalPerson.as_str(), "NATURAL_PERSON");
-        assert_eq!(UboType::from_str("PUBLIC_FLOAT"), UboType::PublicFloat);
-        assert_eq!(UboType::from_str("unknown_value"), UboType::Unknown);
+        assert_eq!(UboType::parse("PUBLIC_FLOAT"), UboType::PublicFloat);
+        assert_eq!(UboType::parse("unknown_value"), UboType::Unknown);
     }
 }
