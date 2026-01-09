@@ -139,7 +139,7 @@ impl App {
                 provider: crate::command::VoiceProvider::from_str(&cmd.provider),
             };
 
-            let result = dispatch_command(source, &context);
+            let result = dispatch_command(source.clone(), &context);
 
             web_sys::console::log_1(
                 &format!(
@@ -151,9 +151,7 @@ impl App {
 
             // Route based on command result
             match result {
-                CommandResult::Navigation(verb) => {
-                    self.execute_navigation_verb(verb, Some(source.clone()))
-                }
+                CommandResult::Navigation(verb) => self.execute_navigation_verb(verb, Some(source)),
                 CommandResult::Agent(prompt) => self.send_to_agent(prompt),
                 CommandResult::None => {}
             }
@@ -186,8 +184,8 @@ impl App {
                     transcript,
                     confidence,
                 },
-                Some(crate::command::CommandSource::Chat) => NavigationSource::Widget,
-                Some(crate::command::CommandSource::Egui) => NavigationSource::Widget,
+                Some(crate::command::CommandSource::Chat { .. }) => NavigationSource::Widget,
+                Some(crate::command::CommandSource::Egui { .. }) => NavigationSource::Widget,
                 None => NavigationSource::Programmatic,
             };
             self.state.log_navigation(dsl, nav_source);
