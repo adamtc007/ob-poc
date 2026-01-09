@@ -558,11 +558,15 @@ impl ToolHandlers {
                 // Include view_state if a view.* operation produced one
                 let view_state = ctx.take_pending_view_state();
 
+                // Include viewport_state if a viewport.* operation produced one
+                let viewport_state = ctx.take_pending_viewport_state();
+
                 Ok(json!({
                     "success": true,
                     "steps_executed": results.len(),
                     "bindings": bindings,
-                    "view_state": view_state
+                    "view_state": view_state,
+                    "viewport_state": viewport_state
                 }))
             }
             Err(e) => {

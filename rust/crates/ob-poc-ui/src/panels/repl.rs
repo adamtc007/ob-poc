@@ -474,7 +474,8 @@ fn has_dsl_content(state: &AppState) -> bool {
         || state
             .session
             .as_ref()
-            .and_then(|s| s.dsl_source.as_ref())
+            .and_then(|s| s.dsl.as_ref())
+            .and_then(|d| d.source.as_ref())
             .map(|s| !s.trim().is_empty())
             .unwrap_or(false)
 }
@@ -569,7 +570,8 @@ fn render_input_area(ui: &mut Ui, state: &mut AppState) {
         let can_execute = state
             .session
             .as_ref()
-            .map(|s| s.can_execute)
+            .and_then(|s| s.dsl.as_ref())
+            .map(|d| d.can_execute)
             .unwrap_or(false)
             && !is_loading
             && has_dsl_content(state);

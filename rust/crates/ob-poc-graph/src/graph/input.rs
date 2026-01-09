@@ -7,6 +7,17 @@ use super::types::*;
 use egui::{Pos2, Rect, Response, Vec2};
 
 // =============================================================================
+// ENHANCE ACTION (for Esper-style enhance level control)
+// =============================================================================
+
+/// Action to change the enhance level (triggered by keyboard)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnhanceAction {
+    Increment,
+    Decrement,
+}
+
+// =============================================================================
 // INPUT STATE
 // =============================================================================
 
@@ -33,6 +44,8 @@ pub struct InputState {
     last_pointer_pos: Option<Pos2>,
     /// Pending container open action (set on double-click of container node)
     pub pending_container_open: Option<super::ContainerInfo>,
+    /// Pending enhance action (set by keyboard, consumed by CbuGraphWidget)
+    pub pending_enhance_action: Option<EnhanceAction>,
 }
 
 impl InputState {
@@ -62,6 +75,11 @@ impl InputState {
     /// Take pending container open action (consumes it)
     pub fn take_pending_container_open(&mut self) -> Option<super::ContainerInfo> {
         self.pending_container_open.take()
+    }
+
+    /// Take pending enhance action (consumes it)
+    pub fn take_pending_enhance_action(&mut self) -> Option<EnhanceAction> {
+        self.pending_enhance_action.take()
     }
 }
 
@@ -325,6 +343,27 @@ impl InputHandler {
                 needs_repaint = true;
             }
 
+            // 'E' to increment enhance level, 'Shift+E' to decrement
+            // Note: Actual enhance level change happens in CbuGraphWidget via pending_enhance_action
+            if i.key_pressed(egui::Key::E) {
+                if i.modifiers.shift {
+                    state.pending_enhance_action = Some(EnhanceAction::Decrement);
+                } else {
+                    state.pending_enhance_action = Some(EnhanceAction::Increment);
+                }
+                needs_repaint = true;
+            }
+
+            // '[' and ']' as alternative enhance controls
+            if i.key_pressed(egui::Key::OpenBracket) {
+                state.pending_enhance_action = Some(EnhanceAction::Decrement);
+                needs_repaint = true;
+            }
+            if i.key_pressed(egui::Key::CloseBracket) {
+                state.pending_enhance_action = Some(EnhanceAction::Increment);
+                needs_repaint = true;
+            }
+
             // Arrow keys for panning
             let pan_speed = 50.0 / camera.zoom();
             if i.key_down(egui::Key::ArrowLeft) {
@@ -389,6 +428,7 @@ impl InputHandler {
     }
 
     /// Hit test to find which node (if any) is under the given screen position
+    /// Uses O(log n) spatial index for efficient lookup
     fn hit_test_node(
         screen_pos: Pos2,
         graph: &LayoutGraph,
@@ -398,17 +438,8 @@ impl InputHandler {
         // Convert screen position to world coordinates
         let world_pos = camera.screen_to_world(screen_pos, screen_rect);
 
-        // Check each node
-        for node in graph.nodes.values() {
-            let _half_size = node.size / 2.0;
-            let node_rect = Rect::from_center_size(node.position, node.size);
-
-            if node_rect.contains(world_pos) {
-                return Some(node.id.clone());
-            }
-        }
-
-        None
+        // Use spatial index for O(log n) hit testing with precise rect check
+        graph.hit_test_rect(world_pos).map(|s| s.to_string())
     }
 
     /// Hit test for investor groups (returns group index)

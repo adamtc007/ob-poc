@@ -1422,6 +1422,7 @@ pub fn set_node_status(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ob_poc_types::trading_matrix::DocumentStatus;
 
     #[test]
     fn test_create_document() {

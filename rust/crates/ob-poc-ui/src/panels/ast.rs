@@ -1,9 +1,10 @@
 //! AST Panel
 //!
-//! Displays the parsed AST from the session's assembled_dsl.
+//! Displays the parsed AST from the session's DslState.
 
 use crate::state::AppState;
 use egui::{Color32, RichText, ScrollArea, Ui};
+use ob_poc_types::{AstStatement, SessionStateEnum};
 
 pub fn ast_panel(ui: &mut Ui, state: &mut AppState) {
     ui.vertical(|ui| {
@@ -17,100 +18,143 @@ pub fn ast_panel(ui: &mut Ui, state: &mut AppState) {
             return;
         };
 
-        // Get assembled_dsl from session
-        let assembled = session.assembled_dsl.as_ref();
-
-        if assembled.is_none() || assembled.map(|v| v.is_null()).unwrap_or(true) {
+        // Get DslState from session
+        let Some(ref dsl_state) = session.dsl else {
             ui.centered_and_justified(|ui| {
                 ui.label("Chat with the agent to generate DSL");
             });
             return;
-        }
-
-        let assembled = assembled.unwrap();
-
-        // assembled_dsl can be either:
-        // 1. An object with {statements: [...], combined: "...", intent_count: N}
-        // 2. An array of DSL strings directly
-        // 3. A single string
-
-        // Try to extract statements from object format first
-        let statements: Vec<&serde_json::Value> = if let Some(obj) = assembled.as_object() {
-            // Object format: {statements: [...], combined: "..."}
-            if let Some(stmts) = obj.get("statements").and_then(|v| v.as_array()) {
-                stmts.iter().collect()
-            } else {
-                vec![]
-            }
-        } else if let Some(arr) = assembled.as_array() {
-            // Direct array format
-            arr.iter().collect()
-        } else {
-            vec![]
         };
 
-        if statements.is_empty() {
-            // Maybe it's just a string?
-            if let Some(s) = assembled.as_str() {
-                ui.label(RichText::new("1 statement").small());
-                ui.add_space(4.0);
-                ScrollArea::vertical().show(ui, |ui| {
-                    egui::Frame::default()
-                        .fill(Color32::from_rgb(35, 35, 45))
-                        .inner_margin(6.0)
-                        .rounding(4.0)
-                        .show(ui, |ui| {
-                            ui.label(RichText::new(s).monospace());
-                        });
-                });
-            } else {
-                ui.centered_and_justified(|ui| {
-                    ui.label("No DSL statements yet");
-                });
-            }
+        // Check if we have AST statements
+        let has_ast = dsl_state
+            .ast
+            .as_ref()
+            .map(|a| !a.is_empty())
+            .unwrap_or(false);
+
+        // Check if we have source
+        let has_source = dsl_state
+            .source
+            .as_ref()
+            .map(|s| !s.is_empty())
+            .unwrap_or(false);
+
+        if !has_ast && !has_source {
+            ui.centered_and_justified(|ui| {
+                ui.label("No DSL statements yet");
+            });
             return;
         }
 
-        ui.label(RichText::new(format!("{} statement(s)", statements.len())).small());
-        ui.add_space(4.0);
+        // Display AST statements if available
+        if let Some(ref ast) = dsl_state.ast {
+            if !ast.is_empty() {
+                ui.label(RichText::new(format!("{} statement(s)", ast.len())).small());
+                ui.add_space(4.0);
 
-        ScrollArea::vertical().show(ui, |ui| {
-            for (i, stmt) in statements.iter().enumerate() {
+                ScrollArea::vertical().show(ui, |ui| {
+                    for (i, stmt) in ast.iter().enumerate() {
+                        egui::Frame::default()
+                            .fill(Color32::from_rgb(35, 35, 45))
+                            .inner_margin(6.0)
+                            .rounding(4.0)
+                            .show(ui, |ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        RichText::new(format!("{}.", i + 1)).color(Color32::GRAY),
+                                    );
+                                    // Display verb and binding based on statement type
+                                    let label = match stmt {
+                                        AstStatement::VerbCall {
+                                            domain,
+                                            verb,
+                                            binding,
+                                            ..
+                                        } => {
+                                            let base = format!("{}.{}", domain, verb);
+                                            if let Some(ref bind) = binding {
+                                                format!("{} :as @{}", base, bind)
+                                            } else {
+                                                base
+                                            }
+                                        }
+                                        AstStatement::Comment { text, .. } => {
+                                            format!("; {}", text)
+                                        }
+                                    };
+                                    ui.label(RichText::new(label).monospace());
+                                });
+                            });
+                        ui.add_space(4.0);
+                    }
+                });
+            }
+        } else if let Some(ref source) = dsl_state.source {
+            // Fallback: display raw source if no AST
+            ui.label(RichText::new("DSL Source").small());
+            ui.add_space(4.0);
+            ScrollArea::vertical().show(ui, |ui| {
                 egui::Frame::default()
                     .fill(Color32::from_rgb(35, 35, 45))
                     .inner_margin(6.0)
                     .rounding(4.0)
                     .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            ui.label(RichText::new(format!("{}.", i + 1)).color(Color32::GRAY));
-                            if let Some(s) = stmt.as_str() {
-                                ui.label(RichText::new(s).monospace());
-                            } else {
-                                // If it's not a string, pretty-print the JSON
-                                let json_str = serde_json::to_string_pretty(stmt)
-                                    .unwrap_or_else(|_| stmt.to_string());
-                                ui.label(RichText::new(json_str).monospace().small());
-                            }
-                        });
+                        ui.label(RichText::new(source).monospace());
                     });
-                ui.add_space(4.0);
+            });
+        }
+
+        // Show validation status if available
+        if let Some(ref validation) = dsl_state.validation {
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Validation:").small());
+                if validation.valid {
+                    ui.label(RichText::new("Valid").small().color(Color32::GREEN));
+                } else {
+                    ui.label(RichText::new("Invalid").small().color(Color32::RED));
+                }
+            });
+
+            // Show errors if any
+            if !validation.errors.is_empty() {
+                for err in &validation.errors {
+                    ui.label(
+                        RichText::new(format!("  • {}", err.message))
+                            .small()
+                            .color(Color32::RED),
+                    );
+                }
             }
-        });
+
+            // Show warnings if any
+            if !validation.warnings.is_empty() {
+                for warn in &validation.warnings {
+                    ui.label(
+                        RichText::new(format!("  • {}", warn))
+                            .small()
+                            .color(Color32::YELLOW),
+                    );
+                }
+            }
+        }
 
         // Show session state
         ui.separator();
         ui.horizontal(|ui| {
             ui.label(RichText::new("State:").small());
-            if let Some(state_str) = session.state.as_str() {
-                let color = match state_str {
-                    "ready_to_execute" => Color32::GREEN,
-                    "new" => Color32::GRAY,
-                    _ => Color32::YELLOW,
-                };
-                ui.label(RichText::new(state_str).small().color(color));
-            }
+            let (state_str, color) = match &session.state {
+                SessionStateEnum::ReadyToExecute => ("ready_to_execute", Color32::GREEN),
+                SessionStateEnum::New => ("new", Color32::GRAY),
+                SessionStateEnum::PendingValidation => ("pending_validation", Color32::YELLOW),
+                SessionStateEnum::Executing => ("executing", Color32::LIGHT_BLUE),
+                SessionStateEnum::Executed => ("executed", Color32::GREEN),
+                SessionStateEnum::Error => ("error", Color32::RED),
+            };
+            ui.label(RichText::new(state_str).small().color(color));
 
-            if session.can_execute {
+            if dsl_state.can_execute {
                 ui.separator();
                 ui.label(
                     RichText::new("Ready to execute")

@@ -45,10 +45,13 @@ pub mod layout;
 pub mod lod;
 pub mod ontology;
 pub mod render;
+pub mod sdf;
+pub mod spatial;
 pub mod trading_matrix;
 pub mod types;
+pub mod viewport;
 
-pub use animation::{SpringConfig, SpringF32, SpringVec2};
+pub use animation::{EsperTransition, EsperTransitionState, SpringConfig, SpringF32, SpringVec2};
 pub use astronomy::{AstronomyView, NavigationEntry, TransitionAction, ViewTransition};
 pub use camera::Camera2D;
 pub use force_sim::{ClusterNode, ForceConfig, ForceSimulation};
@@ -56,7 +59,7 @@ pub use force_sim::{ClusterNode, ForceConfig, ForceSimulation};
 pub use galaxy::{ClusterData, ClusterType, GalaxyAction, GalaxyView, RiskSummary};
 
 // Re-export NavigationAction from shared types for galaxy navigation
-pub use input::{InputHandler, InputState};
+pub use input::{EnhanceAction, InputHandler, InputState};
 pub use layout::LayoutEngine;
 pub use ob_poc_types::galaxy::NavigationAction;
 pub use ontology::{
@@ -71,6 +74,16 @@ pub use trading_matrix::{
     TradingMatrixNodeType, TradingMatrixResponse, TradingMatrixState,
 };
 pub use types::*;
+pub use viewport::{
+    render_focus_ring, render_node_with_confidence, render_viewport_hud, EsperRenderState, GapType,
+    IlluminateAspect, RedFlagCategory, ViewportAction, ViewportRenderState,
+};
+
+// SDF primitives and operations for hit testing and confidence visualization
+pub use sdf::{cluster_blob, hit_test_circle, hit_test_rect, ConfidenceHalo, HitResult};
+
+// R-tree spatial index for O(log n) hit testing
+pub use spatial::{SpatialIndex, SpatialNode};
 
 // Re-export PanDirection from ob-poc-types for Esper-style navigation
 pub use ob_poc_types::PanDirection;
@@ -186,6 +199,14 @@ pub struct CbuGraphWidget {
     type_filter: Option<String>,
     /// Highlighted type - nodes of this type are highlighted but others still visible
     highlighted_type: Option<String>,
+    /// Viewport render state for HUD animations
+    viewport_render_state: ViewportRenderState,
+    /// Esper-style visual mode toggles (xray, peel, shadow, etc.)
+    esper_render_state: EsperRenderState,
+    /// Esper-style discrete stepped transition for enhance level changes
+    esper_transition: Option<EsperTransition>,
+    /// Current enhance level (0-4)
+    current_enhance_level: u8,
 }
 
 impl Default for CbuGraphWidget {
@@ -206,6 +227,10 @@ impl CbuGraphWidget {
             needs_initial_fit: true,
             type_filter: None,
             highlighted_type: None,
+            viewport_render_state: ViewportRenderState::new(),
+            esper_render_state: EsperRenderState::new(),
+            esper_transition: None,
+            current_enhance_level: 0,
         }
     }
 
@@ -622,8 +647,166 @@ impl CbuGraphWidget {
         // TODO: Clear type highlighting
     }
 
+    // =========================================================================
+    // ESPER RENDER STATE ACCESSORS (for NavigationVerb handlers)
+    // =========================================================================
+
+    /// Get mutable reference to Esper render state for toggle operations
+    pub fn esper_render_state_mut(&mut self) -> &mut EsperRenderState {
+        &mut self.esper_render_state
+    }
+
+    /// Get reference to Esper render state for query operations
+    pub fn esper_render_state(&self) -> &EsperRenderState {
+        &self.esper_render_state
+    }
+
+    /// Check if any Esper visual mode is active
+    pub fn has_active_esper_mode(&self) -> bool {
+        self.esper_render_state.any_mode_active()
+    }
+
+    /// Reset all Esper visual modes to default
+    pub fn reset_esper_modes(&mut self) {
+        self.esper_render_state.reset();
+    }
+
+    // =========================================================================
+    // ESPER-STYLE ENHANCE LEVEL TRANSITIONS
+    // =========================================================================
+
+    /// Set enhance level with Esper-style discrete stepped transition.
+    /// Each step holds for 100ms with a 1.03x scale pulse "click" effect.
+    pub fn set_enhance_level(&mut self, target_level: u8) {
+        let target = target_level.min(4); // Clamp to 0-4
+        if target != self.current_enhance_level {
+            self.esper_transition = Some(EsperTransition::new(self.current_enhance_level, target));
+        }
+    }
+
+    /// Increment enhance level by 1 (with Esper transition)
+    pub fn increment_enhance_level(&mut self) {
+        let new_level = (self.current_enhance_level + 1).min(4);
+        self.set_enhance_level(new_level);
+    }
+
+    /// Decrement enhance level by 1 (with Esper transition)
+    pub fn decrement_enhance_level(&mut self) {
+        let new_level = self.current_enhance_level.saturating_sub(1);
+        self.set_enhance_level(new_level);
+    }
+
+    /// Get current enhance level (accounts for mid-transition state)
+    pub fn enhance_level(&self) -> u8 {
+        self.esper_transition
+            .as_ref()
+            .map(|t| t.current_level())
+            .unwrap_or(self.current_enhance_level)
+    }
+
+    /// Get enhance scale factor for "click" pulse effect during transitions
+    pub fn enhance_scale(&self) -> f32 {
+        self.esper_transition
+            .as_ref()
+            .map(|t| t.scale())
+            .unwrap_or(1.0)
+    }
+
+    /// Check if an enhance transition is currently in progress
+    pub fn is_enhance_transitioning(&self) -> bool {
+        self.esper_transition
+            .as_ref()
+            .map(|t| !t.is_complete())
+            .unwrap_or(false)
+    }
+
+    /// Tick the Esper transition (call each frame with delta time).
+    /// Returns true if still animating (needs repaint).
+    fn tick_esper_transition(&mut self, dt: f32) -> bool {
+        if let Some(ref mut transition) = self.esper_transition {
+            transition.update(dt);
+            if transition.is_complete() {
+                // Transition complete - commit final level and clear
+                self.current_enhance_level = transition.current_level();
+                self.esper_transition = None;
+                false
+            } else {
+                true // Still animating
+            }
+        } else {
+            false
+        }
+    }
+
+    // =========================================================================
+    // LAYOUT ORIENTATION & SEARCH (AgentCommand handlers)
+    // =========================================================================
+
+    /// Toggle between VERTICAL and HORIZONTAL layout orientation.
+    /// This affects how the force simulation arranges nodes.
+    pub fn toggle_orientation(&mut self) {
+        // For now, trigger a re-layout with the camera reset
+        // Future: Add orientation state to LayoutEngine and ForceConfig
+        self.needs_initial_fit = true;
+        self.recompute_layout();
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(&"toggle_orientation: layout recomputed".into());
+    }
+
+    /// Search for entities matching a query string and highlight/focus them.
+    /// If a single match is found, focus on it. If multiple, highlight all.
+    pub fn search_entities(&mut self, query: &str) {
+        let Some(ref graph) = self.layout_graph else {
+            return;
+        };
+
+        let query_lower = query.to_lowercase();
+        let mut matches: Vec<String> = Vec::new();
+
+        // Search through nodes by label (fuzzy match on lowercase)
+        for (id, node) in &graph.nodes {
+            if node.label.to_lowercase().contains(&query_lower) {
+                matches.push(id.clone());
+            }
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "search_entities: query='{}' found {} matches",
+                query,
+                matches.len()
+            )
+            .into(),
+        );
+
+        match matches.len() {
+            0 => {
+                // No matches - clear any existing filter
+                self.clear_type_filter();
+            }
+            1 => {
+                // Single match - focus on it
+                let id = matches.into_iter().next().unwrap();
+                self.focus_node(&id);
+            }
+            _ => {
+                // Multiple matches - highlight the first one and set type filter
+                // Future: Could implement multi-node highlighting
+                if let Some(first_id) = matches.first() {
+                    self.focus_node(first_id);
+                }
+            }
+        }
+    }
+
     /// Main UI function
     pub fn ui(&mut self, ui: &mut egui::Ui) {
+        // Update time-based animations BEFORE borrowing graph
+        let dt = ui.input(|i| i.stable_dt);
+        self.camera.update(dt);
+        let esper_animating = self.tick_esper_transition(dt);
+
         let Some(graph) = self.layout_graph.as_mut() else {
             #[cfg(target_arch = "wasm32")]
             web_sys::console::log_1(&"ui(): No layout_graph, showing empty state".into());
@@ -667,10 +850,6 @@ impl CbuGraphWidget {
             self.needs_initial_fit = false;
         }
 
-        // Update camera interpolation
-        let dt = ui.input(|i| i.stable_dt);
-        self.camera.update(dt);
-
         // Handle input
         let needs_repaint = InputHandler::handle_input(
             &response,
@@ -680,11 +859,14 @@ impl CbuGraphWidget {
             screen_rect,
         );
 
+        // Capture pending enhance action (will handle after graph borrow released)
+        let pending_enhance = self.input_state.take_pending_enhance_action();
+
         // Set cursor
         ui.ctx()
             .set_cursor_icon(input::cursor_for_state(&self.input_state));
 
-        // Render graph with type filter support
+        // Render graph with type filter support and Esper visual modes
         self.renderer.render(
             &painter,
             graph,
@@ -693,6 +875,7 @@ impl CbuGraphWidget {
             self.input_state.focused_node.as_deref(),
             self.type_filter.as_deref(),
             self.highlighted_type.as_deref(),
+            Some(&self.esper_render_state),
         );
 
         // Render UI chrome (stats, controls)
@@ -720,8 +903,16 @@ impl CbuGraphWidget {
             }
         }
 
+        // Handle pending enhance action (after graph borrows released)
+        if let Some(action) = pending_enhance {
+            match action {
+                input::EnhanceAction::Increment => self.increment_enhance_level(),
+                input::EnhanceAction::Decrement => self.decrement_enhance_level(),
+            }
+        }
+
         // Request repaint if animating or needs update
-        if needs_repaint || self.camera_is_animating() {
+        if needs_repaint || self.camera_is_animating() || esper_animating {
             ui.ctx().request_repaint();
         }
     }
@@ -775,7 +966,7 @@ impl CbuGraphWidget {
         );
 
         // Keyboard hints in bottom-left
-        let hints = "Drag: Pan | Scroll: Zoom | Click: Focus | Esc: Clear | R: Fit";
+        let hints = "Drag: Pan | Scroll: Zoom | Click: Focus | E/[]: Enhance | Esc: Clear | R: Fit";
         painter.text(
             screen_rect.left_bottom() + Vec2::new(10.0, -10.0),
             egui::Align2::LEFT_BOTTOM,
@@ -797,5 +988,73 @@ impl CbuGraphWidget {
                 );
             }
         }
+
+        // Enhance level indicator in bottom-right (Esper-style with scale pulse)
+        self.render_enhance_indicator(painter, screen_rect);
+    }
+
+    /// Render the Esper-style enhance level indicator with discrete step visualization
+    fn render_enhance_indicator(&self, painter: &egui::Painter, screen_rect: Rect) {
+        let level = self.enhance_level();
+        let scale = self.enhance_scale();
+        let is_transitioning = self.is_enhance_transitioning();
+
+        // Position in bottom-right
+        let base_pos = screen_rect.right_bottom() + Vec2::new(-80.0, -40.0);
+
+        // Apply scale pulse effect during transitions
+        let font_size = 14.0 * scale;
+        let indicator_color = if is_transitioning {
+            // Gold color during transition "click"
+            Color32::from_rgb(255, 193, 7)
+        } else {
+            // Muted color when stable
+            Color32::from_rgb(150, 150, 150)
+        };
+
+        // Level text
+        let level_text = format!("Enhance: {}", level);
+        painter.text(
+            base_pos,
+            egui::Align2::RIGHT_BOTTOM,
+            level_text,
+            egui::FontId::proportional(font_size),
+            indicator_color,
+        );
+
+        // Visual pips showing discrete steps (0-4)
+        let pip_y = base_pos.y - 20.0;
+        let pip_spacing = 12.0 * scale;
+        let pip_radius = 4.0 * scale;
+
+        for i in 0..=4u8 {
+            let pip_x = base_pos.x - 70.0 + (i as f32 * pip_spacing);
+            let pip_pos = egui::Pos2::new(pip_x, pip_y);
+
+            let pip_color = if i <= level {
+                if is_transitioning && i == level {
+                    // Current step during transition - bright gold
+                    Color32::from_rgb(255, 215, 0)
+                } else {
+                    // Filled pip - cyan
+                    Color32::from_rgb(96, 165, 250)
+                }
+            } else {
+                // Empty pip - dark
+                Color32::from_rgb(60, 60, 60)
+            };
+
+            painter.circle_filled(pip_pos, pip_radius, pip_color);
+        }
+
+        // Hint text
+        let hint = "+/- keys";
+        painter.text(
+            base_pos + Vec2::new(0.0, 15.0),
+            egui::Align2::RIGHT_BOTTOM,
+            hint,
+            egui::FontId::proportional(9.0),
+            Color32::from_rgb(80, 80, 80),
+        );
     }
 }

@@ -19,7 +19,7 @@ use ob_poc_graph::{
     TradingMatrixNode, TradingMatrixState, ViewMode,
 };
 use ob_poc_types::{
-    galaxy::{NavigationAction, NavigationScope, UniverseGraph, ViewLevel},
+    galaxy::{NavigationScope, UniverseGraph, ViewLevel},
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
     SessionContext, SessionStateResponse, ValidateDslResponse,
 };
@@ -279,7 +279,7 @@ impl Default for PanelState {
             show_ast: true, // Default to AST view
             show_entity_detail: false,
             show_debug: false,
-            layout: LayoutMode::FourPanel,
+            layout: LayoutMode::Simplified,
         }
     }
 }
@@ -288,7 +288,8 @@ impl Default for PanelState {
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub enum LayoutMode {
     #[default]
-    FourPanel, // 2x2 grid
+    Simplified, // New default: 90% viewport + 10% bottom (Chat left, Session right)
+    FourPanel,     // 2x2 grid (legacy)
     EditorFocus,   // Large DSL editor + small panels
     GraphFocus,    // Large graph + small panels
     GraphFullSize, // Graph only, full window
@@ -385,6 +386,16 @@ pub struct AsyncState {
     pub pending_focus_entity: Option<String>, // Focus on entity by ID
     pub pending_reset_layout: bool,   // Reset layout to default
 
+    // Hierarchy navigation (expand/collapse nodes)
+    pub pending_expand_node: Option<String>, // Node key to expand
+    pub pending_collapse_node: Option<String>, // Node key to collapse
+
+    // Export and layout commands
+    pub pending_export: Option<String>, // Export format: "png", "svg", "pdf"
+    pub pending_toggle_orientation: bool, // Toggle VERTICAL/HORIZONTAL layout
+    pub pending_search: Option<String>, // Search query for graph
+    pub pending_show_help: bool,        // Show help overlay
+
     // Extended Esper 3D/Multi-dimensional commands
     // Scale navigation (astronomical metaphor)
     pub pending_scale_universe: bool,
@@ -456,6 +467,7 @@ pub struct AsyncState {
     pub needs_context_refetch: bool, // CBU selected, fetch session context
     pub needs_trading_matrix_refetch: bool, // Trading view mode selected
     pub needs_session_refetch: bool, // Version changed, need full session refetch
+    pub needs_resolution_check: bool, // Chat completed with DSL, check for unresolved entities
     pub pending_cbu_id: Option<Uuid>, // CBU to fetch graph for (set by select_cbu)
 
     // Execution tracking - prevents repeated refetch
@@ -506,19 +518,31 @@ impl AppState {
             state.loading_session = false;
             match result {
                 Ok(session) => {
-                    // Sync DSL editor from combined_dsl if server has content and we're not dirty
+                    // Check if DSL content is present - use the SINGLE source: session.dsl
+                    let has_dsl = session
+                        .dsl
+                        .as_ref()
+                        .and_then(|d| d.source.as_ref())
+                        .map(|s| !s.is_empty())
+                        .unwrap_or(false);
+
+                    // Sync DSL editor from session.dsl if server has content and we're not dirty
                     if !self.buffers.dsl_dirty {
-                        // Try combined_dsl first (from session state), then dsl_source
-                        if let Some(ref combined) = session.combined_dsl {
-                            if let Some(dsl_str) = combined.as_str() {
-                                if !dsl_str.is_empty() {
-                                    self.buffers.dsl_editor = dsl_str.to_string();
+                        if let Some(ref dsl_state) = session.dsl {
+                            if let Some(ref source) = dsl_state.source {
+                                if !source.is_empty() {
+                                    self.buffers.dsl_editor = source.clone();
                                 }
                             }
-                        } else if let Some(ref dsl) = session.dsl_source {
-                            self.buffers.dsl_editor = dsl.clone();
                         }
                     }
+
+                    // If DSL is present and no resolution active, trigger resolution check
+                    // This enables automatic entity lookup popup when DSL has unresolved refs
+                    if has_dsl && self.resolution.is_none() && !state.loading_resolution {
+                        state.needs_resolution_check = true;
+                    }
+
                     // Track session version for external change detection (MCP/REPL)
                     self.last_known_version = session.version.clone();
                     self.session = Some(session);
@@ -817,14 +841,18 @@ impl AppState {
         // Clear the flag
         state.needs_graph_refetch = false;
 
-        // Use pending_cbu_id if set (from select_cbu), otherwise use session_id
+        // Use pending_cbu_id if set (from select_cbu), otherwise get active CBU from session
         if let Some(cbu_id) = state.pending_cbu_id.take() {
             return Some(cbu_id);
         }
 
-        // Fall back to current session_id (for view mode changes, execution complete)
+        // Fall back to active CBU from session (for view mode changes, execution complete)
+        // NOTE: We must NOT use session_id here - that's the SESSION UUID, not the CBU ID
         drop(state); // Release lock before accessing self
-        self.session_id
+        self.session
+            .as_ref()
+            .and_then(|s| s.active_cbu.as_ref())
+            .and_then(|cbu| Uuid::parse_str(&cbu.id).ok())
     }
 
     /// Check if trading matrix refetch is needed and return the CBU ID to fetch
@@ -841,14 +869,18 @@ impl AppState {
         // Clear the flag
         state.needs_trading_matrix_refetch = false;
 
-        // Use pending_cbu_id if set (from select_cbu), otherwise use session_id
+        // Use pending_cbu_id if set (from select_cbu), otherwise get active CBU from session
         if let Some(cbu_id) = state.pending_cbu_id.clone() {
             return Some(cbu_id);
         }
 
-        // Fall back to current session_id (for view mode changes)
+        // Fall back to active CBU from session (for view mode changes)
+        // NOTE: We must NOT use session_id here - that's the SESSION UUID, not the CBU ID
         drop(state); // Release lock before accessing self
-        self.session_id
+        self.session
+            .as_ref()
+            .and_then(|s| s.active_cbu.as_ref())
+            .and_then(|cbu| Uuid::parse_str(&cbu.id).ok())
     }
 
     /// Check if context refetch is needed and return true if so
@@ -880,6 +912,21 @@ impl AppState {
 
         // Clear the flag
         state.needs_session_refetch = false;
+        true
+    }
+
+    /// Check if resolution check is needed (DSL has unresolved entity refs)
+    pub fn take_pending_resolution_check(&self) -> bool {
+        let Ok(mut state) = self.async_state.lock() else {
+            return false;
+        };
+
+        if !state.needs_resolution_check {
+            return false;
+        }
+
+        // Clear the flag
+        state.needs_resolution_check = false;
         true
     }
 
@@ -1008,6 +1055,72 @@ impl AppState {
         if let Ok(mut state) = self.async_state.lock() {
             let pending = state.pending_reset_layout;
             state.pending_reset_layout = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    // =========================================================================
+    // Hierarchy Navigation - Take Methods
+    // =========================================================================
+
+    /// Check if an expand node command is pending
+    pub fn take_pending_expand_node(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_expand_node.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a collapse node command is pending
+    pub fn take_pending_collapse_node(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_collapse_node.take()
+        } else {
+            None
+        }
+    }
+
+    // =========================================================================
+    // Export and Layout - Take Methods
+    // =========================================================================
+
+    /// Check if an export command is pending
+    pub fn take_pending_export(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_export.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a toggle orientation command is pending
+    pub fn take_pending_toggle_orientation(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_toggle_orientation;
+            state.pending_toggle_orientation = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if a search command is pending
+    pub fn take_pending_search(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_search.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a show help command is pending
+    pub fn take_pending_show_help(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_show_help;
+            state.pending_show_help = false;
             pending
         } else {
             false
@@ -1445,34 +1558,20 @@ impl AppState {
     }
 
     /// Get DSL source from session or editor buffer
+    ///
+    /// Priority: editor buffer (user editing) > session.dsl.source (server state)
     pub fn get_dsl_source(&self) -> Option<String> {
         // First try the editor buffer if it has content
         if !self.buffers.dsl_editor.trim().is_empty() {
             return Some(self.buffers.dsl_editor.clone());
         }
 
-        // Then try session's dsl_source
+        // Then try session's DslState.source - the SINGLE source of truth
         if let Some(ref session) = self.session {
-            if let Some(ref dsl) = session.dsl_source {
-                if !dsl.trim().is_empty() {
-                    return Some(dsl.clone());
-                }
-            }
-            // Try combined_dsl
-            if let Some(ref combined) = session.combined_dsl {
-                if let Some(s) = combined.as_str() {
-                    if !s.trim().is_empty() {
-                        return Some(s.to_string());
-                    }
-                }
-            }
-            // Try assembled_dsl.combined
-            if let Some(ref assembled) = session.assembled_dsl {
-                if let Some(obj) = assembled.as_object() {
-                    if let Some(combined) = obj.get("combined").and_then(|v| v.as_str()) {
-                        if !combined.trim().is_empty() {
-                            return Some(combined.to_string());
-                        }
+            if let Some(ref dsl_state) = session.dsl {
+                if let Some(ref source) = dsl_state.source {
+                    if !source.trim().is_empty() {
+                        return Some(source.clone());
                     }
                 }
             }
@@ -1840,6 +1939,34 @@ impl AppState {
         if let Ok(mut state) = self.async_state.lock() {
             state.pending_go_to_universe = true;
         }
+    }
+
+    /// Fetch CBUs for a commercial client (book/galaxy view)
+    /// Maps to `view.book :client <name>` DSL verb
+    pub fn fetch_client_book(&mut self, client_name: &str) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+        let client_name = client_name.to_string();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_universe = true; // Reuse universe loading state
+        }
+
+        spawn_local(async move {
+            // Fetch universe filtered by client
+            let result = api::get_universe_graph_by_client(&client_name).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_universe_graph = Some(result);
+                state.loading_universe = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
     }
 
     /// Check if universe is currently loading

@@ -19,10 +19,12 @@
 //! - POST   /api/agent/onboard/render    - Render an onboarding template with parameters
 
 use crate::api::session::{
-    create_session_store, AgentSession, ChatRequest, ChatResponse, CreateSessionRequest,
-    CreateSessionResponse, ExecuteResponse, ExecutionResult, MessageRole, SessionState,
-    SessionStateResponse, SessionStore,
+    create_session_store, AgentSession, ChatRequest, CreateSessionRequest, CreateSessionResponse,
+    ExecuteResponse, ExecutionResult, MessageRole, SessionState, SessionStateResponse,
+    SessionStore,
 };
+
+// API types - SINGLE SOURCE OF TRUTH for HTTP boundary
 use crate::database::derive_semantic_state;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
@@ -32,6 +34,10 @@ use crate::dsl_v2::{
     ExecutionResult as DslV2Result, SemanticValidator,
 };
 use crate::ontology::SemanticStageRegistry;
+use ob_poc_types::{
+    AstArgument, AstSpan, AstStatement, AstValue, BoundEntityInfo, ChatResponse, DslState,
+    DslValidation, SessionStateEnum, ValidationError as ApiValidationError, VerbIntentInfo,
+};
 
 use axum::{
     extract::{Path, Query, State},
@@ -44,6 +50,244 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
+
+// ============================================================================
+// Type Converters - Internal types to API types (ob_poc_types)
+// ============================================================================
+
+/// Convert internal SessionState to API SessionStateEnum
+fn to_session_state_enum(state: &SessionState) -> SessionStateEnum {
+    match state {
+        SessionState::New => SessionStateEnum::New,
+        SessionState::PendingValidation => SessionStateEnum::PendingValidation,
+        SessionState::ReadyToExecute => SessionStateEnum::ReadyToExecute,
+        SessionState::Executing => SessionStateEnum::Executing,
+        SessionState::Executed => SessionStateEnum::Executed,
+        SessionState::Closed => SessionStateEnum::Executed, // Map closed to executed for API
+    }
+}
+
+/// Convert dsl_core::Span to API AstSpan
+fn to_api_span(span: &dsl_core::Span) -> AstSpan {
+    AstSpan {
+        start: span.start,
+        end: span.end,
+        start_line: None,
+        end_line: None,
+    }
+}
+
+/// Convert internal dsl_core::Statement to API AstStatement
+fn to_api_ast_statement(stmt: &dsl_core::Statement) -> AstStatement {
+    match stmt {
+        dsl_core::Statement::VerbCall(vc) => AstStatement::VerbCall {
+            domain: vc.domain.clone(),
+            verb: vc.verb.clone(),
+            arguments: vc
+                .arguments
+                .iter()
+                .map(|arg| AstArgument {
+                    key: arg.key.clone(),
+                    value: to_api_ast_value(&arg.value),
+                    span: Some(to_api_span(&arg.span)),
+                })
+                .collect(),
+            binding: vc.binding.clone(),
+            span: Some(to_api_span(&vc.span)),
+        },
+        dsl_core::Statement::Comment(text) => AstStatement::Comment {
+            text: text.clone(),
+            span: None,
+        },
+    }
+}
+
+/// Convert internal dsl_core::AstNode to API AstValue
+fn to_api_ast_value(node: &dsl_core::AstNode) -> AstValue {
+    match node {
+        dsl_core::AstNode::Literal(lit) => match lit {
+            dsl_core::ast::Literal::String(s) => AstValue::String { value: s.clone() },
+            dsl_core::ast::Literal::Integer(n) => AstValue::Number { value: *n as f64 },
+            dsl_core::ast::Literal::Decimal(d) => {
+                use rust_decimal::prelude::ToPrimitive;
+                AstValue::Number {
+                    value: d.to_f64().unwrap_or(0.0),
+                }
+            }
+            dsl_core::ast::Literal::Boolean(b) => AstValue::Boolean { value: *b },
+            dsl_core::ast::Literal::Null => AstValue::Null,
+            dsl_core::ast::Literal::Uuid(u) => AstValue::String {
+                value: u.to_string(),
+            },
+        },
+        dsl_core::AstNode::SymbolRef { name, .. } => AstValue::SymbolRef { name: name.clone() },
+        dsl_core::AstNode::EntityRef {
+            entity_type,
+            value,
+            resolved_key,
+            ..
+        } => AstValue::EntityRef {
+            entity_type: entity_type.clone(),
+            search_key: value.clone(),
+            resolved_key: resolved_key.clone(),
+        },
+        dsl_core::AstNode::List { items, .. } => AstValue::List {
+            items: items.iter().map(to_api_ast_value).collect(),
+        },
+        dsl_core::AstNode::Map { entries, .. } => AstValue::Map {
+            entries: entries
+                .iter()
+                .map(|(k, v)| ob_poc_types::AstMapEntry {
+                    key: k.clone(),
+                    value: to_api_ast_value(v),
+                })
+                .collect(),
+        },
+        dsl_core::AstNode::Nested(_vc) => {
+            // Nested verb calls are complex - for now just represent as null
+            // The UI doesn't typically need to display nested calls inline
+            AstValue::Null
+        }
+    }
+}
+
+/// Convert internal VerbIntent to API VerbIntentInfo
+fn to_api_verb_intent(intent: &crate::api::intent::VerbIntent) -> VerbIntentInfo {
+    use ob_poc_types::ParamValue as ApiParamValue;
+
+    // Split verb into domain.action
+    let parts: Vec<&str> = intent.verb.splitn(2, '.').collect();
+    let (domain, action) = if parts.len() == 2 {
+        (parts[0].to_string(), parts[1].to_string())
+    } else {
+        ("unknown".to_string(), intent.verb.clone())
+    };
+
+    // Convert params
+    let params: std::collections::HashMap<String, ApiParamValue> = intent
+        .params
+        .iter()
+        .map(|(k, v)| {
+            let api_val = match v {
+                crate::api::intent::ParamValue::String(s) => {
+                    ApiParamValue::String { value: s.clone() }
+                }
+                crate::api::intent::ParamValue::Number(n) => ApiParamValue::Number { value: *n },
+                crate::api::intent::ParamValue::Integer(n) => {
+                    ApiParamValue::Number { value: *n as f64 }
+                }
+                crate::api::intent::ParamValue::Boolean(b) => ApiParamValue::Boolean { value: *b },
+                crate::api::intent::ParamValue::Uuid(u) => ApiParamValue::String {
+                    value: u.to_string(),
+                },
+                crate::api::intent::ParamValue::ResolvedEntity {
+                    display_name,
+                    resolved_id,
+                } => ApiParamValue::ResolvedEntity {
+                    display_name: display_name.clone(),
+                    resolved_id: resolved_id.to_string(),
+                    entity_type: "entity".to_string(), // Default, could be enhanced
+                },
+                crate::api::intent::ParamValue::List(items) => {
+                    // For lists, just stringify for now
+                    ApiParamValue::String {
+                        value: format!("{:?}", items),
+                    }
+                }
+                crate::api::intent::ParamValue::Object(obj) => {
+                    // For objects, just stringify for now
+                    ApiParamValue::String {
+                        value: format!("{:?}", obj),
+                    }
+                }
+            };
+            (k.clone(), api_val)
+        })
+        .collect();
+
+    VerbIntentInfo {
+        verb: intent.verb.clone(),
+        domain,
+        action,
+        params,
+        bind_as: None, // VerbIntent doesn't have bind_as field
+        validation: None,
+    }
+}
+
+/// Build DslState from AgentChatResponse fields
+fn build_dsl_state(
+    dsl_source: Option<&String>,
+    ast: Option<&Vec<dsl_core::Statement>>,
+    can_execute: bool,
+    intents: &[crate::api::intent::VerbIntent],
+    validation_results: &[crate::api::intent::IntentValidation],
+    bindings: &std::collections::HashMap<String, crate::api::session::BoundEntity>,
+) -> Option<DslState> {
+    // Only create DslState if there's actual DSL content
+    if dsl_source.is_none() && ast.is_none() && intents.is_empty() {
+        return None;
+    }
+
+    // Convert AST
+    let api_ast = ast.map(|stmts| stmts.iter().map(to_api_ast_statement).collect());
+
+    // Convert intents
+    let api_intents = if intents.is_empty() {
+        None
+    } else {
+        Some(intents.iter().map(to_api_verb_intent).collect())
+    };
+
+    // Build validation from validation_results
+    let validation = if validation_results.is_empty() {
+        None
+    } else {
+        let errors: Vec<ApiValidationError> = validation_results
+            .iter()
+            .filter(|v| !v.valid)
+            .flat_map(|v| {
+                // Convert each IntentError to ApiValidationError
+                v.errors.iter().map(|err| ApiValidationError {
+                    message: format!("[{}] {}", v.intent.verb, err.message),
+                    line: None,
+                    column: None,
+                    suggestion: err.param.clone(), // Use param as suggestion context
+                })
+            })
+            .collect();
+
+        Some(DslValidation {
+            valid: errors.is_empty(),
+            errors,
+            warnings: vec![],
+        })
+    };
+
+    // Convert bindings (BoundEntity.display_name -> BoundEntityInfo.name)
+    let api_bindings: std::collections::HashMap<String, BoundEntityInfo> = bindings
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.clone(),
+                BoundEntityInfo {
+                    id: v.id.to_string(),
+                    name: v.display_name.clone(),
+                    entity_type: v.entity_type.clone(),
+                },
+            )
+        })
+        .collect();
+
+    Some(DslState {
+        source: dsl_source.cloned(),
+        ast: api_ast,
+        can_execute,
+        validation,
+        intents: api_intents,
+        bindings: api_bindings,
+    })
+}
 
 // ============================================================================
 // Request/Response Types
@@ -414,6 +658,7 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         .route("/api/session/:id/bind", post(set_session_binding))
         .route("/api/session/:id/context", get(get_session_context))
         .route("/api/session/:id/focus", post(set_session_focus))
+        .route("/api/session/:id/view-mode", post(set_session_view_mode))
         .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
         .route("/api/session/:id/watch", get(watch_session))
         // DSL parsing and entity reference resolution
@@ -612,6 +857,107 @@ async fn watch_session(
     }
 }
 
+/// Generate help text showing all available MCP tools/commands
+fn generate_commands_help() -> String {
+    r#"# Available Commands
+
+## DSL Operations
+| Command | Description |
+|---------|-------------|
+| `dsl_validate` | Parse and validate DSL syntax/semantics |
+| `dsl_execute` | Execute DSL against database (with dry_run option) |
+| `dsl_plan` | Show execution plan without running |
+| `dsl_lookup` | Look up real database IDs (prevents UUID hallucination) |
+| `dsl_complete` | Get completions for verbs, domains, products, roles |
+| `dsl_signature` | Get verb signature with parameters and types |
+| `dsl_generate` | Generate DSL from natural language |
+
+## CBU & Entity Operations
+| Command | Description |
+|---------|-------------|
+| `cbu_get` | Get CBU with entities, roles, documents, screenings |
+| `cbu_list` | List/search CBUs with filtering |
+| `entity_get` | Get entity details with relationships |
+| `entity_search` | Smart entity search with disambiguation |
+
+## Schema & Verbs
+| Command | Description |
+|---------|-------------|
+| `verbs_list` | List available DSL verbs (optionally by domain) |
+| `schema_info` | Get entity types, roles, document types |
+
+## Session Context
+| Command | Description |
+|---------|-------------|
+| `session_context` | Get current session context (bindings, active CBU) |
+
+## Workflow Operations
+| Command | Description |
+|---------|-------------|
+| `workflow_status` | Get workflow instance status with blockers |
+| `workflow_advance` | Try to advance workflow (evaluates guards) |
+| `workflow_transition` | Manual state transition |
+| `workflow_start` | Start a new workflow instance |
+| `resolve_blocker` | Get resolution options for a blocker |
+
+## Template Operations
+| Command | Description |
+|---------|-------------|
+| `template_list` | List/search templates by tag, blocker, or workflow state |
+| `template_get` | Get full template details with params and DSL body |
+| `template_expand` | Expand template to DSL with parameter substitution |
+
+## Batch Operations
+| Command | Description |
+|---------|-------------|
+| `batch_start` | Start batch mode with a template |
+| `batch_add_entities` | Add entities to a parameter's key set |
+| `batch_confirm_keyset` | Mark a key set as complete |
+| `batch_set_scalar` | Set a scalar parameter value |
+| `batch_get_state` | Get current batch execution state |
+| `batch_expand_current` | Expand template for current batch item |
+| `batch_record_result` | Record success/failure for current item |
+| `batch_skip_current` | Skip current item |
+| `batch_cancel` | Cancel batch operation |
+
+## Research Macros
+| Command | Description |
+|---------|-------------|
+| `research_list` | List available research macros |
+| `research_get` | Get research macro definition |
+| `research_execute` | Execute research with LLM + web search |
+| `research_approve` | Approve research results |
+| `research_reject` | Reject research results |
+| `research_status` | Get current research state |
+
+## Taxonomy Navigation
+| Command | Description |
+|---------|-------------|
+| `taxonomy_get` | Get entity type taxonomy tree |
+| `taxonomy_drill_in` | Drill into a taxonomy node |
+| `taxonomy_zoom_out` | Zoom out one level |
+| `taxonomy_reset` | Reset to root level |
+| `taxonomy_position` | Get current position in taxonomy |
+| `taxonomy_entities` | List entities of focused type |
+
+## Trading Matrix
+| Command | Description |
+|---------|-------------|
+| `trading_matrix_get` | Get trading matrix summary for a CBU |
+
+## View Commands (Natural Language)
+| Say | Effect |
+|-----|--------|
+| "kyc view" / "ubo view" / "ownership view" | Switch to KYC/UBO view mode |
+| "service view" / "service delivery" | Switch to Service Delivery view mode |
+| "custody view" / "settlement view" / "ssi view" | Switch to Custody/Trading view mode |
+| "switch to kyc" / "switch to service" | Switch view modes |
+
+---
+*Type `/commands` or `/help` to see this list again.*"#
+        .to_string()
+}
+
 /// POST /api/session/:id/chat - Process chat message and generate DSL via LLM
 ///
 /// Pipeline: User message → Intent extraction (tool call) → DSL builder → Linter → Feedback loop
@@ -642,7 +988,7 @@ async fn chat_session(
     tracing::info!("CBU ID: {:?}", req.cbu_id);
 
     // Get session (create if needed)
-    let mut session = {
+    let session = {
         let sessions = state.sessions.read().await;
         tracing::info!("Looking up session in store...");
         match sessions.get(&session_id) {
@@ -657,6 +1003,21 @@ async fn chat_session(
         }
     };
 
+    // Handle /commands or /help - show available MCP tools without LLM
+    let trimmed_msg = req.message.trim().to_lowercase();
+    if trimmed_msg == "/commands" || trimmed_msg == "/help" || trimmed_msg == "show commands" {
+        let commands_help = generate_commands_help();
+        return Ok(Json(ChatResponse {
+            message: commands_help,
+            dsl: None,
+            session_state: to_session_state_enum(&session.state),
+            commands: None,
+        }));
+    }
+
+    // Make session mutable for the rest of the handler
+    let mut session = session;
+
     // Create LLM client (uses AGENT_BACKEND env var to select provider)
     let llm_client = match crate::agentic::create_llm_client() {
         Ok(client) => client,
@@ -664,14 +1025,8 @@ async fn chat_session(
             let error_msg = format!("Error: LLM client initialization failed: {}", e);
             return Ok(Json(ChatResponse {
                 message: error_msg,
-                intents: vec![],
-                assembled_dsl: None,
-                validation_results: vec![],
-                session_state: session.state.clone(),
-                can_execute: false,
-                dsl_source: None,
-                ast: None,
-                bindings: None,
+                dsl: None,
+                session_state: to_session_state_enum(&session.state),
                 commands: None,
             }));
         }
@@ -702,14 +1057,8 @@ async fn chat_session(
             // Return error as JSON response instead of opaque 500
             return Ok(Json(ChatResponse {
                 message: format!("Agent error: {}", e),
-                intents: vec![],
-                assembled_dsl: None,
-                validation_results: vec![],
-                session_state: session.state.clone(),
-                can_execute: false,
-                dsl_source: None,
-                ast: None,
-                bindings: None,
+                dsl: None,
+                session_state: to_session_state_enum(&session.state),
                 commands: None,
             }));
         }
@@ -724,31 +1073,21 @@ async fn chat_session(
     // Notify watchers that session changed
     state.session_manager.notify(session_id).await;
 
-    // Build assembled DSL for response
-    let assembled = response
-        .dsl_source
-        .as_ref()
-        .map(|dsl| crate::api::intent::AssembledDsl {
-            statements: vec![dsl.clone()],
-            combined: dsl.clone(),
-            intent_count: response.intents.len(),
-        });
+    // Build DslState from response fields
+    let dsl_state = build_dsl_state(
+        response.dsl_source.as_ref(),
+        response.ast.as_ref(),
+        response.can_execute,
+        &response.intents,
+        &response.validation_results,
+        &session.context.bindings,
+    );
 
-    // Return response (ChatResponse is compatible with AgentChatResponse)
+    // Return response using API types (single source of truth)
     Ok(Json(ChatResponse {
         message: response.message,
-        intents: response.intents,
-        assembled_dsl: assembled,
-        validation_results: response.validation_results,
-        session_state: response.session_state,
-        can_execute: response.can_execute,
-        dsl_source: response.dsl_source,
-        ast: response.ast,
-        bindings: if session.context.bindings.is_empty() {
-            None
-        } else {
-            Some(session.context.bindings.clone())
-        },
+        dsl: dsl_state,
+        session_state: to_session_state_enum(&response.session_state),
         commands: response.commands,
     }))
 }
@@ -1279,6 +1618,21 @@ async fn execute_session_dsl(
             }
 
             // =========================================================================
+            // PROPAGATE VIEWPORT STATE FROM EXECUTION CONTEXT
+            // =========================================================================
+            // Viewport operations (viewport.focus, viewport.enhance, etc.) store ViewportState
+            // in ExecutionContext.pending_viewport_state. Propagate it to SessionContext
+            // so the UI can access it for CBU-focused navigation.
+            if let Some(viewport_state) = exec_ctx.take_pending_viewport_state() {
+                tracing::info!(
+                    "[EXEC] Propagating ViewportState to session context (view_type: {:?}, focus_mode: {:?})",
+                    viewport_state.view_type,
+                    viewport_state.focus.focus_mode
+                );
+                context.set_viewport_state(viewport_state);
+            }
+
+            // =========================================================================
             // LOG SUCCESS
             // =========================================================================
             if let Some(lid) = log_id {
@@ -1640,6 +1994,26 @@ pub struct SetFocusResponse {
     pub relevant_verbs: Vec<String>,
 }
 
+/// Request to set view mode on session (sync from egui client)
+#[derive(Debug, Deserialize)]
+pub struct SetViewModeRequest {
+    /// The view mode to set (e.g., "KYC_UBO", "SERVICE_DELIVERY", "TRADING")
+    pub view_mode: String,
+    /// Optional view level (e.g., "Universe", "Cluster", "System")
+    #[serde(default)]
+    pub view_level: Option<String>,
+}
+
+/// Response from setting view mode
+#[derive(Debug, Serialize)]
+pub struct SetViewModeResponse {
+    pub success: bool,
+    /// The view mode that was set
+    pub view_mode: String,
+    /// The view level that was set (if any)
+    pub view_level: Option<String>,
+}
+
 /// POST /api/session/:id/bind - Set a binding in the session context
 ///
 /// This allows the UI to register external entities (like a selected CBU)
@@ -1735,6 +2109,41 @@ async fn set_session_binding(
         success: true,
         binding_name: actual_name_clone,
         bindings: bindings_clone,
+    }))
+}
+
+/// POST /api/session/:id/view-mode - Set view mode on session (sync from egui client)
+///
+/// This allows the UI to sync its current view mode (e.g., KYC_UBO, SERVICE_DELIVERY, TRADING)
+/// and view level (e.g., Universe, Cluster, System) to the server session.
+/// This is important for ensuring the server knows the visualization context.
+async fn set_session_view_mode(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<SetViewModeRequest>,
+) -> Result<Json<SetViewModeResponse>, StatusCode> {
+    // Update session
+    {
+        let mut sessions = state.sessions.write().await;
+        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+        session.context.view_mode = Some(req.view_mode.clone());
+        // Note: view_level could be stored in session context if needed in future
+    }
+
+    tracing::debug!(
+        "View mode set: session={} view_mode={} view_level={:?}",
+        session_id,
+        req.view_mode,
+        req.view_level
+    );
+
+    // Notify watchers that session changed
+    state.session_manager.notify(session_id).await;
+
+    Ok(Json(SetViewModeResponse {
+        success: true,
+        view_mode: req.view_mode,
+        view_level: req.view_level,
     }))
 }
 

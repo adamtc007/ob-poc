@@ -16,6 +16,7 @@ pub mod navigation;
 mod panels;
 pub mod state;
 pub mod tokens;
+pub mod view;
 #[cfg(target_arch = "wasm32")]
 mod voice_bridge;
 mod widgets;

@@ -8981,11 +8981,19 @@ cargo x gleif-import --manager-lei "..." --create-cbus --limit 10
 
 ### BODS DSL Verbs
 
+The BODS integration provides verbs for UBO discovery, statement management, and GLEIF synchronization.
+
 | Verb | Description |
 |------|-------------|
-| `bods.discover-ubos` | Discover UBOs via BODS for entity |
-| `bods.import-ownership` | Import ownership statements from BODS |
-| `bods.refresh` | Refresh BODS data for entity |
+| `bods.discover-ubos` | Discover Ultimate Beneficial Owners using GLEIF + BODS data |
+| `bods.import` | Bulk import BODS statements from file or API |
+| `bods.link-entity` | Link local entity to BODS entity statement |
+| `bods.get-statement` | Get a BODS statement by ID |
+| `bods.list-by-entity` | List BODS statements linked to an entity |
+| `bods.find-by-lei` | Find BODS entity statement by LEI |
+| `bods.list-persons` | List person statements with beneficial ownership |
+| `bods.list-ownership` | List ownership statements for an entity |
+| `bods.sync-from-gleif` | Sync BODS data from GLEIF reporting exceptions |
 
 ### Reporting Exceptions
 
@@ -8997,6 +9005,121 @@ GLEIF defines exceptions when parent information is unavailable:
 | `NATURAL_PERSONS` | Owned by natural persons | Query BODS for person statements |
 | `NON_CONSOLIDATING` | Parent doesn't consolidate | Follow alternate ownership chain |
 | `NON_PUBLIC` | Confidential for legal reasons | Flag for manual review |
+
+### GLEIF + BODS Integration Architecture
+
+The system implements a **two-table edge model** separating corporate hierarchy from beneficial ownership:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    entity_identifiers                            │
+│                  (LEI = Global Master Key)                       │
+│  Migration: 010_bods_gleif_integration.sql                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               │               ▼
+┌─────────────────────────┐   │   ┌─────────────────────────────┐
+│  gleif_relationships    │   │   │   entity_relationships      │
+│  (Consolidation)        │   │   │   (Beneficial Ownership)    │
+├─────────────────────────┤   │   ├─────────────────────────────┤
+│ DirectParent            │   │   │ shareholding (BODS)         │
+│ UltimateParent          │   │   │ votingRights (BODS)         │
+│ DirectlyConsolidated    │   │   │ boardMember (BODS)          │
+│ FundManager             │   │   │ trustee, settlor (BODS)     │
+│ UmbrellaFund            │   │   │ (23 BODS interest types)    │
+└─────────────────────────┘   │   └─────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │    entities     │
+                    │  (Hub Table)    │
+                    └─────────────────┘
+```
+
+**Critical Distinction:**
+
+| Table | Semantics | Source | Purpose |
+|-------|-----------|--------|----------|
+| `gleif_relationships` | Corporate hierarchy | GLEIF API | Accounting consolidation |
+| `entity_relationships` | Beneficial ownership | Documents, declarations | KYC/AML compliance |
+
+**NEVER MIX THESE.** GLEIF tells you who consolidates whom for accounting. BODS/entity_relationships tells you who actually benefits or controls for KYC.
+
+### Database Schema (Migration 010)
+
+**entity_identifiers** - LEI as global master key:
+```sql
+CREATE TABLE "ob-poc".entity_identifiers (
+    identifier_id UUID PRIMARY KEY,
+    entity_id UUID REFERENCES entities(entity_id),
+    scheme VARCHAR(50),      -- 'LEI', 'company_register', 'tax_id'
+    id VARCHAR(100),         -- The actual identifier value
+    lei_status VARCHAR(30),  -- 'ISSUED', 'LAPSED', 'RETIRED'
+    lei_next_renewal DATE,
+    is_validated BOOLEAN,
+    UNIQUE(entity_id, scheme, id)
+);
+```
+
+**gleif_relationships** - Corporate hierarchy (SEPARATE from UBO):
+```sql
+CREATE TABLE "ob-poc".gleif_relationships (
+    gleif_rel_id UUID PRIMARY KEY,
+    parent_entity_id UUID REFERENCES entities,
+    parent_lei VARCHAR(20),
+    child_entity_id UUID REFERENCES entities,
+    child_lei VARCHAR(20),
+    relationship_type VARCHAR(50),  -- IS_DIRECTLY_CONSOLIDATED_BY, etc.
+    ownership_percentage NUMERIC(5,2),
+    accounting_standard VARCHAR(50),
+    UNIQUE(parent_lei, child_lei, relationship_type)
+);
+```
+
+**bods_interest_types** - 23 standard BODS interest types:
+```sql
+CREATE TABLE "ob-poc".bods_interest_types (
+    type_code VARCHAR(50) PRIMARY KEY,  -- 'shareholding', 'votingRights', etc.
+    display_name VARCHAR(100),
+    category VARCHAR(30),               -- 'ownership', 'control', 'trust'
+    requires_percentage BOOLEAN
+);
+```
+
+**Extended entity_relationships columns:**
+- `interest_type` → FK to `bods_interest_types`
+- `direct_or_indirect` → 'direct', 'indirect', 'unknown'
+- `share_minimum`, `share_maximum` → For BODS ranges
+- `is_component`, `component_of_relationship_id` → For indirect chain tracking
+
+### Join Strategy
+
+When BODS data arrives:
+
+1. **Has LEI?** → `SELECT entity_id FROM entity_identifiers WHERE scheme='LEI' AND id=:lei`
+2. **No LEI?** → `INSERT INTO entities` (synthetic UUID), optionally backfill via `gleif.search`
+
+```
+BODS Statement Arrives
+        │
+        ▼
+    Has LEI? ──YES──► Link to existing entity via entity_identifiers
+        │
+       NO
+        │
+        ▼
+    Create synthetic entity, backfill LEI later
+```
+
+### Helper Views
+
+| View | Description |
+|------|-------------|
+| `v_entities_with_lei` | Entities joined with their LEI identifiers |
+| `v_ubo_interests` | UBO edges with BODS interest type info |
+| `v_gleif_hierarchy` | GLEIF corporate hierarchy (consolidation only) |
+
 
 ## Teams & Access Management
 

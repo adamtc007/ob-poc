@@ -293,6 +293,205 @@ impl SpringVec2 {
 // TESTS
 // =============================================================================
 
+// =============================================================================
+// ESPER TRANSITION (Discrete Stepped Enhance Level Changes)
+// =============================================================================
+
+/// Esper-style stepped transition for enhance level changes
+///
+/// NOT smooth interpolation - discrete steps with brief hold and scale pulse.
+/// Feels like Blade Runner's Esper machine: deliberate, mechanical, precision.
+///
+/// # EGUI-RULES Compliance
+/// - Call `update(dt)` at start of frame (in update loop, not render)
+/// - Read state via `current_level()`, `scale()` for rendering
+/// - No callbacks - poll state each frame
+///
+/// # Usage
+/// ```ignore
+/// let mut esper = EsperTransition::new(0, 3); // L0 → L3
+///
+/// // Each frame in update():
+/// match esper.update(dt) {
+///     EsperTransitionState::Stepping { level, scale, .. } => {
+///         render_at_enhance_level(level, scale);
+///     }
+///     EsperTransitionState::Complete { level } => {
+///         render_at_enhance_level(level, 1.0);
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct EsperTransition {
+    /// Discrete enhance levels to step through [L0, L1, L2, ...]
+    steps: Vec<u8>,
+    /// Current step index
+    current_step: usize,
+    /// Time spent at current step (in seconds)
+    hold_timer: f32,
+    /// How long to hold each step before advancing (seconds)
+    hold_duration: f32,
+    /// Scale pulse for "click" effect (1.0 = settled, 1.03 = peak)
+    scale_pulse: f32,
+    /// Whether transition is complete
+    complete: bool,
+}
+
+impl EsperTransition {
+    /// Default hold duration between steps (100ms)
+    pub const DEFAULT_HOLD_MS: u64 = 100;
+
+    /// Scale pulse peak (3% bump)
+    pub const SCALE_PULSE_PEAK: f32 = 1.03;
+
+    /// Scale settle factor (0.3 = fast settle, ~3-4 frames at 60fps)
+    pub const SCALE_SETTLE_FACTOR: f32 = 0.3;
+
+    /// Create transition from one enhance level to another
+    ///
+    /// Steps through each intermediate level - never skips.
+    /// E.g., L0 → L3 steps through: L0 → L1 → L2 → L3
+    pub fn new(from_level: u8, to_level: u8) -> Self {
+        let steps: Vec<u8> = if from_level <= to_level {
+            (from_level..=to_level).collect()
+        } else {
+            (to_level..=from_level).rev().collect()
+        };
+
+        Self {
+            steps,
+            current_step: 0,
+            hold_timer: 0.0,
+            hold_duration: Self::DEFAULT_HOLD_MS as f32 / 1000.0,
+            scale_pulse: 1.0,
+            complete: false,
+        }
+    }
+
+    /// Create with custom hold duration in milliseconds
+    pub fn with_hold_ms(mut self, ms: u64) -> Self {
+        self.hold_duration = ms as f32 / 1000.0;
+        self
+    }
+
+    /// Update transition state. Call each frame with delta time in seconds.
+    /// Returns current state for rendering.
+    pub fn update(&mut self, dt: f32) -> EsperTransitionState {
+        if self.complete {
+            return EsperTransitionState::Complete {
+                level: *self.steps.last().unwrap_or(&0),
+            };
+        }
+
+        self.hold_timer += dt;
+
+        // Time to advance to next step?
+        if self.hold_timer >= self.hold_duration && self.current_step < self.steps.len() - 1 {
+            self.current_step += 1;
+            self.hold_timer = 0.0;
+            self.scale_pulse = Self::SCALE_PULSE_PEAK; // The "click" - quick scale bump
+        }
+
+        // Check if we've completed all steps
+        if self.current_step >= self.steps.len() - 1 && self.hold_timer >= self.hold_duration {
+            self.complete = true;
+            return EsperTransitionState::Complete {
+                level: self.steps[self.current_step],
+            };
+        }
+
+        // Settle the pulse (lerp toward 1.0)
+        self.scale_pulse = self.scale_pulse + (1.0 - self.scale_pulse) * Self::SCALE_SETTLE_FACTOR;
+
+        EsperTransitionState::Stepping {
+            level: self.steps[self.current_step],
+            scale: self.scale_pulse,
+            progress: if self.steps.len() <= 1 {
+                1.0
+            } else {
+                self.current_step as f32 / (self.steps.len() - 1) as f32
+            },
+        }
+    }
+
+    /// Check if transition is complete
+    pub fn is_complete(&self) -> bool {
+        self.complete
+    }
+
+    /// Get current enhance level
+    pub fn current_level(&self) -> u8 {
+        self.steps.get(self.current_step).copied().unwrap_or(0)
+    }
+
+    /// Get target (final) enhance level
+    pub fn target_level(&self) -> u8 {
+        *self.steps.last().unwrap_or(&0)
+    }
+
+    /// Get current scale factor
+    pub fn scale(&self) -> f32 {
+        if self.complete {
+            1.0
+        } else {
+            self.scale_pulse
+        }
+    }
+
+    /// Skip to end immediately
+    pub fn complete_immediately(&mut self) {
+        self.current_step = self.steps.len().saturating_sub(1);
+        self.scale_pulse = 1.0;
+        self.complete = true;
+    }
+}
+
+/// State returned by EsperTransition::update()
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum EsperTransitionState {
+    /// Currently stepping through levels
+    Stepping {
+        /// Current enhance level to render
+        level: u8,
+        /// Scale factor for "click" pulse (1.0 = normal, 1.03 = pulse peak)
+        scale: f32,
+        /// Overall progress 0.0 to 1.0
+        progress: f32,
+    },
+    /// Transition complete
+    Complete {
+        /// Final enhance level
+        level: u8,
+    },
+}
+
+impl EsperTransitionState {
+    /// Get the current level regardless of state
+    pub fn level(&self) -> u8 {
+        match self {
+            EsperTransitionState::Stepping { level, .. } => *level,
+            EsperTransitionState::Complete { level } => *level,
+        }
+    }
+
+    /// Get the scale factor (1.0 if complete)
+    pub fn scale(&self) -> f32 {
+        match self {
+            EsperTransitionState::Stepping { scale, .. } => *scale,
+            EsperTransitionState::Complete { .. } => 1.0,
+        }
+    }
+
+    /// Check if transition is complete
+    pub fn is_complete(&self) -> bool {
+        matches!(self, EsperTransitionState::Complete { .. })
+    }
+}
+
+// =============================================================================
+// TESTS
+// =============================================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,5 +551,115 @@ mod tests {
         }
 
         assert!(max_value > 1.0, "Bouncy spring should overshoot target");
+    }
+
+    // =========================================================================
+    // ESPER TRANSITION TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_esper_transition_steps_through_levels() {
+        let mut esper = EsperTransition::new(0, 3);
+
+        // Should start at level 0
+        assert_eq!(esper.current_level(), 0);
+        assert!(!esper.is_complete());
+
+        // Step through with enough time to advance
+        let dt = 0.15; // 150ms > 100ms hold
+
+        let state = esper.update(dt);
+        assert!(matches!(
+            state,
+            EsperTransitionState::Stepping { level: 1, .. }
+        ));
+
+        let state = esper.update(dt);
+        assert!(matches!(
+            state,
+            EsperTransitionState::Stepping { level: 2, .. }
+        ));
+
+        let state = esper.update(dt);
+        assert!(matches!(
+            state,
+            EsperTransitionState::Stepping { level: 3, .. }
+        ));
+
+        // One more should complete
+        let state = esper.update(dt);
+        assert!(matches!(state, EsperTransitionState::Complete { level: 3 }));
+        assert!(esper.is_complete());
+    }
+
+    #[test]
+    fn test_esper_transition_reverse() {
+        let mut esper = EsperTransition::new(3, 0);
+
+        // Should step down: 3 → 2 → 1 → 0
+        assert_eq!(esper.current_level(), 3);
+
+        let dt = 0.15;
+        esper.update(dt);
+        assert_eq!(esper.current_level(), 2);
+
+        esper.update(dt);
+        assert_eq!(esper.current_level(), 1);
+
+        esper.update(dt);
+        assert_eq!(esper.current_level(), 0);
+    }
+
+    #[test]
+    fn test_esper_transition_scale_pulse() {
+        let mut esper = EsperTransition::new(0, 2);
+
+        // Initial scale should be 1.0
+        assert!((esper.scale() - 1.0).abs() < 0.001);
+
+        // After advancing, should get a scale pulse
+        esper.update(0.15); // Advance to level 1
+        let scale = esper.scale();
+
+        // Scale should be between 1.0 and 1.03 (settling from pulse)
+        assert!(scale >= 1.0 && scale <= 1.03);
+    }
+
+    #[test]
+    fn test_esper_transition_complete_immediately() {
+        let mut esper = EsperTransition::new(0, 4);
+
+        assert!(!esper.is_complete());
+        esper.complete_immediately();
+
+        assert!(esper.is_complete());
+        assert_eq!(esper.current_level(), 4);
+        assert!((esper.scale() - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_esper_transition_single_level() {
+        let mut esper = EsperTransition::new(2, 2);
+
+        // Same start and end = already complete after one update
+        let state = esper.update(0.15);
+        assert!(matches!(state, EsperTransitionState::Complete { level: 2 }));
+    }
+
+    #[test]
+    fn test_esper_transition_state_accessors() {
+        let stepping = EsperTransitionState::Stepping {
+            level: 2,
+            scale: 1.02,
+            progress: 0.5,
+        };
+        assert_eq!(stepping.level(), 2);
+        assert!((stepping.scale() - 1.02).abs() < 0.001);
+        assert!(!stepping.is_complete());
+
+        let complete = EsperTransitionState::Complete { level: 4 };
+        assert_eq!(complete.level(), 4);
+        assert!((complete.scale() - 1.0).abs() < 0.001);
+        assert!(complete.is_complete());
     }
 }

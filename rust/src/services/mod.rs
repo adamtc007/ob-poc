@@ -30,6 +30,9 @@ pub mod resolution_service;
 // DSL enrichment (source → segments for UI display)
 pub mod dsl_enrichment;
 
+// Viewport resolution (lazy loading for viewport state)
+pub mod viewport_resolution_service;
+
 // Re-exports
 pub use dictionary_service_impl::DictionaryServiceImpl;
 pub use document_attribute_crud_service::DocumentAttributeCrudService;
@@ -38,3 +41,4 @@ pub use dsl_enrichment::{bindings_from_session_context, enrich_dsl, BindingInfo}
 pub use resolution_service::{create_resolution_store, ResolutionService, ResolutionStore};
 pub use sink_executor::CompositeSinkExecutor;
 pub use source_executor::CompositeSourceExecutor;
+pub use viewport_resolution_service::ViewportResolutionService;

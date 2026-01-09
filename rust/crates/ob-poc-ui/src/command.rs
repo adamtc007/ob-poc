@@ -144,6 +144,11 @@ pub enum NavigationVerb {
     // Scale Navigation (Astronomical Metaphor)
     // =========================================================================
     ScaleUniverse,
+    /// View all CBUs for a commercial client (the "galaxy" / book view)
+    /// Maps to `view.book :client <id>` DSL verb
+    ScaleBook {
+        client_name: String,
+    },
     ScaleGalaxy {
         segment: Option<String>,
     },
@@ -743,6 +748,28 @@ fn match_verb_from_transcript(transcript: &str, ctx: &InvestigationContext) -> N
         ],
     ) {
         return NavigationVerb::ScaleUniverse;
+    }
+
+    // Book view - all CBUs for a commercial client (the "galaxy" / book view)
+    // "book allianz", "client allianz", "show book blackrock", "allianz book"
+    if let Some(client) = extract_after_any(&text, &["book", "client book", "show book"]) {
+        if !client.is_empty() {
+            return NavigationVerb::ScaleBook {
+                client_name: client,
+            };
+        }
+    }
+    // Also match "allianz book" pattern (client name first)
+    if text.ends_with(" book") || text.ends_with(" books") {
+        let client = text
+            .trim_end_matches(" books")
+            .trim_end_matches(" book")
+            .trim();
+        if !client.is_empty() {
+            return NavigationVerb::ScaleBook {
+                client_name: client.to_string(),
+            };
+        }
     }
 
     if let Some(segment) = extract_after_any(&text, &["galaxy", "segment", "cluster", "sector"]) {

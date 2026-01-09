@@ -10,6 +10,8 @@
 use std::time::Duration;
 
 pub mod attribute_values_service;
+pub mod bods_service;
+pub mod bods_types;
 pub mod cbu_entity_roles_service;
 pub mod cbu_service;
 pub mod context_discovery_service;
@@ -31,6 +33,7 @@ pub mod service_service;
 pub mod session_repository;
 pub mod view_config_service;
 pub mod view_state_audit;
+pub mod viewport_service;
 pub mod visualization_repository;
 
 // Legacy modules not yet integrated - kept for reference but not compiled
@@ -40,6 +43,12 @@ pub mod visualization_repository;
 
 // Re-export for convenience
 pub use attribute_values_service::{AttributeValueRow, AttributeValuesService};
+pub use bods_service::BodsService;
+pub use bods_types::{
+    BodsEntityType, BodsInterestType, EntityIdentifier, EntityWithLei, GleifHierarchyEntry,
+    GleifRelationship, NewEntityIdentifier, NewGleifRelationship, NewPersonPepStatus,
+    PersonPepStatus, UboInterest,
+};
 pub use cbu_entity_roles_service::{CbuEntityRoleExpanded, CbuEntityRolesService, RoleRow};
 pub use cbu_service::{CbuRow, CbuService, NewCbuFields};
 pub use crud_service::{AssetType, CrudOperation, CrudService, OperationType};
@@ -97,6 +106,11 @@ pub use view_state_audit::{
 pub use view_config_service::{
     EdgeTypeConfig, LayoutCacheEntry, LayoutConfigEntry, NodeLayoutOverride, NodeTypeConfig,
     ViewConfigService, ViewModeConfig,
+};
+
+pub use viewport_service::{
+    CbuCategoryCounts, CbuEntityMember, CbuViewportContainer, ConfidenceZone, EntityRelationship,
+    EntityViewportDetail, InstrumentMatrixSummary, InstrumentTypeNode, ViewportService,
 };
 
 pub use semantic_state_service::derive_semantic_state;

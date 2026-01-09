@@ -6,17 +6,16 @@
 //! 3. Handling widget responses (no callbacks, return values only)
 
 use crate::api;
-use crate::command::AgentPromptConduit;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
-    dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, taxonomy_panel, toolbar,
-    trading_matrix_panel, CbuSearchAction, CbuSearchData, ContainerBrowseAction,
-    ContainerBrowseData, ContextPanelAction, DslEditorAction, TaxonomyPanelAction, ToolbarAction,
-    ToolbarData, TradingMatrixPanelAction,
+    dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, session_panel,
+    taxonomy_panel, toolbar, trading_matrix_panel, CbuSearchAction, CbuSearchData,
+    ContainerBrowseAction, ContainerBrowseData, ContextPanelAction, DslEditorAction,
+    TaxonomyPanelAction, ToolbarAction, ToolbarData, TradingMatrixPanelAction,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
-use ob_poc_graph::{CbuGraphWidget, GalaxyView, ViewMode};
-use ob_poc_types::galaxy::ViewLevel;
+use ob_poc_graph::{CbuGraphWidget, TradingMatrixNodeIdExt, ViewMode};
+use ob_poc_types::galaxy::{NavigationAction, ViewLevel};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use wasm_bindgen_futures::spawn_local;
@@ -103,7 +102,8 @@ impl App {
     #[cfg(target_arch = "wasm32")]
     fn process_voice_commands(&mut self) {
         use crate::command::{
-            dispatch_command, CommandResult, CommandSource, InvestigationContext,
+            dispatch_command, AgentPromptConduit, CommandResult, CommandSource,
+            InvestigationContext,
         };
         use crate::voice_bridge::take_pending_voice_commands;
 
@@ -233,6 +233,18 @@ impl App {
                 self.state.view_level = ob_poc_types::galaxy::ViewLevel::Universe;
                 self.state.fetch_universe_graph();
             }
+            NavigationVerb::ScaleBook { client_name } => {
+                // View all CBUs for a commercial client (the "galaxy" / book view)
+                // Maps to `view.book :client <id>` DSL verb
+                // Client name will be resolved to entity_id via EntityGateway
+                self.state.navigation_scope = ob_poc_types::galaxy::NavigationScope::Book {
+                    apex_entity_id: client_name.clone(), // Will be resolved
+                    apex_name: client_name.clone(),
+                };
+                self.state.view_level = ob_poc_types::galaxy::ViewLevel::Cluster;
+                // Fetch the book/client's CBUs via API
+                self.state.fetch_client_book(&client_name);
+            }
             NavigationVerb::ScaleGalaxy { segment } => {
                 // Drill into a cluster/segment in galaxy view
                 if let Some(cluster_id) = segment {
@@ -300,20 +312,51 @@ impl App {
                 }
             }
             NavigationVerb::Xray => {
-                // Toggle transparency mode
-                web_sys::console::log_1(&"X-ray mode toggled".into());
+                // Toggle X-ray transparency mode (local, no server)
+                self.state
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_xray();
+                let enabled = self.state.graph_widget.esper_render_state().xray_enabled;
+                web_sys::console::log_1(&format!("X-ray mode: {}", enabled).into());
             }
             NavigationVerb::Peel => {
-                // Peel layer
-                web_sys::console::log_1(&"Layer peeled".into());
+                // Peel layer - incrementally hide outer layers (local, no server)
+                self.state
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_peel();
+                let depth = self.state.graph_widget.esper_render_state().peel_depth;
+                let enabled = self.state.graph_widget.esper_render_state().peel_enabled;
+                web_sys::console::log_1(
+                    &format!("Peel: enabled={}, depth={}", enabled, depth).into(),
+                );
             }
             NavigationVerb::CrossSection => {
-                // Show cross section
-                web_sys::console::log_1(&"Cross section view".into());
+                // Toggle cross section view (local, no server)
+                self.state
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_cross_section();
+                let enabled = self
+                    .state
+                    .graph_widget
+                    .esper_render_state()
+                    .cross_section_enabled;
+                web_sys::console::log_1(&format!("Cross section: {}", enabled).into());
             }
             NavigationVerb::DepthIndicator => {
-                // Show depth indicator
-                web_sys::console::log_1(&"Depth indicator shown".into());
+                // Toggle depth indicator (local, no server)
+                self.state
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_depth_indicator();
+                let enabled = self
+                    .state
+                    .graph_widget
+                    .esper_render_state()
+                    .depth_indicator_enabled;
+                web_sys::console::log_1(&format!("Depth indicator: {}", enabled).into());
             }
 
             // Orbital navigation
@@ -401,33 +444,74 @@ impl App {
                 }
             }
             NavigationVerb::Illuminate { aspect } => {
-                // Highlight specific aspect using agent state
-                web_sys::console::log_1(&format!("Illuminating: {}", aspect).into());
-                // Could set agent mode to highlight specific relationships
+                // Illuminate specific aspect (local, no server)
+                // Map aspect string to IlluminateAspect enum
+                let illuminate_aspect = match aspect.to_lowercase().as_str() {
+                    "ownership" => ob_poc_graph::IlluminateAspect::Ownership,
+                    "control" => ob_poc_graph::IlluminateAspect::Control,
+                    "risk" => ob_poc_graph::IlluminateAspect::Risk,
+                    "documents" | "docs" => ob_poc_graph::IlluminateAspect::Documents,
+                    "kyc" | "kyc_status" => ob_poc_graph::IlluminateAspect::KycStatus,
+                    _ => ob_poc_graph::IlluminateAspect::Custom,
+                };
+                self.state
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_illuminate(illuminate_aspect);
+                let enabled = self
+                    .state
+                    .graph_widget
+                    .esper_render_state()
+                    .illuminate_enabled;
+                web_sys::console::log_1(&format!("Illuminate {}: {}", aspect, enabled).into());
             }
             NavigationVerb::Shadow => {
-                // Dim background entities - toggle focus mode
-                web_sys::console::log_1(&"Shadowing background entities".into());
+                // Toggle shadow mode - dim non-focused entities (local, no server)
+                self.state
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_shadow();
+                let enabled = self.state.graph_widget.esper_render_state().shadow_enabled;
+                web_sys::console::log_1(&format!("Shadow mode: {}", enabled).into());
             }
             NavigationVerb::RedFlagScan => {
-                // Highlight entities with anomalies
-                if self.state.galaxy_view.has_anomalies() {
+                // Toggle red flag scan - highlight entities with anomalies (local, no server)
+                self.state
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_red_flag_scan(Some(ob_poc_graph::RedFlagCategory::All));
+                let enabled = self
+                    .state
+                    .graph_widget
+                    .esper_render_state()
+                    .red_flag_scan_enabled;
+                web_sys::console::log_1(&format!("Red flag scan: {}", enabled).into());
+                // Also set galaxy agent mode for compatibility
+                if enabled && self.state.galaxy_view.has_anomalies() {
                     let count = self.state.galaxy_view.total_anomaly_count();
-                    web_sys::console::log_1(
-                        &format!("Red flag scan: {} anomalies found", count).into(),
-                    );
-                    // Agent mode could highlight anomaly nodes
+                    web_sys::console::log_1(&format!("Found {} anomalies", count).into());
                     self.state
                         .galaxy_view
                         .set_agent_mode(ob_poc_graph::AgentMode::Scanning);
                 }
             }
             NavigationVerb::BlackHole => {
-                // Highlight entities with missing data
-                web_sys::console::log_1(&"Black hole scan: finding missing data".into());
+                // Toggle black hole mode - highlight entities with missing data (local, no server)
                 self.state
-                    .galaxy_view
-                    .set_agent_mode(ob_poc_graph::AgentMode::Scanning);
+                    .graph_widget
+                    .esper_render_state_mut()
+                    .toggle_black_hole(Some(ob_poc_graph::GapType::All));
+                let enabled = self
+                    .state
+                    .graph_widget
+                    .esper_render_state()
+                    .black_hole_enabled;
+                web_sys::console::log_1(&format!("Black hole scan: {}", enabled).into());
+                if enabled {
+                    self.state
+                        .galaxy_view
+                        .set_agent_mode(ob_poc_graph::AgentMode::Scanning);
+                }
             }
 
             // Context
@@ -488,8 +572,8 @@ impl crate::command::AgentPromptConduit for App {
         // Convert to chat message and send
         let message = prompt.to_chat_message();
 
-        // Get session ID
-        let Some(session_id) = self.state.session_id else {
+        // Ensure we have a session
+        let Some(_session_id) = self.state.session_id else {
             web_sys::console::warn_1(&"[AgentConduit] No session, cannot send".into());
             return;
         };
@@ -587,6 +671,13 @@ impl eframe::App for App {
                 );
                 self.state.refetch_session();
             }
+        }
+
+        // Central resolution check - triggered when session has DSL with potential unresolved refs
+        // This enables automatic entity lookup popup for disambiguation
+        if self.state.take_pending_resolution_check() {
+            web_sys::console::log_1(&"update: triggering resolution check for DSL".into());
+            self.state.start_resolution();
         }
 
         // Check for pending execute command from agent
@@ -722,19 +813,111 @@ impl eframe::App for App {
         }
 
         // =================================================================
+        // Process Hierarchy Navigation Commands
+        // =================================================================
+
+        // Handle expand node command - expands a node in the graph or taxonomy
+        if let Some(node_key) = self.state.take_pending_expand_node() {
+            web_sys::console::log_1(&format!("update: expand node {}", node_key).into());
+            // Expand in taxonomy state (type browser)
+            self.state.taxonomy_state.expand(&node_key);
+            // Also expand in trading matrix (parse node key as TradingMatrixNodeId)
+            if let Ok(node_id) =
+                ob_poc_graph::graph::trading_matrix::TradingMatrixNodeId::parse(&node_key)
+            {
+                self.state.trading_matrix_state.expand(&node_id);
+            }
+        }
+
+        // Handle collapse node command - collapses a node in the graph or taxonomy
+        if let Some(node_key) = self.state.take_pending_collapse_node() {
+            web_sys::console::log_1(&format!("update: collapse node {}", node_key).into());
+            // Collapse in taxonomy state (type browser)
+            self.state.taxonomy_state.collapse(&node_key);
+            // Also collapse in trading matrix
+            if let Ok(node_id) =
+                ob_poc_graph::graph::trading_matrix::TradingMatrixNodeId::parse(&node_key)
+            {
+                self.state.trading_matrix_state.collapse(&node_id);
+            }
+        }
+
+        // =================================================================
+        // Process Export and Layout Commands
+        // =================================================================
+
+        // Handle export command
+        if let Some(format) = self.state.take_pending_export() {
+            web_sys::console::log_1(&format!("update: export format={}", format).into());
+            // TODO: Implement export to PNG/SVG/PDF via canvas screenshot or SVG generation
+            // For now, log that it's not yet implemented
+            web_sys::console::warn_1(
+                &format!(
+                    "Export to {} not yet implemented - requires canvas API",
+                    format
+                )
+                .into(),
+            );
+        }
+
+        // Handle toggle orientation command - flip between VERTICAL and HORIZONTAL layout
+        if self.state.take_pending_toggle_orientation() {
+            web_sys::console::log_1(&"update: toggle orientation".into());
+            // Toggle the graph layout orientation
+            self.state.graph_widget.toggle_orientation();
+        }
+
+        // Handle search command - search for entities in the graph
+        if let Some(query) = self.state.take_pending_search() {
+            web_sys::console::log_1(&format!("update: search query={}", query).into());
+            // Use the graph widget's search functionality or highlight matching entities
+            self.state.graph_widget.search_entities(&query);
+        }
+
+        // Handle show help command - display help overlay
+        if self.state.take_pending_show_help() {
+            web_sys::console::log_1(&"update: show help".into());
+            // TODO: Implement help overlay panel
+            // For now, just log that help was requested
+            web_sys::console::log_1(
+                &"Help: Drag=Pan, Scroll=Zoom, Click=Focus, Esc=Clear, R=Fit, Tab=Next".into(),
+            );
+        }
+
+        // =================================================================
         // Process Extended Esper 3D/Multi-dimensional Navigation Commands
         // =================================================================
 
-        // Scale Navigation (astronomical metaphor)
+        // Scale Navigation (astronomical metaphor) - execute via DSL session
         if self.state.take_pending_scale_universe() {
             web_sys::console::log_1(&"update: scale universe (full book view)".into());
-            // TODO: Implement universe/full book view - zoom out to show all CBUs
-            self.state.graph_widget.zoom_fit();
+            // Execute view.universe via session to show all CBUs
+            if let Some(session_id) = self.state.session_id {
+                self.state
+                    .execute_dsl_with_content(session_id, "(view.universe)".to_string());
+            } else {
+                web_sys::console::warn_1(
+                    &"scale universe: no session, falling back to zoom_fit".into(),
+                );
+                self.state.graph_widget.zoom_fit();
+            }
         }
 
         if let Some(segment) = self.state.take_pending_scale_galaxy() {
             web_sys::console::log_1(&format!("update: scale galaxy segment={:?}", segment).into());
-            // TODO: Implement galaxy/segment view
+            // Execute view.book via session to show CBUs for a client/segment
+            if let Some(session_id) = self.state.session_id {
+                let dsl = if let Some(client_name) = segment {
+                    // view.book :client "ClientName" - show CBUs for this commercial client
+                    format!("(view.book :client \"{}\")", client_name)
+                } else {
+                    // No segment specified - show full universe
+                    "(view.universe)".to_string()
+                };
+                self.state.execute_dsl_with_content(session_id, dsl);
+            } else {
+                web_sys::console::warn_1(&"scale galaxy: no session, cannot execute DSL".into());
+            }
         }
 
         if let Some(cbu_id) = self.state.take_pending_scale_system() {
@@ -1124,21 +1307,25 @@ impl eframe::App for App {
                     ui.heading("Server Session");
                     if let Some(ref session) = self.state.session {
                         ui.label(format!("state: {:?}", session.state));
-                        ui.label(format!("can_execute: {}", session.can_execute));
                         ui.label(format!(
-                            "assembled_dsl: {:?}",
-                            session.assembled_dsl.as_ref().map(|v| v
-                                .to_string()
-                                .chars()
-                                .take(50)
-                                .collect::<String>())
+                            "can_execute: {}",
+                            session.dsl.as_ref().map(|d| d.can_execute).unwrap_or(false)
                         ));
                         ui.label(format!(
-                            "combined_dsl len: {}",
+                            "dsl source: {:?}",
                             session
-                                .combined_dsl
+                                .dsl
                                 .as_ref()
-                                .map(|v| v.to_string().len())
+                                .and_then(|d| d.source.as_ref())
+                                .map(|s| { s.chars().take(50).collect::<String>() })
+                        ));
+                        ui.label(format!(
+                            "dsl source len: {}",
+                            session
+                                .dsl
+                                .as_ref()
+                                .and_then(|d| d.source.as_ref())
+                                .map(|s| s.len())
                                 .unwrap_or(0)
                         ));
                     } else {
@@ -1220,6 +1407,7 @@ impl eframe::App for App {
                     .and_then(|s| s.active_cbu.as_ref())
                     .map(|c| c.name.clone()),
                 view_mode: self.state.view_mode,
+                view_level: self.state.view_level,
                 layout: self.state.panels.layout,
                 last_error,
                 is_loading: self.state.is_loading(),
@@ -1312,25 +1500,59 @@ impl eframe::App for App {
         };
         self.handle_container_browse_action(container_browse_action);
 
-        // Context panel (left side) - shows session context and semantic stages
-        let context_action = egui::SidePanel::left("context_panel")
-            .default_width(220.0)
-            .min_width(180.0)
-            .max_width(350.0)
-            .resizable(true)
-            .show(ctx, |ui| context_panel(ui, &self.state))
-            .inner;
+        // For Simplified layout: Chat on left side, skip context panel
+        // For other layouts: Context panel on left side
+        if self.state.panels.layout == LayoutMode::Simplified {
+            // Chat panel (left side) for simplified layout
+            egui::SidePanel::left("chat_side_panel")
+                .default_width(280.0)
+                .min_width(200.0)
+                .max_width(400.0)
+                .resizable(true)
+                .show(ctx, |ui| {
+                    chat_panel(ui, &mut self.state);
+                });
 
-        // Handle context panel actions
-        self.handle_context_panel_action(context_action);
+            // Session panel (bottom) for simplified layout
+            egui::TopBottomPanel::bottom("session_bottom_panel")
+                .default_height(120.0)
+                .min_height(80.0)
+                .max_height(300.0)
+                .resizable(true)
+                .show(ctx, |ui| {
+                    session_panel(ui, &mut self.state);
+                });
 
-        // Main content area
-        egui::CentralPanel::default().show(ctx, |ui| match self.state.panels.layout {
-            LayoutMode::FourPanel => self.render_four_panel(ui),
-            LayoutMode::EditorFocus => self.render_editor_focus(ui),
-            LayoutMode::GraphFocus => self.render_graph_focus(ui),
-            LayoutMode::GraphFullSize => self.render_graph_full_size(ui),
-        });
+            // Main content area - just the graph viewport
+            egui::CentralPanel::default().show(ctx, |ui| {
+                if self.state.view_level == ViewLevel::Universe {
+                    self.render_galaxy_view(ui);
+                } else {
+                    self.state.graph_widget.ui(ui);
+                }
+            });
+        } else {
+            // Context panel (left side) - shows session context and semantic stages
+            let context_action = egui::SidePanel::left("context_panel")
+                .default_width(220.0)
+                .min_width(180.0)
+                .max_width(350.0)
+                .resizable(true)
+                .show(ctx, |ui| context_panel(ui, &self.state))
+                .inner;
+
+            // Handle context panel actions
+            self.handle_context_panel_action(context_action);
+
+            // Main content area
+            egui::CentralPanel::default().show(ctx, |ui| match self.state.panels.layout {
+                LayoutMode::Simplified => self.render_simplified(ui), // Won't reach here
+                LayoutMode::FourPanel => self.render_four_panel(ui),
+                LayoutMode::EditorFocus => self.render_editor_focus(ui),
+                LayoutMode::GraphFocus => self.render_graph_focus(ui),
+                LayoutMode::GraphFullSize => self.render_graph_full_size(ui),
+            });
+        }
 
         // =================================================================
         // STEP 6: Session watch via long-polling (detect MCP/REPL changes)
@@ -1374,6 +1596,10 @@ impl App {
 
         if let Some(mode) = action.change_view_mode {
             self.state.set_view_mode(mode);
+        }
+
+        if let Some(level) = action.change_view_level {
+            self.state.set_view_level(level);
         }
 
         if let Some(layout) = action.change_layout {
@@ -1659,6 +1885,61 @@ impl App {
         }
     }
 
+    /// Render simplified layout:
+    /// - Top 90%: Single viewport (graph widget)
+    /// - Bottom 10%: Split - Chat (left 50%) + Session/REPL (right 50%)
+    fn render_simplified(&mut self, ui: &mut egui::Ui) {
+        let available = ui.available_size();
+        let top_height = available.y * 0.9;
+        let bottom_height = available.y * 0.1 - 4.0;
+
+        // Top: Graph viewport (90% height, full width)
+        ui.allocate_ui(egui::vec2(available.x, top_height), |ui| {
+            egui::Frame::default()
+                .inner_margin(0.0)
+                .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                .show(ui, |ui| {
+                    // Render galaxy view at Universe level, otherwise render CBU graph
+                    if self.state.view_level == ViewLevel::Universe {
+                        self.render_galaxy_view(ui);
+                    } else {
+                        self.state.graph_widget.ui(ui);
+                    }
+                });
+        });
+
+        ui.separator();
+
+        // Bottom row: Chat (left) + Session/REPL (right)
+        ui.horizontal(|ui| {
+            ui.set_height(bottom_height);
+
+            // Chat panel (left, 50% width)
+            ui.vertical(|ui| {
+                ui.set_width(available.x * 0.5 - 4.0);
+                egui::Frame::default()
+                    .inner_margin(4.0)
+                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                    .show(ui, |ui| {
+                        chat_panel(ui, &mut self.state);
+                    });
+            });
+
+            ui.separator();
+
+            // Session/REPL panel (right, 50% width) - human-readable session state
+            ui.vertical(|ui| {
+                ui.set_width(available.x * 0.5 - 4.0);
+                egui::Frame::default()
+                    .inner_margin(4.0)
+                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                    .show(ui, |ui| {
+                        session_panel(ui, &mut self.state);
+                    });
+            });
+        });
+    }
+
     /// Render layout:
     /// - Top 50%: Graph (full width)
     /// - Bottom left 60%: Unified REPL (chat + resolution + DSL)
@@ -1911,7 +2192,174 @@ impl App {
                 .handle_input_v2(&response, &camera, screen_rect)
         {
             web_sys::console::log_1(&format!("Galaxy navigation action: {:?}", action).into());
-            // TODO: Handle navigation actions (drill into cluster, etc.)
+            self.handle_galaxy_action(action);
+        }
+    }
+
+    /// Handle navigation actions from the galaxy view by sending DSL commands to the agent.
+    /// All navigation is agent-directed - UI clicks translate to DSL view verbs.
+    fn handle_galaxy_action(&mut self, action: NavigationAction) {
+        let dsl_command = match action {
+            NavigationAction::DrillIntoCluster { cluster_id } => {
+                web_sys::console::log_1(
+                    &format!("Galaxy: drilling into cluster: {}", cluster_id).into(),
+                );
+                // Cluster IDs are formatted as "type:value" (e.g., "client:Allianz", "jurisdiction:LU")
+                // Parse and generate appropriate DSL command
+                self.cluster_id_to_dsl_command(&cluster_id)
+            }
+            NavigationAction::DrillIntoCbu { cbu_id } => {
+                web_sys::console::log_1(&format!("Galaxy: drilling into CBU: {}", cbu_id).into());
+                // CBU drill-down uses view.cbu verb
+                Some(format!("(view.cbu :cbu-id \"{}\")", cbu_id))
+            }
+            NavigationAction::DrillUp => {
+                web_sys::console::log_1(&"Galaxy: drilling up".into());
+                Some("(view.zoom-out)".to_string())
+            }
+            NavigationAction::GoToUniverse => {
+                web_sys::console::log_1(&"Galaxy: going to universe".into());
+                Some("(view.universe)".to_string())
+            }
+            NavigationAction::GoToBreadcrumb { index } => {
+                web_sys::console::log_1(&format!("Galaxy: going to breadcrumb {}", index).into());
+                Some(format!("(view.back-to :depth {})", index))
+            }
+            NavigationAction::Select { node_id, .. } => {
+                web_sys::console::log_1(&format!("Galaxy: selected node: {}", node_id).into());
+                // Selection doesn't need a DSL command, handled locally
+                None
+            }
+            NavigationAction::DrillIntoEntity { entity_id } => {
+                web_sys::console::log_1(
+                    &format!("Galaxy: drilling into entity: {}", entity_id).into(),
+                );
+                // Entity focus - could use view.refine or similar
+                Some(format!("(view.select :ids [\"{}\"])", entity_id))
+            }
+            NavigationAction::SetClusterType { cluster_type } => {
+                web_sys::console::log_1(
+                    &format!("Galaxy: setting cluster type to {:?}", cluster_type).into(),
+                );
+                // Re-render universe with new clustering
+                Some(format!("(view.universe :cluster-by {:?})", cluster_type))
+            }
+            NavigationAction::FetchData { scope } => {
+                web_sys::console::log_1(&format!("Galaxy: fetch data for {:?}", scope).into());
+                // Data fetch is handled by the graph widget, but could trigger refresh
+                None
+            }
+            NavigationAction::Prefetch { scope_id } => {
+                web_sys::console::log_1(&format!("Galaxy: prefetch for {}", scope_id).into());
+                // Prefetch is a hint, no DSL needed
+                None
+            }
+            // Camera/hover actions are handled locally by the graph widget, no DSL needed
+            NavigationAction::Hover { .. }
+            | NavigationAction::ClearHover
+            | NavigationAction::Deselect
+            | NavigationAction::FlyTo { .. }
+            | NavigationAction::ZoomTo { .. }
+            | NavigationAction::ZoomIn { .. }
+            | NavigationAction::ZoomOut { .. }
+            | NavigationAction::ZoomFit
+            | NavigationAction::Pan { .. }
+            | NavigationAction::Center => None,
+        };
+
+        // Execute DSL command via session if we have one
+        if let Some(cmd) = dsl_command {
+            web_sys::console::log_1(&format!("Galaxy: executing DSL: {}", cmd).into());
+
+            // Get session ID - navigation requires an active session
+            let Some(session_id) = self.state.session_id else {
+                web_sys::console::warn_1(&"Galaxy: no session, cannot execute DSL".into());
+                return;
+            };
+
+            // Execute DSL directly via session (not through LLM chat)
+            if cmd.starts_with('(') {
+                // DSL command - execute directly via session
+                self.state.execute_dsl_with_content(session_id, cmd);
+            } else {
+                // Natural language fallback - send via chat infrastructure
+                // (All cluster_id_to_dsl_command outputs should be DSL, but this is a safety net)
+                web_sys::console::log_1(
+                    &format!("Galaxy: sending natural language to chat: {}", cmd).into(),
+                );
+                self.state.buffers.chat_input = cmd;
+                self.state.send_chat_message();
+            }
+        }
+    }
+
+    /// Convert a cluster ID to the appropriate DSL view command.
+    /// Cluster IDs are formatted as "type:value" (e.g., "client:Allianz", "jurisdiction:LU")
+    fn cluster_id_to_dsl_command(&self, cluster_id: &str) -> Option<String> {
+        // Parse cluster ID - expected format: "type:value"
+        let parts: Vec<&str> = cluster_id.splitn(2, ':').collect();
+        if parts.len() != 2 {
+            web_sys::console::warn_1(
+                &format!("Galaxy: unexpected cluster ID format: {}", cluster_id).into(),
+            );
+            // Fallback: filter by name
+            return Some(format!(
+                "(view.universe :filter {{ :name \"{}\" }})",
+                cluster_id
+            ));
+        }
+
+        let cluster_type = parts[0];
+        let cluster_value = parts[1];
+
+        match cluster_type {
+            "client" => {
+                // Client cluster -> view.book with client name filter
+                // Need to look up the client entity ID - for now use universe with filter
+                Some(format!(
+                    "(view.universe :filter {{ :client \"{}\" }})",
+                    cluster_value
+                ))
+            }
+            "jurisdiction" => {
+                // Jurisdiction cluster -> view.universe :jurisdiction ["CODE"]
+                Some(format!(
+                    "(view.universe :jurisdiction [\"{}\"])",
+                    cluster_value
+                ))
+            }
+            "fund-type" | "fund_type" => {
+                // Fund type cluster -> view.universe :fund-type ["TYPE"]
+                Some(format!(
+                    "(view.universe :fund-type [\"{}\"])",
+                    cluster_value
+                ))
+            }
+            "status" => {
+                // Status cluster -> view.universe :status ["STATUS"]
+                Some(format!("(view.universe :status [\"{}\"])", cluster_value))
+            }
+            "risk" | "risk_rating" => {
+                // Risk rating cluster
+                Some(format!(
+                    "(view.universe :risk-rating [\"{}\"])",
+                    cluster_value
+                ))
+            }
+            "product" => {
+                // Product cluster
+                Some(format!("(view.universe :product [\"{}\"])", cluster_value))
+            }
+            _ => {
+                web_sys::console::warn_1(
+                    &format!("Galaxy: unknown cluster type: {}", cluster_type).into(),
+                );
+                // Fallback: try as generic filter
+                Some(format!(
+                    "(view.universe :filter {{ :{} \"{}\" }})",
+                    cluster_type, cluster_value
+                ))
+            }
         }
     }
 }
@@ -2111,6 +2559,76 @@ impl AppState {
                 state.needs_trading_matrix_refetch = true;
             }
         }
+
+        // Sync view mode to server session (fire-and-forget)
+        if let Some(session_id) = self.session_id {
+            let view_mode_str = match mode {
+                ViewMode::KycUbo => "KYC_UBO",
+                ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
+                ViewMode::ProductsOnly => "PRODUCTS_ONLY",
+                ViewMode::Trading => "TRADING",
+            };
+            let view_level_str = format!("{:?}", self.view_level);
+            spawn_local(async move {
+                if let Err(e) =
+                    api::set_view_mode(session_id, view_mode_str, Some(&view_level_str)).await
+                {
+                    web_sys::console::warn_1(
+                        &format!("Failed to sync view mode to server: {}", e).into(),
+                    );
+                }
+            });
+        }
+    }
+
+    /// Set view level (Universe/Cluster/System/etc) - controls navigation scope
+    pub fn set_view_level(&mut self, level: ViewLevel) {
+        web_sys::console::log_1(
+            &format!(
+                "set_view_level: changing from {:?} to {:?}",
+                self.view_level, level
+            )
+            .into(),
+        );
+        self.view_level = level;
+
+        // When navigating to Universe level, trigger universe fetch
+        // When navigating to lower levels, graph refetch handles it
+        if let Ok(mut state) = self.async_state.lock() {
+            match level {
+                ViewLevel::Universe => {
+                    state.needs_universe_refetch = true;
+                }
+                ViewLevel::Cluster => {
+                    // TODO: fetch cluster detail when we have cluster_id context
+                    state.needs_universe_refetch = true;
+                }
+                _ => {
+                    // System/Planet/Surface/Core levels use CBU graph
+                    state.needs_graph_refetch = true;
+                }
+            }
+        }
+
+        // Sync view level to server session (fire-and-forget)
+        if let Some(session_id) = self.session_id {
+            let view_mode_str = match self.view_mode {
+                ViewMode::KycUbo => "KYC_UBO",
+                ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
+                ViewMode::ProductsOnly => "PRODUCTS_ONLY",
+                ViewMode::Trading => "TRADING",
+            };
+            let view_level_str = format!("{:?}", level);
+            spawn_local(async move {
+                if let Err(e) =
+                    api::set_view_mode(session_id, view_mode_str, Some(&view_level_str)).await
+                {
+                    web_sys::console::warn_1(
+                        &format!("Failed to sync view level to server: {}", e).into(),
+                    );
+                }
+            });
+        }
     }
 
     /// Send chat message
@@ -2183,13 +2701,30 @@ impl AppState {
                                         );
                                         state.pending_execute = Some(session_id);
                                     }
-                                    // TODO: Implement these commands
-                                    ob_poc_types::AgentCommand::Undo
-                                    | ob_poc_types::AgentCommand::Clear
-                                    | ob_poc_types::AgentCommand::Delete { .. }
-                                    | ob_poc_types::AgentCommand::DeleteLast => {
+                                    // REPL undo/clear commands - require backend session API support
+                                    ob_poc_types::AgentCommand::Undo => {
                                         web_sys::console::warn_1(
-                                            &format!("Command not implemented: {:?}", cmd).into(),
+                                            &"Command: Undo - requires session undo API".into(),
+                                        );
+                                    }
+                                    ob_poc_types::AgentCommand::Clear => {
+                                        web_sys::console::warn_1(
+                                            &"Command: Clear - requires session clear API".into(),
+                                        );
+                                    }
+                                    ob_poc_types::AgentCommand::Delete { index } => {
+                                        web_sys::console::warn_1(
+                                            &format!(
+                                                "Command: Delete statement {} - requires session delete API",
+                                                index
+                                            )
+                                            .into(),
+                                        );
+                                    }
+                                    ob_poc_types::AgentCommand::DeleteLast => {
+                                        web_sys::console::warn_1(
+                                            &"Command: DeleteLast - requires session delete API"
+                                                .into(),
                                         );
                                     }
                                     // Navigation commands
@@ -2197,7 +2732,8 @@ impl AppState {
                                         web_sys::console::log_1(
                                             &format!("Command: ShowCbu cbu_id={}", cbu_id).into(),
                                         );
-                                        // TODO: Navigate to CBU
+                                        // Navigate to CBU using ScaleSystem mechanism
+                                        state.pending_scale_system = Some(Some(cbu_id.clone()));
                                     }
                                     ob_poc_types::AgentCommand::HighlightEntity { entity_id } => {
                                         web_sys::console::log_1(
@@ -2207,20 +2743,28 @@ impl AppState {
                                             )
                                             .into(),
                                         );
-                                        // TODO: Highlight entity in graph
+                                        // Focus entity using FocusEntity mechanism
+                                        state.pending_focus_entity = Some(entity_id.clone());
                                     }
                                     ob_poc_types::AgentCommand::NavigateDsl { line } => {
-                                        web_sys::console::log_1(
-                                            &format!("Command: NavigateDsl line={}", line).into(),
+                                        // No DSL editor in simplified UI - log and ignore
+                                        web_sys::console::warn_1(
+                                            &format!(
+                                                "Command: NavigateDsl line={} - not applicable in simplified UI",
+                                                line
+                                            )
+                                            .into(),
                                         );
-                                        // TODO: Scroll DSL editor to line
                                     }
                                     ob_poc_types::AgentCommand::FocusAst { node_id } => {
-                                        web_sys::console::log_1(
-                                            &format!("Command: FocusAst node_id={}", node_id)
-                                                .into(),
+                                        // No AST view in simplified UI - log and ignore
+                                        web_sys::console::warn_1(
+                                            &format!(
+                                                "Command: FocusAst node_id={} - not applicable in simplified UI",
+                                                node_id
+                                            )
+                                            .into(),
                                         );
-                                        // TODO: Focus AST node
                                     }
                                     // Graph filtering commands - store in AsyncState for processing in update loop
                                     ob_poc_types::AgentCommand::FilterByType { type_codes } => {
@@ -2564,12 +3108,42 @@ impl AppState {
                                         state.pending_taxonomy_clear_filter = true;
                                     }
 
-                                    // Unhandled commands - log but don't fail
-                                    _ => {
-                                        web_sys::console::warn_1(
-                                            &format!("Command not yet implemented: {:?}", cmd)
-                                                .into(),
+                                    // Hierarchy navigation commands
+                                    ob_poc_types::AgentCommand::ExpandNode { node_key } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ExpandNode {}", node_key).into(),
                                         );
+                                        state.pending_expand_node = Some(node_key.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::CollapseNode { node_key } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: CollapseNode {}", node_key).into(),
+                                        );
+                                        state.pending_collapse_node = Some(node_key.clone());
+                                    }
+
+                                    // Export and layout commands
+                                    ob_poc_types::AgentCommand::Export { format, .. } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: Export {:?}", format).into(),
+                                        );
+                                        state.pending_export = format.clone();
+                                    }
+                                    ob_poc_types::AgentCommand::ToggleOrientation => {
+                                        web_sys::console::log_1(
+                                            &"Command: ToggleOrientation".into(),
+                                        );
+                                        state.pending_toggle_orientation = true;
+                                    }
+                                    ob_poc_types::AgentCommand::Search { query } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: Search {}", query).into(),
+                                        );
+                                        state.pending_search = Some(query.clone());
+                                    }
+                                    ob_poc_types::AgentCommand::ShowHelp { .. } => {
+                                        web_sys::console::log_1(&"Command: ShowHelp".into());
+                                        state.pending_show_help = true;
                                     }
                                 }
                             }

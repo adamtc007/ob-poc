@@ -11,6 +11,7 @@ use super::edges::{
 };
 use super::lod::{render_node_at_lod, DetailLevel};
 use super::types::*;
+use super::viewport::EsperRenderState;
 use egui::{Color32, FontId, Pos2, Rect, Stroke, Vec2};
 use std::collections::HashMap;
 
@@ -60,6 +61,7 @@ impl GraphRenderer {
     /// * `focused_node` - currently focused node (highlighted with connected edges)
     /// * `type_filter` - if set, only nodes matching this type are fully visible
     /// * `highlighted_type` - if set, nodes of this type get a highlight effect
+    /// * `esper_state` - Esper render modes (xray, peel, shadow, etc.) - optional
     pub fn render(
         &self,
         painter: &egui::Painter,
@@ -69,6 +71,7 @@ impl GraphRenderer {
         focused_node: Option<&str>,
         type_filter: Option<&str>,
         highlighted_type: Option<&str>,
+        esper_state: Option<&EsperRenderState>,
     ) {
         // Render container backgrounds first (below everything)
         self.render_containers(painter, graph, camera, screen_rect);
@@ -172,6 +175,7 @@ impl GraphRenderer {
                 in_focus,
                 is_focused,
                 is_highlighted,
+                esper_state,
             );
         }
 
@@ -317,6 +321,7 @@ impl GraphRenderer {
     }
 
     /// Render a single node
+    #[allow(clippy::too_many_arguments)]
     fn render_node(
         &self,
         painter: &egui::Painter,
@@ -326,6 +331,7 @@ impl GraphRenderer {
         in_focus: bool,
         is_focused: bool,
         is_highlighted: bool,
+        esper_state: Option<&EsperRenderState>,
     ) {
         // Transform to screen coordinates
         let screen_pos = camera.world_to_screen(node.position, screen_rect);
@@ -337,12 +343,38 @@ impl GraphRenderer {
             return;
         }
 
-        // Apply focus opacity (highlighted nodes always full opacity)
-        let opacity = if in_focus || is_highlighted {
+        // Calculate opacity and highlight state
+        // First, apply Esper render modes if active
+        let (esper_alpha, esper_highlight) = if let Some(esper) = esper_state {
+            if esper.any_mode_active() {
+                // Use Esper state to compute alpha and highlight
+                // depth: use hierarchy_depth from node (clamped to u8)
+                // has_red_flag: use needs_attention from node
+                // has_gap: for now, treat incomplete KYC as a gap
+                let depth = (node.hierarchy_depth as u8).min(255);
+                let has_red_flag = node.needs_attention;
+                let has_gap = node.kyc_completion.map(|c| c < 100).unwrap_or(false);
+
+                esper.get_node_alpha(is_focused, depth, has_red_flag, has_gap)
+            } else {
+                (1.0, false)
+            }
+        } else {
+            (1.0, false)
+        };
+
+        // If Esper computed alpha is 0, skip rendering entirely (peel mode hides nodes)
+        if esper_alpha <= 0.0 {
+            return;
+        }
+
+        // Combine focus opacity with Esper alpha
+        let base_opacity = if in_focus || is_highlighted || esper_highlight {
             1.0
         } else {
             self.blur_opacity
         };
+        let opacity = base_opacity * esper_alpha;
 
         if self.use_lod {
             // Use LOD system
@@ -361,11 +393,96 @@ impl GraphRenderer {
                     );
                 }
             }
-            render_node_at_lod(painter, node, screen_pos, screen_size, lod, opacity);
+
+            // If esper highlight is active, render with highlight effect
+            if esper_highlight {
+                self.render_node_with_esper_highlight(
+                    painter,
+                    node,
+                    screen_pos,
+                    screen_size,
+                    camera.zoom(),
+                    opacity,
+                    esper_state,
+                );
+            } else {
+                render_node_at_lod(painter, node, screen_pos, screen_size, lod, opacity);
+            }
         } else {
             // Legacy rendering
             self.render_node_legacy(painter, node, screen_pos, screen_size, opacity);
         }
+    }
+
+    /// Render a node with Esper highlight effect (glow, pulsing border, etc.)
+    #[allow(clippy::too_many_arguments)]
+    fn render_node_with_esper_highlight(
+        &self,
+        painter: &egui::Painter,
+        node: &LayoutNode,
+        screen_pos: Pos2,
+        screen_size: Vec2,
+        zoom: f32,
+        opacity: f32,
+        esper_state: Option<&EsperRenderState>,
+    ) {
+        let node_rect = Rect::from_center_size(screen_pos, screen_size);
+        let corner_radius = CORNER_RADIUS * zoom;
+
+        // Determine highlight color based on active Esper mode
+        let highlight_color = if let Some(esper) = esper_state {
+            if esper.red_flag_scan_enabled {
+                // Red/orange glow for red flags
+                Color32::from_rgb(255, 100, 50)
+            } else if esper.black_hole_enabled {
+                // Purple/magenta for gaps/black holes
+                Color32::from_rgb(180, 50, 255)
+            } else if esper.illuminate_enabled {
+                // Gold/yellow for illuminate
+                Color32::from_rgb(255, 200, 50)
+            } else {
+                // Default highlight
+                Color32::from_rgb(100, 200, 255)
+            }
+        } else {
+            Color32::from_rgb(100, 200, 255)
+        };
+
+        // Draw outer glow (larger rect with fade)
+        let glow_expand = 6.0 * zoom;
+        let glow_rect = node_rect.expand(glow_expand);
+        let glow_color = Color32::from_rgba_unmultiplied(
+            highlight_color.r(),
+            highlight_color.g(),
+            highlight_color.b(),
+            (80.0 * opacity) as u8,
+        );
+        painter.rect_filled(glow_rect, corner_radius + glow_expand / 2.0, glow_color);
+
+        // Draw node background
+        let fill = apply_opacity(node.style.fill_color, opacity);
+        let text_color = apply_opacity(node.style.text_color, opacity);
+
+        painter.rect_filled(node_rect, corner_radius, fill);
+
+        // Draw highlighted border
+        let border_width = 3.0 * zoom;
+        let border_color = apply_opacity(highlight_color, opacity);
+        painter.rect_stroke(
+            node_rect,
+            corner_radius,
+            Stroke::new(border_width, border_color),
+        );
+
+        // Draw label
+        let font_size = 12.0 * zoom;
+        painter.text(
+            screen_pos,
+            egui::Align2::CENTER_CENTER,
+            &node.label,
+            FontId::proportional(font_size),
+            text_color,
+        );
     }
 
     /// Legacy node rendering (for reference/fallback)

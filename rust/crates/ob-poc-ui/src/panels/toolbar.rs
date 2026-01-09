@@ -1,21 +1,22 @@
 //! Top Toolbar Panel
 //!
-//! Contains CBU selector, view mode selector, layout selector, and status indicators.
-//!
-//! Note: CBU selection and view mode changes trigger API calls.
-//! These are handled via return values, not callbacks.
+//! Simplified toolbar showing only essential navigation and status.
+//! Dropdowns removed for cleaner interface - navigation via graph/chat.
 
 use crate::state::LayoutMode;
-use egui::{Color32, ComboBox, RichText, Ui};
+use egui::{Color32, RichText, Ui};
 use ob_poc_graph::ViewMode;
+use ob_poc_types::galaxy::ViewLevel;
 use uuid::Uuid;
 
 /// Data needed to render the toolbar (extracted before render)
 pub struct ToolbarData {
     /// Current CBU name (if any)
     pub current_cbu_name: Option<String>,
-    /// Current view mode
+    /// Current view mode (for CBU-level views)
     pub view_mode: ViewMode,
+    /// Current navigation level (Universe, Cluster, System, etc.)
+    pub view_level: ViewLevel,
     /// Current layout mode
     pub layout: LayoutMode,
     /// Last error (if any)
@@ -31,8 +32,10 @@ pub struct ToolbarAction {
     pub select_cbu: Option<(Uuid, String)>,
     /// User clicked to open CBU search modal
     pub open_cbu_search: bool,
-    /// User changed view mode
+    /// User changed view mode (CBU-level layer)
     pub change_view_mode: Option<ViewMode>,
+    /// User changed view level (navigation scope)
+    pub change_view_level: Option<ViewLevel>,
     /// User changed layout mode
     pub change_layout: Option<LayoutMode>,
     /// User dismissed error
@@ -43,68 +46,53 @@ pub fn toolbar(ui: &mut Ui, data: &ToolbarData) -> ToolbarAction {
     let mut action = ToolbarAction::default();
 
     ui.horizontal(|ui| {
-        ui.set_height(32.0);
+        ui.set_height(28.0);
 
-        // CBU Selector - now a button that opens search modal
-        ui.label("CBU:");
-        let button_text = data.current_cbu_name.as_deref().unwrap_or("Search...");
-        if ui.button(button_text).clicked() {
-            action.open_cbu_search = true;
+        // Navigation breadcrumb: Universe > Cluster > CBU
+        if data.view_level != ViewLevel::Universe {
+            // Show breadcrumb back to universe
+            if ui.small_button("Universe").clicked() {
+                action.change_view_level = Some(ViewLevel::Universe);
+            }
+            ui.label(RichText::new(">").weak().small());
         }
 
-        ui.separator();
+        // Current scope indicator
+        let scope_text = match data.view_level {
+            ViewLevel::Universe => "Universe".to_string(),
+            ViewLevel::Cluster => "Cluster".to_string(),
+            _ => data
+                .current_cbu_name
+                .clone()
+                .unwrap_or_else(|| "CBU".to_string()),
+        };
+        ui.label(RichText::new(scope_text).strong());
 
-        // View Mode Selector
-        ui.label("View:");
-        ComboBox::from_id_salt("view_mode")
-            .selected_text(view_mode_name(data.view_mode))
-            .show_ui(ui, |ui| {
-                for mode in ViewMode::all() {
-                    if ui
-                        .selectable_label(data.view_mode == *mode, view_mode_name(*mode))
-                        .clicked()
-                    {
-                        action.change_view_mode = Some(*mode);
-                    }
-                }
-            });
-
-        ui.separator();
-
-        // Layout selector
-        ui.label("Layout:");
-        if ui
-            .selectable_label(data.layout == LayoutMode::FourPanel, "4-Panel")
-            .clicked()
-        {
-            action.change_layout = Some(LayoutMode::FourPanel);
-        }
-        if ui
-            .selectable_label(data.layout == LayoutMode::EditorFocus, "Editor")
-            .clicked()
-        {
-            action.change_layout = Some(LayoutMode::EditorFocus);
-        }
-        if ui
-            .selectable_label(data.layout == LayoutMode::GraphFullSize, "Graph")
-            .clicked()
-        {
-            action.change_layout = Some(LayoutMode::GraphFullSize);
+        // View mode indicator (read-only, no dropdown)
+        if matches!(
+            data.view_level,
+            ViewLevel::System | ViewLevel::Planet | ViewLevel::Surface | ViewLevel::Core
+        ) {
+            ui.label(RichText::new("|").weak().small());
+            ui.label(RichText::new(view_mode_name(data.view_mode)).small());
         }
 
         // Spacer - push remaining items to the right
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            // Error indicator
-            if let Some(ref error) = data.last_error {
-                ui.label(RichText::new(error).color(Color32::RED).small());
-                if ui.button(RichText::new("X").color(Color32::RED)).clicked() {
-                    action.dismiss_error = true;
-                }
-            }
-
             // Loading indicator
             if data.is_loading {
                 ui.spinner();
+            }
+
+            // Error indicator
+            if let Some(ref error) = data.last_error {
+                if ui
+                    .small_button(RichText::new("X").color(Color32::RED))
+                    .clicked()
+                {
+                    action.dismiss_error = true;
+                }
+                ui.label(RichText::new(error).color(Color32::RED).small());
             }
         });
     });
@@ -118,5 +106,16 @@ fn view_mode_name(mode: ViewMode) -> &'static str {
         ViewMode::ServiceDelivery => "Services",
         ViewMode::ProductsOnly => "Products",
         ViewMode::Trading => "Trading",
+    }
+}
+
+fn view_level_name(level: ViewLevel) -> &'static str {
+    match level {
+        ViewLevel::Universe => "Universe",
+        ViewLevel::Cluster => "Cluster",
+        ViewLevel::System => "CBU",
+        ViewLevel::Planet => "Entity",
+        ViewLevel::Surface => "Details",
+        ViewLevel::Core => "Deep",
     }
 }

@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use super::spatial::SpatialIndex;
+
 // =============================================================================
 // CBU CATEGORY & TEMPLATES
 // =============================================================================
@@ -636,6 +638,9 @@ pub struct LayoutGraph {
 
     /// Bounding box of all nodes (for camera fitting)
     pub bounds: egui::Rect,
+
+    /// R-tree spatial index for O(log n) hit testing
+    spatial_index: SpatialIndex,
 }
 
 impl Default for LayoutGraph {
@@ -648,6 +653,7 @@ impl Default for LayoutGraph {
             edges: Vec::new(),
             investor_groups: Vec::new(),
             bounds: egui::Rect::NOTHING,
+            spatial_index: SpatialIndex::new(),
         }
     }
 }
@@ -662,6 +668,7 @@ impl LayoutGraph {
             edges: Vec::new(),
             investor_groups: Vec::new(),
             bounds: egui::Rect::NOTHING,
+            spatial_index: SpatialIndex::new(),
         }
     }
 
@@ -675,10 +682,11 @@ impl LayoutGraph {
         self.nodes.get_mut(id)
     }
 
-    /// Recompute bounds from all nodes
+    /// Recompute bounds and spatial index from all nodes
     pub fn recompute_bounds(&mut self) {
         if self.nodes.is_empty() {
             self.bounds = egui::Rect::NOTHING;
+            self.spatial_index = SpatialIndex::new();
             return;
         }
 
@@ -696,6 +704,63 @@ impl LayoutGraph {
         }
 
         self.bounds = egui::Rect::from_min_max(Pos2::new(min_x, min_y), Pos2::new(max_x, max_y));
+
+        // Rebuild spatial index for O(log n) hit testing
+        self.rebuild_spatial_index();
+    }
+
+    /// Rebuild the spatial index from current node positions
+    fn rebuild_spatial_index(&mut self) {
+        self.spatial_index = SpatialIndex::from_nodes(self.nodes.values().map(|node| {
+            // Use max dimension as radius for circular hit area
+            let radius = node.size.x.max(node.size.y) / 2.0;
+            super::spatial::SpatialNode::new(
+                node.id.clone(),
+                [node.position.x, node.position.y],
+                radius,
+            )
+        }));
+    }
+
+    /// O(log n) hit test using spatial index
+    /// Returns the ID of the node at the given world position, if any
+    pub fn hit_test(&self, world_pos: Pos2, threshold: f32) -> Option<&str> {
+        self.spatial_index
+            .hit_test([world_pos.x, world_pos.y], threshold)
+            .map(|node| node.id.as_str())
+    }
+
+    /// O(log n) hit test that also checks if point is inside the node's rect
+    /// More precise than circular hit test for rectangular nodes
+    pub fn hit_test_rect(&self, world_pos: Pos2) -> Option<&str> {
+        // First use spatial index to find candidates quickly
+        // Use a reasonable threshold to find nearby nodes
+        let threshold = 100.0; // Generous threshold to catch nearby nodes
+
+        // Get nearest node from spatial index
+        if let Some(spatial_node) = self
+            .spatial_index
+            .hit_test([world_pos.x, world_pos.y], threshold)
+        {
+            // Verify with precise rect check
+            if let Some(node) = self.nodes.get(&spatial_node.id) {
+                let node_rect = egui::Rect::from_center_size(node.position, node.size);
+                if node_rect.contains(world_pos) {
+                    return Some(&node.id);
+                }
+            }
+        }
+
+        // Fallback: check if we're inside any node's rect that spatial index might have missed
+        // This handles edge cases where the nearest circular approximation doesn't match
+        for node in self.nodes.values() {
+            let node_rect = egui::Rect::from_center_size(node.position, node.size);
+            if node_rect.contains(world_pos) {
+                return Some(&node.id);
+            }
+        }
+
+        None
     }
 }
 

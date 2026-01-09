@@ -21,6 +21,7 @@ pub mod galaxy;
 pub mod resolution;
 pub mod semantic_stage;
 pub mod trading_matrix;
+pub mod viewport;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,6 +29,14 @@ use uuid::Uuid;
 
 // Re-export resolution types for convenience
 pub use resolution::*;
+
+// Re-export viewport types for convenience
+pub use viewport::{
+    CameraState, CbuRef, CbuViewMemory, CbuViewType, ConcreteEntityRef, ConcreteEntityType,
+    ConfidenceZone, ConfigNodeRef, EnhanceArg, EnhanceLevelInfo, EnhanceOp, Enhanceable,
+    FocusManager, FocusMode, InstrumentMatrixRef, InstrumentType, ProductServiceRef,
+    ViewportFilters, ViewportFocusState, ViewportState,
+};
 
 // ============================================================================
 // SESSION API
@@ -91,47 +100,95 @@ pub struct BoundEntityInfo {
     pub entity_type: String, // e.g., "cbu", "entity"
 }
 
-/// Session state response
-/// NOTE: Accepts flexible types to handle server's native types
+/// Session state response - the SINGLE source of truth for session state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStateResponse {
     #[serde(deserialize_with = "deserialize_uuid_or_string")]
     pub session_id: String,
+
     /// Entity type this session operates on ("cbu", "kyc_case", "onboarding", "bulk", etc.)
     #[serde(default)]
     pub entity_type: String,
+
     /// Entity ID this session operates on (None if creating new or bulk mode)
     #[serde(default)]
     pub entity_id: Option<String>,
+
+    /// Session state enum
     #[serde(default)]
-    pub state: serde_json::Value,
+    pub state: SessionStateEnum,
+
+    /// Message count in conversation
     #[serde(default)]
     pub message_count: usize,
+
+    /// DSL state - the SINGLE source of truth for all DSL content
     #[serde(default)]
-    pub can_execute: bool,
-    #[serde(default)]
-    pub dsl_source: Option<String>,
+    pub dsl: Option<DslState>,
+
     /// Active CBU for this session (if set via bind)
     #[serde(default)]
     pub active_cbu: Option<BoundEntityInfo>,
-    /// Named bindings available in the session (name -> entity info)
+
+    /// Named bindings available in the session (typed, not serde_json::Value)
     #[serde(default)]
-    pub bindings: serde_json::Value,
-    // Extra fields from server
+    pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
+
+    /// Session context (typed)
     #[serde(default)]
-    pub pending_intents: Option<serde_json::Value>,
+    pub context: Option<SessionContextInfo>,
+
+    /// Chat messages (typed)
     #[serde(default)]
-    pub assembled_dsl: Option<serde_json::Value>,
-    #[serde(default)]
-    pub combined_dsl: Option<serde_json::Value>,
-    #[serde(default)]
-    pub context: Option<serde_json::Value>,
-    #[serde(default)]
-    pub messages: Option<serde_json::Value>,
+    pub messages: Option<Vec<ChatMessage>>,
+
     /// Session version (ISO timestamp from server's updated_at)
     /// UI uses this to detect external changes (MCP/REPL modifying session)
     #[serde(default)]
     pub version: Option<String>,
+}
+
+/// Session context information
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SessionContextInfo {
+    /// Stage focus for verb filtering
+    #[serde(default)]
+    pub stage_focus: Option<String>,
+
+    /// Domain hint for RAG
+    #[serde(default)]
+    pub domain_hint: Option<String>,
+
+    /// View mode (KYC_UBO, SERVICE_DELIVERY, etc.)
+    #[serde(default)]
+    pub view_mode: Option<String>,
+}
+
+/// Chat message in conversation history
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatMessage {
+    /// Message role
+    pub role: ChatMessageRole,
+
+    /// Message content
+    pub content: String,
+
+    /// Timestamp (ISO 8601)
+    #[serde(default)]
+    pub timestamp: Option<String>,
+
+    /// DSL associated with this message (if agent response with DSL)
+    #[serde(default)]
+    pub dsl: Option<DslState>,
+}
+
+/// Chat message role
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatMessageRole {
+    User,
+    Agent,
+    System,
 }
 
 // ============================================================================
@@ -146,33 +203,148 @@ pub struct ChatRequest {
     pub cbu_id: Option<String>, // UUID as string
 }
 
-/// Chat response from agent
-/// NOTE: Fields use #[serde(default)] to be flexible with server response
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChatResponse {
-    pub message: String,
+// ============================================================================
+// DSL STATE - Single source of truth for DSL across API boundary
+// ============================================================================
+
+/// Consolidated DSL state - the SINGLE source of truth for DSL content.
+/// Replaces the previous scattered fields: dsl_source, combined_dsl, assembled_dsl
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DslState {
+    /// The canonical DSL source text (always present if there's any DSL)
+    #[serde(default)]
+    pub source: Option<String>,
+
+    /// Parsed AST statements (typed, not serde_json::Value)
+    #[serde(default)]
+    pub ast: Option<Vec<AstStatement>>,
+
+    /// Whether this DSL is ready to execute (passed validation)
     #[serde(default)]
     pub can_execute: bool,
+
+    /// Validation status
     #[serde(default)]
-    pub dsl_source: Option<String>,
-    /// AST - accepts any JSON since server sends different format
+    pub validation: Option<DslValidation>,
+
+    /// Intent information from agent (what verbs were extracted)
     #[serde(default)]
-    pub ast: Option<serde_json::Value>,
-    /// Session state - accepts any JSON (server sends enum, we accept anything)
+    pub intents: Option<Vec<VerbIntentInfo>>,
+
+    /// Symbol bindings created by this DSL
     #[serde(default)]
-    pub session_state: serde_json::Value,
+    pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
+}
+
+/// Validation result for DSL
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DslValidation {
+    /// Whether validation passed
+    pub valid: bool,
+    /// Validation errors (if any)
+    #[serde(default)]
+    pub errors: Vec<ValidationError>,
+    /// Validation warnings (if any)
+    #[serde(default)]
+    pub warnings: Vec<String>,
+}
+
+/// Information about an extracted verb intent
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbIntentInfo {
+    /// Full verb name (e.g., "cbu.assign-role")
+    pub verb: String,
+    /// Domain (e.g., "cbu")
+    pub domain: String,
+    /// Action (e.g., "assign-role")
+    pub action: String,
+    /// Parameter values (typed)
+    #[serde(default)]
+    pub params: std::collections::HashMap<String, ParamValue>,
+    /// Binding name if `:as @name` specified
+    #[serde(default)]
+    pub bind_as: Option<String>,
+    /// Validation status for this intent
+    #[serde(default)]
+    pub validation: Option<IntentValidationStatus>,
+}
+
+/// Parameter value in a verb intent
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ParamValue {
+    /// Literal string value
+    String { value: String },
+    /// Literal number value
+    Number { value: f64 },
+    /// Literal boolean value
+    Boolean { value: bool },
+    /// Symbol reference (@name)
+    SymbolRef { symbol: String },
+    /// Resolved entity reference
+    ResolvedEntity {
+        /// Display name for UI
+        display_name: String,
+        /// Resolved UUID
+        resolved_id: String,
+        /// Entity type
+        entity_type: String,
+    },
+    /// Unresolved entity lookup (needs resolution)
+    UnresolvedLookup {
+        /// Search text
+        search_text: String,
+        /// Expected entity type
+        entity_type: String,
+    },
+}
+
+/// Validation status for an intent
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentValidationStatus {
+    /// Whether this intent is valid
+    pub valid: bool,
+    /// Error message if invalid
+    #[serde(default)]
+    pub error: Option<String>,
+    /// Missing required parameters
+    #[serde(default)]
+    pub missing_params: Vec<String>,
+    /// Unresolved entity references
+    #[serde(default)]
+    pub unresolved_refs: Vec<String>,
+}
+
+/// Chat response from agent
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChatResponse {
+    /// Agent's text message
+    pub message: String,
+
+    /// DSL state - the SINGLE source of truth for all DSL content
+    #[serde(default)]
+    pub dsl: Option<DslState>,
+
+    /// Session state after this response
+    #[serde(default)]
+    pub session_state: SessionStateEnum,
+
     /// UI commands to execute (show CBU, highlight entity, etc.)
     #[serde(default)]
     pub commands: Option<Vec<AgentCommand>>,
-    // Extra fields from server that we ignore but must accept
-    #[serde(default)]
-    pub intents: Option<serde_json::Value>,
-    #[serde(default)]
-    pub validation_results: Option<serde_json::Value>,
-    #[serde(default)]
-    pub assembled_dsl: Option<serde_json::Value>,
-    #[serde(default)]
-    pub bindings: Option<serde_json::Value>,
+}
+
+/// Session state enum for typed responses
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionStateEnum {
+    #[default]
+    New,
+    PendingValidation,
+    ReadyToExecute,
+    Executing,
+    Executed,
+    Error,
 }
 
 /// SSE stream event - tagged enum for discrimination
@@ -232,11 +404,6 @@ pub enum AgentCommand {
         /// Entity ID or search term
         entity_id: String,
     },
-    /// Select an entity for details ("select that", "tell me about this one")
-    SelectEntity { entity_id: String },
-    /// Clear entity selection ("deselect", "clear selection", "never mind")
-    ClearSelection,
-
     // =========================================================================
     // View Mode Commands
     // =========================================================================
@@ -287,18 +454,6 @@ pub enum AgentCommand {
     // =========================================================================
     // Hierarchy Navigation
     // =========================================================================
-    /// Drill down into selected node ("drill down", "go deeper", "expand")
-    DrillDown {
-        /// Optional node to drill into (defaults to selected)
-        #[serde(default)]
-        node_key: Option<String>,
-    },
-    /// Drill up to parent level ("drill up", "go up", "collapse")
-    DrillUp,
-    /// Expand all nodes ("expand all", "show everything")
-    ExpandAll,
-    /// Collapse all nodes ("collapse all", "close all")
-    CollapseAll,
     /// Expand specific node ("expand allianz", "open that")
     ExpandNode { node_key: String },
     /// Collapse specific node ("collapse that", "close allianz")
@@ -319,9 +474,6 @@ pub enum AgentCommand {
     },
     /// Clear all graph filters and highlights
     ClearFilter,
-    /// Show/hide a specific layer ("show ubo layer", "hide services")
-    SetLayerVisibility { layer: String, visible: bool },
-
     // =========================================================================
     // Export Commands ("Give me a hard copy")
     // =========================================================================
@@ -331,19 +483,6 @@ pub enum AgentCommand {
         #[serde(default)]
         format: Option<String>,
     },
-
-    // =========================================================================
-    // Animation & Playback
-    // =========================================================================
-    /// Play animation sequence ("animate", "show me the flow")
-    PlayAnimation {
-        #[serde(default)]
-        animation_type: Option<String>,
-    },
-    /// Pause animation ("pause", "wait")
-    PauseAnimation,
-    /// Resume animation ("continue", "resume", "keep going")
-    ResumeAnimation,
 
     // =========================================================================
     // Layout Commands
@@ -358,19 +497,6 @@ pub enum AgentCommand {
     // =========================================================================
     /// Search within graph ("find john", "search for director")
     Search { query: String },
-    /// Clear search results
-    ClearSearch,
-
-    // =========================================================================
-    // Comparison Commands
-    // =========================================================================
-    /// Compare with another CBU or snapshot ("compare with", "diff")
-    Compare {
-        /// ID or name of entity to compare with
-        target: String,
-    },
-    /// Exit comparison mode
-    ExitCompare,
 
     // =========================================================================
     // Scale Navigation (Astronomical metaphor for client book depth)

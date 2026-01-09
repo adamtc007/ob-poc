@@ -303,6 +303,298 @@ domains:
           description: "Returns breadcrumb labels and frame IDs"
 
       # =========================================================================
+      # ESPER NAVIGATION - Phase 1 (Core Navigation)
+      # =========================================================================
+
+      drill:
+        description: "Drill into an entity, showing subsidiaries or parent chain"
+        behavior: plugin
+        plugin:
+          handler: ViewDrillOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to drill into"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: direction
+            type: string
+            required: false
+            default: "down"
+            valid_values:
+              - down # Into subsidiaries/children
+              - up # Into parents/owners
+            description: "Drill direction"
+          - name: depth
+            type: integer
+            required: false
+            default: 1
+            description: "How many levels to drill"
+        returns:
+          type: view_state
+          capture: true
+          description: "Updates view to show drilled entity and its relationships"
+
+      surface:
+        description: "Surface up from current drill (pop navigation stack)"
+        behavior: plugin
+        plugin:
+          handler: ViewSurfaceOp
+        args:
+          - name: levels
+            type: integer
+            required: false
+            default: 1
+            description: "How many levels to surface (or 'all' for universe)"
+          - name: to-universe
+            type: boolean
+            required: false
+            default: false
+            description: "Surface all the way to universe view"
+        returns:
+          type: view_state
+          capture: true
+          description: "Returns to previous navigation level"
+
+      trace:
+        description: "Follow money, control, or risk threads from an entity"
+        behavior: plugin
+        plugin:
+          handler: ViewTraceOp
+        args:
+          - name: mode
+            type: string
+            required: true
+            valid_values:
+              - money # Follow financial flows
+              - control # Follow control relationships
+              - risk # Follow risk indicators
+              - documents # Follow document chains
+              - alerts # Follow alert threads
+            description: "What to trace"
+          - name: from-entity
+            type: uuid
+            required: false
+            description: "Entity to trace from (defaults to current focus)"
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: depth
+            type: integer
+            required: false
+            default: 5
+            description: "Maximum trace depth"
+        returns:
+          type: view_state
+          capture: true
+          description: "Highlights trace path in current view"
+
+      xray:
+        description: "Show hidden layers transparently (see through structure)"
+        behavior: plugin
+        plugin:
+          handler: ViewXrayOp
+        args:
+          - name: layers
+            type: string_list
+            required: false
+            description: "Which layers to make transparent"
+            valid_values:
+              - custody
+              - ubo
+              - services
+              - documents
+              - screenings
+          - name: off
+            type: boolean
+            required: false
+            default: false
+            description: "Turn off x-ray mode"
+        returns:
+          type: view_state
+          capture: true
+          description: "Toggles layer transparency"
+
+      peel:
+        description: "Remove outer layer to reveal inner structure"
+        behavior: plugin
+        plugin:
+          handler: ViewPeelOp
+        args:
+          - name: layer
+            type: string
+            required: false
+            description: "Specific layer to peel"
+          - name: reset
+            type: boolean
+            required: false
+            default: false
+            description: "Restore all peeled layers"
+        returns:
+          type: view_state
+          capture: true
+          description: "Updates view with peeled layer hidden"
+
+      illuminate:
+        description: "Highlight a specific aspect across all visible entities"
+        behavior: plugin
+        plugin:
+          handler: ViewIlluminateOp
+        args:
+          - name: aspect
+            type: string
+            required: true
+            valid_values:
+              - risks # Highlight risk indicators
+              - documents # Highlight document status
+              - screenings # Highlight screening results
+              - gaps # Highlight data gaps
+              - pending # Highlight pending items
+            description: "What aspect to illuminate"
+          - name: off
+            type: boolean
+            required: false
+            default: false
+            description: "Turn off illumination"
+        returns:
+          type: view_state
+          capture: true
+          description: "Applies visual highlighting"
+
+      # =========================================================================
+      # ESPER NAVIGATION - Phase 1 (Risk Highlighting)
+      # =========================================================================
+
+      shadow:
+        description: "Dim non-risk items to emphasize risk (shadow mode)"
+        behavior: plugin
+        plugin:
+          handler: ViewShadowOp
+        args:
+          - name: threshold
+            type: string
+            required: false
+            default: "any"
+            valid_values:
+              - high # Only high risk highlighted
+              - medium # Medium and high risk highlighted
+              - any # Any risk level highlighted
+            description: "Risk threshold for highlighting"
+          - name: off
+            type: boolean
+            required: false
+            default: false
+            description: "Turn off shadow mode"
+        returns:
+          type: view_state
+          capture: true
+          description: "Toggles shadow mode"
+
+      red-flag:
+        description: "Scan and highlight red flags"
+        behavior: plugin
+        plugin:
+          handler: ViewRedFlagOp
+        args:
+          - name: category
+            type: string
+            required: false
+            valid_values:
+              - pep # PEP flags
+              - sanctions # Sanctions flags
+              - adverse-media # Adverse media flags
+              - all # All flag types
+            description: "Category of red flags to scan"
+          - name: off
+            type: boolean
+            required: false
+            default: false
+            description: "Turn off red flag scan"
+        returns:
+          type: view_state
+          capture: true
+          description: "Highlights red flags in current view"
+
+      black-holes:
+        description: "Show data gaps as 'black holes'"
+        behavior: plugin
+        plugin:
+          handler: ViewBlackHolesOp
+        args:
+          - name: type
+            type: string
+            required: false
+            valid_values:
+              - ownership # Missing ownership data
+              - documents # Missing documents
+              - screening # Missing screenings
+              - all # All gap types
+            description: "Type of gaps to highlight"
+          - name: off
+            type: boolean
+            required: false
+            default: false
+            description: "Turn off black hole mode"
+        returns:
+          type: view_state
+          capture: true
+          description: "Highlights data gaps"
+
+      # =========================================================================
+      # ESPER NAVIGATION - Phase 1 (Detail & Context)
+      # =========================================================================
+
+      detail:
+        description: "Change detail level for current focus"
+        behavior: plugin
+        plugin:
+          handler: ViewDetailOp
+        args:
+          - name: level
+            type: string
+            required: true
+            valid_values:
+              - graph # Normal graph view
+              - attributes # Expanded attribute cards
+              - raw # JSON/raw data view
+            description: "Detail level to set"
+        returns:
+          type: view_state
+          capture: true
+          description: "Changes detail level"
+
+      context:
+        description: "Set UI context mode (changes workflow adaptation)"
+        behavior: plugin
+        plugin:
+          handler: ViewContextOp
+        args:
+          - name: mode
+            type: string
+            required: true
+            valid_values:
+              - onboarding # New client onboarding
+              - review # Periodic review
+              - investigation # Investigation/deep dive
+              - monitoring # Ongoing monitoring
+              - remediation # Remediation workflow
+            description: "Context mode to set"
+        returns:
+          type: view_state
+          capture: true
+          description: "Changes context mode"
+
+      # =========================================================================
       # INTROSPECTION
       # =========================================================================
 

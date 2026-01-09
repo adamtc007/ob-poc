@@ -1,0 +1,238 @@
+# LEI Gate Rules Configuration
+# Load at startup by lei_gate_engine.rs
+# See ai-thoughts/008-lei-gate-rules-engine.md for full documentation
+
+version: 1
+
+enums:
+  gate_type:
+    - PRE_TRADE_HARD_STOP      # Must have LEI before trade execution
+    - PRE_GO_LIVE_HARD_STOP    # Must have LEI before service enablement
+    - POST_TRADE_REPORTING_RISK # Not a stop, but breaks reporting
+    - BEST_PRACTICE_MASTERING  # Recommended for data quality
+
+  party:
+    - CLIENT        # Onboarded entity/fund/CBU anchor
+    - COUNTERPARTY  # Trading counterparty
+    - ISSUER        # Issuer of securities (SFTR)
+    - HEAD_OFFICE   # Head office when acting via branch
+
+  requiredness:
+    - REQUIRED           # Must have, block if missing
+    - REQUIRED_IF_EXISTS # Required only if entity has LEI
+    - RECOMMENDED        # Soft prompt, allow proceed
+
+  service_line:
+    - custody
+    - execution
+    - prime
+    - collateral
+    - sec_lending
+
+  activity:
+    - custody_only
+    - execute_trade
+    - otc_derivatives
+    - sft
+
+  jurisdiction:
+    - EU
+    - UK
+    - US
+    - AU
+    - HK
+    - OTHER
+
+rules:
+  # ============================================================================
+  # EU MiFIR - "No LEI, No Trade"
+  # ============================================================================
+  - id: EU_MIFIR_NO_LEI_NO_TRADE
+    description: "EU MiFIR/RTS22: Hard stop before executing reportable trades"
+    service_lines: [execution, prime]
+    activities: [execute_trade]
+    jurisdictions: [EU]
+    regimes: [EU_MIFIR_RTS22]
+    gate_type: PRE_TRADE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, lei_active]
+    message: "EU MiFIR: Cannot execute reportable transactions for LEI-eligible clients without LEI."
+
+  # ============================================================================
+  # UK MiFIR - "No LEI, No Trade"
+  # ============================================================================
+  - id: UK_MIFIR_NO_LEI_NO_TRADE
+    description: "UK MiFIR: Hard stop before executing reportable trades"
+    service_lines: [execution, prime]
+    activities: [execute_trade]
+    jurisdictions: [UK]
+    regimes: [UK_MIFIR]
+    gate_type: PRE_TRADE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, lei_active]
+    message: "UK MiFIR: Firms cannot execute trades for LEI-eligible clients without an LEI."
+
+  # ============================================================================
+  # EU EMIR - Derivatives Reporting
+  # ============================================================================
+  - id: EU_EMIR_DERIVATIVES
+    description: "EU EMIR: LEI required for derivative counterparty reporting"
+    service_lines: [prime, collateral]
+    activities: [otc_derivatives]
+    jurisdictions: [EU]
+    regimes: [EU_EMIR]
+    gate_type: PRE_GO_LIVE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, lei_active]
+      - party: COUNTERPARTY
+        requiredness: REQUIRED
+        checks: [lei_present]
+    message: "EU EMIR: LEI required for legal-entity counterparties in derivative reporting."
+
+  # ============================================================================
+  # UK EMIR - Derivatives Reporting
+  # ============================================================================
+  - id: UK_EMIR_DERIVATIVES
+    description: "UK EMIR: LEI required for derivative counterparty reporting"
+    service_lines: [prime, collateral]
+    activities: [otc_derivatives]
+    jurisdictions: [UK]
+    regimes: [UK_EMIR]
+    gate_type: PRE_GO_LIVE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, lei_active]
+      - party: COUNTERPARTY
+        requiredness: REQUIRED
+        checks: [lei_present]
+    message: "UK EMIR: Validation rules specify ISO 17442 LEI for reporting counterparty."
+
+  # ============================================================================
+  # US CFTC Part 45 - Swaps Reporting
+  # ============================================================================
+  - id: US_CFTC_SWAPS
+    description: "US CFTC Part 45: LEI required for swap counterparties"
+    service_lines: [prime, collateral]
+    activities: [otc_derivatives]
+    jurisdictions: [US]
+    regimes: [US_CFTC_PART45]
+    gate_type: PRE_GO_LIVE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, lei_active, iso17442_conformant]
+      - party: COUNTERPARTY
+        requiredness: REQUIRED
+        checks: [lei_present, iso17442_conformant]
+    message: "CFTC Part 45: LEIs (ISO 17442) required for swap counterparties in reporting/recordkeeping."
+
+  # ============================================================================
+  # EU SFTR - Securities Financing Transactions
+  # ============================================================================
+  - id: EU_SFTR_SFT
+    description: "EU SFTR: LEI required for SFT counterparties and issuers"
+    service_lines: [sec_lending, collateral]
+    activities: [sft]
+    jurisdictions: [EU]
+    regimes: [EU_SFTR]
+    gate_type: PRE_GO_LIVE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, lei_active]
+      - party: COUNTERPARTY
+        requiredness: REQUIRED
+        checks: [lei_present]
+      - party: ISSUER
+        requiredness: REQUIRED_IF_EXISTS
+        checks: [lei_present]
+    message: "EU SFTR: LEI required for SFT counterparties; issuer LEI required where available."
+
+  # ============================================================================
+  # Australia ASIC DTR 2024
+  # ============================================================================
+  - id: AU_ASIC_OTC
+    description: "Australia ASIC DTR 2024: LEI per ISO 17442 for OTC reporting"
+    service_lines: [prime, collateral]
+    activities: [otc_derivatives]
+    jurisdictions: [AU]
+    regimes: [AU_ASIC_DTR_2024]
+    gate_type: PRE_GO_LIVE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, iso17442_conformant]
+      - party: COUNTERPARTY
+        requiredness: REQUIRED
+        checks: [lei_present, iso17442_conformant]
+    message: "ASIC DTR 2024: Use LEI per ISO 17442 where entity has an LEI."
+
+  # ============================================================================
+  # Hong Kong HKTR
+  # ============================================================================
+  - id: HK_HKTR_OTC
+    description: "Hong Kong HKTR: LEI per ISO 17442 with ISO 20022/CDE alignment"
+    service_lines: [prime, collateral]
+    activities: [otc_derivatives]
+    jurisdictions: [HK]
+    regimes: [HK_HKTR]
+    gate_type: PRE_GO_LIVE_HARD_STOP
+    lei_requirements:
+      - party: CLIENT
+        requiredness: REQUIRED
+        checks: [lei_present, iso17442_conformant]
+      - party: COUNTERPARTY
+        requiredness: REQUIRED
+        checks: [lei_present, iso17442_conformant]
+      - party: HEAD_OFFICE
+        requiredness: RECOMMENDED
+        checks: [lei_present]
+    message: "HKTR: LEI (ISO 17442) prioritized in reporting schema."
+
+  # ============================================================================
+  # Custody - Best Practice (No Hard Stop)
+  # ============================================================================
+  - id: CUSTODY_MASTERING
+    description: "Pure custody: collect LEI for data quality and future expansion"
+    service_lines: [custody]
+    activities: [custody_only]
+    jurisdictions: [EU, UK, US, AU, HK, OTHER]
+    regimes: []
+    gate_type: BEST_PRACTICE_MASTERING
+    lei_requirements:
+      - party: CLIENT
+        requiredness: RECOMMENDED
+        checks: [lei_present]
+    message: "Collect LEI at onboarding to avoid re-papering when client expands into other services."
+
+  # ============================================================================
+  # Branch Identification Policy
+  # ============================================================================
+  - id: BRANCH_HEAD_OFFICE
+    description: "Branch reporting requires head-office LEI"
+    conditions:
+      is_branch: true
+    gate_type: POST_TRADE_REPORTING_RISK
+    lei_requirements:
+      - party: HEAD_OFFICE
+        requiredness: REQUIRED
+        checks: [lei_present]
+    message: "Branch reporting typically uses head-office LEI per ESMA guidance."
+
+# ============================================================================
+# Default rule when no specific rule matches
+# ============================================================================
+default_rule:
+  gate_type: BEST_PRACTICE_MASTERING
+  lei_requirements:
+    - party: CLIENT
+      requiredness: RECOMMENDED
+      checks: [lei_present]
+  message: "LEI recommended for enterprise data quality."

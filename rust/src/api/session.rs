@@ -1133,6 +1133,12 @@ pub struct SessionContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub view_state: Option<crate::session::ViewState>,
 
+    /// Viewport state from viewport.* DSL verbs (focus, enhance, filter, camera)
+    /// This tracks the CBU-focused viewport with focus state machine, enhance levels,
+    /// camera state, and filters. Populated after DSL execution when viewport.* verbs run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub viewport_state: Option<ob_poc_types::ViewportState>,
+
     // =========================================================================
     // View State Fields - For REPL/View synchronization
     // =========================================================================
@@ -1442,6 +1448,45 @@ impl SessionContext {
     /// Check if there's a view state set
     pub fn has_view_state(&self) -> bool {
         self.view_state.is_some()
+    }
+
+    // =========================================================================
+    // VIEWPORT STATE METHODS - For viewport.* verb output propagation
+    // =========================================================================
+
+    /// Set the viewport state from viewport.* operations
+    /// This is called after DSL execution when viewport.* verbs produce a ViewportState
+    pub fn set_viewport_state(&mut self, state: ob_poc_types::ViewportState) {
+        self.viewport_state = Some(state);
+    }
+
+    /// Get the current viewport state
+    pub fn viewport_state(&self) -> Option<&ob_poc_types::ViewportState> {
+        self.viewport_state.as_ref()
+    }
+
+    /// Get mutable reference to the viewport state
+    pub fn viewport_state_mut(&mut self) -> Option<&mut ob_poc_types::ViewportState> {
+        self.viewport_state.as_mut()
+    }
+
+    /// Take the viewport state (consumes it)
+    pub fn take_viewport_state(&mut self) -> Option<ob_poc_types::ViewportState> {
+        self.viewport_state.take()
+    }
+
+    /// Check if there's a viewport state set
+    pub fn has_viewport_state(&self) -> bool {
+        self.viewport_state.is_some()
+    }
+
+    /// Get or initialize the viewport state with default
+    /// Useful for operations that need to modify viewport state
+    pub fn viewport_state_or_default(&mut self) -> &mut ob_poc_types::ViewportState {
+        if self.viewport_state.is_none() {
+            self.viewport_state = Some(ob_poc_types::ViewportState::default());
+        }
+        self.viewport_state.as_mut().unwrap()
     }
 
     // =========================================================================

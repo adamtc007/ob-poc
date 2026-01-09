@@ -51,6 +51,27 @@ domains:
               - BENEFICIAL
               - DIRECTLY_CONSOLIDATED
               - ULTIMATELY_CONSOLIDATED
+          - name: interest-type
+            type: string
+            required: false
+            maps_to: interest_type
+            default: shareholding
+            description: BODS 0.4 interest type code (e.g., shareholding, votingRights, appointmentOfBoard)
+            lookup:
+              table: bods_interest_types
+              entity_type: interest_type
+              schema: ob-poc
+              search_key: type_code
+              primary_key: type_code
+          - name: direct-or-indirect
+            type: string
+            required: false
+            maps_to: direct_or_indirect
+            description: Whether this is direct or indirect ownership
+            valid_values:
+              - direct
+              - indirect
+              - unknown
           - name: effective-from
             type: date
             required: false

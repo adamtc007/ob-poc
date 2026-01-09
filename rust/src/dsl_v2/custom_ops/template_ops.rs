@@ -473,6 +473,7 @@ impl CustomOperation for TemplateBatchOp {
             json_bindings: ctx.json_bindings.clone(),
             current_selection: ctx.current_selection.clone(),
             pending_view_state: None, // Batch operations don't produce view state
+            pending_viewport_state: None, // Batch operations don't produce viewport state
             source_attribution: ctx.source_attribution.clone(),
             session_id: ctx.session_id,
         };

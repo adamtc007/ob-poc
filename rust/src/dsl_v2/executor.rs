@@ -17,6 +17,10 @@ use uuid::Uuid;
 // This enables view operations to communicate ViewState back to the session layer
 use crate::session::ViewState;
 
+// Import ViewportState for the pending_viewport_state field
+// This enables viewport operations to communicate ViewportState back to the session layer
+use ob_poc_types::ViewportState;
+
 #[cfg(feature = "database")]
 use super::ast::{AstNode, Literal, VerbCall};
 #[cfg(feature = "database")]
@@ -119,6 +123,13 @@ pub struct ExecutionContext {
     /// This solves the "session state side door" where ViewState was being discarded
     /// because CustomOperation only receives ExecutionContext, not UnifiedSessionContext.
     pub pending_view_state: Option<ViewState>,
+    /// Pending viewport state from viewport.* operations
+    ///
+    /// Viewport operations (viewport.focus, viewport.enhance, viewport.filter, etc.)
+    /// create a ViewportState but cannot directly access the session. Instead, they
+    /// store the ViewportState here. After execution completes, the caller should call
+    /// `take_pending_viewport_state()` and propagate it via `session.set_viewport_state()`.
+    pub pending_viewport_state: Option<ViewportState>,
     /// Source attribution for audit trail
     ///
     /// Tracks where the execution originated (api, cli, mcp, etc.),
@@ -143,6 +154,7 @@ impl Default for ExecutionContext {
             idempotency_enabled: true,
             current_selection: None,
             pending_view_state: None,
+            pending_viewport_state: None,
             source_attribution: super::idempotency::SourceAttribution::default(),
             session_id: None,
         }
@@ -254,6 +266,8 @@ impl ExecutionContext {
             current_selection: self.current_selection.clone(),
             // Don't inherit pending_view_state - each iteration starts fresh
             pending_view_state: None,
+            // Don't inherit pending_viewport_state - each iteration starts fresh
+            pending_viewport_state: None,
             // Inherit source attribution for audit trail consistency
             source_attribution: self.source_attribution.clone(),
             // Inherit session ID for view state linkage
@@ -360,6 +374,47 @@ impl ExecutionContext {
     /// Check if there's a pending view state
     pub fn has_pending_view_state(&self) -> bool {
         self.pending_view_state.is_some()
+    }
+
+    // =========================================================================
+    // VIEWPORT STATE METHODS - For viewport.* verb output to session layer
+    // =========================================================================
+
+    /// Set pending viewport state (called by viewport.* operations)
+    ///
+    /// Viewport operations create a ViewportState but cannot directly access
+    /// the session. Instead, they store the ViewportState here.
+    /// After execution, the caller should call `take_pending_viewport_state()`
+    /// and propagate it to the session via `session.set_viewport_state(state)`.
+    pub fn set_pending_viewport_state(&mut self, state: ViewportState) {
+        self.pending_viewport_state = Some(state);
+    }
+
+    /// Take the pending viewport state (consumes it)
+    ///
+    /// Called by the execution layer after DSL execution completes.
+    /// The caller should propagate this to SessionContext:
+    /// ```ignore
+    /// if let Some(state) = ctx.take_pending_viewport_state() {
+    ///     session.context.set_viewport_state(state);
+    /// }
+    /// ```
+    pub fn take_pending_viewport_state(&mut self) -> Option<ViewportState> {
+        self.pending_viewport_state.take()
+    }
+
+    /// Check if there's a pending viewport state
+    pub fn has_pending_viewport_state(&self) -> bool {
+        self.pending_viewport_state.is_some()
+    }
+
+    /// Get a mutable reference to the pending viewport state
+    /// Creates a default state if none exists (for incremental updates)
+    pub fn viewport_state_or_default(&mut self) -> &mut ViewportState {
+        if self.pending_viewport_state.is_none() {
+            self.pending_viewport_state = Some(ViewportState::default());
+        }
+        self.pending_viewport_state.as_mut().unwrap()
     }
 
     /// Create context from DomainContext (for submission execution)

@@ -157,5 +157,6 @@ members = [
     "crates/ob-poc-types",
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",
+    "crates/viewport",
     "xtask",
 ]

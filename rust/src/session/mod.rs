@@ -59,8 +59,10 @@ pub use verb_discovery::{
 };
 pub use verb_sync::{SyncResult, VerbSyncError, VerbSyncService};
 pub use view_state::{
-    BatchOperation, LayoutBounds, LayoutResult, NodePosition, OperationPreview, PendingOperation,
-    Refinement, ViewState,
+    BatchOperation, ContextMode, CrossSectionAxis, DetailLevel, DrillDirection, GapType,
+    HighlightMode, IlluminateAspect, LayoutBounds, LayoutResult, NavStackEntry, NodePosition,
+    OperationPreview, PendingOperation, RedFlagCategory, Refinement, RiskThreshold, ScaleLevel,
+    TemporalMode, TraceMode, ViewState,
 };
 
 /// Unified session context - handles REPL + Visualization + Navigation

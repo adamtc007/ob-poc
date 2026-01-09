@@ -211,6 +211,32 @@ pub async fn bind_entity(
     .await
 }
 
+/// Sync view mode to server session
+/// This allows the server to know what visualization context the client is in
+pub async fn set_view_mode(
+    session_id: Uuid,
+    view_mode: &str,
+    view_level: Option<&str>,
+) -> Result<(), String> {
+    #[derive(Serialize)]
+    struct SetViewModeRequest {
+        view_mode: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        view_level: Option<String>,
+    }
+
+    let _response: serde_json::Value = post(
+        &format!("/api/session/{}/view-mode", session_id),
+        &SetViewModeRequest {
+            view_mode: view_mode.to_string(),
+            view_level: view_level.map(|s| s.to_string()),
+        },
+    )
+    .await?;
+
+    Ok(())
+}
+
 /// Get session context (CBU info, linked entities, symbols)
 /// Used to populate ContextPanel and inform agent prompts
 pub async fn get_session_context(session_id: Uuid) -> Result<SessionContext, String> {
@@ -291,6 +317,21 @@ pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraph
 /// Get universe graph (all clusters for galaxy view)
 pub async fn get_universe_graph() -> Result<UniverseGraph, String> {
     get("/api/universe").await
+}
+
+/// Get universe graph filtered by commercial client (book view)
+/// Maps to `view.book :client <name>` DSL verb
+pub async fn get_universe_graph_by_client(client_name: &str) -> Result<UniverseGraph, String> {
+    // Simple URL encoding for spaces and special chars
+    let encoded = client_name
+        .replace(' ', "%20")
+        .replace('&', "%26")
+        .replace('=', "%3D");
+    get(&format!(
+        "/api/universe?cluster_by=client&client={}",
+        encoded
+    ))
+    .await
 }
 
 /// Get cluster details (CBUs within a cluster)

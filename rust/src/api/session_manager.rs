@@ -334,7 +334,7 @@ mod tests {
         let manager = SessionManager::new(store);
 
         // Create a session
-        let session = AgentSession::new();
+        let session = AgentSession::new(None);
         let id = session.id;
         manager.insert_session(session).await;
 
@@ -357,7 +357,7 @@ mod tests {
         let store = create_session_store();
         let manager = SessionManager::new(store);
 
-        let session = AgentSession::new();
+        let session = AgentSession::new(None);
         let id = session.id;
         manager.insert_session(session).await;
 
@@ -378,7 +378,7 @@ mod tests {
         let store = create_session_store();
         let manager = SessionManager::new(store);
 
-        let session = AgentSession::new();
+        let session = AgentSession::new(None);
         let id = session.id;
         manager.insert_session(session).await;
 
@@ -401,7 +401,7 @@ mod tests {
         let store = create_session_store();
         let manager = SessionManager::new(store);
 
-        let session = AgentSession::new();
+        let session = AgentSession::new(None);
         let id = session.id;
         manager.insert_session(session).await;
 

@@ -1581,12 +1581,11 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     /// - "track 45 left" → Pan(Left, 45)
     /// - "stop" / "hold" / "freeze" / "that's good" → Stop
     /// - "center" / "home" → Center
-    /// - "drill down" / "go deeper" / "expand" → DrillDown
-    /// - "drill up" / "go up" / "collapse" → DrillUp
-    /// - "expand all" → ExpandAll
-    /// - "collapse all" → CollapseAll
+    /// - "drill up" / "go up" / "back up" → TaxonomyZoomOut
     /// - "give me a hard copy" / "print" / "screenshot" → Export
     /// - "reset layout" / "auto arrange" → ResetLayout
+    /// - "flip" / "rotate layout" → ToggleOrientation
+    /// - "find X" / "search for X" → Search
     /// - "help" / "what can I say" → ShowHelp
     fn handle_esper_command(&self, message: &str) -> Option<AgentChatResponse> {
         use ob_poc_types::PanDirection;
@@ -1737,45 +1736,15 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // =========================================================================
 
         // "drill down" / "go deeper" / "expand"
-        if (words[0] == "drill" && words.get(1) == Some(&"down"))
-            || (words[0] == "go" && words.get(1) == Some(&"deeper"))
-            || (words[0] == "dive" && words.get(1) == Some(&"in"))
-            || lower_msg.contains("what's inside")
-        {
-            return Some(make_response(
-                "Drilling down...",
-                AgentCommand::DrillDown { node_key: None },
-            ));
-        }
-
-        // "drill up" / "go up" / "back up"
+        // "drill up" / "go up" / "back up" → TaxonomyZoomOut
         if (words[0] == "drill" && words.get(1) == Some(&"up"))
             || (words[0] == "go" && words.get(1) == Some(&"up"))
             || (words[0] == "back" && words.get(1) == Some(&"up"))
             || lower_msg.contains("show parent")
         {
-            return Some(make_response("Drilling up...", AgentCommand::DrillUp));
-        }
-
-        // "expand all" / "show all" / "blow it all open"
-        if lower_msg.contains("expand all")
-            || lower_msg.contains("show everything")
-            || lower_msg.contains("blow it")
-        {
             return Some(make_response(
-                "Expanding all nodes.",
-                AgentCommand::ExpandAll,
-            ));
-        }
-
-        // "collapse all" / "close all" / "fold it up"
-        if lower_msg.contains("collapse all")
-            || lower_msg.contains("close all")
-            || lower_msg.contains("fold it")
-        {
-            return Some(make_response(
-                "Collapsing all nodes.",
-                AgentCommand::CollapseAll,
+                "Zooming out...",
+                AgentCommand::TaxonomyZoomOut,
             ));
         }
 

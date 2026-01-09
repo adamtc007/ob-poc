@@ -68,5 +68,38 @@ impl MyWidget {
 | Callbacks | Can't test, hard to trace | Return actions |
 | Layout queries | Don't know size until drawn | Use previous frame or fixed |
 | Retained mode thinking | "Widget remembers" | It doesn't. Pass state in. |
+| Hardcoded enum in struct Default | Ignores enum's `#[default]` | Use `EnumType::default()` |
+
+## Default Value Rule
+
+When an enum has `#[default]` attribute, **never hardcode a variant** in a struct's `Default` impl:
+
+```rust
+// WRONG - hardcoded value ignores enum's #[default]
+impl Default for PanelState {
+    fn default() -> Self {
+        Self {
+            layout: LayoutMode::FourPanel,  // BUG: ignores LayoutMode's #[default]
+        }
+    }
+}
+
+// RIGHT - respect the enum's default
+impl Default for PanelState {
+    fn default() -> Self {
+        Self {
+            layout: LayoutMode::default(),  // Uses enum's #[default] attribute
+        }
+    }
+}
+
+// BEST - derive Default if all fields have Default
+#[derive(Default)]
+pub struct PanelState {
+    pub layout: LayoutMode,  // Automatically uses LayoutMode::default()
+}
+```
+
+This prevents the bug where changing an enum's `#[default]` has no effect because struct impls override it.
 
 Read CLAUDE.md section "egui State Management & Best Practices" for full details.

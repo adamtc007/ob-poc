@@ -5,6 +5,7 @@
 
 pub mod graph;
 
+#[allow(deprecated)]
 pub use graph::{
     entity_matches_type,
     get_entities_for_type,
@@ -25,7 +26,7 @@ pub use graph::{
     EntityTypeOntology,
     ForceConfig,
     ForceSimulation,
-    GalaxyAction,
+    GalaxyAction, // deprecated - use NavigationAction from ob_poc_types::galaxy instead
     GalaxyView,
     GraphEdgeData,
     GraphNodeData,
@@ -54,3 +55,6 @@ pub use graph::{
 
 // Re-export galaxy types from ob-poc-types for convenience
 pub use ob_poc_types::galaxy::AgentMode;
+
+// Re-export Esper render state types for NavigationVerb handlers
+pub use graph::viewport::{EsperRenderState, GapType, IlluminateAspect, RedFlagCategory};

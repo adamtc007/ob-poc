@@ -53,6 +53,10 @@ pub trait TradingMatrixNodeIdExt {
 
     /// Create a root node ID
     fn root() -> TradingMatrixNodeId;
+
+    /// Parse a node key string back into a TradingMatrixNodeId
+    /// The key format is segments joined by "/" (e.g., "UNIVERSE/EQUITY/XNYS")
+    fn parse(key: &str) -> Result<TradingMatrixNodeId, &'static str>;
 }
 
 impl TradingMatrixNodeIdExt for TradingMatrixNodeId {
@@ -62,6 +66,14 @@ impl TradingMatrixNodeIdExt for TradingMatrixNodeId {
 
     fn root() -> TradingMatrixNodeId {
         TradingMatrixNodeId(Vec::new())
+    }
+
+    fn parse(key: &str) -> Result<TradingMatrixNodeId, &'static str> {
+        if key.is_empty() {
+            return Ok(TradingMatrixNodeId(Vec::new()));
+        }
+        let segments: Vec<String> = key.split('/').map(|s| s.to_string()).collect();
+        Ok(TradingMatrixNodeId(segments))
     }
 }
 
@@ -1044,7 +1056,7 @@ mod tests {
 
     #[test]
     fn test_node_id_path() {
-        let root = TradingMatrixNodeIdExt::root();
+        let root = TradingMatrixNodeId::root();
         assert_eq!(root.depth(), 0);
         assert_eq!(root.as_key(), "");
 
