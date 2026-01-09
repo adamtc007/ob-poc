@@ -1,164 +1,223 @@
 (* ============================================================================
-   UBO/KYC DSL - Extended Backus-Naur Form (EBNF) Grammar
+   OB-POC DSL - Extended Backus-Naur Form (EBNF) Grammar
    ============================================================================
 
-   This grammar defines a declarative S-expression based DSL for modeling
-   institutional KYC workflows, entity ownership structures, and UBO discovery.
+   This grammar defines the S-expression based DSL for KYC/AML onboarding,
+   custody configuration, UBO discovery, and entity management.
 
-   Key Design Principles:
+   Design Principles:
    - S-expression syntax for homoiconicity
-   - EDF / Clojure : token use for readability
-   - Declarative graph construction
-   - Multi-source data with conflict resolution
-   - Audit trail via EVIDENCED_BY relationships
+   - Clojure-style keyword arguments (:key value)
+   - Symbol references (@name) for cross-statement binding
+   - YAML-driven verb definitions (no hardcoded verbs in parser)
+
+   Reference implementation: rust/crates/dsl-core/src/parser.rs
+   Verb definitions: rust/config/verbs/*.yaml
+
+   Last updated: 2025-01-09 (aligned with NOM parser implementation)
    ============================================================================ *)
 
-(* Top-level program structure *)
-program = workflow* ;
 
-workflow = '(' 'define-kyc-investigation'
-             string                         (* workflow-id *)
-             property-list                  (* workflow properties *)
-             statement*                     (* workflow statements *)
-           ')' ;
+(* ============================================================================
+   TOP-LEVEL STRUCTURE
+   ============================================================================ *)
 
-(* Core Statements *)
-statement = declare-entity
-          | obtain-document
-          | create-edge
-          | solicit-attribute
-          | calculate-ubo
-          | resolve-conflict
-          | generate-report
-          | schedule-monitoring
-          | parallel-block
-          | sequential-block ;
+program = { statement } ;
 
-(* Entity Declaration *)
-declare-entity = '(' 'declare-entity'
-                   ':node-id' identifier
-                   ':label' entity-label
-                   ':properties' property-map
-                 ')' ;
+statement = comment | verb-call ;
 
-entity-label = 'Company' | 'Person' | 'Trust' | 'Address'
-             | 'Document' | 'Officer' ;
 
-(* Document Operations *)
-obtain-document = '(' 'obtain-document'
-                    ':doc-id' identifier
-                    ':doc-type' string
-                    ':issuer' string
-                    ':issue-date' date
-                    ':confidence' number
-                    property-list?
-                  ')' ;
+(* ============================================================================
+   COMMENTS
+   ============================================================================ *)
 
-parallel-obtain = '(' 'parallel-obtain'
-                    obtain-document+
-                  ')' ;
+comment = ";;" , { character - newline } , [ newline ] ;
 
-(* Graph Edge Creation *)
-create-edge = '(' 'create-edge'
-                ':from' identifier
-                ':to' identifier
-                ':type' edge-type
-                ':properties' property-map
-                ':evidenced-by' evidence-list
-              ')' ;
 
-edge-type = 'HAS_OWNERSHIP' | 'HAS_CONTROL' | 'IS_DIRECTOR_OF'
-          | 'IS_SECRETARY_OF' | 'HAS_SHAREHOLDER' | 'RESIDES_AT'
-          | 'HAS_REGISTERED_OFFICE' | 'EVIDENCED_BY' ;
+(* ============================================================================
+   VERB CALLS
+   ============================================================================
 
-evidence-list = '[' (string (',' string)*)? ']' ;
+   The core construct of the DSL. A verb call invokes a domain-specific
+   operation with keyword arguments.
 
-(* Attribute Solicitation *)
-solicit-attribute = '(' 'solicit-attribute'
-                      ':attr-id' identifier
-                      ':from' identifier
-                      ':value-type' type-spec
-                      property-list?
-                    ')' ;
+   Examples:
+     (cbu.ensure :name "Apex Fund" :jurisdiction "LU" :as @fund)
+     (entity.create-proper-person :first-name "John" :last-name "Smith")
+     (cbu.assign-role :cbu-id @fund :entity-id @person :role "DIRECTOR")
+   ============================================================================ *)
 
-(* UBO Calculation *)
-calculate-ubo = '(' 'calculate-ubo-prongs'
-                  ':target' identifier
-                  ':algorithm' string
-                  ':max-depth' integer
-                  ':threshold' number
-                  ':traversal-rules' rule-map
-                  ':output' output-map
-                ')' ;
+verb-call = "(" , domain-verb , { argument } , [ as-binding ] , ")" ;
 
-(* Conflict Resolution *)
-resolve-conflict = '(' 'resolve-conflicts'
-                     ':node' identifier
-                     ':property' string
-                     ':strategy' waterfall-strategy
-                     ':resolution' resolution-map
-                   ')' ;
+domain-verb = domain , "." , verb-name ;
 
-waterfall-strategy = '(' 'waterfall'
-                       source-priority+
-                     ')' ;
+domain = kebab-identifier ;
 
-source-priority = '(' source-type string ':confidence' number ')' ;
+verb-name = kebab-identifier ;
 
-source-type = 'primary-source' | 'government-registry'
-            | 'third-party-service' | 'self-declared' ;
+(* Arguments are keyword-value pairs *)
+argument = keyword , whitespace+ , value ;
 
-(* Report Generation *)
-generate-report = '(' 'generate-ubo-report'
-                    ':target' identifier
-                    ':status' string
-                    ':identified-ubos' ubo-list
-                    ':unresolved-prongs' prong-list
-                    property-list?
-                  ')' ;
+(* Keyword is a colon followed by an identifier *)
+keyword = ":" , kebab-identifier ;
 
-(* Monitoring *)
-schedule-monitoring = '(' 'schedule-monitoring'
-                        ':target' identifier
-                        ':frequency' string
-                        ':triggers' trigger-list
-                        property-list?
-                      ')' ;
+(* Optional binding directive - captures result for later reference *)
+as-binding = ":as" , whitespace+ , symbol-ref ;
 
-(* Control Flow *)
-parallel-block = '(' 'parallel' statement+ ')' ;
-sequential-block = '(' 'sequential' statement+ ')' ;
 
-(* Property Structures *)
-property-list = (property-pair)* ;
-property-pair = keyword value ;
+(* ============================================================================
+   VALUES
+   ============================================================================
 
-property-map = '{' (map-entry (',' map-entry)*)? '}' ;
-map-entry = keyword value ;
+   Values can be literals, symbol references, lists, maps, or nested verb calls.
 
-(* Value Types *)
-value = string | number | boolean | date | identifier
-      | list | map | multi-value ;
+   Types:
+   - String literals: "hello world"
+   - Integer literals: 42, -17
+   - Decimal literals: 3.14, -0.5
+   - Boolean literals: true, false
+   - Null literal: nil
+   - UUID literals: "550e8400-e29b-41d4-a716-446655440000" (auto-detected)
+   - Symbol references: @fund, @person, @my-binding
+   - Lists: ["a" "b" "c"], [1 2 3]
+   - Maps: {:key "value" :count 42}
+   - Nested verb calls: (inner.verb :arg value)
+   ============================================================================ *)
 
-multi-value = '[' value-with-source+ ']' ;
-value-with-source = '{' ':value' value ':source' string '}' ;
+value = boolean-literal
+      | null-literal
+      | symbol-ref
+      | string-literal
+      | number-literal
+      | nested-verb-call
+      | list-literal
+      | map-literal ;
 
-list = '[' (value (',' value)*)? ']' ;
-map = '{' (map-entry (',' map-entry)*)? '}' ;
+(* Boolean literals *)
+boolean-literal = "true" | "false" ;
 
-(* Primitives *)
-string = '"' character* '"' ;
-number = integer | float ;
-integer = digit+ ;
-float = digit+ '.' digit+ ;
-boolean = 'true' | 'false' ;
-date = string ;  (* ISO 8601 format in practice *)
-identifier = (letter | '-' | '_') (letter | digit | '-' | '_')* ;
-keyword = ':' identifier ;
+(* Null literal *)
+null-literal = "nil" ;
 
-letter = 'a'..'z' | 'A'..'Z' ;
-digit = '0'..'9' ;
-character = ? any character except '"' ? ;
+(* Symbol reference - refers to a previously bound result *)
+symbol-ref = "@" , identifier ;
 
-(* Comments *)
-comment = ';;' ? any character except newline ? newline ;
+(* String literal with escape sequences *)
+string-literal = '"' , { string-char | escape-sequence } , '"' ;
+
+string-char = ? any character except '"' and '\' ? ;
+
+escape-sequence = "\" , ( "n" | "r" | "t" | "\" | '"' ) ;
+
+(* Number literals - integers and decimals *)
+number-literal = [ "-" ] , digit+ , [ "." , digit+ ] ;
+
+(* Nested verb call - verb calls can appear as values *)
+nested-verb-call = verb-call ;
+
+(* List literal - ordered collection *)
+list-literal = "[" , [ value , { [ "," ] , value } ] , "]" ;
+
+(* Map literal - key-value collection with keyword keys *)
+map-literal = "{" , { keyword , whitespace+ , value } , "}" ;
+
+
+(* ============================================================================
+   IDENTIFIERS
+   ============================================================================
+
+   Identifiers support kebab-case naming convention (hyphens between words).
+
+   Valid examples:
+   - cbu, entity, kyc-case
+   - create-proper-person, assign-role
+   - my-binding, fund-a
+   ============================================================================ *)
+
+(* Kebab-case identifier - allows hyphens between words *)
+kebab-identifier = ( letter | "_" ) , { letter | digit | "_" | "-" } ;
+
+(* Standard identifier - no hyphens, used for symbol names *)
+identifier = ( letter | "_" ) , { letter | digit | "_" | "-" } ;
+
+
+(* ============================================================================
+   PRIMITIVES
+   ============================================================================ *)
+
+letter = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
+       | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
+       | "u" | "v" | "w" | "x" | "y" | "z"
+       | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
+       | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
+       | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+newline = ? line feed character (U+000A) ? ;
+
+whitespace = ? space, tab, newline, or carriage return ? ;
+
+character = ? any Unicode character ? ;
+
+
+(* ============================================================================
+   EXAMPLES
+   ============================================================================
+
+   Basic entity creation:
+
+     (entity.create-proper-person
+       :first-name "John"
+       :last-name "Smith"
+       :date-of-birth "1980-01-15"
+       :nationality "US"
+       :as @john)
+
+   CBU with role assignment:
+
+     (cbu.ensure :name "Apex Fund" :jurisdiction "LU" :client-type "FUND" :as @fund)
+     (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+
+   Nested verb call in list:
+
+     (kyc-case.create
+       :cbu-id @fund
+       :case-type "NEW_CLIENT"
+       :entities [@john @company]
+       :as @case)
+
+   Map value with nested data:
+
+     (test.verb :config {:name "Test" :value 42 :enabled true})
+
+   ============================================================================ *)
+
+
+(* ============================================================================
+   NOTES ON IMPLEMENTATION
+   ============================================================================
+
+   1. VERB REGISTRATION
+      Verbs are defined in YAML files under rust/config/verbs/*.yaml
+      The parser does NOT validate verb names - that happens in the
+      semantic validation phase using the RuntimeVerbRegistry.
+
+   2. ENTITY RESOLUTION
+      String arguments that reference entities are enriched post-parse
+      based on YAML verb definitions. The enrichment pass converts
+      Literal::String to EntityRef where lookup config exists.
+
+   3. UUID DETECTION
+      Strings that match UUID format are automatically parsed as
+      Literal::Uuid rather than Literal::String.
+
+   4. WHITESPACE
+      Whitespace between tokens is flexible - spaces, tabs, and newlines
+      are all treated equivalently. Multi-line statements are supported.
+
+   5. ERROR RECOVERY
+      The parser uses nom's cut combinator for better error messages.
+      Invalid syntax produces descriptive error messages with context.
+
+   ============================================================================ *)

@@ -276,48 +276,36 @@ The `dynamic_verbs` pattern in YAML suggests these could be auto-generated, but 
 
 ## Part 4: DSL Grammar Analysis
 
-### 4.1 EBNF vs Actual Implementation ⚠️ Divergence
+### 4.1 EBNF Grammar (Aligned with Parser)
 
-**The EBNF grammar (`docs/dsl-grammar.ebnf`) describes S-expressions:**
-```lisp
-(define-kyc-investigation "workflow-123"
-  :target entity-ref
-  (declare-entity :node-id comp1 :label Company ...)
-  (create-edge :from comp1 :to person1 :type HAS_OWNERSHIP ...)
-  (calculate-ubo-prongs :target comp1 :threshold 25.0 ...)
-)
-```
+**The EBNF grammar (`docs/dsl-grammar.ebnf`) now matches the NOM parser implementation (updated 2025-01-09).**
 
-**The actual parser (`dsl_v2/parser.rs`) implements:**
+**DSL syntax:**
 ```clojure
 (cbu.ensure :name "Apex Fund" :jurisdiction "LU" :as @fund)
-(entity.create-limited-company :name "Apex Holdings" :cbu-id @fund)
-(cbu.assign-role :cbu-id @fund :entity-id @entity :role "DIRECTOR")
+(entity.create-limited-company :name "Apex Holdings" :cbu-id @fund :as @company)
+(cbu.assign-role :cbu-id @fund :entity-id @company :role "DIRECTOR")
 ```
 
-**Key differences:**
-| Aspect | EBNF | Actual |
-|--------|------|--------|
-| Top-level | `define-kyc-investigation` wrapper | Flat statement list |
-| Node creation | `declare-entity :node-id X` | `domain.verb :args...` |
-| Edge creation | `create-edge :from :to :type` | Implicit via role/ownership verbs |
-| Binding | Not specified | `:as @symbol` |
-| Resolution | `identifier` references | `EntityRef` with `resolved_key` |
+**Grammar structure:**
+| Element | Syntax | Example |
+|---------|--------|---------|
+| Verb call | `(domain.verb :args... [:as @symbol])` | `(cbu.ensure :name "X")` |
+| Keyword arg | `:key value` | `:jurisdiction "LU"` |
+| Binding | `:as @symbol` | `:as @fund` |
+| Symbol ref | `@name` | `@fund`, `@entity` |
+| Values | strings, numbers, bools, nil, lists, maps | `"text"`, `42`, `true`, `[1 2]` |
 
-### 4.2 Recommendation: Reconcile or Deprecate EBNF
+### 4.2 Key Grammar Files
 
-**Option A:** Update EBNF to match actual implementation
-```ebnf
-program = statement* ;
-statement = verb_call | comment ;
-verb_call = '(' domain '.' verb argument* binding? ')' ;
-argument = ':' identifier value ;
-binding = ':as' '@' identifier ;
-value = string | number | boolean | symbol_ref | entity_ref | list | map ;
-symbol_ref = '@' identifier ;
-```
+| File | Purpose |
+|------|---------|
+| `docs/dsl-grammar.ebnf` | Formal EBNF grammar specification |
+| `rust/crates/dsl-core/src/parser.rs` | NOM combinator parser implementation |
+| `rust/crates/dsl-core/src/ast.rs` | AST types (Program, VerbCall, AstNode) |
+| `rust/config/verbs/*.yaml` | Verb definitions (drives semantic validation) |
 
-**Option B:** Keep EBNF as "future vision" and document divergence
+**Note:** The parser is grammar-driven but verb-agnostic. Verb validation happens in the semantic phase using `RuntimeVerbRegistry` loaded from YAML.
 
 ### 4.3 EntityRef Resolution ✅ Well Designed
 

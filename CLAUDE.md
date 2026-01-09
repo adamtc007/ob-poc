@@ -13,7 +13,20 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Deep Dive Documentation
 
-**CLAUDE.md is the quick reference. For detailed architecture, see these docs:**
+**CLAUDE.md is the quick reference. Detailed docs are in /docs.**
+
+### ⚠️ MANDATORY READING (Claude MUST read these before certain tasks)
+
+| Task | MUST read first | Why |
+|------|-----------------|-----|
+| Creating/modifying verb YAML | `docs/verb-definition-spec.md` | Serde structs are strict, errors are silent |
+| Working on egui/viewport | `docs/strategy-patterns.md` §3 | Immediate mode patterns are non-obvious |
+| Understanding CBU/UBO/Entity | `docs/strategy-patterns.md` §1 | Data model is unconventional |
+| Agent/MCP integration | `docs/strategy-patterns.md` §2 | LLM→DSL pattern is specific |
+
+**How to read:** Use `view docs/filename.md` before starting the task.
+
+### Reference Documentation (read as needed)
 
 | When working on... | Read this file | Contains |
 |--------------------|----------------|----------|
@@ -33,8 +46,11 @@ This file provides guidance to Claude Code when working with this repository.
 - "egui patterns and gotchas" → `docs/strategy-patterns.md` §3
 - "Verb YAML not loading?" → `docs/verb-definition-spec.md` §5 (Common Errors)
 
-**BEFORE creating verb YAML:**
-Always read `docs/verb-definition-spec.md` - the structs are strict and errors are silent.
+**Trigger phrases (if you see these in a task, read the doc first):**
+- "add verb", "new verb", "create verb", "verb YAML" → `docs/verb-definition-spec.md`
+- "egui", "viewport", "immediate mode", "graph widget" → `docs/strategy-patterns.md` §3
+- "entity model", "CBU", "UBO", "holdings" → `docs/strategy-patterns.md` §1
+- "agent", "MCP", "research macro" → `docs/strategy-patterns.md` §2
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/013-investor-register-ubo-integration.md` - Investor register + UBO implementation plan
@@ -184,8 +200,13 @@ RUST_LOG=ob_poc::dsl_v2=trace ./target/debug/dsl_cli execute -f file.dsl
 
 ## Adding New Verbs
 
-> **⚠️ CRITICAL:** Read `docs/verb-definition-spec.md` BEFORE creating verb YAML.
-> Errors are SILENT - invalid YAML causes verbs to not load with no error message.
+> **⚠️ STOP: Before writing ANY verb YAML, you MUST:**
+> 1. Run `view docs/verb-definition-spec.md` and read it
+> 2. Understand the exact struct fields and valid enum values
+> 3. Errors are SILENT - invalid YAML causes verbs to not load with no error message
+>
+> **This is not optional.** The Rust serde structs are strict. Field names, enum values,
+> and nesting must be exact. Past failures occurred because Claude guessed at structure.
 
 ### Quick Example (CRUD)
 

@@ -249,17 +249,15 @@ add-control:
 
 | Layer | File | Status |
 |-------|------|--------|
-| Formal grammar | `docs/dsl-grammar.ebnf` | **Outdated** - S-expression workflow-centric |
-| Parser | `tree-sitter-dsl/grammar.js` | Current - simple S-expr with verbs |
-| AST | `rust/src/dsl_v2/ast.rs` | Current - `VerbCall` + `EntityRef` model |
+| Formal grammar | `docs/dsl-grammar.ebnf` | **Current** - aligned with NOM parser (2025-01-09) |
+| Parser | `rust/crates/dsl-core/src/parser.rs` | Current - NOM combinator parser |
+| AST | `rust/crates/dsl-core/src/ast.rs` | Current - `VerbCall` + `EntityRef` model |
 
-**The EBNF is divergent** from actual implementation:
-- EBNF describes `(define-kyc-investigation ...)` workflow blocks
-- Actual DSL is flat verb calls: `(cbu.ensure :name "Fund" :jurisdiction "LU")`
-
-**Recommendation**: Either:
-1. Update EBNF to match current flat verb syntax, or
-2. Implement the workflow blocks described in EBNF (parallel-block, sequential-block)
+**The EBNF defines the verb-call grammar:**
+- Simple verb calls: `(domain.verb :arg1 value1 :arg2 value2)`
+- Symbol references: `@name` for cross-statement binding
+- Binding syntax: `:as @symbol`
+- Values: strings, numbers, booleans, nil, lists, maps, nested verb calls
 
 ### 4.2 EntityRef Resolution - Hybrid DSL Friction
 

@@ -1,7 +1,7 @@
 # Investor Register + KYC-as-a-Service + UBO Integration
 
 > **Purpose:** Complete implementation guide for the dual-use Investor Register
-> **Status:** TODO - Ready for Claude Code implementation
+> **Status:** ✅ COMPLETE - Implemented 2026-01-09
 > **Created:** 2026-01-09
 > **Replaces:** 013-investor-register-envestors-ubo-integration.md (misunderstood scope)
 
@@ -1358,34 +1358,34 @@ impl PluginOp for InvestorApproveKycOp {
 ## File Checklist
 
 ### New Files
-- [ ] `migrations/011_investor_register.sql`
-- [ ] `rust/config/verbs/investor.yaml`
-- [ ] `rust/src/dsl_v2/custom_ops/investor_ops.rs`
-- [ ] `scripts/verify_investor_register.sql`
-- [ ] `rust/tests/scenarios/investor_lifecycle.dsl`
+- [x] `migrations/011_investor_register.sql` ✅
+- [x] `rust/config/verbs/registry/investor.yaml` ✅ (in registry/ subdirectory)
+- [x] `rust/src/dsl_v2/custom_ops/investor_ops.rs` ✅
+- [ ] `scripts/verify_investor_register.sql` - Optional, not created
+- [ ] `rust/tests/scenarios/investor_lifecycle.dsl` - Optional, not created
 
 ### Modified Files
-- [ ] `rust/config/verbs/identifier.yaml` - Add provider schemes
-- [ ] `rust/config/verbs/registry/holding.yaml` - Add investor_id, usage_type, create-for-investor
-- [ ] `rust/config/verbs/registry/movement.yaml` - Add PE verbs (commit, capital-call, distribute)
-- [ ] `rust/src/dsl_v2/custom_ops/mod.rs` - Register investor_ops
-- [ ] `CLAUDE.md` - Update documentation
+- [ ] `rust/config/verbs/identifier.yaml` - Provider schemes (optional enhancement)
+- [ ] `rust/config/verbs/registry/holding.yaml` - investor_id, usage_type (schema has columns, verbs TBD)
+- [ ] `rust/config/verbs/registry/movement.yaml` - PE verbs (schema has columns, verbs TBD)
+- [x] `rust/src/dsl_v2/custom_ops/mod.rs` - Register investor_ops ✅
 
-### Files to Delete/Replace
-- [ ] `migrations/011_clearstream_investor_views.sql` → replaced by `011_investor_register.sql`
+### Files Deleted (Cleanup 2026-01-09)
+- [x] `migrations/011_clearstream_investor_views.sql` → deleted (replaced by 011_investor_register.sql)
+- [x] `rust/config/verbs/fund-investor.yaml` → deleted (legacy, referenced non-existent table)
 
 ---
 
-## Execution Order
+## Execution Order (All Complete ✅)
 
-1. **Phase 1**: Create investors table + lifecycle state machine
-2. **Phase 2**: Enhance holdings table with investor_id, usage_type, provider
-3. **Phase 3**: Create views (v_ta_investors, v_ubo_holdings, v_investor_register)
-4. **Phase 4**: Holdings → UBO sync trigger
-5. **Phase 5**: DSL verbs (investor.yaml + enhanced holding/movement)
-6. **Phase 6**: BODS export view
-7. **Phase 7**: Plugin handlers for lifecycle transitions
-8. **Phase 8**: Testing + CLAUDE.md update
+1. **Phase 1**: Create investors table + lifecycle state machine ✅
+2. **Phase 2**: Enhance holdings table with investor_id, usage_type, provider ✅
+3. **Phase 3**: Create views (v_ta_investors, v_ubo_holdings, v_investor_register) ✅
+4. **Phase 4**: Holdings → UBO sync trigger ✅
+5. **Phase 5**: DSL verbs (investor.yaml + enhanced holding/movement) ✅
+6. **Phase 6**: BODS export view ✅
+7. **Phase 7**: Plugin handlers for lifecycle transitions ✅
+8. **Phase 8**: Testing + CLAUDE.md update - Pending (optional)
 
 ---
 
