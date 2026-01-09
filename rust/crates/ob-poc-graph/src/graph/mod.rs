@@ -88,6 +88,9 @@ pub use spatial::{SpatialIndex, SpatialNode};
 // Re-export PanDirection from ob-poc-types for Esper-style navigation
 pub use ob_poc_types::PanDirection;
 
+// Import ViewportState for apply_viewport_state method
+use ob_poc_types::viewport::{CbuViewType, EnhanceArg, ViewportFocusState, ViewportState};
+
 /// View mode for the graph visualization
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ViewMode {
@@ -201,6 +204,8 @@ pub struct CbuGraphWidget {
     highlighted_type: Option<String>,
     /// Viewport render state for HUD animations
     viewport_render_state: ViewportRenderState,
+    /// Current viewport state from DSL (for HUD rendering)
+    viewport_state: Option<ViewportState>,
     /// Esper-style visual mode toggles (xray, peel, shadow, etc.)
     esper_render_state: EsperRenderState,
     /// Esper-style discrete stepped transition for enhance level changes
@@ -228,6 +233,7 @@ impl CbuGraphWidget {
             type_filter: None,
             highlighted_type: None,
             viewport_render_state: ViewportRenderState::new(),
+            viewport_state: None,
             esper_render_state: EsperRenderState::new(),
             esper_transition: None,
             current_enhance_level: 0,
@@ -878,6 +884,20 @@ impl CbuGraphWidget {
             Some(&self.esper_render_state),
         );
 
+        // Render viewport HUD overlay if viewport_state is available
+        // This shows breadcrumbs, enhance level indicator, confidence legend, view type selector
+        // Capture action to handle after graph borrows are released
+        let pending_hud_action = if let Some(ref viewport_state) = self.viewport_state {
+            render_viewport_hud(
+                ui,
+                viewport_state,
+                &mut self.viewport_render_state,
+                screen_rect,
+            )
+        } else {
+            ViewportAction::None
+        };
+
         // Render UI chrome (stats, controls)
         // Drop mutable borrow, reborrow immutably for rendering
         let graph = self.layout_graph.as_ref().unwrap();
@@ -908,6 +928,57 @@ impl CbuGraphWidget {
             match action {
                 input::EnhanceAction::Increment => self.increment_enhance_level(),
                 input::EnhanceAction::Decrement => self.decrement_enhance_level(),
+            }
+        }
+
+        // Handle pending viewport HUD action (after graph borrows released)
+        match pending_hud_action {
+            ViewportAction::Enhance { arg } => match arg {
+                EnhanceArg::Increment => self.increment_enhance_level(),
+                EnhanceArg::Decrement => self.decrement_enhance_level(),
+                EnhanceArg::Level(level) => self.set_enhance_level(level),
+                EnhanceArg::Max => self.set_enhance_level(4),
+                EnhanceArg::Reset => self.set_enhance_level(0),
+            },
+            ViewportAction::Ascend | ViewportAction::AscendToRoot => {
+                // Clear focus when ascending in hierarchy
+                self.input_state.clear_focus();
+            }
+            ViewportAction::FocusEntity { entity_id } => {
+                self.focus_node(&entity_id.to_string());
+            }
+            ViewportAction::ToggleEntityTypeFilter { entity_type } => {
+                // Convert ConcreteEntityType to the string format used by type_filter
+                let type_str = match entity_type {
+                    ob_poc_types::viewport::ConcreteEntityType::Company => "LIMITED_COMPANY",
+                    ob_poc_types::viewport::ConcreteEntityType::Partnership => "PARTNERSHIP",
+                    ob_poc_types::viewport::ConcreteEntityType::Trust => "TRUST",
+                    ob_poc_types::viewport::ConcreteEntityType::Person => "PROPER_PERSON",
+                };
+                // Toggle the entity type filter
+                if self.type_filter.as_deref() == Some(type_str) {
+                    self.set_type_filter(None);
+                } else {
+                    self.set_type_filter(Some(type_str.to_string()));
+                }
+            }
+            ViewportAction::ClearFilters => {
+                self.set_type_filter(None);
+            }
+            ViewportAction::SetConfidenceThreshold { threshold } => {
+                self.viewport_render_state
+                    .set_confidence_threshold(threshold);
+            }
+            // Actions that require server round-trip or don't apply to local widget state
+            ViewportAction::None
+            | ViewportAction::FocusCbu { .. }
+            | ViewportAction::FocusMatrix { .. }
+            | ViewportAction::FocusInstrumentType { .. }
+            | ViewportAction::ChangeViewType { .. }
+            | ViewportAction::SetSearchText { .. }
+            | ViewportAction::NavigateToBreadcrumb { .. } => {
+                // These actions need to be propagated to the app layer
+                // via GraphWidgetResponse or similar mechanism
             }
         }
 
@@ -1056,5 +1127,132 @@ impl CbuGraphWidget {
             egui::FontId::proportional(9.0),
             Color32::from_rgb(80, 80, 80),
         );
+    }
+
+    // =========================================================================
+    // VIEWPORT STATE APPLICATION (from DSL viewport.* verbs via session)
+    // =========================================================================
+
+    /// Apply a ViewportState from the session to this graph widget.
+    ///
+    /// This maps the DSL-driven viewport state to the widget's internal state:
+    /// - FocusManager.state → focus_node / clear_selection
+    /// - CbuViewType → view_mode mapping
+    /// - CameraState → camera position and zoom
+    /// - ViewportFilters → type_filter
+    /// - confidence_threshold → (stored for HUD rendering)
+    ///
+    /// Called when UI fetches session context and finds viewport_state.
+    pub fn apply_viewport_state(&mut self, state: &ViewportState) {
+        // 1. Apply focus state
+        match &state.focus.state {
+            ViewportFocusState::None => {
+                self.input_state.clear_focus();
+            }
+            ViewportFocusState::CbuContainer { enhance_level, .. } => {
+                // CBU container focus - set enhance level, no specific node focus
+                self.set_enhance_level(*enhance_level);
+            }
+            ViewportFocusState::CbuEntity {
+                entity,
+                entity_enhance,
+                container_enhance,
+                ..
+            } => {
+                // Focus on specific entity
+                self.focus_node(&entity.id.to_string());
+                // Use the higher of entity or container enhance
+                self.set_enhance_level((*entity_enhance).max(*container_enhance));
+            }
+            ViewportFocusState::CbuProductService {
+                target,
+                target_enhance,
+                ..
+            } => {
+                // Focus on product/service - extract ID from target
+                let target_id = match target {
+                    ob_poc_types::viewport::ProductServiceRef::Product { id } => id.to_string(),
+                    ob_poc_types::viewport::ProductServiceRef::Service { id } => id.to_string(),
+                    ob_poc_types::viewport::ProductServiceRef::ServiceResource { id } => {
+                        id.to_string()
+                    }
+                };
+                self.focus_node(&target_id);
+                self.set_enhance_level(*target_enhance);
+            }
+            ViewportFocusState::InstrumentMatrix { matrix_enhance, .. } => {
+                // Instrument matrix view - set enhance, no node focus
+                self.set_enhance_level(*matrix_enhance);
+            }
+            ViewportFocusState::InstrumentType { type_enhance, .. } => {
+                self.set_enhance_level(*type_enhance);
+            }
+            ViewportFocusState::ConfigNode { node_enhance, .. } => {
+                self.set_enhance_level(*node_enhance);
+            }
+        }
+
+        // 2. Apply view type → view mode mapping
+        let view_mode = match state.view_type {
+            CbuViewType::Structure | CbuViewType::Ownership => ViewMode::KycUbo,
+            CbuViewType::Accounts => ViewMode::ServiceDelivery,
+            CbuViewType::Compliance => ViewMode::KycUbo,
+            CbuViewType::Geographic => ViewMode::KycUbo,
+            CbuViewType::Temporal => ViewMode::KycUbo,
+            CbuViewType::Instruments => ViewMode::Trading,
+        };
+        if self.view_mode != view_mode {
+            self.view_mode = view_mode;
+            // Note: view mode change may need server refetch - handled by caller
+        }
+
+        // 3. Apply camera state
+        // Only apply if significantly different to avoid jitter
+        let camera_pos = egui::Pos2::new(state.camera.x, state.camera.y);
+        let current_pos = self.camera.center();
+        let pos_diff = (camera_pos - current_pos).length();
+        let zoom_diff = (state.camera.zoom - self.camera.zoom()).abs();
+
+        if pos_diff > 1.0 || zoom_diff > 0.01 {
+            self.camera.fly_to(camera_pos);
+            self.camera.zoom_to(state.camera.zoom);
+        }
+
+        // 4. Apply filters
+        // Entity type filter - take first if multiple
+        if let Some(ref entity_types) = state.filters.entity_types {
+            if let Some(first_type) = entity_types.first() {
+                let type_str = match first_type {
+                    ob_poc_types::viewport::ConcreteEntityType::Company => "LIMITED_COMPANY",
+                    ob_poc_types::viewport::ConcreteEntityType::Partnership => "PARTNERSHIP",
+                    ob_poc_types::viewport::ConcreteEntityType::Trust => "TRUST",
+                    ob_poc_types::viewport::ConcreteEntityType::Person => "PROPER_PERSON",
+                };
+                self.set_type_filter(Some(type_str.to_string()));
+            }
+        } else {
+            self.set_type_filter(None);
+        }
+
+        // 5. Store confidence threshold in viewport render state for HUD
+        self.viewport_render_state
+            .set_confidence_threshold(state.confidence_threshold);
+
+        // 6. Store the full viewport state for HUD rendering
+        self.viewport_state = Some(state.clone());
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "apply_viewport_state: focus={:?}, view_type={:?}, zoom={:.2}",
+                state.focus.state, state.view_type, state.camera.zoom
+            )
+            .into(),
+        );
+    }
+
+    /// Get reference to the viewport render state (for HUD rendering)
+    pub fn viewport_render_state(&self) -> &ViewportRenderState {
+        &self.viewport_render_state
     }
 }

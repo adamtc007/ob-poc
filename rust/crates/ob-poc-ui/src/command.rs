@@ -239,6 +239,174 @@ pub enum NavigationVerb {
     None,
 }
 
+impl NavigationVerb {
+    /// Convert the navigation verb to a DSL string for logging/audit.
+    ///
+    /// Uses the `nav.*` domain for navigation commands.
+    pub fn to_dsl_string(&self) -> String {
+        match self {
+            // Basic Navigation
+            NavigationVerb::ZoomIn { factor } => match factor {
+                Some(f) => format!("(nav.zoom :direction in :factor {})", f),
+                None => "(nav.zoom :direction in)".to_string(),
+            },
+            NavigationVerb::ZoomOut { factor } => match factor {
+                Some(f) => format!("(nav.zoom :direction out :factor {})", f),
+                None => "(nav.zoom :direction out)".to_string(),
+            },
+            NavigationVerb::ZoomFit => "(nav.zoom :fit true)".to_string(),
+            NavigationVerb::ZoomTo { level } => format!("(nav.zoom :level {})", level),
+            NavigationVerb::Pan { direction, amount } => {
+                let dir = match direction {
+                    PanDirection::Left => "left",
+                    PanDirection::Right => "right",
+                    PanDirection::Up => "up",
+                    PanDirection::Down => "down",
+                };
+                match amount {
+                    Some(a) => format!("(nav.pan :direction {} :amount {})", dir, a),
+                    None => format!("(nav.pan :direction {})", dir),
+                }
+            }
+            NavigationVerb::Center => "(nav.center)".to_string(),
+            NavigationVerb::Stop => "(nav.stop)".to_string(),
+            NavigationVerb::FocusEntity { entity_id } => {
+                format!("(nav.focus :entity-id \"{}\")", entity_id)
+            }
+            NavigationVerb::ResetLayout => "(nav.reset-layout)".to_string(),
+
+            // View Mode
+            NavigationVerb::SetViewMode { mode } => {
+                let mode_str = match mode {
+                    ViewMode::KycUbo => "kyc-ubo",
+                    ViewMode::ServiceDelivery => "service-delivery",
+                    ViewMode::ProductsOnly => "products-only",
+                    ViewMode::Trading => "trading",
+                };
+                format!("(nav.set-view-mode :mode {})", mode_str)
+            }
+
+            // Type Filtering
+            NavigationVerb::FilterByType { type_codes } => {
+                if type_codes.is_empty() {
+                    "(nav.filter-by-type)".to_string()
+                } else {
+                    let codes = type_codes
+                        .iter()
+                        .map(|c| format!("\"{}\"", c))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    format!("(nav.filter-by-type :types [{}])", codes)
+                }
+            }
+            NavigationVerb::HighlightType { type_code } => {
+                format!("(nav.highlight-type :type \"{}\")", type_code)
+            }
+            NavigationVerb::ClearFilter => "(nav.clear-filter)".to_string(),
+
+            // Scale Navigation (astronomical metaphor)
+            NavigationVerb::ScaleUniverse => "(nav.scale :level universe)".to_string(),
+            NavigationVerb::ScaleBook { client_name } => {
+                format!("(nav.scale :level book :client \"{}\")", client_name)
+            }
+            NavigationVerb::ScaleGalaxy { segment } => match segment {
+                Some(s) => format!("(nav.scale :level galaxy :segment \"{}\")", s),
+                None => "(nav.scale :level galaxy)".to_string(),
+            },
+            NavigationVerb::ScaleSystem { cbu_id } => match cbu_id {
+                Some(id) => format!("(nav.scale :level system :cbu-id \"{}\")", id),
+                None => "(nav.scale :level system)".to_string(),
+            },
+            NavigationVerb::ScalePlanet { entity_id } => match entity_id {
+                Some(id) => format!("(nav.scale :level planet :entity-id \"{}\")", id),
+                None => "(nav.scale :level planet)".to_string(),
+            },
+            NavigationVerb::ScaleSurface => "(nav.scale :level surface)".to_string(),
+            NavigationVerb::ScaleCore => "(nav.scale :level core)".to_string(),
+
+            // Depth Navigation
+            NavigationVerb::DrillThrough => "(nav.drill-through)".to_string(),
+            NavigationVerb::SurfaceReturn => "(nav.surface-return)".to_string(),
+            NavigationVerb::Xray => "(nav.xray)".to_string(),
+            NavigationVerb::Peel => "(nav.peel)".to_string(),
+            NavigationVerb::CrossSection => "(nav.cross-section)".to_string(),
+            NavigationVerb::DepthIndicator => "(nav.depth-indicator)".to_string(),
+
+            // Orbital Navigation
+            NavigationVerb::Orbit { entity_id } => match entity_id {
+                Some(id) => format!("(nav.orbit :entity-id \"{}\")", id),
+                None => "(nav.orbit)".to_string(),
+            },
+            NavigationVerb::RotateLayer { layer } => {
+                format!("(nav.rotate-layer :layer \"{}\")", layer)
+            }
+            NavigationVerb::Flip => "(nav.flip)".to_string(),
+            NavigationVerb::Tilt { dimension } => {
+                format!("(nav.tilt :dimension \"{}\")", dimension)
+            }
+
+            // Temporal Navigation
+            NavigationVerb::TimeRewind { target_date } => match target_date {
+                Some(d) => format!("(nav.time-rewind :target-date \"{}\")", d),
+                None => "(nav.time-rewind)".to_string(),
+            },
+            NavigationVerb::TimePlay { from, to } => {
+                let mut args = String::new();
+                if let Some(f) = from {
+                    args.push_str(&format!(" :from \"{}\"", f));
+                }
+                if let Some(t) = to {
+                    args.push_str(&format!(" :to \"{}\"", t));
+                }
+                format!("(nav.time-play{})", args)
+            }
+            NavigationVerb::TimeFreeze => "(nav.time-freeze)".to_string(),
+            NavigationVerb::TimeSlice { date1, date2 } => {
+                let mut args = String::new();
+                if let Some(d1) = date1 {
+                    args.push_str(&format!(" :date1 \"{}\"", d1));
+                }
+                if let Some(d2) = date2 {
+                    args.push_str(&format!(" :date2 \"{}\"", d2));
+                }
+                format!("(nav.time-slice{})", args)
+            }
+            NavigationVerb::TimeTrail { entity_id } => match entity_id {
+                Some(id) => format!("(nav.time-trail :entity-id \"{}\")", id),
+                None => "(nav.time-trail)".to_string(),
+            },
+
+            // Investigation Patterns
+            NavigationVerb::FollowRabbit { from_entity } => match from_entity {
+                Some(id) => format!("(nav.follow-rabbit :from-entity \"{}\")", id),
+                None => "(nav.follow-rabbit)".to_string(),
+            },
+            NavigationVerb::DiveInto { entity_id } => match entity_id {
+                Some(id) => format!("(nav.dive-into :entity-id \"{}\")", id),
+                None => "(nav.dive-into)".to_string(),
+            },
+            NavigationVerb::WhoControls { entity_id } => match entity_id {
+                Some(id) => format!("(nav.who-controls :entity-id \"{}\")", id),
+                None => "(nav.who-controls)".to_string(),
+            },
+            NavigationVerb::Illuminate { aspect } => {
+                format!("(nav.illuminate :aspect \"{}\")", aspect)
+            }
+            NavigationVerb::Shadow => "(nav.shadow)".to_string(),
+            NavigationVerb::RedFlagScan => "(nav.red-flag-scan)".to_string(),
+            NavigationVerb::BlackHole => "(nav.black-hole)".to_string(),
+
+            // Context
+            NavigationVerb::SetContext { context } => {
+                format!("(nav.set-context :context \"{}\")", context)
+            }
+
+            // No-op
+            NavigationVerb::None => "(nav.noop)".to_string(),
+        }
+    }
+}
+
 // =============================================================================
 // AGENT PROMPT - Commands that need server/agent processing
 // =============================================================================
@@ -709,9 +877,7 @@ fn try_match_investigation_query(
 
     if text_lower.starts_with("execute") || text_lower.starts_with("run dsl") {
         // Extract DSL after the command
-        let dsl = if text_lower.starts_with("execute ") {
-            text[8..].trim().to_string()
-        } else if text_lower.starts_with("run dsl ") {
+        let dsl = if text_lower.starts_with("execute ") || text_lower.starts_with("run dsl ") {
             text[8..].trim().to_string()
         } else {
             text.to_string()

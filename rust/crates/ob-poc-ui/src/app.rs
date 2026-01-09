@@ -70,6 +70,7 @@ impl App {
             universe_graph: None,
             last_known_version: None,
             last_version_check: None,
+            navigation_log: Vec::new(),
         };
 
         // Try to restore session from localStorage
@@ -150,7 +151,9 @@ impl App {
 
             // Route based on command result
             match result {
-                CommandResult::Navigation(verb) => self.execute_navigation_verb(verb),
+                CommandResult::Navigation(verb) => {
+                    self.execute_navigation_verb(verb, Some(source.clone()))
+                }
                 CommandResult::Agent(prompt) => self.send_to_agent(prompt),
                 CommandResult::None => {}
             }
@@ -159,10 +162,36 @@ impl App {
 
     /// Execute a navigation verb from any command source (voice, chat, egui).
     /// These are LOCAL UI commands - no server round-trip needed.
+    ///
+    /// If `source` is provided, the command is logged to the navigation audit trail.
     #[cfg(target_arch = "wasm32")]
-    fn execute_navigation_verb(&mut self, verb: crate::command::NavigationVerb) {
+    fn execute_navigation_verb(
+        &mut self,
+        verb: crate::command::NavigationVerb,
+        source: Option<crate::command::CommandSource>,
+    ) {
         use crate::command::NavigationVerb;
+        use crate::state::NavigationSource;
         use ob_poc_types::PanDirection;
+
+        // Log to navigation audit trail (skip None commands)
+        if !matches!(verb, NavigationVerb::None) {
+            let dsl = verb.to_dsl_string();
+            let nav_source = match source {
+                Some(crate::command::CommandSource::Voice {
+                    transcript,
+                    confidence,
+                    ..
+                }) => NavigationSource::Voice {
+                    transcript,
+                    confidence,
+                },
+                Some(crate::command::CommandSource::Chat) => NavigationSource::Widget,
+                Some(crate::command::CommandSource::Egui) => NavigationSource::Widget,
+                None => NavigationSource::Programmatic,
+            };
+            self.state.log_navigation(dsl, nav_source);
+        }
 
         match verb {
             NavigationVerb::None => {}
@@ -2832,7 +2861,7 @@ impl AppState {
                                             )
                                             .into(),
                                         );
-                                        state.pending_pan = Some((direction.clone(), *amount));
+                                        state.pending_pan = Some((*direction, *amount));
                                     }
                                     ob_poc_types::AgentCommand::Center => {
                                         web_sys::console::log_1(&"Command: Center".into());

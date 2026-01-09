@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pf3wukrb5CpdDVMpSX0oXeGguoJxqUBr2OLDvKfrIllBTuOTtyT8Gbzalkv5wGV
+\restrict Zh78Q7k6iRiQlrgnxsU3ZXjcf2ogl6R2kZcrFNBbhbOOl6y4o7UYOwACwqtsPtn
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -3602,7 +3602,12 @@ CREATE TABLE "ob-poc".entities (
     external_id character varying(255),
     name character varying(255) NOT NULL,
     created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text)
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    bods_entity_type character varying(30),
+    bods_entity_subtype character varying(30),
+    founding_date date,
+    dissolution_date date,
+    is_publicly_listed boolean DEFAULT false
 );
 
 
@@ -5241,6 +5246,49 @@ COMMENT ON COLUMN "ob-poc".bods_entity_statements.lei IS 'LEI identifier if pres
 
 
 --
+-- Name: bods_entity_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bods_entity_types (
+    type_code character varying(30) NOT NULL,
+    display_name character varying(100) NOT NULL,
+    description text,
+    subtypes jsonb DEFAULT '[]'::jsonb,
+    display_order integer DEFAULT 0
+);
+
+
+--
+-- Name: TABLE bods_entity_types; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".bods_entity_types IS 'BODS 0.4 entity type codelist.';
+
+
+--
+-- Name: bods_interest_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bods_interest_types (
+    type_code character varying(50) NOT NULL,
+    display_name character varying(100) NOT NULL,
+    category character varying(30) NOT NULL,
+    description text,
+    bods_standard boolean DEFAULT true,
+    requires_percentage boolean DEFAULT false,
+    display_order integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE bods_interest_types; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".bods_interest_types IS 'BODS 0.4 standard interest types (22 types). Codelist for entity_relationships.interest_type.';
+
+
+--
 -- Name: bods_ownership_statements; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -5634,7 +5682,7 @@ CREATE TABLE "ob-poc".entity_relationships (
     ownership_type character varying(30),
     control_type character varying(30),
     trust_role character varying(30),
-    interest_type character varying(20),
+    interest_type character varying(50),
     effective_from date,
     effective_to date,
     source character varying(100),
@@ -5647,6 +5695,15 @@ CREATE TABLE "ob-poc".entity_relationships (
     trust_class_description text,
     is_regulated boolean DEFAULT true,
     regulatory_jurisdiction character varying(20),
+    direct_or_indirect character varying(10) DEFAULT 'unknown'::character varying,
+    share_minimum numeric(5,2),
+    share_maximum numeric(5,2),
+    share_exclusive_minimum boolean DEFAULT false,
+    share_exclusive_maximum boolean DEFAULT false,
+    is_component boolean DEFAULT false,
+    component_of_relationship_id uuid,
+    statement_date date,
+    replaces_relationship_id uuid,
     CONSTRAINT chk_er_no_self_reference CHECK ((from_entity_id <> to_entity_id)),
     CONSTRAINT chk_er_ownership_has_percentage CHECK ((((relationship_type)::text <> 'ownership'::text) OR (percentage IS NOT NULL))),
     CONSTRAINT chk_er_relationship_type CHECK (((relationship_type)::text = ANY ((ARRAY['ownership'::character varying, 'control'::character varying, 'trust_role'::character varying, 'employment'::character varying, 'management'::character varying])::text[]))),
@@ -7325,6 +7382,18 @@ CREATE TABLE "ob-poc".entity_identifiers (
     valid_until date,
     source character varying(50),
     created_at timestamp with time zone DEFAULT now(),
+    scheme_name character varying(100),
+    uri character varying(500),
+    is_validated boolean DEFAULT false,
+    validated_at timestamp with time zone,
+    validation_source character varying(100),
+    validation_details jsonb DEFAULT '{}'::jsonb,
+    lei_status character varying(30),
+    lei_next_renewal date,
+    lei_managing_lou character varying(100),
+    lei_initial_registration date,
+    lei_last_update timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now(),
     CONSTRAINT valid_identifier_type CHECK (((identifier_type)::text = ANY ((ARRAY['LEI'::character varying, 'BIC'::character varying, 'ISIN'::character varying, 'CIK'::character varying, 'MIC'::character varying, 'REG_NUM'::character varying, 'FIGI'::character varying, 'CUSIP'::character varying, 'SEDOL'::character varying])::text[])))
 );
 
@@ -7333,7 +7402,7 @@ CREATE TABLE "ob-poc".entity_identifiers (
 -- Name: TABLE entity_identifiers; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".entity_identifiers IS 'Cross-reference identifiers from GLEIF (LEI, BIC mappings, etc.) and other sources';
+COMMENT ON TABLE "ob-poc".entity_identifiers IS 'Unified identifier storage for entities. LEI is the global spine, supports any identifier scheme.';
 
 
 --
@@ -7615,7 +7684,7 @@ CREATE TABLE "ob-poc".entity_relationships_history (
     ownership_type character varying(30),
     control_type character varying(30),
     trust_role character varying(30),
-    interest_type character varying(20),
+    interest_type character varying(50),
     effective_from date,
     effective_to date,
     source character varying(100),
@@ -7947,6 +8016,41 @@ CREATE TABLE "ob-poc".fund_structure (
     created_at timestamp with time zone DEFAULT now(),
     created_by character varying(100)
 );
+
+
+--
+-- Name: gleif_relationships; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".gleif_relationships (
+    gleif_rel_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    parent_entity_id uuid NOT NULL,
+    parent_lei character varying(20) NOT NULL,
+    child_entity_id uuid NOT NULL,
+    child_lei character varying(20) NOT NULL,
+    relationship_type character varying(50) NOT NULL,
+    relationship_status character varying(30),
+    relationship_qualifier character varying(50),
+    ownership_percentage numeric(5,2),
+    ownership_percentage_min numeric(5,2),
+    ownership_percentage_max numeric(5,2),
+    accounting_standard character varying(50),
+    start_date date,
+    end_date date,
+    gleif_record_id character varying(100),
+    gleif_registration_status character varying(30),
+    fetched_at timestamp with time zone DEFAULT now(),
+    raw_data jsonb,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE gleif_relationships; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".gleif_relationships IS 'GLEIF corporate hierarchy (consolidation). SEPARATE from entity_relationships (UBO/KYC). GLEIF = accounting, UBO = beneficial ownership.';
 
 
 --
@@ -8588,6 +8692,40 @@ CREATE TABLE "ob-poc".onboarding_tasks (
     retry_count integer DEFAULT 0,
     CONSTRAINT onboarding_tasks_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'complete'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
+
+
+--
+-- Name: person_pep_status; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".person_pep_status (
+    pep_status_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    person_entity_id uuid NOT NULL,
+    status character varying(20) NOT NULL,
+    reason text,
+    jurisdiction character varying(10),
+    position_held text,
+    position_level character varying(30),
+    start_date date,
+    end_date date,
+    source_type character varying(50),
+    source_reference text,
+    screening_id uuid,
+    verified_at timestamp with time zone,
+    verified_by character varying(255),
+    verification_notes text,
+    pep_risk_level character varying(20),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT person_pep_status_status_check CHECK (((status)::text = ANY ((ARRAY['isPep'::character varying, 'isNotPep'::character varying, 'unknown'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE person_pep_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".person_pep_status IS 'BODS-compliant PEP status tracking.';
 
 
 --
@@ -10690,6 +10828,24 @@ CREATE VIEW "ob-poc".v_document_extraction_map AS
 
 
 --
+-- Name: v_entities_with_lei; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_entities_with_lei AS
+ SELECT e.entity_id,
+    e.name,
+    e.bods_entity_type,
+    et.type_code AS entity_type_code,
+    ei.identifier_value AS lei,
+    ei.lei_status,
+    ei.lei_next_renewal,
+    ei.is_validated AS lei_validated
+   FROM (("ob-poc".entities e
+     JOIN "ob-poc".entity_types et ON ((et.entity_type_id = e.entity_type_id)))
+     LEFT JOIN "ob-poc".entity_identifiers ei ON (((ei.entity_id = e.entity_id) AND ((ei.identifier_type)::text = 'LEI'::text))));
+
+
+--
 -- Name: v_entity_regulatory_status; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -10773,6 +10929,30 @@ CREATE VIEW "ob-poc".v_execution_verb_audit AS
 --
 
 COMMENT ON VIEW "ob-poc".v_execution_verb_audit IS 'Execution log with verb versioning audit info. has_stale_verb_refs=true means verb config changed since execution.';
+
+
+--
+-- Name: v_gleif_hierarchy; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_gleif_hierarchy AS
+ SELECT gr.gleif_rel_id,
+    gr.parent_entity_id,
+    parent.name AS parent_name,
+    gr.parent_lei,
+    gr.child_entity_id,
+    child.name AS child_name,
+    gr.child_lei,
+    gr.relationship_type,
+    gr.relationship_status,
+    gr.ownership_percentage,
+    gr.accounting_standard,
+    gr.start_date,
+    gr.end_date
+   FROM (("ob-poc".gleif_relationships gr
+     JOIN "ob-poc".entities parent ON ((parent.entity_id = gr.parent_entity_id)))
+     JOIN "ob-poc".entities child ON ((child.entity_id = gr.child_entity_id)))
+  WHERE (((gr.relationship_status)::text = 'ACTIVE'::text) OR (gr.relationship_status IS NULL));
 
 
 --
@@ -10992,6 +11172,34 @@ CREATE VIEW "ob-poc".v_ubo_evidence_summary AS
 --
 
 COMMENT ON VIEW "ob-poc".v_ubo_evidence_summary IS 'Summary view of UBO records with evidence status';
+
+
+--
+-- Name: v_ubo_interests; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_ubo_interests AS
+ SELECT er.relationship_id,
+    er.from_entity_id AS interested_party_id,
+    owner.name AS interested_party_name,
+    er.to_entity_id AS subject_id,
+    subject.name AS subject_name,
+    er.interest_type,
+    "bit".display_name AS interest_type_display,
+    "bit".category AS interest_category,
+    er.direct_or_indirect,
+    COALESCE(er.percentage, er.share_minimum, er.share_maximum) AS ownership_share,
+    er.share_minimum,
+    er.share_maximum,
+    er.effective_from,
+    er.effective_to,
+    er.is_component,
+    er.component_of_relationship_id
+   FROM ((("ob-poc".entity_relationships er
+     JOIN "ob-poc".entities owner ON ((owner.entity_id = er.from_entity_id)))
+     JOIN "ob-poc".entities subject ON ((subject.entity_id = er.to_entity_id)))
+     LEFT JOIN "ob-poc".bods_interest_types "bit" ON ((("bit".type_code)::text = (er.interest_type)::text)))
+  WHERE (((er.relationship_type)::text = ANY ((ARRAY['ownership'::character varying, 'control'::character varying, 'trust_role'::character varying])::text[])) AND ((er.effective_to IS NULL) OR (er.effective_to > CURRENT_DATE)));
 
 
 --
@@ -13142,6 +13350,22 @@ ALTER TABLE ONLY "ob-poc".bods_entity_statements
 
 
 --
+-- Name: bods_entity_types bods_entity_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bods_entity_types
+    ADD CONSTRAINT bods_entity_types_pkey PRIMARY KEY (type_code);
+
+
+--
+-- Name: bods_interest_types bods_interest_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bods_interest_types
+    ADD CONSTRAINT bods_interest_types_pkey PRIMARY KEY (type_code);
+
+
+--
 -- Name: bods_ownership_statements bods_ownership_statements_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -14118,6 +14342,22 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
+-- Name: gleif_relationships gleif_relationships_parent_lei_child_lei_relationship_type_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".gleif_relationships
+    ADD CONSTRAINT gleif_relationships_parent_lei_child_lei_relationship_type_key UNIQUE (parent_lei, child_lei, relationship_type);
+
+
+--
+-- Name: gleif_relationships gleif_relationships_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".gleif_relationships
+    ADD CONSTRAINT gleif_relationships_pkey PRIMARY KEY (gleif_rel_id);
+
+
+--
 -- Name: gleif_sync_log gleif_sync_log_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -14347,6 +14587,14 @@ ALTER TABLE ONLY "ob-poc".onboarding_requests
 
 ALTER TABLE ONLY "ob-poc".onboarding_tasks
     ADD CONSTRAINT onboarding_tasks_pkey PRIMARY KEY (task_id);
+
+
+--
+-- Name: person_pep_status person_pep_status_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".person_pep_status
+    ADD CONSTRAINT person_pep_status_pkey PRIMARY KEY (pep_status_id);
 
 
 --
@@ -17099,6 +17347,13 @@ CREATE INDEX idx_edge_types_ubo ON "ob-poc".edge_types USING btree (show_in_ubo_
 
 
 --
+-- Name: idx_entities_bods_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entities_bods_type ON "ob-poc".entities USING btree (bods_entity_type);
+
+
+--
 -- Name: idx_entities_external_id; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -17239,6 +17494,20 @@ CREATE INDEX idx_entity_funds_parent ON "ob-poc".entity_funds USING btree (paren
 
 
 --
+-- Name: idx_entity_identifiers_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_identifiers_lei ON "ob-poc".entity_identifiers USING btree (identifier_value) WHERE ((identifier_type)::text = 'LEI'::text);
+
+
+--
+-- Name: idx_entity_identifiers_lei_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_identifiers_lei_status ON "ob-poc".entity_identifiers USING btree (lei_status) WHERE ((identifier_type)::text = 'LEI'::text);
+
+
+--
 -- Name: idx_entity_identifiers_lookup; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -17302,10 +17571,24 @@ CREATE INDEX idx_entity_reg_profile_regulator ON "ob-poc".entity_regulatory_prof
 
 
 --
+-- Name: idx_entity_rel_component_of; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_rel_component_of ON "ob-poc".entity_relationships USING btree (component_of_relationship_id) WHERE (is_component = true);
+
+
+--
 -- Name: idx_entity_rel_from; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_entity_rel_from ON "ob-poc".entity_relationships USING btree (from_entity_id);
+
+
+--
+-- Name: idx_entity_rel_interest_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entity_rel_interest_type ON "ob-poc".entity_relationships USING btree (interest_type);
 
 
 --
@@ -17593,6 +17876,41 @@ CREATE INDEX idx_gen_log_session ON "ob-poc".dsl_generation_log USING btree (ses
 --
 
 CREATE INDEX idx_gen_log_success ON "ob-poc".dsl_generation_log USING btree (success) WHERE (success = true);
+
+
+--
+-- Name: idx_gleif_rel_child; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_gleif_rel_child ON "ob-poc".gleif_relationships USING btree (child_entity_id);
+
+
+--
+-- Name: idx_gleif_rel_child_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_gleif_rel_child_lei ON "ob-poc".gleif_relationships USING btree (child_lei);
+
+
+--
+-- Name: idx_gleif_rel_parent; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_gleif_rel_parent ON "ob-poc".gleif_relationships USING btree (parent_entity_id);
+
+
+--
+-- Name: idx_gleif_rel_parent_lei; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_gleif_rel_parent_lei ON "ob-poc".gleif_relationships USING btree (parent_lei);
+
+
+--
+-- Name: idx_gleif_rel_type; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_gleif_rel_type ON "ob-poc".gleif_relationships USING btree (relationship_type);
 
 
 --
@@ -18006,6 +18324,27 @@ CREATE INDEX idx_partnerships_jurisdiction ON "ob-poc".entity_partnerships USING
 --
 
 CREATE INDEX idx_partnerships_type ON "ob-poc".entity_partnerships USING btree (partnership_type);
+
+
+--
+-- Name: idx_person_pep_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_person_pep_active ON "ob-poc".person_pep_status USING btree (person_entity_id) WHERE (((status)::text = 'isPep'::text) AND (end_date IS NULL));
+
+
+--
+-- Name: idx_person_pep_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_person_pep_entity ON "ob-poc".person_pep_status USING btree (person_entity_id);
+
+
+--
+-- Name: idx_person_pep_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_person_pep_status ON "ob-poc".person_pep_status USING btree (status);
 
 
 --
@@ -21343,6 +21682,22 @@ ALTER TABLE ONLY "ob-poc".fund_structure
 
 
 --
+-- Name: gleif_relationships gleif_relationships_child_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".gleif_relationships
+    ADD CONSTRAINT gleif_relationships_child_entity_id_fkey FOREIGN KEY (child_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: gleif_relationships gleif_relationships_parent_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".gleif_relationships
+    ADD CONSTRAINT gleif_relationships_parent_entity_id_fkey FOREIGN KEY (parent_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
 -- Name: gleif_sync_log gleif_sync_log_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -21540,6 +21895,14 @@ ALTER TABLE ONLY "ob-poc".onboarding_tasks
 
 ALTER TABLE ONLY "ob-poc".onboarding_tasks
     ADD CONSTRAINT onboarding_tasks_resource_instance_id_fkey FOREIGN KEY (resource_instance_id) REFERENCES "ob-poc".cbu_resource_instances(instance_id);
+
+
+--
+-- Name: person_pep_status person_pep_status_person_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".person_pep_status
+    ADD CONSTRAINT person_pep_status_person_entity_id_fkey FOREIGN KEY (person_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
 
 
 --
@@ -22234,5 +22597,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pf3wukrb5CpdDVMpSX0oXeGguoJxqUBr2OLDvKfrIllBTuOTtyT8Gbzalkv5wGV
+\unrestrict Zh78Q7k6iRiQlrgnxsU3ZXjcf2ogl6R2kZcrFNBbhbOOl6y4o7UYOwACwqtsPtn
 

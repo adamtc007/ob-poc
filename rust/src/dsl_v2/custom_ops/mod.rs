@@ -58,6 +58,7 @@ mod ubo_analysis;
 pub mod ubo_graph_ops;
 mod verify_ops;
 mod view_ops;
+mod viewport_ops;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -247,6 +248,12 @@ pub use view_ops::{
     ViewXrayOp,
     ViewZoomInOp,
     ViewZoomOutOp,
+};
+
+// Viewport operations (viewport state management for Decker/Esper navigation)
+pub use viewport_ops::{
+    ViewportAscendOp, ViewportCameraOp, ViewportClearOp, ViewportDescendOp, ViewportEnhanceOp,
+    ViewportFilterOp, ViewportFocusOp, ViewportTrackOp, ViewportViewTypeOp,
 };
 
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
@@ -643,6 +650,17 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ViewDetailOp));
         registry.register(Arc::new(ViewContextOp));
 
+        // Viewport operations (viewport state management for Decker/Esper navigation)
+        registry.register(Arc::new(ViewportFocusOp));
+        registry.register(Arc::new(ViewportEnhanceOp));
+        registry.register(Arc::new(ViewportAscendOp));
+        registry.register(Arc::new(ViewportDescendOp));
+        registry.register(Arc::new(ViewportCameraOp));
+        registry.register(Arc::new(ViewportFilterOp));
+        registry.register(Arc::new(ViewportTrackOp));
+        registry.register(Arc::new(ViewportClearOp));
+        registry.register(Arc::new(ViewportViewTypeOp));
+
         // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
         // Capital operations (share class transfers, reconciliation, ownership chains)
         registry.register(Arc::new(CapitalTransferOp));
@@ -869,6 +887,16 @@ mod tests {
         assert!(registry.has("view", "black-holes"));
         assert!(registry.has("view", "detail"));
         assert!(registry.has("view", "context"));
+        // Viewport operations (Decker/Esper viewport state management)
+        assert!(registry.has("viewport", "focus"));
+        assert!(registry.has("viewport", "enhance"));
+        assert!(registry.has("viewport", "ascend"));
+        assert!(registry.has("viewport", "descend"));
+        assert!(registry.has("viewport", "camera"));
+        assert!(registry.has("viewport", "filter"));
+        assert!(registry.has("viewport", "track"));
+        assert!(registry.has("viewport", "clear"));
+        assert!(registry.has("viewport", "view-type"));
         // KYC Control Enhancement: Capital operations
         assert!(registry.has("capital", "transfer"));
         assert!(registry.has("capital", "reconcile"));

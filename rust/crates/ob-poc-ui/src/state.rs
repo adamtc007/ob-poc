@@ -45,6 +45,34 @@ pub enum MessageRole {
     Agent,
 }
 
+/// Source of a navigation command (for audit trail)
+#[derive(Clone, Debug, PartialEq)]
+pub enum NavigationSource {
+    /// Voice command with transcript and confidence
+    Voice { transcript: String, confidence: f32 },
+    /// Keyboard shortcut
+    Keyboard,
+    /// Mouse/touch gesture
+    Gesture,
+    /// UI button/widget click
+    Widget,
+    /// Programmatic (e.g., from agent)
+    Programmatic,
+}
+
+/// Entry in the navigation log (for audit/replay)
+#[derive(Clone, Debug)]
+pub struct NavigationLogEntry {
+    /// DSL representation of the command
+    pub dsl: String,
+    /// When the command was executed
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+    /// Source of the command
+    pub source: NavigationSource,
+    /// CBU context (if any)
+    pub cbu_id: Option<Uuid>,
+}
+
 // =============================================================================
 // SERVER DATA (fetched via API, NEVER modified locally)
 // =============================================================================
@@ -169,6 +197,10 @@ pub struct AppState {
     /// Timestamp of last version check (to throttle polling)
     pub last_version_check: Option<f64>,
 
+    /// Navigation command log (DSL audit trail for voice/keyboard navigation)
+    /// Capped at 1000 entries to prevent unbounded growth
+    pub navigation_log: Vec<NavigationLogEntry>,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -222,6 +254,7 @@ impl Default for AppState {
             navigation_stack: Vec::new(),
             last_known_version: None,
             last_version_check: None,
+            navigation_log: Vec::new(),
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),
@@ -734,6 +767,19 @@ impl AppState {
             state.loading_session_context = false;
             match result {
                 Ok(context) => {
+                    // Apply viewport_state to graph widget if present
+                    // This syncs DSL-driven viewport state (from viewport.* verbs) to the UI
+                    if let Some(ref viewport_state) = context.viewport_state {
+                        self.graph_widget.apply_viewport_state(viewport_state);
+                        #[cfg(target_arch = "wasm32")]
+                        web_sys::console::log_1(
+                            &format!(
+                                "Applied viewport_state from session: focus={:?}",
+                                viewport_state.focus.state
+                            )
+                            .into(),
+                        );
+                    }
                     self.session_context = Some(context);
                 }
                 Err(e) => state.last_error = Some(format!("Session context fetch failed: {}", e)),
@@ -870,7 +916,7 @@ impl AppState {
         state.needs_trading_matrix_refetch = false;
 
         // Use pending_cbu_id if set (from select_cbu), otherwise get active CBU from session
-        if let Some(cbu_id) = state.pending_cbu_id.clone() {
+        if let Some(cbu_id) = state.pending_cbu_id {
             return Some(cbu_id);
         }
 
@@ -1750,6 +1796,53 @@ impl AppState {
 /// Parse view mode from string (used by agent commands)
 pub fn parse_view_mode(s: &str) -> Option<ViewMode> {
     ViewMode::from_str(s)
+}
+
+// =============================================================================
+// NAVIGATION LOG METHODS
+// =============================================================================
+
+/// Maximum number of navigation log entries to keep
+const MAX_NAVIGATION_LOG_ENTRIES: usize = 1000;
+
+impl AppState {
+    /// Log a navigation command to the audit trail
+    ///
+    /// The DSL string is generated from the NavigationVerb using to_dsl_string().
+    /// This enables replay and audit of voice/keyboard navigation commands.
+    pub fn log_navigation(&mut self, dsl: String, source: NavigationSource) {
+        let cbu_id = self
+            .session
+            .as_ref()
+            .and_then(|s| s.active_cbu.as_ref())
+            .and_then(|cbu| uuid::Uuid::parse_str(&cbu.id).ok());
+
+        let entry = NavigationLogEntry {
+            dsl,
+            timestamp: chrono::Utc::now(),
+            source,
+            cbu_id,
+        };
+
+        self.navigation_log.push(entry);
+
+        // Cap the log to prevent unbounded growth
+        if self.navigation_log.len() > MAX_NAVIGATION_LOG_ENTRIES {
+            // Remove oldest entries
+            let excess = self.navigation_log.len() - MAX_NAVIGATION_LOG_ENTRIES;
+            self.navigation_log.drain(0..excess);
+        }
+    }
+
+    /// Get recent navigation log entries (most recent first)
+    pub fn recent_navigation_log(&self, limit: usize) -> Vec<&NavigationLogEntry> {
+        self.navigation_log.iter().rev().take(limit).collect()
+    }
+
+    /// Clear the navigation log
+    pub fn clear_navigation_log(&mut self) {
+        self.navigation_log.clear();
+    }
 }
 
 // =============================================================================

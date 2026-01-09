@@ -1338,6 +1338,10 @@ pub struct SessionContext {
     /// Set by user clicking on a stage in the UI
     #[serde(default)]
     pub stage_focus: Option<String>,
+    /// Viewport state from DSL viewport.* verbs (focus, enhance, filter, camera)
+    /// This drives the graph widget's view state
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub viewport_state: Option<ViewportState>,
 }
 
 /// CBU-specific context with summary info

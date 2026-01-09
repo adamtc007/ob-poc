@@ -1,0 +1,386 @@
+# =============================================================================
+# Identifier Domain Verbs
+# =============================================================================
+# Purpose: Attach and manage external identifiers (LEI, Clearstream KV, ISIN, etc.)
+#          to entities using the entity_identifiers table from migration 010
+# =============================================================================
+
+domains:
+  identifier:
+    description: External identifier management for entities (LEI, Clearstream, Tax ID, ISIN, etc.)
+    verbs:
+      attach:
+        description: Attach an external identifier to an entity (idempotent by entity+scheme+id)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_identifiers
+          schema: ob-poc
+          returning: identifier_id
+          conflict_keys:
+            - entity_id
+            - scheme
+            - id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            description: The entity to attach the identifier to
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: scheme
+            type: string
+            required: true
+            maps_to: scheme
+            description: Identifier scheme (e.g., LEI, CLEARSTREAM_KV, ISIN)
+            valid_values:
+              - LEI
+              - CLEARSTREAM_KV
+              - CLEARSTREAM_ACCT
+              - ISIN
+              - company_register
+              - tax_id
+              - SWIFT_BIC
+              - DUNS
+              - VAT
+              - national_id
+          - name: id
+            type: string
+            required: true
+            maps_to: id
+            description: The identifier value
+          - name: scheme-name
+            type: string
+            required: false
+            maps_to: scheme_name
+            description: Human-readable scheme name (e.g., "Clearstream Banking KV Reference")
+          - name: uri
+            type: string
+            required: false
+            maps_to: uri
+            description: URI for the identifier (e.g., GLEIF API URL)
+          - name: is-validated
+            type: boolean
+            required: false
+            maps_to: is_validated
+            default: false
+            description: Whether this identifier has been validated
+          - name: validation-source
+            type: string
+            required: false
+            maps_to: validation_source
+            description: Source of validation (e.g., "GLEIF API", "Manual verification")
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+            description: When this identifier became effective
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+            description: When this identifier expired (for historical tracking)
+        returns:
+          type: uuid
+          name: identifier_id
+          capture: true
+
+      attach-lei:
+        description: Attach LEI with GLEIF-specific metadata (convenience wrapper)
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_identifiers
+          schema: ob-poc
+          returning: identifier_id
+          conflict_keys:
+            - entity_id
+            - scheme
+            - id
+          set_values:
+            scheme: LEI
+            scheme_name: Legal Entity Identifier (GLEIF)
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: lei
+            type: string
+            required: true
+            maps_to: id
+            description: 20-character LEI code
+          - name: lei-status
+            type: string
+            required: false
+            maps_to: lei_status
+            valid_values:
+              - ISSUED
+              - LAPSED
+              - RETIRED
+              - PENDING_ARCHIVAL
+              - MERGED
+              - DUPLICATE
+          - name: lei-next-renewal
+            type: date
+            required: false
+            maps_to: lei_next_renewal
+          - name: lei-managing-lou
+            type: string
+            required: false
+            maps_to: lei_managing_lou
+            description: Managing LOU (e.g., "BLOOMBERG", "DTCC")
+          - name: is-validated
+            type: boolean
+            required: false
+            maps_to: is_validated
+            default: true
+          - name: validation-source
+            type: string
+            required: false
+            maps_to: validation_source
+            default: GLEIF API
+        returns:
+          type: uuid
+          name: identifier_id
+          capture: true
+
+      attach-clearstream:
+        description: Attach Clearstream KV reference or account number
+        behavior: crud
+        crud:
+          operation: upsert
+          table: entity_identifiers
+          schema: ob-poc
+          returning: identifier_id
+          conflict_keys:
+            - entity_id
+            - scheme
+            - id
+          set_values:
+            scheme_name: Clearstream Banking Reference
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: reference
+            type: string
+            required: true
+            maps_to: id
+            description: Clearstream reference ID
+          - name: reference-type
+            type: string
+            required: false
+            maps_to: scheme
+            default: CLEARSTREAM_KV
+            valid_values:
+              - CLEARSTREAM_KV
+              - CLEARSTREAM_ACCT
+          - name: is-validated
+            type: boolean
+            required: false
+            maps_to: is_validated
+            default: true
+          - name: validation-source
+            type: string
+            required: false
+            maps_to: validation_source
+            default: Clearstream CASCADE-RS
+        returns:
+          type: uuid
+          name: identifier_id
+          capture: true
+
+      validate:
+        description: Mark an identifier as validated
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_identifiers
+          schema: ob-poc
+          key: identifier_id
+        args:
+          - name: identifier-id
+            type: uuid
+            required: true
+            maps_to: identifier_id
+          - name: validation-source
+            type: string
+            required: true
+            maps_to: validation_source
+            description: Source of validation (e.g., "GLEIF API", "Manual verification")
+        set_values:
+          is_validated: true
+          validated_at: now()
+        returns:
+          type: affected
+
+      invalidate:
+        description: Mark an identifier as invalid or expired
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_identifiers
+          schema: ob-poc
+          key: identifier_id
+        args:
+          - name: identifier-id
+            type: uuid
+            required: true
+            maps_to: identifier_id
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+            description: Expiration date (defaults to today)
+        set_values:
+          is_validated: false
+        returns:
+          type: affected
+
+      remove:
+        description: Remove an identifier from an entity (hard delete)
+        behavior: crud
+        crud:
+          operation: delete
+          table: entity_identifiers
+          schema: ob-poc
+          key: identifier_id
+        args:
+          - name: identifier-id
+            type: uuid
+            required: true
+            maps_to: identifier_id
+        returns:
+          type: affected
+
+      list-by-entity:
+        description: List all identifiers for an entity
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: entity_identifiers
+          schema: ob-poc
+          fk_col: entity_id
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: scheme
+            type: string
+            required: false
+            maps_to: scheme
+            description: Filter by scheme (e.g., "LEI", "CLEARSTREAM_KV")
+        returns:
+          type: record_set
+
+      find-by-lei:
+        description: Find entity by LEI
+        behavior: crud
+        crud:
+          operation: select
+          table: entity_identifiers
+          schema: ob-poc
+        args:
+          - name: lei
+            type: string
+            required: true
+            maps_to: id
+        set_values:
+          scheme: LEI
+        returns:
+          type: record
+
+      find-by-clearstream:
+        description: Find entity by Clearstream reference
+        behavior: crud
+        crud:
+          operation: select
+          table: entity_identifiers
+          schema: ob-poc
+        args:
+          - name: reference
+            type: string
+            required: true
+            maps_to: id
+          - name: reference-type
+            type: string
+            required: false
+            maps_to: scheme
+            default: CLEARSTREAM_KV
+        returns:
+          type: record
+
+      find-by-isin:
+        description: Find entity by ISIN (for share classes/funds)
+        behavior: crud
+        crud:
+          operation: select
+          table: entity_identifiers
+          schema: ob-poc
+        args:
+          - name: isin
+            type: string
+            required: true
+            maps_to: id
+        set_values:
+          scheme: ISIN
+        returns:
+          type: record
+
+      update-lei-status:
+        description: Update LEI status after GLEIF refresh
+        behavior: crud
+        crud:
+          operation: update
+          table: entity_identifiers
+          schema: ob-poc
+          key: identifier_id
+        args:
+          - name: identifier-id
+            type: uuid
+            required: true
+            maps_to: identifier_id
+          - name: lei-status
+            type: string
+            required: true
+            maps_to: lei_status
+            valid_values:
+              - ISSUED
+              - LAPSED
+              - RETIRED
+              - PENDING_ARCHIVAL
+              - MERGED
+              - DUPLICATE
+          - name: lei-next-renewal
+            type: date
+            required: false
+            maps_to: lei_next_renewal
+        set_values:
+          validated_at: now()
+        returns:
+          type: affected

@@ -342,6 +342,7 @@ impl From<DiscoveredContext> for ob_poc_types::SessionContext {
             symbols: std::collections::HashMap::new(),
             semantic_state: None, // Derived separately after context discovery
             stage_focus: None,    // Set from session context, not discovery
+            viewport_state: None, // Set from session context, not discovery
         }
     }
 }

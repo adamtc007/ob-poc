@@ -27,13 +27,16 @@
 | `gleif.resolve-successor` | Find successor for merged/renamed LEI |
 | `gleif.lookup-by-isin` | Find LEI by ISIN |
 
-### BODS DSL Verbs (6 operations)
+### BODS DSL Verbs (9 operations)
 | Verb | Purpose |
 |------|--------|
 | `bods.discover-ubos` | Calculate UBOs from ownership graph |
 | `bods.import` | Import BODS statement package |
+| `bods.link-entity` | Link local entity to BODS statement |
 | `bods.get-statement` | Get BODS statement for entity |
+| `bods.list-by-entity` | List BODS statements for entity |
 | `bods.find-by-lei` | Find BODS records by LEI |
+| `bods.list-persons` | List person statements |
 | `bods.list-ownership` | List ownership interests |
 | `bods.sync-from-gleif` | Sync GLEIF data into BODS format |
 
@@ -114,9 +117,11 @@ ORDER BY column_name;
 
 ## PHASE 2: Rust Types
 
-### Step 2.1: Create BODS Types Module
+> ✅ **IMPLEMENTED** - These files already exist in rust/src/database/
 
-**File:** `rust/src/database/bods_types.rs`
+### Step 2.1: BODS Types Module
+
+**File:** `rust/src/database/bods_types.rs` ✅ EXISTS
 
 ```rust
 //! BODS 0.4 Types for OB-POC
@@ -225,9 +230,9 @@ pub struct NewGleifRelationship {
 }
 ```
 
-### Step 2.2: Create BODS Service
+### Step 2.2: BODS Service
 
-**File:** `rust/src/database/bods_service.rs`
+**File:** `rust/src/database/bods_service.rs` ✅ EXISTS
 
 ```rust
 //! BODS Service - Operations for BODS-aligned tables
@@ -577,9 +582,11 @@ pub use bods_service::BodsService;
 
 ## PHASE 3: DSL Verb Definitions
 
-### Step 3.1: Create GLEIF Verbs
+> ✅ **IMPLEMENTED** - Verb YAML files already exist
 
-**File:** `rust/config/verbs/gleif.yaml` (create or append)
+### Step 3.1: GLEIF Verbs
+
+**File:** `rust/config/verbs/gleif.yaml` ✅ EXISTS (15 verbs)
 
 ```yaml
 domains:

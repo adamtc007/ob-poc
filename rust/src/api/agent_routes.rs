@@ -2260,6 +2260,9 @@ async fn get_session_context(
 
                     // Copy stage focus from session
                     ctx.stage_focus = session.context.stage_focus.clone();
+
+                    // Copy viewport state from session (set by viewport.* DSL verbs)
+                    ctx.viewport_state = session.context.viewport_state.clone();
                 }
 
                 // Derive semantic state for the CBU (onboarding journey progress)
@@ -2305,6 +2308,9 @@ async fn get_session_context(
                     },
                 );
             }
+
+            // Copy viewport state from session (set by viewport.* DSL verbs)
+            ctx.viewport_state = session.context.viewport_state.clone();
         }
 
         ctx

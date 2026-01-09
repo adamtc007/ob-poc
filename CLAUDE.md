@@ -1,5 +1,11 @@
 # CLAUDE.md
 
+> **Last reviewed:** 2026-01-09
+> **Verb count:** ~720 verbs across 94 YAML files
+> **Custom ops:** 42 plugin handlers
+> **Crates:** 13 fine-grained crates
+> **Migrations:** 11 schema migrations (latest: 011_clearstream_investor_views.sql)
+
 This file provides guidance to Claude Code when working with this repository.
 
 ## Lexicon-Based Agent Pipeline
@@ -21,16 +27,17 @@ DSL Source → EXISTING DSL PIPELINE → Database
 ### Key Files
 
 ```
-rust/config/agent/lexicon.yaml             ← Token vocabulary (verbs, entities, roles, etc.)
-rust/src/agentic/lexicon/
-├── mod.rs                                 ← Module exports
-├── tokens.rs                              ← Token, TokenType, TokenSource types
-├── loader.rs                              ← LexiconConfig YAML loader
-├── tokenizer.rs                           ← Lexicon-backed tokenizer with entity resolution
-├── intent_ast.rs                          ← IntentAst enum (RoleAssign, IsdaEstablish, etc.)
-├── intent_parser.rs                       ← Nom grammar parsers for each intent type
-└── pipeline.rs                            ← Full pipeline: tokenize → parse → generate DSL
-rust/src/agentic/lexicon_agent.rs          ← LexiconAgentPipeline (main entry point)
+rust/config/agent/lexicon.yaml                    ← Token vocabulary (verbs, entities, roles, etc.)
+rust/crates/ob-agentic/src/lexicon/
+├── mod.rs                                        ← Module exports
+├── tokens.rs                                     ← Token, TokenType, TokenSource types
+├── loader.rs                                     ← LexiconConfig YAML loader
+├── tokenizer.rs                                  ← Lexicon-backed tokenizer with entity resolution
+├── intent_ast.rs                                 ← IntentAst enum (RoleAssign, IsdaEstablish, etc.)
+├── intent_parser.rs                              ← Nom grammar parsers for each intent type
+├── pipeline.rs                                   ← Full pipeline: tokenize → parse → generate DSL
+└── db_resolver.rs                                ← Database-backed entity resolution
+rust/crates/ob-agentic/src/lexicon_agent.rs       ← LexiconAgentPipeline (main entry point)
 ```
 
 ### Supported Intent Types
@@ -65,7 +72,7 @@ The lexicon defines vocabulary for: verbs (add, create, set up), entities (resol
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                   Agentic Server (Axum)                         │
-│  rust/src/bin/agentic_server.rs                                 │
+│  rust/src/bin/dsl_api.rs                                        │
 │  - /api/agent/generate → Claude API → DSL                       │
 │  - /api/session/* → Session management                          │
 │  - /api/templates/* → Template rendering                        │
@@ -516,6 +523,47 @@ match parse_nav_command(input) {
     Err(e) => eprintln!("Parse error: {:?}", e),
 }
 ```
+
+### Navigation Log (DSL Audit Trail)
+
+Every navigation command emits a DSL string to an audit log, enabling reproducibility and analysis.
+
+**Key Types** (`rust/crates/ob-poc-ui/src/`):
+
+| Type | File | Description |
+|------|------|-------------|
+| `NavigationVerb` | `command.rs` | ~40 navigation command variants |
+| `NavigationVerb::to_dsl_string()` | `command.rs` | Converts verb to DSL (e.g., `(nav.zoom :direction in)`) |
+| `NavigationSource` | `state.rs` | Command origin: Voice, Keyboard, Gesture, Widget, Programmatic |
+| `NavigationLogEntry` | `state.rs` | Log entry with DSL, timestamp, source, CBU context |
+
+**DSL Domain:** `nav.*` prefix for all navigation commands.
+
+**Example DSL Strings:**
+
+| Command | DSL |
+|---------|-----|
+| Zoom in 1.5x | `(nav.zoom :direction in :factor 1.5)` |
+| Pan left | `(nav.pan :direction left)` |
+| Scale to book | `(nav.scale :level book :client "Allianz")` |
+| Filter by jurisdiction | `(nav.filter :dimension jurisdiction :values ["LU" "IE"])` |
+| Focus entity | `(nav.focus :entity-id "uuid...")` |
+| Temporal snapshot | `(nav.temporal :as-of "2024-01-15")` |
+
+**AppState Methods:**
+
+```rust
+// Log a navigation command
+state.log_navigation(dsl, NavigationSource::Voice { transcript, confidence });
+
+// Get recent entries (for replay/analysis)
+let recent = state.recent_navigation_log(50);
+
+// Clear log
+state.clear_navigation_log();
+```
+
+**Automatic Logging:** All `execute_navigation_verb()` calls automatically log to the navigation audit trail with source provenance (voice transcript, keyboard, widget, etc.).
 
 ## Ontology Module (`rust/src/ontology/`)
 
@@ -982,7 +1030,7 @@ ob-poc/
 │   │   │   ├── semantic_validator.rs # Entity resolution + validation
 │   │   │   ├── execution_plan.rs   # AST → ExecutionPlan
 │   │   │   ├── topo_sort.rs        # Topological sorting
-│   │   │   └── custom_ops/         # Plugin handlers (~28 files)
+│   │   │   └── custom_ops/         # Plugin handlers (~42 files)
 │   │   ├── database/               # Repository pattern services
 │   │   ├── domains/                # Domain handler trait (stub implementations)
 │   │   ├── graph/                  # Graph visualization
@@ -1000,9 +1048,12 @@ ob-poc/
 │   │   ├── workflow/               # Workflow re-exports (uses ob-workflow)
 │   │   ├── trading_profile/        # Trading profile documents
 │   │   └── bin/
-│   │       ├── agentic_server.rs   # Main server binary
-│   │       ├── dsl_cli.rs          # CLI tool
-│   │       └── dsl_mcp.rs          # MCP server binary
+│   │       ├── dsl_api.rs          # Main Axum server binary
+│   │       ├── dsl_cli.rs          # CLI tool for DSL execution
+│   │       ├── dsl_mcp.rs          # MCP server binary
+│   │       ├── batch_test_harness.rs  # Batch testing harness
+│   │       ├── research_harness.rs    # Research macro testing
+│   │       └── template_harness.rs    # Template testing
 │   │
 │   └── tests/
 │       ├── db_integration.rs       # Database integration tests
@@ -1012,7 +1063,17 @@ ob-poc/
 │   ├── egui.md                     # /egui - egui development rules
 │   ├── verify-complete.md          # /verify-complete - stub detection
 │   └── ...
+├── ai-thoughts/                    # Architectural decision records (ADRs)
+│   ├── 009-bods-integration-architecture.md
+│   ├── 010-bods-deep-integration.md
+│   ├── 011-bods-gleif-crosswalk.md
+│   └── 012-bods-gleif-integration-TODO.md
 ├── docs/
+├── migrations/                     # SQLx migrations (11 files)
+│   ├── 001_consolidate_cbu_category_constraint.sql
+│   ├── ...
+│   ├── 010_bods_gleif_integration.sql  # BODS 0.4 + GLEIF deep integration
+│   └── 011_clearstream_investor_views.sql  # Clearstream CASCADE-RS views
 ├── schema_export.sql               # Full DDL for database rebuild
 └── CLAUDE.md                       # This file
 ```
@@ -1031,6 +1092,7 @@ The codebase uses **fine-grained crates** to separate concerns:
 | `ob-poc-types` | No | Shared API types for TypeScript generation |
 | `ob-poc-ui` | No | Pure egui/WASM UI - fetches data via HTTP |
 | `ob-poc-graph` | No | WASM graph widget - pure rendering |
+| `viewport` | No | Shared viewport types for graph rendering |
 | `entity-gateway` | Yes | gRPC entity resolution with Tantivy indexes |
 | `dsl-lsp` | Yes | LSP needs full schema for completions |
 | `ob-poc-web` | Yes | Axum server handles all DB operations |
@@ -4353,26 +4415,53 @@ The UBO system uses a **clean separation** between structural graph data and KYC
 
 ### UBO Verbs
 
-**Note:** UBO chain tracing operations (`ubo.trace-chains`, `ubo.infer-chain`) now include **control relationships** alongside ownership relationships. This aligns with AML/KYC regulatory guidance where a person may be a beneficial owner through control (voting rights, board control, veto powers) even without direct ownership percentage.
+**Note:** UBO chain tracing operations (`ubo.trace-chains`) include **control relationships** alongside ownership relationships. This aligns with AML/KYC regulatory guidance where a person may be a beneficial owner through control (voting rights, board control, veto powers) even without direct ownership percentage.
+
+**Ownership & Control Relationships:**
 
 | Verb | Description |
 |------|-------------|
-| `ubo.add-ownership` | Add ownership relationship |
+| `ubo.add-ownership` | Add ownership relationship (now with BODS interest-type support) |
 | `ubo.update-ownership` | Update ownership percentage |
 | `ubo.end-ownership` | End ownership relationship |
+| `ubo.delete-ownership` | Hard delete ownership relationship |
+| `ubo.add-control` | Add control relationship (board, voting, veto) |
+| `ubo.end-control` | End control relationship |
+| `ubo.delete-control` | Hard delete control relationship |
+| `ubo.add-trust-role` | Add trust role (settlor, trustee, beneficiary) |
+| `ubo.end-trust-role` | End trust role |
+| `ubo.delete-trust-role` | Hard delete trust role |
+| `ubo.delete-relationship` | Generic relationship deletion |
+
+**Query & Discovery:**
+
+| Verb | Description |
+|------|-------------|
 | `ubo.list-owners` | List owners of entity |
 | `ubo.list-owned` | List entities owned by entity |
-| `ubo.register-ubo` | Register UBO determination |
-| `ubo.verify-ubo` | Mark UBO as verified |
-| `ubo.list-ubos` | List UBOs for CBU |
 | `ubo.list-by-subject` | List UBOs for subject entity |
-| `ubo.discover-owner` | Discover potential UBOs from documents, registry, or screening |
+| `ubo.list-ubos` | List UBO candidates for CBU (persons with ≥25% ownership) |
+| `ubo.calculate` | Calculate effective ownership through chains |
 | `ubo.trace-chains` | Trace all ownership AND control chains to natural persons |
-| `ubo.infer-chain` | Trace ownership/control chain upward from starting entity |
-| `ubo.check-completeness` | Validate UBO determination completeness |
-| `ubo.supersede-ubo` | Supersede UBO record with newer determination |
-| `ubo.snapshot-cbu` | Capture point-in-time UBO state snapshot |
-| `ubo.compare-snapshot` | Compare two UBO snapshots for changes |
+
+**UBO Lifecycle:**
+
+| Verb | Description |
+|------|-------------|
+| `ubo.mark-deceased` | Mark UBO as deceased |
+| `ubo.convergence-supersede` | Supersede during convergence process |
+| `ubo.transfer-control` | Transfer control from one UBO to another |
+| `ubo.waive-verification` | Waive verification with justification |
+| `ubo.mark-terminus` | Mark entity as ownership chain terminus |
+
+**Deprecated (use alternatives):**
+
+| Verb | Replaced By |
+|------|-------------|
+| `ubo.register-ubo` | `ubo.allege` (convergence model) |
+| `ubo.verify-ubo` | `ubo.verify` (plugin) |
+| `ubo.supersede-ubo` | `ubo.end-ownership` + `ubo.add-ownership` |
+| `ubo.close-ubo` | `ubo.end-ownership` |
 
 **Chain output includes:**
 - `relationship_types`: Array showing each hop type (OWNERSHIP, VOTING_RIGHTS, BOARD_APPOINTMENT, etc.)
@@ -4413,9 +4502,23 @@ The UBO system uses a **clean separation** between structural graph data and KYC
 ### Example: UBO Chain
 
 ```clojure
-;; Build ownership chain: Person → HoldCo → Fund
-(ubo.add-ownership :owner-entity-id @person :owned-entity-id @holdco :percentage 100 :ownership-type "DIRECT" :as @own1)
-(ubo.add-ownership :owner-entity-id @holdco :owned-entity-id @fund-entity :percentage 60 :ownership-type "DIRECT" :as @own2)
+;; Build ownership chain: Person → HoldCo → Fund (with BODS 0.4 fields)
+(ubo.add-ownership 
+  :owner-entity-id @person 
+  :owned-entity-id @holdco 
+  :percentage 100 
+  :ownership-type "DIRECT"
+  :interest-type "shareholding"   ;; BODS interest type
+  :direct-or-indirect "direct"
+  :as @own1)
+
+(ubo.add-ownership 
+  :owner-entity-id @holdco 
+  :owned-entity-id @fund-entity 
+  :percentage 60 
+  :ownership-type "DIRECT"
+  :interest-type "shareholding"
+  :as @own2)
 
 ;; Register UBO determination
 (ubo.register-ubo :cbu-id @fund :subject-entity-id @fund-entity :ubo-person-id @person :relationship-type "OWNER" :qualifying-reason "OWNERSHIP_25PCT" :ownership-percentage 60 :workflow-type "ONBOARDING")
@@ -6250,7 +6353,7 @@ For Claude Desktop integration. The MCP server (`dsl_mcp`) provides tools for DS
 | Interface | Binary | Protocol | Use Case |
 |-----------|--------|----------|----------|
 | MCP Server | `dsl_mcp` | JSON-RPC over stdio | Claude Desktop integration |
-| HTTP API | `agentic_server` | REST over HTTP | Browser UI, external clients, REPL |
+| HTTP API | `dsl_api` | REST over HTTP | Browser UI, external clients, REPL |
 
 **Why this matters:**
 - Both interfaces use the same `ToolHandlers` implementation (`rust/src/mcp/handlers/core.rs`)
@@ -6262,7 +6365,7 @@ For Claude Desktop integration. The MCP server (`dsl_mcp`) provides tools for DS
 | File | Purpose |
 |------|---------|
 | `rust/src/bin/dsl_mcp.rs` | MCP server binary (standalone) |
-| `rust/src/bin/agentic_server.rs` | HTTP server with integrated MCP tools |
+| `rust/src/bin/dsl_api.rs` | HTTP server with integrated MCP tools |
 | `rust/src/mcp/handlers/core.rs` | `ToolHandlers` - shared tool implementations |
 | `rust/src/api/session.rs` | `SessionStore` type and `AgentSession` |
 
@@ -9093,6 +9196,18 @@ CREATE TABLE "ob-poc".bods_interest_types (
 - `share_minimum`, `share_maximum` → For BODS ranges
 - `is_component`, `component_of_relationship_id` → For indirect chain tracking
 
+### BODS Interest Types Reference
+
+The 22 standard BODS 0.4 interest types organized by category:
+
+| Category | Interest Types |
+|----------|----------------|
+| **ownership** | shareholding, votingRights, otherInfluenceOrControl |
+| **control** | boardMember, boardChair, ceo, seniorManaging, appointmentOfBoard, otherAppointmentOfBoard |
+| **trust** | settlor, trustee, protector, beneficiaryOfLegalArrangement, rightsToSurplusAssets, rightsToProfitOrIncome |
+| **contractual** | nominee, nominator |
+| **other** | enjoymentAndUseOfAssets, rightsGrantedByContract, conditionalRightsGrantedByContract, unknown, none |
+
 ### Join Strategy
 
 When BODS data arrives:
@@ -9120,6 +9235,147 @@ BODS Statement Arrives
 | `v_ubo_interests` | UBO edges with BODS interest type info |
 | `v_gleif_hierarchy` | GLEIF corporate hierarchy (consolidation only) |
 
+## Clearstream Investor Register Integration
+
+The system supports Clearstream CASCADE-RS/Vestima data ingestion for investor registry management.
+
+### Clearstream → ob-poc Table Mapping
+
+| Clearstream Structure | ob-poc Table | Schema | Purpose |
+|----------------------|--------------|--------|----------|
+| `Clearstream_Investor_Static` | `entities` + `entity_identifiers` | ob-poc | Investor identity with LEI spine |
+| `Clearstream_Register_Positions` | `holdings` | kyc | Position register (units per investor per share class) |
+| `Clearstream_Movement_Log` | `movements` | kyc | Subscription/redemption/transfer audit trail |
+| Share Class Master | `share_classes` | kyc | ISIN-anchored share class with NAV, fees, liquidity terms |
+
+### Clearstream → BODS Mapping
+
+| Clearstream Field | BODS Attribute | ob-poc Column |
+|-------------------|----------------|---------------|
+| `Reference_ID` (KV-system) | `identifiers[].id` | `entity_identifiers.id` (scheme=CLEARSTREAM_KV) |
+| `Shareholder_Name` | `name` | `entities.name` |
+| `Country_Code` | `addresses[].country` | `entities.country_code` |
+| `Investor_Type` (1/2) | `entityType` | `entities.entity_type` |
+| `Tax_ID / LEI` | `identifiers[].id` | `entity_identifiers.id` (scheme=LEI) |
+| `ISIN` | (via ownership subject) | `share_classes.isin` |
+| `Holding_Quantity` | `interests[].share` | `holdings.units` |
+| `Registration_Date` | `interests[].startDate` | `holdings.acquisition_date` |
+| `Trans_Ref` | (audit trail) | `movements.reference` |
+
+### Clearstream Views (Migration 011)
+
+| View | Description |
+|------|-------------|
+| `kyc.v_clearstream_register` | Main investor register with holdings, identifiers, ownership % |
+| `kyc.v_clearstream_movements` | Movement/transaction log with investor and fund context |
+| `kyc.v_bods_ownership_statements` | BODS 0.4 format for regulatory reporting |
+| `kyc.v_share_class_summary` | Share class summary with investor counts and AUM |
+| `kyc.v_investor_portfolio` | All holdings for an investor across funds |
+| `ob-poc.v_entity_identifier_xref` | Cross-reference of all entity identifiers |
+
+### Identifier Verbs
+
+The `identifier` domain manages external identifiers (LEI, Clearstream, ISIN, Tax ID):
+
+| Verb | Description |
+|------|-------------|
+| `identifier.attach` | Attach any identifier to an entity (idempotent) |
+| `identifier.attach-lei` | Attach LEI with GLEIF metadata |
+| `identifier.attach-clearstream` | Attach Clearstream KV reference or account |
+| `identifier.validate` | Mark identifier as validated |
+| `identifier.invalidate` | Mark identifier as invalid/expired |
+| `identifier.remove` | Hard delete an identifier |
+| `identifier.list-by-entity` | List all identifiers for an entity |
+| `identifier.find-by-lei` | Find entity by LEI |
+| `identifier.find-by-clearstream` | Find entity by Clearstream reference |
+| `identifier.find-by-isin` | Find entity by ISIN |
+| `identifier.update-lei-status` | Update LEI status after GLEIF refresh |
+
+### Registry Verbs
+
+The `share-class`, `holding`, and `movement` domains manage the investor register:
+
+**Share Classes:**
+
+| Verb | Description |
+|------|-------------|
+| `share-class.create` | Create share class for fund CBU |
+| `share-class.ensure` | Upsert by ISIN |
+| `share-class.update-nav` | Update NAV for share class |
+| `share-class.list` | List share classes for fund |
+| `share-class.close` | Close share class to subscriptions |
+
+**Holdings:**
+
+| Verb | Description |
+|------|-------------|
+| `holding.create` | Create investor holding |
+| `holding.ensure` | Upsert by share_class+investor |
+| `holding.update-units` | Update holding units |
+| `holding.list-by-share-class` | List holdings for share class |
+| `holding.list-by-investor` | List holdings for investor |
+| `holding.close` | Close a holding |
+
+**Movements:**
+
+| Verb | Description |
+|------|-------------|
+| `movement.subscribe` | Record subscription |
+| `movement.redeem` | Record redemption |
+| `movement.transfer-in` | Record incoming transfer |
+| `movement.transfer-out` | Record outgoing transfer |
+| `movement.confirm` | Confirm pending movement |
+| `movement.settle` | Mark movement as settled |
+| `movement.cancel` | Cancel pending movement |
+
+### Example: Clearstream Data Import
+
+```clojure
+;; 1. Create fund and share class
+(cbu.ensure :name "Luxembourg SICAV" :jurisdiction "LU" :as @fund)
+(share-class.ensure 
+  :cbu-id @fund 
+  :name "Class A (EUR Institutional)" 
+  :isin "LU0123456789"
+  :currency "EUR"
+  :fund-type "UCITS"
+  :investor-eligibility "PROFESSIONAL"
+  :as @class-a)
+
+;; 2. Register investor entity with Clearstream reference
+(entity.ensure-limited-company 
+  :name "Nominee Holdings GmbH" 
+  :jurisdiction "DE"
+  :as @investor)
+(identifier.attach-clearstream 
+  :entity-id @investor 
+  :reference "12345678")
+(identifier.attach-lei 
+  :entity-id @investor 
+  :lei "529900HNOAA1KXQJUQ27"
+  :lei-status "ISSUED")
+
+;; 3. Create holding (register position)
+(holding.create 
+  :share-class-id @class-a 
+  :investor-entity-id @investor 
+  :units 100000
+  :acquisition-date "2025-01-15"
+  :as @holding)
+
+;; 4. Record subscription movement
+(movement.subscribe 
+  :holding-id @holding 
+  :units 50000 
+  :price-per-unit 125.50
+  :trade-date "2025-01-20"
+  :reference "CLR-2025-00123"
+  :as @sub)
+
+;; 5. Confirm and settle
+(movement.confirm :movement-id @sub)
+(movement.settle :movement-id @sub :settlement-date "2025-01-22")
+```
 
 ## Teams & Access Management
 

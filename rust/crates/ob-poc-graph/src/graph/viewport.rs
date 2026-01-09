@@ -196,6 +196,8 @@ pub struct ViewportRenderState {
     hud_opacity: SpringF32,
     /// Current focus ring target (for tracking changes)
     focus_ring_target_id: Option<String>,
+    /// Confidence threshold for entity visibility (from ViewportState)
+    confidence_threshold: f32,
 }
 
 impl Default for ViewportRenderState {
@@ -212,7 +214,18 @@ impl ViewportRenderState {
             breadcrumb_height: SpringF32::with_config(0.0, SpringConfig::FAST),
             hud_opacity: SpringF32::with_config(1.0, SpringConfig::MEDIUM),
             focus_ring_target_id: None,
+            confidence_threshold: 0.0, // Show all by default
         }
+    }
+
+    /// Set confidence threshold for entity visibility
+    pub fn set_confidence_threshold(&mut self, threshold: f32) {
+        self.confidence_threshold = threshold;
+    }
+
+    /// Get current confidence threshold
+    pub fn confidence_threshold(&self) -> f32 {
+        self.confidence_threshold
     }
 
     /// Update animations each frame

@@ -299,6 +299,11 @@ impl ToolHandlers {
             .ok_or_else(|| anyhow!("source required"))?;
         let dry_run = args["dry_run"].as_bool().unwrap_or(false);
 
+        // Extract session_id if provided - enables session state persistence
+        let session_id = args["session_id"]
+            .as_str()
+            .and_then(|s| Uuid::parse_str(s).ok());
+
         // Extract user_intent if provided, otherwise use a default
         let user_intent = args["intent"].as_str().unwrap_or("MCP tool execution");
 
@@ -560,6 +565,39 @@ impl ToolHandlers {
 
                 // Include viewport_state if a viewport.* operation produced one
                 let viewport_state = ctx.take_pending_viewport_state();
+
+                // Persist to session if session_id provided and sessions available
+                // This enables MCP → UI synchronization via watch channels
+                if let (Some(sid), Some(sessions)) = (session_id, &self.sessions) {
+                    let mut store = sessions.write().await;
+                    if let Some(session) = store.get_mut(&sid) {
+                        // Update bindings in session context
+                        for (k, v) in ctx.symbols.iter() {
+                            session.context.named_refs.insert(k.clone(), *v);
+                        }
+
+                        // Update view_state if produced
+                        if let Some(ref vs) = view_state {
+                            session.context.view_state = Some(vs.clone());
+                        }
+
+                        // Update viewport_state if produced
+                        if let Some(ref vps) = viewport_state {
+                            session.context.viewport_state = Some(vps.clone());
+                        }
+
+                        // Touch updated_at to trigger watch notification
+                        session.updated_at = chrono::Utc::now();
+
+                        tracing::debug!(
+                            session_id = %sid,
+                            bindings_count = ctx.symbols.len(),
+                            has_view_state = view_state.is_some(),
+                            has_viewport_state = viewport_state.is_some(),
+                            "MCP execution persisted to session"
+                        );
+                    }
+                }
 
                 Ok(json!({
                     "success": true,

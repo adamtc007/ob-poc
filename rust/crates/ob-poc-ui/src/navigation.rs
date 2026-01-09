@@ -749,7 +749,7 @@ impl NavigationService {
         self.universe_graph
             .as_ref()
             .and_then(|g| g.clusters.iter().find(|c| c.id == cluster_id))
-            .map(|c| c.cluster_type.clone())
+            .map(|c| c.cluster_type)
             .unwrap_or(ClusterType::Client)
     }
 
