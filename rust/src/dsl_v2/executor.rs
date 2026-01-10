@@ -463,6 +463,113 @@ impl ExecutionContext {
         self.pending_scope_change.is_some()
     }
 
+    // =========================================================================
+    // AGENT CONTROL METHODS - For agent.* verb output to session layer
+    // =========================================================================
+
+    /// Signal agent start (called by agent.start)
+    ///
+    /// Agent control operations cannot directly access the AgentController.
+    /// Instead, they store control signals here for the caller to process.
+    pub fn set_pending_agent_start(&mut self, agent_session_id: Uuid, task: String) {
+        self.bind_json(
+            "_agent_control",
+            serde_json::json!({
+                "action": "start",
+                "agent_session_id": agent_session_id,
+                "task": task
+            }),
+        );
+    }
+
+    /// Signal agent pause (called by agent.pause)
+    pub fn set_pending_agent_pause(&mut self) {
+        self.bind_json(
+            "_agent_control",
+            serde_json::json!({
+                "action": "pause"
+            }),
+        );
+    }
+
+    /// Signal agent resume (called by agent.resume)
+    pub fn set_pending_agent_resume(&mut self) {
+        self.bind_json(
+            "_agent_control",
+            serde_json::json!({
+                "action": "resume"
+            }),
+        );
+    }
+
+    /// Signal agent stop (called by agent.stop)
+    pub fn set_pending_agent_stop(&mut self) {
+        self.bind_json(
+            "_agent_control",
+            serde_json::json!({
+                "action": "stop"
+            }),
+        );
+    }
+
+    /// Signal checkpoint response (called by agent.confirm/reject/select)
+    pub fn set_pending_checkpoint_response(
+        &mut self,
+        checkpoint_id: Option<Uuid>,
+        response_type: &str,
+        selected_index: i32,
+    ) {
+        self.bind_json(
+            "_agent_control",
+            serde_json::json!({
+                "action": "checkpoint_response",
+                "checkpoint_id": checkpoint_id,
+                "response_type": response_type,
+                "selected_index": selected_index
+            }),
+        );
+    }
+
+    /// Signal threshold change (called by agent.set-threshold)
+    pub fn set_pending_threshold_change(
+        &mut self,
+        auto_proceed: Option<f64>,
+        ambiguous_floor: Option<f64>,
+    ) {
+        self.bind_json(
+            "_agent_control",
+            serde_json::json!({
+                "action": "set_threshold",
+                "auto_proceed": auto_proceed,
+                "ambiguous_floor": ambiguous_floor
+            }),
+        );
+    }
+
+    /// Signal mode change (called by agent.set-mode)
+    pub fn set_pending_mode_change(&mut self, mode: String) {
+        self.bind_json(
+            "_agent_control",
+            serde_json::json!({
+                "action": "set_mode",
+                "mode": mode
+            }),
+        );
+    }
+
+    /// Take the pending agent control signal (consumes it)
+    ///
+    /// Called by the execution layer after DSL execution completes.
+    /// The caller should process this signal and update the AgentController.
+    pub fn take_pending_agent_control(&mut self) -> Option<serde_json::Value> {
+        self.json_bindings.remove("_agent_control")
+    }
+
+    /// Check if there's a pending agent control signal
+    pub fn has_pending_agent_control(&self) -> bool {
+        self.json_bindings.contains_key("_agent_control")
+    }
+
     /// Create context from DomainContext (for submission execution)
     #[cfg(feature = "database")]
     pub fn from_domain(domain_ctx: &DomainContext) -> Self {

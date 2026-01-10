@@ -1350,6 +1350,10 @@ pub struct SessionContext {
     /// This drives the graph widget's view state
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub viewport_state: Option<ViewportState>,
+    /// Agent state for research workflow automation
+    /// Shows current agent mode, status, and any pending checkpoints
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_state: Option<AgentStateView>,
 }
 
 /// CBU-specific context with summary info
@@ -1533,6 +1537,195 @@ impl ExecuteResult {
             result: None,
         }
     }
+}
+
+// ============================================================================
+// AGENT STATE (for research workflow UI)
+// ============================================================================
+
+/// Agent mode - how the session operates
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentMode {
+    /// User drives all operations manually
+    #[default]
+    Manual,
+    /// Agent runs autonomously, auto-selects high-confidence matches
+    Agent,
+    /// Agent proposes, user confirms at checkpoints
+    Hybrid,
+}
+
+/// Agent task type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentTaskType {
+    /// Fill ownership gaps in CBU structure
+    ResolveGaps,
+    /// Research full ownership chain to natural persons
+    ChainResearch,
+    /// Enrich a single entity with external data
+    EnrichEntity,
+    /// Enrich all entities in a CBU/group
+    EnrichGroup,
+    /// Screen entities for sanctions/PEP/adverse media
+    ScreenEntities,
+}
+
+/// Agent execution status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentStatus {
+    /// Not running
+    #[default]
+    Idle,
+    /// Running and processing
+    Running,
+    /// Paused by user
+    Paused,
+    /// Waiting for user confirmation at checkpoint
+    Checkpoint,
+    /// Completed successfully
+    Complete,
+    /// Failed with error
+    Failed,
+    /// Cancelled by user
+    Cancelled,
+}
+
+/// A candidate match for user selection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentCandidate {
+    /// Candidate index
+    pub index: i32,
+    /// External key (LEI, company number, etc.)
+    pub key: String,
+    /// Key type (LEI, COMPANY_NUMBER, etc.)
+    pub key_type: String,
+    /// Entity name
+    pub name: String,
+    /// Jurisdiction
+    #[serde(default)]
+    pub jurisdiction: Option<String>,
+    /// Match confidence (0.0 - 1.0)
+    pub confidence: f32,
+    /// Whether this was auto-selected
+    #[serde(default)]
+    pub auto_selected: bool,
+    /// Additional metadata
+    #[serde(default)]
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// A checkpoint requiring user confirmation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentCheckpoint {
+    /// Checkpoint ID
+    pub checkpoint_id: String,
+    /// Checkpoint type
+    pub checkpoint_type: CheckpointType,
+    /// Entity being researched
+    pub target_entity_id: String,
+    /// Search query that produced candidates
+    pub search_query: String,
+    /// Source provider (gleif, companies_house, etc.)
+    pub source_provider: String,
+    /// Candidate matches to choose from
+    pub candidates: Vec<AgentCandidate>,
+    /// Reason for checkpoint (why not auto-selected)
+    pub reason: String,
+    /// Created timestamp
+    pub created_at: String,
+}
+
+/// Type of checkpoint
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CheckpointType {
+    /// Need to select from ambiguous matches
+    Disambiguation,
+    /// Confirm before import
+    ConfirmImport,
+    /// Verify chain continuation
+    ChainVerification,
+    /// Confirm screening results
+    ScreeningReview,
+}
+
+/// Agent state for UI display
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AgentStateView {
+    /// Current mode
+    pub mode: AgentMode,
+    /// Current status
+    pub status: AgentStatus,
+    /// Agent session ID (if running)
+    #[serde(default)]
+    pub agent_session_id: Option<String>,
+    /// Current task type
+    #[serde(default)]
+    pub task: Option<AgentTaskType>,
+    /// Target entity being researched
+    #[serde(default)]
+    pub target_entity_id: Option<String>,
+    /// Current loop iteration
+    #[serde(default)]
+    pub loop_iteration: u32,
+    /// Maximum iterations allowed
+    #[serde(default)]
+    pub max_iterations: u32,
+    /// Pending checkpoint (if status == Checkpoint)
+    #[serde(default)]
+    pub pending_checkpoint: Option<AgentCheckpoint>,
+    /// Number of decisions made this session
+    #[serde(default)]
+    pub decisions_made: u32,
+    /// Number of actions taken this session
+    #[serde(default)]
+    pub actions_taken: u32,
+    /// Last error message (if status == Failed)
+    #[serde(default)]
+    pub error_message: Option<String>,
+    /// Progress message for UI
+    #[serde(default)]
+    pub progress_message: Option<String>,
+}
+
+/// Agent event for SSE streaming to UI
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "event_type", rename_all = "snake_case")]
+pub enum AgentStreamEvent {
+    /// Agent started
+    Started {
+        agent_session_id: String,
+        task: AgentTaskType,
+        target_entity_id: Option<String>,
+    },
+    /// Executing DSL
+    Executing { dsl: String, iteration: u32 },
+    /// Checkpoint created - needs user input
+    Checkpoint { checkpoint: AgentCheckpoint },
+    /// Progress update
+    Progress {
+        message: String,
+        iteration: u32,
+        decisions_made: u32,
+        actions_taken: u32,
+    },
+    /// Agent completed
+    Completed {
+        decisions_made: u32,
+        actions_taken: u32,
+        entities_created: u32,
+    },
+    /// Agent paused
+    Paused { iteration: u32 },
+    /// Agent resumed
+    Resumed { iteration: u32 },
+    /// Agent failed
+    Failed { error: String, iteration: u32 },
+    /// Agent cancelled
+    Cancelled { iteration: u32 },
 }
 
 // ============================================================================

@@ -40,6 +40,7 @@
 //! - `llm_client`: LLM client trait with tool use support
 //! - `error`: Error types
 
+pub mod agent_controller;
 pub mod definition;
 pub mod error;
 pub mod executor;
@@ -47,6 +48,9 @@ pub mod llm_client;
 pub mod registry;
 
 // Re-exports for convenience
+pub use agent_controller::{
+    AgentController, AgentEvent, CheckpointResponse, ConfidenceConfig, StrategyResult,
+};
 pub use definition::{MacroParamDef, ResearchMacroDef, ResearchOutput, ReviewRequirement};
 pub use error::{ResearchError, Result};
 pub use executor::{ApprovedResearch, ResearchExecutor, ResearchResult, SearchQuality};

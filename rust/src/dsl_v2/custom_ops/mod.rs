@@ -19,6 +19,7 @@
 //! 4. Ensure operations are testable in isolation
 
 mod access_review_ops;
+mod agent_ops;
 mod attribute_ops;
 pub mod batch_control_ops;
 mod board_ops;
@@ -748,6 +749,9 @@ impl CustomOperationRegistry {
         // Session scope management operations
         session_ops::register_session_ops(&mut registry);
 
+        // Agent control operations (agent mode lifecycle, checkpoints)
+        agent_ops::register_agent_ops(&mut registry);
+
         registry
     }
 
@@ -1032,6 +1036,18 @@ mod tests {
         assert!(registry.has("investor", "suspend"));
         assert!(registry.has("investor", "reinstate"));
         assert!(registry.has("investor", "count-by-state"));
+        // Agent control operations (agent mode lifecycle, checkpoints)
+        assert!(registry.has("agent", "start"));
+        assert!(registry.has("agent", "pause"));
+        assert!(registry.has("agent", "resume"));
+        assert!(registry.has("agent", "stop"));
+        assert!(registry.has("agent", "confirm"));
+        assert!(registry.has("agent", "reject"));
+        assert!(registry.has("agent", "select"));
+        assert!(registry.has("agent", "status"));
+        assert!(registry.has("agent", "history"));
+        assert!(registry.has("agent", "set-threshold"));
+        assert!(registry.has("agent", "set-mode"));
     }
 
     #[test]

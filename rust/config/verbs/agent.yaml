@@ -1,0 +1,249 @@
+# Agent Control Verbs
+#
+# Controls the agent mode and loop execution.
+# Agent modes: Manual (user drives), Agent (autonomous loop), Hybrid (agent proposes, user confirms)
+#
+# Integration: UnifiedSessionContext, AgentController, AgentState
+
+domains:
+  agent:
+    description: |
+      Agent control operations for research workflow automation.
+      Manages the agent loop lifecycle: start, pause, resume, stop.
+      Handles checkpoint confirmations for ambiguous decisions.
+    invocation_hints:
+      - "start agent"
+      - "run autonomously"
+      - "agent mode"
+      - "research mode"
+      - "pause agent"
+      - "stop agent"
+      - "resume"
+      - "continue research"
+    verbs:
+      # ============================================
+      # Lifecycle Operations
+      # ============================================
+      start:
+        description: Start agent mode with a specific task
+        behavior: plugin
+        handler: AgentStartOp
+        invocation_phrases:
+          - "start the agent"
+          - "run research automatically"
+          - "start autonomous mode"
+          - "resolve gaps for"
+          - "enrich"
+          - "research this entity"
+        args:
+          - name: task
+            type: string
+            required: true
+            description: |
+              Task type: resolve-gaps, chain-research, enrich-entity,
+              enrich-group, screen-entities
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: target_entity_id
+            description: Target entity for the task (if applicable)
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: max-iterations
+            type: integer
+            required: false
+            default: 50
+            description: Maximum loop iterations before stopping
+          - name: mode
+            type: string
+            required: false
+            default: hybrid
+            description: |
+              Agent mode: agent (fully autonomous), hybrid (checkpoints on ambiguous)
+        returns:
+          type: uuid
+          name: agent_session_id
+          capture: true
+
+      pause:
+        description: Pause the running agent loop
+        behavior: plugin
+        handler: AgentPauseOp
+        invocation_phrases:
+          - "pause the agent"
+          - "pause research"
+          - "hold on"
+          - "wait"
+        args: []
+        returns:
+          type: affected
+
+      resume:
+        description: Resume a paused agent loop
+        behavior: plugin
+        handler: AgentResumeOp
+        invocation_phrases:
+          - "resume the agent"
+          - "continue research"
+          - "keep going"
+          - "go ahead"
+        args: []
+        returns:
+          type: affected
+
+      stop:
+        description: Stop the agent loop completely
+        behavior: plugin
+        handler: AgentStopOp
+        invocation_phrases:
+          - "stop the agent"
+          - "cancel research"
+          - "abort"
+          - "stop"
+        args: []
+        returns:
+          type: affected
+
+      # ============================================
+      # Checkpoint Operations
+      # ============================================
+      confirm:
+        description: Confirm a checkpoint decision
+        behavior: plugin
+        handler: AgentConfirmOp
+        invocation_phrases:
+          - "confirm"
+          - "yes, use that one"
+          - "proceed with"
+          - "that's correct"
+          - "accept"
+        args:
+          - name: checkpoint-id
+            type: uuid
+            required: false
+            maps_to: checkpoint_id
+            description: Checkpoint to confirm (uses current if not specified)
+          - name: selected-candidate
+            type: integer
+            required: false
+            default: 0
+            description: Index of selected candidate (0-based)
+        returns:
+          type: affected
+
+      reject:
+        description: Reject a checkpoint and skip this decision
+        behavior: plugin
+        handler: AgentRejectOp
+        invocation_phrases:
+          - "reject"
+          - "no, skip this"
+          - "none of these"
+          - "skip"
+        args:
+          - name: checkpoint-id
+            type: uuid
+            required: false
+            maps_to: checkpoint_id
+            description: Checkpoint to reject (uses current if not specified)
+          - name: reason
+            type: string
+            required: false
+            description: Reason for rejection
+        returns:
+          type: affected
+
+      select:
+        description: Select a specific candidate from checkpoint options
+        behavior: plugin
+        handler: AgentSelectOp
+        invocation_phrases:
+          - "select option"
+          - "use the first one"
+          - "use the second one"
+          - "pick"
+        args:
+          - name: checkpoint-id
+            type: uuid
+            required: false
+            maps_to: checkpoint_id
+            description: Checkpoint to respond to (uses current if not specified)
+          - name: candidate-index
+            type: integer
+            required: true
+            description: Index of selected candidate (0-based)
+        returns:
+          type: affected
+
+      # ============================================
+      # Status Operations
+      # ============================================
+      status:
+        description: Get current agent status
+        behavior: plugin
+        handler: AgentStatusOp
+        invocation_phrases:
+          - "agent status"
+          - "what is the agent doing"
+          - "research status"
+          - "progress"
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      history:
+        description: Get agent decision and action history for current session
+        behavior: plugin
+        handler: AgentHistoryOp
+        invocation_phrases:
+          - "agent history"
+          - "what did the agent do"
+          - "show decisions"
+          - "show actions"
+        args:
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+            description: Maximum entries to return
+        returns:
+          type: record
+          capture: false
+
+      # ============================================
+      # Configuration Operations
+      # ============================================
+      set-threshold:
+        description: Set confidence thresholds for auto-selection
+        behavior: plugin
+        handler: AgentSetThresholdOp
+        args:
+          - name: auto-proceed
+            type: decimal
+            required: false
+            description: Confidence threshold for auto-proceed (default 0.90)
+          - name: ambiguous-floor
+            type: decimal
+            required: false
+            description: Minimum confidence for checkpoint (default 0.70)
+        returns:
+          type: affected
+
+      set-mode:
+        description: Switch between agent and hybrid modes
+        behavior: plugin
+        handler: AgentSetModeOp
+        args:
+          - name: mode
+            type: string
+            required: true
+            description: |
+              Mode: manual (no agent), agent (fully autonomous),
+              hybrid (checkpoints on ambiguous)
+        returns:
+          type: affected
