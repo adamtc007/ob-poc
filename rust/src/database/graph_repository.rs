@@ -158,6 +158,20 @@ struct OwnershipChainRow {
     depth: i32,
 }
 
+/// Aggregated data rows for building an EntityGraph
+///
+/// Groups all the database row types needed to construct a graph,
+/// reducing the number of parameters passed to build_graph.
+#[derive(Debug, Default)]
+struct GraphDataRows {
+    cbus: Vec<CbuRow>,
+    entities: Vec<EntityRow>,
+    roles: Vec<RoleRow>,
+    ownership: Vec<OwnershipRow>,
+    control: Vec<ControlRow>,
+    fund_structure: Vec<FundStructureRow>,
+}
+
 // =============================================================================
 // POSTGRES IMPLEMENTATION
 // =============================================================================
@@ -458,18 +472,10 @@ impl PgGraphRepository {
     }
 
     /// Build EntityGraph from loaded data
-    fn build_graph(
-        &self,
-        cbus: Vec<CbuRow>,
-        entities: Vec<EntityRow>,
-        roles: Vec<RoleRow>,
-        ownership_rows: Vec<OwnershipRow>,
-        control_rows: Vec<ControlRow>,
-        fund_rows: Vec<FundStructureRow>,
-    ) -> EntityGraph {
+    fn build_graph(&self, data: GraphDataRows) -> EntityGraph {
         // Build nodes
         let mut nodes: HashMap<Uuid, GraphNode> = HashMap::new();
-        for e in entities {
+        for e in data.entities {
             let mut node = GraphNode::new(
                 e.entity_id,
                 e.name,
@@ -481,7 +487,7 @@ impl PgGraphRepository {
 
         // Build CBU nodes
         let mut cbu_nodes: HashMap<Uuid, CbuNode> = HashMap::new();
-        for c in cbus {
+        for c in data.cbus {
             let mut cbu = CbuNode::new(c.cbu_id, c.name);
             cbu.jurisdiction = c.jurisdiction;
             cbu.commercial_client_id = c.commercial_client_entity_id;
@@ -489,7 +495,8 @@ impl PgGraphRepository {
         }
 
         // Build role assignments
-        let role_assignments: Vec<RoleAssignment> = roles
+        let role_assignments: Vec<RoleAssignment> = data
+            .roles
             .into_iter()
             .map(|r| RoleAssignment {
                 id: Uuid::new_v4(),
@@ -523,7 +530,8 @@ impl PgGraphRepository {
         }
 
         // Build ownership edges
-        let ownership_edges: Vec<OwnershipEdge> = ownership_rows
+        let ownership_edges: Vec<OwnershipEdge> = data
+            .ownership
             .into_iter()
             .map(|r| {
                 let ownership_type = r
@@ -552,7 +560,8 @@ impl PgGraphRepository {
         }
 
         // Build control edges
-        let control_edges: Vec<ControlEdge> = control_rows
+        let control_edges: Vec<ControlEdge> = data
+            .control
             .into_iter()
             .map(|r| {
                 let control_type = r
@@ -576,7 +585,8 @@ impl PgGraphRepository {
         }
 
         // Build fund edges
-        let fund_edges: Vec<FundEdge> = fund_rows
+        let fund_edges: Vec<FundEdge> = data
+            .fund_structure
             .into_iter()
             .map(|r| {
                 let relationship_type = r.relationship_type.parse().unwrap_or_default();
@@ -627,14 +637,14 @@ impl GraphRepository for PgGraphRepository {
         let fund_rows = self.load_fund_edges(&entity_ids).await?;
 
         // Build graph
-        let mut graph = self.build_graph(
+        let mut graph = self.build_graph(GraphDataRows {
             cbus,
             entities,
             roles,
-            ownership_rows,
-            control_rows,
-            fund_rows,
-        );
+            ownership: ownership_rows,
+            control: control_rows,
+            fund_structure: fund_rows,
+        });
 
         // Compute depth from terminus
         graph.compute_depths();
@@ -729,14 +739,14 @@ impl GraphRepository for PgGraphRepository {
         let fund_rows = self.load_fund_edges(&entity_ids).await?;
 
         // Build graph
-        let mut graph = self.build_graph(
+        let mut graph = self.build_graph(GraphDataRows {
             cbus,
-            all_entities,
-            all_roles,
-            ownership_rows,
-            control_rows,
-            fund_rows,
-        );
+            entities: all_entities,
+            roles: all_roles,
+            ownership: ownership_rows,
+            control: control_rows,
+            fund_structure: fund_rows,
+        });
 
         graph.compute_depths();
 
@@ -777,14 +787,14 @@ impl GraphRepository for PgGraphRepository {
         let fund_rows = self.load_fund_edges(&entity_ids).await?;
 
         // Build graph
-        let mut graph = self.build_graph(
+        let mut graph = self.build_graph(GraphDataRows {
             cbus,
-            all_entities,
-            all_roles,
-            ownership_rows,
-            control_rows,
-            fund_rows,
-        );
+            entities: all_entities,
+            roles: all_roles,
+            ownership: ownership_rows,
+            control: control_rows,
+            fund_structure: fund_rows,
+        });
 
         graph.compute_depths();
 
@@ -922,14 +932,14 @@ impl GraphRepository for PgGraphRepository {
         let fund_rows = self.load_fund_edges(&entity_id_set).await?;
 
         // Build graph
-        let mut graph = self.build_graph(
+        let mut graph = self.build_graph(GraphDataRows {
             cbus,
             entities,
-            all_roles,
-            ownership_rows,
-            control_rows,
-            fund_rows,
-        );
+            roles: all_roles,
+            ownership: ownership_rows,
+            control: control_rows,
+            fund_structure: fund_rows,
+        });
 
         graph.compute_depths();
 

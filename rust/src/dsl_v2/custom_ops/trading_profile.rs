@@ -466,20 +466,21 @@ impl CustomOperation for TradingProfileMaterializeOp {
         // Start transaction
         let mut tx = pool.begin().await?;
 
-        // Build lookup caches
-        let instrument_class_map = build_instrument_class_map(&mut tx).await?;
-        let market_map = build_market_map(&mut tx).await?;
+        // Build reference maps for materialization
+        let mut refs = ReferenceMaps::new();
+        refs.instrument_class_map = build_instrument_class_map(&mut tx).await?;
+        refs.market_map = build_market_map(&mut tx).await?;
+
+        let opts = MaterializationOptions { force };
 
         // Materialize SSIs first (booking rules reference them)
-        let mut ssi_name_to_id: HashMap<String, Uuid> = HashMap::new();
-
         if sections.contains(&"ssis".to_string()) {
             let mut created = 0;
             for (category, ssis) in &document.standing_instructions {
                 for ssi in ssis {
                     let ssi_id =
-                        materialize_ssi(&mut tx, cbu_id, category, ssi, &market_map, force).await?;
-                    ssi_name_to_id.insert(ssi.name.clone(), ssi_id);
+                        materialize_ssi(&mut tx, cbu_id, category, ssi, &refs, &opts).await?;
+                    refs.ssi_name_to_id.insert(ssi.name.clone(), ssi_id);
                     created += 1;
                 }
             }
@@ -496,21 +497,14 @@ impl CustomOperation for TradingProfileMaterializeOp {
             .fetch_all(&mut *tx)
             .await?;
             for row in rows {
-                ssi_name_to_id.insert(row.ssi_name, row.ssi_id);
+                refs.ssi_name_to_id.insert(row.ssi_name, row.ssi_id);
             }
         }
 
         // Materialize universe
         if sections.contains(&"universe".to_string()) {
-            let created = materialize_universe(
-                &mut tx,
-                cbu_id,
-                &document.universe,
-                &instrument_class_map,
-                &market_map,
-                force,
-            )
-            .await?;
+            let created =
+                materialize_universe(&mut tx, cbu_id, &document.universe, &refs, &opts).await?;
             result
                 .records_created
                 .insert("cbu_instrument_universe".to_string(), created);
@@ -519,16 +513,9 @@ impl CustomOperation for TradingProfileMaterializeOp {
 
         // Materialize booking rules
         if sections.contains(&"booking_rules".to_string()) {
-            let created = materialize_booking_rules(
-                &mut tx,
-                cbu_id,
-                &document.booking_rules,
-                &ssi_name_to_id,
-                &instrument_class_map,
-                &market_map,
-                force,
-            )
-            .await?;
+            let created =
+                materialize_booking_rules(&mut tx, cbu_id, &document.booking_rules, &refs, &opts)
+                    .await?;
             result
                 .records_created
                 .insert("ssi_booking_rules".to_string(), created);
@@ -544,7 +531,7 @@ impl CustomOperation for TradingProfileMaterializeOp {
                 pool,
                 cbu_id,
                 &document.isda_agreements,
-                &ssi_name_to_id,
+                &refs.ssi_name_to_id,
             )
             .await?;
             result
@@ -588,6 +575,41 @@ impl CustomOperation for TradingProfileMaterializeOp {
 // =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+// MATERIALIZATION HELPERS
+// =============================================================================
+
+/// Reference maps for materializing trading profile elements
+///
+/// These maps resolve symbolic names (SSI name, instrument class code, MIC)
+/// to database UUIDs during materialization.
+#[cfg(feature = "database")]
+struct ReferenceMaps {
+    /// SSI name -> ssi_id
+    ssi_name_to_id: HashMap<String, Uuid>,
+    /// Instrument class code -> class_id
+    instrument_class_map: HashMap<String, Uuid>,
+    /// Market MIC -> market_id
+    market_map: HashMap<String, Uuid>,
+}
+
+#[cfg(feature = "database")]
+impl ReferenceMaps {
+    fn new() -> Self {
+        Self {
+            ssi_name_to_id: HashMap::new(),
+            instrument_class_map: HashMap::new(),
+            market_map: HashMap::new(),
+        }
+    }
+}
+
+/// Options controlling materialization behavior
+#[cfg(feature = "database")]
+#[derive(Debug, Clone, Default)]
+struct MaterializationOptions {
+    /// Force overwrite existing records (vs skip on conflict)
+    force: bool,
+}
 
 #[cfg(feature = "database")]
 async fn build_instrument_class_map(
@@ -617,8 +639,8 @@ async fn materialize_ssi(
     cbu_id: Uuid,
     category: &str,
     ssi: &StandingInstruction,
-    market_map: &HashMap<String, Uuid>,
-    force: bool,
+    refs: &ReferenceMaps,
+    opts: &MaterializationOptions,
 ) -> Result<Uuid> {
     let ssi_id = Uuid::new_v4();
 
@@ -631,9 +653,11 @@ async fn materialize_ssi(
     };
 
     // Look up market_id if mic is specified
-    let market_id = ssi.mic.as_ref().and_then(|m| market_map.get(m)).copied();
-
-    let _conflict_action = if force { "DO UPDATE SET" } else { "DO NOTHING" };
+    let market_id = ssi
+        .mic
+        .as_ref()
+        .and_then(|m| refs.market_map.get(m))
+        .copied();
 
     // Use raw query to handle ON CONFLICT properly
     let query = format!(
@@ -645,7 +669,7 @@ async fn materialize_ssi(
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'ACTIVE', CURRENT_DATE, 'TRADING_PROFILE')
            ON CONFLICT (cbu_id, ssi_name) {}
            RETURNING ssi_id"#,
-        if force {
+        if opts.force {
             "DO UPDATE SET
                 ssi_type = EXCLUDED.ssi_type,
                 market_id = EXCLUDED.market_id,
@@ -699,20 +723,19 @@ async fn materialize_universe(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     cbu_id: Uuid,
     universe: &crate::trading_profile::Universe,
-    instrument_class_map: &HashMap<String, Uuid>,
-    market_map: &HashMap<String, Uuid>,
-    _force: bool,
+    refs: &ReferenceMaps,
+    _opts: &MaterializationOptions,
 ) -> Result<i32> {
     let mut created = 0;
 
     for market_cfg in &universe.allowed_markets {
-        let Some(&market_id) = market_map.get(&market_cfg.mic) else {
+        let Some(&market_id) = refs.market_map.get(&market_cfg.mic) else {
             tracing::warn!(mic = %market_cfg.mic, "Market not found in reference data, skipping");
             continue;
         };
 
         for inst_cfg in &universe.instrument_classes {
-            let Some(&class_id) = instrument_class_map.get(&inst_cfg.class_code) else {
+            let Some(&class_id) = refs.instrument_class_map.get(&inst_cfg.class_code) else {
                 tracing::warn!(code = %inst_cfg.class_code, "Instrument class not found, skipping");
                 continue;
             };
@@ -775,16 +798,14 @@ async fn materialize_booking_rules(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     cbu_id: Uuid,
     rules: &[BookingRule],
-    ssi_name_to_id: &HashMap<String, Uuid>,
-    instrument_class_map: &HashMap<String, Uuid>,
-    market_map: &HashMap<String, Uuid>,
-    _force: bool,
+    refs: &ReferenceMaps,
+    _opts: &MaterializationOptions,
 ) -> Result<i32> {
     let mut created = 0;
 
     for rule in rules {
         // Look up SSI ID from name
-        let Some(&ssi_id) = ssi_name_to_id.get(&rule.ssi_ref) else {
+        let Some(&ssi_id) = refs.ssi_name_to_id.get(&rule.ssi_ref) else {
             tracing::warn!(ssi_ref = %rule.ssi_ref, rule = %rule.name, "SSI not found for booking rule, skipping");
             continue;
         };
@@ -794,7 +815,7 @@ async fn materialize_booking_rules(
             .match_criteria
             .instrument_class
             .as_ref()
-            .and_then(|c| instrument_class_map.get(c))
+            .and_then(|c| refs.instrument_class_map.get(c))
             .copied();
 
         // Look up market_id if mic specified
@@ -802,7 +823,7 @@ async fn materialize_booking_rules(
             .match_criteria
             .mic
             .as_ref()
-            .and_then(|m| market_map.get(m))
+            .and_then(|m| refs.market_map.get(m))
             .copied();
 
         // NOTE: We do NOT insert specificity_score - it's GENERATED ALWAYS
@@ -3454,42 +3475,26 @@ impl CustomOperation for TradingProfileApproveOp {
         // Start transaction for materialization
         let mut tx = pool.begin().await?;
 
-        // Build lookup caches
-        let instrument_class_map = build_instrument_class_map(&mut tx).await?;
-        let market_map = build_market_map(&mut tx).await?;
+        // Build reference maps for materialization
+        let mut refs = ReferenceMaps::new();
+        refs.instrument_class_map = build_instrument_class_map(&mut tx).await?;
+        refs.market_map = build_market_map(&mut tx).await?;
+
+        let opts = MaterializationOptions { force: true };
 
         // Materialize SSIs first (booking rules reference them)
-        let mut ssi_name_to_id: HashMap<String, Uuid> = HashMap::new();
         for (category, ssis) in &document.standing_instructions {
             for ssi in ssis {
-                let ssi_id =
-                    materialize_ssi(&mut tx, cbu_id, category, ssi, &market_map, true).await?;
-                ssi_name_to_id.insert(ssi.name.clone(), ssi_id);
+                let ssi_id = materialize_ssi(&mut tx, cbu_id, category, ssi, &refs, &opts).await?;
+                refs.ssi_name_to_id.insert(ssi.name.clone(), ssi_id);
             }
         }
 
         // Materialize universe
-        materialize_universe(
-            &mut tx,
-            cbu_id,
-            &document.universe,
-            &instrument_class_map,
-            &market_map,
-            true,
-        )
-        .await?;
+        materialize_universe(&mut tx, cbu_id, &document.universe, &refs, &opts).await?;
 
         // Materialize booking rules
-        materialize_booking_rules(
-            &mut tx,
-            cbu_id,
-            &document.booking_rules,
-            &ssi_name_to_id,
-            &instrument_class_map,
-            &market_map,
-            true,
-        )
-        .await?;
+        materialize_booking_rules(&mut tx, cbu_id, &document.booking_rules, &refs, &opts).await?;
 
         // Materialize ISDA agreements if present
         if !document.isda_agreements.is_empty() {
@@ -3498,7 +3503,7 @@ impl CustomOperation for TradingProfileApproveOp {
                 pool,
                 cbu_id,
                 &document.isda_agreements,
-                &ssi_name_to_id,
+                &refs.ssi_name_to_id,
             )
             .await?;
         }

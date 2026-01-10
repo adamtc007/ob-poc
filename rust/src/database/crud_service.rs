@@ -77,6 +77,40 @@ pub struct CrudOperation {
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+// =============================================================================
+// PARAMETER STRUCTS
+// =============================================================================
+
+/// Parameters for logging a CRUD operation
+#[derive(Debug, Clone)]
+pub struct CrudOperationLog {
+    /// Type of operation (Create, Read, Update, Delete)
+    pub operation_type: OperationType,
+    /// Type of asset being operated on
+    pub asset_type: AssetType,
+    /// Database table name
+    pub entity_table_name: String,
+    /// DSL that was generated/executed
+    pub generated_dsl: Option<String>,
+    /// Original AI instruction that triggered this
+    pub ai_instruction: Option<String>,
+    /// Records affected by this operation
+    pub affected_records: Option<JsonValue>,
+    /// AI context (provider and model used)
+    pub ai_context: Option<AiContext>,
+}
+
+/// AI provider context for audit trail
+#[derive(Debug, Clone, Default)]
+pub struct AiContext {
+    pub provider: String,
+    pub model: String,
+}
+
+// =============================================================================
+// SERVICE
+// =============================================================================
+
 /// Service for CRUD operation logging
 #[derive(Clone, Debug)]
 pub struct CrudService {
@@ -95,19 +129,14 @@ impl CrudService {
     }
 
     /// Log a CRUD operation
-    #[allow(clippy::too_many_arguments)]
-    pub async fn log_crud_operation(
-        &self,
-        operation_type: OperationType,
-        asset_type: AssetType,
-        entity_table_name: &str,
-        generated_dsl: Option<&str>,
-        ai_instruction: Option<&str>,
-        affected_records: Option<JsonValue>,
-        ai_provider: Option<&str>,
-        ai_model: Option<&str>,
-    ) -> Result<Uuid> {
+    pub async fn log_crud_operation(&self, log: CrudOperationLog) -> Result<Uuid> {
         let operation_id = Uuid::new_v4();
+
+        let (ai_provider, ai_model) = log
+            .ai_context
+            .as_ref()
+            .map(|ctx| (Some(ctx.provider.as_str()), Some(ctx.model.as_str())))
+            .unwrap_or((None, None));
 
         sqlx::query(
             r#"
@@ -120,12 +149,12 @@ impl CrudService {
             "#,
         )
         .bind(operation_id)
-        .bind(operation_type.to_string())
-        .bind(asset_type.to_string())
-        .bind(entity_table_name)
-        .bind(generated_dsl)
-        .bind(ai_instruction)
-        .bind(affected_records)
+        .bind(log.operation_type.to_string())
+        .bind(log.asset_type.to_string())
+        .bind(&log.entity_table_name)
+        .bind(&log.generated_dsl)
+        .bind(&log.ai_instruction)
+        .bind(&log.affected_records)
         .bind(ai_provider)
         .bind(ai_model)
         .execute(&self.pool)
@@ -134,7 +163,7 @@ impl CrudService {
 
         info!(
             "Logged {} {} operation {} on {}",
-            operation_type, asset_type, operation_id, entity_table_name
+            log.operation_type, log.asset_type, operation_id, log.entity_table_name
         );
 
         Ok(operation_id)

@@ -257,6 +257,83 @@ pub struct LayoutCacheEntry {
 }
 
 // =============================================================================
+// PARAMETER STRUCTS (for functions with many arguments)
+// =============================================================================
+
+/// Parameters for upserting a layout override
+#[derive(Debug, Clone)]
+pub struct LayoutOverrideParams {
+    /// CBU this override applies to
+    pub cbu_id: Uuid,
+    /// View mode (e.g., "ubo", "trading")
+    pub view_mode: String,
+    /// User-specific override (None for global)
+    pub user_id: Option<Uuid>,
+    /// Node being overridden
+    pub node_id: Uuid,
+    /// Type of node
+    pub node_type: String,
+    /// Position adjustments
+    pub position: LayoutPosition,
+    /// Node state flags
+    pub state: LayoutNodeState,
+}
+
+/// Position and size overrides for a node
+#[derive(Debug, Clone, Default)]
+pub struct LayoutPosition {
+    pub x_offset: f64,
+    pub y_offset: f64,
+    pub width_override: Option<f64>,
+    pub height_override: Option<f64>,
+}
+
+/// State flags for a layout node
+#[derive(Debug, Clone, Default)]
+pub struct LayoutNodeState {
+    /// Node is pinned (won't move during layout)
+    pub pinned: bool,
+    /// Node is collapsed (children hidden)
+    pub collapsed: bool,
+    /// Node is hidden entirely
+    pub hidden: bool,
+}
+
+/// Parameters for saving a layout cache entry
+#[derive(Debug, Clone)]
+pub struct LayoutCacheParams {
+    /// CBU this cache applies to
+    pub cbu_id: Uuid,
+    /// View mode (e.g., "ubo", "trading")
+    pub view_mode: String,
+    /// User-specific cache (None for global)
+    pub user_id: Option<Uuid>,
+    /// Hash of inputs used to compute this layout
+    pub input_hash: String,
+    /// Computed layout data
+    pub layout_data: LayoutData,
+    /// Computation statistics
+    pub stats: LayoutStats,
+}
+
+/// Computed layout data for caching
+#[derive(Debug, Clone)]
+pub struct LayoutData {
+    pub node_positions: serde_json::Value,
+    pub edge_paths: serde_json::Value,
+    pub bounding_box: Option<serde_json::Value>,
+    pub tier_info: Option<serde_json::Value>,
+}
+
+/// Statistics about layout computation
+#[derive(Debug, Clone, Default)]
+pub struct LayoutStats {
+    pub computation_time_ms: i32,
+    pub node_count: i32,
+    pub edge_count: i32,
+}
+
+// =============================================================================
 // VIEW CONFIG SERVICE
 // =============================================================================
 
@@ -638,21 +715,9 @@ impl ViewConfigService {
     }
 
     /// Save or update a layout override for a node
-    #[allow(clippy::too_many_arguments)]
     pub async fn upsert_layout_override(
         pool: &PgPool,
-        cbu_id: Uuid,
-        view_mode: &str,
-        user_id: Option<Uuid>,
-        node_id: Uuid,
-        node_type: &str,
-        x_offset: f64,
-        y_offset: f64,
-        width_override: Option<f64>,
-        height_override: Option<f64>,
-        pinned: bool,
-        collapsed: bool,
-        hidden: bool,
+        params: LayoutOverrideParams,
     ) -> Result<Uuid> {
         let override_id = sqlx::query_scalar::<_, Uuid>(
             r#"INSERT INTO "ob-poc".layout_overrides
@@ -672,18 +737,18 @@ impl ViewConfigService {
                    updated_at = now()
                RETURNING override_id"#,
         )
-        .bind(cbu_id)
-        .bind(view_mode)
-        .bind(user_id)
-        .bind(node_id)
-        .bind(node_type)
-        .bind(x_offset)
-        .bind(y_offset)
-        .bind(width_override)
-        .bind(height_override)
-        .bind(pinned)
-        .bind(collapsed)
-        .bind(hidden)
+        .bind(params.cbu_id)
+        .bind(&params.view_mode)
+        .bind(params.user_id)
+        .bind(params.node_id)
+        .bind(&params.node_type)
+        .bind(params.position.x_offset)
+        .bind(params.position.y_offset)
+        .bind(params.position.width_override)
+        .bind(params.position.height_override)
+        .bind(params.state.pinned)
+        .bind(params.state.collapsed)
+        .bind(params.state.hidden)
         .fetch_one(pool)
         .await?;
         Ok(override_id)
@@ -773,21 +838,7 @@ impl ViewConfigService {
     }
 
     /// Save layout cache
-    #[allow(clippy::too_many_arguments)]
-    pub async fn save_layout_cache(
-        pool: &PgPool,
-        cbu_id: Uuid,
-        view_mode: &str,
-        user_id: Option<Uuid>,
-        input_hash: &str,
-        node_positions: serde_json::Value,
-        edge_paths: serde_json::Value,
-        bounding_box: Option<serde_json::Value>,
-        tier_info: Option<serde_json::Value>,
-        computation_time_ms: i32,
-        node_count: i32,
-        edge_count: i32,
-    ) -> Result<Uuid> {
+    pub async fn save_layout_cache(pool: &PgPool, params: LayoutCacheParams) -> Result<Uuid> {
         let cache_id = sqlx::query_scalar::<_, Uuid>(
             r#"INSERT INTO "ob-poc".layout_cache
                (cbu_id, view_mode, user_id, input_hash,
@@ -809,17 +860,17 @@ impl ViewConfigService {
                    valid_until = NULL
                RETURNING cache_id"#,
         )
-        .bind(cbu_id)
-        .bind(view_mode)
-        .bind(user_id)
-        .bind(input_hash)
-        .bind(node_positions)
-        .bind(edge_paths)
-        .bind(bounding_box)
-        .bind(tier_info)
-        .bind(computation_time_ms)
-        .bind(node_count)
-        .bind(edge_count)
+        .bind(params.cbu_id)
+        .bind(&params.view_mode)
+        .bind(params.user_id)
+        .bind(&params.input_hash)
+        .bind(&params.layout_data.node_positions)
+        .bind(&params.layout_data.edge_paths)
+        .bind(&params.layout_data.bounding_box)
+        .bind(&params.layout_data.tier_info)
+        .bind(params.stats.computation_time_ms)
+        .bind(params.stats.node_count)
+        .bind(params.stats.edge_count)
         .fetch_one(pool)
         .await?;
         Ok(cache_id)
