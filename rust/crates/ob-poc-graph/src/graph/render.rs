@@ -46,6 +46,21 @@ impl Default for GraphRenderer {
     }
 }
 
+/// Options controlling how the graph is rendered
+///
+/// Groups optional rendering parameters to reduce function argument count.
+#[derive(Debug, Clone, Default)]
+pub struct RenderOptions<'a> {
+    /// Currently focused node (highlighted with connected edges)
+    pub focused_node: Option<&'a str>,
+    /// If set, only nodes matching this type are fully visible
+    pub type_filter: Option<&'a str>,
+    /// If set, nodes of this type get a highlight effect
+    pub highlighted_type: Option<&'a str>,
+    /// Esper render modes (xray, peel, shadow, etc.)
+    pub esper_state: Option<&'a EsperRenderState>,
+}
+
 impl GraphRenderer {
     pub fn new() -> Self {
         Self::default()
@@ -58,21 +73,20 @@ impl GraphRenderer {
     /// * `graph` - the layout graph to render
     /// * `camera` - camera for world-to-screen transformation
     /// * `screen_rect` - visible screen area
-    /// * `focused_node` - currently focused node (highlighted with connected edges)
-    /// * `type_filter` - if set, only nodes matching this type are fully visible
-    /// * `highlighted_type` - if set, nodes of this type get a highlight effect
-    /// * `esper_state` - Esper render modes (xray, peel, shadow, etc.) - optional
+    /// * `opts` - optional render settings (focus, filters, esper state)
     pub fn render(
         &self,
         painter: &egui::Painter,
         graph: &LayoutGraph,
         camera: &Camera2D,
         screen_rect: Rect,
-        focused_node: Option<&str>,
-        type_filter: Option<&str>,
-        highlighted_type: Option<&str>,
-        esper_state: Option<&EsperRenderState>,
+        opts: &RenderOptions<'_>,
     ) {
+        // Extract options for use in rendering
+        let focused_node = opts.focused_node;
+        let type_filter = opts.type_filter;
+        let highlighted_type = opts.highlighted_type;
+        let esper_state = opts.esper_state;
         // Render container backgrounds first (below everything)
         self.render_containers(painter, graph, camera, screen_rect);
 

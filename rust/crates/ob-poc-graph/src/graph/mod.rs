@@ -878,10 +878,12 @@ impl CbuGraphWidget {
             graph,
             &self.camera,
             screen_rect,
-            self.input_state.focused_node.as_deref(),
-            self.type_filter.as_deref(),
-            self.highlighted_type.as_deref(),
-            Some(&self.esper_render_state),
+            &render::RenderOptions {
+                focused_node: self.input_state.focused_node.as_deref(),
+                type_filter: self.type_filter.as_deref(),
+                highlighted_type: self.highlighted_type.as_deref(),
+                esper_state: Some(&self.esper_render_state),
+            },
         );
 
         // Render viewport HUD overlay if viewport_state is available
