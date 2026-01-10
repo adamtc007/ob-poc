@@ -1,9 +1,28 @@
 domains:
   gleif:
     description: GLEIF API integration for LEI data enrichment and corporate tree import
+
+    invocation_hints:
+      - "LEI"
+      - "GLEIF"
+      - "legal entity identifier"
+      - "parent company"
+      - "ultimate parent"
+      - "corporate hierarchy"
+      - "who owns"
+      - "ownership chain"
+      - "corporate structure"
+      - "fund manager"
+      - "umbrella fund"
+
     verbs:
       enrich:
         description: Enrich an entity with GLEIF data by LEI (creates entity if not exists)
+        invocation_phrases:
+          - "enrich from GLEIF"
+          - "get LEI data"
+          - "fetch LEI record"
+          - "import from GLEIF"
         behavior: plugin
         args:
           - name: lei
@@ -31,6 +50,11 @@ domains:
 
       search:
         description: Search GLEIF for entities by name, jurisdiction, or category
+        invocation_phrases:
+          - "search GLEIF"
+          - "find in GLEIF"
+          - "look up LEI"
+          - "search for entity"
         behavior: plugin
         args:
           - name: name
@@ -68,6 +92,11 @@ domains:
 
       import-tree:
         description: Import corporate tree (parents and/or children) from GLEIF
+        invocation_phrases:
+          - "import the GLEIF hierarchy"
+          - "get parent chain from GLEIF"
+          - "load corporate structure"
+          - "import ownership tree"
         behavior: plugin
         args:
           - name: root-lei
@@ -102,6 +131,11 @@ domains:
 
       import-managed-funds:
         description: Import funds managed by an investment manager with full CBU structure
+        invocation_phrases:
+          - "import managed funds"
+          - "get funds for manager"
+          - "load fund portfolio"
+          - "import investment manager funds"
         behavior: plugin
         args:
           - name: manager-lei
@@ -200,6 +234,11 @@ domains:
 
       trace-ownership:
         description: Trace ownership chain from entity to UBO terminus via GLEIF parent relationships
+        invocation_phrases:
+          - "trace ownership"
+          - "find ultimate parent"
+          - "who owns this ultimately"
+          - "trace to UBO"
         behavior: plugin
         args:
           - name: lei

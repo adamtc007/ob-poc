@@ -3,11 +3,12 @@
 > **Status:** Planning
 > **Priority:** High - Required for UBO gap resolution
 > **Created:** 2026-01-10
-> **Estimated Effort:** 70-85 hours
+> **Estimated Effort:** 85-100 hours
 > **Dependencies:** 
 >   - 019-group-taxonomy-intra-company-ownership.md (ownership graph, gaps)
 >   - Existing GLEIF integration (refactor under this pattern)
 >   - CLAUDE.md and annexes (review before implementation)
+>   - Session/REPL/Viewport infrastructure
 
 ---
 
@@ -22,655 +23,723 @@
 4. Review /docs/repl-viewport.md for session/scope context
 5. Review existing GLEIF implementation as reference pattern
 6. Review /rust/config/verbs/*.yaml for verb YAML conventions
+7. Review session mode infrastructure for agent integration
 ```
 
 This ensures implementation aligns with established project architecture.
 
 ---
 
-## Core Architecture
+## System Integration Overview
 
-### The Two-Phase Pattern
+**This is critical: Research verbs must wire through the existing infrastructure or they are invisible.**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    BOUNDED NON-DETERMINISM                                   │
+│                    FULL SYSTEM WIRING                                        │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   Research requires TWO execution models:                                   │
+│   ┌─────────────────┐                                                       │
+│   │   LLM Service   │ ◄── Claude API                                        │
+│   │   (reasoning)   │                                                       │
+│   └────────┬────────┘                                                       │
+│            │ prompts, responses                                             │
+│            ▼                                                                │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                    AGENT CONTROLLER                                  │   │
+│   │                                                                      │   │
+│   │  • Loads prompt templates                                           │   │
+│   │  • Manages agent loop state                                         │   │
+│   │  • Parses LLM output for DSL verbs                                  │   │
+│   │  • Routes checkpoints to UI                                         │   │
+│   │  • Enforces confidence thresholds                                   │   │
+│   │  • Respects session scope                                           │   │
+│   │                                                                      │   │
+│   └───────────────────────────┬─────────────────────────────────────────┘   │
+│                               │                                             │
+│           ┌───────────────────┼───────────────────┐                        │
+│           │                   │                   │                        │
+│           ▼                   ▼                   ▼                        │
+│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                  │
+│   │    REPL     │     │   Session   │     │   Viewport  │                  │
+│   │             │     │             │     │    (egui)   │                  │
+│   │ • Parses    │◄───►│ • Scope ctx │◄───►│             │                  │
+│   │   DSL       │     │ • Variables │     │ • REPL pane │                  │
+│   │ • Executes  │     │ • Mode      │     │ • Checkpoint│                  │
+│   │   verbs     │     │ • Agent     │     │   dialogs   │                  │
+│   │ • Returns   │     │   state     │     │ • Progress  │                  │
+│   │   results   │     │             │     │   display   │                  │
+│   └──────┬──────┘     └─────────────┘     └──────▲──────┘                  │
+│          │                                       │                         │
+│          │                                       │                         │
+│          ▼                                       │                         │
+│   ┌─────────────┐                                │                         │
+│   │  Handlers   │                                │                         │
+│   │  (Rust/Go)  │ ─────────────────────────────► │                         │
+│   │             │    checkpoint events,          │                         │
+│   │             │    progress updates            │                         │
+│   └──────┬──────┘                                │                         │
+│          │                                       │                         │
+│          ▼                                       │                         │
+│   ┌─────────────┐                                │                         │
+│   │  Database   │                                │                         │
+│   │             │ ◄──────────────────────────────┘                         │
+│   │ • Entities  │    user input (selections,                               │
+│   │ • Decisions │    confirmations, overrides)                             │
+│   │ • Actions   │                                                          │
+│   └─────────────┘                                                          │
 │                                                                              │
-│   PHASE 1: LLM EXPLORATION                                                  │
-│   ════════════════════════                                                   │
-│   • Fuzzy name matching                                                     │
-│   • Context reasoning                                                       │
-│   • Source selection                                                        │
-│   • Disambiguation                                                          │
-│   • Confidence scoring                                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Agent Integration
+
+### Session Modes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SESSION MODE MODEL                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   Executed via: PROMPT TEMPLATES + LLM reasoning                            │
-│   Output: IDENTIFIER (LEI, company number, CIK, etc.)                       │
+│   Session gains a MODE field:                                               │
 │                                                                              │
-│   Non-deterministic but AUDITABLE                                           │
-│                                                                              │
-│   ───────────────────────────────────────────────────────────────────────   │
-│                                                                              │
-│   PHASE 2: DSL EXECUTION                                                    │
+│   MODE: MANUAL (default)                                                    │
 │   ══════════════════════                                                     │
-│   • Fetch exact record by identifier                                        │
-│   • Normalize to schema                                                     │
-│   • Create/update entities                                                  │
-│   • Create relationships                                                    │
-│   • Audit trail                                                             │
+│   • User types DSL commands                                                 │
+│   • REPL executes immediately                                               │
+│   • Results displayed                                                       │
+│   • Standard current behavior                                               │
 │                                                                              │
-│   Executed via: DSL VERBS (key required)                                    │
-│   Output: Entities, relationships in database                               │
+│   MODE: AGENT                                                               │
+│   ═══════════════                                                            │
+│   • Agent controller running                                                │
+│   • LLM generates DSL commands                                              │
+│   • REPL executes on agent's behalf                                         │
+│   • User supervises, responds to checkpoints                                │
+│   • Can pause/resume/stop                                                   │
 │                                                                              │
-│   Deterministic, reproducible, idempotent                                   │
-│                                                                              │
-│   ═══════════════════════════════════════════════════════════════════════   │
-│                                                                              │
-│   THE IDENTIFIER IS THE BRIDGE                                              │
-│                                                                              │
-│   ┌──────────────────┐         ┌──────────────────┐                        │
-│   │  FUZZY WORLD     │         │ DETERMINISTIC    │                        │
-│   │                  │   KEY   │ WORLD            │                        │
-│   │  "AllianzGI"     │ ──────► │                  │                        │
-│   │  "that ManCo"    │   LEI   │ import-hierarchy │                        │
-│   │  reasoning...    │         │ create entities  │                        │
-│   └──────────────────┘         └──────────────────┘                        │
-│                                                                              │
-│   Prompt templates find the key                                             │
-│   DSL verbs use the key                                                     │
+│   MODE: HYBRID                                                              │
+│   ════════════                                                               │
+│   • Agent running but user can interleave commands                          │
+│   • User commands take priority                                             │
+│   • Agent resumes after user command completes                              │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Why This Architecture
+### Session State Extension
+
+```rust
+// Extension to existing Session struct
+
+pub struct Session {
+    // Existing fields...
+    pub scope: Scope,
+    pub variables: HashMap<String, Value>,
+    
+    // New agent fields
+    pub mode: SessionMode,
+    pub agent_state: Option<AgentState>,
+}
+
+pub enum SessionMode {
+    Manual,
+    Agent,
+    Hybrid,
+}
+
+pub struct AgentState {
+    pub agent_session_id: Uuid,
+    pub task: AgentTask,
+    pub status: AgentStatus,
+    pub target_entity_id: Option<Uuid>,
+    pub target_group_id: Option<Uuid>,
+    
+    // Loop state
+    pub loop_iteration: u32,
+    pub max_iterations: u32,
+    pub current_prompt: String,
+    
+    // Checkpoint state
+    pub pending_checkpoint: Option<Checkpoint>,
+    
+    // History
+    pub decisions: Vec<DecisionRef>,
+    pub actions: Vec<ActionRef>,
+    
+    // Timing
+    pub started_at: DateTime<Utc>,
+    pub last_activity: DateTime<Utc>,
+}
+
+pub enum AgentTask {
+    ResolveGaps,
+    ChainResearch,
+    EnrichEntity,
+    EnrichGroup,
+    ScreenEntities,
+}
+
+pub enum AgentStatus {
+    Running,
+    Paused,
+    Checkpoint,  // Awaiting user input
+    Complete,
+    Failed,
+    Cancelled,
+}
+
+pub struct Checkpoint {
+    pub checkpoint_id: Uuid,
+    pub checkpoint_type: CheckpointType,
+    pub context: CheckpointContext,
+    pub candidates: Vec<Candidate>,
+    pub created_at: DateTime<Utc>,
+}
+
+pub enum CheckpointType {
+    AmbiguousMatch,     // Multiple candidates, need selection
+    HighStakes,         // Auto-match but context requires confirmation
+    ScreeningHit,       // Sanctions/PEP match found
+    ValidationFailure,  // Post-import validation failed
+    SourceUnavailable,  // Preferred source failed, confirm fallback
+}
+```
+
+### Agent Controller
+
+```rust
+pub struct AgentController {
+    session: Arc<RwLock<Session>>,
+    repl: Arc<Repl>,
+    llm: Arc<LlmService>,
+    prompt_loader: PromptLoader,
+    event_tx: mpsc::Sender<AgentEvent>,
+}
+
+impl AgentController {
+    
+    /// Main entry point - starts agent for a task
+    pub async fn start(&self, task: AgentTask, params: AgentParams) -> Result<Uuid> {
+        let agent_session_id = Uuid::new_v4();
+        
+        // Update session
+        {
+            let mut session = self.session.write().await;
+            session.mode = SessionMode::Agent;
+            session.agent_state = Some(AgentState {
+                agent_session_id,
+                task: task.clone(),
+                status: AgentStatus::Running,
+                target_entity_id: params.entity_id,
+                target_group_id: params.group_id,
+                loop_iteration: 0,
+                max_iterations: params.max_iterations.unwrap_or(50),
+                current_prompt: String::new(),
+                pending_checkpoint: None,
+                decisions: vec![],
+                actions: vec![],
+                started_at: Utc::now(),
+                last_activity: Utc::now(),
+            });
+        }
+        
+        // Emit start event for UI
+        self.event_tx.send(AgentEvent::Started { 
+            agent_session_id, 
+            task: task.clone() 
+        }).await?;
+        
+        // Spawn the loop
+        let controller = self.clone();
+        tokio::spawn(async move {
+            controller.run_loop().await
+        });
+        
+        Ok(agent_session_id)
+    }
+    
+    /// The main agent loop
+    async fn run_loop(&self) -> Result<AgentResult> {
+        loop {
+            // Check status
+            let status = {
+                let session = self.session.read().await;
+                session.agent_state.as_ref().map(|s| s.status.clone())
+            };
+            
+            match status {
+                Some(AgentStatus::Running) => {
+                    // Continue loop
+                }
+                Some(AgentStatus::Paused) => {
+                    // Wait for resume signal
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+                Some(AgentStatus::Checkpoint) => {
+                    // Wait for user response
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    continue;
+                }
+                _ => break,
+            }
+            
+            // Get current scope from session (agent respects session scope)
+            let scope = {
+                let session = self.session.read().await;
+                session.scope.clone()
+            };
+            
+            // Step 1: Identify gaps using DSL
+            let gaps = self.execute_dsl(
+                "ownership.identify-gaps(:entity-id @target)"
+            ).await?;
+            
+            if gaps.is_empty() {
+                self.complete(AgentResult::Success).await?;
+                break;
+            }
+            
+            // Step 2: Load orchestration prompt
+            let context = self.build_context(&gaps, &scope).await?;
+            let prompt = self.prompt_loader.load(
+                "research/orchestration/resolve-gap.md",
+                &context
+            )?;
+            
+            self.update_current_prompt(&prompt).await;
+            
+            // Step 3: LLM reasons about strategy
+            let strategy = self.llm.complete(&prompt).await?;
+            
+            // Step 4: Execute strategy (search, evaluate, import or checkpoint)
+            match self.execute_strategy(&strategy).await? {
+                StrategyResult::Imported(action_id) => {
+                    self.record_action(action_id).await?;
+                }
+                StrategyResult::NeedsCheckpoint(checkpoint) => {
+                    self.request_checkpoint(checkpoint).await?;
+                    // Loop will wait at Checkpoint status
+                }
+                StrategyResult::NoMatch => {
+                    self.try_next_source_or_skip().await?;
+                }
+            }
+            
+            // Increment and check limits
+            self.increment_iteration().await?;
+        }
+        
+        Ok(AgentResult::Success)
+    }
+    
+    /// Execute DSL via REPL
+    async fn execute_dsl(&self, dsl: &str) -> Result<Value> {
+        // Emit event for UI
+        self.event_tx.send(AgentEvent::Executing { 
+            dsl: dsl.to_string() 
+        }).await?;
+        
+        // Execute through REPL
+        let result = self.repl.execute(dsl).await?;
+        
+        // Emit result
+        self.event_tx.send(AgentEvent::Executed { 
+            dsl: dsl.to_string(),
+            result: result.clone(),
+        }).await?;
+        
+        Ok(result)
+    }
+    
+    /// Handle checkpoint response from user
+    pub async fn respond_checkpoint(&self, response: CheckpointResponse) -> Result<()> {
+        let checkpoint = {
+            let mut session = self.session.write().await;
+            session.agent_state.as_mut()
+                .and_then(|s| s.pending_checkpoint.take())
+        };
+        
+        if let Some(checkpoint) = checkpoint {
+            match response {
+                CheckpointResponse::Select(index) => {
+                    let selected = &checkpoint.candidates[index];
+                    
+                    // Record decision
+                    let decision_id = self.execute_dsl(&format!(
+                        "research.workflow.record-decision(\
+                            :search-query \"{}\" \
+                            :source-provider \"{}\" \
+                            :candidates-found {:?} \
+                            :selected-key \"{}\" \
+                            :confidence {} \
+                            :reasoning \"User selected from checkpoint\" \
+                            :decision-type \"USER_SELECTED\")",
+                        checkpoint.context.search_query,
+                        checkpoint.context.source,
+                        checkpoint.candidates,
+                        selected.key,
+                        selected.score,
+                    )).await?;
+                    
+                    // Execute import with selected key
+                    self.execute_import(&checkpoint.context.source, &selected.key, decision_id).await?;
+                    
+                    // Resume loop
+                    self.set_status(AgentStatus::Running).await;
+                }
+                CheckpointResponse::Reject => {
+                    // Record rejection, try next source
+                    self.try_next_source_or_skip().await?;
+                    self.set_status(AgentStatus::Running).await;
+                }
+                CheckpointResponse::ManualOverride(key) => {
+                    // User provided correct key manually
+                    let decision_id = self.execute_dsl(&format!(
+                        "research.workflow.record-decision(\
+                            :search-query \"{}\" \
+                            :source-provider \"{}\" \
+                            :candidates-found {:?} \
+                            :selected-key \"{}\" \
+                            :confidence 1.0 \
+                            :reasoning \"User manual override\" \
+                            :decision-type \"USER_SELECTED\")",
+                        checkpoint.context.search_query,
+                        checkpoint.context.source,
+                        checkpoint.candidates,
+                        key,
+                    )).await?;
+                    
+                    self.execute_import(&checkpoint.context.source, &key, decision_id).await?;
+                    self.set_status(AgentStatus::Running).await;
+                }
+            }
+        }
+        
+        Ok(())
+    }
+}
+```
+
+### Viewport Integration
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    MIRRORS HUMAN ANALYST WORKFLOW                            │
+│                    VIEWPORT AGENT UI                                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   Human analyst:                                                            │
-│   1. Gets request: "Add ownership for HoldCo"                               │
-│   2. Searches GLEIF, Companies House, Google...          ← Fuzzy            │
-│   3. Finds candidates, applies judgment                  ← Fuzzy            │
-│   4. Picks the right one based on context                ← Fuzzy            │
-│   5. Notes down LEI or company number                    ← KEY              │
-│   6. Runs import in system                               ← Deterministic    │
+│   REPL pane shows agent activity:                                           │
 │                                                                              │
-│   LLM automates steps 1-5                                                   │
-│   DSL executes step 6                                                       │
-│   The KEY is the handoff point                                              │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  REPL                                         [MODE: AGENT ▶ RUNNING]│   │
+│   ├─────────────────────────────────────────────────────────────────────┤   │
+│   │  > agent.resolve-gaps(:entity-id @fund-alpha)                       │   │
+│   │                                                                      │   │
+│   │  🤖 Agent started: RESOLVE_GAPS                                      │   │
+│   │     Target: Fund Alpha                                               │   │
+│   │     Scope: GROUP @allianzgi                                          │   │
+│   │                                                                      │   │
+│   │  [1] ownership.identify-gaps(:entity-id @fund-alpha)                │   │
+│   │      → Found 2 gaps: HoldCo Ltd, Nominee X                          │   │
+│   │                                                                      │   │
+│   │  [2] Searching GLEIF for "HoldCo Ltd"...                            │   │
+│   │      → 2 candidates found (scores: 0.85, 0.82)                      │   │
+│   │                                                                      │   │
+│   │  ┌───────────────────────────────────────────────────────────────┐  │   │
+│   │  │ ⚠️  CHECKPOINT: Select match for "HoldCo Ltd"                  │  │   │
+│   │  │                                                                 │  │   │
+│   │  │  [1] HOLDCO LIMITED (LEI: 213800ABC...)                        │  │   │
+│   │  │      UK | Active | Score: 0.85                                 │  │   │
+│   │  │                                                                 │  │   │
+│   │  │  [2] HOLDCO LTD (LEI: 213800XYZ...)                            │  │   │
+│   │  │      UK | Active | Score: 0.82                                 │  │   │
+│   │  │                                                                 │  │   │
+│   │  │  > Enter 1, 2, N (neither), or M (manual): _                   │  │   │
+│   │  └───────────────────────────────────────────────────────────────┘  │   │
+│   │                                                                      │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
-│   ═══════════════════════════════════════════════════════════════════════   │
-│                                                                              │
-│   WHY NOT PURE APPROACHES:                                                  │
-│                                                                              │
-│   Pure Deterministic:                                                       │
-│   • User must provide LEI, company number, CIK...                           │
-│   • But users have: "AllianzGI" or "Fund Alpha's ManCo"                     │
-│   • Pushes fuzzy search to user - defeats purpose                           │
-│                                                                              │
-│   Pure LLM:                                                                 │
-│   • LLM searches AND imports data                                           │
-│   • No audit trail, no reproducibility                                      │
-│   • Can't answer: "Why did X get linked to Y?"                              │
-│   • Can't replay or correct                                                 │
+│   Status bar: [Iteration 2/50] [Decisions: 0] [Actions: 0] [⏸ Pause] [⏹ Stop]│
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Component 1: Prompt Templates
+## Invocation Phrases
 
-### Directory Structure
+**Critical: The LLM needs hints about when to use research verbs. These phrases trigger verb consideration.**
 
-```
-/prompts/research/
-│
-├── sources/
-│   ├── gleif/
-│   │   ├── search.md                 # Find LEI for entity name
-│   │   ├── disambiguate.md           # Pick best from candidates
-│   │   └── validate-lei.md           # Check LEI status
-│   │
-│   ├── companies-house/
-│   │   ├── search.md                 # Find company number
-│   │   ├── search-officer.md         # Find person in officers
-│   │   └── disambiguate.md
-│   │
-│   ├── sec-edgar/
-│   │   ├── search.md                 # Find CIK
-│   │   ├── find-filings.md           # Find relevant filings
-│   │   └── parse-13f.md              # Extract holders from 13F
-│   │
-│   ├── orbis/
-│   │   ├── search.md                 # Find BvD ID
-│   │   └── disambiguate.md
-│   │
-│   └── open-corporates/
-│       └── search.md
-│
-├── screening/
-│   ├── interpret-sanctions.md        # Evaluate sanctions hits
-│   ├── interpret-pep.md              # Evaluate PEP status
-│   └── assess-risk.md                # Overall risk assessment
-│
-├── documents/
-│   ├── extract-ownership.md          # Extract from annual report
-│   ├── extract-directors.md          # Extract board composition
-│   └── parse-declaration.md          # Parse UBO declaration
-│
-└── orchestration/
-    ├── resolve-gap.md                # Strategy for single gap
-    ├── chain-research.md             # Full chain strategy
-    ├── select-source.md              # Pick best source for need
-    └── reconcile-conflict.md         # Handle conflicting data
-```
+### agent.yaml
 
-### Prompt Template Structure
-
-```markdown
-# /prompts/research/sources/gleif/search.md
-
-## Context
-You are searching GLEIF (Global LEI Foundation) to find the LEI 
-for an entity. GLEIF is the authoritative source for Legal Entity
-Identifiers.
-
-## Input
-- entity_name: {{entity_name}}
-- jurisdiction: {{jurisdiction}} (optional)
-- entity_type: {{entity_type}} (optional)
-- context: {{context}} (optional - why we're looking)
-
-## GLEIF API
-Endpoint: https://api.gleif.org/api/v1/fuzzycompletions
-Parameters: field=fulltext, q={search_term}
-
-Alternative: https://api.gleif.org/api/v1/lei-records
-Filter: filter[entity.legalName]={exact_name}
-
-## Search Strategy
-1. Try exact name match first
-2. If no results, remove legal suffixes (Ltd, GmbH, LLC, Inc, etc.)
-3. If still no results, try key words from name
-4. Filter by jurisdiction if provided
-5. Only consider LEIs with status ISSUED (not LAPSED, RETIRED, etc.)
-
-## Disambiguation Rules
-When multiple candidates found:
-- Prefer exact jurisdiction match
-- Prefer active (not dormant) entities
-- Prefer longer-established LEIs (earlier registration date)
-- Check parent relationships for context clues
-
-## Output Format
-If confident match (score > 0.90):
-```json
-{
-  "status": "found",
-  "lei": "529900XXXXXXXXXXXXXX",
-  "legal_name": "AllianzGI GmbH",
-  "jurisdiction": "DE",
-  "confidence": 0.95,
-  "reasoning": "Exact name match, correct jurisdiction, active LEI"
-}
-```
-
-If ambiguous (multiple candidates 0.70-0.90):
-```json
-{
-  "status": "ambiguous",
-  "candidates": [
-    {"lei": "...", "name": "...", "score": 0.85, "jurisdiction": "DE"},
-    {"lei": "...", "name": "...", "score": 0.82, "jurisdiction": "US"}
-  ],
-  "clarification_needed": "Multiple entities with similar names. Is this the German or US entity?"
-}
-```
-
-If no match (all scores < 0.70):
-```json
-{
-  "status": "not_found",
-  "search_terms_tried": ["AllianzGI GmbH", "AllianzGI", "Allianz Global Investors"],
-  "suggestion": "Entity may not have an LEI. Try Companies House or Orbis."
-}
-```
-
-## Critical Rules
-- NEVER fabricate an LEI
-- NEVER assume - if unsure, return ambiguous
-- Always include reasoning for selection
-- Log all API calls made
-```
-
-### Orchestration Prompts
-
-```markdown
-# /prompts/research/orchestration/resolve-gap.md
-
-## Context
-You are resolving an ownership gap - a point in the ownership chain
-where we don't have complete information.
-
-## Input
-- gap_type: {{gap_type}}
-- entity_id: {{entity_id}}
-- entity_name: {{entity_name}}
-- jurisdiction: {{jurisdiction}}
-- known_context: {{context}}
-
-## Gap Types and Strategies
-
-### BROKEN_CHAIN (non-terminal entity with no parent)
-Priority sources:
-1. GLEIF - if entity likely has LEI (large, regulated, international)
-2. Companies House - if UK entity
-3. SEC EDGAR - if US public company
-4. Orbis - fallback for commercial data
-5. OpenCorporates - broad coverage, less depth
-
-### NOMINEE_HOLDING (legal owner known, beneficial unknown)
-Strategy:
-1. Check if nominee is known custodian (Clearstream, Euroclear, etc.)
-2. If yes, outreach.request-nominee-disclosure
-3. If no, check Orbis for nominee's own ownership
-
-### UNKNOWN_PERSON (natural person not verified)
-Strategy:
-1. screening.sanctions - check sanctions lists
-2. screening.pep - check PEP status
-3. identity.verify - if high-risk or material holding
-
-### UNACCOUNTED_SHARES (gap in cap table)
-Strategy:
-1. outreach.request-share-register
-2. Check for recent corporate actions (splits, buybacks)
-3. May need registrar reconciliation
-
-## Source Selection Logic
-```
-jurisdiction == "GB" AND entity_type == "COMPANY" → companies-house
-jurisdiction == "US" AND is_public → sec-edgar
-has_lei OR is_large_corporate → gleif
-else → orbis OR open-corporates
-```
-
-## Output Format
-```json
-{
-  "strategy": [
-    {"step": 1, "source": "gleif", "action": "search", "params": {...}},
-    {"step": 2, "source": "companies-house", "action": "search", "if": "gleif.not_found"},
-    {"step": 3, "action": "import", "source": "best_match", "verb": "research.{source}.import-hierarchy"}
-  ],
-  "confidence_threshold": 0.85,
-  "human_checkpoint": false,
-  "reasoning": "UK company likely in Companies House, may also have LEI"
-}
-```
-```
-
----
-
-## Component 2: Decision Logging Schema
-
-### Research Decisions Table
-
-```sql
--- =============================================================================
--- RESEARCH DECISIONS (audit trail for Phase 1)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS kyc.research_decisions (
-    decision_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+```yaml
+domains:
+  agent:
+    description: "Agent mode control and automated research"
     
-    -- What triggered this research
-    trigger_id UUID REFERENCES kyc.ownership_research_triggers(trigger_id),
-    target_entity_id UUID REFERENCES "ob-poc".entities(entity_id),
+    invocation_hints:
+      - "find the ownership"
+      - "complete the chain"
+      - "resolve the gaps"
+      - "research this entity"
+      - "who owns"
+      - "trace the ownership"
+      - "fill in the missing"
+      - "figure out the UBO"
+      - "look up the parent"
+      - "find out who controls"
+      - "investigate"
+      - "do the research"
+      - "automate the lookup"
+      - "run the agent"
     
-    -- Search context
-    search_query TEXT NOT NULL,
-    search_context JSONB,  -- jurisdiction, entity_type, etc.
-    
-    -- Source used
-    source_provider VARCHAR(30) NOT NULL,
-    
-    -- Candidates found
-    candidates_found JSONB NOT NULL,  -- [{key, name, score, metadata}]
-    candidates_count INTEGER NOT NULL,
-    
-    -- Selection
-    selected_key VARCHAR(100),  -- LEI, company number, CIK, etc.
-    selected_key_type VARCHAR(20),  -- LEI, COMPANY_NUMBER, CIK, BVD_ID
-    selection_confidence DECIMAL(3,2),  -- 0.00 - 1.00
-    selection_reasoning TEXT NOT NULL,
-    
-    -- Decision type
-    decision_type VARCHAR(20) NOT NULL,
-    
-    -- Verification
-    auto_selected BOOLEAN NOT NULL DEFAULT false,
-    verified_by UUID,  -- User who confirmed (if not auto)
-    verified_at TIMESTAMPTZ,
-    
-    -- Link to resulting action
-    resulting_action_id UUID,  -- Points to research_actions if executed
-    
-    -- Audit
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    session_id UUID,
-    
-    CONSTRAINT chk_decision_type CHECK (
-        decision_type IN (
-            'AUTO_SELECTED',     -- High confidence, proceeded automatically
-            'USER_SELECTED',     -- User picked from candidates
-            'USER_CONFIRMED',    -- Auto-selected but user confirmed
-            'NO_MATCH',          -- No suitable candidates found
-            'AMBIGUOUS',         -- Multiple candidates, awaiting user input
-            'REJECTED'           -- User rejected suggested match
-        )
-    )
-);
+    verbs:
+      start:
+        description: "Start agent mode with a task"
+        invocation_phrases:
+          - "start the agent"
+          - "run agent mode"
+          - "automate this"
+          - "let the agent handle"
+        behavior: plugin
+        handler: AgentStartOp
+        args:
+          - name: task
+            type: string
+            required: true
+            valid_values: [RESOLVE_GAPS, CHAIN_RESEARCH, ENRICH_ENTITY, SCREEN_ENTITIES]
+          - name: target-entity-id
+            type: uuid
+          - name: target-group-id
+            type: uuid
+          - name: options
+            type: object
+        effects:
+          - sets session.mode to AGENT
+          - spawns agent controller loop
+        returns:
+          type: object
 
-CREATE INDEX idx_research_decisions_target ON kyc.research_decisions(target_entity_id);
-CREATE INDEX idx_research_decisions_trigger ON kyc.research_decisions(trigger_id);
-CREATE INDEX idx_research_decisions_type ON kyc.research_decisions(decision_type);
+      pause:
+        description: "Pause agent execution"
+        invocation_phrases:
+          - "pause the agent"
+          - "hold on"
+          - "wait"
+          - "stop for now"
+        behavior: plugin
+        handler: AgentPauseOp
 
-COMMENT ON TABLE kyc.research_decisions IS 
-'Audit trail for Phase 1 (LLM exploration) decisions. Captures the non-deterministic 
-search and selection process for later review and correction.';
+      resume:
+        description: "Resume paused agent"
+        invocation_phrases:
+          - "continue"
+          - "resume"
+          - "carry on"
+          - "keep going"
+        behavior: plugin
+        handler: AgentResumeOp
+
+      stop:
+        description: "Stop agent and return to manual mode"
+        invocation_phrases:
+          - "stop the agent"
+          - "cancel"
+          - "abort"
+          - "I'll do it manually"
+        behavior: plugin
+        handler: AgentStopOp
+
+      status:
+        description: "Get agent status"
+        invocation_phrases:
+          - "what's the agent doing"
+          - "agent status"
+          - "how's it going"
+          - "progress"
+        behavior: plugin
+        handler: AgentStatusOp
+
+      respond-checkpoint:
+        description: "Respond to agent checkpoint"
+        invocation_phrases:
+          - "select the first"
+          - "use that one"
+          - "neither"
+          - "try again"
+          - "the correct one is"
+        behavior: plugin
+        handler: AgentRespondCheckpointOp
+        args:
+          - name: checkpoint-id
+            type: uuid
+            required: true
+          - name: response
+            type: string
+            required: true
+          - name: manual-key
+            type: string
+          - name: notes
+            type: string
+
+      # =====================================================================
+      # TASK-SPECIFIC ENTRY POINTS
+      # =====================================================================
+      
+      resolve-gaps:
+        description: "Agent resolves ownership gaps"
+        invocation_phrases:
+          - "resolve the gaps"
+          - "fill in the missing ownership"
+          - "complete the ownership structure"
+          - "fix the broken chains"
+          - "find the missing parents"
+          - "who are the ultimate owners"
+        behavior: plugin
+        handler: AgentResolveGapsOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: max-depth
+            type: integer
+            default: 5
+          - name: auto-confirm-threshold
+            type: decimal
+            default: 0.90
+        returns:
+          type: object
+
+      chain-research:
+        description: "Agent builds complete ownership chain"
+        invocation_phrases:
+          - "build the ownership chain"
+          - "trace ownership to the top"
+          - "find all the parents"
+          - "complete chain research"
+          - "who ultimately owns this"
+        behavior: plugin
+        handler: AgentChainResearchOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: jurisdiction
+            type: string
+            required: true
+          - name: max-depth
+            type: integer
+            default: 10
+
+      enrich-entity:
+        description: "Agent enriches entity with external data"
+        invocation_phrases:
+          - "enrich this entity"
+          - "get more data on"
+          - "fill in the details"
+          - "look up details for"
+          - "find information about"
+        behavior: plugin
+        handler: AgentEnrichEntityOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+          - name: fields
+            type: array
+            default: [HIERARCHY, OFFICERS]
+
+      enrich-group:
+        description: "Agent enriches all entities in group"
+        invocation_phrases:
+          - "enrich the group"
+          - "update all entities in the group"
+          - "refresh group data"
+        behavior: plugin
+        handler: AgentEnrichGroupOp
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+
+      screen-entities:
+        description: "Agent screens entities for sanctions/PEP"
+        invocation_phrases:
+          - "screen for sanctions"
+          - "check PEP status"
+          - "run screening"
+          - "compliance check"
+          - "are there any sanctions"
+        behavior: plugin
+        handler: AgentScreenEntitiesOp
+        args:
+          - name: entity-ids
+            type: array
+          - name: scope
+            type: string
+            valid_values: [ENTITY, GROUP, CBU]
+          - name: scope-id
+            type: uuid
 ```
 
-### Research Actions Table
-
-```sql
--- =============================================================================
--- RESEARCH ACTIONS (audit trail for Phase 2)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS kyc.research_actions (
-    action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
-    -- What entity this affects
-    target_entity_id UUID NOT NULL REFERENCES "ob-poc".entities(entity_id),
-    
-    -- Link to decision that triggered this
-    decision_id UUID REFERENCES kyc.research_decisions(decision_id),
-    trigger_id UUID REFERENCES kyc.ownership_research_triggers(trigger_id),
-    
-    -- Action details
-    action_type VARCHAR(50) NOT NULL,  -- IMPORT_HIERARCHY, IMPORT_PSC, etc.
-    source_provider VARCHAR(30) NOT NULL,
-    source_key VARCHAR(100) NOT NULL,  -- The identifier used
-    source_key_type VARCHAR(20) NOT NULL,
-    
-    -- DSL verb executed
-    verb_domain VARCHAR(30) NOT NULL,
-    verb_name VARCHAR(50) NOT NULL,
-    verb_args JSONB NOT NULL,
-    
-    -- Outcome
-    success BOOLEAN NOT NULL,
-    
-    -- Changes made (if successful)
-    entities_created INTEGER DEFAULT 0,
-    entities_updated INTEGER DEFAULT 0,
-    relationships_created INTEGER DEFAULT 0,
-    fields_updated JSONB,  -- [{entity_id, field, old_value, new_value}]
-    
-    -- Errors (if failed)
-    error_code VARCHAR(50),
-    error_message TEXT,
-    
-    -- Performance
-    duration_ms INTEGER,
-    api_calls_made INTEGER,
-    
-    -- Audit
-    executed_at TIMESTAMPTZ DEFAULT NOW(),
-    executed_by UUID,
-    session_id UUID,
-    
-    -- Rollback support
-    is_rolled_back BOOLEAN DEFAULT false,
-    rolled_back_at TIMESTAMPTZ,
-    rolled_back_by UUID,
-    rollback_reason TEXT
-);
-
-CREATE INDEX idx_research_actions_target ON kyc.research_actions(target_entity_id);
-CREATE INDEX idx_research_actions_decision ON kyc.research_actions(decision_id);
-CREATE INDEX idx_research_actions_verb ON kyc.research_actions(verb_domain, verb_name);
-
-COMMENT ON TABLE kyc.research_actions IS 
-'Audit trail for Phase 2 (DSL execution). Every import/update via research verbs 
-is logged here with full details for reproducibility and rollback.';
-```
-
-### Correction Tracking
-
-```sql
--- =============================================================================
--- RESEARCH CORRECTIONS (when wrong key was selected)
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS kyc.research_corrections (
-    correction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
-    -- What's being corrected
-    original_decision_id UUID NOT NULL REFERENCES kyc.research_decisions(decision_id),
-    original_action_id UUID REFERENCES kyc.research_actions(action_id),
-    
-    -- Correction details
-    correction_type VARCHAR(20) NOT NULL,
-    
-    -- Wrong selection
-    wrong_key VARCHAR(100),
-    wrong_key_type VARCHAR(20),
-    
-    -- Correct selection
-    correct_key VARCHAR(100),
-    correct_key_type VARCHAR(20),
-    
-    -- New action (if re-imported)
-    new_action_id UUID REFERENCES kyc.research_actions(action_id),
-    
-    -- Why
-    correction_reason TEXT NOT NULL,
-    
-    -- Who/when
-    corrected_at TIMESTAMPTZ DEFAULT NOW(),
-    corrected_by UUID NOT NULL,
-    
-    CONSTRAINT chk_correction_type CHECK (
-        correction_type IN (
-            'WRONG_ENTITY',      -- Selected wrong entity entirely
-            'WRONG_JURISDICTION',-- Right name, wrong jurisdiction
-            'STALE_DATA',        -- Data was outdated
-            'MERGE_REQUIRED',    -- Need to merge with existing
-            'UNLINK'             -- Remove incorrect link
-        )
-    )
-);
-
-COMMENT ON TABLE kyc.research_corrections IS 
-'Tracks corrections when Phase 1 selected the wrong identifier. 
-Supports learning and audit trail for regulatory inquiries.';
-```
-
----
-
-## Component 3: Confidence Thresholds
-
-### Configuration
-
-```sql
--- =============================================================================
--- RESEARCH CONFIDENCE CONFIGURATION
--- =============================================================================
-
-CREATE TABLE IF NOT EXISTS kyc.research_confidence_config (
-    config_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
-    -- Scope (global or per-source)
-    source_provider VARCHAR(30),  -- NULL = global default
-    
-    -- Thresholds
-    auto_proceed_threshold DECIMAL(3,2) DEFAULT 0.90,
-    ambiguous_threshold DECIMAL(3,2) DEFAULT 0.70,
-    reject_threshold DECIMAL(3,2) DEFAULT 0.50,
-    
-    -- Behavior
-    require_human_checkpoint BOOLEAN DEFAULT false,
-    checkpoint_contexts TEXT[],  -- ['NEW_CLIENT', 'MATERIAL_HOLDING', 'HIGH_RISK']
-    
-    -- Limits
-    max_auto_imports_per_session INTEGER DEFAULT 50,
-    max_chain_depth INTEGER DEFAULT 10,
-    
-    -- Active
-    effective_from DATE DEFAULT CURRENT_DATE,
-    effective_to DATE,
-    
-    CONSTRAINT uq_confidence_source UNIQUE (source_provider, effective_from)
-);
-
--- Seed defaults
-INSERT INTO kyc.research_confidence_config (
-    source_provider, auto_proceed_threshold, ambiguous_threshold, require_human_checkpoint
-) VALUES 
-(NULL, 0.90, 0.70, false),      -- Global default
-('gleif', 0.92, 0.75, false),   -- GLEIF is authoritative, high bar
-('companies_house', 0.88, 0.70, false),
-('orbis', 0.85, 0.65, false),   -- Commercial, slightly lower
-('screening', 0.00, 0.00, true) -- Always human checkpoint for screening
-ON CONFLICT DO NOTHING;
-```
-
-### Threshold Logic
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    CONFIDENCE-BASED ROUTING                                  │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   SCORE >= auto_proceed_threshold (e.g., 0.90)                              │
-│   ════════════════════════════════════════════                               │
-│   → AUTO_SELECTED                                                           │
-│   → Proceed directly to Phase 2 (import)                                    │
-│   → Log decision with reasoning                                             │
-│   → No user interaction needed                                              │
-│                                                                              │
-│   SCORE >= ambiguous_threshold (e.g., 0.70)                                 │
-│   ════════════════════════════════════════════                               │
-│   → AMBIGUOUS                                                               │
-│   → Present candidates to user                                              │
-│   → "Did you mean X or Y?"                                                  │
-│   → Wait for user selection                                                 │
-│   → Then proceed to Phase 2                                                 │
-│                                                                              │
-│   SCORE < ambiguous_threshold                                               │
-│   ═══════════════════════════                                                │
-│   → NO_MATCH                                                                │
-│   → "Could not find confident match"                                        │
-│   → Suggest alternative sources                                             │
-│   → May require manual research                                             │
-│                                                                              │
-│   CHECKPOINT CONTEXTS (always ask user regardless of score)                 │
-│   ════════════════════════════════════════════════════════                   │
-│   • NEW_CLIENT - First-time entity for new client                           │
-│   • MATERIAL_HOLDING - >25% ownership stake                                 │
-│   • HIGH_RISK_JURISDICTION - Sanctions-sensitive jurisdictions              │
-│   • SCREENING_HIT - Any sanctions/PEP matches                               │
-│   • CORRECTION - Re-doing after previous correction                         │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Component 4: DSL Verbs (Phase 2 Only)
-
-### Verb Design Principle
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    VERB DESIGN RULES                                         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   1. ALL import verbs require an IDENTIFIER (key)                           │
-│      ─────────────────────────────────────────────                           │
-│      ✗ research.gleif.import(:name "AllianzGI")     ← NO fuzzy              │
-│      ✓ research.gleif.import(:lei "529900XXXXXX")   ← YES exact key        │
-│                                                                              │
-│   2. Verbs are IDEMPOTENT                                                   │
-│      ────────────────────────                                                │
-│      Running same verb twice with same key = same result                    │
-│      (may update existing rather than duplicate)                            │
-│                                                                              │
-│   3. Verbs CREATE AUDIT TRAIL                                               │
-│      ────────────────────────────                                            │
-│      Every verb execution logged to research_actions                        │
-│      Links back to decision that provided the key                           │
-│                                                                              │
-│   4. Verbs VALIDATE post-import                                             │
-│      ─────────────────────────────                                           │
-│      After import, run sanity checks                                        │
-│      Flag anomalies but don't block                                         │
-│                                                                              │
-│   5. Verbs support ROLLBACK                                                 │
-│      ─────────────────────────                                               │
-│      Can mark action as rolled back                                         │
-│      Undo creates reverse relationships                                     │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### research/gleif.yaml
+### research.gleif.yaml
 
 ```yaml
 domains:
   research.gleif:
-    description: "GLEIF - Global LEI Foundation (import verbs)"
+    description: "GLEIF - Global LEI Foundation"
+    
+    invocation_hints:
+      - "LEI"
+      - "GLEIF"
+      - "legal entity identifier"
+      - "global LEI"
+      - "parent company"
+      - "ultimate parent"
+      - "corporate hierarchy"
+      - "who owns"
     
     verbs:
       import-entity:
         description: "Import entity by LEI"
+        invocation_phrases:
+          - "import from GLEIF"
+          - "get the LEI record"
+          - "fetch LEI"
+          - "load from GLEIF"
         behavior: plugin
         handler: GleifImportEntityOp
+        requires_key: true
+        key_type: LEI
+        key_validation: "^[A-Z0-9]{20}$"
         args:
           - name: lei
             type: string
             required: true
-            validation: "^[A-Z0-9]{20}$"
           - name: target-entity-id
             type: uuid
-            description: "Link to existing entity (creates new if omitted)"
           - name: decision-id
             type: uuid
-            description: "Link to research decision that found this LEI"
-        returns:
-          type: object
-          fields:
-            - entity_id: uuid
-            - created: boolean
-            - fields_updated: array
 
       import-hierarchy:
         description: "Import ownership hierarchy by LEI"
+        invocation_phrases:
+          - "import the GLEIF hierarchy"
+          - "get parent chain from GLEIF"
+          - "fetch GLEIF ownership"
+          - "load corporate structure"
+          - "who owns this according to GLEIF"
         behavior: plugin
         handler: GleifImportHierarchyOp
+        requires_key: true
+        key_type: LEI
         args:
           - name: lei
             type: string
             required: true
-            validation: "^[A-Z0-9]{20}$"
           - name: direction
             type: string
             default: "UP"
@@ -683,17 +752,13 @@ domains:
             default: true
           - name: decision-id
             type: uuid
-        returns:
-          type: object
-          fields:
-            - entities_created: integer
-            - entities_updated: integer
-            - relationships_created: integer
-            - chain_depth: integer
-            - terminals_found: array
 
       validate-lei:
-        description: "Validate LEI status against GLEIF"
+        description: "Validate LEI status"
+        invocation_phrases:
+          - "check if LEI is valid"
+          - "validate this LEI"
+          - "is the LEI current"
         behavior: plugin
         handler: GleifValidateLeiOp
         args:
@@ -702,58 +767,70 @@ domains:
             required: true
           - name: entity-id
             type: uuid
-            description: "Check against existing entity data"
-        returns:
-          type: object
-          fields:
-            - is_valid: boolean
-            - status: string
-            - discrepancies: array
 
       refresh-entity:
         description: "Refresh entity data from GLEIF"
+        invocation_phrases:
+          - "refresh from GLEIF"
+          - "update GLEIF data"
+          - "sync with GLEIF"
         behavior: plugin
         handler: GleifRefreshEntityOp
         args:
           - name: entity-id
             type: uuid
             required: true
-            description: "Must have LEI already"
-        returns:
-          type: object
-          fields:
-            - fields_updated: array
-            - was_stale: boolean
 ```
 
-### research/companies-house.yaml
+### research.companies-house.yaml
 
 ```yaml
 domains:
   research.companies-house:
-    description: "UK Companies House (import verbs)"
+    description: "UK Companies House registry"
+    
+    invocation_hints:
+      - "Companies House"
+      - "UK company"
+      - "British company"
+      - "company number"
+      - "UK directors"
+      - "PSC"
+      - "persons with significant control"
     
     verbs:
       import-company:
-        description: "Import company profile by company number"
+        description: "Import company by company number"
+        invocation_phrases:
+          - "import from Companies House"
+          - "get UK company"
+          - "fetch from CH"
+          - "load company"
         behavior: plugin
         handler: CompaniesHouseImportCompanyOp
+        requires_key: true
+        key_type: COMPANY_NUMBER
+        key_validation: "^[A-Z0-9]{8}$"
         args:
           - name: company-number
             type: string
             required: true
-            validation: "^[A-Z0-9]{8}$"
           - name: target-entity-id
             type: uuid
           - name: decision-id
             type: uuid
-        returns:
-          type: object
 
       import-officers:
         description: "Import officers/directors"
+        invocation_phrases:
+          - "get the directors"
+          - "import officers"
+          - "who are the directors"
+          - "fetch board composition"
         behavior: plugin
         handler: CompaniesHouseImportOfficersOp
+        requires_key: true
+        key_type: COMPANY_NUMBER
         args:
           - name: company-number
             type: string
@@ -766,16 +843,19 @@ domains:
             default: false
           - name: decision-id
             type: uuid
-        returns:
-          type: object
-          fields:
-            - officers_created: integer
-            - appointments_created: integer
 
       import-psc:
-        description: "Import Persons with Significant Control"
+        description: "Import Persons with Significant Control (UBO)"
+        invocation_phrases:
+          - "get the PSCs"
+          - "import UBOs from Companies House"
+          - "who controls this UK company"
+          - "significant control"
+          - "fetch PSC records"
         behavior: plugin
         handler: CompaniesHouseImportPscOp
+        requires_key: true
+        key_type: COMPANY_NUMBER
         args:
           - name: company-number
             type: string
@@ -785,57 +865,58 @@ domains:
             required: true
           - name: decision-id
             type: uuid
-        returns:
-          type: object
-          fields:
-            - pscs_created: integer
-            - ownership_edges_created: integer
-            - control_edges_created: integer
-
-      import-filing:
-        description: "Import specific filing document"
-        behavior: plugin
-        handler: CompaniesHouseImportFilingOp
-        args:
-          - name: company-number
-            type: string
-            required: true
-          - name: filing-id
-            type: string
-            required: true
-          - name: entity-id
-            type: uuid
-            required: true
 ```
 
-### research/sec.yaml
+### research.sec.yaml
 
 ```yaml
 domains:
   research.sec:
-    description: "US SEC EDGAR (import verbs)"
+    description: "US SEC EDGAR filings"
+    
+    invocation_hints:
+      - "SEC"
+      - "EDGAR"
+      - "US company"
+      - "American company"
+      - "CIK"
+      - "13F"
+      - "13D"
+      - "13G"
+      - "beneficial owner"
+      - "institutional holder"
     
     verbs:
       import-company:
         description: "Import company by CIK"
+        invocation_phrases:
+          - "import from SEC"
+          - "get SEC filing"
+          - "fetch from EDGAR"
         behavior: plugin
         handler: SecImportCompanyOp
+        requires_key: true
+        key_type: CIK
         args:
           - name: cik
             type: string
             required: true
-            validation: "^[0-9]{10}$"
           - name: target-entity-id
             type: uuid
           - name: decision-id
             type: uuid
-        returns:
-          type: object
 
       import-13f-holders:
-        description: "Import institutional holders from 13F filings"
+        description: "Import institutional holders from 13F"
+        invocation_phrases:
+          - "get 13F holders"
+          - "import institutional holders"
+          - "who are the institutional investors"
+          - "fetch 13F filings"
         behavior: plugin
         handler: SecImport13FOp
+        requires_key: true
+        key_type: CIK
         args:
           - name: cik
             type: string
@@ -845,19 +926,23 @@ domains:
             required: true
           - name: as-of-quarter
             type: string
-            description: "YYYY-Q# format, defaults to latest"
           - name: threshold-pct
             type: decimal
             default: 0
           - name: decision-id
             type: uuid
-        returns:
-          type: object
 
       import-13dg-owners:
-        description: "Import beneficial owners from 13D/13G filings"
+        description: "Import beneficial owners from 13D/13G"
+        invocation_phrases:
+          - "get 13D owners"
+          - "get 13G owners"
+          - "who are the beneficial owners"
+          - "activist investors"
         behavior: plugin
         handler: SecImport13DGOp
+        requires_key: true
+        key_type: CIK
         args:
           - name: cik
             type: string
@@ -867,111 +952,33 @@ domains:
             required: true
           - name: decision-id
             type: uuid
-        returns:
-          type: object
-
-      import-insiders:
-        description: "Import insider holdings from Form 3/4/5"
-        behavior: plugin
-        handler: SecImportInsidersOp
-        args:
-          - name: cik
-            type: string
-            required: true
-          - name: entity-id
-            type: uuid
-            required: true
 ```
 
-### research/orbis.yaml
-
-```yaml
-domains:
-  research.orbis:
-    description: "Bureau van Dijk Orbis (import verbs, requires subscription)"
-    
-    verbs:
-      import-entity:
-        description: "Import entity by BvD ID"
-        behavior: plugin
-        handler: OrbisImportEntityOp
-        args:
-          - name: bvd-id
-            type: string
-            required: true
-          - name: target-entity-id
-            type: uuid
-          - name: decision-id
-            type: uuid
-        returns:
-          type: object
-
-      import-hierarchy:
-        description: "Import ownership hierarchy"
-        behavior: plugin
-        handler: OrbisImportHierarchyOp
-        args:
-          - name: bvd-id
-            type: string
-            required: true
-          - name: direction
-            type: string
-            default: "UP"
-            valid_values: [UP, DOWN, BOTH]
-          - name: threshold-pct
-            type: decimal
-            default: 25
-          - name: decision-id
-            type: uuid
-        returns:
-          type: object
-
-      import-shareholders:
-        description: "Import shareholders"
-        behavior: plugin
-        handler: OrbisImportShareholdersOp
-        args:
-          - name: bvd-id
-            type: string
-            required: true
-          - name: entity-id
-            type: uuid
-            required: true
-          - name: threshold-pct
-            type: decimal
-            default: 0
-          - name: decision-id
-            type: uuid
-        returns:
-          type: object
-
-      import-ubo:
-        description: "Import UBO data"
-        behavior: plugin
-        handler: OrbisImportUboOp
-        args:
-          - name: bvd-id
-            type: string
-            required: true
-          - name: entity-id
-            type: uuid
-            required: true
-          - name: decision-id
-            type: uuid
-        returns:
-          type: object
-```
-
-### research/screening.yaml
+### research.screening.yaml
 
 ```yaml
 domains:
   research.screening:
-    description: "Screening results (record verbs)"
+    description: "Sanctions, PEP, and adverse media screening"
+    
+    invocation_hints:
+      - "sanctions"
+      - "PEP"
+      - "politically exposed"
+      - "adverse media"
+      - "screening"
+      - "compliance check"
+      - "OFAC"
+      - "EU sanctions"
+      - "watchlist"
     
     verbs:
       record-sanctions-check:
         description: "Record sanctions screening result"
+        invocation_phrases:
+          - "record sanctions result"
+          - "log sanctions check"
+          - "save screening outcome"
         behavior: plugin
         handler: ScreeningRecordSanctionsOp
         args:
@@ -981,7 +988,6 @@ domains:
           - name: provider
             type: string
             required: true
-            valid_values: [WORLD_CHECK, DOW_JONES, COMPLY_ADVANTAGE, ACCUITY, MANUAL]
           - name: lists-checked
             type: array
             required: true
@@ -991,14 +997,14 @@ domains:
             valid_values: [CLEAR, POTENTIAL_MATCH, CONFIRMED_MATCH]
           - name: matches
             type: array
-            description: "Details of any matches found"
           - name: decision-id
             type: uuid
-        returns:
-          type: object
 
       record-pep-check:
         description: "Record PEP screening result"
+        invocation_phrases:
+          - "record PEP result"
+          - "log PEP check"
         behavior: plugin
         handler: ScreeningRecordPepOp
         args:
@@ -1014,14 +1020,14 @@ domains:
             valid_values: [NOT_PEP, PEP, RCA, FORMER_PEP]
           - name: pep-details
             type: object
-            description: "Position, jurisdiction, dates if PEP"
           - name: decision-id
             type: uuid
-        returns:
-          type: object
 
       record-adverse-media:
-        description: "Record adverse media screening result"
+        description: "Record adverse media result"
+        invocation_phrases:
+          - "record adverse media"
+          - "log media screening"
         behavior: plugin
         handler: ScreeningRecordAdverseMediaOp
         args:
@@ -1034,311 +1040,154 @@ domains:
           - name: result
             type: string
             required: true
-            valid_values: [CLEAR, MENTIONS_FOUND, SIGNIFICANT_ADVERSE]
           - name: mentions
             type: array
           - name: decision-id
             type: uuid
-        returns:
-          type: object
-
-      record-identity-verification:
-        description: "Record identity verification result"
-        behavior: plugin
-        handler: ScreeningRecordIdentityOp
-        args:
-          - name: person-entity-id
-            type: uuid
-            required: true
-          - name: provider
-            type: string
-            required: true
-            valid_values: [ONFIDO, JUMIO, TRULIOO, SUMSUB, MANUAL]
-          - name: result
-            type: string
-            required: true
-            valid_values: [VERIFIED, FAILED, PENDING_REVIEW, EXPIRED]
-          - name: verification-details
-            type: object
-          - name: document-ids
-            type: array
-          - name: decision-id
-            type: uuid
-        returns:
-          type: object
 ```
 
-### research/outreach.yaml
+### research.generic.yaml
 
 ```yaml
 domains:
-  research.outreach:
-    description: "Counterparty outreach tracking"
+  research.generic:
+    description: "Generic import for discovered/pluggable sources"
+    
+    invocation_hints:
+      - "import from"
+      - "I found"
+      - "registry shows"
+      - "according to"
+      - "data from"
     
     verbs:
-      create-request:
-        description: "Create outreach request"
-        behavior: crud
-        crud:
-          operation: insert
-          table: outreach_requests
-          schema: kyc
-          returning: request_id
-        args:
-          - name: target-entity-id
-            type: uuid
-            required: true
-            maps_to: target_entity_id
-          - name: request-type
-            type: string
-            required: true
-            maps_to: request_type
-            valid_values: [NOMINEE_DISCLOSURE, UBO_DECLARATION, SHARE_REGISTER, BOARD_COMPOSITION, GENERAL_INQUIRY]
-          - name: recipient-entity-id
-            type: uuid
-            maps_to: recipient_entity_id
-          - name: recipient-email
-            type: string
-            maps_to: recipient_email
-          - name: deadline-days
-            type: integer
-            default: 30
-          - name: trigger-id
-            type: uuid
-            maps_to: trigger_id
-        returns:
-          type: uuid
-          capture: true
-
-      mark-sent:
-        description: "Mark request as sent"
-        behavior: crud
-        crud:
-          operation: update
-          table: outreach_requests
-          schema: kyc
-        args:
-          - name: request-id
-            type: uuid
-            required: true
-            maps_to: request_id
-
-      record-response:
-        description: "Record response to outreach"
+      import-entity:
+        description: "Import entity from any source using normalized structure"
+        invocation_phrases:
+          - "import this entity"
+          - "load this data"
+          - "save what I found"
+          - "create entity from"
         behavior: plugin
-        handler: OutreachRecordResponseOp
+        handler: GenericImportEntityOp
         args:
-          - name: request-id
-            type: uuid
-            required: true
-          - name: response-type
+          - name: source-name
             type: string
             required: true
-            valid_values: [FULL_DISCLOSURE, PARTIAL_DISCLOSURE, DECLINED, NO_RESPONSE]
-          - name: document-id
-            type: uuid
-          - name: notes
+            description: "Human-readable source name"
+          - name: source-url
             type: string
-        returns:
-          type: object
-
-      close-request:
-        description: "Close outreach request"
-        behavior: crud
-        crud:
-          operation: update
-          table: outreach_requests
-          schema: kyc
-        args:
-          - name: request-id
-            type: uuid
-            required: true
-            maps_to: request_id
-          - name: resolution-notes
+            description: "URL of source (for audit)"
+          - name: source-key
             type: string
-            maps_to: resolution_notes
-
-      list-pending:
-        description: "List pending outreach requests"
-        behavior: crud
-        crud:
-          operation: select
-          table: outreach_requests
-          schema: kyc
-        args:
-          - name: target-entity-id
-            type: uuid
-            maps_to: target_entity_id
-          - name: status
+            required: true
+            description: "Identifier from source"
+          - name: source-key-type
             type: string
-            maps_to: status
-            default: "PENDING"
-```
-
-### research/documents.yaml
-
-```yaml
-domains:
-  research.documents:
-    description: "Document import (after LLM extraction)"
-    
-    verbs:
-      import-extracted-ownership:
-        description: "Import ownership data extracted from document"
-        behavior: plugin
-        handler: DocumentsImportOwnershipOp
-        args:
-          - name: document-id
-            type: uuid
             required: true
-          - name: target-entity-id
-            type: uuid
-            required: true
+            description: "Type of identifier"
           - name: extracted-data
             type: object
             required: true
-            description: "Structured ownership data from LLM extraction"
+            description: "Normalized entity data"
+          - name: raw-response
+            type: string
+            description: "Original response for audit"
           - name: decision-id
             type: uuid
-        returns:
-          type: object
 
-      import-extracted-directors:
-        description: "Import directors extracted from document"
+      import-hierarchy:
+        description: "Import hierarchy from any source"
+        invocation_phrases:
+          - "import this hierarchy"
+          - "load ownership structure"
+          - "create these relationships"
         behavior: plugin
-        handler: DocumentsImportDirectorsOp
+        handler: GenericImportHierarchyOp
         args:
-          - name: document-id
-            type: uuid
+          - name: source-name
+            type: string
             required: true
-          - name: target-entity-id
-            type: uuid
-            required: true
-          - name: extracted-data
+          - name: entities
             type: array
             required: true
+            description: "Array of normalized entity objects"
+          - name: relationships
+            type: array
+            required: true
+            description: "Array of relationship objects"
           - name: decision-id
             type: uuid
-        returns:
-          type: object
 
-      import-ubo-declaration:
-        description: "Import parsed UBO declaration"
+      import-officers:
+        description: "Import officers from any source"
+        invocation_phrases:
+          - "import these directors"
+          - "add these officers"
+          - "load board composition"
         behavior: plugin
-        handler: DocumentsImportUboDeclarationOp
+        handler: GenericImportOfficersOp
         args:
-          - name: document-id
-            type: uuid
-            required: true
           - name: entity-id
             type: uuid
             required: true
-          - name: parsed-data
-            type: object
+          - name: source-name
+            type: string
             required: true
-          - name: validate-against-existing
-            type: boolean
-            default: true
+          - name: officers
+            type: array
+            required: true
           - name: decision-id
             type: uuid
-        returns:
-          type: object
-
-      record-reconciliation:
-        description: "Record share register reconciliation result"
-        behavior: plugin
-        handler: DocumentsRecordReconciliationOp
-        args:
-          - name: document-id
-            type: uuid
-            required: true
-          - name: issuer-entity-id
-            type: uuid
-            required: true
-          - name: reconciliation-result
-            type: object
-            required: true
-          - name: discrepancies
-            type: array
-        returns:
-          type: object
 ```
 
-### research/workflow.yaml
+### research.workflow.yaml
 
 ```yaml
 domains:
   research.workflow:
-    description: "Research workflow management"
+    description: "Research workflow and decision management"
+    
+    invocation_hints:
+      - "research trigger"
+      - "gap"
+      - "decision"
+      - "correction"
+      - "audit trail"
     
     verbs:
-      # Trigger management
       list-triggers:
         description: "List research triggers"
+        invocation_phrases:
+          - "show research triggers"
+          - "what gaps need work"
+          - "pending research"
+          - "what needs to be done"
         behavior: crud
         crud:
           operation: select
           table: ownership_research_triggers
           schema: kyc
-        args:
-          - name: entity-id
-            type: uuid
-            maps_to: target_entity_id
-          - name: status
-            type: string
-            maps_to: status
-          - name: priority
-            type: string
-            maps_to: priority
 
       create-trigger:
         description: "Create research trigger"
+        invocation_phrases:
+          - "create a trigger"
+          - "flag for research"
+          - "mark as needing work"
         behavior: crud
         crud:
           operation: insert
           table: ownership_research_triggers
           schema: kyc
           returning: trigger_id
-        args:
-          - name: target-entity-id
-            type: uuid
-            required: true
-            maps_to: target_entity_id
-          - name: research-type
-            type: string
-            required: true
-            maps_to: research_type
-          - name: description
-            type: string
-            maps_to: description
-          - name: priority
-            type: string
-            default: "MEDIUM"
-            maps_to: priority
 
-      resolve-trigger:
-        description: "Resolve research trigger"
-        behavior: plugin
-        handler: WorkflowResolveTriggerOp
-        args:
-          - name: trigger-id
-            type: uuid
-            required: true
-          - name: resolution
-            type: string
-            required: true
-            valid_values: [RESOLVED, PARTIALLY_RESOLVED, UNRESOLVABLE, DEFERRED]
-          - name: resolution-notes
-            type: string
-          - name: action-ids
-            type: array
-            description: "Research actions that resolved this"
-        returns:
-          type: object
-
-      # Decision management
       record-decision:
-        description: "Record a research decision (Phase 1 outcome)"
+        description: "Record a research decision"
+        invocation_phrases:
+          - "record the decision"
+          - "log the selection"
+          - "save decision"
         behavior: crud
         crud:
           operation: insert
@@ -1348,487 +1197,647 @@ domains:
         args:
           - name: trigger-id
             type: uuid
-            maps_to: trigger_id
           - name: target-entity-id
             type: uuid
-            maps_to: target_entity_id
           - name: search-query
             type: string
             required: true
-            maps_to: search_query
           - name: source-provider
             type: string
             required: true
-            maps_to: source_provider
           - name: candidates-found
             type: array
             required: true
-            maps_to: candidates_found
           - name: selected-key
             type: string
-            maps_to: selected_key
           - name: selected-key-type
             type: string
-            maps_to: selected_key_type
           - name: confidence
             type: decimal
-            maps_to: selection_confidence
           - name: reasoning
             type: string
             required: true
-            maps_to: selection_reasoning
           - name: decision-type
             type: string
             required: true
-            maps_to: decision_type
-        returns:
-          type: uuid
-          capture: true
 
       confirm-decision:
         description: "User confirms ambiguous decision"
+        invocation_phrases:
+          - "confirm this"
+          - "yes that's right"
+          - "use that one"
         behavior: plugin
         handler: WorkflowConfirmDecisionOp
-        args:
-          - name: decision-id
-            type: uuid
-            required: true
-          - name: selected-key
-            type: string
-            required: true
-          - name: selected-key-type
-            type: string
-            required: true
-        returns:
-          type: object
 
       reject-decision:
-        description: "User rejects suggested decision"
+        description: "User rejects suggestion"
+        invocation_phrases:
+          - "no that's wrong"
+          - "reject"
+          - "not that one"
         behavior: plugin
         handler: WorkflowRejectDecisionOp
-        args:
-          - name: decision-id
-            type: uuid
-            required: true
-          - name: rejection-reason
-            type: string
-            required: true
-        returns:
-          type: object
 
-      # Corrections
       record-correction:
-        description: "Record a correction to previous decision"
+        description: "Record correction to previous decision"
+        invocation_phrases:
+          - "correct this"
+          - "fix the mistake"
+          - "wrong entity was selected"
+          - "undo that selection"
         behavior: crud
         crud:
           operation: insert
           table: research_corrections
           schema: kyc
           returning: correction_id
-        args:
-          - name: original-decision-id
-            type: uuid
-            required: true
-            maps_to: original_decision_id
-          - name: correction-type
-            type: string
-            required: true
-            maps_to: correction_type
-          - name: wrong-key
-            type: string
-            maps_to: wrong_key
-          - name: correct-key
-            type: string
-            maps_to: correct_key
-          - name: correction-reason
-            type: string
-            required: true
-            maps_to: correction_reason
-        returns:
-          type: uuid
-          capture: true
-
-      # Reporting
-      gap-report:
-        description: "Generate gap analysis report"
-        behavior: plugin
-        handler: WorkflowGapReportOp
-        args:
-          - name: entity-id
-            type: uuid
-          - name: group-id
-            type: uuid
-          - name: cbu-id
-            type: uuid
-        returns:
-          type: object
 
       audit-trail:
-        description: "Get research audit trail for entity"
+        description: "Get research audit trail"
+        invocation_phrases:
+          - "show audit trail"
+          - "what research was done"
+          - "history of decisions"
+          - "how did we get this data"
         behavior: plugin
         handler: WorkflowAuditTrailOp
         args:
           - name: entity-id
             type: uuid
             required: true
-          - name: include-decisions
-            type: boolean
-            default: true
-          - name: include-actions
-            type: boolean
-            default: true
-          - name: include-corrections
-            type: boolean
-            default: true
-        returns:
-          type: object
 ```
 
 ---
 
-## Component 5: Agent Patterns
+## Pluggable Source Model
 
-### Agent Loop Structure
+### Source Tiers
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    RESEARCH AGENT LOOP                                       │
+│                    THREE-TIER SOURCE MODEL                                   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│   TRIGGER: User request or ownership gap identified                         │
+│   TIER 1: BUILT-IN SOURCES (optimized, pre-built handlers)                  │
+│   ═════════════════════════════════════════════════════════                  │
 │                                                                              │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  LOOP:                                                               │   │
-│   │                                                                      │   │
-│   │  1. IDENTIFY GAP                                                    │   │
-│   │     ───────────────                                                  │   │
-│   │     ownership.identify-gaps(:entity-id @target)                     │   │
-│   │     → Gap: HoldCo Ltd has no parent                                 │   │
-│   │                                                                      │   │
-│   │  2. LOAD ORCHESTRATION PROMPT                                       │   │
-│   │     ─────────────────────────────                                    │   │
-│   │     Load: /prompts/research/orchestration/resolve-gap.md            │   │
-│   │     Insert: entity_name, jurisdiction, context                      │   │
-│   │                                                                      │   │
-│   │  3. LLM REASONS (prompt execution)                                  │   │
-│   │     ─────────────────────────────────                                │   │
-│   │     "UK company, try GLEIF then Companies House"                    │   │
-│   │                                                                      │   │
-│   │  4. LOAD SOURCE PROMPT                                              │   │
-│   │     ──────────────────────                                           │   │
-│   │     Load: /prompts/research/sources/gleif/search.md                 │   │
-│   │     Execute: Call GLEIF API, evaluate results                       │   │
-│   │                                                                      │   │
-│   │  5. EVALUATE CONFIDENCE                                             │   │
-│   │     ─────────────────────────                                        │   │
-│   │     If score >= 0.90: AUTO_SELECTED → continue                      │   │
-│   │     If score 0.70-0.90: AMBIGUOUS → present to user                 │   │
-│   │     If score < 0.70: Try next source or NO_MATCH                    │   │
-│   │                                                                      │   │
-│   │  6. RECORD DECISION (Phase 1 audit)                                 │   │
-│   │     ───────────────────────────────────                              │   │
-│   │     research.workflow.record-decision(                              │   │
-│   │         :search-query "HoldCo Ltd"                                  │   │
-│   │         :source-provider "gleif"                                    │   │
-│   │         :candidates-found [...]                                     │   │
-│   │         :selected-key "213800ABC..."                                │   │
-│   │         :confidence 0.92                                            │   │
-│   │         :reasoning "Exact match, correct jurisdiction"              │   │
-│   │         :decision-type "AUTO_SELECTED")                             │   │
-│   │     → decision_id captured                                          │   │
-│   │                                                                      │   │
-│   │  7. EMIT IMPORT VERB (Phase 2)                                      │   │
-│   │     ──────────────────────────────                                   │   │
-│   │     research.gleif.import-hierarchy(                                │   │
-│   │         :lei "213800ABC..."                                         │   │
-│   │         :direction "UP"                                             │   │
-│   │         :decision-id @decision_id)                                  │   │
-│   │     → entities_created: 1, relationships_created: 1                 │   │
-│   │                                                                      │   │
-│   │  8. VALIDATE RESULT                                                 │   │
-│   │     ─────────────────                                                │   │
-│   │     Check: jurisdiction matches? Entity type sensible?              │   │
-│   │     Flag anomalies if found                                         │   │
-│   │                                                                      │   │
-│   │  9. CHECK IF MORE GAPS                                              │   │
-│   │     ─────────────────────                                            │   │
-│   │     ownership.identify-gaps(:entity-id @target)                     │   │
-│   │     If gaps remain → LOOP back to step 2                            │   │
-│   │     If no gaps → EXIT                                               │   │
-│   │                                                                      │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
+│   • GLEIF                    research.gleif.import-*                        │
+│   • Companies House          research.companies-house.import-*              │
+│   • SEC EDGAR                research.sec.import-*                          │
 │                                                                              │
-│   EXIT CONDITIONS:                                                          │
-│   • No more gaps (coverage sufficient)                                      │
-│   • Max depth reached                                                       │
-│   • All sources exhausted for a gap                                         │
-│   • User intervention required (ambiguous, checkpoint)                      │
+│   Characteristics:                                                          │
+│   • Dedicated prompt templates with API details                             │
+│   • Dedicated handlers with schema mapping                                  │
+│   • Specific verbs                                                          │
+│   • Optimized parsing                                                       │
+│                                                                              │
+│   ───────────────────────────────────────────────────────────────────────   │
+│                                                                              │
+│   TIER 2: REGISTERED SOURCES (semi-known, pluggable)                        │
+│   ═══════════════════════════════════════════════════                        │
+│                                                                              │
+│   • Singapore ACRA           registered, base URL known                     │
+│   • Hong Kong CR             registered, API documented                     │
+│   • German Handelsregister   registered, no API (web scraping)              │
+│                                                                              │
+│   Characteristics:                                                          │
+│   • Source registered in discovered_sources table                           │
+│   • LLM has hints (base URL, notes from previous use)                       │
+│   • Uses research.generic.import-* verbs                                    │
+│   • LLM adapts to API/format                                                │
+│                                                                              │
+│   ───────────────────────────────────────────────────────────────────────   │
+│                                                                              │
+│   TIER 3: DISCOVERED SOURCES (ad-hoc, LLM figures it out)                   │
+│   ════════════════════════════════════════════════════════                   │
+│                                                                              │
+│   • User says "check the Cayman registry"                                   │
+│   • LLM web searches for API/access                                         │
+│   • LLM reads docs, makes calls, parses response                            │
+│   • LLM extracts to normalized structure                                    │
+│   • Uses research.generic.import-* verbs                                    │
+│   • Optionally registers as Tier 2 for future use                           │
+│                                                                              │
+│   The LLM is the universal API adapter                                      │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Checkpoint Logic
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    HUMAN CHECKPOINT TRIGGERS                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   ALWAYS CHECKPOINT:                                                        │
-│   ══════════════════                                                         │
-│   • Screening hits (sanctions, PEP, adverse media)                          │
-│   • Confidence score in ambiguous range (0.70-0.90)                         │
-│   • Multiple equally-scored candidates                                      │
-│   • Correction to previous decision                                         │
-│                                                                              │
-│   CONTEXT-BASED CHECKPOINT:                                                 │
-│   ═════════════════════════                                                  │
-│   • NEW_CLIENT flag set                                                     │
-│   • Material holding (>25% ownership)                                       │
-│   • High-risk jurisdiction                                                  │
-│   • Entity type mismatch (found company, expected person)                   │
-│                                                                              │
-│   CHECKPOINT UI PATTERN:                                                    │
-│   ══════════════════════                                                     │
-│                                                                              │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  RESEARCH CHECKPOINT                                                 │   │
-│   │                                                                      │   │
-│   │  Searching for: "HoldCo Ltd" (UK company)                           │   │
-│   │                                                                      │   │
-│   │  Found 2 candidates:                                                │   │
-│   │                                                                      │   │
-│   │  ○ HOLDCO LIMITED (12345678)                                        │   │
-│   │    Score: 0.85 | UK | Active                                        │   │
-│   │    Registered: 2015 | SIC: 64209                                    │   │
-│   │                                                                      │   │
-│   │  ○ HOLDCO LTD (87654321)                                            │   │
-│   │    Score: 0.82 | UK | Active                                        │   │
-│   │    Registered: 2019 | SIC: 70100                                    │   │
-│   │                                                                      │   │
-│   │  [Select first] [Select second] [Neither - manual research]         │   │
-│   │                                                                      │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Component 6: Validation Rules
-
-### Post-Import Validation
+### Normalized Data Structure
 
 ```yaml
-# /config/research/validation-rules.yaml
+# Contract between LLM exploration and deterministic import
 
-validation_rules:
+extracted_entity:
+  required:
+    name: string
+    source_key: string
+    source_name: string
   
-  # Jurisdiction consistency
-  jurisdiction_match:
-    description: "Imported entity jurisdiction should match expected"
-    severity: WARNING
-    check: |
-      imported.jurisdiction == expected.jurisdiction 
-      OR expected.jurisdiction IS NULL
-
-  # Entity type sanity
-  entity_type_sensible:
-    description: "Entity type should make sense in context"
-    severity: WARNING
-    check: |
-      IF context.expecting == 'NATURAL_PERSON'
-      THEN imported.entity_type IN ('INDIVIDUAL', 'PERSON')
-      
-      IF context.expecting == 'CORPORATE'
-      THEN imported.entity_type IN ('COMPANY', 'FUND', 'PARTNERSHIP', etc.)
-
-  # Circular reference
-  no_circular_ownership:
-    description: "Import should not create circular ownership"
-    severity: ERROR
-    check: |
-      NOT EXISTS cycle in ownership_graph starting from imported.entity_id
-
-  # Duplicate entity
-  no_duplicate_entity:
-    description: "Should not create duplicate of existing entity"
-    severity: WARNING
-    check: |
-      NOT EXISTS entity WHERE 
-        (lei = imported.lei AND lei IS NOT NULL)
-        OR (company_number = imported.company_number AND jurisdiction = imported.jurisdiction)
-        OR (similarity(name, imported.name) > 0.95 AND jurisdiction = imported.jurisdiction)
-
-  # LEI status
-  lei_is_active:
-    description: "LEI should be in ISSUED status"
-    severity: WARNING
-    check: |
-      imported.lei_status IN ('ISSUED', 'PENDING_TRANSFER')
-      OR imported.lei IS NULL
-
-  # Relationship consistency
-  ownership_totals:
-    description: "Imported ownership should not exceed 100%"
-    severity: WARNING
-    check: |
-      SUM(ownership_pct) for target_entity <= 105  # Allow small rounding
-
-  # Temporal consistency
-  dates_sensible:
-    description: "Dates should be sensible"
-    severity: WARNING
-    check: |
-      incorporated_date < TODAY
-      AND (ceased_date IS NULL OR ceased_date > incorporated_date)
+  optional:
+    jurisdiction: string        # ISO country code
+    entity_type: string         # Mapped to our taxonomy
+    status: string              # ACTIVE, DISSOLVED, etc.
+    incorporated_date: date
+    dissolved_date: date
+    registered_address: object
+    lei: string
+    tax_id: string
+    registration_number: string
+    
+  nested:
+    officers:
+      - name: string
+        role: string            # DIRECTOR, SECRETARY, CEO
+        appointed_date: date
+        resigned_date: date
+        nationality: string
+        
+    shareholders:
+      - name: string
+        entity_type: string     # PERSON, COMPANY
+        shares: number
+        share_class: string
+        percentage: decimal
+        source_key: string      # If identifiable
+        
+    parents:
+      - name: string
+        relationship_type: string
+        ownership_pct: decimal
+        source_key: string
 ```
 
-### Anomaly Flagging
+### Source Discovery Prompt
+
+```markdown
+# /prompts/research/sources/discover-source.md
+
+## Context
+You need to find corporate/ownership data but we don't have a pre-built 
+integration for the relevant registry. You must find and use the source.
+
+## Input
+- entity_name: {{entity_name}}
+- jurisdiction: {{jurisdiction}}
+- data_needed: {{data_needed}}
+
+## Your Task
+
+1. IDENTIFY data sources for {{jurisdiction}}:
+   - Official company registry
+   - Securities regulator
+   - Tax authority records
+   - Commercial databases
+
+2. FIND API or access method:
+   - Search for "[jurisdiction] company registry API"
+   - Check if public API exists
+   - Check authentication requirements
+   - Note rate limits
+
+3. SEARCH for the entity and extract data
+
+4. NORMALIZE to our standard structure:
+```json
+{
+  "source": {
+    "name": "...",
+    "url": "...",
+    "accessed_at": "..."
+  },
+  "entity": { ... },
+  "officers": [ ... ],
+  "shareholders": [ ... ]
+}
+```
+
+5. EMIT the import verb:
+   research.generic.import-entity(
+     :source-name "..."
+     :source-key "..."
+     :extracted-data { ... }
+   )
+
+## Rules
+- NEVER fabricate data
+- Include raw response snippet for audit
+- Flag uncertain field mappings
+- If API unavailable, note it and suggest alternatives
+```
+
+### Discovered Sources Table
+
+```sql
+CREATE TABLE IF NOT EXISTS kyc.discovered_sources (
+    source_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Identity
+    source_name VARCHAR(100) NOT NULL UNIQUE,
+    source_type VARCHAR(30) NOT NULL,
+    
+    -- Coverage
+    jurisdictions TEXT[] NOT NULL,
+    data_provides TEXT[],
+    
+    -- Access
+    base_url VARCHAR(500),
+    api_documentation_url VARCHAR(500),
+    requires_auth BOOLEAN DEFAULT false,
+    auth_type VARCHAR(30),
+    
+    -- LLM learned details
+    api_notes TEXT,
+    example_request TEXT,
+    example_response TEXT,
+    parsing_notes TEXT,
+    
+    -- Quality tracking
+    times_used INTEGER DEFAULT 0,
+    success_count INTEGER DEFAULT 0,
+    last_used_at TIMESTAMPTZ,
+    last_success_at TIMESTAMPTZ,
+    reliability_score DECIMAL(3,2) GENERATED ALWAYS AS (
+        CASE WHEN times_used > 0 
+        THEN success_count::DECIMAL / times_used 
+        ELSE 0 END
+    ) STORED,
+    
+    -- Status
+    is_active BOOLEAN DEFAULT true,
+    
+    -- Audit
+    discovered_at TIMESTAMPTZ DEFAULT NOW(),
+    discovered_in_session UUID,
+    
+    CONSTRAINT chk_source_type CHECK (
+        source_type IN ('REGISTRY', 'REGULATOR', 'COMMERCIAL', 'AGGREGATOR', 'OTHER')
+    )
+);
+```
+
+---
+
+## Core Architecture: Bounded Non-Determinism
+
+### The Two-Phase Pattern
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PHASE 1 vs PHASE 2                                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   PHASE 1: LLM EXPLORATION                                                  │
+│   ════════════════════════                                                   │
+│   • Fuzzy name matching                                                     │
+│   • Context reasoning                                                       │
+│   • Source selection                                                        │
+│   • API discovery                                                           │
+│   • Disambiguation                                                          │
+│   • Confidence scoring                                                      │
+│                                                                              │
+│   Executed via: PROMPT TEMPLATES                                            │
+│   Output: IDENTIFIER (LEI, company number, CIK) + normalized data           │
+│                                                                              │
+│   Non-deterministic but AUDITABLE                                           │
+│                                                                              │
+│   ───────────────────────────────────────────────────────────────────────   │
+│                                                                              │
+│   PHASE 2: DSL EXECUTION                                                    │
+│   ══════════════════════                                                     │
+│   • Validate normalized structure                                           │
+│   • Map to entity schema                                                    │
+│   • Create/update entities                                                  │
+│   • Create relationships                                                    │
+│   • Record in audit trail                                                   │
+│                                                                              │
+│   Executed via: DSL VERBS                                                   │
+│   Input: IDENTIFIER + normalized data (from Phase 1)                        │
+│                                                                              │
+│   Deterministic, reproducible, idempotent                                   │
+│                                                                              │
+│   ═══════════════════════════════════════════════════════════════════════   │
+│                                                                              │
+│   THE IDENTIFIER IS THE BRIDGE                                              │
+│                                                                              │
+│   Phase 1 finds the key → Phase 2 uses the key                              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Confidence Thresholds
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CONFIDENCE-BASED ROUTING                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   Score >= 0.90 (auto_proceed_threshold)                                    │
+│   ═══════════════════════════════════════                                    │
+│   → AUTO_SELECTED                                                           │
+│   → Proceed to Phase 2 immediately                                          │
+│   → Log decision with reasoning                                             │
+│                                                                              │
+│   Score 0.70-0.90 (ambiguous range)                                         │
+│   ═════════════════════════════════                                          │
+│   → CHECKPOINT                                                              │
+│   → Present candidates to user                                              │
+│   → Wait for selection                                                      │
+│   → Then proceed to Phase 2                                                 │
+│                                                                              │
+│   Score < 0.70 (reject_threshold)                                           │
+│   ═══════════════════════════════                                            │
+│   → NO_MATCH                                                                │
+│   → Try next source in priority list                                        │
+│   → Or flag for manual research                                             │
+│                                                                              │
+│   FORCED CHECKPOINTS (regardless of score):                                 │
+│   ═════════════════════════════════════════                                  │
+│   • Screening hits (sanctions, PEP)                                         │
+│   • High-stakes context (NEW_CLIENT, MATERIAL_HOLDING)                      │
+│   • Correction to previous decision                                         │
+│   • Multiple equally-scored candidates                                      │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Decision Audit Schema
 
 ```sql
 -- =============================================================================
--- RESEARCH ANOMALIES
+-- RESEARCH DECISIONS (Phase 1 audit)
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS kyc.research_anomalies (
-    anomaly_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    
-    -- What action triggered this
-    action_id UUID NOT NULL REFERENCES kyc.research_actions(action_id),
-    entity_id UUID NOT NULL REFERENCES "ob-poc".entities(entity_id),
-    
-    -- Anomaly details
-    rule_code VARCHAR(50) NOT NULL,
-    severity VARCHAR(10) NOT NULL,
-    description TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS kyc.research_decisions (
+    decision_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     
     -- Context
-    expected_value TEXT,
-    actual_value TEXT,
+    trigger_id UUID REFERENCES kyc.ownership_research_triggers(trigger_id),
+    target_entity_id UUID REFERENCES "ob-poc".entities(entity_id),
+    session_id UUID,
     
-    -- Resolution
-    status VARCHAR(20) DEFAULT 'OPEN',
-    resolution TEXT,
-    resolved_by UUID,
-    resolved_at TIMESTAMPTZ,
+    -- Search
+    search_query TEXT NOT NULL,
+    search_context JSONB,
+    
+    -- Source
+    source_provider VARCHAR(30) NOT NULL,
+    source_tier VARCHAR(10),  -- BUILT_IN, REGISTERED, DISCOVERED
+    
+    -- Candidates
+    candidates_found JSONB NOT NULL,
+    candidates_count INTEGER NOT NULL,
+    
+    -- Selection
+    selected_key VARCHAR(100),
+    selected_key_type VARCHAR(20),
+    selection_confidence DECIMAL(3,2),
+    selection_reasoning TEXT NOT NULL,
+    
+    -- Decision
+    decision_type VARCHAR(20) NOT NULL,
+    
+    -- Verification
+    auto_selected BOOLEAN NOT NULL DEFAULT false,
+    verified_by UUID,
+    verified_at TIMESTAMPTZ,
+    
+    -- Link to action
+    resulting_action_id UUID,
     
     -- Audit
-    detected_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
     
-    CONSTRAINT chk_anomaly_severity CHECK (severity IN ('ERROR', 'WARNING', 'INFO')),
-    CONSTRAINT chk_anomaly_status CHECK (status IN ('OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'FALSE_POSITIVE'))
+    CONSTRAINT chk_decision_type CHECK (decision_type IN (
+        'AUTO_SELECTED', 'USER_SELECTED', 'USER_CONFIRMED',
+        'NO_MATCH', 'AMBIGUOUS', 'REJECTED'
+    ))
 );
 
-CREATE INDEX idx_anomalies_action ON kyc.research_anomalies(action_id);
-CREATE INDEX idx_anomalies_entity ON kyc.research_anomalies(entity_id);
-CREATE INDEX idx_anomalies_status ON kyc.research_anomalies(status);
+-- =============================================================================
+-- RESEARCH ACTIONS (Phase 2 audit)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS kyc.research_actions (
+    action_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Context
+    target_entity_id UUID NOT NULL REFERENCES "ob-poc".entities(entity_id),
+    decision_id UUID REFERENCES kyc.research_decisions(decision_id),
+    session_id UUID,
+    
+    -- Action
+    action_type VARCHAR(50) NOT NULL,
+    source_provider VARCHAR(30) NOT NULL,
+    source_key VARCHAR(100) NOT NULL,
+    source_key_type VARCHAR(20) NOT NULL,
+    
+    -- DSL
+    verb_domain VARCHAR(30) NOT NULL,
+    verb_name VARCHAR(50) NOT NULL,
+    verb_args JSONB NOT NULL,
+    
+    -- Outcome
+    success BOOLEAN NOT NULL,
+    entities_created INTEGER DEFAULT 0,
+    entities_updated INTEGER DEFAULT 0,
+    relationships_created INTEGER DEFAULT 0,
+    
+    -- Errors
+    error_code VARCHAR(50),
+    error_message TEXT,
+    
+    -- Performance
+    duration_ms INTEGER,
+    
+    -- Audit
+    executed_at TIMESTAMPTZ DEFAULT NOW(),
+    executed_by UUID
+);
+
+-- =============================================================================
+-- RESEARCH CORRECTIONS
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS kyc.research_corrections (
+    correction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    original_decision_id UUID NOT NULL REFERENCES kyc.research_decisions(decision_id),
+    original_action_id UUID REFERENCES kyc.research_actions(action_id),
+    
+    correction_type VARCHAR(20) NOT NULL,
+    wrong_key VARCHAR(100),
+    correct_key VARCHAR(100),
+    new_action_id UUID REFERENCES kyc.research_actions(action_id),
+    
+    correction_reason TEXT NOT NULL,
+    
+    corrected_at TIMESTAMPTZ DEFAULT NOW(),
+    corrected_by UUID NOT NULL,
+    
+    CONSTRAINT chk_correction_type CHECK (correction_type IN (
+        'WRONG_ENTITY', 'WRONG_JURISDICTION', 'STALE_DATA', 'MERGE_REQUIRED', 'UNLINK'
+    ))
+);
 ```
 
 ---
 
-## Key Files
+## Prompt Templates
 
-| Category | File | Purpose |
-|----------|------|---------|
-| **Prompts** | `/prompts/research/sources/gleif/*.md` | GLEIF search/disambiguate |
-| | `/prompts/research/sources/companies-house/*.md` | CH search |
-| | `/prompts/research/orchestration/*.md` | Strategy prompts |
-| **Verbs** | `/rust/config/verbs/research/gleif.yaml` | GLEIF import verbs |
-| | `/rust/config/verbs/research/companies-house.yaml` | CH import verbs |
-| | `/rust/config/verbs/research/sec.yaml` | SEC import verbs |
-| | `/rust/config/verbs/research/screening.yaml` | Screening record verbs |
-| | `/rust/config/verbs/research/workflow.yaml` | Workflow verbs |
-| **Handlers** | `/rust/src/research/gleif/handler.rs` | GLEIF verb handlers |
-| | `/rust/src/research/companies_house/handler.rs` | CH handlers |
-| | `/rust/src/research/workflow/handler.rs` | Workflow handlers |
-| **Schema** | `/migrations/016_research_workflows.sql` | All research tables |
-| **Config** | `/config/research/validation-rules.yaml` | Validation rules |
-| | `/config/research/confidence-thresholds.yaml` | Threshold config |
+### Directory Structure
+
+```
+/prompts/research/
+├── sources/
+│   ├── gleif/
+│   │   ├── search.md
+│   │   └── disambiguate.md
+│   ├── companies-house/
+│   │   ├── search.md
+│   │   └── search-officer.md
+│   ├── sec-edgar/
+│   │   ├── search.md
+│   │   └── parse-13f.md
+│   └── discover-source.md          # For Tier 3 discovery
+│
+├── screening/
+│   ├── interpret-sanctions.md
+│   └── interpret-pep.md
+│
+├── documents/
+│   ├── extract-ownership.md
+│   └── extract-directors.md
+│
+└── orchestration/
+    ├── resolve-gap.md              # Strategy for single gap
+    ├── chain-research.md           # Full chain strategy
+    └── select-source.md            # Pick best source
+```
+
+### Example: GLEIF Search Prompt
+
+```markdown
+# /prompts/research/sources/gleif/search.md
+
+## Context
+Search GLEIF for entity: {{entity_name}}
+Jurisdiction hint: {{jurisdiction}}
+Context: {{context}}
+
+## GLEIF API
+Fuzzy search: https://api.gleif.org/api/v1/fuzzycompletions?field=fulltext&q={query}
+Exact search: https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]={name}
+
+## Strategy
+1. Try exact name
+2. Remove legal suffixes (Ltd, GmbH, LLC)
+3. Filter by jurisdiction
+4. Only ISSUED status (not LAPSED)
+
+## Scoring
+- Exact name match: +0.3
+- Jurisdiction match: +0.2  
+- Active status: +0.2
+- Recent registration: +0.1
+- Has parent data: +0.1
+
+## Output
+If score >= 0.90:
+  {"status": "found", "lei": "...", "confidence": 0.95, "reasoning": "..."}
+
+If 0.70-0.90:
+  {"status": "ambiguous", "candidates": [...]}
+
+If < 0.70:
+  {"status": "not_found", "suggestion": "Try Companies House"}
+
+## Then Emit
+research.workflow.record-decision(:search-query "..." :source-provider "gleif" ...)
+
+If found:
+  research.gleif.import-hierarchy(:lei "..." :decision-id @decision_id)
+```
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Schema & Framework (12h)
-- [ ] 1.1 Review CLAUDE.md and all annexes
-- [ ] 1.2 Create research_decisions table
-- [ ] 1.3 Create research_actions table
-- [ ] 1.4 Create research_corrections table
-- [ ] 1.5 Create research_anomalies table
-- [ ] 1.6 Create research_confidence_config table
-- [ ] 1.7 Create outreach_requests table
-- [ ] 1.8 Seed default confidence thresholds
+### Phase 1: Agent Infrastructure (15h)
+- [ ] 1.1 Review CLAUDE.md and session/REPL docs
+- [ ] 1.2 Extend Session with mode and agent_state
+- [ ] 1.3 Implement AgentController struct
+- [ ] 1.4 Implement agent loop skeleton
+- [ ] 1.5 Wire agent events to viewport
+- [ ] 1.6 Implement checkpoint UI pattern
 
-### Phase 2: Prompt Templates (10h)
-- [ ] 2.1 Create prompt directory structure
-- [ ] 2.2 Write GLEIF search prompt
-- [ ] 2.3 Write GLEIF disambiguate prompt
-- [ ] 2.4 Write Companies House search prompt
-- [ ] 2.5 Write SEC search prompt
-- [ ] 2.6 Write resolve-gap orchestration prompt
-- [ ] 2.7 Write chain-research orchestration prompt
-- [ ] 2.8 Write screening interpretation prompts
+### Phase 2: Agent Verbs (10h)
+- [ ] 2.1 Implement agent.start verb
+- [ ] 2.2 Implement agent.pause/resume/stop
+- [ ] 2.3 Implement agent.respond-checkpoint
+- [ ] 2.4 Implement agent.resolve-gaps
+- [ ] 2.5 Implement agent.chain-research
+- [ ] 2.6 Add invocation phrases to verb YAML
 
-### Phase 3: GLEIF Refactor (8h)
-- [ ] 3.1 Refactor existing GLEIF under research module
-- [ ] 3.2 Add decision_id parameter to import verbs
-- [ ] 3.3 Implement audit trail logging
-- [ ] 3.4 Add validation post-import
-- [ ] 3.5 Update verb YAML definitions
+### Phase 3: Audit Schema (8h)
+- [ ] 3.1 Create research_decisions table
+- [ ] 3.2 Create research_actions table
+- [ ] 3.3 Create research_corrections table
+- [ ] 3.4 Create discovered_sources table
+- [ ] 3.5 Create confidence_config table
 
-### Phase 4: Companies House Integration (10h)
-- [ ] 4.1 Implement CH API client
-- [ ] 4.2 Implement import-company verb
-- [ ] 4.3 Implement import-officers verb
-- [ ] 4.4 Implement import-psc verb
-- [ ] 4.5 Add CH prompt templates
-- [ ] 4.6 Test with real UK companies
+### Phase 4: Prompt Templates (10h)
+- [ ] 4.1 Create prompt directory structure
+- [ ] 4.2 Write GLEIF search/disambiguate prompts
+- [ ] 4.3 Write Companies House prompts
+- [ ] 4.4 Write orchestration prompts
+- [ ] 4.5 Write discover-source prompt
+- [ ] 4.6 Implement PromptLoader
 
-### Phase 5: SEC EDGAR Integration (8h)
-- [ ] 5.1 Implement EDGAR API client
-- [ ] 5.2 Implement 13F parser
-- [ ] 5.3 Implement 13D/G parser
-- [ ] 5.4 Implement import verbs
-- [ ] 5.5 Add SEC prompt templates
+### Phase 5: GLEIF Refactor (8h)
+- [ ] 5.1 Move existing GLEIF under research module
+- [ ] 5.2 Add decision_id parameter
+- [ ] 5.3 Wire audit trail logging
+- [ ] 5.4 Add invocation phrases
+- [ ] 5.5 Test end-to-end
 
-### Phase 6: Screening Framework (8h)
-- [ ] 6.1 Define screening provider interface
-- [ ] 6.2 Implement record-sanctions-check verb
-- [ ] 6.3 Implement record-pep-check verb
-- [ ] 6.4 Implement interpretation prompts
-- [ ] 6.5 Always-checkpoint logic for hits
+### Phase 6: Companies House (10h)
+- [ ] 6.1 Implement CH API client
+- [ ] 6.2 Implement import-company verb
+- [ ] 6.3 Implement import-officers verb
+- [ ] 6.4 Implement import-psc verb
+- [ ] 6.5 Add prompt templates
+- [ ] 6.6 Test with real data
 
-### Phase 7: Workflow Verbs (8h)
-- [ ] 7.1 Implement record-decision verb
-- [ ] 7.2 Implement confirm-decision verb
-- [ ] 7.3 Implement reject-decision verb
-- [ ] 7.4 Implement record-correction verb
-- [ ] 7.5 Implement resolve-trigger verb
-- [ ] 7.6 Implement audit-trail verb
+### Phase 7: Generic Import Path (8h)
+- [ ] 7.1 Define normalized structure schema
+- [ ] 7.2 Implement research.generic.import-entity
+- [ ] 7.3 Implement research.generic.import-hierarchy
+- [ ] 7.4 Implement source registration logic
+- [ ] 7.5 Test with discovered source
 
-### Phase 8: Validation Framework (6h)
-- [ ] 8.1 Define validation rule structure
-- [ ] 8.2 Implement post-import validation hook
-- [ ] 8.3 Implement anomaly recording
-- [ ] 8.4 Implement anomaly resolution workflow
+### Phase 8: Screening (8h)
+- [ ] 8.1 Implement record-sanctions-check
+- [ ] 8.2 Implement record-pep-check
+- [ ] 8.3 Implement interpret prompts
+- [ ] 8.4 Wire forced checkpoint for hits
 
-### Phase 9: Agent Integration (10h)
-- [ ] 9.1 Implement agent loop structure
-- [ ] 9.2 Implement checkpoint UI pattern
-- [ ] 9.3 Implement confidence routing
-- [ ] 9.4 Implement multi-source fallback
-- [ ] 9.5 Implement chain-research orchestration
-- [ ] 9.6 Test end-to-end agent flow
+### Phase 9: Workflow Verbs (6h)
+- [ ] 9.1 Implement record-decision
+- [ ] 9.2 Implement confirm/reject-decision
+- [ ] 9.3 Implement record-correction
+- [ ] 9.4 Implement audit-trail query
 
-### Phase 10: Testing & Documentation (8h)
-- [ ] 10.1 Test GLEIF flow end-to-end
-- [ ] 10.2 Test Companies House flow
-- [ ] 10.3 Test ambiguous case handling
-- [ ] 10.4 Test correction workflow
-- [ ] 10.5 Test validation rules
-- [ ] 10.6 Update CLAUDE.md with research patterns
-- [ ] 10.7 Document prompt template conventions
+### Phase 10: Integration Testing (10h)
+- [ ] 10.1 Test full agent loop
+- [ ] 10.2 Test checkpoint flow
+- [ ] 10.3 Test correction workflow
+- [ ] 10.4 Test discovered source flow
+- [ ] 10.5 Test scope inheritance
+- [ ] 10.6 Update CLAUDE.md
 
 ---
 
@@ -1836,60 +1845,31 @@ CREATE INDEX idx_anomalies_status ON kyc.research_anomalies(status);
 
 | Phase | Effort |
 |-------|--------|
-| 1. Schema & Framework | 12h |
-| 2. Prompt Templates | 10h |
-| 3. GLEIF Refactor | 8h |
-| 4. Companies House | 10h |
-| 5. SEC EDGAR | 8h |
-| 6. Screening | 8h |
-| 7. Workflow Verbs | 8h |
-| 8. Validation | 6h |
-| 9. Agent Integration | 10h |
-| 10. Testing & Docs | 8h |
-| **Total** | **~88h** |
-
----
-
-## Verb Summary
-
-| Domain | Verbs | Type |
-|--------|-------|------|
-| `research.gleif` | 4 | Import (Phase 2) |
-| `research.companies-house` | 4 | Import (Phase 2) |
-| `research.sec` | 4 | Import (Phase 2) |
-| `research.orbis` | 4 | Import (Phase 2) |
-| `research.screening` | 4 | Record (Phase 2) |
-| `research.outreach` | 5 | Workflow |
-| `research.documents` | 4 | Import (Phase 2) |
-| `research.workflow` | 10 | Decision/audit |
-| **Total** | **~39** | |
-
-Note: Search/disambiguation is handled by **prompt templates**, not verbs.
+| 1. Agent Infrastructure | 15h |
+| 2. Agent Verbs | 10h |
+| 3. Audit Schema | 8h |
+| 4. Prompt Templates | 10h |
+| 5. GLEIF Refactor | 8h |
+| 6. Companies House | 10h |
+| 7. Generic Import | 8h |
+| 8. Screening | 8h |
+| 9. Workflow Verbs | 6h |
+| 10. Testing | 10h |
+| **Total** | **~93h** |
 
 ---
 
 ## Success Criteria
 
-1. **Phase separation clear** - Prompts for exploration, verbs for import
-2. **All decisions audited** - research_decisions captures every selection
-3. **All actions audited** - research_actions captures every import
-4. **Confidence routing works** - Auto/ambiguous/no-match correctly routed
-5. **Checkpoints enforced** - High-stakes decisions require human confirmation
-6. **Corrections tracked** - Wrong selections can be corrected with audit trail
-7. **Validation catches anomalies** - Post-import sanity checks work
-8. **Agent loop functional** - End-to-end gap resolution works
-
----
-
-## Risk Assessment
-
-| Risk | Mitigation |
-|------|------------|
-| LLM picks wrong entity | Confidence thresholds, human checkpoints, corrections |
-| API rate limits | Caching, backoff, rate limit tracking |
-| Source data conflicts | Reconciliation prompts, discrepancy flagging |
-| Audit trail too verbose | Configurable detail levels |
-| Agent loops forever | Max depth, max iterations, timeout |
+1. **Agent wired to session** - Mode, state visible in session
+2. **Agent wired to REPL** - DSL emitted and executed
+3. **Agent wired to viewport** - Progress, checkpoints displayed
+4. **Invocation phrases work** - LLM triggers correct verbs
+5. **Decisions audited** - All Phase 1 selections logged
+6. **Actions audited** - All Phase 2 imports logged
+7. **Pluggable sources** - Discovered source can be used and registered
+8. **Checkpoints enforced** - User confirms ambiguous/high-stakes
+9. **Corrections tracked** - Mistakes can be fixed with audit trail
 
 ---
 

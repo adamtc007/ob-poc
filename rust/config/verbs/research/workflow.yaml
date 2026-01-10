@@ -2,6 +2,16 @@ domains:
   research.workflow:
     description: "Research workflow management - decision tracking, audit trail, corrections"
 
+    invocation_hints:
+      - "research decision"
+      - "audit trail"
+      - "what research was done"
+      - "how did we get this data"
+      - "correction"
+      - "fix the mistake"
+      - "wrong entity"
+      - "undo selection"
+
     verbs:
       # =======================================================================
       # DECISION MANAGEMENT
@@ -71,6 +81,11 @@ domains:
 
       confirm-decision:
         description: "User confirms an ambiguous decision"
+        invocation_phrases:
+          - "confirm this"
+          - "yes that's right"
+          - "use that one"
+          - "select this match"
         behavior: plugin
         handler: WorkflowConfirmDecisionOp
         args:
@@ -88,6 +103,11 @@ domains:
 
       reject-decision:
         description: "User rejects a suggested decision"
+        invocation_phrases:
+          - "no that's wrong"
+          - "reject"
+          - "not that one"
+          - "none of these"
         behavior: plugin
         handler: WorkflowRejectDecisionOp
         args:
@@ -187,6 +207,11 @@ domains:
 
       record-correction:
         description: "Record a correction to a previous decision"
+        invocation_phrases:
+          - "correct this"
+          - "fix the mistake"
+          - "wrong entity was selected"
+          - "undo that selection"
         behavior: crud
         crud:
           operation: insert
@@ -304,6 +329,12 @@ domains:
 
       audit-trail:
         description: "Get research audit trail for an entity"
+        invocation_phrases:
+          - "show audit trail"
+          - "what research was done"
+          - "history of decisions"
+          - "how did we get this data"
+          - "where did this come from"
         behavior: plugin
         handler: WorkflowAuditTrailOp
         args:
