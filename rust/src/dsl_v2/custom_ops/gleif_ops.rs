@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt};
+use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, extract_uuid_opt};
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -149,14 +149,34 @@ impl CustomOperation for GleifEnrichOp {
             ctx.bind(binding, entity_id);
         }
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        let result_json = serde_json::json!({
             "entity_id": entity_id,
             "lei": lei,
             "names_added": result.names_added,
             "addresses_added": result.addresses_added,
             "identifiers_added": result.identifiers_added,
             "parent_relationships_added": result.parent_relationships_added,
-        })))
+        });
+
+        // Log research action if decision-id provided (links Phase 2 execution to Phase 1 selection)
+        if let Some(decision_id) = extract_uuid_opt(verb_call, ctx, "decision-id") {
+            let entities_updated = if result.names_added > 0 || result.addresses_added > 0 {
+                1
+            } else {
+                0
+            };
+            log_research_action(
+                pool,
+                decision_id,
+                "gleif:enrich",
+                &result_json,
+                0,
+                entities_updated,
+            )
+            .await?;
+        }
+
+        Ok(ExecutionResult::Record(result_json))
     }
 
     #[cfg(not(feature = "database"))]
@@ -260,7 +280,7 @@ impl CustomOperation for GleifImportTreeOp {
     async fn execute(
         &self,
         verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
+        ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let root_lei = extract_string_opt(verb_call, "root-lei")
@@ -276,13 +296,28 @@ impl CustomOperation for GleifImportTreeOp {
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
         let result = service.import_corporate_tree(&root_lei, max_depth).await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        let result_json = serde_json::json!({
             "root_lei": result.root_lei,
             "entities_created": result.entities_created,
             "entities_updated": result.entities_updated,
             "relationships_created": result.relationships_created,
             "terminal_entities": result.terminal_entities.len(),
-        })))
+        });
+
+        // Log research action if decision-id provided
+        if let Some(decision_id) = extract_uuid_opt(verb_call, ctx, "decision-id") {
+            log_research_action(
+                pool,
+                decision_id,
+                "gleif:import-tree",
+                &result_json,
+                result.entities_created as i32,
+                result.entities_updated as i32,
+            )
+            .await?;
+        }
+
+        Ok(ExecutionResult::Record(result_json))
     }
 
     #[cfg(not(feature = "database"))]
@@ -727,7 +762,7 @@ impl CustomOperation for GleifImportManagedFundsOp {
             tracing::debug!("Imported fund: {} ({})", fund_name, fund_lei);
         }
 
-        Ok(ExecutionResult::Record(serde_json::json!({
+        let result_json = serde_json::json!({
             "manager_lei": manager_lei,
             "name_pattern": name_pattern,
             "search_method": search_method,
@@ -735,7 +770,22 @@ impl CustomOperation for GleifImportManagedFundsOp {
             "entities_created": entities_created,
             "cbus_created": cbus_created,
             "roles_assigned": roles_assigned,
-        })))
+        });
+
+        // Log research action if decision-id provided
+        if let Some(decision_id) = extract_uuid_opt(verb_call, _ctx, "decision-id") {
+            log_research_action(
+                pool,
+                decision_id,
+                "gleif:import-managed-funds",
+                &result_json,
+                entities_created,
+                0,
+            )
+            .await?;
+        }
+
+        Ok(ExecutionResult::Record(result_json))
     }
 
     #[cfg(not(feature = "database"))]
@@ -1650,4 +1700,32 @@ async fn get_lei_for_entity(pool: &PgPool, entity_id: Uuid) -> Result<Option<Str
     .flatten();
 
     Ok(lei)
+}
+
+/// Log a research action to the audit trail when decision-id is provided.
+/// This links Phase 2 DSL execution back to Phase 1 LLM selection.
+#[cfg(feature = "database")]
+async fn log_research_action(
+    pool: &PgPool,
+    decision_id: Uuid,
+    verb_fqn: &str,
+    result_summary: &serde_json::Value,
+    entities_created: i32,
+    entities_updated: i32,
+) -> Result<Uuid> {
+    let action_id: Uuid = sqlx::query_scalar(
+        r#"INSERT INTO kyc.research_actions
+           (decision_id, verb_fqn, result_summary, entities_created, entities_updated)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING action_id"#,
+    )
+    .bind(decision_id)
+    .bind(verb_fqn)
+    .bind(result_summary)
+    .bind(entities_created)
+    .bind(entities_updated)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(action_id)
 }

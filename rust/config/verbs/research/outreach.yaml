@@ -1,0 +1,207 @@
+domains:
+  research.outreach:
+    description: "Counterparty outreach tracking for ownership disclosures and information requests"
+
+    verbs:
+      # =======================================================================
+      # REQUEST MANAGEMENT
+      # =======================================================================
+
+      create-request:
+        description: "Create an outreach request"
+        behavior: crud
+        crud:
+          operation: insert
+          table: outreach_requests
+          schema: kyc
+          returning: request_id
+        args:
+          - name: target-entity-id
+            type: uuid
+            required: true
+            maps_to: target_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: request-type
+            type: string
+            required: true
+            maps_to: request_type
+          - name: recipient-entity-id
+            type: uuid
+            required: false
+            maps_to: recipient_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: recipient-email
+            type: string
+            required: false
+            maps_to: recipient_email
+          - name: recipient-name
+            type: string
+            required: false
+            maps_to: recipient_name
+          - name: deadline-days
+            type: integer
+            required: false
+            description: "Number of days until deadline (default 30)"
+          - name: request-notes
+            type: string
+            required: false
+            maps_to: request_notes
+          - name: trigger-id
+            type: uuid
+            required: false
+            maps_to: trigger_id
+        returns:
+          type: uuid
+          capture: true
+
+      mark-sent:
+        description: "Mark request as sent"
+        behavior: crud
+        crud:
+          operation: update
+          table: outreach_requests
+          schema: kyc
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+          - name: status
+            type: string
+            required: false
+            default: "SENT"
+            maps_to: status
+        returns:
+          type: affected
+
+      send-reminder:
+        description: "Mark that a reminder was sent"
+        behavior: crud
+        crud:
+          operation: update
+          table: outreach_requests
+          schema: kyc
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+          - name: status
+            type: string
+            required: false
+            default: "REMINDED"
+            maps_to: status
+        returns:
+          type: affected
+
+      record-response:
+        description: "Record response to outreach request"
+        behavior: plugin
+        handler: OutreachRecordResponseOp
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+          - name: response-type
+            type: string
+            required: true
+            valid_values:
+              - FULL_DISCLOSURE
+              - PARTIAL_DISCLOSURE
+              - DECLINED
+              - NO_RESPONSE
+          - name: document-id
+            type: uuid
+            required: false
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: record
+
+      close-request:
+        description: "Close an outreach request"
+        behavior: crud
+        crud:
+          operation: update
+          table: outreach_requests
+          schema: kyc
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+          - name: status
+            type: string
+            required: false
+            default: "CLOSED"
+            maps_to: status
+          - name: resolution-notes
+            type: string
+            required: false
+            maps_to: resolution_notes
+        returns:
+          type: affected
+
+      # =======================================================================
+      # QUERIES
+      # =======================================================================
+
+      list-pending:
+        description: "List pending outreach requests"
+        behavior: crud
+        crud:
+          operation: select
+          table: outreach_requests
+          schema: kyc
+        args:
+          - name: target-entity-id
+            type: uuid
+            required: false
+            maps_to: target_entity_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            default: "PENDING"
+          - name: request-type
+            type: string
+            required: false
+            maps_to: request_type
+        returns:
+          type: record_set
+
+      list-overdue:
+        description: "List overdue outreach requests"
+        behavior: plugin
+        handler: OutreachListOverdueOp
+        args:
+          - name: days-overdue
+            type: integer
+            required: false
+            default: 0
+        returns:
+          type: record_set
+
+      get-request:
+        description: "Get details of a specific request"
+        behavior: crud
+        crud:
+          operation: select
+          table: outreach_requests
+          schema: kyc
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+        returns:
+          type: record

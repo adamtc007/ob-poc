@@ -40,11 +40,13 @@ mod lifecycle_ops;
 mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
+mod outreach_ops;
 mod ownership_ops;
 mod partnership_ops;
 mod refdata_loader;
 mod regulatory_ops;
 mod request_ops;
+mod research_workflow_ops;
 mod resource_ops;
 mod rfi;
 mod screening_ops;
@@ -363,6 +365,15 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ScreeningPepOp));
         registry.register(Arc::new(ScreeningSanctionsOp));
         registry.register(Arc::new(ScreeningAdverseMediaOp));
+
+        // Research workflow operations
+        registry.register(Arc::new(research_workflow_ops::WorkflowConfirmDecisionOp));
+        registry.register(Arc::new(research_workflow_ops::WorkflowRejectDecisionOp));
+        registry.register(Arc::new(research_workflow_ops::WorkflowAuditTrailOp));
+
+        // Outreach operations
+        registry.register(Arc::new(outreach_ops::OutreachRecordResponseOp));
+        registry.register(Arc::new(outreach_ops::OutreachListOverdueOp));
 
         // Resource instance operations
         registry.register(Arc::new(ResourceCreateOp));

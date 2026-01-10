@@ -1,0 +1,354 @@
+domains:
+  research.workflow:
+    description: "Research workflow management - decision tracking, audit trail, corrections"
+
+    verbs:
+      # =======================================================================
+      # DECISION MANAGEMENT
+      # =======================================================================
+
+      record-decision:
+        description: "Record a research decision (Phase 1 outcome)"
+        behavior: crud
+        crud:
+          operation: insert
+          table: research_decisions
+          schema: kyc
+          returning: decision_id
+        args:
+          - name: target-entity-id
+            type: uuid
+            required: false
+            maps_to: target_entity_id
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: search-query
+            type: string
+            required: true
+            maps_to: search_query
+          - name: source-provider
+            type: string
+            required: true
+            maps_to: source_provider
+          - name: candidates-found
+            type: object
+            required: true
+            maps_to: candidates_found
+          - name: candidates-count
+            type: integer
+            required: false
+            maps_to: candidates_count
+          - name: selected-key
+            type: string
+            required: false
+            maps_to: selected_key
+          - name: selected-key-type
+            type: string
+            required: false
+            maps_to: selected_key_type
+          - name: confidence
+            type: decimal
+            required: false
+            maps_to: selection_confidence
+          - name: reasoning
+            type: string
+            required: true
+            maps_to: selection_reasoning
+          - name: decision-type
+            type: string
+            required: true
+            maps_to: decision_type
+          - name: auto-selected
+            type: boolean
+            required: false
+            maps_to: auto_selected
+        returns:
+          type: uuid
+          capture: true
+
+      confirm-decision:
+        description: "User confirms an ambiguous decision"
+        behavior: plugin
+        handler: WorkflowConfirmDecisionOp
+        args:
+          - name: decision-id
+            type: uuid
+            required: true
+          - name: selected-key
+            type: string
+            required: true
+          - name: selected-key-type
+            type: string
+            required: true
+        returns:
+          type: record
+
+      reject-decision:
+        description: "User rejects a suggested decision"
+        behavior: plugin
+        handler: WorkflowRejectDecisionOp
+        args:
+          - name: decision-id
+            type: uuid
+            required: true
+          - name: rejection-reason
+            type: string
+            required: true
+        returns:
+          type: record
+
+      # =======================================================================
+      # ACTION MANAGEMENT
+      # =======================================================================
+
+      record-action:
+        description: "Record a research action (Phase 2 execution)"
+        behavior: crud
+        crud:
+          operation: insert
+          table: research_actions
+          schema: kyc
+          returning: action_id
+        args:
+          - name: target-entity-id
+            type: uuid
+            required: true
+            maps_to: target_entity_id
+          - name: decision-id
+            type: uuid
+            required: false
+            maps_to: decision_id
+          - name: action-type
+            type: string
+            required: true
+            maps_to: action_type
+          - name: source-provider
+            type: string
+            required: true
+            maps_to: source_provider
+          - name: source-key
+            type: string
+            required: true
+            maps_to: source_key
+          - name: source-key-type
+            type: string
+            required: true
+            maps_to: source_key_type
+          - name: verb-domain
+            type: string
+            required: true
+            maps_to: verb_domain
+          - name: verb-name
+            type: string
+            required: true
+            maps_to: verb_name
+          - name: verb-args
+            type: object
+            required: false
+            maps_to: verb_args
+          - name: success
+            type: boolean
+            required: true
+            maps_to: success
+          - name: entities-created
+            type: integer
+            required: false
+            maps_to: entities_created
+          - name: entities-updated
+            type: integer
+            required: false
+            maps_to: entities_updated
+          - name: relationships-created
+            type: integer
+            required: false
+            maps_to: relationships_created
+          - name: error-code
+            type: string
+            required: false
+            maps_to: error_code
+          - name: error-message
+            type: string
+            required: false
+            maps_to: error_message
+          - name: duration-ms
+            type: integer
+            required: false
+            maps_to: duration_ms
+        returns:
+          type: uuid
+          capture: true
+
+      # =======================================================================
+      # CORRECTIONS
+      # =======================================================================
+
+      record-correction:
+        description: "Record a correction to a previous decision"
+        behavior: crud
+        crud:
+          operation: insert
+          table: research_corrections
+          schema: kyc
+          returning: correction_id
+        args:
+          - name: original-decision-id
+            type: uuid
+            required: true
+            maps_to: original_decision_id
+          - name: original-action-id
+            type: uuid
+            required: false
+            maps_to: original_action_id
+          - name: correction-type
+            type: string
+            required: true
+            maps_to: correction_type
+          - name: wrong-key
+            type: string
+            required: false
+            maps_to: wrong_key
+          - name: wrong-key-type
+            type: string
+            required: false
+            maps_to: wrong_key_type
+          - name: correct-key
+            type: string
+            required: false
+            maps_to: correct_key
+          - name: correct-key-type
+            type: string
+            required: false
+            maps_to: correct_key_type
+          - name: correction-reason
+            type: string
+            required: true
+            maps_to: correction_reason
+        returns:
+          type: uuid
+          capture: true
+
+      # =======================================================================
+      # ANOMALIES
+      # =======================================================================
+
+      record-anomaly:
+        description: "Record a post-import validation anomaly"
+        behavior: crud
+        crud:
+          operation: insert
+          table: research_anomalies
+          schema: kyc
+          returning: anomaly_id
+        args:
+          - name: action-id
+            type: uuid
+            required: true
+            maps_to: action_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: rule-code
+            type: string
+            required: true
+            maps_to: rule_code
+          - name: severity
+            type: string
+            required: true
+            maps_to: severity
+          - name: description
+            type: string
+            required: true
+            maps_to: description
+          - name: expected-value
+            type: string
+            required: false
+            maps_to: expected_value
+          - name: actual-value
+            type: string
+            required: false
+            maps_to: actual_value
+        returns:
+          type: uuid
+          capture: true
+
+      resolve-anomaly:
+        description: "Resolve an anomaly"
+        behavior: crud
+        crud:
+          operation: update
+          table: research_anomalies
+          schema: kyc
+        args:
+          - name: anomaly-id
+            type: uuid
+            required: true
+            maps_to: anomaly_id
+          - name: status
+            type: string
+            required: true
+            maps_to: status
+          - name: resolution
+            type: string
+            required: false
+            maps_to: resolution
+        returns:
+          type: affected
+
+      # =======================================================================
+      # QUERIES
+      # =======================================================================
+
+      audit-trail:
+        description: "Get research audit trail for an entity"
+        behavior: plugin
+        handler: WorkflowAuditTrailOp
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: include-decisions
+            type: boolean
+            required: false
+            default: true
+          - name: include-actions
+            type: boolean
+            required: false
+            default: true
+          - name: include-corrections
+            type: boolean
+            required: false
+            default: true
+          - name: include-anomalies
+            type: boolean
+            required: false
+            default: true
+        returns:
+          type: record
+
+      pending-decisions:
+        description: "List decisions awaiting user input"
+        behavior: crud
+        crud:
+          operation: select
+          table: research_decisions
+          schema: kyc
+        args:
+          - name: source-provider
+            type: string
+            required: false
+            maps_to: source_provider
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+        returns:
+          type: record_set
