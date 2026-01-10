@@ -17,6 +17,7 @@
 //! ```
 
 pub mod agent_context;
+pub mod agent_mode;
 pub mod canonical_hash;
 pub mod enhanced_context;
 pub mod research_context;
@@ -41,6 +42,10 @@ use crate::navigation::{NavCommand, NavExecutor, NavResult};
 
 pub use crate::research::ApprovedResearch;
 pub use agent_context::AgentGraphContext;
+pub use agent_mode::{
+    ActionRef, AgentState, AgentStatus, AgentTask, Candidate, Checkpoint, CheckpointContext,
+    CheckpointType, DecisionRef, SessionMode,
+};
 pub use canonical_hash::{canonical_json_hash, hash_to_hex, hex_to_hash, sha256};
 pub use enhanced_context::{
     get_verb_suggestions, EnhancedAgentContext, EnhancedContextBuilder, SerializableAgentContext,
@@ -99,6 +104,13 @@ pub struct UnifiedSessionContext {
     /// View state - the unified "it" that session is looking at
     /// This IS what the user sees = what operations target = what agent knows about
     pub view: Option<ViewState>,
+
+    /// Session operating mode (Manual, Agent, Hybrid)
+    #[serde(default)]
+    pub mode: SessionMode,
+
+    /// Agent state when in Agent mode
+    pub agent: Option<AgentState>,
 }
 
 impl Clone for UnifiedSessionContext {
@@ -116,6 +128,8 @@ impl Clone for UnifiedSessionContext {
             bookmarks: self.bookmarks.clone(),
             research: self.research.clone(),
             view: self.view.clone(),
+            mode: self.mode,
+            agent: self.agent.clone(),
         }
     }
 }
@@ -159,6 +173,8 @@ impl UnifiedSessionContext {
             bookmarks: HashMap::new(),
             research: ResearchContext::new(),
             view: None,
+            mode: SessionMode::Manual,
+            agent: None,
         }
     }
 
@@ -449,6 +465,91 @@ impl UnifiedSessionContext {
     /// Check if a node can be zoomed into.
     pub fn can_zoom_in(&self, node_id: Uuid) -> bool {
         self.view.as_ref().is_some_and(|v| v.can_zoom_in(node_id))
+    }
+
+    // =========================================================================
+    // AGENT MODE METHODS
+    // =========================================================================
+
+    /// Start agent mode with a task
+    pub fn start_agent(&mut self, task: AgentTask) -> Uuid {
+        let state = AgentState::new(task);
+        let agent_session_id = state.agent_session_id;
+        self.agent = Some(state);
+        self.mode = SessionMode::Agent;
+        agent_session_id
+    }
+
+    /// Start agent mode for resolving gaps
+    pub fn start_resolve_gaps(&mut self, entity_id: Uuid) -> Uuid {
+        let state = AgentState::resolve_gaps(entity_id);
+        let agent_session_id = state.agent_session_id;
+        self.agent = Some(state);
+        self.mode = SessionMode::Agent;
+        agent_session_id
+    }
+
+    /// Start agent mode for chain research
+    pub fn start_chain_research(&mut self, entity_id: Uuid) -> Uuid {
+        let state = AgentState::chain_research(entity_id);
+        let agent_session_id = state.agent_session_id;
+        self.agent = Some(state);
+        self.mode = SessionMode::Agent;
+        agent_session_id
+    }
+
+    /// Stop agent mode and return to manual
+    pub fn stop_agent(&mut self) {
+        if let Some(agent) = &mut self.agent {
+            agent.cancel();
+        }
+        self.mode = SessionMode::Manual;
+    }
+
+    /// Pause agent execution
+    pub fn pause_agent(&mut self) {
+        if let Some(agent) = &mut self.agent {
+            agent.pause();
+        }
+    }
+
+    /// Resume agent execution
+    pub fn resume_agent(&mut self) {
+        if let Some(agent) = &mut self.agent {
+            agent.resume();
+        }
+    }
+
+    /// Check if session is in agent mode
+    pub fn is_agent_mode(&self) -> bool {
+        matches!(self.mode, SessionMode::Agent | SessionMode::Hybrid)
+    }
+
+    /// Check if agent is waiting for user input
+    pub fn agent_waiting(&self) -> bool {
+        self.agent.as_ref().is_some_and(|a| a.is_waiting())
+    }
+
+    /// Get pending checkpoint if any
+    pub fn pending_checkpoint(&self) -> Option<&Checkpoint> {
+        self.agent
+            .as_ref()
+            .and_then(|a| a.pending_checkpoint.as_ref())
+    }
+
+    /// Get agent status
+    pub fn agent_status(&self) -> Option<AgentStatus> {
+        self.agent.as_ref().map(|a| a.status)
+    }
+
+    /// Get agent summary for display
+    pub fn agent_summary(&self) -> Option<String> {
+        self.agent.as_ref().map(|a| a.summary())
+    }
+
+    /// Get mutable reference to agent state
+    pub fn agent_mut(&mut self) -> Option<&mut AgentState> {
+        self.agent.as_mut()
     }
 }
 

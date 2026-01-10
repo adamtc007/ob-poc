@@ -1,11 +1,11 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-10
-> **Verb count:** ~760 verbs across 97 YAML files
-> **Custom ops:** 47 plugin handlers
+> **Verb count:** ~820 verbs across 105+ YAML files
+> **Custom ops:** 55+ plugin handlers
 > **Crates:** 13 fine-grained crates
-> **Migrations:** 13 schema migrations (latest: 013_capital_structure_ownership.sql)
-> **Pending:** DSL execution path consolidation (see ai-thoughts/015-consolidate-dsl-execution-path.md)
+> **Migrations:** 16 schema migrations (latest: 016_research_workflows.sql)
+> **Pending TODOs:** 019 (GROUP taxonomy), 020 (Research workflows)
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -13,7 +13,7 @@ This file provides guidance to Claude Code when working with this repository.
 
 ## Deep Dive Documentation
 
-**CLAUDE.md is the quick reference. Detailed docs are in /docs.**
+**CLAUDE.md is the quick reference. Detailed docs are in /docs and /ai-thoughts.**
 
 ### ⚠️ MANDATORY READING (Claude MUST read these before certain tasks)
 
@@ -26,8 +26,10 @@ This file provides guidance to Claude Code when working with this repository.
 | Capital structure/ownership | `ai-thoughts/016-capital-structure-ownership-model.md` | Multi-class cap table design |
 | Complex capital verbs (split/exercise) | `ai-thoughts/017-transactional-safety-complex-capital-verbs.md` | Transaction safety patterns |
 | Investor register visualization | `ai-thoughts/018-investor-register-visualization.md` | Dual-mode display, institutional look-through |
+| **GROUP/UBO ownership model** | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` | **UBO is COMPUTED not STORED**, coverage model |
+| **Research workflows & agent** | `ai-thoughts/020-research-workflows-external-sources.md` | **Bounded non-determinism**, prompt templates vs DSL verbs |
 
-**How to read:** Use `view docs/filename.md` before starting the task.
+**How to read:** Use `view docs/filename.md` or `view ai-thoughts/filename.md` before starting the task.
 
 ### Reference Documentation (read as needed)
 
@@ -43,25 +45,33 @@ This file provides guidance to Claude Code when working with this repository.
 **START HERE for non-obvious concepts:**
 - "Why is everything an Entity?" → `docs/strategy-patterns.md` §1
 - "What's the difference between CBU and Entity?" → `docs/strategy-patterns.md` §1
-- "How does UBO discovery work?" → `docs/strategy-patterns.md` §1
+- "How does UBO discovery work?" → `docs/strategy-patterns.md` §1, `ai-thoughts/019-*`
 - "Why DSL instead of direct SQL?" → `docs/strategy-patterns.md` §2
-- "What are Research Macros?" → `docs/strategy-patterns.md` §2
+- "What are Research Macros?" → `docs/strategy-patterns.md` §2, `ai-thoughts/020-*`
 - "egui patterns and gotchas" → `docs/strategy-patterns.md` §3
 - "Verb YAML not loading?" → `docs/verb-definition-spec.md` §5 (Common Errors)
+- "How does the agent work?" → `ai-thoughts/020-*` (Agent integration)
+- "UBO computed vs stored?" → `ai-thoughts/019-*` (UBO is COMPUTED)
 
 **Trigger phrases (if you see these in a task, read the doc first):**
 - "add verb", "new verb", "create verb", "verb YAML" → `docs/verb-definition-spec.md`
 - "egui", "viewport", "immediate mode", "graph widget" → `docs/strategy-patterns.md` §3
 - "entity model", "CBU", "UBO", "holdings" → `docs/strategy-patterns.md` §1
-- "agent", "MCP", "research macro" → `docs/strategy-patterns.md` §2
-- "investor register", "cap table", "shareholder", "control holder" → `ai-thoughts/018-investor-register-visualization.md`
-- "institutional holder", "UBO chain", "look-through" → `ai-thoughts/018-investor-register-visualization.md`
+- "agent", "MCP", "research macro" → `docs/strategy-patterns.md` §2, `ai-thoughts/020-*`
+- "investor register", "cap table", "shareholder", "control holder" → `ai-thoughts/018-*`
+- "institutional holder", "UBO chain", "look-through" → `ai-thoughts/018-*`, `ai-thoughts/019-*`
+- "GROUP", "ownership graph", "coverage", "gaps" → `ai-thoughts/019-*`
+- "research", "GLEIF", "Companies House", "external source" → `ai-thoughts/020-*`
+- "checkpoint", "confidence", "disambiguation" → `ai-thoughts/020-*`
+- "agent mode", "resolve gaps", "chain research" → `ai-thoughts/020-*`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
 - `ai-thoughts/016-capital-structure-ownership-model.md` - Multi-class cap table, voting/economic rights, dilution
 - `ai-thoughts/017-transactional-safety-complex-capital-verbs.md` - SERIALIZABLE + advisory locks for splits/exercises
 - `ai-thoughts/018-investor-register-visualization.md` - Dual-mode visualization, threshold collapse, institutional look-through
+- `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` - GROUP taxonomy, UBO computation, coverage model, jurisdiction rules
+- `ai-thoughts/020-research-workflows-external-sources.md` - Research agent, bounded non-determinism, pluggable sources
 
 ---
 
@@ -105,17 +115,182 @@ User/Agent → DSL Source → Parser → Compiler → Executor → PostgreSQL
 
 ---
 
+## GROUP / UBO Ownership Model
+
+> **Reference:** `ai-thoughts/019-group-taxonomy-intra-company-ownership.md`
+
+### Core Principle: UBO is COMPUTED not STORED
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    UBO IS COMPUTED, NOT STORED                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   We store FACTS:                    We COMPUTE on demand:                  │
+│   • Ownership edges (A owns 30% B)   • UBO list for jurisdiction X          │
+│   • Control edges (A appoints B)     • Coverage metrics                     │
+│   • Source documents                 • Gap analysis                         │
+│   • Verification status              • BODS export                          │
+│                                                                              │
+│   Same graph → different UBO list depending on jurisdiction rules           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Five-Layer Model
+
+| Layer | What it is | Stored? |
+|-------|------------|---------|
+| **Raw Data** | Ownership/control edges between entities | ✓ Yes |
+| **Coverage** | Known vs unknown breakdown | ✓ Computed, cached |
+| **Rules** | Jurisdiction thresholds (25% EU, 10% US) | ✓ Config table |
+| **Computation** | `fn_compute_ubos(entity, jurisdiction)` | Computed |
+| **Output** | BODS statements, reports | Generated |
+
+### Coverage Model
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  COVERAGE CATEGORIES                                                         │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  KNOWN_BENEFICIAL (35%)    → Chain traced to natural person(s)              │
+│  KNOWN_LEGAL_ONLY (25%)    → Nominee/custodian, needs look-through          │
+│  KNOWN_AGGREGATE (18%)     → Public float, accepted unknown                 │
+│  UNACCOUNTED (22%)         → Data gap, triggers research                    │
+│                                                                              │
+│  Incomplete data is a VALID STATE, not an error                             │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Tables (kyc schema)
+
+| Table | Purpose |
+|-------|---------|
+| `ownership_groups` | Group registry linking CBUs |
+| `synthetic_holders` | PUBLIC_FLOAT, NOMINEE_POOL, UNACCOUNTED |
+| `control_relationships` | Board appointments, voting agreements |
+| `ownership_coverage` | Computed coverage metrics |
+| `ubo_jurisdiction_rules` | Configurable thresholds per jurisdiction |
+| `ownership_research_triggers` | Gap resolution action items |
+
+---
+
+## Research Workflows & Agent Mode
+
+> **Reference:** `ai-thoughts/020-research-workflows-external-sources.md`
+
+### Bounded Non-Determinism Architecture
+
+Research uses a TWO-PHASE pattern that separates LLM exploration from deterministic execution:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: LLM EXPLORATION              │  PHASE 2: DSL EXECUTION            │
+│  ══════════════════════════            │  ════════════════════════          │
+│                                        │                                    │
+│  Prompt Templates                      │  DSL Verbs                         │
+│  • /prompts/research/gleif/search.md   │  • research.gleif.import-hierarchy │
+│  • /prompts/research/orchestration/*   │  • research.generic.import-entity  │
+│                                        │                                    │
+│  LLM searches, reasons, disambiguates  │  Fetch, normalize, create, audit   │
+│                                        │                                    │
+│  Output: IDENTIFIER (key)              │  Input: IDENTIFIER (key)           │
+│                                        │                                    │
+│  Non-deterministic but AUDITABLE       │  Deterministic, reproducible       │
+└────────────────────┬───────────────────┴────────────────────────────────────┘
+                     │
+                     ▼
+              THE IDENTIFIER IS THE BRIDGE
+              (LEI, company_number, CIK)
+```
+
+### Session Modes
+
+| Mode | Description |
+|------|-------------|
+| `MANUAL` | User types DSL, REPL executes (default) |
+| `AGENT` | LLM generates DSL, user supervises via checkpoints |
+| `HYBRID` | User and agent collaborate, user can interleave |
+
+### Agent Invocation Phrases
+
+The LLM uses these phrases to determine when to invoke agent/research verbs:
+
+```yaml
+# Agent task triggers
+- "find the ownership" → agent.resolve-gaps
+- "complete the chain" → agent.chain-research
+- "who owns" → agent.resolve-gaps
+- "resolve the gaps" → agent.resolve-gaps
+- "enrich this entity" → agent.enrich-entity
+
+# Research source triggers
+- "check GLEIF" → research.gleif.import-*
+- "UK company" → research.companies-house.import-*
+- "SEC filing" → research.sec.import-*
+- "screen for sanctions" → agent.screen-entities
+
+# Checkpoint responses
+- "select the first" → agent.respond-checkpoint
+- "neither" → agent.respond-checkpoint (reject)
+- "the correct one is" → agent.respond-checkpoint (manual override)
+```
+
+### Confidence Thresholds
+
+| Score | Action | Decision Type |
+|-------|--------|---------------|
+| ≥ 0.90 | Auto-proceed | AUTO_SELECTED |
+| 0.70-0.90 | User checkpoint | AMBIGUOUS |
+| < 0.70 | Try next source | NO_MATCH |
+
+**Forced checkpoints** (regardless of score):
+- Screening hits (sanctions, PEP)
+- High-stakes context (NEW_CLIENT, MATERIAL_HOLDING)
+- Corrections to previous decisions
+
+### Pluggable Source Model
+
+| Tier | Example | Handler |
+|------|---------|---------|
+| **Built-in** | GLEIF, Companies House, SEC | Dedicated verb + handler |
+| **Registered** | Singapore ACRA | `research.generic.import-*` |
+| **Discovered** | LLM finds API | `research.generic.import-*` |
+
+The LLM is the universal API adapter - for Tier 2/3 sources, it discovers the API, makes calls, parses responses, and hands normalized data to deterministic import verbs.
+
+### Key Tables (kyc schema)
+
+| Table | Purpose |
+|-------|---------|
+| `research_decisions` | Phase 1 audit (search → selection → reasoning) |
+| `research_actions` | Phase 2 audit (verb → outcome → entities created) |
+| `research_corrections` | Tracks fixes when wrong key was selected |
+| `discovered_sources` | Registry of Tier 2/3 sources LLM has used |
+| `outreach_requests` | Counterparty disclosure request tracking |
+
+---
+
 ## Directory Structure
 
 ```
 ob-poc/
 ├── rust/
-│   ├── config/verbs/           # Verb YAML definitions (95 files, ~720 verbs)
+│   ├── config/verbs/           # Verb YAML definitions (105+ files, ~820 verbs)
 │   │   ├── cbu.yaml            # CBU domain
 │   │   ├── entity.yaml         # Entity domain
 │   │   ├── custody/            # Custody subdomain
 │   │   ├── kyc/                # KYC subdomain
-│   │   └── registry/           # Investor registry
+│   │   ├── registry/           # Investor registry
+│   │   ├── research/           # Research workflows (NEW)
+│   │   │   ├── gleif.yaml
+│   │   │   ├── companies-house.yaml
+│   │   │   ├── generic.yaml
+│   │   │   └── workflow.yaml
+│   │   └── agent/              # Agent mode verbs (NEW)
+│   │       └── agent.yaml
 │   ├── crates/
 │   │   ├── dsl-core/           # Parser, AST, compiler (NO DB dependency)
 │   │   ├── ob-agentic/         # LLM agent for DSL generation
@@ -125,14 +300,31 @@ ob-poc/
 │   ├── src/
 │   │   ├── dsl_v2/             # DSL execution layer
 │   │   │   ├── generic_executor.rs  # YAML-driven CRUD executor
-│   │   │   ├── custom_ops/     # Plugin handlers (~44 files)
+│   │   │   ├── custom_ops/     # Plugin handlers (~55 files)
 │   │   │   └── verb_registry.rs
+│   │   ├── research/           # Research module (NEW)
+│   │   │   ├── mod.rs
+│   │   │   ├── gleif/
+│   │   │   ├── companies_house/
+│   │   │   └── workflow/
+│   │   ├── agent/              # Agent controller (NEW)
+│   │   │   ├── mod.rs
+│   │   │   ├── controller.rs
+│   │   │   └── checkpoint.rs
 │   │   ├── api/                # REST API routes
 │   │   └── bin/
 │   │       ├── dsl_api.rs      # Main Axum server
 │   │       └── dsl_cli.rs      # CLI tool
 │   └── xtask/                  # Build automation
-├── migrations/                 # SQLx migrations (12 files)
+├── prompts/                    # LLM prompt templates (NEW)
+│   └── research/
+│       ├── sources/
+│       │   ├── gleif/
+│       │   ├── companies-house/
+│       │   └── discover-source.md
+│       ├── screening/
+│       └── orchestration/
+├── migrations/                 # SQLx migrations (16 files)
 ├── docs/                       # Architecture documentation
 ├── ai-thoughts/                # ADRs and working docs
 └── CLAUDE.md                   # This file
@@ -202,6 +394,9 @@ RUST_LOG=ob_poc::dsl_v2=debug ./target/debug/dsl_cli execute -f file.dsl
 
 # Trace level - includes SQL bind values (very verbose)
 RUST_LOG=ob_poc::dsl_v2=trace ./target/debug/dsl_cli execute -f file.dsl
+
+# Agent/research debugging
+RUST_LOG=ob_poc::agent=debug,ob_poc::research=debug ./target/debug/dsl_cli
 ```
 
 ---
@@ -273,6 +468,28 @@ impl CustomOp for MyComplexOperationOp {
         // Custom logic here
     }
 }
+```
+
+### Adding Invocation Phrases (for Agent)
+
+For verbs that should be triggered by natural language:
+
+```yaml
+my-domain:
+  description: "My domain"
+  invocation_hints:           # Domain-level hints
+    - "my domain"
+    - "related concept"
+    
+  verbs:
+    my-verb:
+      description: "Does something"
+      invocation_phrases:     # Verb-level phrases
+        - "do the thing"
+        - "perform my action"
+        - "execute my verb"
+      behavior: plugin
+      handler: MyVerbOp
 ```
 
 ### Verify Verbs Load
@@ -389,6 +606,7 @@ For these areas, always do a **read-only analysis pass** before proposing edits:
 
 - DSL → AST → execution → DB transitions
 - UBO graph logic / ownership calculations
+- Research agent loop / checkpoint handling
 - Anything coupling Rust + SQL + YAML
 
 **Pass 1:** Read files, explain the pipeline, state invariants.
@@ -396,7 +614,7 @@ For these areas, always do a **read-only analysis pass** before proposing edits:
 
 ### When in Doubt
 
-If uncertain about DSL semantics, CBU/UBO/KYC domain rules, or cross-crate boundaries:
+If uncertain about DSL semantics, CBU/UBO/KYC domain rules, research workflow patterns, or cross-crate boundaries:
 
 1. Stop
 2. Explain the uncertainty
@@ -423,8 +641,16 @@ Never silently "guess and commit" on complex domain logic.
 | `bods` | 9 | BODS 0.4 UBO discovery, import/export |
 | `trading-profile` | 15 | Trading matrix configuration |
 | `capital` | 25 | Share classes, issuance, supply tracking |
-| `ownership` | 15 | Holdings, control positions, snapshots |
+| `ownership` | 20 | Holdings, control, coverage, computation |
 | `dilution` | 10 | Options, warrants, convertibles, exercises |
+| **`agent`** | **12** | **Agent mode, checkpoints, task orchestration** |
+| **`research`** | **8** | **Generic lookup, import, enrich verbs** |
+| **`research.gleif`** | **4** | **GLEIF import (refactored)** |
+| **`research.companies-house`** | **4** | **UK Companies House import** |
+| **`research.sec`** | **4** | **US SEC EDGAR import** |
+| **`research.generic`** | **3** | **Pluggable source import** |
+| **`research.screening`** | **4** | **Screening result recording** |
+| **`research.workflow`** | **10** | **Decisions, corrections, triggers** |
 
 **Full verb reference:** See YAML files in `rust/config/verbs/`
 
@@ -469,17 +695,6 @@ Shareholders can be institutions (not proper persons). The visualization support
 | `chain_depth` | Levels to reach all proper persons |
 | `ubo_discovery_status` | COMPLETE, PARTIAL, PENDING, NOT_REQUIRED |
 
-### Key Types
-
-| Type | Location | Purpose |
-|------|----------|---------|
-| `InvestorRegisterView` | `rust/src/graph/investor_register.rs` | Full API response |
-| `ControlHolderNode` | Same | Individual holder above threshold |
-| `AggregateInvestorsNode` | Same | Collapsed "N other investors" node |
-| `UboSummary` | Same | Pre-fetched UBO for institutional holders |
-| `InvestorPanelState` | `ob-poc-ui/src/state.rs` | UI-only panel state |
-| `InvestorPanelAction` | `ob-poc-ui/src/panels/investor_panel.rs` | Panel interaction actions |
-
 ### Threshold Rules
 
 Configured per issuer in `kyc.issuer_control_config`:
@@ -503,10 +718,13 @@ Configured per issuer in `kyc.issuer_control_config`:
 | Plugin handlers | `rust/src/dsl_v2/custom_ops/` |
 | DSL parser | `rust/crates/dsl-core/src/parser.rs` |
 | Generic executor | `rust/src/dsl_v2/generic_executor.rs` |
+| Agent controller | `rust/src/agent/controller.rs` |
+| Research handlers | `rust/src/research/` |
+| Prompt templates | `prompts/research/` |
 | API routes | `rust/src/api/` |
 | Migrations | `migrations/*.sql` |
 | Config types | `rust/crates/dsl-core/src/config/types.rs` |
 
 ---
 
-*For detailed reference material, see the docs/ directory.*
+*For detailed reference material, see the docs/ directory and ai-thoughts/ working documents.*
