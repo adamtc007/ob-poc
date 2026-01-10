@@ -18,6 +18,9 @@ use ob_poc_graph::{
     CbuGraphData, CbuGraphWidget, EntityTypeOntology, GalaxyView, TaxonomyState, TradingMatrix,
     TradingMatrixNode, TradingMatrixState, ViewMode,
 };
+use ob_poc_types::investor_register::{
+    BreakdownDimension, InvestorFilters, InvestorListResponse, InvestorRegisterView,
+};
 use ob_poc_types::{
     galaxy::{NavigationScope, UniverseGraph, ViewLevel},
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
@@ -138,6 +141,14 @@ pub struct AppState {
     /// Set via fetch_universe(), never modified directly
     pub universe_graph: Option<UniverseGraph>,
 
+    /// Investor register data (control holders + aggregate)
+    /// Set via fetch_investor_register(), never modified directly
+    pub investor_register: Option<InvestorRegisterView>,
+
+    /// Investor list for drill-down (paginated)
+    /// Set via fetch_investor_list(), never modified directly
+    pub investor_list: Option<InvestorListResponse>,
+
     // =========================================================================
     // UI-ONLY STATE (ephemeral, not persisted)
     // =========================================================================
@@ -216,6 +227,9 @@ pub struct AppState {
     /// E.g., "galaxy", "book", "cbu", "jurisdiction", "neighborhood"
     pub current_scope: Option<CurrentScope>,
 
+    /// Investor register UI state (aggregate breakdown view, drill-down)
+    pub investor_register_ui: InvestorRegisterUi,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -241,6 +255,8 @@ impl Default for AppState {
             session_context: None,
             trading_matrix: None,
             universe_graph: None,
+            investor_register: None,
+            investor_list: None,
 
             // UI-only state
             buffers: TextBuffers::default(),
@@ -271,6 +287,7 @@ impl Default for AppState {
             last_version_check: None,
             navigation_log: Vec::new(),
             current_scope: None,
+            investor_register_ui: InvestorRegisterUi::default(),
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),
@@ -381,6 +398,69 @@ pub struct CbuSearchUi {
 }
 
 // =============================================================================
+// INVESTOR REGISTER UI STATE
+// =============================================================================
+
+/// Investor register panel UI-only state
+#[derive(Clone)]
+pub struct InvestorRegisterUi {
+    /// Whether the investor panel is shown
+    pub show_panel: bool,
+
+    /// Whether the aggregate node is expanded (showing breakdown)
+    pub aggregate_expanded: bool,
+
+    /// Current breakdown dimension being viewed
+    pub breakdown_dimension: BreakdownDimension,
+
+    /// Whether drill-down list is shown
+    pub show_drill_down: bool,
+
+    /// Current drill-down page (1-indexed)
+    pub drill_down_page: i32,
+
+    /// Drill-down filter: investor type
+    pub filter_investor_type: Option<String>,
+
+    /// Drill-down filter: KYC status
+    pub filter_kyc_status: Option<String>,
+
+    /// Drill-down filter: jurisdiction
+    pub filter_jurisdiction: Option<String>,
+
+    /// Drill-down search query
+    pub search_query: String,
+
+    /// Sort field for drill-down list
+    pub sort_by: String,
+
+    /// Sort direction (true = ascending)
+    pub sort_ascending: bool,
+
+    /// Selected investor entity ID (for detail view)
+    pub selected_investor_id: Option<String>,
+}
+
+impl Default for InvestorRegisterUi {
+    fn default() -> Self {
+        Self {
+            show_panel: false,
+            aggregate_expanded: false,
+            breakdown_dimension: BreakdownDimension::InvestorType,
+            show_drill_down: false,
+            drill_down_page: 1,
+            filter_investor_type: None,
+            filter_kyc_status: None,
+            filter_jurisdiction: None,
+            search_query: String::new(),
+            sort_by: "name".to_string(),
+            sort_ascending: true,
+            selected_investor_id: None,
+        }
+    }
+}
+
+// =============================================================================
 // ASYNC STATE - Coordination for spawn_local operations
 // =============================================================================
 
@@ -414,6 +494,8 @@ pub struct AsyncState {
     pub pending_cbu_search: Option<Result<crate::api::CbuSearchResponse, String>>,
     pub pending_session_context: Option<Result<SessionContext, String>>,
     pub pending_trading_matrix: Option<Result<TradingMatrix, String>>,
+    pub pending_investor_register: Option<Result<InvestorRegisterView, String>>,
+    pub pending_investor_list: Option<Result<InvestorListResponse, String>>,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -517,7 +599,9 @@ pub struct AsyncState {
     pub needs_trading_matrix_refetch: bool, // Trading view mode selected
     pub needs_session_refetch: bool, // Version changed, need full session refetch
     pub needs_resolution_check: bool, // Chat completed with DSL, check for unresolved entities
+    pub needs_investor_register_refetch: bool, // Investor register view selected
     pub pending_cbu_id: Option<Uuid>, // CBU to fetch graph for (set by select_cbu)
+    pub pending_issuer_id: Option<Uuid>, // Issuer to fetch investor register for
 
     // Execution tracking - prevents repeated refetch
     pub execution_handled: bool,
@@ -531,6 +615,8 @@ pub struct AsyncState {
     pub searching_resolution: bool,
     pub loading_session_context: bool,
     pub loading_trading_matrix: bool,
+    pub loading_investor_register: bool,
+    pub loading_investor_list: bool,
     pub checking_version: bool, // Version poll in progress
     pub watching_session: bool, // Long-poll watch in progress
 
@@ -837,6 +923,32 @@ impl AppState {
             }
         }
 
+        // Process investor register
+        if let Some(result) = state.pending_investor_register.take() {
+            state.loading_investor_register = false;
+            match result {
+                Ok(register) => {
+                    // Auto-show panel when investor register data arrives
+                    if !register.control_holders.is_empty() || register.aggregate.is_some() {
+                        self.investor_register_ui.show_panel = true;
+                    }
+                    self.investor_register = Some(register);
+                }
+                Err(e) => state.last_error = Some(format!("Investor register fetch failed: {}", e)),
+            }
+        }
+
+        // Process investor list (drill-down)
+        if let Some(result) = state.pending_investor_list.take() {
+            state.loading_investor_list = false;
+            match result {
+                Ok(list) => {
+                    self.investor_list = Some(list);
+                }
+                Err(e) => state.last_error = Some(format!("Investor list fetch failed: {}", e)),
+            }
+        }
+
         // Process taxonomy breadcrumbs response
         if let Some(result) = state.pending_taxonomy_breadcrumbs_response.take() {
             state.loading_taxonomy = false;
@@ -997,6 +1109,29 @@ impl AppState {
         // Clear the flag
         state.needs_session_refetch = false;
         true
+    }
+
+    /// Check if investor register refetch is needed and return the issuer ID to fetch
+    /// Called ONCE per frame in update() - the single central place for investor register fetches
+    pub fn take_pending_investor_register_refetch(&self) -> Option<Uuid> {
+        let Ok(mut state) = self.async_state.lock() else {
+            return None;
+        };
+
+        if !state.needs_investor_register_refetch {
+            return None;
+        }
+
+        // Clear the flag
+        state.needs_investor_register_refetch = false;
+
+        // Use pending_issuer_id if set
+        if let Some(issuer_id) = state.pending_issuer_id.take() {
+            return Some(issuer_id);
+        }
+
+        // No issuer ID available
+        None
     }
 
     /// Check if resolution check is needed (DSL has unresolved entity refs)
@@ -1709,6 +1844,70 @@ impl AppState {
             if let Ok(mut state) = async_state.lock() {
                 state.pending_trading_matrix = Some(result);
                 state.loading_trading_matrix = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Fetch investor register view for an issuer
+    /// Shows control holders (>5%) as individual nodes, aggregates others
+    pub fn fetch_investor_register(&mut self, issuer_id: String, share_class: Option<String>) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_investor_register = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_investor_register(&issuer_id, share_class.as_deref()).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_investor_register = Some(result);
+                state.loading_investor_register = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Fetch paginated investor list for drill-down
+    pub fn fetch_investor_list(&mut self, issuer_id: String, page: i32, page_size: i32) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        // Build filters from UI state
+        let filters = InvestorFilters {
+            investor_type: self.investor_register_ui.filter_investor_type.clone(),
+            kyc_status: self.investor_register_ui.filter_kyc_status.clone(),
+            jurisdiction: self.investor_register_ui.filter_jurisdiction.clone(),
+            search: if self.investor_register_ui.search_query.is_empty() {
+                None
+            } else {
+                Some(self.investor_register_ui.search_query.clone())
+            },
+            min_units: None,
+        };
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_investor_list = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_investor_list(&issuer_id, page, page_size, &filters).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_investor_list = Some(result);
+                state.loading_investor_list = false;
             }
             if let Some(ctx) = ctx {
                 ctx.request_repaint();

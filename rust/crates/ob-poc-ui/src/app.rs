@@ -8,10 +8,11 @@
 use crate::api;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
-    dsl_editor_panel, entity_detail_panel, repl_panel, results_panel, session_panel,
-    taxonomy_panel, toolbar, trading_matrix_panel, CbuSearchAction, CbuSearchData,
+    dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, results_panel,
+    session_panel, taxonomy_panel, toolbar, trading_matrix_panel, CbuSearchAction, CbuSearchData,
     ContainerBrowseAction, ContainerBrowseData, ContextPanelAction, DslEditorAction,
-    TaxonomyPanelAction, ToolbarAction, ToolbarData, TradingMatrixPanelAction,
+    InvestorRegisterAction, TaxonomyPanelAction, ToolbarAction, ToolbarData,
+    TradingMatrixPanelAction,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, TradingMatrixNodeIdExt, ViewMode};
@@ -42,6 +43,9 @@ impl App {
             cbu_list: Vec::new(),
             session_context: None,
             trading_matrix: None,
+            universe_graph: None,
+            investor_register: None,
+            investor_list: None,
             buffers: TextBuffers::default(),
             view_mode: ViewMode::KycUbo,
             panels: PanelState::default(),
@@ -67,11 +71,11 @@ impl App {
             navigation_scope: ob_poc_types::galaxy::NavigationScope::default(),
             view_level: ob_poc_types::galaxy::ViewLevel::default(),
             navigation_stack: Vec::new(),
-            universe_graph: None,
             last_known_version: None,
             last_version_check: None,
             navigation_log: Vec::new(),
             current_scope: None,
+            investor_register_ui: crate::state::InvestorRegisterUi::default(),
         };
 
         // Try to restore session from localStorage
@@ -1544,6 +1548,20 @@ impl eframe::App for App {
         };
         self.handle_container_browse_action(container_browse_action);
 
+        // Investor register panel (right side, shown when show_panel is true)
+        let investor_register_action = if self.state.investor_register_ui.show_panel {
+            egui::SidePanel::right("investor_register_panel")
+                .default_width(320.0)
+                .min_width(280.0)
+                .max_width(500.0)
+                .resizable(true)
+                .show(ctx, |ui| investor_register_panel(ui, &self.state))
+                .inner
+        } else {
+            InvestorRegisterAction::None
+        };
+        self.handle_investor_register_action(investor_register_action);
+
         // For Simplified layout: Chat on left side, skip context panel
         // For other layouts: Context panel on left side
         if self.state.panels.layout == LayoutMode::Simplified {
@@ -1925,6 +1943,107 @@ impl App {
                     &format!("TradingMatrix: Load children for {}", node_key).into(),
                 );
                 // TODO: Lazy loading of children
+            }
+        }
+    }
+
+    /// Handle investor register panel actions
+    fn handle_investor_register_action(&mut self, action: crate::panels::InvestorRegisterAction) {
+        use crate::panels::InvestorRegisterAction;
+
+        match action {
+            InvestorRegisterAction::None => {}
+            InvestorRegisterAction::SelectControlHolder { entity_id } => {
+                web_sys::console::log_1(
+                    &format!("InvestorRegister: Select control holder {}", entity_id).into(),
+                );
+                self.state.selected_entity_id = Some(entity_id.clone());
+                self.state.graph_widget.focus_entity(&entity_id);
+            }
+            InvestorRegisterAction::ToggleAggregate => {
+                self.state.investor_register_ui.aggregate_expanded =
+                    !self.state.investor_register_ui.aggregate_expanded;
+            }
+            InvestorRegisterAction::SetBreakdownDimension(dimension) => {
+                self.state.investor_register_ui.breakdown_dimension = dimension;
+            }
+            InvestorRegisterAction::DrillDown => {
+                self.state.investor_register_ui.show_drill_down = true;
+                // Fetch first page of investor list
+                if let Some(ref register) = self.state.investor_register {
+                    let issuer_id = register.issuer.entity_id.clone();
+                    self.state.fetch_investor_list(issuer_id, 1, 50);
+                }
+            }
+            InvestorRegisterAction::CloseDrillDown => {
+                self.state.investor_register_ui.show_drill_down = false;
+                self.state.investor_list = None;
+            }
+            InvestorRegisterAction::SetPage(page) => {
+                self.state.investor_register_ui.drill_down_page = page;
+                if let Some(ref register) = self.state.investor_register {
+                    let issuer_id = register.issuer.entity_id.clone();
+                    self.state.fetch_investor_list(issuer_id, page, 50);
+                }
+            }
+            InvestorRegisterAction::ApplyFilter {
+                investor_type,
+                kyc_status,
+                jurisdiction,
+            } => {
+                self.state.investor_register_ui.filter_investor_type = investor_type;
+                self.state.investor_register_ui.filter_kyc_status = kyc_status;
+                self.state.investor_register_ui.filter_jurisdiction = jurisdiction;
+                // Refetch with new filters
+                if let Some(ref register) = self.state.investor_register {
+                    let issuer_id = register.issuer.entity_id.clone();
+                    self.state.fetch_investor_list(issuer_id, 1, 50);
+                }
+            }
+            InvestorRegisterAction::ClearFilters => {
+                self.state.investor_register_ui.filter_investor_type = None;
+                self.state.investor_register_ui.filter_kyc_status = None;
+                self.state.investor_register_ui.filter_jurisdiction = None;
+                self.state.investor_register_ui.search_query.clear();
+                if let Some(ref register) = self.state.investor_register {
+                    let issuer_id = register.issuer.entity_id.clone();
+                    self.state.fetch_investor_list(issuer_id, 1, 50);
+                }
+            }
+            InvestorRegisterAction::SelectInvestor { entity_id } => {
+                web_sys::console::log_1(
+                    &format!("InvestorRegister: Select investor {}", entity_id).into(),
+                );
+                self.state.selected_entity_id = Some(entity_id.clone());
+                self.state.graph_widget.focus_entity(&entity_id);
+            }
+            InvestorRegisterAction::SetSort { field, ascending } => {
+                self.state.investor_register_ui.sort_by = field;
+                self.state.investor_register_ui.sort_ascending = ascending;
+                // Refetch with new sort
+                if let Some(ref register) = self.state.investor_register {
+                    let issuer_id = register.issuer.entity_id.clone();
+                    let page = self.state.investor_register_ui.drill_down_page;
+                    self.state.fetch_investor_list(issuer_id, page, 50);
+                }
+            }
+            InvestorRegisterAction::Search { query } => {
+                self.state.investor_register_ui.search_query = query;
+                if let Some(ref register) = self.state.investor_register {
+                    let issuer_id = register.issuer.entity_id.clone();
+                    self.state.fetch_investor_list(issuer_id, 1, 50);
+                }
+            }
+            InvestorRegisterAction::ClosePanel => {
+                self.state.investor_register_ui.show_panel = false;
+                self.state.investor_register = None;
+                self.state.investor_list = None;
+            }
+            InvestorRegisterAction::Refresh => {
+                if let Some(ref register) = self.state.investor_register {
+                    let issuer_id = register.issuer.entity_id.clone();
+                    self.state.fetch_investor_register(issuer_id, None);
+                }
             }
         }
     }

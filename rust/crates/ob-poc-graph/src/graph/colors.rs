@@ -341,3 +341,121 @@ pub fn primary_text_color() -> Color32 {
 pub fn secondary_text_color() -> Color32 {
     Color32::from_rgb(156, 163, 175)
 }
+
+// =============================================================================
+// CAPITAL STRUCTURE COLORS
+// =============================================================================
+
+/// Get color for share class by instrument kind
+pub fn share_class_color(instrument_kind: &str, is_voting: bool) -> Color32 {
+    if !is_voting {
+        return Color32::from_rgb(156, 163, 175); // Gray for non-voting
+    }
+    match instrument_kind.to_uppercase().as_str() {
+        "ORDINARY_EQUITY" => Color32::from_rgb(100, 149, 237), // Cornflower blue
+        "PREFERENCE_EQUITY" => Color32::from_rgb(255, 215, 0), // Gold
+        "FUND_UNIT" => Color32::from_rgb(144, 238, 144),       // Light green
+        "FUND_SHARE" => Color32::from_rgb(134, 239, 172),      // Green-300
+        "LP_INTEREST" => Color32::from_rgb(221, 160, 221),     // Plum
+        "GP_INTEREST" => Color32::from_rgb(255, 182, 193),     // Light pink
+        "DEBT" => Color32::from_rgb(176, 190, 197),            // Blue-gray
+        "CONVERTIBLE" | "CONVERTIBLE_NOTE" => Color32::from_rgb(255, 165, 0), // Orange
+        "WARRANT" => Color32::from_rgb(253, 224, 71),          // Yellow-300
+        "SAFE" => Color32::from_rgb(251, 191, 36),             // Amber-400
+        _ => Color32::from_rgb(192, 192, 192),                 // Silver
+    }
+}
+
+/// Get color for control edge based on source and status
+pub fn control_edge_color(
+    has_control: bool,
+    has_significant_influence: bool,
+    derived_from: &str,
+) -> Color32 {
+    match (
+        has_control,
+        has_significant_influence,
+        derived_from.to_uppercase().as_str(),
+    ) {
+        (true, _, "REGISTER") => Color32::from_rgb(220, 38, 38), // Red-600 - proven control
+        (true, _, "BODS") => Color32::from_rgb(255, 140, 0),     // Dark orange
+        (true, _, "GLEIF") => Color32::from_rgb(234, 179, 8),    // Yellow-500
+        (true, _, _) => Color32::from_rgb(239, 68, 68),          // Red-500
+        (false, true, _) => Color32::from_rgb(251, 146, 60),     // Orange-400 - significant
+        (false, false, _) => Color32::from_rgb(156, 163, 175),   // Gray-400
+    }
+}
+
+/// Get color for special right indicator
+pub fn special_right_color(right_type: &str) -> Color32 {
+    match right_type.to_uppercase().as_str() {
+        "BOARD_APPOINTMENT" | "BOARD_OBSERVER" => Color32::from_rgb(138, 43, 226), // Blue violet
+        "VETO_MA" | "VETO_FUNDRAISE" | "VETO_BUDGET" => Color32::from_rgb(220, 20, 60), // Crimson
+        "CONSENT_REQUIRED" => Color32::from_rgb(255, 87, 34),                      // Deep orange
+        "ANTI_DILUTION" => Color32::from_rgb(255, 193, 7),                         // Amber
+        "DRAG_ALONG" | "TAG_ALONG" => Color32::from_rgb(59, 130, 246),             // Blue-500
+        "PREEMPTION" | "ROFR" => Color32::from_rgb(16, 185, 129),                  // Emerald-500
+        _ => Color32::from_rgb(75, 0, 130),                                        // Indigo
+    }
+}
+
+/// Get icon for share class by instrument kind
+pub fn share_class_icon(instrument_kind: &str) -> &'static str {
+    match instrument_kind.to_uppercase().as_str() {
+        "ORDINARY_EQUITY" => "🏛️",
+        "PREFERENCE_EQUITY" => "⭐",
+        "FUND_UNIT" => "📊",
+        "FUND_SHARE" => "📈",
+        "LP_INTEREST" => "🤝",
+        "GP_INTEREST" => "👔",
+        "DEBT" => "📜",
+        "CONVERTIBLE" | "CONVERTIBLE_NOTE" => "🔄",
+        "WARRANT" => "📋",
+        "SAFE" => "🛡️",
+        _ => "📄",
+    }
+}
+
+/// Get control indicator icons
+pub fn control_indicator(
+    has_control: bool,
+    has_board_rights: bool,
+    has_veto: bool,
+) -> &'static str {
+    match (has_control, has_board_rights, has_veto) {
+        (true, true, true) => "⚡🪑🚫", // Control + board + veto
+        (true, true, false) => "⚡🪑",  // Control + board
+        (true, false, true) => "⚡🚫",  // Control + veto
+        (true, false, false) => "⚡",   // Control only
+        (false, true, true) => "🪑🚫",  // Board + veto
+        (false, true, false) => "🪑",   // Board only
+        (false, false, true) => "🚫",   // Veto only
+        (false, false, false) => "",    // None
+    }
+}
+
+/// Get color for dilution instrument type
+pub fn dilution_instrument_color(instrument_type: &str) -> Color32 {
+    match instrument_type.to_uppercase().as_str() {
+        "STOCK_OPTION" => Color32::from_rgb(59, 130, 246), // Blue-500
+        "RSU" => Color32::from_rgb(99, 102, 241),          // Indigo-500
+        "WARRANT" => Color32::from_rgb(234, 179, 8),       // Yellow-500
+        "CONVERTIBLE_NOTE" => Color32::from_rgb(249, 115, 22), // Orange-500
+        "SAFE" => Color32::from_rgb(251, 191, 36),         // Amber-400
+        "CONVERTIBLE_PREFERRED" => Color32::from_rgb(168, 85, 247), // Purple-500
+        "PHANTOM_STOCK" | "SAR" => Color32::from_rgb(156, 163, 175), // Gray-400
+        _ => Color32::from_rgb(107, 114, 128),             // Gray-500
+    }
+}
+
+/// Get color for reconciliation finding severity
+pub fn reconciliation_severity_color(severity: &str) -> Color32 {
+    match severity.to_uppercase().as_str() {
+        "CRITICAL" => Color32::from_rgb(220, 38, 38), // Red-600
+        "HIGH" => Color32::from_rgb(239, 68, 68),     // Red-500
+        "MEDIUM" => Color32::from_rgb(251, 191, 36),  // Amber-400
+        "LOW" => Color32::from_rgb(234, 179, 8),      // Yellow-500
+        "INFO" => Color32::from_rgb(59, 130, 246),    // Blue-500
+        _ => Color32::from_rgb(156, 163, 175),        // Gray-400
+    }
+}

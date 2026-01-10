@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-09
-> **Verb count:** ~720 verbs across 95 YAML files
-> **Custom ops:** 44 plugin handlers
+> **Last reviewed:** 2026-01-10
+> **Verb count:** ~760 verbs across 97 YAML files
+> **Custom ops:** 47 plugin handlers
 > **Crates:** 13 fine-grained crates
-> **Migrations:** 12 schema migrations (latest: 012_session_scope_management.sql)
+> **Migrations:** 13 schema migrations (latest: 013_capital_structure_ownership.sql)
 > **Pending:** DSL execution path consolidation (see ai-thoughts/015-consolidate-dsl-execution-path.md)
 
 This file provides guidance to Claude Code when working with this repository.
@@ -23,6 +23,9 @@ This file provides guidance to Claude Code when working with this repository.
 | Working on egui/viewport | `docs/strategy-patterns.md` §3 | Immediate mode patterns are non-obvious |
 | Understanding CBU/UBO/Entity | `docs/strategy-patterns.md` §1 | Data model is unconventional |
 | Agent/MCP integration | `docs/strategy-patterns.md` §2 | LLM→DSL pattern is specific |
+| Capital structure/ownership | `ai-thoughts/016-capital-structure-ownership-model.md` | Multi-class cap table design |
+| Complex capital verbs (split/exercise) | `ai-thoughts/017-transactional-safety-complex-capital-verbs.md` | Transaction safety patterns |
+| Investor register visualization | `ai-thoughts/018-investor-register-visualization.md` | Dual-mode display, institutional look-through |
 
 **How to read:** Use `view docs/filename.md` before starting the task.
 
@@ -51,9 +54,14 @@ This file provides guidance to Claude Code when working with this repository.
 - "egui", "viewport", "immediate mode", "graph widget" → `docs/strategy-patterns.md` §3
 - "entity model", "CBU", "UBO", "holdings" → `docs/strategy-patterns.md` §1
 - "agent", "MCP", "research macro" → `docs/strategy-patterns.md` §2
+- "investor register", "cap table", "shareholder", "control holder" → `ai-thoughts/018-investor-register-visualization.md`
+- "institutional holder", "UBO chain", "look-through" → `ai-thoughts/018-investor-register-visualization.md`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
+- `ai-thoughts/016-capital-structure-ownership-model.md` - Multi-class cap table, voting/economic rights, dilution
+- `ai-thoughts/017-transactional-safety-complex-capital-verbs.md` - SERIALIZABLE + advisory locks for splits/exercises
+- `ai-thoughts/018-investor-register-visualization.md` - Dual-mode visualization, threshold collapse, institutional look-through
 
 ---
 
@@ -414,8 +422,76 @@ Never silently "guess and commit" on complex domain logic.
 | `gleif` | 15 | GLEIF LEI lookup, hierarchy import |
 | `bods` | 9 | BODS 0.4 UBO discovery, import/export |
 | `trading-profile` | 15 | Trading matrix configuration |
+| `capital` | 25 | Share classes, issuance, supply tracking |
+| `ownership` | 15 | Holdings, control positions, snapshots |
+| `dilution` | 10 | Options, warrants, convertibles, exercises |
 
 **Full verb reference:** See YAML files in `rust/config/verbs/`
+
+---
+
+## Investor Register Visualization
+
+The investor register uses a **dual-mode visualization** to handle the scale difference between control holders (5-50) and economic investors (potentially 100,000+).
+
+### Visualization Modes
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  CONTROL VIEW (Taxonomy Graph)              ECONOMIC VIEW (Table Panel)     │
+│  ─────────────────────────────              ─────────────────────────────   │
+│                                                                              │
+│  Individual nodes for:                      Aggregate node expands to:       │
+│  • >5% voting/economic                      • Breakdown by investor type     │
+│  • Board appointment rights                 • Paginated searchable table     │
+│  • Veto rights                              • Filter by type/status/country  │
+│  • Any special rights                       • Export capability              │
+│                                                                              │
+│  ┌──────────────┐  ┌──────────────┐        ┌─────────────────────────────┐  │
+│  │ AllianzGI    │  │ Sequoia      │        │ 📊 4,847 other investors    │  │
+│  │ 35.2% ⚡     │  │ 22.1% 🪑    │        │    (22.0% economic)         │  │
+│  │ [View UBOs]  │  │ [View LPs]   │        │    [Click to expand]        │  │
+│  └──────────────┘  └──────────────┘        └─────────────────────────────┘  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Institutional Look-Through
+
+Shareholders can be institutions (not proper persons). The visualization supports drilling into their UBO structure:
+
+| Field | Purpose |
+|-------|---------|
+| `is_terminal` | `true` = proper person (end of chain), `false` = institution |
+| `has_ubo_structure` | Institution has navigable ownership structure |
+| `cbu_id` | Link to institution's CBU graph (if onboarded) |
+| `known_ubos` | Pre-fetched UBO summary (max 5) |
+| `chain_depth` | Levels to reach all proper persons |
+| `ubo_discovery_status` | COMPLETE, PARTIAL, PENDING, NOT_REQUIRED |
+
+### Key Types
+
+| Type | Location | Purpose |
+|------|----------|---------|
+| `InvestorRegisterView` | `rust/src/graph/investor_register.rs` | Full API response |
+| `ControlHolderNode` | Same | Individual holder above threshold |
+| `AggregateInvestorsNode` | Same | Collapsed "N other investors" node |
+| `UboSummary` | Same | Pre-fetched UBO for institutional holders |
+| `InvestorPanelState` | `ob-poc-ui/src/state.rs` | UI-only panel state |
+| `InvestorPanelAction` | `ob-poc-ui/src/panels/investor_panel.rs` | Panel interaction actions |
+
+### Threshold Rules
+
+Configured per issuer in `kyc.issuer_control_config`:
+
+| Threshold | Default | Effect |
+|-----------|---------|--------|
+| `disclosure_threshold_pct` | 5% | Above = individual node |
+| `material_threshold_pct` | 10% | Highlighted |
+| `significant_threshold_pct` | 25% | ⚡ indicator |
+| `control_threshold_pct` | 50% | ⚡ + control edge |
+
+**Any holder with board/veto rights appears as individual node regardless of percentage.**
 
 ---
 

@@ -58,6 +58,9 @@ pub mod taxonomy_routes;
 pub mod universe_routes;
 
 #[cfg(feature = "server")]
+pub mod capital_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -103,3 +106,6 @@ pub use taxonomy_routes::create_taxonomy_router;
 
 #[cfg(feature = "server")]
 pub use universe_routes::create_universe_router;
+
+#[cfg(feature = "server")]
+pub use capital_routes::create_capital_router;

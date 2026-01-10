@@ -11,6 +11,7 @@ mod container_browse;
 mod context;
 mod dsl_editor;
 mod entity_detail;
+mod investor_register;
 mod repl;
 mod results;
 mod session;
@@ -27,6 +28,7 @@ pub use container_browse::{
 pub use context::{context_panel, ContextPanelAction};
 pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
+pub use investor_register::{investor_register_panel, InvestorRegisterAction};
 pub use repl::repl_panel;
 pub use results::results_panel;
 pub use session::session_panel;

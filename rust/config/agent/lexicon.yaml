@@ -583,3 +583,189 @@ modifiers:
     - draft
     - approved
     - rejected
+
+# ============================================================================
+# Capital Structure & Ownership Model (Migration 013)
+# ============================================================================
+
+# Additional verbs for capital structure operations
+capital_verbs:
+  # Share class management
+  share_class:
+    - create share class
+    - add share class
+    - issue shares
+    - issue units
+    - initial issuance
+    - new issuance
+    - split
+    - stock split
+    - reverse split
+    - buyback
+    - share buyback
+    - repurchase
+    - cancel shares
+    - retire shares
+
+  # Dilution instruments
+  dilution:
+    - grant options
+    - issue options
+    - award options
+    - issue warrants
+    - grant warrants
+    - create safe
+    - issue safe
+    - create convertible
+    - issue convertible note
+    - exercise
+    - exercise options
+    - exercise warrants
+    - convert
+    - forfeit
+    - forfeit options
+    - vest
+    - vesting
+
+  # Ownership operations
+  ownership:
+    - compute ownership
+    - calculate ownership
+    - derive ownership
+    - snapshot
+    - take snapshot
+    - reconcile
+    - reconcile ownership
+    - compare sources
+    - trace chain
+    - trace ownership
+    - who controls
+    - find controllers
+    - analyze control
+    - control positions
+
+  # Cap table
+  cap_table:
+    - cap table
+    - capitalization table
+    - shareholder list
+    - holder list
+    - fully diluted
+    - on exercisable basis
+
+# Additional entity types for capital structure
+capital_entities:
+  # Share class types
+  share_class:
+    - share class
+    - class of shares
+    - common stock
+    - ordinary shares
+    - preferred stock
+    - preference shares
+    - series a
+    - series b
+    - series c
+    - seed
+    - founders shares
+    - class a
+    - class b
+    - voting shares
+    - non-voting shares
+
+  # Dilution instruments
+  dilution_instrument:
+    - option
+    - options
+    - stock option
+    - employee option
+    - esop
+    - warrant
+    - warrants
+    - safe
+    - simple agreement for future equity
+    - convertible
+    - convertible note
+    - convertible bond
+    - rsu
+    - restricted stock unit
+
+  # Ownership concepts
+  ownership_concept:
+    - ownership
+    - shareholding
+    - stake
+    - holding
+    - position
+    - control
+    - significant influence
+    - voting rights
+    - economic rights
+    - board seat
+    - board rights
+
+  # Sources
+  ownership_source:
+    - register
+    - investor register
+    - shareholder register
+    - bods
+    - beneficial ownership
+    - gleif
+    - lei
+    - company registry
+
+# Capital structure modifiers
+capital_modifiers:
+  # Basis types
+  basis:
+    - outstanding
+    - fully diluted
+    - exercisable
+    - vested
+    - unvested
+    - in the money
+    - out of the money
+
+  # Control thresholds
+  control:
+    - controlling
+    - majority
+    - minority
+    - significant
+    - substantial
+    - blocking
+    - threshold
+
+  # Issuance types
+  issuance:
+    - authorized
+    - issued
+    - treasury
+    - unallocated
+    - reserved
+
+  # Instrument status
+  instrument_status:
+    - outstanding
+    - exercised
+    - forfeited
+    - expired
+    - cancelled
+    - converted
+    - vested
+    - unvested
+    - cliff
+
+  # Rights types
+  rights:
+    - voting
+    - economic
+    - anti-dilution
+    - preemptive
+    - pro-rata
+    - tag-along
+    - drag-along
+    - veto
+    - board appointment
+    - information

@@ -1994,6 +1994,12 @@ pub enum NodeType {
     InstrumentClass,
     IsdaAgreement,
     CsaAgreement,
+    // Capital structure node types (Migration 013)
+    IssuanceEvent,
+    DilutionInstrument,
+    OwnershipSnapshot,
+    ReconciliationRun,
+    SpecialRight,
 }
 
 /// Legacy layer types
@@ -2076,6 +2082,23 @@ pub enum EdgeType {
     /// Undefined/unmapped relationship type (e.g., from GLEIF import)
     /// Allows imports to proceed even when we don't have a specific mapping
     Undefined,
+    // Capital structure edge types (Migration 013)
+    /// ShareClass -> Entity (issuer)
+    IssuedBy,
+    /// IssuanceEvent -> ShareClass
+    AffectsSupply,
+    /// DilutionInstrument -> ShareClass (target class on conversion)
+    ConvertsTo,
+    /// DilutionInstrument -> Entity (holder)
+    GrantedTo,
+    /// OwnershipSnapshot -> Entity (owner)
+    SnapshotOwner,
+    /// OwnershipSnapshot -> Entity (issuer)
+    SnapshotIssuer,
+    /// SpecialRight -> ShareClass or Entity
+    RightAttachedTo,
+    /// ReconciliationRun -> OwnershipSnapshot
+    ComparedSnapshot,
 }
 
 impl EdgeType {
@@ -2111,6 +2134,15 @@ impl EdgeType {
             "ISDA_HAS_CSA" => Some(Self::HasCsa),
             "CBU_IM_MANDATE" => Some(Self::ImMandate),
             "UNDEFINED" => Some(Self::Undefined),
+            // Capital structure edge types (Migration 013)
+            "ISSUED_BY" => Some(Self::IssuedBy),
+            "AFFECTS_SUPPLY" => Some(Self::AffectsSupply),
+            "CONVERTS_TO" => Some(Self::ConvertsTo),
+            "GRANTED_TO" => Some(Self::GrantedTo),
+            "SNAPSHOT_OWNER" => Some(Self::SnapshotOwner),
+            "SNAPSHOT_ISSUER" => Some(Self::SnapshotIssuer),
+            "RIGHT_ATTACHED_TO" => Some(Self::RightAttachedTo),
+            "COMPARED_SNAPSHOT" => Some(Self::ComparedSnapshot),
             _ => None,
         }
     }
@@ -2165,6 +2197,15 @@ impl EdgeType {
             Self::HasCsa => "ISDA_HAS_CSA",
             Self::ImMandate => "CBU_IM_MANDATE",
             Self::Undefined => "UNDEFINED",
+            // Capital structure edge types (Migration 013)
+            Self::IssuedBy => "ISSUED_BY",
+            Self::AffectsSupply => "AFFECTS_SUPPLY",
+            Self::ConvertsTo => "CONVERTS_TO",
+            Self::GrantedTo => "GRANTED_TO",
+            Self::SnapshotOwner => "SNAPSHOT_OWNER",
+            Self::SnapshotIssuer => "SNAPSHOT_ISSUER",
+            Self::RightAttachedTo => "RIGHT_ATTACHED_TO",
+            Self::ComparedSnapshot => "COMPARED_SNAPSHOT",
         }
     }
 
@@ -2290,7 +2331,31 @@ impl EdgeType {
             EdgeType::HasCsa => "has CSA",
             EdgeType::ImMandate => "IM mandate",
             EdgeType::Undefined => "related to",
+            // Capital structure edge labels (Migration 013)
+            EdgeType::IssuedBy => "issued by",
+            EdgeType::AffectsSupply => "affects supply",
+            EdgeType::ConvertsTo => "converts to",
+            EdgeType::GrantedTo => "granted to",
+            EdgeType::SnapshotOwner => "snapshot owner",
+            EdgeType::SnapshotIssuer => "snapshot issuer",
+            EdgeType::RightAttachedTo => "right attached to",
+            EdgeType::ComparedSnapshot => "compared snapshot",
         }
+    }
+
+    /// Check if this edge type relates to capital structure
+    pub fn is_capital_structure(&self) -> bool {
+        matches!(
+            self,
+            EdgeType::IssuedBy
+                | EdgeType::AffectsSupply
+                | EdgeType::ConvertsTo
+                | EdgeType::GrantedTo
+                | EdgeType::SnapshotOwner
+                | EdgeType::SnapshotIssuer
+                | EdgeType::RightAttachedTo
+                | EdgeType::ComparedSnapshot
+        )
     }
 }
 

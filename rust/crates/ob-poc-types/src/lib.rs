@@ -18,6 +18,7 @@
 //! 3. UUIDs as strings for JSON compatibility
 
 pub mod galaxy;
+pub mod investor_register;
 pub mod resolution;
 pub mod semantic_stage;
 pub mod trading_matrix;
@@ -29,6 +30,13 @@ use uuid::Uuid;
 
 // Re-export resolution types for convenience
 pub use resolution::*;
+
+// Re-export investor register types for convenience
+pub use investor_register::{
+    AggregateBreakdown, AggregateInvestorsNode, BreakdownDimension, ControlHolderNode, ControlTier,
+    InvestorFilters, InvestorListItem, InvestorListResponse, InvestorRegisterView, IssuerSummary,
+    PaginationInfo, ThresholdConfig,
+};
 
 // Re-export viewport types for convenience
 pub use viewport::{

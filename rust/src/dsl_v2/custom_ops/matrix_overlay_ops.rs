@@ -322,9 +322,11 @@ impl CustomOperation for MatrixCompareProductsOp {
             .iter()
             .find(|a| a.key == "products")
             .and_then(|a| {
-                a.value.as_list().map(|list| list.iter()
-                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                            .collect())
+                a.value.as_list().map(|list| {
+                    list.iter()
+                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .collect()
+                })
             })
             .ok_or_else(|| anyhow::anyhow!("Missing products argument (must be a list)"))?;
 

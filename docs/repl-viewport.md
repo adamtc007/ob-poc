@@ -587,6 +587,67 @@
 
 ---
 
+## 11. Investor Register Visualization
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    INVESTOR REGISTER VISUALIZATION                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   DUAL-MODE DISPLAY                                                          │
+│   ─────────────────                                                          │
+│                                                                              │
+│   Control View (Graph)                 Economic View (Panel)                 │
+│   ────────────────────                 ─────────────────────                 │
+│   Individual nodes for:                Aggregate node expands to:            │
+│   • >5% voting/economic                • Breakdown by type/status           │
+│   • Board rights                       • Paginated searchable table         │
+│   • Veto rights                        • Filter & export                    │
+│                                                                              │
+│   ┌────────────────┐                   ┌─────────────────────────────────┐  │
+│   │ AllianzGI 35%  │                   │ 📊 4,847 other investors (22%) │  │
+│   │ ⚡ INSTITUTION │                   │    [Click to expand]            │  │
+│   │ [View UBOs]    │                   └─────────────────────────────────┘  │
+│   └────────────────┘                                                         │
+│                                                                              │
+│   TIER-BASED COLORING                                                        │
+│   ───────────────────                                                        │
+│   Control (>50%)        → Red                                               │
+│   Significant (>25%)    → Yellow                                            │
+│   Disclosure (>5%)      → Blue                                              │
+│   Special Rights        → Purple                                            │
+│                                                                              │
+│   INSTITUTIONAL LOOK-THROUGH                                                 │
+│   ──────────────────────────                                                 │
+│   is_terminal           → true = proper person (end of chain)               │
+│   has_ubo_structure     → Institution has navigable ownership               │
+│   known_ubos            → Pre-fetched UBO summary (max 5)                   │
+│   [🔍 View UBO Chain]   → Navigates to institution's CBU graph              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/graph/investor_register.rs` | Server response types |
+| `rust/src/api/capital_routes.rs` | API endpoints |
+| `rust/crates/ob-poc-types/src/investor_register.rs` | Client types |
+| `rust/crates/ob-poc-ui/src/panels/investor_register.rs` | Panel component |
+| `rust/crates/ob-poc-ui/src/state.rs` | UI state management |
+| `rust/crates/ob-poc-ui/src/app.rs` | Action handling and wiring |
+
+### Design Highlights
+
+1. **Server-side threshold partitioning** - Control holders (>5% or special rights) vs aggregate
+2. **Decimal handling** - `rust_decimal::Decimal` server-side, `f64` client-side for JSON
+3. **Tier-based coloring** - Control (red), Significant (yellow), Disclosure (blue), SpecialRights (purple)
+4. **Expandable breakdown** - By investor type, KYC status, or jurisdiction
+5. **Drill-down list** - Paginated with filters for viewing all investors
+
+---
+
 ## Quick Reference: Key Files
 
 ```

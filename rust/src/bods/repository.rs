@@ -442,14 +442,8 @@ impl BodsRepository {
         .bind(&ubo.country_of_residence)
         .bind(&ownership_chain)
         .bind(chain_depth)
-        .bind(
-            ubo.ownership_min
-                .and_then(|v| Decimal::try_from(v).ok()),
-        )
-        .bind(
-            ubo.ownership_max
-                .and_then(|v| Decimal::try_from(v).ok()),
-        )
+        .bind(ubo.ownership_min.and_then(|v| Decimal::try_from(v).ok()))
+        .bind(ubo.ownership_max.and_then(|v| Decimal::try_from(v).ok()))
         .bind(
             ubo.ownership_percentage
                 .and_then(|v| Decimal::try_from(v).ok()),

@@ -5,12 +5,14 @@
 
 use ob_poc_graph::{CbuGraphData, TradingMatrix, ViewMode};
 use ob_poc_types::{
-    galaxy::UniverseGraph, CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse,
-    ConfirmAllRequest, ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse,
-    ExecuteRequest, ExecuteResponse, GetContextResponse, ResolutionSearchRequest,
-    ResolutionSearchResponse, ResolutionSessionResponse, SelectResolutionRequest,
-    SelectResolutionResponse, SessionContext, SessionStateResponse, SetBindingRequest,
-    SetBindingResponse, StartResolutionRequest, ValidateDslRequest, ValidateDslResponse,
+    galaxy::UniverseGraph,
+    investor_register::{InvestorFilters, InvestorListResponse, InvestorRegisterView},
+    CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse, ConfirmAllRequest,
+    ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse, ExecuteRequest,
+    ExecuteResponse, GetContextResponse, ResolutionSearchRequest, ResolutionSearchResponse,
+    ResolutionSessionResponse, SelectResolutionRequest, SelectResolutionResponse, SessionContext,
+    SessionStateResponse, SetBindingRequest, SetBindingResponse, StartResolutionRequest,
+    ValidateDslRequest, ValidateDslResponse,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
@@ -656,4 +658,55 @@ pub fn remove_local_storage(key: &str) -> Result<(), String> {
         .remove_item(key)
         .map_err(|_| "Failed to remove localStorage item")?;
     Ok(())
+}
+
+// =============================================================================
+// Investor Register API
+// =============================================================================
+
+/// Get investor register view for an issuer
+/// Returns control holders (>5%) as individual nodes and aggregate for others
+pub async fn get_investor_register(
+    issuer_id: &str,
+    share_class: Option<&str>,
+) -> Result<InvestorRegisterView, String> {
+    let mut url = format!("/api/capital/{}/investors", issuer_id);
+    if let Some(sc) = share_class {
+        let encoded = js_sys::encode_uri_component(sc);
+        url = format!("{}?share_class={}", url, encoded);
+    }
+    get(&url).await
+}
+
+/// Get paginated investor list for drill-down
+pub async fn get_investor_list(
+    issuer_id: &str,
+    page: i32,
+    page_size: i32,
+    filters: &InvestorFilters,
+) -> Result<InvestorListResponse, String> {
+    let mut params = vec![format!("page={}", page), format!("page_size={}", page_size)];
+
+    if let Some(ref t) = filters.investor_type {
+        params.push(format!("investor_type={}", js_sys::encode_uri_component(t)));
+    }
+    if let Some(ref s) = filters.kyc_status {
+        params.push(format!("kyc_status={}", js_sys::encode_uri_component(s)));
+    }
+    if let Some(ref j) = filters.jurisdiction {
+        params.push(format!("jurisdiction={}", js_sys::encode_uri_component(j)));
+    }
+    if let Some(ref q) = filters.search {
+        params.push(format!("search={}", js_sys::encode_uri_component(q)));
+    }
+    if let Some(min) = filters.min_units {
+        params.push(format!("min_units={}", min));
+    }
+
+    let url = format!(
+        "/api/capital/{}/investors/list?{}",
+        issuer_id,
+        params.join("&")
+    );
+    get(&url).await
 }

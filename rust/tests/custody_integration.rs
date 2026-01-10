@@ -812,12 +812,10 @@ async fn test_coverage_validation_with_gap() {
         .await
         .expect("EQUITY class should exist");
 
-    let bond_class_id = get_instrument_class_id(&pool, "GOVT_BOND")
-        .await
-        .or({
-            // GOVT_BOND might not exist, skip test
-            None
-        });
+    let bond_class_id = get_instrument_class_id(&pool, "GOVT_BOND").await.or({
+        // GOVT_BOND might not exist, skip test
+        None
+    });
 
     let market_id = get_market_id(&pool, "XNYS")
         .await

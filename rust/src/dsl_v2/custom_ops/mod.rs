@@ -28,6 +28,7 @@ mod cbu_ops;
 mod cbu_role_ops;
 mod control_ops;
 mod custody;
+mod dilution_ops;
 mod document_ops;
 mod entity_ops;
 pub mod entity_query;
@@ -39,6 +40,7 @@ mod lifecycle_ops;
 mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
+mod ownership_ops;
 mod partnership_ops;
 mod refdata_loader;
 mod regulatory_ops;
@@ -261,12 +263,23 @@ pub use viewport_ops::{
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
 pub use board_ops::BoardAnalyzeControlOp;
 pub use capital_ops::{
-    CapitalCancelSharesOp, CapitalIssueSharesOp, CapitalOwnershipChainOp, CapitalReconcileOp,
+    CapitalBuybackOp, CapitalCancelOp, CapitalCancelSharesOp, CapitalCapTableOp, CapitalHoldersOp,
+    CapitalIssueInitialOp, CapitalIssueNewOp, CapitalIssueSharesOp, CapitalOwnershipChainOp,
+    CapitalReconcileOp, CapitalShareClassCreateOp, CapitalShareClassGetSupplyOp, CapitalSplitOp,
     CapitalTransferOp,
 };
 pub use control_ops::{
     ControlAnalyzeOp, ControlBuildGraphOp, ControlIdentifyUbosOp, ControlReconcileOwnershipOp,
     ControlTraceChainOp,
+};
+pub use dilution_ops::{
+    DilutionCreateConvertibleNoteOp, DilutionCreateSafeOp, DilutionExerciseOp, DilutionForfeitOp,
+    DilutionGetSummaryOp, DilutionGrantOptionsOp, DilutionIssueWarrantOp, DilutionListOp,
+};
+pub use ownership_ops::{
+    OwnershipAnalyzeGapsOp, OwnershipComputeOp, OwnershipControlPositionsOp,
+    OwnershipReconcileFindingsOp, OwnershipReconcileOp, OwnershipSnapshotListOp,
+    OwnershipTraceChainOp, OwnershipWhoControlsOp,
 };
 pub use partnership_ops::{
     PartnershipAnalyzeControlOp, PartnershipContributionOp, PartnershipDistributionOp,
@@ -671,6 +684,26 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(CapitalIssueSharesOp));
         registry.register(Arc::new(CapitalCancelSharesOp));
 
+        // Capital Structure & Ownership Model operations (Migration 013)
+        // Share class management
+        registry.register(Arc::new(CapitalShareClassCreateOp));
+        registry.register(Arc::new(CapitalShareClassGetSupplyOp));
+        // Issuance events
+        registry.register(Arc::new(CapitalIssueInitialOp));
+        registry.register(Arc::new(CapitalIssueNewOp));
+        registry.register(Arc::new(CapitalSplitOp));
+        registry.register(Arc::new(CapitalBuybackOp));
+        registry.register(Arc::new(CapitalCancelOp));
+        // Cap table queries
+        registry.register(Arc::new(CapitalCapTableOp));
+        registry.register(Arc::new(CapitalHoldersOp));
+
+        // Dilution instrument operations (options, warrants, SAFEs, convertibles)
+        dilution_ops::register_dilution_ops(&mut registry);
+
+        // Ownership computation and reconciliation operations
+        ownership_ops::register_ownership_ops(&mut registry);
+
         // Board operations (board composition control analysis)
         registry.register(Arc::new(BoardAnalyzeControlOp));
 
@@ -911,6 +944,34 @@ mod tests {
         assert!(registry.has("capital", "get-ownership-chain"));
         assert!(registry.has("capital", "issue-shares"));
         assert!(registry.has("capital", "cancel-shares"));
+        // Capital Structure & Ownership Model operations (Migration 013)
+        assert!(registry.has("capital", "share-class.create"));
+        assert!(registry.has("capital", "share-class.get-supply"));
+        assert!(registry.has("capital", "issue.initial"));
+        assert!(registry.has("capital", "issue.new"));
+        assert!(registry.has("capital", "split"));
+        assert!(registry.has("capital", "buyback"));
+        assert!(registry.has("capital", "cancel"));
+        assert!(registry.has("capital", "cap-table"));
+        assert!(registry.has("capital", "holders"));
+        // Dilution instrument operations
+        assert!(registry.has("capital", "dilution.grant-options"));
+        assert!(registry.has("capital", "dilution.issue-warrant"));
+        assert!(registry.has("capital", "dilution.create-safe"));
+        assert!(registry.has("capital", "dilution.create-convertible-note"));
+        assert!(registry.has("capital", "dilution.exercise"));
+        assert!(registry.has("capital", "dilution.forfeit"));
+        assert!(registry.has("capital", "dilution.list"));
+        assert!(registry.has("capital", "dilution.get-summary"));
+        // Ownership operations
+        assert!(registry.has("ownership", "compute"));
+        assert!(registry.has("ownership", "snapshot.list"));
+        assert!(registry.has("ownership", "control-positions"));
+        assert!(registry.has("ownership", "who-controls"));
+        assert!(registry.has("ownership", "reconcile"));
+        assert!(registry.has("ownership", "reconcile.findings"));
+        assert!(registry.has("ownership", "analyze-gaps"));
+        assert!(registry.has("ownership", "trace-chain"));
         // KYC Control Enhancement: Board operations
         assert!(registry.has("board", "analyze-control"));
         // KYC Control Enhancement: Trust operations

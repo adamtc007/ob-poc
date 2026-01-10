@@ -56,5 +56,12 @@ pub use graph::{
 // Re-export galaxy types from ob-poc-types for convenience
 pub use ob_poc_types::galaxy::AgentMode;
 
+// Re-export investor register types from ob-poc-types for convenience
+pub use ob_poc_types::investor_register::{
+    AggregateBreakdown, AggregateInvestorsNode, BreakdownDimension, ControlHolderNode, ControlTier,
+    InvestorFilters, InvestorListItem, InvestorListResponse, InvestorRegisterView,
+    IssuerSummary as InvestorIssuerSummary, PaginationInfo, ThresholdConfig,
+};
+
 // Re-export Esper render state types for NavigationVerb handlers
 pub use graph::viewport::{EsperRenderState, GapType, IlluminateAspect, RedFlagCategory};

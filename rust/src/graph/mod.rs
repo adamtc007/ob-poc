@@ -18,6 +18,7 @@
 #[cfg(feature = "database")]
 pub mod config_driven_builder;
 pub mod filters;
+pub mod investor_register;
 pub mod layout_v2;
 #[cfg(feature = "database")]
 pub mod query_engine;
@@ -28,6 +29,11 @@ pub mod viewport;
 #[cfg(feature = "database")]
 pub use config_driven_builder::{ConfigDrivenGraphBuilder, EdgeLayoutHints, NodeRenderingHints};
 pub use filters::{FilterBuilder, GraphFilterOps};
+pub use investor_register::{
+    AggregateBreakdown, AggregateInvestorsNode, ControlHolderNode, InvestorFilters,
+    InvestorListItem, InvestorListQuery, InvestorListResponse, InvestorRegisterQuery,
+    InvestorRegisterView, IssuerSummary, PaginationInfo, ThresholdConfig,
+};
 pub use layout_v2::{EdgeLayoutConfig, LayoutConfigV2, LayoutEngineV2};
 #[cfg(feature = "database")]
 pub use query_engine::GraphQueryEngine;
