@@ -4,12 +4,20 @@ domains:
 
     verbs:
       # =========================================================================
-      # CA EVENT TYPE REFERENCE DATA
+      # CA EVENT TYPE REFERENCE DATA (CATALOG)
       # =========================================================================
+      # Event types are global reference data, not CBU-specific.
+      # Source of truth: catalog (seeded reference data)
 
       define-event-type:
         description: "Define corporate action event type"
         behavior: crud
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
+          noun: ca_event_type
+          tags: [reference-data, seeding]
         crud:
           operation: upsert
           table: ca_event_types
@@ -56,6 +64,12 @@ domains:
       list-event-types:
         description: "List CA event types"
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: catalog
+          scope: global
+          noun: ca_event_type
+          tags: [read, reference-data]
         crud:
           operation: select
           table: ca_event_types
@@ -76,12 +90,23 @@ domains:
             - custody.ca_event_types
 
       # =========================================================================
-      # CBU CA PREFERENCES
+      # CBU CA PREFERENCES (OPERATIONAL - WRITTEN BY MATERIALIZE)
       # =========================================================================
+      # CA preferences are CBU-specific operational config.
+      # Source of truth: matrix (authored in trading profile, materialized to tables)
+      # These verbs are PROJECTION tier - only used by materialize pipeline.
 
       set-preferences:
         description: "Set corporate action processing preferences for CBU"
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ca_preference
+          internal: true
+          tags: [projection, materialize-target]
         crud:
           operation: upsert
           table: cbu_ca_preferences
@@ -157,6 +182,12 @@ domains:
       list-preferences:
         description: "List CA preferences for CBU"
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: ca_preference
+          tags: [read, operational-state]
         crud:
           operation: list_by_fk
           table: cbu_ca_preferences
@@ -184,6 +215,14 @@ domains:
       remove-preference:
         description: "Remove CA preference"
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ca_preference
+          internal: true
+          tags: [projection, materialize-target]
         crud:
           operation: delete
           table: cbu_ca_preferences
@@ -197,12 +236,20 @@ domains:
           type: affected
 
       # =========================================================================
-      # INSTRUCTION WINDOWS
+      # INSTRUCTION WINDOWS (OPERATIONAL - WRITTEN BY MATERIALIZE)
       # =========================================================================
 
       set-instruction-window:
         description: "Configure CA instruction deadline rules"
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: instruction_window
+          internal: true
+          tags: [projection, materialize-target]
         crud:
           operation: upsert
           table: cbu_ca_instruction_windows
@@ -276,6 +323,12 @@ domains:
       list-instruction-windows:
         description: "List instruction window configurations"
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: instruction_window
+          tags: [read, operational-state]
         crud:
           operation: list_by_fk
           table: cbu_ca_instruction_windows
@@ -298,12 +351,20 @@ domains:
             - custody.cbu_ca_instruction_windows
 
       # =========================================================================
-      # CA SSI MAPPING
+      # CA SSI MAPPING (OPERATIONAL - WRITTEN BY MATERIALIZE)
       # =========================================================================
 
       link-ca-ssi:
         description: "Link CA payment/delivery to specific SSI"
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ca_ssi_mapping
+          internal: true
+          tags: [projection, materialize-target]
         crud:
           operation: upsert
           table: cbu_ca_ssi_mappings
@@ -361,6 +422,12 @@ domains:
       list-ca-ssi-mappings:
         description: "List CA SSI mappings"
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: ca_ssi_mapping
+          tags: [read, operational-state]
         crud:
           operation: list_by_fk
           table: cbu_ca_ssi_mappings
@@ -383,13 +450,19 @@ domains:
             - custody.cbu_ca_ssi_mappings
 
       # =========================================================================
-      # VALIDATION
+      # VALIDATION & GAP ANALYSIS
       # =========================================================================
 
       validate-ca-config:
         description: "Validate corporate action configuration completeness"
         behavior: plugin
         handler: validate_ca_configuration
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: ca_validation
+          tags: [read, validation, gap-analysis]
         args:
           - name: cbu-id
             type: uuid
@@ -413,6 +486,12 @@ domains:
         description: "Derive required CA config from universe"
         behavior: plugin
         handler: derive_required_ca_config
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: ca_requirements
+          tags: [read, gap-analysis, derivation]
         args:
           - name: cbu-id
             type: uuid
