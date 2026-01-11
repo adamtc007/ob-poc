@@ -550,6 +550,121 @@ Configured per issuer in `kyc.issuer_control_config`:
 
 ---
 
+## Session State Management
+
+Session = Intent Scope = Visual State = Operation Target. **They are the same thing.**
+
+> **Full details:** `docs/session-visualization-architecture.md`
+
+### Scope Hierarchy
+
+```
+Universe (all CBUs)
+  └── Book (commercial client: Allianz, BlackRock)
+       └── Filtered Book (jurisdiction, fund type, status)
+            └── Single CBU
+                 └── Entity Neighborhood (N hops)
+```
+
+**Session Verbs (session.yaml):**
+| Verb | Purpose |
+|------|---------|
+| `session.set-galaxy` | All CBUs under apex entity |
+| `session.set-book` | Filtered subset (jurisdictions, cbu-types) |
+| `session.set-cbu` | Single CBU focus |
+| `session.set-jurisdiction` | All CBUs in a jurisdiction |
+| `session.set-neighborhood` | N hops from focal entity |
+| `session.back` / `session.forward` | History navigation |
+
+### Scope Filters
+
+**GraphFilters (graph/types.rs):**
+```rust
+pub struct GraphFilters {
+    pub jurisdictions: Option<Vec<String>>,   // LU, IE, DE
+    pub fund_types: Option<Vec<String>>,      // EQUITY, FIXED_INCOME
+    pub entity_types: Option<Vec<EntityType>>,
+    pub same_manco_id: Option<Uuid>,          // Same management company
+    pub same_sicav_id: Option<Uuid>,          // Same SICAV umbrella
+    pub min_ownership_pct: Option<Decimal>,
+    pub prong: ProngFilter,                   // Both, OwnershipOnly, ControlOnly
+    pub as_of_date: NaiveDate,
+    pub path_only: bool,
+}
+```
+
+### Active CBU Set (0..n)
+
+Multi-CBU selection for batch operations:
+```rust
+pub struct SessionScopeState {
+    pub active_cbu_ids: Option<Vec<Uuid>>,  // 0..n CBUs
+    // ...
+}
+```
+
+**Verbs:** `session.add-cbu`, `session.remove-cbu`, `session.clear-cbu-set`, `session.list-active-cbus`
+
+### History / Back-Forward Navigation
+
+**Database (019_session_navigation_history.sql):**
+- `session_scope_history` table stores snapshots
+- `history_position` column tracks current position
+- PL/pgSQL functions: `push_scope_history()`, `navigate_back()`, `navigate_forward()`
+
+**Edge cases handled:** Empty session, no prior history, at end of forward stack → returns `navigated: false`
+
+### Astro Navigation (Scale Levels)
+
+```rust
+pub enum ViewLevel {
+    Universe,   // All CBUs as dots
+    Cluster,    // Segment/galaxy view
+    System,     // Single CBU (solar system)
+    Planet,     // Single entity focus
+    Surface,    // High zoom detail
+    Core,       // Deepest zoom
+}
+```
+
+**Voice/chat triggers:** "universe", "book allianz", "galaxy", "system", "planet", "surface", "core"
+
+### ESPER View Verbs
+
+| Verb | Description |
+|------|-------------|
+| `view.drill` | Drill into entity (up/down) |
+| `view.surface` | Surface up from drill |
+| `view.trace` | Follow threads (money/control/risk/documents/alerts) |
+| `view.xray` | Show hidden layers (custody/ubo/services) |
+| `view.peel` | Remove outer layer |
+| `view.illuminate` | Highlight aspect |
+
+### Fractal Zoom (TaxonomyStack)
+
+**API Endpoints:**
+- `POST /api/session/:id/taxonomy/zoom-in`
+- `POST /api/session/:id/taxonomy/zoom-out`
+- `POST /api/session/:id/taxonomy/back-to`
+- `GET /api/session/:id/taxonomy/breadcrumbs`
+
+**Transitions (view/transition.rs):**
+- `LayoutTransition` - Smooth interpolation with easing
+- `EsperTransition` - Stepped Blade Runner-style enhance
+- Presets: `QUICK` (0.2s), `STANDARD` (0.35s), `DRAMATIC` (0.5s)
+
+### REPL `:verbs` Command
+
+```
+:verbs           → List all domains with verb counts
+:verbs kyc       → List KYC domain verbs with args
+:verbs session   → List session verbs
+```
+
+**MCP equivalent:** `verbs_list` tool with `domain` parameter
+
+---
+
 ## Key Files Reference
 
 | What | Where |

@@ -1,8 +1,8 @@
 # Session & Visualization Architecture
 
-> **Status:** Mostly Implemented
+> **Status:** ✅ Complete
 > **Last Updated:** 2026-01-11
-> **Related:** TODO-TAXONOMY-LAYOUT-SESSION-CONTEXT.md, TODO-SESSION-SCOPE-VERBS.md
+> **Related:** CLAUDE.md Session State Management section
 
 ---
 
@@ -194,54 +194,99 @@ Tool {
 
 ---
 
-## Gaps / Partial Implementation
+## Recent Completions (2026-01-11)
 
-### 1. Same ManCo / Same SICAV Filtering
+### ✅ Same ManCo / Same SICAV Filtering
 
-**Current:** Not explicit fields in GraphFilters or scope_filters.
-
-**Needed:** Add to scope_filters JSONB or GraphFilters:
+**GraphFilters (graph/types.rs):**
 ```rust
 pub struct GraphFilters {
     // ... existing ...
-    pub same_manco: Option<Uuid>,      // Filter to CBUs with same ManCo
-    pub same_sicav: Option<Uuid>,      // Filter to CBUs in same SICAV umbrella
+    pub same_manco_id: Option<Uuid>,   // Filter to entities with same ManCo
+    pub same_sicav_id: Option<Uuid>,   // Filter to entities in same SICAV umbrella
 }
 ```
 
-Or use scope_filters JSONB:
+**GraphNode (graph/types.rs):**
+```rust
+pub struct GraphNode {
+    // ... existing ...
+    pub manco_id: Option<Uuid>,        // ManCo managing this entity
+    pub sicav_id: Option<Uuid>,        // SICAV this entity belongs to
+}
+```
+
+**Filter Logic (graph/filters.rs):**
+- Entities with matching `manco_id` pass the `same_manco_id` filter
+- Entities with matching `sicav_id` pass the `same_sicav_id` filter
+- Entities without these IDs pass through (may be the ManCo/SICAV itself)
+
+### ✅ REPL `:verbs` Command
+
+**CLI REPL (dsl_cli.rs):**
+```
+:verbs           → List all domains with verb counts
+:verbs kyc       → List all verbs in KYC domain with args
+:verbs session   → List all session verbs
+```
+
+**MCP Tool:**
 ```json
-{"same_manco": "uuid-here", "same_sicav": "uuid-here"}
+{
+  "name": "verbs_list",
+  "arguments": { "domain": "kyc" }
+}
 ```
 
-### 2. REPL `/command domain` Prompt
+### ✅ Fractal Zoom Navigation (TaxonomyStack)
 
-**Current:** MCP tool `verbs_list` has domain filter, but REPL panel doesn't have explicit `/command kyc` handling.
+**API Endpoints:**
+- `POST /api/session/:id/taxonomy/zoom-in` - Push type onto stack
+- `POST /api/session/:id/taxonomy/zoom-out` - Pop from stack
+- `POST /api/session/:id/taxonomy/back-to` - Jump to breadcrumb level
+- `POST /api/session/:id/taxonomy/reset` - Clear stack to root
+- `GET /api/session/:id/taxonomy/breadcrumbs` - Get current trail
 
-**Needed:** Add to REPL input handler:
+**Client (ob-poc-ui):**
+- `TaxonomyPanelAction::ZoomIn/ZoomOut/BackTo`
+- `state.taxonomy_zoom_in/out/back_to/reset()`
+- Breadcrumb UI with clickable navigation
+
+**Transitions (view/transition.rs):**
+- `LayoutTransition` - Smooth position/size/opacity interpolation
+- `EsperTransition` - Stepped Blade Runner-style enhance levels
+- Easing functions: ease_out_cubic, ease_in_out_cubic, etc.
+- `TransitionParams::QUICK/STANDARD/DRAMATIC/RESPONSIVE`
+
+### ✅ Astro Navigation (Scale Levels)
+
+**NavigationVerb (command.rs):**
+```rust
+ScaleUniverse           // All CBUs as dots
+ScaleBook { client }    // All CBUs for commercial client
+ScaleGalaxy { segment } // Cluster/segment view
+ScaleSystem { cbu_id }  // Single CBU (solar system)
+ScalePlanet { entity }  // Single entity focus
+ScaleSurface            // High zoom detail
+ScaleCore               // Deepest zoom
 ```
-/command          → Show all domains
-/command kyc      → Show KYC domain verbs
-/command trading  → Show trading domain verbs
+
+**ViewLevel (galaxy.rs):**
+```rust
+pub enum ViewLevel {
+    Universe,
+    Cluster,
+    System,
+    Planet,
+    Surface,
+    Core,
+}
 ```
 
-### 3. Fractal Zoom Animation (Astro → Landing)
-
-**Current:** TaxonomyStack design exists in TODO docs, history works at session level.
-
-**Needed:** 
-- ViewState.stack: TaxonomyStack for zoom levels
-- view.zoom-in / view.zoom-out verbs wired
-- Transition animation in egui renderer
-
-### 4. Layout Mode Transitions
-
-**Current:** Layout modes defined (pyramid, solar_system, matrix, force_directed)
-
-**Needed:**
-- Mass-based automatic mode selection
-- Smooth transitions between layouts
-- Debouncing to prevent flip-flopping
+**Wiring (app.rs):**
+- Each scale verb updates `navigation_scope` and `view_level`
+- Triggers appropriate API fetches (`fetch_universe_graph`, `fetch_client_book`)
+- Integrates with galaxy view focus stack
 
 ---
 
