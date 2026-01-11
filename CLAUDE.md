@@ -1,12 +1,13 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-11
-> **Verb count:** ~824 verbs across 105+ YAML files
+> **Verb count:** ~816 verbs across 105+ YAML files
 > **Custom ops:** 55+ plugin handlers
 > **Crates:** 13 fine-grained crates
-> **Migrations:** 19 schema migrations (latest: 019_session_navigation_history.sql)
+> **Migrations:** 20 schema migrations (latest: 020_trading_profile_materialization.sql)
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
+> **Verb Tiering:** ✅ Implemented - Tiering metadata, linter, canonical pivot (Phase 1-7 complete)
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -35,7 +36,7 @@ This file provides guidance to Claude Code when working with this repository.
 | **Feedback Inspector (design)** | `ai-thoughts/023b-feedback-inspector.md` | ✅ **DONE** - On-demand failure analysis, classification, repro generation, audit trail, MCP interface |
 | **Event Infrastructure (impl)** | `ai-thoughts/025-implement-event-infrastructure.md` | ✅ **DONE** - Lock-free emitter, drain task, session logger |
 | **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
-| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | **TODO** - Instrument taxonomy as generative core, verb tiering, materialize pipeline |
+| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Verb tiering, linter, deprecated verb cleanup, materialize pipeline |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
 
 > **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
@@ -54,6 +55,7 @@ This file provides guidance to Claude Code when working with this repository.
 | **Agent pipeline, LLM integration** | `docs/agent-architecture.md` | Lexicon tokenizer, intent parsing, research macros, conductor mode, voice |
 | **UI, graph viz, REPL commands** | `docs/repl-viewport.md` | 5-panel layout, shared state, graph interactions, taxonomy navigator, galaxy nav |
 | **Research workflows, agent mode** | `docs/research-agent-annex.md` | Invocation phrases, confidence routing, checkpoint UI, pluggable sources |
+| **Architecture & economics** | `docs/architecture/intent-driven-onboarding.md` | DSL-as-state philosophy, refactoring economics, Rust vs Java TCO, LLM productivity |
 
 **START HERE for non-obvious concepts:**
 - "Why is everything an Entity?" → `docs/strategy-patterns.md` §1
@@ -86,6 +88,8 @@ This file provides guidance to Claude Code when working with this repository.
 - "view verb", "esper", "drill", "surface", "trace" → `docs/session-visualization-architecture.md`
 - "active CBU set", "multi-CBU selection" → `docs/session-visualization-architecture.md`
 - "zoom animation", "astro", "landing", "taxonomy stack" → `docs/session-visualization-architecture.md`
+- "refactor", "rename verb", "delete verb", "deprecate", "cleanup" → `ai-thoughts/027-*`, `docs/architecture/intent-driven-onboarding.md`
+- "trading matrix", "instrument taxonomy", "materialize", "canonical" → `ai-thoughts/027-*`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -100,7 +104,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/023b-feedback-inspector.md` - ✅ DONE - On-demand analysis, repro generation, audit trail, MCP server
 - `ai-thoughts/025-implement-event-infrastructure.md` - ✅ DONE - Lock-free emitter, drain task, session logger
 - `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
-- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - **TODO (~62h)** - Instrument taxonomy as generative core, verb cleanup (delete/replace), materialize pipeline
+- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ **DONE** - Verb tiering system, linter, deprecated verb cleanup, materialize pipeline
 
 ---
 
@@ -343,7 +347,47 @@ my-domain:
 
 ```bash
 cargo x verify-verbs   # Shows parse errors for all YAML files
+cargo x verbs lint     # Check tiering rule violations
 ```
+
+### Verb Tiering System
+
+Verbs are categorized by their role in the data flow:
+
+| Tier | Purpose | Example |
+|------|---------|---------|
+| `reference` | Global reference data (catalogs) | `corporate-action:define-event-type` |
+| `intent` | User-facing authoring operations | `trading-profile:add-market` |
+| `projection` | Internal writes to operational tables | `cbu-custody:add-universe` (deprecated) |
+| `diagnostics` | Read-only queries and validation | `cbu-custody:list-ssis` |
+| `composite` | Multi-table orchestration | `trading-profile:materialize` |
+
+**Source of Truth:**
+- `matrix` - Trading profile document is canonical
+- `catalog` - Global reference catalog
+- `operational` - Derived/projected tables
+- `session` - Ephemeral session state
+
+**Verb Metadata Example:**
+```yaml
+my-verb:
+  description: "Do something"
+  behavior: crud
+  metadata:
+    tier: intent                    # reference|intent|projection|diagnostics|composite
+    source_of_truth: matrix         # matrix|catalog|operational|session
+    scope: cbu                      # global|cbu
+    writes_operational: false       # true if writes to operational tables
+    internal: false                 # true if not for direct user invocation
+    noun: trading_profile           # domain object being operated on
+    tags: [authoring, draft]        # free-form tags
+  # ... rest of verb definition
+```
+
+**Linting Rules:**
+- Projection verbs must be `internal: true`
+- Intent verbs cannot have `writes_operational: true`
+- Diagnostics verbs must be read-only
 
 ---
 
