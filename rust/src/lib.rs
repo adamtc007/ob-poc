@@ -92,6 +92,13 @@ pub mod bods;
 #[cfg(feature = "database")]
 pub mod research;
 
+// Event infrastructure - always-on, zero-overhead event capture from DSL pipeline
+pub mod events;
+
+// Feedback Inspector - on-demand failure analysis, repro generation, audit trail
+#[cfg(feature = "database")]
+pub mod feedback;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

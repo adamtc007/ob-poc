@@ -720,6 +720,17 @@ pub struct GraphNode {
     pub cbu_memberships: Vec<Uuid>,
 
     // =========================================================================
+    // FUND STRUCTURE RELATIONSHIPS (for Same ManCo / Same SICAV filters)
+    // =========================================================================
+    /// ManCo (management company) that manages this entity (if fund/subfund)
+    #[serde(default)]
+    pub manco_id: Option<Uuid>,
+
+    /// SICAV/umbrella this entity belongs to (if subfund)
+    #[serde(default)]
+    pub sicav_id: Option<Uuid>,
+
+    // =========================================================================
     // CLASSIFICATION
     // =========================================================================
     /// Primary role category for layout (from taxonomy)
@@ -800,6 +811,8 @@ impl Default for GraphNode {
             controlled_by: Vec::new(),
             controls: Vec::new(),
             cbu_memberships: Vec::new(),
+            manco_id: None,
+            sicav_id: None,
             primary_role_category: None,
             layout_behavior: None,
             ubo_treatment: None,
@@ -1628,6 +1641,16 @@ pub struct GraphFilters {
 
     /// Show only the path to cursor (hide unrelated nodes)
     pub path_only: bool,
+
+    /// Filter to entities managed by this ManCo (management company)
+    /// Shows only funds/subfunds that share the same management company
+    #[serde(default)]
+    pub same_manco_id: Option<Uuid>,
+
+    /// Filter to entities under this SICAV umbrella
+    /// Shows only subfunds belonging to the same SICAV/umbrella structure
+    #[serde(default)]
+    pub same_sicav_id: Option<Uuid>,
 }
 
 impl Default for GraphFilters {
@@ -1640,6 +1663,8 @@ impl Default for GraphFilters {
             as_of_date: chrono::Local::now().date_naive(),
             min_ownership_pct: None,
             path_only: false,
+            same_manco_id: None,
+            same_sicav_id: None,
         }
     }
 }

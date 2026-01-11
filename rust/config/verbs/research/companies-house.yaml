@@ -1,0 +1,143 @@
+domains:
+  research.companies-house:
+    description: UK Companies House registry - company profiles, PSC, and officers
+
+    invocation_hints:
+      - "Companies House"
+      - "UK company"
+      - "British company"
+      - "company number"
+      - "UK directors"
+      - "PSC"
+      - "persons with significant control"
+      - "UK beneficial owners"
+
+    verbs:
+      search:
+        description: Search UK Companies House for companies by name
+        invocation_phrases:
+          - "search Companies House"
+          - "find UK company"
+          - "look up British company"
+        behavior: plugin
+        handler: ChSearchOp
+        args:
+          - name: query
+            type: string
+            required: true
+            description: Company name or search query
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+            description: Maximum results
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+            description: Include dissolved companies
+        returns:
+          type: record_set
+
+      fetch-company:
+        description: Fetch company profile from Companies House
+        invocation_phrases:
+          - "get UK company"
+          - "fetch from Companies House"
+          - "company profile"
+        behavior: plugin
+        handler: ChFetchCompanyOp
+        args:
+          - name: company-number
+            type: string
+            required: true
+            description: UK company number (8 characters)
+          - name: decision-id
+            type: uuid
+            required: false
+            description: Research decision ID for audit trail
+        returns:
+          type: record
+
+      fetch-psc:
+        description: Fetch Persons with Significant Control from Companies House
+        invocation_phrases:
+          - "get PSCs"
+          - "who controls this UK company"
+          - "beneficial owners from Companies House"
+          - "significant control"
+        behavior: plugin
+        handler: ChFetchPscOp
+        args:
+          - name: company-number
+            type: string
+            required: true
+            description: UK company number
+          - name: include-ceased
+            type: boolean
+            required: false
+            default: false
+            description: Include ceased PSCs
+          - name: decision-id
+            type: uuid
+            required: false
+            description: Research decision ID for audit trail
+        returns:
+          type: record_set
+
+      fetch-officers:
+        description: Fetch officers (directors, secretaries) from Companies House
+        invocation_phrases:
+          - "get UK directors"
+          - "company officers"
+          - "who runs this UK company"
+        behavior: plugin
+        handler: ChFetchOfficersOp
+        args:
+          - name: company-number
+            type: string
+            required: true
+            description: UK company number
+          - name: include-resigned
+            type: boolean
+            required: false
+            default: false
+            description: Include resigned officers
+          - name: roles
+            type: string_list
+            required: false
+            description: Filter by officer role
+        returns:
+          type: record_set
+
+      import-company:
+        description: Import company and optionally PSC/officers to database
+        invocation_phrases:
+          - "import from Companies House"
+          - "add UK company to database"
+          - "import British company"
+        behavior: plugin
+        handler: ChImportCompanyOp
+        args:
+          - name: company-number
+            type: string
+            required: true
+            description: UK company number
+          - name: include-psc
+            type: boolean
+            required: false
+            default: true
+            description: Also import PSCs
+          - name: include-officers
+            type: boolean
+            required: false
+            default: false
+            description: Also import officers
+          - name: decision-id
+            type: uuid
+            required: false
+            description: Research decision ID for audit trail
+        returns:
+          type: uuid
+          name: entity_id
+          capture: true

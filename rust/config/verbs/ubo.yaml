@@ -141,6 +141,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -166,6 +167,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -247,6 +249,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -272,6 +275,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -362,6 +366,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -387,6 +392,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id
@@ -408,6 +414,7 @@ domains:
             maps_to: relationship_id
             lookup:
               table: entity_relationships
+              entity_type: relationship
               schema: ob-poc
               search_key: relationship_id
               primary_key: relationship_id

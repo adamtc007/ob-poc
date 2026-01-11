@@ -617,26 +617,30 @@ impl CustomOperation for RequestExtendOp {
         }
 
         // Calculate new due date
-        let new_date = if let Some(date) = new_due_date {
-            date
-        } else {
-            let days = days.unwrap();
-            // Get current due date and add days
-            let current = sqlx::query_scalar!(
-                r#"SELECT due_date FROM kyc.outstanding_requests WHERE request_id = $1"#,
-                request_id
-            )
-            .fetch_optional(pool)
-            .await?
-            .flatten()
-            .ok_or_else(|| anyhow!("Request {} not found", request_id))?;
+        let new_date = match (new_due_date, days) {
+            (Some(date), _) => date,
+            (None, Some(days_val)) => {
+                // Get current due date and add days
+                let current = sqlx::query_scalar!(
+                    r#"SELECT due_date FROM kyc.outstanding_requests WHERE request_id = $1"#,
+                    request_id
+                )
+                .fetch_optional(pool)
+                .await?
+                .flatten()
+                .ok_or_else(|| anyhow!("Request {} not found", request_id))?;
 
-            current
-                + Duration::days(days)
-                    .to_std()
-                    .ok()
-                    .map(|d| chrono::Duration::from_std(d).unwrap())
-                    .unwrap_or(chrono::Duration::days(days))
+                current
+                    + Duration::days(days_val)
+                        .to_std()
+                        .ok()
+                        .and_then(|d| chrono::Duration::from_std(d).ok())
+                        .unwrap_or_else(|| chrono::Duration::days(days_val))
+            }
+            (None, None) => {
+                // This case is already handled above with early return
+                unreachable!("Either days or new-due-date is required - checked above")
+            }
         };
 
         // Update with extension logged in communication_log

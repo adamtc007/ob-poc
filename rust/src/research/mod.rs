@@ -39,6 +39,7 @@
 //! - `executor`: Research execution with LLM and validation
 //! - `llm_client`: LLM client trait with tool use support
 //! - `error`: Error types
+//! - `sources`: Pluggable source loaders (GLEIF, Companies House, SEC EDGAR)
 
 pub mod agent_controller;
 pub mod definition;
@@ -46,6 +47,7 @@ pub mod error;
 pub mod executor;
 pub mod llm_client;
 pub mod registry;
+pub mod sources;
 
 // Re-exports for convenience
 pub use agent_controller::{
@@ -58,3 +60,11 @@ pub use llm_client::{
     ClaudeResearchClient, LlmResponse, ResearchLlmClient, ResearchSource, ToolCall, ToolDef,
 };
 pub use registry::ResearchMacroRegistry;
+
+// Source loader re-exports
+pub use sources::{
+    EntityStatus, EntityType, FetchControlHoldersOptions, FetchOfficersOptions, FetchOptions,
+    FetchParentChainOptions, HolderType, NormalizedAddress, NormalizedControlHolder,
+    NormalizedEntity, NormalizedOfficer, NormalizedRelationship, OfficerRole, RelationshipType,
+    SearchCandidate, SearchOptions, SourceDataType, SourceInfo, SourceLoader, SourceRegistry,
+};

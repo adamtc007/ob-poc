@@ -11,6 +11,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -21,6 +22,109 @@ use crate::graph::GraphScope;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
+
+// ============================================================================
+// Session Scope State Struct
+// ============================================================================
+
+/// Session scope state returned from navigation operations.
+/// Uses Option<T> for all nullable database fields.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionScopeState {
+    pub scope_type: Option<String>,
+    pub apex_entity_id: Option<Uuid>,
+    pub apex_entity_name: Option<String>,
+    pub cbu_id: Option<Uuid>,
+    pub cbu_name: Option<String>,
+    pub jurisdiction_code: Option<String>,
+    pub focal_entity_id: Option<Uuid>,
+    pub focal_entity_name: Option<String>,
+    pub neighborhood_hops: Option<i32>,
+    pub history_position: Option<i32>,
+    pub active_cbu_ids: Option<Vec<Uuid>>,
+}
+
+impl SessionScopeState {
+    /// Convert to GraphScope enum for pending scope change
+    pub fn to_graph_scope(&self) -> GraphScope {
+        match self.scope_type.as_deref() {
+            Some("galaxy") | Some("book") => match (&self.apex_entity_id, &self.apex_entity_name) {
+                (Some(id), Some(name)) => GraphScope::Book {
+                    apex_entity_id: *id,
+                    apex_name: name.clone(),
+                },
+                _ => GraphScope::Empty,
+            },
+            Some("cbu") => match (&self.cbu_id, &self.cbu_name) {
+                (Some(id), Some(name)) => GraphScope::SingleCbu {
+                    cbu_id: *id,
+                    cbu_name: name.clone(),
+                },
+                _ => GraphScope::Empty,
+            },
+            Some("jurisdiction") => match &self.jurisdiction_code {
+                Some(code) => GraphScope::Jurisdiction { code: code.clone() },
+                None => GraphScope::Empty,
+            },
+            Some("neighborhood") => match &self.focal_entity_id {
+                Some(id) => GraphScope::EntityNeighborhood {
+                    entity_id: *id,
+                    hops: self.neighborhood_hops.unwrap_or(2) as u32,
+                },
+                None => GraphScope::Empty,
+            },
+            _ => GraphScope::Empty,
+        }
+    }
+
+    /// Check if currently in history (not at the latest scope)
+    pub fn is_in_history(&self) -> bool {
+        self.history_position.map(|p| p >= 0).unwrap_or(false)
+    }
+
+    /// Check if at the end of history (latest scope)
+    pub fn is_at_end(&self) -> bool {
+        self.history_position.map(|p| p < 0).unwrap_or(true)
+    }
+
+    /// Get active CBU count
+    pub fn active_cbu_count(&self) -> usize {
+        self.active_cbu_ids.as_ref().map(|v| v.len()).unwrap_or(0)
+    }
+
+    /// Convert to JSON response for back navigation
+    pub fn to_back_response(&self, navigated: bool) -> serde_json::Value {
+        json!({
+            "success": true,
+            "navigated": navigated,
+            "scope_type": self.scope_type,
+            "apex_entity_name": self.apex_entity_name,
+            "cbu_name": self.cbu_name,
+            "jurisdiction_code": self.jurisdiction_code,
+            "focal_entity_name": self.focal_entity_name,
+            "history_position": self.history_position,
+            "message": if navigated { "Navigated back" } else { "Already at oldest history entry" },
+            "active_cbu_count": self.active_cbu_count()
+        })
+    }
+
+    /// Convert to JSON response for forward navigation
+    pub fn to_forward_response(&self, navigated: bool) -> serde_json::Value {
+        json!({
+            "success": true,
+            "navigated": navigated,
+            "scope_type": self.scope_type,
+            "apex_entity_name": self.apex_entity_name,
+            "cbu_name": self.cbu_name,
+            "jurisdiction_code": self.jurisdiction_code,
+            "focal_entity_name": self.focal_entity_name,
+            "history_position": self.history_position,
+            "at_end": self.is_at_end(),
+            "message": if navigated { "Navigated forward" } else { "Already at latest scope" },
+            "active_cbu_count": self.active_cbu_count()
+        })
+    }
+}
 
 // ============================================================================
 // Helper Functions
@@ -715,60 +819,67 @@ impl CustomOperation for SessionListCbusOp {
 
         // Build dynamic query based on scope type
         let cbus: Vec<serde_json::Value> = match scope {
-            Some(s) => match s.scope_type.as_str() {
-                "galaxy" | "book" if s.apex_entity_id.is_some() => {
-                    let rows = sqlx::query!(
-                        r#"
+            Some(s) => {
+                match (
+                    s.scope_type.as_str(),
+                    &s.apex_entity_id,
+                    &s.cbu_id,
+                    &s.jurisdiction_code,
+                ) {
+                    ("galaxy" | "book", Some(apex_id), _, _) => {
+                        let rows = sqlx::query!(
+                            r#"
                             SELECT cbu_id, name, jurisdiction, client_type
                             FROM "ob-poc".cbus
                             WHERE commercial_client_entity_id = $1
                             ORDER BY name
                             LIMIT $2
                             "#,
-                        s.apex_entity_id.unwrap(),
-                        limit
-                    )
-                    .fetch_all(pool)
-                    .await?;
-                    rows.into_iter()
+                            apex_id,
+                            limit
+                        )
+                        .fetch_all(pool)
+                        .await?;
+                        rows.into_iter()
                             .map(|c| json!({"cbu_id": c.cbu_id, "name": c.name, "jurisdiction": c.jurisdiction, "client_type": c.client_type}))
                             .collect()
-                }
-                "cbu" if s.cbu_id.is_some() => {
-                    let rows = sqlx::query!(
-                        r#"
+                    }
+                    ("cbu", _, Some(cbu_id), _) => {
+                        let rows = sqlx::query!(
+                            r#"
                             SELECT cbu_id, name, jurisdiction, client_type
                             FROM "ob-poc".cbus
                             WHERE cbu_id = $1
                             "#,
-                        s.cbu_id.unwrap()
-                    )
-                    .fetch_all(pool)
-                    .await?;
-                    rows.into_iter()
+                            cbu_id
+                        )
+                        .fetch_all(pool)
+                        .await?;
+                        rows.into_iter()
                             .map(|c| json!({"cbu_id": c.cbu_id, "name": c.name, "jurisdiction": c.jurisdiction, "client_type": c.client_type}))
                             .collect()
-                }
-                "jurisdiction" if s.jurisdiction_code.is_some() => {
-                    let rows = sqlx::query!(
-                        r#"
+                    }
+                    ("jurisdiction", _, _, Some(jurisdiction)) => {
+                        let rows = sqlx::query!(
+                            r#"
                             SELECT cbu_id, name, jurisdiction, client_type
                             FROM "ob-poc".cbus
                             WHERE jurisdiction = $1
                             ORDER BY name
                             LIMIT $2
                             "#,
-                        s.jurisdiction_code.as_ref().unwrap(),
-                        limit
-                    )
-                    .fetch_all(pool)
-                    .await?;
-                    rows.into_iter()
+                            jurisdiction,
+                            limit
+                        )
+                        .fetch_all(pool)
+                        .await?;
+                        rows.into_iter()
                             .map(|c| json!({"cbu_id": c.cbu_id, "name": c.name, "jurisdiction": c.jurisdiction, "client_type": c.client_type}))
                             .collect()
+                    }
+                    _ => vec![],
                 }
-                _ => vec![],
-            },
+            }
             None => vec![],
         };
 
@@ -874,28 +985,44 @@ impl CustomOperation for SessionBackOp {
     ) -> Result<ExecutionResult> {
         let session_id = get_session_id(ctx);
 
-        // Get latest history entry
-        let history = sqlx::query!(
+        // Call the navigate_back PL/pgSQL function
+        let row = sqlx::query_as!(
+            SessionScopeState,
             r#"
-            SELECT scope_snapshot
-            FROM "ob-poc".session_scope_history
-            WHERE session_id = $1
-            ORDER BY position DESC
-            LIMIT 1 OFFSET 1
+            SELECT
+                scope_type,
+                apex_entity_id,
+                apex_entity_name,
+                cbu_id,
+                cbu_name,
+                jurisdiction_code,
+                focal_entity_id,
+                focal_entity_name,
+                neighborhood_hops,
+                history_position,
+                active_cbu_ids
+            FROM "ob-poc".navigate_back($1)
             "#,
             session_id
         )
         .fetch_optional(pool)
         .await?;
 
-        match history {
-            Some(h) => {
-                // Restore from snapshot (simplified - just return the snapshot)
-                // scope_snapshot is JSONB NOT NULL, so it's always present
-                Ok(ExecutionResult::Record(h.scope_snapshot))
+        match row {
+            Some(state) => {
+                let navigated = state.is_in_history();
+
+                // Only set pending scope change if we actually navigated
+                if navigated {
+                    ctx.set_pending_scope_change(state.to_graph_scope());
+                }
+
+                Ok(ExecutionResult::Record(state.to_back_response(navigated)))
             }
             None => Ok(ExecutionResult::Record(json!({
-                "message": "No history available",
+                "success": false,
+                "navigated": false,
+                "message": "Session not found",
                 "session_id": session_id
             }))),
         }
@@ -935,16 +1062,53 @@ impl CustomOperation for SessionForwardOp {
         &self,
         _verb_call: &VerbCall,
         ctx: &mut ExecutionContext,
-        _pool: &PgPool,
+        pool: &PgPool,
     ) -> Result<ExecutionResult> {
         let session_id = get_session_id(ctx);
 
-        // Forward navigation requires tracking current position in history
-        // For now, return a placeholder
-        Ok(ExecutionResult::Record(json!({
-            "message": "Forward navigation not yet implemented",
-            "session_id": session_id
-        })))
+        // Call the navigate_forward PL/pgSQL function
+        let row = sqlx::query_as!(
+            SessionScopeState,
+            r#"
+            SELECT
+                scope_type,
+                apex_entity_id,
+                apex_entity_name,
+                cbu_id,
+                cbu_name,
+                jurisdiction_code,
+                focal_entity_id,
+                focal_entity_name,
+                neighborhood_hops,
+                history_position,
+                active_cbu_ids
+            FROM "ob-poc".navigate_forward($1)
+            "#,
+            session_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        match row {
+            Some(state) => {
+                let navigated = !state.is_at_end();
+
+                // Only set pending scope change if we actually navigated
+                if navigated {
+                    ctx.set_pending_scope_change(state.to_graph_scope());
+                }
+
+                Ok(ExecutionResult::Record(
+                    state.to_forward_response(navigated),
+                ))
+            }
+            None => Ok(ExecutionResult::Record(json!({
+                "success": false,
+                "navigated": false,
+                "message": "Session not found",
+                "session_id": session_id
+            }))),
+        }
     }
 
     #[cfg(not(feature = "database"))]
@@ -1265,6 +1429,295 @@ impl CustomOperation for SessionDeleteBookmarkOp {
 }
 
 // ============================================================================
+// Multi-CBU Set Operations
+// ============================================================================
+
+/// Add a CBU to the active set
+pub struct SessionAddCbuOp;
+
+#[async_trait]
+impl CustomOperation for SessionAddCbuOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "add-cbu"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Adds a CBU to the active CBU set"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let session_id = get_session_id(ctx);
+        let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
+
+        let row = sqlx::query!(
+            r#"
+            SELECT active_cbu_ids
+            FROM "ob-poc".add_cbu_to_set($1, $2)
+            "#,
+            session_id,
+            cbu_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        match row {
+            Some(r) => {
+                let count = r.active_cbu_ids.as_ref().map(|v| v.len()).unwrap_or(0);
+                Ok(ExecutionResult::Record(json!({
+                    "success": true,
+                    "cbu_id": cbu_id,
+                    "active_cbu_count": count,
+                    "active_cbu_ids": r.active_cbu_ids
+                })))
+            }
+            None => Ok(ExecutionResult::Record(json!({
+                "success": false,
+                "message": "Session not found"
+            }))),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+/// Remove a CBU from the active set
+pub struct SessionRemoveCbuOp;
+
+#[async_trait]
+impl CustomOperation for SessionRemoveCbuOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "remove-cbu"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Removes a CBU from the active CBU set"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let session_id = get_session_id(ctx);
+        let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
+
+        let row = sqlx::query!(
+            r#"
+            SELECT active_cbu_ids
+            FROM "ob-poc".remove_cbu_from_set($1, $2)
+            "#,
+            session_id,
+            cbu_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        match row {
+            Some(r) => {
+                let count = r.active_cbu_ids.as_ref().map(|v| v.len()).unwrap_or(0);
+                Ok(ExecutionResult::Record(json!({
+                    "success": true,
+                    "removed_cbu_id": cbu_id,
+                    "active_cbu_count": count,
+                    "active_cbu_ids": r.active_cbu_ids
+                })))
+            }
+            None => Ok(ExecutionResult::Record(json!({
+                "success": false,
+                "message": "Session not found"
+            }))),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+/// Clear the active CBU set
+pub struct SessionClearCbuSetOp;
+
+#[async_trait]
+impl CustomOperation for SessionClearCbuSetOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "clear-cbu-set"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Clears all CBUs from the active set"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let session_id = get_session_id(ctx);
+
+        let row = sqlx::query!(
+            r#"
+            SELECT active_cbu_ids
+            FROM "ob-poc".clear_cbu_set($1)
+            "#,
+            session_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        match row {
+            Some(_) => Ok(ExecutionResult::Record(json!({
+                "success": true,
+                "active_cbu_count": 0,
+                "active_cbu_ids": []
+            }))),
+            None => Ok(ExecutionResult::Record(json!({
+                "success": false,
+                "message": "Session not found"
+            }))),
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+/// List active CBUs in the set
+pub struct SessionListActiveCbusOp;
+
+#[async_trait]
+impl CustomOperation for SessionListActiveCbusOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "list-active-cbus"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Lists all CBUs in the active set with details"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let session_id = get_session_id(ctx);
+
+        // Get active CBU IDs from session scope
+        let scope = sqlx::query!(
+            r#"
+            SELECT active_cbu_ids
+            FROM "ob-poc".session_scopes
+            WHERE session_id = $1
+            "#,
+            session_id
+        )
+        .fetch_optional(pool)
+        .await?;
+
+        let cbu_ids = scope.and_then(|s| s.active_cbu_ids).unwrap_or_default();
+
+        if cbu_ids.is_empty() {
+            return Ok(ExecutionResult::Record(json!({
+                "count": 0,
+                "cbus": []
+            })));
+        }
+
+        // Get CBU details
+        let cbus = sqlx::query!(
+            r#"
+            SELECT cbu_id, name, jurisdiction, client_type
+            FROM "ob-poc".cbus
+            WHERE cbu_id = ANY($1)
+            ORDER BY name
+            "#,
+            &cbu_ids
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let list: Vec<serde_json::Value> = cbus
+            .into_iter()
+            .map(|c| {
+                json!({
+                    "cbu_id": c.cbu_id,
+                    "name": c.name,
+                    "jurisdiction": c.jurisdiction,
+                    "client_type": c.client_type
+                })
+            })
+            .collect();
+
+        Ok(ExecutionResult::Record(json!({
+            "count": list.len(),
+            "cbus": list
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// ============================================================================
 // Registration
 // ============================================================================
 
@@ -1299,4 +1752,10 @@ pub fn register_session_ops(registry: &mut crate::dsl_v2::custom_ops::CustomOper
     registry.register(Arc::new(SessionLoadBookmarkOp));
     registry.register(Arc::new(SessionListBookmarksOp));
     registry.register(Arc::new(SessionDeleteBookmarkOp));
+
+    // Multi-CBU Set
+    registry.register(Arc::new(SessionAddCbuOp));
+    registry.register(Arc::new(SessionRemoveCbuOp));
+    registry.register(Arc::new(SessionClearCbuSetOp));
+    registry.register(Arc::new(SessionListActiveCbusOp));
 }

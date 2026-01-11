@@ -2330,6 +2330,8 @@ async fn cmd_repl(
         validation::{RustStyleFormatter, ValidationContext},
         BindingContext, BindingInfo, CsgLinter, RuntimeVerbRegistry,
     };
+    use ob_poc::events::{init_events, EventConfig, SharedEmitter};
+    use ob_poc::feedback::{FeedbackInspector, ReproGenerator, TodoGenerator};
     use rustyline::completion::{Completer, Pair};
     use rustyline::error::ReadlineError;
     use rustyline::highlight::Highlighter;
@@ -2407,7 +2409,16 @@ async fn cmd_repl(
         .map_err(|e| format!("Database connection failed: {}", e))?;
 
     let repo = SessionRepository::new(pool.clone());
-    let executor = DslExecutor::new(pool.clone());
+
+    // Initialize event infrastructure
+    let event_config =
+        EventConfig::with_file_store(std::path::PathBuf::from("/tmp/ob-poc-events.jsonl"));
+    let events: Option<SharedEmitter> = init_events(&event_config);
+    if events.is_some() && format == OutputFormat::Pretty {
+        println!("{} Event infrastructure initialized", "✓".green());
+    }
+
+    let executor = DslExecutor::new(pool.clone()).with_events(events.clone());
 
     // Parse CBU ID if provided
     let cbu_uuid = if let Some(id) = &cbu_id {
@@ -2519,6 +2530,14 @@ async fn cmd_repl(
             "  {} - Reorder pending DSL by dependencies",
             ":reorder".green()
         );
+        println!(
+            "  {}    - Show event infrastructure health",
+            ":events".green()
+        );
+        println!(
+            "  {}  - Analyze failures (or :fb <fingerprint>)",
+            ":feedback".green()
+        );
         println!("  {}      - Show this help", ":help".green());
         println!("  {}      - Exit REPL", ":quit".green());
         println!();
@@ -2585,6 +2604,11 @@ async fn cmd_repl(
                             println!(
                                 "  :reorder   - Topologically sort pending DSL by dependencies"
                             );
+                            println!(
+                                "  :verbs     - List all available verbs (or :verbs <domain>)"
+                            );
+                            println!("  :events    - Show event infrastructure health");
+                            println!("  :feedback  - Analyze failures (or :fb <fingerprint>)");
                             println!("  :clear     - Clear screen");
                             println!("  :quit      - Exit REPL");
                             println!();
@@ -2820,6 +2844,248 @@ async fn cmd_repl(
                         ":clear" => {
                             print!("\x1B[2J\x1B[1;1H"); // ANSI clear screen
                             stdout.flush().map_err(|e| format!("IO error: {}", e))?;
+                        }
+
+                        ":verbs" => {
+                            // List all domains and verb counts
+                            println!();
+                            println!("{}:", "Available Domains".yellow());
+                            for domain in registry.domains() {
+                                let verbs = registry.verbs_for_domain(domain);
+                                println!("  {:20} {} verbs", domain.green(), verbs.len());
+                            }
+                            println!();
+                            println!(
+                                "Use {} to see verbs for a specific domain",
+                                ":verbs <domain>".cyan()
+                            );
+                        }
+
+                        cmd if cmd.starts_with(":verbs ") => {
+                            let domain = cmd.strip_prefix(":verbs ").unwrap().trim();
+                            let verbs = registry.verbs_for_domain(domain);
+                            if verbs.is_empty() {
+                                println!("{} Unknown domain: {}", "?".yellow(), domain);
+                                println!("  Available: {}", registry.domains().join(", "));
+                            } else {
+                                println!();
+                                println!(
+                                    "{} ({} verbs):",
+                                    format!("Domain: {}", domain).yellow(),
+                                    verbs.len()
+                                );
+                                for v in verbs {
+                                    let args_str = if v.args.is_empty() {
+                                        String::new()
+                                    } else {
+                                        let args: Vec<String> = v
+                                            .args
+                                            .iter()
+                                            .map(|a| {
+                                                if a.required {
+                                                    format!(":{}", a.name)
+                                                } else {
+                                                    format!("[:{}]", a.name)
+                                                }
+                                            })
+                                            .collect();
+                                        format!(" {}", args.join(" "))
+                                    };
+                                    println!(
+                                        "  {}:{}{}",
+                                        v.domain.green(),
+                                        v.verb.green().bold(),
+                                        args_str.dimmed()
+                                    );
+                                    if !v.description.is_empty() {
+                                        println!("      {}", v.description.dimmed());
+                                    }
+                                }
+                                println!();
+                            }
+                        }
+
+                        ":events" | ":ev" => {
+                            if let Some(ref emitter) = events {
+                                let stats = emitter.stats();
+                                println!();
+                                println!("{}:", "Event Infrastructure".yellow());
+                                let status_color = if stats.is_healthy() {
+                                    "healthy".green()
+                                } else if stats.drop_rate() < 0.05 {
+                                    "degraded".yellow()
+                                } else {
+                                    "unhealthy".red()
+                                };
+                                println!("  Status:      {}", status_color);
+                                println!("  Emitted:     {}", stats.emitted);
+                                println!("  Dropped:     {}", stats.dropped);
+                                println!("  Drop rate:   {:.2}%", stats.drop_rate() * 100.0);
+                                println!("  Store:       /tmp/ob-poc-events.jsonl");
+                                println!();
+                            } else {
+                                println!("{}", "(event infrastructure not enabled)".dimmed());
+                            }
+                        }
+
+                        ":feedback" | ":fb" => {
+                            // Analyze failures from last 24 hours
+                            let inspector = FeedbackInspector::new(
+                                pool.clone(),
+                                Some(std::path::PathBuf::from("/tmp/ob-poc-events.jsonl")),
+                            );
+                            let since = chrono::Utc::now() - chrono::Duration::hours(24);
+                            match inspector.analyze(Some(since)).await {
+                                Ok(report) => {
+                                    println!();
+                                    println!("{}:", "Failure Analysis (last 24h)".yellow());
+                                    println!("  Events processed:  {}", report.events_processed);
+                                    println!("  Failures created:  {}", report.failures_created);
+                                    println!("  Failures updated:  {}", report.failures_updated);
+                                    println!();
+                                    if !report.by_error_type.is_empty() {
+                                        println!("  {}:", "By Error Type".cyan());
+                                        for (error_type, count) in &report.by_error_type {
+                                            println!("    {:20} {}", error_type, count);
+                                        }
+                                        println!();
+                                    }
+                                    if !report.by_remediation_path.is_empty() {
+                                        println!("  {}:", "By Remediation Path".cyan());
+                                        for (path, count) in &report.by_remediation_path {
+                                            println!("    {:20} {}", path, count);
+                                        }
+                                        println!();
+                                    }
+                                    println!("  Use :fb <fingerprint> to see issue details");
+                                }
+                                Err(e) => {
+                                    println!("{} Failed to analyze: {}", "✗".red(), e);
+                                }
+                            }
+                        }
+
+                        cmd if cmd.starts_with(":fb ") => {
+                            let args: Vec<&str> = cmd
+                                .strip_prefix(":fb ")
+                                .unwrap()
+                                .split_whitespace()
+                                .collect();
+                            if args.is_empty() {
+                                println!("{} Usage: :fb <fingerprint> | :fb repro <fp> | :fb todo <fp> <num>", "?".yellow());
+                                continue;
+                            }
+
+                            let inspector = FeedbackInspector::new(
+                                pool.clone(),
+                                Some(std::path::PathBuf::from("/tmp/ob-poc-events.jsonl")),
+                            );
+
+                            match args[0] {
+                                "repro" if args.len() >= 2 => {
+                                    // Generate repro for fingerprint
+                                    let fp = args[1];
+                                    let repro_gen = ReproGenerator::new(std::path::PathBuf::from(
+                                        "tests/repro",
+                                    ));
+                                    println!("{}", "Generating repro test...".dimmed());
+                                    match repro_gen.generate_and_verify(&inspector, fp).await {
+                                        Ok(result) => {
+                                            println!();
+                                            println!("{} Repro generated:", "✓".green());
+                                            println!("  Type:   {:?}", result.repro_type);
+                                            println!("  Path:   {}", result.repro_path.display());
+                                            println!(
+                                                "  Verified: {}",
+                                                if result.verified {
+                                                    "yes".green()
+                                                } else {
+                                                    "no".red()
+                                                }
+                                            );
+                                        }
+                                        Err(e) => {
+                                            println!(
+                                                "{} Repro generation failed: {}",
+                                                "✗".red(),
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
+                                "todo" if args.len() >= 3 => {
+                                    // Generate TODO for fingerprint
+                                    let fp = args[1];
+                                    let todo_num: i32 = args[2].parse().unwrap_or(0);
+                                    if todo_num == 0 {
+                                        println!("{} Invalid TODO number", "✗".red());
+                                        continue;
+                                    }
+                                    let todo_gen =
+                                        TodoGenerator::new(std::path::PathBuf::from("todos"));
+                                    println!("{}", "Generating TODO...".dimmed());
+                                    match todo_gen.generate_todo(&inspector, fp, todo_num).await {
+                                        Ok(result) => {
+                                            println!();
+                                            println!(
+                                                "{} TODO-{} generated:",
+                                                "✓".green(),
+                                                result.todo_number
+                                            );
+                                            println!("  Path: {}", result.todo_path.display());
+                                            println!();
+                                            println!("{}:", "Content".yellow());
+                                            for line in result.content.lines().take(20) {
+                                                println!("  {}", line);
+                                            }
+                                            if result.content.lines().count() > 20 {
+                                                println!("  ... (truncated)");
+                                            }
+                                        }
+                                        Err(e) => {
+                                            println!("{} TODO generation failed: {}", "✗".red(), e);
+                                        }
+                                    }
+                                }
+                                fingerprint => {
+                                    // Show issue details
+                                    match inspector.get_issue(fingerprint).await {
+                                        Ok(Some(issue)) => {
+                                            let f = &issue.failure;
+                                            println!();
+                                            println!("{}:", "Issue Details".yellow());
+                                            println!("  Fingerprint:   {}", f.fingerprint.cyan());
+                                            println!("  Error Type:    {:?}", f.error_type);
+                                            println!("  Status:        {:?}", f.status);
+                                            println!("  Verb:          {}", f.verb);
+                                            println!("  Message:       {}", f.error_message);
+                                            println!("  Occurrences:   {}", f.occurrence_count);
+                                            println!("  First seen:    {}", f.first_seen_at);
+                                            println!("  Last seen:     {}", f.last_seen_at);
+                                            println!();
+                                            println!("  Commands:");
+                                            println!(
+                                                "    :fb repro {}    - Generate repro test",
+                                                fingerprint
+                                            );
+                                            println!(
+                                                "    :fb todo {} N   - Generate TODO-N",
+                                                fingerprint
+                                            );
+                                        }
+                                        Ok(None) => {
+                                            println!(
+                                                "{} Issue not found: {}",
+                                                "?".yellow(),
+                                                fingerprint
+                                            );
+                                        }
+                                        Err(e) => {
+                                            println!("{} Failed to get issue: {}", "✗".red(), e);
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         cmd if cmd.starts_with(":cbu ") => {

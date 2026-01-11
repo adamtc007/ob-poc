@@ -1,8 +1,9 @@
 # Ownership Graph & UBO Computation
 
-> **Status:** Planning
+> **Status:** ✅ IMPLEMENTED
 > **Priority:** High - Foundation for normalized UBO across CBUs
 > **Created:** 2026-01-10
+> **Completed:** 2026-01-10
 > **Estimated Effort:** 70-80 hours
 > **Dependencies:** 
 >   - 016-capital-structure-ownership-model.md (investor register schema)

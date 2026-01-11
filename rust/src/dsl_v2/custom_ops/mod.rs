@@ -53,6 +53,7 @@ mod rfi;
 mod screening_ops;
 mod semantic_ops;
 mod session_ops;
+mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
 mod temporal_ops;
@@ -752,6 +753,9 @@ impl CustomOperationRegistry {
         // Agent control operations (agent mode lifecycle, checkpoints)
         agent_ops::register_agent_ops(&mut registry);
 
+        // Research source loader operations (GLEIF, Companies House, SEC EDGAR)
+        source_loader_ops::register_source_loader_ops(&mut registry);
+
         registry
     }
 
@@ -1048,6 +1052,24 @@ mod tests {
         assert!(registry.has("agent", "history"));
         assert!(registry.has("agent", "set-threshold"));
         assert!(registry.has("agent", "set-mode"));
+        // Research source loader operations
+        assert!(registry.has("research.sources", "list"));
+        assert!(registry.has("research.sources", "info"));
+        assert!(registry.has("research.sources", "search"));
+        assert!(registry.has("research.sources", "fetch"));
+        assert!(registry.has("research.sources", "find-for-jurisdiction"));
+        // Companies House operations
+        assert!(registry.has("research.companies-house", "search"));
+        assert!(registry.has("research.companies-house", "fetch-company"));
+        assert!(registry.has("research.companies-house", "fetch-psc"));
+        assert!(registry.has("research.companies-house", "fetch-officers"));
+        assert!(registry.has("research.companies-house", "import-company"));
+        // SEC EDGAR operations
+        assert!(registry.has("research.sec-edgar", "search"));
+        assert!(registry.has("research.sec-edgar", "fetch-company"));
+        assert!(registry.has("research.sec-edgar", "fetch-beneficial-owners"));
+        assert!(registry.has("research.sec-edgar", "fetch-filings"));
+        assert!(registry.has("research.sec-edgar", "import-company"));
     }
 
     #[test]

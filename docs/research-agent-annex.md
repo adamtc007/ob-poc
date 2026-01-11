@@ -2,7 +2,8 @@
 
 > **Reference TODOs:**
 > - `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` (~78h)
-> - `ai-thoughts/020-research-workflows-external-sources.md` (~93h)
+> - `ai-thoughts/020-research-workflows-external-sources.md` (~93h) - Orchestration
+> - `ai-thoughts/021-pluggable-research-source-loaders.md` (~52h) - Source implementations
 
 This annex covers the GROUP ownership model, UBO computation, research workflows, and agent integration.
 
@@ -182,40 +183,84 @@ The LLM uses these phrases to determine when to invoke agent/research verbs:
 
 ## Pluggable Source Model
 
+> **Implementation details:** See `ai-thoughts/021-pluggable-research-source-loaders.md`
+
+**All source loaders follow the same ETL pattern:**
+
+```
+Source API → Source Types → Normalized Structures → Our Entity Model → Database
+```
+
 | Tier | Example | Handler | LLM Role |
 |------|---------|---------|----------|
 | **Built-in** | GLEIF, Companies House, SEC | Dedicated verb + handler | Search only |
 | **Registered** | Singapore ACRA | `research.generic.import-*` | Search + adapt |
 | **Discovered** | LLM finds API | `research.generic.import-*` | Everything |
 
-**The LLM is the universal API adapter** - for Tier 2/3 sources, it discovers the API, makes calls, parses responses, and hands normalized data to deterministic import verbs.
+### Existing GLEIF Implementation (Reference)
+
+```
+rust/src/research/sources/          # NEW - Pluggable source loaders
+├── mod.rs                          # Re-exports
+├── traits.rs                       # SourceLoader trait
+├── normalized.rs                   # Normalized structures
+├── registry.rs                     # SourceRegistry
+│
+├── gleif/
+│   ├── mod.rs
+│   ├── client.rs                   # GleifClient
+│   ├── types.rs                    # LeiRecord, etc.
+│   └── loader.rs                   # impl SourceLoader
+│
+├── companies_house/
+│   ├── mod.rs
+│   ├── client.rs                   # CompaniesHouseClient
+│   ├── types.rs                    # ChCompany, ChPscRecord, etc.
+│   └── loader.rs                   # impl SourceLoader
+│
+└── sec_edgar/
+    ├── mod.rs
+    ├── client.rs                   # SecEdgarClient
+    ├── types.rs                    # SecSubmissions, Sec13DG, etc.
+    └── loader.rs                   # impl SourceLoader
+
+rust/src/dsl_v2/custom_ops/source_loader_ops.rs   # 15 handlers
+rust/config/verbs/research/
+├── sources.yaml                    # Generic (list, search, fetch)
+├── companies-house.yaml            # UK-specific verbs
+└── sec-edgar.yaml                  # US-specific verbs
+```
+
+**All loaders implement the `SourceLoader` trait with resilience pattern.**
+
+### Target Tables
+
+| Normalized Structure | Target Table |
+|---------------------|--------------|
+| `NormalizedEntity` (company) | `entities`, `entity_limited_companies` |
+| `NormalizedEntity` (person) | `entities`, `entity_natural_persons` |
+| `NormalizedControlHolder` | `kyc.control_relationships` |
+| `NormalizedOfficer` | `kyc.officers` |
+| `NormalizedRelationship` | `kyc.ownership_edges` |
+
+**Entity resolution** prevents duplicates: check LEI, registration_number, or name+jurisdiction before creating.
 
 ### Normalized Data Contract
 
+> **Full struct definitions:** See `ai-thoughts/021-pluggable-research-source-loaders.md`
+
 ```yaml
-extracted_entity:
-  required:
-    name: string
-    source_key: string
-    source_name: string
-  
-  optional:
-    jurisdiction: string        # ISO country code
-    entity_type: string         # Mapped to taxonomy
-    status: string              # ACTIVE, DISSOLVED
-    incorporated_date: date
-    lei: string
-    
-  nested:
-    officers:
-      - name: string
-        role: string            # DIRECTOR, SECRETARY
-        appointed_date: date
-        
-    shareholders:
-      - name: string
-        percentage: decimal
-        source_key: string
+NormalizedEntity:
+  required: [source_key, source_name, name]
+  optional: [lei, registration_number, jurisdiction, entity_type, status, incorporated_date]
+
+NormalizedControlHolder:
+  required: [holder_name, holder_type]
+  optional: [ownership_pct_*, voting_pct, has_*_rights, natures_of_control]
+
+NormalizedOfficer:
+  required: [name, role]
+  optional: [appointed_date, resigned_date, nationality]
 ```
 
 ---
@@ -408,16 +453,20 @@ ob-poc/
 
 | Component | Status | TODO |
 |-----------|--------|------|
-| GROUP taxonomy schema | Planning | 019 |
-| UBO computation functions | Planning | 019 |
-| Coverage model | Planning | 019 |
-| Agent infrastructure | Planning | 020 Phase 1 |
-| Agent verbs | Planning | 020 Phase 2 |
-| Research audit schema | Planning | 020 Phase 3 |
-| Prompt templates | Planning | 020 Phase 4 |
-| GLEIF refactor | Planning | 020 Phase 5 |
-| Companies House | Planning | 020 Phase 6 |
-| Generic import | Planning | 020 Phase 7 |
+| **GROUP taxonomy schema** | ✅ Done | 019 |
+| **UBO computation functions** | ✅ Done | 019 |
+| **Coverage model** | ✅ Done | 019 |
+| **Agent infrastructure** | ✅ Done | 020 Phase 1 |
+| **Agent verbs** | ✅ Done | 020 Phase 2 |
+| **Research audit schema** | ✅ Done | 020 Phase 3 |
+| **Prompt templates** | ✅ Done | 020 Phase 4 |
+| **SourceLoader trait** | ✅ Done | 021 Phase 1 |
+| **GLEIF loader** | ✅ Done | 021 Phase 2 |
+| **Companies House loader** | ✅ Done | 021 Phase 3 |
+| **SEC EDGAR loader** | ✅ Done | 021 Phase 4 |
+| **Generic import** | ✅ Done | 021 Phase 5 |
+| **15 source handlers** | ✅ Done | 021 |
+| **35 tests passing** | ✅ Done | 021 |
 
 ---
 

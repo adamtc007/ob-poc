@@ -338,9 +338,20 @@ impl RuntimeVerbRegistry {
     fn build_verb(domain: &str, verb: &str, config: &VerbConfig) -> RuntimeVerb {
         let behavior = match (&config.behavior, &config.crud, &config.handler) {
             (VerbBehavior::Crud, Some(crud), _) => {
+                // For entity_create/entity_upsert operations, table defaults to base_table
+                let table = crud.table.clone().unwrap_or_else(|| {
+                    if matches!(
+                        crud.operation,
+                        CrudOperation::EntityCreate | CrudOperation::EntityUpsert
+                    ) {
+                        crud.base_table.clone().unwrap_or_default()
+                    } else {
+                        String::new()
+                    }
+                });
                 RuntimeBehavior::Crud(Box::new(RuntimeCrudConfig {
                     operation: crud.operation,
-                    table: crud.table.clone().unwrap_or_default(),
+                    table,
                     schema: crud.schema.clone().unwrap_or_else(|| "ob-poc".to_string()),
                     key: crud.key.clone(),
                     returning: crud.returning.clone(),

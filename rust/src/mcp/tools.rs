@@ -1185,5 +1185,180 @@ in the response."#.into(),
                 "required": ["cbu_id"]
             }),
         },
+        // =====================================================================
+        // Feedback Inspector Tools
+        // On-demand failure analysis, repro generation, and TODO creation
+        // =====================================================================
+        Tool {
+            name: "feedback_analyze".into(),
+            description: r#"Analyze failures from the event store.
+
+Scans failure events, classifies them, computes fingerprints for
+deduplication, and stores in the feedback database.
+
+Returns:
+- total_failures: Number of failure events processed
+- unique_issues: Deduplicated issue count
+- resolution_rate: Percentage resolved at runtime
+- by_error_type: Breakdown by error classification
+- top_verbs: Most failing verbs
+
+Use since_hours to limit analysis window (default 24h)."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "since_hours": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Analyze failures from last N hours"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "feedback_list".into(),
+            description: r#"List issues with optional filtering.
+
+Returns issue summaries with:
+- fingerprint: Unique issue identifier
+- error_type: Classification (TIMEOUT, ENUM_DRIFT, HANDLER_PANIC, etc.)
+- status: Lifecycle state (NEW, REPRO_VERIFIED, TODO_CREATED, etc.)
+- verb: The DSL verb that failed
+- occurrence_count: How many times seen
+- first_seen/last_seen: Temporal bounds
+
+Filter by status, error_type, verb, or source."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["NEW", "REPRO_GENERATED", "REPRO_VERIFIED", "TODO_CREATED", "IN_PROGRESS", "RESOLVED", "WONT_FIX"],
+                        "description": "Filter by issue status"
+                    },
+                    "error_type": {
+                        "type": "string",
+                        "enum": ["TIMEOUT", "RATE_LIMITED", "ENUM_DRIFT", "SCHEMA_DRIFT", "HANDLER_PANIC", "HANDLER_ERROR", "PARSE_ERROR"],
+                        "description": "Filter by error type"
+                    },
+                    "verb": {
+                        "type": "string",
+                        "description": "Filter by verb name (partial match)"
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Filter by source (gleif, bods, etc.)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Max results to return"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "feedback_get".into(),
+            description: r#"Get full details for a specific issue.
+
+Returns:
+- failure: Complete failure record with context
+- occurrences: List of individual occurrences
+- audit_trail: Full audit history
+
+Use the fingerprint from feedback_list or feedback_analyze."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "Issue fingerprint (e.g., v1:HANDLER_PANIC:gleif.fetch:...)"
+                    }
+                },
+                "required": ["fingerprint"]
+            }),
+        },
+        Tool {
+            name: "feedback_repro".into(),
+            description: r#"Generate and verify a repro test for an issue.
+
+Creates a test file that reproduces the failure:
+- GoldenJson: Expected vs actual JSON comparison
+- DslScenario: DSL script that triggers the error
+- UnitTest: Rust unit test
+
+Verifies the test fails as expected, then updates issue status.
+
+Returns:
+- repro_type: Type of test generated
+- path: File path of generated test
+- passes: Whether verification passed (test fails = good)"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "Issue fingerprint"
+                    }
+                },
+                "required": ["fingerprint"]
+            }),
+        },
+        Tool {
+            name: "feedback_todo".into(),
+            description: r#"Generate a TODO document for an issue.
+
+REQUIRES verified repro first - call feedback_repro before this.
+
+Creates a structured TODO markdown file with:
+- Issue summary and classification
+- Repro test reference
+- Suggested fix approach
+- Acceptance criteria
+
+Returns:
+- todo_number: Assigned TODO number
+- path: File path of generated TODO
+- content: The TODO document content"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "Issue fingerprint (must have verified repro)"
+                    },
+                    "todo_number": {
+                        "type": "integer",
+                        "description": "TODO number to assign (e.g., 27 for TODO-027)"
+                    }
+                },
+                "required": ["fingerprint", "todo_number"]
+            }),
+        },
+        Tool {
+            name: "feedback_audit".into(),
+            description: r#"Get audit trail for an issue.
+
+Returns chronological list of all actions taken:
+- CAPTURED: Initial capture from event
+- CLASSIFIED: Error type determined
+- REPRO_GENERATED: Test file created
+- REPRO_VERIFIED_FAILS: Test confirmed to fail
+- TODO_CREATED: TODO document generated
+- FIX_COMMITTED: Fix merged
+- RESOLVED: Issue closed
+
+Each entry includes actor, timestamp, and details."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "Issue fingerprint"
+                    }
+                },
+                "required": ["fingerprint"]
+            }),
+        },
     ]
 }

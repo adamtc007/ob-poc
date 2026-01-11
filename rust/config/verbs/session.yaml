@@ -269,3 +269,64 @@ domains:
             description: Bookmark name to delete
         returns:
           type: affected
+
+      # ============================================
+      # Multi-CBU Set Operations
+      # ============================================
+      add-cbu:
+        description: Add a CBU to the active CBU set (for multi-CBU workflows)
+        behavior: plugin
+        handler: SessionAddCbuOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            description: The CBU to add to the active set
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          capture: false
+
+      remove-cbu:
+        description: Remove a CBU from the active CBU set
+        behavior: plugin
+        handler: SessionRemoveCbuOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            description: The CBU to remove from the active set
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          capture: false
+
+      clear-cbu-set:
+        description: Clear all CBUs from the active set
+        behavior: plugin
+        handler: SessionClearCbuSetOp
+        args: []
+        returns:
+          type: record
+          capture: false
+
+      list-active-cbus:
+        description: List all CBUs in the active set with details
+        behavior: plugin
+        handler: SessionListActiveCbusOp
+        args: []
+        returns:
+          type: record
+          capture: false

@@ -140,32 +140,29 @@ impl CustomOperation for EntityQueryOp {
         );
 
         // Execute query with dynamic binding
-        let rows: Vec<(Uuid, String)> = if name_like.is_some() && jurisdiction.is_some() {
-            let pattern = format!("%{}%", name_like.unwrap().replace('%', ""));
-            sqlx::query_as(&query)
-                .bind(pattern)
-                .bind(jurisdiction.unwrap())
-                .fetch_all(pool)
-                .await?
-        } else if name_like.is_some() {
-            let pattern = name_like.unwrap();
-            // Convert user pattern to SQL ILIKE pattern
-            let sql_pattern = if pattern.contains('%') {
-                pattern.to_string()
-            } else {
-                format!("%{}%", pattern)
-            };
-            sqlx::query_as(&query)
-                .bind(sql_pattern)
-                .fetch_all(pool)
-                .await?
-        } else if jurisdiction.is_some() {
-            sqlx::query_as(&query)
-                .bind(jurisdiction.unwrap())
-                .fetch_all(pool)
-                .await?
-        } else {
-            sqlx::query_as(&query).fetch_all(pool).await?
+        let rows: Vec<(Uuid, String)> = match (&name_like, &jurisdiction) {
+            (Some(name), Some(jur)) => {
+                let pattern = format!("%{}%", name.replace('%', ""));
+                sqlx::query_as(&query)
+                    .bind(pattern)
+                    .bind(jur)
+                    .fetch_all(pool)
+                    .await?
+            }
+            (Some(name), None) => {
+                // Convert user pattern to SQL ILIKE pattern
+                let sql_pattern = if name.contains('%') {
+                    name.to_string()
+                } else {
+                    format!("%{}%", name)
+                };
+                sqlx::query_as(&query)
+                    .bind(sql_pattern)
+                    .fetch_all(pool)
+                    .await?
+            }
+            (None, Some(jur)) => sqlx::query_as(&query).bind(jur).fetch_all(pool).await?,
+            (None, None) => sqlx::query_as(&query).fetch_all(pool).await?,
         };
 
         let result = EntityQueryResult {

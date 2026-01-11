@@ -1,11 +1,12 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-10
-> **Verb count:** ~820 verbs across 105+ YAML files
+> **Last reviewed:** 2026-01-11
+> **Verb count:** ~824 verbs across 105+ YAML files
 > **Custom ops:** 55+ plugin handlers
 > **Crates:** 13 fine-grained crates
-> **Migrations:** 16 schema migrations (latest: 016_research_workflows.sql)
-> **Pending TODOs:** 019 (GROUP taxonomy), 020 (Research workflows)
+> **Migrations:** 19 schema migrations (latest: 019_session_navigation_history.sql)
+> **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
+> **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -26,9 +27,17 @@ This file provides guidance to Claude Code when working with this repository.
 | Capital structure/ownership | `ai-thoughts/016-capital-structure-ownership-model.md` | Multi-class cap table design |
 | Complex capital verbs (split/exercise) | `ai-thoughts/017-transactional-safety-complex-capital-verbs.md` | Transaction safety patterns |
 | Investor register visualization | `ai-thoughts/018-investor-register-visualization.md` | Dual-mode display, institutional look-through |
-| **GROUP/UBO ownership model** | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` | **UBO is COMPUTED not STORED**, coverage model |
-| **Research workflows & agent** | `ai-thoughts/020-research-workflows-external-sources.md` | **Bounded non-determinism**, prompt templates vs DSL verbs |
+| **GROUP/UBO ownership model** | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` | ✅ **DONE** - UBO computed not stored, coverage model |
+| **Research workflows & agent** | `ai-thoughts/020-research-workflows-external-sources.md` | ✅ **DONE** - Bounded non-determinism, orchestration |
+| **Source loaders (GLEIF/CH/SEC)** | `ai-thoughts/021-pluggable-research-source-loaders.md` | ✅ **DONE** - SourceLoader trait, 3 loaders, 15 handlers |
+| **Luxembourg loader** | `ai-thoughts/022-luxembourg-source-loader.md` | PARKED - CSSF (testable), RCS/RBE (stub pattern) |
+| **Event Infrastructure (design)** | `ai-thoughts/023a-event-infrastructure.md` | ✅ **DONE** - Always-on, zero-overhead event capture from DSL pipeline + session logging |
+| **Feedback Inspector (design)** | `ai-thoughts/023b-feedback-inspector.md` | ✅ **DONE** - On-demand failure analysis, classification, repro generation, audit trail, MCP interface |
+| **Event Infrastructure (impl)** | `ai-thoughts/025-implement-event-infrastructure.md` | ✅ **DONE** - Lock-free emitter, drain task, session logger |
+| **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
+
+> **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
 
 **How to read:** Use `view docs/filename.md` or `view ai-thoughts/filename.md` before starting the task.
 
@@ -37,6 +46,7 @@ This file provides guidance to Claude Code when working with this repository.
 | When working on... | Read this file | Contains |
 |--------------------|----------------|----------|
 | **Understanding WHY things work this way** | `docs/strategy-patterns.md` | Data philosophy, CBU/UBO/Trading concepts, Agent strategy, egui do's/don'ts |
+| **Session & visualization architecture** | `docs/session-visualization-architecture.md` | Session scopes, view verbs, ESPER navigation, filters, history, active CBU set |
 | **Creating or modifying verb YAML** | `docs/verb-definition-spec.md` | **CRITICAL** - exact YAML structure, valid field values, common errors |
 | **Entity model, schemas, relationships** | `docs/entity-model-ascii.md` | Full ERD, table relationships, identifier schemes, UBO flow, dual-use holdings |
 | **DSL parser, compiler, executor** | `docs/dsl-verb-flow.md` | Pipeline stages, verb resolution, YAML structure, capture/interpolation, plugin handlers |
@@ -64,18 +74,31 @@ This file provides guidance to Claude Code when working with this repository.
 - "investor register", "cap table", "shareholder", "control holder" → `ai-thoughts/018-*`
 - "institutional holder", "UBO chain", "look-through" → `ai-thoughts/018-*`, `ai-thoughts/019-*`
 - "GROUP", "ownership graph", "coverage", "gaps" → `ai-thoughts/019-*`
-- "research", "GLEIF", "Companies House", "external source" → `docs/research-agent-annex.md`
+- "research", "GLEIF", "Companies House", "external source" → `docs/research-agent-annex.md`, `ai-thoughts/021-*`
 - "checkpoint", "confidence", "disambiguation" → `docs/research-agent-annex.md`
 - "agent mode", "resolve gaps", "chain research" → `docs/research-agent-annex.md`
 - "invocation phrases", "agent triggers" → `docs/research-agent-annex.md`
+- "SourceLoader", "source registry", "API client" → `ai-thoughts/021-*`
+- "SEC EDGAR", "13D", "13G", "CIK" → `ai-thoughts/021-*`
+- "PSC", "beneficial owner", "control holder" → `ai-thoughts/021-*`
+- "session scope", "galaxy", "book", "navigation history" → `docs/session-visualization-architecture.md`
+- "view verb", "esper", "drill", "surface", "trace" → `docs/session-visualization-architecture.md`
+- "active CBU set", "multi-CBU selection" → `docs/session-visualization-architecture.md`
+- "zoom animation", "astro", "landing", "taxonomy stack" → `docs/session-visualization-architecture.md`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
 - `ai-thoughts/016-capital-structure-ownership-model.md` - Multi-class cap table, voting/economic rights, dilution
 - `ai-thoughts/017-transactional-safety-complex-capital-verbs.md` - SERIALIZABLE + advisory locks for splits/exercises
 - `ai-thoughts/018-investor-register-visualization.md` - Dual-mode visualization, threshold collapse, institutional look-through
-- `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` - GROUP taxonomy, UBO computation, coverage model, jurisdiction rules
-- `ai-thoughts/020-research-workflows-external-sources.md` - Research agent, bounded non-determinism, pluggable sources
+- `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` - ✅ DONE - GROUP taxonomy, UBO computation, coverage model
+- `ai-thoughts/020-research-workflows-external-sources.md` - ✅ DONE - Research agent, bounded non-determinism, orchestration
+- `ai-thoughts/021-pluggable-research-source-loaders.md` - ✅ DONE - SourceLoader trait, GLEIF/CH/SEC loaders, 15 handlers
+- `ai-thoughts/022-luxembourg-source-loader.md` - PARKED - Luxembourg CSSF/RCS/RBE, stub pattern for subscription sources
+- `ai-thoughts/023a-event-infrastructure.md` - ✅ DONE - Always-on event capture, zero DSL impact, session logging
+- `ai-thoughts/023b-feedback-inspector.md` - ✅ DONE - On-demand analysis, repro generation, audit trail, MCP server
+- `ai-thoughts/025-implement-event-infrastructure.md` - ✅ DONE - Lock-free emitter, drain task, session logger
+- `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
 
 ---
 

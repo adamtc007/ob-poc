@@ -178,6 +178,28 @@ impl GraphFilterOps for EntityGraph {
             }
         }
 
+        // Check Same ManCo filter - entity must be managed by the same ManCo
+        if let Some(manco_id) = self.filters.same_manco_id {
+            // If node has a manco_id, it must match. If node has no manco_id, show it anyway
+            // (it could be the ManCo itself, or an entity not in the fund structure)
+            if let Some(node_manco) = node.manco_id {
+                if node_manco != manco_id {
+                    return false;
+                }
+            }
+        }
+
+        // Check Same SICAV filter - entity must belong to the same SICAV/umbrella
+        if let Some(sicav_id) = self.filters.same_sicav_id {
+            // If node has a sicav_id, it must match. If node has no sicav_id, show it anyway
+            // (it could be the SICAV itself, or an entity not in the fund structure)
+            if let Some(node_sicav) = node.sicav_id {
+                if node_sicav != sicav_id {
+                    return false;
+                }
+            }
+        }
+
         true
     }
 
@@ -319,6 +341,8 @@ pub struct FilterBuilder {
     as_of_date: Option<NaiveDate>,
     min_ownership_pct: Option<Decimal>,
     path_only: bool,
+    same_manco_id: Option<Uuid>,
+    same_sicav_id: Option<Uuid>,
 }
 
 impl FilterBuilder {
@@ -378,6 +402,16 @@ impl FilterBuilder {
         self
     }
 
+    pub fn same_manco(mut self, manco_id: Uuid) -> Self {
+        self.same_manco_id = Some(manco_id);
+        self
+    }
+
+    pub fn same_sicav(mut self, sicav_id: Uuid) -> Self {
+        self.same_sicav_id = Some(sicav_id);
+        self
+    }
+
     pub fn build(self) -> GraphFilters {
         GraphFilters {
             prong: self.prong,
@@ -389,6 +423,8 @@ impl FilterBuilder {
                 .unwrap_or_else(|| chrono::Utc::now().date_naive()),
             min_ownership_pct: self.min_ownership_pct,
             path_only: self.path_only,
+            same_manco_id: self.same_manco_id,
+            same_sicav_id: self.same_sicav_id,
         }
     }
 }

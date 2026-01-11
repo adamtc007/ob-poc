@@ -37,6 +37,7 @@ domains:
             maps_to: target_entity_id
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
@@ -50,6 +51,7 @@ domains:
             maps_to: recipient_entity_id
             lookup:
               table: entities
+              entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id

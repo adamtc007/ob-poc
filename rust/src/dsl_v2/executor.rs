@@ -47,6 +47,9 @@ use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+// Event infrastructure for observability
+use crate::events::SharedEmitter;
+
 /// Return type specification for verb execution
 #[derive(Debug, Clone)]
 pub enum ReturnType {
@@ -631,6 +634,8 @@ pub struct DslExecutor {
     idempotency: super::idempotency::IdempotencyManager,
     #[cfg(feature = "database")]
     verb_hash_lookup: crate::session::verb_hash_lookup::VerbHashLookupService,
+    /// Event emitter for observability (optional, zero-overhead when None)
+    events: Option<SharedEmitter>,
 }
 
 impl DslExecutor {
@@ -645,7 +650,22 @@ impl DslExecutor {
             ),
             pool,
             custom_ops: CustomOperationRegistry::new(),
+            events: None,
         }
+    }
+
+    /// Set the event emitter for observability.
+    ///
+    /// When set, the executor will emit events for each verb execution.
+    /// The emitter is lock-free and adds < 1μs overhead per command.
+    pub fn with_events(mut self, events: Option<SharedEmitter>) -> Self {
+        self.events = events;
+        self
+    }
+
+    /// Get the event emitter (if configured).
+    pub fn events(&self) -> Option<&SharedEmitter> {
+        self.events.as_ref()
     }
 
     /// Get a reference to the database pool
@@ -658,8 +678,51 @@ impl DslExecutor {
     ///
     /// Routes through YAML-driven generic executor for CRUD verbs,
     /// and custom operations registry for plugins.
+    ///
+    /// If an event emitter is configured, emits success/failure events
+    /// with timing information (< 1μs overhead).
     #[cfg(feature = "database")]
     pub async fn execute_verb(
+        &self,
+        vc: &VerbCall,
+        ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let verb_name = format!("{}.{}", vc.domain, vc.verb);
+        let start = std::time::Instant::now();
+
+        // Execute the verb
+        let result = self.execute_verb_inner(vc, ctx).await;
+
+        // Emit event if emitter is configured (< 1μs, never blocks, never fails)
+        if let Some(ref events) = self.events {
+            let duration_ms = start.elapsed().as_millis() as u64;
+            let session_id = ctx.session_id;
+
+            match &result {
+                Ok(_) => {
+                    events.emit(crate::events::DslEvent::succeeded(
+                        session_id,
+                        verb_name,
+                        duration_ms,
+                    ));
+                }
+                Err(e) => {
+                    events.emit(crate::events::DslEvent::failed(
+                        session_id,
+                        verb_name,
+                        duration_ms,
+                        e,
+                    ));
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Inner verb execution logic (no event emission)
+    #[cfg(feature = "database")]
+    async fn execute_verb_inner(
         &self,
         vc: &VerbCall,
         ctx: &mut ExecutionContext,

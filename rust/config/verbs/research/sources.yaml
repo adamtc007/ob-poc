@@ -1,0 +1,133 @@
+domains:
+  research.sources:
+    description: Research source loader management - list, search, and fetch from pluggable sources
+
+    invocation_hints:
+      - "research source"
+      - "data source"
+      - "registry lookup"
+      - "external source"
+      - "which sources"
+
+    verbs:
+      list:
+        description: List all available research sources
+        invocation_phrases:
+          - "list research sources"
+          - "what sources are available"
+          - "which registries can you access"
+          - "show data sources"
+        behavior: plugin
+        handler: SourceListOp
+        returns:
+          type: record_set
+
+      info:
+        description: Get information about a specific research source
+        invocation_phrases:
+          - "tell me about this source"
+          - "source capabilities"
+          - "what can this source provide"
+        behavior: plugin
+        handler: SourceInfoOp
+        args:
+          - name: source-id
+            type: string
+            required: true
+            description: Source identifier (gleif, companies-house, sec-edgar)
+            valid_values:
+              - gleif
+              - companies-house
+              - sec-edgar
+        returns:
+          type: record
+
+      search:
+        description: Search a specific source for entities by name
+        invocation_phrases:
+          - "search source for"
+          - "find in source"
+          - "look up in"
+        behavior: plugin
+        handler: SourceSearchOp
+        args:
+          - name: source-id
+            type: string
+            required: true
+            description: Source to search
+          - name: query
+            type: string
+            required: true
+            description: Entity name or search query
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Jurisdiction filter (ISO 3166-1 alpha-2)
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+            description: Maximum results
+          - name: include-inactive
+            type: boolean
+            required: false
+            default: false
+            description: Include inactive/dissolved entities
+        returns:
+          type: record_set
+
+      fetch:
+        description: Fetch entity data from a source by its key
+        invocation_phrases:
+          - "fetch from source"
+          - "get record from"
+          - "import from source"
+        behavior: plugin
+        handler: SourceFetchOp
+        args:
+          - name: source-id
+            type: string
+            required: true
+            description: Source to fetch from
+          - name: key
+            type: string
+            required: true
+            description: Source-specific key (LEI, company number, CIK)
+          - name: include-raw
+            type: boolean
+            required: false
+            default: false
+            description: Include raw API response
+          - name: decision-id
+            type: uuid
+            required: false
+            description: Research decision ID for audit trail
+        returns:
+          type: record
+
+      find-for-jurisdiction:
+        description: Find the best source for a jurisdiction and data type
+        invocation_phrases:
+          - "which source for"
+          - "best source for jurisdiction"
+          - "find source for"
+        behavior: plugin
+        handler: SourceFindForJurisdictionOp
+        args:
+          - name: jurisdiction
+            type: string
+            required: true
+            description: Jurisdiction code (ISO 3166-1 alpha-2)
+          - name: data-type
+            type: string
+            required: true
+            description: Type of data needed
+            valid_values:
+              - entity
+              - control-holders
+              - officers
+              - parent-chain
+              - subsidiaries
+              - filings
+        returns:
+          type: record_set

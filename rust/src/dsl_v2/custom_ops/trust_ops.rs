@@ -355,7 +355,7 @@ impl CustomOperation for TrustIdentifyUbosOp {
 
         for prov in &provisions {
             // Handle class beneficiaries (no specific holder)
-            if prov.holder_entity_id.is_none() {
+            let Some(holder_id) = prov.holder_entity_id else {
                 if let Some(ref class_desc) = prov.beneficiary_class {
                     class_beneficiaries.push(json!({
                         "beneficiary_class": class_desc,
@@ -365,9 +365,7 @@ impl CustomOperation for TrustIdentifyUbosOp {
                     }));
                 }
                 continue;
-            }
-
-            let holder_id = prov.holder_entity_id.unwrap();
+            };
             let holder_id_str = holder_id.to_string();
 
             if seen.contains(&holder_id_str) {

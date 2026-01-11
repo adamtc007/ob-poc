@@ -902,6 +902,7 @@ pub enum CheckpointResponse {
 }
 
 /// An ownership gap that needs resolution
+#[allow(dead_code)] // Fields used for debugging/future expansion
 #[derive(Debug, Clone)]
 struct OwnershipGap {
     entity_id: Uuid,

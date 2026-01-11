@@ -185,6 +185,13 @@ impl ToolHandlers {
             "taxonomy_entities" => self.taxonomy_entities(args).await,
             // Trading matrix tools
             "trading_matrix_get" => self.trading_matrix_get(args).await,
+            // Feedback inspector tools
+            "feedback_analyze" => self.feedback_analyze(args).await,
+            "feedback_list" => self.feedback_list(args).await,
+            "feedback_get" => self.feedback_get(args).await,
+            "feedback_repro" => self.feedback_repro(args).await,
+            "feedback_todo" => self.feedback_todo(args).await,
+            "feedback_audit" => self.feedback_audit(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -3368,5 +3375,265 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                 "trading_profile_verbs": "Use verbs_list with domain='trading-profile' to see available operations"
             }
         }))
+    }
+
+    // =========================================================================
+    // FEEDBACK INSPECTOR HANDLERS
+    // =========================================================================
+
+    async fn feedback_analyze(&self, args: Value) -> Result<Value> {
+        use crate::feedback::{AnalysisReport, FeedbackInspector};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            since_hours: Option<i64>,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let since_hours = args.since_hours.unwrap_or(24);
+
+        let pool = self.require_pool()?;
+        let inspector = FeedbackInspector::new(
+            pool.clone(),
+            Some(std::path::PathBuf::from("/tmp/ob-poc-events.jsonl")),
+        );
+
+        let since = chrono::Utc::now() - chrono::Duration::hours(since_hours);
+        let report = inspector.analyze(Some(since)).await?;
+
+        Ok(json!({
+            "total_failures": report.events_processed,
+            "unique_issues": report.failures_created,
+            "updated_issues": report.failures_updated,
+            "by_error_type": report.by_error_type,
+            "by_remediation_path": report.by_remediation_path,
+            "analyzed_at": report.analyzed_at.to_rfc3339()
+        }))
+    }
+
+    async fn feedback_list(&self, args: Value) -> Result<Value> {
+        use crate::feedback::{ErrorType, FeedbackInspector, IssueFilter, IssueStatus};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            status: Option<String>,
+            error_type: Option<String>,
+            verb: Option<String>,
+            source: Option<String>,
+            limit: Option<i64>,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+
+        let pool = self.require_pool()?;
+        let inspector = FeedbackInspector::new(pool.clone(), None);
+
+        let filter = IssueFilter {
+            status: args.status.and_then(|s| parse_issue_status(&s)),
+            error_type: args.error_type.and_then(|s| parse_error_type(&s)),
+            verb: args.verb,
+            source: args.source,
+            limit: args.limit,
+            ..Default::default()
+        };
+
+        let issues = inspector.list_issues(filter).await?;
+
+        Ok(json!({
+            "count": issues.len(),
+            "issues": issues.iter().map(|i| json!({
+                "fingerprint": i.fingerprint,
+                "error_type": format!("{:?}", i.error_type),
+                "status": format!("{:?}", i.status),
+                "verb": i.verb,
+                "source": i.source,
+                "message": i.error_message,
+                "occurrence_count": i.occurrence_count,
+                "first_seen": i.first_seen_at.to_rfc3339(),
+                "last_seen": i.last_seen_at.to_rfc3339(),
+                "repro_verified": i.repro_verified
+            })).collect::<Vec<_>>()
+        }))
+    }
+
+    async fn feedback_get(&self, args: Value) -> Result<Value> {
+        use crate::feedback::FeedbackInspector;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            fingerprint: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+
+        let pool = self.require_pool()?;
+        let inspector = FeedbackInspector::new(pool.clone(), None);
+
+        let issue = inspector.get_issue(&args.fingerprint).await?;
+
+        match issue {
+            Some(detail) => Ok(json!({
+                "found": true,
+                "failure": {
+                    "id": detail.failure.id,
+                    "fingerprint": detail.failure.fingerprint,
+                    "error_type": format!("{:?}", detail.failure.error_type),
+                    "remediation_path": format!("{:?}", detail.failure.remediation_path),
+                    "status": format!("{:?}", detail.failure.status),
+                    "verb": detail.failure.verb,
+                    "source": detail.failure.source,
+                    "message": detail.failure.error_message,
+                    "context": detail.failure.error_context,
+                    "user_intent": detail.failure.user_intent,
+                    "command_sequence": detail.failure.command_sequence,
+                    "repro_type": detail.failure.repro_type,
+                    "repro_path": detail.failure.repro_path,
+                    "repro_verified": detail.failure.repro_verified,
+                    "fix_commit": detail.failure.fix_commit,
+                    "fix_notes": detail.failure.fix_notes,
+                    "occurrence_count": detail.failure.occurrence_count,
+                    "first_seen": detail.failure.first_seen_at.to_rfc3339(),
+                    "last_seen": detail.failure.last_seen_at.to_rfc3339()
+                },
+                "occurrences": detail.occurrences.iter().take(10).map(|o| json!({
+                    "id": o.id,
+                    "event_timestamp": o.event_timestamp.to_rfc3339(),
+                    "session_id": o.session_id,
+                    "verb": o.verb,
+                    "duration_ms": o.duration_ms,
+                    "message": o.error_message
+                })).collect::<Vec<_>>(),
+                "audit_trail": detail.audit_trail.iter().map(|a| json!({
+                    "action": format!("{:?}", a.action),
+                    "actor_type": format!("{:?}", a.actor_type),
+                    "actor_id": a.actor_id,
+                    "details": a.details,
+                    "created_at": a.created_at.to_rfc3339()
+                })).collect::<Vec<_>>()
+            })),
+            None => Ok(json!({
+                "found": false,
+                "fingerprint": args.fingerprint
+            })),
+        }
+    }
+
+    async fn feedback_repro(&self, args: Value) -> Result<Value> {
+        use crate::feedback::{FeedbackInspector, ReproGenerator};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            fingerprint: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+
+        let pool = self.require_pool()?;
+        let inspector = FeedbackInspector::new(pool.clone(), None);
+        let repro_gen = ReproGenerator::new();
+
+        let result = repro_gen
+            .generate_and_verify(&inspector, &args.fingerprint)
+            .await?;
+
+        Ok(json!({
+            "fingerprint": args.fingerprint,
+            "repro_type": format!("{:?}", result.repro_type),
+            "path": result.path.to_string_lossy(),
+            "verified": result.verified,
+            "passes": result.passes,
+            "output": result.output
+        }))
+    }
+
+    async fn feedback_todo(&self, args: Value) -> Result<Value> {
+        use crate::feedback::{FeedbackInspector, TodoGenerator};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            fingerprint: String,
+            todo_number: i32,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+
+        let pool = self.require_pool()?;
+        let inspector = FeedbackInspector::new(pool.clone(), None);
+        let todo_gen = TodoGenerator::new();
+
+        let result = todo_gen
+            .generate_todo(&inspector, &args.fingerprint, args.todo_number)
+            .await?;
+
+        Ok(json!({
+            "fingerprint": args.fingerprint,
+            "todo_number": result.todo_number,
+            "path": result.todo_path.to_string_lossy(),
+            "content": result.content
+        }))
+    }
+
+    async fn feedback_audit(&self, args: Value) -> Result<Value> {
+        use crate::feedback::FeedbackInspector;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            fingerprint: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+
+        let pool = self.require_pool()?;
+        let inspector = FeedbackInspector::new(pool.clone(), None);
+
+        let trail = inspector.get_audit_trail(&args.fingerprint).await?;
+
+        Ok(json!({
+            "fingerprint": args.fingerprint,
+            "count": trail.len(),
+            "entries": trail.iter().map(|a| json!({
+                "id": a.id,
+                "action": format!("{:?}", a.action),
+                "actor_type": format!("{:?}", a.actor_type),
+                "actor_id": a.actor_id,
+                "details": a.details,
+                "evidence": a.evidence,
+                "previous_status": a.previous_status.map(|s| format!("{:?}", s)),
+                "new_status": a.new_status.map(|s| format!("{:?}", s)),
+                "created_at": a.created_at.to_rfc3339()
+            })).collect::<Vec<_>>()
+        }))
+    }
+}
+
+// Helper functions for parsing enum strings
+fn parse_issue_status(s: &str) -> Option<crate::feedback::IssueStatus> {
+    use crate::feedback::IssueStatus;
+    match s.to_uppercase().as_str() {
+        "NEW" => Some(IssueStatus::New),
+        "REPRO_GENERATED" => Some(IssueStatus::ReproGenerated),
+        "REPRO_VERIFIED" => Some(IssueStatus::ReproVerified),
+        "TODO_CREATED" => Some(IssueStatus::TodoCreated),
+        "IN_PROGRESS" => Some(IssueStatus::InProgress),
+        "FIX_COMMITTED" => Some(IssueStatus::FixCommitted),
+        "RESOLVED" => Some(IssueStatus::Resolved),
+        "WONT_FIX" => Some(IssueStatus::WontFix),
+        _ => None,
+    }
+}
+
+fn parse_error_type(s: &str) -> Option<crate::feedback::ErrorType> {
+    use crate::feedback::ErrorType;
+    match s.to_uppercase().as_str() {
+        "TIMEOUT" => Some(ErrorType::Timeout),
+        "RATE_LIMITED" => Some(ErrorType::RateLimited),
+        "ENUM_DRIFT" => Some(ErrorType::EnumDrift),
+        "SCHEMA_DRIFT" => Some(ErrorType::SchemaDrift),
+        "HANDLER_PANIC" => Some(ErrorType::HandlerPanic),
+        "HANDLER_ERROR" => Some(ErrorType::HandlerError),
+        "PARSE_ERROR" => Some(ErrorType::ParseError),
+        "DSL_PARSE_ERROR" => Some(ErrorType::DslParseError),
+        "VALIDATION_FAILED" => Some(ErrorType::ValidationFailed),
+        _ => None,
     }
 }

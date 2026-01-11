@@ -1253,15 +1253,14 @@ impl CustomOperation for CapitalSplitOp {
         .fetch_optional(&mut *tx)
         .await?;
 
-        if current_issued.is_none() || current_issued == Some(rust_decimal::Decimal::ZERO) {
-            return Err(anyhow!("Cannot split share class with no issued units"));
-        }
+        let issued = current_issued
+            .filter(|&units| units != rust_decimal::Decimal::ZERO)
+            .ok_or_else(|| anyhow!("Cannot split share class with no issued units"))?;
 
         let multiplier =
             rust_decimal::Decimal::from(ratio_to) / rust_decimal::Decimal::from(ratio_from);
 
         // Calculate units delta for the event (for audit purposes)
-        let issued = current_issued.unwrap();
         let new_issued = issued * multiplier;
         let units_delta = new_issued - issued;
 
