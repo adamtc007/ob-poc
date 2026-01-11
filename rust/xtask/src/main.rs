@@ -349,6 +349,20 @@ enum VerbsAction {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
+
+    /// Lint verbs for tiering rule compliance
+    ///
+    /// Validates verb metadata against tiering rules from 027-trading-matrix-canonical-pivot.
+    /// Exits with code 1 if any verbs have tiering errors.
+    Lint {
+        /// Show only errors, not warnings
+        #[arg(long)]
+        errors_only: bool,
+
+        /// Show tier distribution and additional details
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -482,6 +496,10 @@ fn main() -> Result<()> {
                     rt.block_on(verbs::verbs_diagnostics(errors_only))
                 }
                 VerbsAction::Check { verbose } => rt.block_on(verbs::verbs_check(verbose)),
+                VerbsAction::Lint {
+                    errors_only,
+                    verbose,
+                } => rt.block_on(verbs::verbs_lint(errors_only, verbose)),
             }
         }
     }

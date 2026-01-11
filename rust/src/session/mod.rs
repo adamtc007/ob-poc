@@ -29,6 +29,7 @@ pub mod verb_discovery;
 pub mod verb_hash_lookup;
 pub mod verb_rag_metadata;
 pub mod verb_sync;
+pub mod verb_tiering_linter;
 pub mod view_state;
 
 use chrono::{DateTime, Utc};
@@ -63,6 +64,7 @@ pub use verb_discovery::{
     VerbDiscoveryService, VerbSuggestion, WorkflowPhaseInfo,
 };
 pub use verb_sync::{SyncResult, VerbSyncError, VerbSyncService};
+pub use verb_tiering_linter::{lint_all_verbs, lint_verb_tiering, LintReport, VerbLintResult};
 pub use view_state::{
     BatchOperation, ContextMode, CrossSectionAxis, DetailLevel, DrillDirection, GapType,
     HighlightMode, IlluminateAspect, LayoutBounds, LayoutResult, NavStackEntry, NodePosition,

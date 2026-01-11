@@ -9,6 +9,7 @@ use dsl_core::config::ConfigLoader;
 use ob_poc::dsl_v2::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;
+use ob_poc::session::verb_tiering_linter;
 
 /// Compile all verbs from YAML and sync to database
 pub async fn verbs_compile(verbose: bool) -> Result<()> {
@@ -335,6 +336,147 @@ pub async fn verbs_check(verbose: bool) -> Result<()> {
         std::process::exit(1);
     } else {
         println!("\n  All verb contracts are up-to-date.");
+    }
+
+    Ok(())
+}
+
+/// Lint verbs for tiering rule compliance
+///
+/// Validates verb metadata against tiering rules:
+/// - Projection verbs must be internal
+/// - Intent verbs cannot write to operational tables
+/// - Diagnostics verbs must be read-only
+/// - etc.
+pub async fn verbs_lint(errors_only: bool, verbose: bool) -> Result<()> {
+    println!("===========================================");
+    println!("  Verb Tiering Lint Report");
+    println!("===========================================\n");
+
+    // Load verb config from YAML
+    println!("Loading verb definitions from YAML...");
+    let loader = ConfigLoader::from_env();
+    let verbs_config = loader.load_verbs().context("Failed to load verb config")?;
+
+    // Run the tiering linter
+    let report = verb_tiering_linter::lint_all_verbs(&verbs_config.domains);
+
+    println!("  Scanned {} verbs\n", report.total_verbs);
+
+    // Print summary
+    println!("===========================================");
+    println!("  Summary");
+    println!("===========================================");
+    println!("  Total verbs:          {}", report.total_verbs);
+    println!("  Verbs with errors:    {}", report.verbs_with_errors);
+    println!("  Verbs with warnings:  {}", report.verbs_with_warnings);
+    println!("  Missing metadata:     {}", report.verbs_missing_metadata);
+
+    // Print details
+    let issues = report.issues_only();
+    if !issues.is_empty() {
+        println!("\n===========================================");
+        println!("  Issues");
+        println!("===========================================\n");
+
+        for result in issues {
+            if errors_only && !result.has_errors() {
+                continue;
+            }
+
+            println!("{}:", result.full_name);
+
+            for error in &result.diagnostics.errors {
+                println!("  ERROR [{}]: {}", error.code, error.message);
+                if let Some(ref path) = error.path {
+                    println!("        at: {}", path);
+                }
+                if let Some(ref hint) = error.hint {
+                    println!("        hint: {}", hint);
+                }
+            }
+
+            if !errors_only {
+                for warning in &result.diagnostics.warnings {
+                    println!("  WARN  [{}]: {}", warning.code, warning.message);
+                    if let Some(ref path) = warning.path {
+                        println!("        at: {}", path);
+                    }
+                    if verbose {
+                        if let Some(ref hint) = warning.hint {
+                            println!("        hint: {}", hint);
+                        }
+                    }
+                }
+            }
+
+            println!();
+        }
+    } else {
+        println!("\n  No tiering issues found.");
+    }
+
+    // Print tier distribution if verbose
+    if verbose {
+        println!("\n===========================================");
+        println!("  Tier Distribution");
+        println!("===========================================");
+
+        let mut tier_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut source_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+
+        for (domain_name, domain_config) in &verbs_config.domains {
+            for (verb_name, verb_config) in &domain_config.verbs {
+                if let Some(ref metadata) = verb_config.metadata {
+                    let tier_name = metadata
+                        .tier
+                        .as_ref()
+                        .map(|t| format!("{:?}", t))
+                        .unwrap_or_else(|| "unset".to_string());
+                    *tier_counts.entry(tier_name).or_insert(0) += 1;
+
+                    let source_name = metadata
+                        .source_of_truth
+                        .as_ref()
+                        .map(|s| format!("{:?}", s))
+                        .unwrap_or_else(|| "unset".to_string());
+                    *source_counts.entry(source_name).or_insert(0) += 1;
+                } else {
+                    *tier_counts.entry("no_metadata".to_string()).or_insert(0) += 1;
+                    *source_counts.entry("no_metadata".to_string()).or_insert(0) += 1;
+                }
+
+                // Suppress unused variable warnings
+                let _ = (domain_name, verb_name);
+            }
+        }
+
+        println!("\n  By Tier:");
+        let mut tiers: Vec<_> = tier_counts.into_iter().collect();
+        tiers.sort_by(|a, b| b.1.cmp(&a.1));
+        for (tier, count) in tiers {
+            println!("    {:15} {}", tier, count);
+        }
+
+        println!("\n  By Source of Truth:");
+        let mut sources: Vec<_> = source_counts.into_iter().collect();
+        sources.sort_by(|a, b| b.1.cmp(&a.1));
+        for (source, count) in sources {
+            println!("    {:15} {}", source, count);
+        }
+    }
+
+    // Exit with error code if there are errors
+    if report.has_errors() {
+        println!("\n===========================================");
+        println!(
+            "  FAILED: {} verbs have tiering errors",
+            report.verbs_with_errors
+        );
+        println!("===========================================");
+        std::process::exit(1);
     }
 
     Ok(())

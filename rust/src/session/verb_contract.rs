@@ -173,6 +173,24 @@ pub mod codes {
     pub const MISSING_DESCRIPTION: &str = "MISSING_DESCRIPTION";
     pub const PRODUCES_EMPTY_TYPE: &str = "PRODUCES_EMPTY_TYPE";
     pub const PLUGIN_EMPTY_HANDLER: &str = "PLUGIN_EMPTY_HANDLER";
+
+    // Tiering lint codes (T0xx series)
+    /// Verb writes to operational table but is not tier: projection or composite
+    pub const TIER_WRITE_NOT_PROJECTION: &str = "T001";
+    /// Verb is tier: projection but missing internal: true
+    pub const TIER_PROJECTION_NOT_INTERNAL: &str = "T002";
+    /// Verb marked deprecated but missing tier: projection
+    pub const TIER_DEPRECATED_NOT_PROJECTION: &str = "T003";
+    /// Verb has writes_operational: true but behavior is not CRUD insert/upsert/update/delete
+    pub const TIER_WRITES_OP_MISMATCH: &str = "T004";
+    /// Verb is tier: intent but writes to operational tables (should use materialize)
+    pub const TIER_INTENT_WRITES_OPERATIONAL: &str = "T005";
+    /// Verb is tier: diagnostics but has write behavior
+    pub const TIER_DIAGNOSTICS_HAS_WRITE: &str = "T006";
+    /// Verb missing metadata (no tiering info)
+    pub const TIER_MISSING_METADATA: &str = "T007";
+    /// Verb has inconsistent source_of_truth
+    pub const TIER_INCONSISTENT_SOURCE: &str = "T008";
 }
 
 #[cfg(test)]
