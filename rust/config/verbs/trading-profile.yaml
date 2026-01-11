@@ -6,6 +6,12 @@ domains:
         description: Import a trading profile document from YAML/JSON file or inline content
         behavior: plugin
         handler: import_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, authoring]
         args:
           - name: cbu-id
             type: uuid
@@ -53,6 +59,12 @@ domains:
       read:
         description: Read a trading profile by ID
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [read]
         crud:
           operation: select
           table: cbu_trading_profiles
@@ -69,6 +81,12 @@ domains:
         description: Get the active trading profile for a CBU
         behavior: plugin
         handler: get_active_trading_profile
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [read, lookup]
         args:
           - name: cbu-id
             type: uuid
@@ -85,6 +103,12 @@ domains:
       list-versions:
         description: List all versions of trading profiles for a CBU
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [read, versioning]
         crud:
           operation: list_by_fk
           table: cbu_trading_profiles
@@ -108,6 +132,12 @@ domains:
         description: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
         behavior: plugin
         handler: activate_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, activation]
         args:
           - name: profile-id
             type: uuid
@@ -124,6 +154,13 @@ domains:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
         behavior: plugin
         handler: materialize_trading_profile
+        metadata:
+          tier: composite
+          source_of_truth: matrix
+          scope: cbu
+          writes_operational: true
+          noun: trading_matrix
+          tags: [projection, sync, critical]
         lifecycle:
           writes_tables:
             - custody.cbu_instrument_universe
@@ -154,10 +191,16 @@ domains:
           type: record
           description: Materialization result with counts of records created/updated/deleted
 
-      validate:
+      validate-document:
         description: Validate a trading profile document without importing
         behavior: plugin
         handler: validate_trading_profile
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [validation, pre-import]
         args:
           - name: file-path
             type: string
@@ -175,6 +218,12 @@ domains:
         description: Compare two trading profile versions
         behavior: plugin
         handler: diff_trading_profiles
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [read, versioning, comparison]
         args:
           - name: profile-id-1
             type: uuid
@@ -192,6 +241,12 @@ domains:
         description: Export a trading profile to YAML format
         behavior: plugin
         handler: export_trading_profile
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [read, export]
         args:
           - name: profile-id
             type: uuid
@@ -212,6 +267,12 @@ domains:
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
         behavior: plugin
         handler: create_draft_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, authoring]
         args:
           - name: cbu-id
             type: uuid
@@ -235,6 +296,12 @@ domains:
         description: Clone a trading profile to another CBU, creating a new DRAFT profile
         behavior: plugin
         handler: clone_trading_profile_to_cbu
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, authoring, cloning]
         args:
           - name: profile-id
             type: uuid
@@ -276,6 +343,12 @@ domains:
         description: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
         behavior: plugin
         handler: create_new_version_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, authoring, versioning]
         args:
           - name: cbu-id
             type: uuid
@@ -307,6 +380,12 @@ domains:
         description: Add instrument class to trading profile universe
         behavior: plugin
         handler: add_instrument_class_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: universe
+          tags: [authoring, universe]
         args:
           - name: profile-id
             type: uuid
@@ -341,6 +420,12 @@ domains:
         description: Remove instrument class from trading profile universe
         behavior: plugin
         handler: remove_instrument_class_from_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: universe
+          tags: [authoring, universe]
         args:
           - name: profile-id
             type: uuid
@@ -355,6 +440,12 @@ domains:
         description: Add market to trading profile universe under an instrument class
         behavior: plugin
         handler: add_market_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: universe
+          tags: [authoring, universe, market]
         args:
           - name: profile-id
             type: uuid
@@ -383,6 +474,12 @@ domains:
         description: Remove market from trading profile universe
         behavior: plugin
         handler: remove_market_from_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: universe
+          tags: [authoring, universe, market]
         args:
           - name: profile-id
             type: uuid
@@ -403,6 +500,12 @@ domains:
         description: Set base currency for trading profile
         behavior: plugin
         handler: set_profile_base_currency
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [authoring, currency]
         args:
           - name: profile-id
             type: uuid
@@ -417,6 +520,12 @@ domains:
         description: Add currency to allowed currencies list
         behavior: plugin
         handler: add_allowed_currency_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [authoring, currency]
         args:
           - name: profile-id
             type: uuid
@@ -433,6 +542,12 @@ domains:
         description: Add SSI to trading profile standing instructions
         behavior: plugin
         handler: add_ssi_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: ssi
+          tags: [authoring, ssi]
         args:
           - name: profile-id
             type: uuid
@@ -477,6 +592,12 @@ domains:
         description: Remove SSI from trading profile
         behavior: plugin
         handler: remove_ssi_from_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: ssi
+          tags: [authoring, ssi]
         args:
           - name: profile-id
             type: uuid
@@ -495,6 +616,12 @@ domains:
         description: Add ALERT-style booking rule to trading profile
         behavior: plugin
         handler: add_booking_rule_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: booking_rule
+          tags: [authoring, booking-rules]
         args:
           - name: profile-id
             type: uuid
@@ -542,6 +669,12 @@ domains:
         description: Remove booking rule from trading profile
         behavior: plugin
         handler: remove_booking_rule_from_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: booking_rule
+          tags: [authoring, booking-rules]
         args:
           - name: profile-id
             type: uuid
@@ -564,6 +697,12 @@ domains:
         description: Add ISDA master agreement to trading profile
         behavior: plugin
         handler: add_isda_config_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: isda
+          tags: [authoring, isda, otc]
         args:
           - name: profile-id
             type: uuid
@@ -598,6 +737,12 @@ domains:
         description: Add product coverage to ISDA config
         behavior: plugin
         handler: add_isda_coverage_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: isda
+          tags: [authoring, isda, otc]
         args:
           - name: profile-id
             type: uuid
@@ -623,6 +768,12 @@ domains:
         description: Add CSA (Credit Support Annex) to ISDA agreement
         behavior: plugin
         handler: add_csa_config_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: csa
+          tags: [authoring, csa, otc, collateral]
         args:
           - name: profile-id
             type: uuid
@@ -661,6 +812,12 @@ domains:
         description: Add eligible collateral to CSA
         behavior: plugin
         handler: add_csa_collateral_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: csa
+          tags: [authoring, csa, collateral]
         args:
           - name: profile-id
             type: uuid
@@ -694,6 +851,12 @@ domains:
         description: Link CSA to collateral SSI in standing instructions
         behavior: plugin
         handler: link_csa_ssi_in_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: csa
+          tags: [authoring, csa, ssi, collateral]
         args:
           - name: profile-id
             type: uuid
@@ -714,6 +877,12 @@ domains:
         description: Add investment manager mandate to trading profile
         behavior: plugin
         handler: add_im_mandate_to_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: im_mandate
+          tags: [authoring, investment-manager]
         args:
           - name: profile-id
             type: uuid
@@ -765,6 +934,12 @@ domains:
         description: Update scope for existing IM mandate
         behavior: plugin
         handler: update_im_scope_in_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: im_mandate
+          tags: [authoring, investment-manager]
         args:
           - name: profile-id
             type: uuid
@@ -788,6 +963,12 @@ domains:
         description: Remove investment manager mandate from profile
         behavior: plugin
         handler: remove_im_mandate_from_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: im_mandate
+          tags: [authoring, investment-manager]
         args:
           - name: profile-id
             type: uuid
@@ -804,6 +985,13 @@ domains:
         description: Materialize document sections to operational tables
         behavior: plugin
         handler: sync_profile_to_operational
+        metadata:
+          tier: composite
+          source_of_truth: matrix
+          scope: cbu
+          writes_operational: true
+          noun: trading_matrix
+          tags: [projection, sync]
         lifecycle:
           writes_tables:
             - custody.cbu_instrument_universe
@@ -837,6 +1025,12 @@ domains:
         description: Rebuild document sections from operational tables
         behavior: plugin
         handler: sync_operational_to_profile
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          noun: trading_matrix
+          tags: [sync, reverse-materialize]
         args:
           - name: profile-id
             type: uuid
@@ -857,6 +1051,12 @@ domains:
         description: Show differences between document and operational tables
         behavior: plugin
         handler: diff_profile_vs_operational
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [read, comparison, drift-detection]
         args:
           - name: profile-id
             type: uuid
@@ -875,6 +1075,12 @@ domains:
         description: Full validation for production readiness
         behavior: plugin
         handler: validate_profile_go_live_ready
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [validation, readiness-check]
         args:
           - name: profile-id
             type: uuid
@@ -892,6 +1098,12 @@ domains:
         description: Validate all universe entries have required SSIs and booking rules
         behavior: plugin
         handler: validate_universe_coverage
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: universe
+          tags: [validation, coverage-check]
         args:
           - name: profile-id
             type: uuid
@@ -904,6 +1116,12 @@ domains:
         description: Validate all booking rules reference valid SSIs
         behavior: plugin
         handler: validate_booking_rule_ssi_refs
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: booking_rule
+          tags: [validation, referential-integrity]
         args:
           - name: profile-id
             type: uuid
@@ -922,10 +1140,16 @@ domains:
       #   - ARCHIVED: Soft deleted
       # =========================================================================
 
-      validate:
+      validate-for-review:
         description: Validate and mark a draft trading profile as ready for client review (transitions DRAFT -> VALIDATED)
         behavior: plugin
-        handler: validate_trading_profile
+        handler: validate_trading_profile_for_review
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, state-transition]
         args:
           - name: profile-id
             type: uuid
@@ -946,6 +1170,12 @@ domains:
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
         behavior: plugin
         handler: submit_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, state-transition]
         args:
           - name: profile-id
             type: uuid
@@ -966,6 +1196,12 @@ domains:
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
         behavior: plugin
         handler: approve_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, state-transition, activation]
         args:
           - name: profile-id
             type: uuid
@@ -986,6 +1222,12 @@ domains:
         description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
         behavior: plugin
         handler: reject_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, state-transition]
         args:
           - name: profile-id
             type: uuid
@@ -1006,6 +1248,12 @@ domains:
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
         behavior: plugin
         handler: archive_trading_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: trading_matrix
+          tags: [lifecycle, state-transition, soft-delete]
         args:
           - name: profile-id
             type: uuid
@@ -1030,6 +1278,12 @@ domains:
         description: Export complete trading matrix document with all configuration sections
         behavior: plugin
         handler: export_full_trading_matrix
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: trading_matrix
+          tags: [read, export, full-matrix]
         lifecycle:
           reads_tables:
             - custody.cbu_instrument_universe
@@ -1099,6 +1353,12 @@ domains:
         description: Export instruction profile section only
         behavior: plugin
         handler: export_instruction_profile_section
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: instruction_profile
+          tags: [read, export, section]
         lifecycle:
           reads_tables:
             - custody.cbu_instruction_assignments
@@ -1128,6 +1388,12 @@ domains:
         description: Export gateway routing section only
         behavior: plugin
         handler: export_gateway_section
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: gateway_routing
+          tags: [read, export, section]
         lifecycle:
           reads_tables:
             - custody.cbu_gateway_connectivity
@@ -1157,6 +1423,12 @@ domains:
         description: Export settlement configuration section only
         behavior: plugin
         handler: export_settlement_section
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: settlement
+          tags: [read, export, section]
         lifecycle:
           reads_tables:
             - custody.cbu_ssi
@@ -1188,6 +1460,12 @@ domains:
         description: Export pricing configuration section only
         behavior: plugin
         handler: export_pricing_section
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: pricing
+          tags: [read, export, section]
         lifecycle:
           reads_tables:
             - custody.cbu_pricing_configs
@@ -1219,6 +1497,12 @@ domains:
         description: Export tax configuration section only
         behavior: plugin
         handler: export_tax_section
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: tax
+          tags: [read, export, section]
         lifecycle:
           reads_tables:
             - custody.cbu_tax_status
@@ -1249,6 +1533,12 @@ domains:
         description: Export corporate actions configuration section only
         behavior: plugin
         handler: export_corporate_actions_section
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: corporate_actions
+          tags: [read, export, section]
         lifecycle:
           reads_tables:
             - custody.cbu_ca_preferences
@@ -1282,6 +1572,12 @@ domains:
         description: Validate entire trading matrix is complete for go-live
         behavior: plugin
         handler: validate_trading_matrix_completeness
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: trading_matrix
+          tags: [validation, readiness-check, gap-analysis]
         lifecycle:
           reads_tables:
             - custody.cbu_instrument_universe
@@ -1318,6 +1614,12 @@ domains:
         description: Generate DSL plan to remediate matrix gaps
         behavior: plugin
         handler: generate_matrix_remediation_plan
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: remediation_plan
+          tags: [read, gap-analysis, dsl-generation]
         lifecycle:
           reads_tables:
             - custody.cbu_instrument_universe

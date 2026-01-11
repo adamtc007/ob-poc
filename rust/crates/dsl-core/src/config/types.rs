@@ -70,6 +70,104 @@ pub struct VerbConfig {
     /// Lifecycle constraints and transitions for this verb
     #[serde(default)]
     pub lifecycle: Option<VerbLifecycle>,
+    /// Verb metadata for tiering, source of truth, and organizational tags
+    #[serde(default)]
+    pub metadata: Option<VerbMetadata>,
+}
+
+// =============================================================================
+// VERB METADATA (Tiering & Organization)
+// =============================================================================
+
+/// Metadata for verb classification, tiering, and organization
+///
+/// Used by:
+/// - Verb linter to enforce tiering rules
+/// - Agent to select appropriate verbs
+/// - Documentation generation
+/// - Verb inventory reports
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct VerbMetadata {
+    /// Verb tier classification:
+    /// - `reference`: Global catalogs, templates, taxonomies (scope: global)
+    /// - `intent`: Authoring surface for CBU business policy (scope: cbu)
+    /// - `projection`: Writes operational tables from matrix (internal only)
+    /// - `diagnostics`: Read-only inspection of state
+    /// - `composite`: Multi-table orchestration verbs
+    #[serde(default)]
+    pub tier: Option<VerbTier>,
+
+    /// Source of truth for data this verb writes:
+    /// - `matrix`: Trading matrix document is canonical
+    /// - `catalog`: Global reference catalog
+    /// - `operational`: Operational tables (derived/projected)
+    #[serde(default)]
+    pub source_of_truth: Option<SourceOfTruth>,
+
+    /// Scope of the verb:
+    /// - `global`: Operates on global reference data
+    /// - `cbu`: Operates within CBU context
+    #[serde(default)]
+    pub scope: Option<VerbScope>,
+
+    /// Whether this verb writes to operational (projection) tables
+    #[serde(default)]
+    pub writes_operational: bool,
+
+    /// Primary noun this verb operates on (for grouping):
+    /// e.g., "trading_matrix", "ssi", "gateway", "booking_rule", "corporate_actions"
+    #[serde(default)]
+    pub noun: Option<String>,
+
+    /// Whether this verb is internal-only (not exposed to agent/user)
+    #[serde(default)]
+    pub internal: bool,
+
+    /// Organizational tags for search and grouping
+    #[serde(default)]
+    pub tags: Vec<String>,
+
+    /// If this verb replaces another (for migration tracking)
+    #[serde(default)]
+    pub replaces: Option<String>,
+}
+
+/// Verb tier classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbTier {
+    /// Global catalogs, templates, taxonomies
+    Reference,
+    /// Authoring surface for CBU business policy (matrix is source of truth)
+    Intent,
+    /// Writes operational tables from matrix (internal only)
+    Projection,
+    /// Read-only inspection of state
+    Diagnostics,
+    /// Multi-table orchestration verbs
+    Composite,
+}
+
+/// Source of truth for data
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceOfTruth {
+    /// Trading matrix document is canonical
+    Matrix,
+    /// Global reference catalog
+    Catalog,
+    /// Operational tables (derived/projected)
+    Operational,
+}
+
+/// Scope of a verb
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbScope {
+    /// Operates on global reference data
+    Global,
+    /// Operates within CBU context
+    Cbu,
 }
 
 // =============================================================================

@@ -5,6 +5,15 @@ domains:
       add-universe:
         description: Declare what a CBU trades (instrument class + market + currencies)
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: universe
+          internal: true
+          tags: [deprecated, use-trading-profile]
+          replaces: null # This verb IS being replaced by trading-profile.add-market
         crud:
           operation: upsert
           table: cbu_instrument_universe
@@ -73,6 +82,12 @@ domains:
       list-universe:
         description: List CBU's traded universe
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: universe
+          tags: [read, operational-state]
         crud:
           operation: list_by_fk
           table: cbu_instrument_universe
@@ -93,6 +108,14 @@ domains:
       remove-universe:
         description: Remove an entry from CBU's trading universe
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: universe
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: delete
           table: cbu_instrument_universe
@@ -107,6 +130,14 @@ domains:
       create-ssi:
         description: Create a Standing Settlement Instruction (idempotent by cbu+name)
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ssi
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: upsert
           table: cbu_ssi
@@ -186,6 +217,14 @@ domains:
       ensure-ssi:
         description: Create or update an SSI by name (idempotent)
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ssi
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: upsert
           table: cbu_ssi
@@ -265,6 +304,12 @@ domains:
       list-ssis:
         description: List SSIs for a CBU
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: ssi
+          tags: [read, operational-state]
         crud:
           operation: list_by_fk
           table: cbu_ssi
@@ -293,6 +338,14 @@ domains:
       activate-ssi:
         description: Activate an SSI
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ssi
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: update
           table: cbu_ssi
@@ -316,6 +369,14 @@ domains:
       suspend-ssi:
         description: Suspend an SSI
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ssi
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: update
           table: cbu_ssi
@@ -339,6 +400,14 @@ domains:
       add-booking-rule:
         description: Add ALERT-style booking rule for SSI routing (idempotent by cbu+name)
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: booking_rule
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: upsert
           table: ssi_booking_rules
@@ -437,6 +506,14 @@ domains:
       ensure-booking-rule:
         description: Create or update a booking rule by name (idempotent)
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: booking_rule
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: upsert
           table: ssi_booking_rules
@@ -535,6 +612,12 @@ domains:
       list-booking-rules:
         description: List booking rules for a CBU
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: booking_rule
+          tags: [read, operational-state]
         crud:
           operation: list_by_fk
           table: ssi_booking_rules
@@ -560,6 +643,14 @@ domains:
       remove-booking-rule:
         description: Remove a booking rule
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: booking_rule
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: delete
           table: ssi_booking_rules
@@ -574,6 +665,14 @@ domains:
       update-rule-priority:
         description: Update booking rule priority
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: booking_rule
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: update
           table: ssi_booking_rules
@@ -599,6 +698,14 @@ domains:
       deactivate-rule:
         description: Deactivate a booking rule
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: booking_rule
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: update
           table: ssi_booking_rules
@@ -623,6 +730,12 @@ domains:
         description: Compare universe to booking rules, find gaps
         behavior: plugin
         handler: derive_required_coverage
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: coverage_gap
+          tags: [read, validation, gap-analysis]
         args:
           - name: cbu-id
             type: uuid
@@ -639,6 +752,12 @@ domains:
         description: Validate that all universe entries have matching booking rules
         behavior: plugin
         handler: validate_booking_coverage
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: coverage_validation
+          tags: [read, validation, coverage-check]
         lifecycle:
           reads_tables:
             - custody.cbu_instrument_universe
@@ -660,6 +779,12 @@ domains:
         description: Find SSI for given trade characteristics (simulate ALERT lookup)
         behavior: plugin
         handler: lookup_ssi_for_trade
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: ssi_lookup
+          tags: [read, routing, alert-simulation]
         lifecycle:
           reads_tables:
             - custody.cbu_ssi
@@ -697,6 +822,14 @@ domains:
       add-agent-override:
         description: Add intermediary agent to SSI settlement chain (idempotent by ssi+role+sequence)
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: agent_override
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: upsert
           table: cbu_ssi_agent_override
@@ -755,6 +888,12 @@ domains:
       list-agent-overrides:
         description: List agent overrides for an SSI
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: agent_override
+          tags: [read, operational-state]
         crud:
           operation: list_by_fk
           table: cbu_ssi_agent_override
@@ -777,6 +916,14 @@ domains:
       remove-agent-override:
         description: Remove an agent override from SSI settlement chain
         behavior: crud
+        metadata:
+          tier: projection
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: agent_override
+          internal: true
+          tags: [deprecated, use-trading-profile]
         crud:
           operation: delete
           table: cbu_ssi_agent_override
@@ -792,6 +939,13 @@ domains:
         description: Bulk import SSIs from SSI_ONBOARDING document
         behavior: plugin
         handler: setup_ssi_from_document
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          writes_operational: true
+          noun: ssi_setup
+          tags: [bulk-import, document-driven]
         args:
           - name: cbu-id
             type: uuid
