@@ -455,8 +455,67 @@ This could use simple pattern matching or LLM for complex cases.
 2. **When to trigger?**
    - Squiggly underline always visible on unresolved refs
    - Click or Ctrl+. → inline popup
-   - Compile with 3+ unresolved → batch modal
-   - "Resolve All" button → batch modal
+   - Compile with 3+ unresolved → batch modal (sub-session)
+   - "Resolve All" button → batch modal (sub-session)
+
+3. **Agent-driven resolution (not forms)**
+   - Resolution happens in scoped agent sub-session
+   - User stays in conversational flow
+   - Sub-session pops back to main chat on completion
+   - See `docs/strategy-patterns.md` §3 Window Stack Architecture
+
+---
+
+## Sub-Session Architecture
+
+Resolution uses the **window stack** pattern (see `docs/strategy-patterns.md`).
+
+```
+Main Agent Chat
+    │
+    │ Agent detects unresolved refs
+    ▼
+Agent: "I found 2 entities to confirm."
+       [Open Resolution Assistant →]
+    │
+    │ Click button (pushes to window_stack)
+    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Resolution Assistant (Layer 2 sub-session)    [← Back] [X]    │
+│  ─────────────────────────────────────────────────────────────  │
+│  Context: entity:link :parent "BlackRock UK" :child "John..."  │
+│                                                                 │
+│  Agent: Which BlackRock UK?                                     │
+│         1. BlackRock Fund Managers (95%)                        │
+│         2. BlackRock UK Holdings (78%)                          │
+│                                                                 │
+│  User: "The fund managers one" [voice or text]                  │
+│                                                                 │
+│  Agent: ✓ Selected. Now, which John Smith?                     │
+│         Found 3 matches. Any details?                           │
+│                                                                 │
+│  User: "UK citizen, born 1965"                                  │
+│                                                                 │
+│  Agent: ✓ John Smith (DOB 1965, UK) selected.                  │
+│         All resolved. Ready to execute?                         │
+│                                                                 │
+│  User: "Yes"                                                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+    │
+    │ Completion (pops from window_stack)
+    ▼
+Main Agent Chat: [Resolution complete, DSL updated with UUIDs]
+```
+
+**Key properties:**
+- Sub-session is a **scoped agent conversation**, not a form
+- Has its own chat history (ephemeral)
+- Voice works naturally ("the first one", "UK citizen")
+- ESC or [← Back] closes and returns to main chat
+- On completion, merges resolved refs back to main session AST
+
+---
 
 ## Open Questions
 

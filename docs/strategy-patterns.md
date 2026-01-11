@@ -827,6 +827,135 @@ Traditional custody systems have dozens of disconnected tables: clients, counter
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Window/Sub-Session Stack Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    WINDOW STACK ARCHITECTURE (MANDATORY)                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ob-poc uses a STACK-BASED window manager for modals and sub-sessions.     │
+│   This is a RULE, not a suggestion.                                         │
+│                                                                              │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                         LAYER MODEL                                  │   │
+│   ├─────────────────────────────────────────────────────────────────────┤   │
+│   │                                                                      │   │
+│   │   Layer 0 (Base)     : Main panels (Chat, DSL, Graph, Results)      │   │
+│   │   Layer 1 (Overlays) : Side panels, search modals                   │   │
+│   │   Layer 2 (Sub-sess) : Agent sub-sessions (Resolution, Research)   │   │
+│   │   Layer 3 (Dialogs)  : Confirmations, alerts                        │   │
+│   │                                                                      │   │
+│   │   Higher layer = renders on top = closes first on ESC               │   │
+│   │                                                                      │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│   STATE STRUCTURE:                                                           │
+│   ────────────────                                                           │
+│                                                                              │
+│   struct AppState {                                                          │
+│       // Layer 0: Main panels (always rendered)                             │
+│       panels: PanelState,                                                   │
+│                                                                              │
+│       // Layer 1-3: Window stack (ordered bottom to top)                    │
+│       window_stack: Vec<WindowInstance>,                                    │
+│   }                                                                          │
+│                                                                              │
+│   struct WindowInstance {                                                   │
+│       id: WindowId,                                                         │
+│       layer: u8,           // 1, 2, or 3                                    │
+│       title: String,                                                        │
+│       state: WindowState,  // Enum with per-type state                      │
+│   }                                                                          │
+│                                                                              │
+│   enum WindowId {                                                           │
+│       CbuSearch,                                                            │
+│       EntityRefPopup { ref_index: usize },                                  │
+│       ResolutionSession { session_id: Uuid },                               │
+│       ResearchSession { session_id: Uuid },                                 │
+│       ConfirmDialog { action: String },                                     │
+│   }                                                                          │
+│                                                                              │
+│   ─────────────────────────────────────────────────────────────────────────  │
+│                                                                              │
+│   RENDER ORDER (in app.rs update):                                          │
+│   ────────────────────────────────                                           │
+│                                                                              │
+│   fn update(&mut self, ctx: &Context, _frame: &mut Frame) {                 │
+│       // 1. Process async results                                           │
+│       self.process_async_results();                                         │
+│                                                                              │
+│       // 2. Render Layer 0 (main panels)                                    │
+│       self.render_main_panels(ctx);                                         │
+│                                                                              │
+│       // 3. Render window stack IN ORDER (bottom to top)                    │
+│       for window in &self.state.window_stack {                              │
+│           self.render_window(ctx, window);                                  │
+│       }                                                                      │
+│                                                                              │
+│       // 4. Handle ESC - closes TOPMOST window                              │
+│       if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {                  │
+│           self.close_topmost_window();                                      │
+│       }                                                                      │
+│   }                                                                          │
+│                                                                              │
+│   ─────────────────────────────────────────────────────────────────────────  │
+│                                                                              │
+│   RULES:                                                                     │
+│   ──────                                                                     │
+│                                                                              │
+│   ✓ All modals/windows MUST be in window_stack (no ad-hoc Window::new)      │
+│   ✓ ESC ALWAYS closes topmost - predictable, no exceptions                  │
+│   ✓ Each window has [← Back] or [X] in header - visual escape route         │
+│   ✓ Sub-sessions are scoped agent chats, not forms                          │
+│   ✓ Layer determines z-order: egui renders last = on top                    │
+│   ✓ Window state lives in WindowInstance.state, not scattered in AppState  │
+│                                                                              │
+│   ✗ DON'T create windows outside the stack                                  │
+│   ✗ DON'T have ESC do different things in different contexts               │
+│   ✗ DON'T nest windows more than 2 deep (confusing UX)                      │
+│                                                                              │
+│   ─────────────────────────────────────────────────────────────────────────  │
+│                                                                              │
+│   SUB-SESSION PATTERN:                                                       │
+│   ────────────────────                                                       │
+│                                                                              │
+│   Sub-sessions are SCOPED AGENT CONVERSATIONS, not modal forms.             │
+│                                                                              │
+│   Main Chat: "Onboard John Smith as director of BlackRock UK"               │
+│              │                                                               │
+│              ▼                                                               │
+│   Agent: "I found 2 entities to confirm."                                   │
+│          [Open Resolution Assistant →]                                       │
+│              │                                                               │
+│              ▼ (pushes to window_stack)                                      │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  Resolution Assistant                              [← Back] [X]     │   │
+│   │  ───────────────────────────────────────────────────────────────    │   │
+│   │  Resolving 2 entities                                               │   │
+│   │                                                                      │   │
+│   │  Agent: Which BlackRock UK?                                         │   │
+│   │         1. BlackRock Fund Managers (95%)                            │   │
+│   │         2. BlackRock UK Holdings (78%)                              │   │
+│   │                                                                      │   │
+│   │  User: "The fund managers one"                                      │   │
+│   │                                                                      │   │
+│   │  Agent: ✓ Selected. Now, which John Smith?                         │   │
+│   │                                                                      │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│              │                                                               │
+│              ▼ (pops from window_stack on completion)                       │
+│   Main Chat: [Resolution complete, DSL updated]                             │
+│                                                                              │
+│   Sub-session types:                                                         │
+│   - ResolutionSession  : Entity disambiguation                              │
+│   - ResearchSession    : GLEIF lookup, UBO discovery                        │
+│   - ReviewSession      : Check generated DSL before execute                 │
+│   - CorrectionSession  : Fix screening hits                                 │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## Quick Reference
