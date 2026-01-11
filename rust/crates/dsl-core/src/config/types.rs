@@ -158,6 +158,8 @@ pub enum SourceOfTruth {
     Catalog,
     /// Operational tables (derived/projected)
     Operational,
+    /// Session state (ephemeral, not persisted business data)
+    Session,
 }
 
 /// Scope of a verb

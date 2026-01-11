@@ -4,6 +4,9 @@
 # Scope types: galaxy, book, cbu, jurisdiction, neighborhood
 #
 # Integration: UnifiedSessionContext, ViewState, AgentGraphContext
+#
+# Tiering: These are "infrastructure" verbs - they manage UI/session state,
+# not business data. Tier: intent (user-invoked navigation actions).
 
 domains:
   session:
@@ -19,6 +22,12 @@ domains:
         description: Set scope to all CBUs under an apex entity (commercial client)
         behavior: plugin
         handler: SessionSetGalaxyOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_scope
+          tags: [navigation, scope-change]
         args:
           - name: apex-entity-id
             type: uuid
@@ -39,6 +48,12 @@ domains:
         description: Set scope to filtered subset of a galaxy (by jurisdiction, entity type, etc.)
         behavior: plugin
         handler: SessionSetBookOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_scope
+          tags: [navigation, scope-change, filtering]
         args:
           - name: apex-entity-id
             type: uuid
@@ -71,6 +86,12 @@ domains:
         description: Set scope to a single CBU
         behavior: plugin
         handler: SessionSetCbuOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_scope
+          tags: [navigation, scope-change]
         args:
           - name: cbu-id
             type: uuid
@@ -91,6 +112,12 @@ domains:
         description: Set scope to all CBUs in a jurisdiction
         behavior: plugin
         handler: SessionSetJurisdictionOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_scope
+          tags: [navigation, scope-change]
         args:
           - name: jurisdiction-code
             type: string
@@ -105,6 +132,12 @@ domains:
         description: Set scope to N hops from a focal entity
         behavior: plugin
         handler: SessionSetNeighborhoodOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_scope
+          tags: [navigation, scope-change, graph-traversal]
         args:
           - name: entity-id
             type: uuid
@@ -133,6 +166,12 @@ domains:
         description: Set cursor to a specific entity within the current scope
         behavior: plugin
         handler: SessionFocusOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_cursor
+          tags: [navigation, focus]
         args:
           - name: entity-id
             type: uuid
@@ -153,6 +192,12 @@ domains:
         description: Clear cursor (unfocus)
         behavior: plugin
         handler: SessionClearFocusOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_cursor
+          tags: [navigation, focus]
         args: []
         returns:
           type: affected
@@ -164,6 +209,12 @@ domains:
         description: Navigate back to previous scope
         behavior: plugin
         handler: SessionBackOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_history
+          tags: [navigation, history]
         args: []
         returns:
           type: record
@@ -173,6 +224,12 @@ domains:
         description: Navigate forward (undo back)
         behavior: plugin
         handler: SessionForwardOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_history
+          tags: [navigation, history]
         args: []
         returns:
           type: record
@@ -185,6 +242,12 @@ domains:
         description: Get current scope information
         behavior: plugin
         handler: SessionInfoOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          scope: global
+          noun: session_info
+          tags: [read, introspection]
         args: []
         returns:
           type: record
@@ -194,6 +257,12 @@ domains:
         description: List CBUs in current scope
         behavior: plugin
         handler: SessionListCbusOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          scope: global
+          noun: session_cbus
+          tags: [read, listing]
         args:
           - name: limit
             type: integer
@@ -211,6 +280,12 @@ domains:
         description: Clear scope (reset to empty)
         behavior: plugin
         handler: SessionClearOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_scope
+          tags: [navigation, reset]
         args: []
         returns:
           type: affected
@@ -222,6 +297,12 @@ domains:
         description: Save current scope as a named bookmark
         behavior: plugin
         handler: SessionSaveBookmarkOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_bookmark
+          tags: [bookmark, persistence]
         args:
           - name: name
             type: string
@@ -240,6 +321,12 @@ domains:
         description: Load scope from a saved bookmark
         behavior: plugin
         handler: SessionLoadBookmarkOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_bookmark
+          tags: [bookmark, navigation]
         args:
           - name: name
             type: string
@@ -253,6 +340,12 @@ domains:
         description: List saved bookmarks
         behavior: plugin
         handler: SessionListBookmarksOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          scope: global
+          noun: session_bookmark
+          tags: [read, listing]
         args: []
         returns:
           type: record
@@ -262,6 +355,12 @@ domains:
         description: Delete a saved bookmark
         behavior: plugin
         handler: SessionDeleteBookmarkOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_bookmark
+          tags: [bookmark, deletion]
         args:
           - name: name
             type: string
@@ -277,6 +376,12 @@ domains:
         description: Add a CBU to the active CBU set (for multi-CBU workflows)
         behavior: plugin
         handler: SessionAddCbuOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_cbu_set
+          tags: [multi-cbu, selection]
         args:
           - name: cbu-id
             type: uuid
@@ -297,6 +402,12 @@ domains:
         description: Remove a CBU from the active CBU set
         behavior: plugin
         handler: SessionRemoveCbuOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_cbu_set
+          tags: [multi-cbu, selection]
         args:
           - name: cbu-id
             type: uuid
@@ -317,6 +428,12 @@ domains:
         description: Clear all CBUs from the active set
         behavior: plugin
         handler: SessionClearCbuSetOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: session_cbu_set
+          tags: [multi-cbu, reset]
         args: []
         returns:
           type: record
@@ -326,6 +443,12 @@ domains:
         description: List all CBUs in the active set with details
         behavior: plugin
         handler: SessionListActiveCbusOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          scope: global
+          noun: session_cbu_set
+          tags: [read, listing]
         args: []
         returns:
           type: record
