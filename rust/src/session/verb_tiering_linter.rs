@@ -1,25 +1,38 @@
 //! Verb Tiering Linter
 //!
-//! Validates verb metadata against tiering rules defined in the 027 Trading Matrix
-//! Canonical Pivot architecture. Enforces the following invariants:
+//! Validates verb metadata for consistency. This linter is domain-agnostic -
+//! different domains have different canonical sources of truth.
 //!
-//! 1. **Projection verbs** (`tier: projection`) must be `internal: true`
-//! 2. **Deprecated verbs** must be `tier: projection`
-//! 3. **Intent verbs** cannot write to operational tables directly
-//! 4. **Diagnostics verbs** must be read-only
-//! 5. **Composite verbs** (materialize) may write to operational tables
+//! # Universal Rules (apply to ALL domains)
+//!
+//! 1. **T007**: All verbs should have tiering metadata (warning for incremental adoption)
+//! 2. **T002**: Projection verbs must be `internal: true` (they're derived, not user-facing)
+//! 3. **T006**: Diagnostics verbs must be read-only
 //!
 //! # Tiering Model
 //!
 //! ```text
-//! Tier        | Source of Truth | Writes Operational | Internal
-//! ------------|-----------------|--------------------|---------
-//! reference   | catalog         | no                 | no
-//! intent      | matrix          | no                 | no
-//! projection  | operational     | yes                | yes (required)
-//! diagnostics | any             | no                 | no
-//! composite   | matrix          | yes (via pipeline) | no
+//! Tier        | Purpose                              | Writes Data | Internal
+//! ------------|--------------------------------------|-------------|----------
+//! reference   | Global reference data (catalogs)     | yes         | no
+//! intent      | User-facing write operations         | yes         | no
+//! projection  | Derived writes (from another source) | yes         | yes (required)
+//! diagnostics | Read-only queries and validation     | no          | no
+//! composite   | Multi-step orchestration             | yes         | no
 //! ```
+//!
+//! # Source of Truth (domain-specific)
+//!
+//! Different domains have different canonical sources:
+//! - `matrix` - Trading profile JSONB document
+//! - `entity` - Entity graph (entity_relationships table)
+//! - `workflow` - Case/KYC state machine
+//! - `external` - External APIs (GLEIF, Companies House, SEC)
+//! - `register` - Capital structure (fund/investor holdings)
+//! - `catalog` - Reference data (seeded lookup tables)
+//! - `session` - Ephemeral UI state
+//! - `document` - Document catalog
+//! - `operational` - Derived/projected tables
 
 use dsl_core::config::types::{CrudOperation, SourceOfTruth, VerbBehavior, VerbConfig, VerbTier};
 
@@ -148,16 +161,12 @@ pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> 
     }
 
     // =========================================================================
-    // Rule 3: Intent verbs cannot write to operational tables
+    // Rule 3: REMOVED - was trading-matrix-specific
     // =========================================================================
-    if matches!(metadata.tier, Some(VerbTier::Intent)) && metadata.writes_operational {
-        diagnostics.add_error_with_path(
-            codes::TIER_INTENT_WRITES_OPERATIONAL,
-            "Intent tier verbs cannot write to operational tables directly",
-            Some("metadata.writes_operational"),
-            Some("Intent verbs modify the matrix document; use materialize to sync to operational tables"),
-        );
-    }
+    // Previously: "Intent verbs cannot write to operational tables"
+    // This was wrong for non-trading-matrix domains (entity, kyc, fund, etc.)
+    // where intent verbs write directly to their canonical source.
+    // The writes_operational flag is now informational, not prescriptive.
 
     // =========================================================================
     // Rule 4: Diagnostics verbs must be read-only
@@ -205,35 +214,27 @@ pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> 
     // =========================================================================
     // Rule 7: Source of truth consistency
     // =========================================================================
+    // NOTE: We no longer enforce strict source_of_truth matching because different
+    // domains have different canonical sources:
+    // - Trading profile → matrix
+    // - Entity/ownership → entity
+    // - KYC/cases → workflow
+    // - Research → external
+    // - Fund/investor → register
+    // - Session/view → session
+    //
+    // The only strict rule: projection verbs must have source_of_truth: operational
+    // (they derive from some other canonical source)
     if let Some(source) = &metadata.source_of_truth {
-        match metadata.tier {
-            Some(VerbTier::Intent)
-                if !matches!(source, SourceOfTruth::Matrix | SourceOfTruth::Session) =>
-            {
-                diagnostics.add_warning_with_path(
-                    codes::TIER_INCONSISTENT_SOURCE,
-                    "Intent tier verbs should have source_of_truth: matrix or session",
-                    Some("metadata.source_of_truth"),
-                    Some("Intent verbs author the trading matrix or manage session state"),
-                );
-            }
-            Some(VerbTier::Projection) if !matches!(source, SourceOfTruth::Operational) => {
+        if let Some(VerbTier::Projection) = metadata.tier {
+            if !matches!(source, SourceOfTruth::Operational) {
                 diagnostics.add_warning_with_path(
                     codes::TIER_INCONSISTENT_SOURCE,
                     "Projection tier verbs should have source_of_truth: operational",
                     Some("metadata.source_of_truth"),
-                    Some("Projection verbs write to operational tables (derived from matrix)"),
+                    Some("Projection verbs write to operational tables (derived from a canonical source)"),
                 );
             }
-            Some(VerbTier::Reference) if !matches!(source, SourceOfTruth::Catalog) => {
-                diagnostics.add_warning_with_path(
-                    codes::TIER_INCONSISTENT_SOURCE,
-                    "Reference tier verbs should have source_of_truth: catalog",
-                    Some("metadata.source_of_truth"),
-                    Some("Reference verbs access global reference data"),
-                );
-            }
-            _ => {}
         }
     }
 

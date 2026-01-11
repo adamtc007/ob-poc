@@ -7,7 +7,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, relationship, create]
@@ -105,7 +105,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, relationship, update]
@@ -143,7 +143,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, relationship, lifecycle]
@@ -175,7 +175,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, relationship, delete]
@@ -203,7 +203,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [control, relationship, create]
@@ -269,7 +269,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [control, relationship, lifecycle]
@@ -301,7 +301,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [control, relationship, delete]
@@ -329,7 +329,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [trust, relationship, create]
@@ -404,7 +404,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [trust, relationship, lifecycle]
@@ -436,7 +436,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [trust, relationship, delete]
@@ -464,7 +464,7 @@ domains:
         behavior: crud
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [relationship, delete, generic]
@@ -491,7 +491,7 @@ domains:
         behavior: plugin
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, query, temporal]
@@ -517,7 +517,7 @@ domains:
         behavior: crud
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, query]
@@ -546,7 +546,7 @@ domains:
         behavior: crud
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: entity
           scope: cbu
           noun: ubo
           tags: [query, ubo-candidates]
@@ -572,7 +572,7 @@ domains:
         behavior: crud
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, query, reverse-lookup]
@@ -601,7 +601,7 @@ domains:
         behavior: plugin
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: entity
           scope: cbu
           noun: ubo
           tags: [computation, ownership, graph-traversal]

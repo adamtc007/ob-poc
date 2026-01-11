@@ -149,17 +149,36 @@ pub enum VerbTier {
 }
 
 /// Source of truth for data
+///
+/// Different domains have different canonical sources:
+/// - Trading profile verbs → matrix (JSONB document)
+/// - Entity/ownership verbs → entity (entity_relationships table)
+/// - KYC/case verbs → workflow (case state machine)
+/// - Research verbs → external (APIs like GLEIF, Companies House)
+/// - Fund/investor verbs → register (capital structure)
+/// - Reference data verbs → catalog (seeded lookup tables)
+/// - Session/view verbs → session (ephemeral UI state)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceOfTruth {
-    /// Trading matrix document is canonical
+    /// Trading matrix document is canonical (trading-profile domain)
     Matrix,
-    /// Global reference catalog
+    /// Global reference catalog (instrument classes, markets, currencies)
     Catalog,
-    /// Operational tables (derived/projected)
+    /// Operational tables - derived/projected from another source
     Operational,
-    /// Session state (ephemeral, not persisted business data)
+    /// Session state - ephemeral, not persisted business data
     Session,
+    /// Entity graph - entity_relationships is the source (UBO, ownership, control)
+    Entity,
+    /// Case workflow - KYC case state machine is canonical
+    Workflow,
+    /// External API - data sourced from GLEIF, Companies House, SEC, etc.
+    External,
+    /// Capital register - fund/investor holdings structure
+    Register,
+    /// Document catalog - document artifacts and metadata
+    Document,
 }
 
 /// Scope of a verb

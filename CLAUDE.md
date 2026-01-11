@@ -362,11 +362,16 @@ Verbs are categorized by their role in the data flow:
 | `diagnostics` | Read-only queries and validation | `cbu-custody:list-ssis` |
 | `composite` | Multi-table orchestration | `trading-profile:materialize` |
 
-**Source of Truth:**
-- `matrix` - Trading profile document is canonical
-- `catalog` - Global reference catalog
+**Source of Truth (domain-specific):**
+- `matrix` - Trading profile JSONB document
+- `entity` - Entity graph (entity_relationships table)
+- `workflow` - Case/KYC state machine
+- `external` - External APIs (GLEIF, Companies House, SEC)
+- `register` - Capital structure (fund/investor holdings)
+- `catalog` - Reference data (seeded lookup tables)
+- `session` - Ephemeral UI state
+- `document` - Document catalog
 - `operational` - Derived/projected tables
-- `session` - Ephemeral session state
 
 **Verb Metadata Example:**
 ```yaml
@@ -384,10 +389,10 @@ my-verb:
   # ... rest of verb definition
 ```
 
-**Linting Rules:**
-- Projection verbs must be `internal: true`
-- Intent verbs cannot have `writes_operational: true`
-- Diagnostics verbs must be read-only
+**Linting Rules (universal, domain-agnostic):**
+- T007: All verbs should have metadata (warning)
+- T002: Projection verbs must be `internal: true`
+- T006: Diagnostics verbs must be read-only
 
 ---
 
