@@ -1000,10 +1000,17 @@ fn generate_verbs_help(domain_filter: Option<&str>) -> String {
 
     if domains.is_empty() {
         if let Some(filter) = domain_filter {
+            let available = reg.domains().join(", ");
             return format!(
-                "No verbs found for domain '{}'\n\nAvailable domains: {}",
-                filter,
-                reg.domains().join(", ")
+                "Unknown domain: '{}'\n\n\
+                 **Usage:** `/commands <domain>` or `/verbs <domain>`\n\n\
+                 **Available domains:** {}\n\n\
+                 **Examples:**\n\
+                 - `/commands session` - session scope management\n\
+                 - `/commands kyc` - KYC case verbs\n\
+                 - `/commands entity` - entity management\n\
+                 - `/verbs` - show all verbs",
+                filter, available
             );
         }
         return "No verbs loaded in registry.".to_string();
