@@ -958,6 +958,117 @@ Traditional custody systems have dozens of disconnected tables: clients, counter
 
 ---
 
+## 4. ob-poc Panel Action Pattern (Refined)
+
+> **Audited:** 2026-01-11 - All 16 panels follow this pattern consistently
+
+### The Pattern
+
+Every interactive panel returns an **action enum** instead of mutating state directly:
+
+```rust
+// panels/my_panel.rs
+pub enum MyPanelAction {
+    None,
+    DoSomething { param: String },
+    SelectItem { id: String },
+    Close,
+}
+
+pub fn my_panel(ui: &mut Ui, data: &MyPanelData) -> Option<MyPanelAction> {
+    let mut action = None;
+    
+    // Render UI, collect action
+    if ui.button("Click").clicked() {
+        action = Some(MyPanelAction::DoSomething { param: "value".to_string() });
+    }
+    
+    action  // Return - don't handle here!
+}
+
+// app.rs - handle AFTER all panels rendered
+fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
+    // 1. Process async results
+    self.state.process_async_results();
+    
+    // 2. Render panels, collect actions
+    let toolbar_action = toolbar(ui, &toolbar_data);
+    let chat_action = chat_panel(ui, &mut self.state);
+    let resolution_action = resolution_modal(ctx, ...);
+    
+    // 3. Handle actions AFTER rendering (avoids borrow conflicts)
+    self.handle_toolbar_action(toolbar_action);
+    self.handle_resolution_action(resolution_action);
+}
+```
+
+### Why This Works
+
+1. **Borrow checker friendly** - No `&mut self` during render
+2. **Composable** - Multiple panels can return actions, processed in order
+3. **Testable** - Actions are data, can be unit tested
+4. **Predictable** - All mutation happens in one place (handlers)
+
+### Panels Following This Pattern
+
+| Panel | Action Enum | Key Actions |
+|-------|-------------|-------------|
+| `toolbar.rs` | `ToolbarAction` | `select_cbu`, `change_view_mode`, `change_layout` |
+| `chat.rs` | Direct via `send_chat_message()` | Send message |
+| `dsl_editor.rs` | `DslEditorAction` | `Clear`, `Validate`, `Execute` |
+| `resolution.rs` | `ResolutionPanelAction` | `Select`, `Skip`, `Complete`, `SendMessage` |
+| `cbu_search.rs` | `CbuSearchAction` | `Search`, `Select`, `Close` |
+| `context.rs` | `ContextPanelAction` | `SelectContext`, `FocusStage` |
+| `taxonomy.rs` | `TaxonomyPanelAction` | `ZoomIn`, `ZoomOut`, `SelectType` |
+| `trading_matrix.rs` | `TradingMatrixPanelAction` | `ToggleExpand`, `SelectNode` |
+| `investor_register.rs` | `InvestorRegisterAction` | `SelectControlHolder`, `DrillDown` |
+
+### Async State Extraction Pattern
+
+Lock briefly, extract data, then render:
+
+```rust
+// ✅ CORRECT - short lock window
+let (loading, should_focus) = {
+    let mut guard = state.async_state.lock().unwrap();
+    let loading = guard.loading_chat;
+    let focus = guard.chat_just_finished;
+    if focus { guard.chat_just_finished = false; }
+    (loading, focus)
+};  // Lock released
+
+// Now render with extracted data
+if loading { ui.spinner(); }
+if should_focus { ui.memory_mut(|m| m.request_focus(input_id)); }
+```
+
+### Data Structs for Panels
+
+Complex panels receive a **data struct** to avoid holding `&AppState` during render:
+
+```rust
+pub struct ResolutionPanelData<'a> {
+    pub window: Option<&'a WindowEntry>,
+    pub matches: Option<&'a [EntityMatchDisplay]>,
+    pub searching: bool,
+    pub current_ref_name: Option<String>,
+    pub messages: Vec<(String, String)>,
+    pub voice_active: bool,
+}
+
+// Extract before render
+let resolution_data = ResolutionPanelData {
+    window: state.window_stack.find_by_type(...),
+    matches: state.resolution_ui.search_results.as_ref().map(...),
+    // ...
+};
+
+// Render with extracted data
+let action = resolution_modal(ctx, &mut buffers.search, &resolution_data);
+```
+
+---
+
 ## Quick Reference
 
 | Concept | Key Insight | Where to Look |
@@ -977,4 +1088,4 @@ Traditional custody systems have dozens of disconnected tables: clients, counter
 
 ---
 
-Generated: 2026-01-09
+Generated: 2026-01-11 (egui patterns audited and refined)

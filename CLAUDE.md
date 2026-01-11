@@ -35,6 +35,7 @@ This file provides guidance to Claude Code when working with this repository.
 | **Feedback Inspector (design)** | `ai-thoughts/023b-feedback-inspector.md` | ✅ **DONE** - On-demand failure analysis, classification, repro generation, audit trail, MCP interface |
 | **Event Infrastructure (impl)** | `ai-thoughts/025-implement-event-infrastructure.md` | ✅ **DONE** - Lock-free emitter, drain task, session logger |
 | **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
+| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | **TODO** - Instrument taxonomy as generative core, verb tiering, materialize pipeline |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
 
 > **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
@@ -99,6 +100,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/023b-feedback-inspector.md` - ✅ DONE - On-demand analysis, repro generation, audit trail, MCP server
 - `ai-thoughts/025-implement-event-infrastructure.md` - ✅ DONE - Lock-free emitter, drain task, session logger
 - `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
+- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - **TODO (~62h)** - Instrument taxonomy as generative core, verb cleanup (delete/replace), materialize pipeline
 
 ---
 
@@ -679,6 +681,163 @@ pub enum ViewLevel {
 | API routes | `rust/src/api/` |
 | Migrations | `migrations/*.sql` |
 | Config types | `rust/crates/dsl-core/src/config/types.rs` |
+
+---
+
+## egui Pattern Compliance Checklist
+
+> **Last audited:** 2026-01-11
+> **Status:** ✅ All panels compliant with documented patterns
+
+### Core Rules (from `docs/strategy-patterns.md` §3)
+
+| Rule | Description | Status |
+|------|-------------|--------|
+| **State External** | All state stored in `AppState`, never in widgets | ✅ |
+| **Actions Return Values** | Panels return `Option<Action>` enums, no callbacks | ✅ |
+| **Short Lock Windows** | Lock async_state, extract data, release, then render | ✅ |
+| **No Async in update()** | All async via `spawn_local` + channels | ✅ |
+| **Window Stack** | Modals use `WindowStack`, ESC closes topmost | ✅ |
+
+### Panel Action Pattern (MANDATORY)
+
+Every panel that handles user interactions MUST:
+
+```rust
+// 1. Define action enum in panel module
+pub enum MyPanelAction {
+    None,
+    DoSomething { param: String },
+    Close,
+}
+
+// 2. Panel returns Option<Action>, NEVER mutates AppState directly
+pub fn my_panel(ui: &mut Ui, data: &MyPanelData) -> Option<MyPanelAction> {
+    let mut action = None;
+    
+    if ui.button("Click").clicked() {
+        action = Some(MyPanelAction::DoSomething { 
+            param: "value".to_string() 
+        });
+    }
+    
+    action  // Return, don't handle here
+}
+
+// 3. App::update() calls handler AFTER rendering
+fn handle_my_panel_action(&mut self, action: Option<MyPanelAction>) {
+    let Some(action) = action else { return };
+    match action {
+        MyPanelAction::DoSomething { param } => { /* mutate state */ }
+        MyPanelAction::Close => { /* close panel */ }
+        MyPanelAction::None => {}
+    }
+}
+```
+
+**Why:** Separates rendering from mutation, prevents borrow conflicts, enables action composition.
+
+### Async State Pattern (MANDATORY)
+
+```rust
+// ✅ CORRECT: Short lock, extract, release, then use
+let (loading, data) = {
+    let guard = state.async_state.lock().unwrap();
+    (guard.loading_chat, guard.pending_data.clone())
+};  // Lock released here
+// Now safe to render with extracted data
+
+// ❌ WRONG: Holding lock across render
+let guard = state.async_state.lock().unwrap();
+ui.label(&guard.some_field);  // Still holding lock!
+```
+
+### Window Stack Layers
+
+| Layer | Purpose | Modal | Examples |
+|-------|---------|-------|----------|
+| 0 | Base panels | No | Chat, DSL Editor, Graph, Results |
+| 1 | Slide-in panels | No | Entity Detail, Container Browse |
+| 2 | Modals | Yes | Resolution, CBU Search, Confirmation |
+| 3 | Toasts | No | Notifications, Errors |
+
+**ESC closes topmost modal (layer 2+), never base panels.**
+
+### Text Buffer Pattern
+
+```rust
+// state.rs - UI-only mutable state
+pub struct TextBuffers {
+    pub chat_input: String,      // Chat message being composed
+    pub dsl_editor: String,      // DSL source being edited
+    pub entity_search: String,   // Search query
+    pub dsl_dirty: bool,         // For "unsaved changes" warning ONLY
+}
+
+// ✅ CORRECT: Bind to buffer
+TextEdit::singleline(&mut state.buffers.chat_input)
+
+// ❌ WRONG: Temporary string (resets every frame!)
+TextEdit::singleline(&mut String::new())
+```
+
+### Panels That Follow All Patterns (Reference)
+
+| Panel | Actions | Async | Notes |
+|-------|---------|-------|-------|
+| `chat.rs` | Via AppState | ✅ Short lock | Focus management on chat complete |
+| `dsl_editor.rs` | `DslEditorAction` | ✅ | Clear/Validate/Execute actions |
+| `resolution.rs` | `ResolutionPanelAction` | ✅ | Sub-session modal with voice |
+| `cbu_search.rs` | `CbuSearchAction` | ✅ | Focus on just_opened flag |
+| `context.rs` | `ContextPanelAction` | ✅ | Stage focus, context selection |
+| `taxonomy.rs` | `TaxonomyPanelAction` | ✅ | Fractal navigation zoom |
+| `trading_matrix.rs` | `TradingMatrixPanelAction` | ✅ | Node selection, navigation |
+| `investor_register.rs` | `InvestorRegisterAction` | ✅ | Aggregate expand, drill-down |
+| `toolbar.rs` | `ToolbarAction` | ✅ | CBU select, layout, view mode |
+
+### Anti-Patterns to Avoid
+
+```rust
+// ❌ NEVER: Callback-based event handling
+ui.button("Click").on_click(|| self.do_thing());  // Not egui API anyway
+
+// ❌ NEVER: Mutating state during render
+if ui.button("Save").clicked() {
+    self.state.save();  // Borrow conflict!
+}
+
+// ❌ NEVER: Async in update()
+async fn update(&mut self) {
+    let data = fetch().await;  // BLOCKS UI THREAD
+}
+
+// ❌ NEVER: Long lock windows
+let guard = self.async_state.lock().unwrap();
+// ... 50 lines of rendering while holding lock ...
+
+// ❌ NEVER: Ad-hoc Window::new outside WindowStack for modals
+Window::new("My Modal")...  // Use WindowStack.push() instead
+```
+
+### Voice Integration Pattern
+
+Voice commands flow through unified dispatcher → resolution modal when active:
+
+```rust
+// app.rs - Route voice to resolution when modal active
+fn process_voice_commands(&mut self) {
+    let resolution_active = self.state.resolution_ui.voice_active
+        && self.state.window_stack.has(&WindowType::Resolution);
+    
+    for cmd in take_pending_voice_commands() {
+        if resolution_active {
+            self.process_resolution_voice_command(&cmd.transcript, cmd.confidence);
+        } else {
+            // Normal voice command dispatch
+        }
+    }
+}
+```
 
 ---
 
