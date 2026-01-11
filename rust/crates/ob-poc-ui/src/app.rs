@@ -8,11 +8,11 @@
 use crate::api;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
-    dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, results_panel,
-    session_panel, taxonomy_panel, toolbar, trading_matrix_panel, CbuSearchAction, CbuSearchData,
-    ContainerBrowseAction, ContainerBrowseData, ContextPanelAction, DslEditorAction,
-    InvestorRegisterAction, TaxonomyPanelAction, ToolbarAction, ToolbarData,
-    TradingMatrixPanelAction,
+    dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
+    results_panel, session_panel, taxonomy_panel, toolbar, trading_matrix_panel, CbuSearchAction,
+    CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction, DslEditorAction,
+    EntityMatchDisplay, InvestorRegisterAction, ResolutionPanelAction, ResolutionPanelData,
+    TaxonomyPanelAction, ToolbarAction, ToolbarData, TradingMatrixPanelAction,
 };
 use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
 use ob_poc_graph::{CbuGraphWidget, TradingMatrixNodeIdExt, ViewMode};
@@ -20,6 +20,102 @@ use ob_poc_types::galaxy::{NavigationAction, ViewLevel};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use wasm_bindgen_futures::spawn_local;
+
+// =============================================================================
+// VOICE COMMAND HELPERS
+// =============================================================================
+
+/// Parse a selection command from voice transcript
+/// Returns the 0-indexed selection if recognized, None otherwise
+///
+/// Recognized patterns:
+/// - "select 1", "select one", "select the first"
+/// - "option 1", "option one"
+/// - "the first one", "the second one"
+/// - "number 1", "number one"
+/// - Just "one", "two", "three" etc.
+#[cfg(target_arch = "wasm32")]
+fn parse_selection_command(transcript: &str) -> Option<usize> {
+    let lower = transcript.to_lowercase();
+
+    // Check for "select N" pattern
+    if lower.starts_with("select ") {
+        let rest = &lower[7..];
+        if let Some(n) = parse_number_word(rest) {
+            return Some(n.saturating_sub(1)); // Convert to 0-indexed
+        }
+    }
+
+    // Check for "option N" pattern
+    if lower.starts_with("option ") {
+        let rest = &lower[7..];
+        if let Some(n) = parse_number_word(rest) {
+            return Some(n.saturating_sub(1));
+        }
+    }
+
+    // Check for "number N" pattern
+    if lower.starts_with("number ") {
+        let rest = &lower[7..];
+        if let Some(n) = parse_number_word(rest) {
+            return Some(n.saturating_sub(1));
+        }
+    }
+
+    // Check for "the first/second/third one" pattern
+    if lower.contains("first") {
+        return Some(0);
+    }
+    if lower.contains("second") {
+        return Some(1);
+    }
+    if lower.contains("third") {
+        return Some(2);
+    }
+    if lower.contains("fourth") {
+        return Some(3);
+    }
+    if lower.contains("fifth") {
+        return Some(4);
+    }
+
+    // Check for just the number word alone
+    let trimmed = lower.trim();
+    if let Some(n) = parse_number_word(trimmed) {
+        if n <= 10 {
+            // Only accept bare numbers 1-10
+            return Some(n.saturating_sub(1));
+        }
+    }
+
+    None
+}
+
+/// Parse a number word or digit to a number
+#[cfg(target_arch = "wasm32")]
+fn parse_number_word(s: &str) -> Option<usize> {
+    let trimmed = s.trim();
+
+    // Try parsing as digit
+    if let Ok(n) = trimmed.parse::<usize>() {
+        return Some(n);
+    }
+
+    // Parse word numbers
+    match trimmed {
+        "one" | "1st" | "first" => Some(1),
+        "two" | "2nd" | "second" => Some(2),
+        "three" | "3rd" | "third" => Some(3),
+        "four" | "4th" | "fourth" => Some(4),
+        "five" | "5th" | "fifth" => Some(5),
+        "six" | "6th" | "sixth" => Some(6),
+        "seven" | "7th" | "seventh" => Some(7),
+        "eight" | "8th" | "eighth" => Some(8),
+        "nine" | "9th" | "ninth" => Some(9),
+        "ten" | "10th" | "tenth" => Some(10),
+        _ => None,
+    }
+}
 
 /// Main application struct
 pub struct App {
@@ -51,6 +147,7 @@ impl App {
             panels: PanelState::default(),
             selected_entity_id: None,
             resolution_ui: crate::state::ResolutionPanelUi::default(),
+            window_stack: crate::state::WindowStack::default(),
             cbu_search_ui: CbuSearchUi::default(),
             container_browse: crate::panels::ContainerBrowseState::default(),
             token_registry: crate::tokens::TokenRegistry::load_defaults().unwrap_or_else(|e| {
@@ -108,8 +205,7 @@ impl App {
     #[cfg(target_arch = "wasm32")]
     fn process_voice_commands(&mut self) {
         use crate::command::{
-            dispatch_command, AgentPromptConduit, CommandResult, CommandSource,
-            InvestigationContext,
+            dispatch_command, CommandResult, CommandSource, InvestigationContext,
         };
         use crate::voice_bridge::take_pending_voice_commands;
 
@@ -119,25 +215,38 @@ impl App {
             return;
         }
 
-        // Build investigation context from current app state
-        let context = InvestigationContext {
-            focused_entity_id: self.state.graph_widget.selected_entity_id(),
-            current_cbu_id: self
+        // Check if resolution modal is active and voice is enabled
+        let resolution_active = self.state.resolution_ui.voice_active
+            && self
                 .state
-                .session
-                .as_ref()
-                .and_then(|s| s.active_cbu.as_ref().map(|cbu| cbu.id.clone())),
-            current_view_mode: self.state.graph_widget.view_mode(),
-            current_zoom: 1.0,
-            selected_entities: self
-                .state
-                .graph_widget
-                .selected_entity_id()
-                .map(|id| vec![id])
-                .unwrap_or_default(),
-        };
+                .window_stack
+                .has(&crate::state::WindowType::Resolution);
 
         for cmd in commands {
+            // If resolution modal is active, route transcripts there
+            if resolution_active {
+                self.process_resolution_voice_command(&cmd.transcript, cmd.confidence);
+                continue;
+            }
+
+            // Build investigation context from current app state
+            let context = InvestigationContext {
+                focused_entity_id: self.state.graph_widget.selected_entity_id(),
+                current_cbu_id: self
+                    .state
+                    .session
+                    .as_ref()
+                    .and_then(|s| s.active_cbu.as_ref().map(|cbu| cbu.id.clone())),
+                current_view_mode: self.state.graph_widget.view_mode(),
+                current_zoom: 1.0,
+                selected_entities: self
+                    .state
+                    .graph_widget
+                    .selected_entity_id()
+                    .map(|id| vec![id])
+                    .unwrap_or_default(),
+            };
+
             let source = CommandSource::Voice {
                 transcript: cmd.transcript.clone(),
                 confidence: cmd.confidence,
@@ -159,6 +268,143 @@ impl App {
                 CommandResult::Navigation(verb) => self.execute_navigation_verb(verb, Some(source)),
                 CommandResult::Agent(prompt) => self.send_to_agent(prompt),
                 CommandResult::None => {}
+            }
+        }
+    }
+
+    /// Process a voice command in resolution context
+    /// Handles selection commands ("select 1", "the first one", "skip", "confirm")
+    /// and refinement phrases ("UK citizen", "born 1965")
+    #[cfg(target_arch = "wasm32")]
+    fn process_resolution_voice_command(&mut self, transcript: &str, confidence: f32) {
+        let lower = transcript.to_lowercase();
+
+        web_sys::console::log_1(
+            &format!(
+                "[Resolution Voice] transcript='{}' confidence={:.2}",
+                transcript, confidence
+            )
+            .into(),
+        );
+
+        // Check for selection commands
+        if let Some(selection) = parse_selection_command(&lower) {
+            web_sys::console::log_1(
+                &format!("[Resolution Voice] Parsed selection: {}", selection).into(),
+            );
+            // Trigger selection via pending state
+            if let Ok(mut state) = self.state.async_state.lock() {
+                state.pending_resolution_select = Some(selection);
+            }
+            return;
+        }
+
+        // Check for skip command
+        if lower.contains("skip") || lower.contains("next") || lower.contains("pass") {
+            web_sys::console::log_1(&"[Resolution Voice] Skip command".into());
+            if let Ok(mut state) = self.state.async_state.lock() {
+                state.pending_resolution_skip = true;
+            }
+            return;
+        }
+
+        // Check for confirm/complete command
+        if lower.contains("confirm")
+            || lower.contains("done")
+            || lower.contains("complete")
+            || lower.contains("finish")
+            || lower == "yes"
+        {
+            web_sys::console::log_1(&"[Resolution Voice] Complete command".into());
+            if let Ok(mut state) = self.state.async_state.lock() {
+                state.pending_resolution_complete = Some(true);
+            }
+            return;
+        }
+
+        // Check for cancel command
+        if lower.contains("cancel") || lower.contains("abort") || lower == "no" {
+            web_sys::console::log_1(&"[Resolution Voice] Cancel command".into());
+            if let Ok(mut state) = self.state.async_state.lock() {
+                state.pending_resolution_cancel = true;
+            }
+            return;
+        }
+
+        // Otherwise, treat as refinement - add to chat messages and search
+        self.state
+            .resolution_ui
+            .messages
+            .push(("user".to_string(), transcript.to_string()));
+
+        // Update search query with refinement
+        if !self.state.resolution_ui.search_query.is_empty() {
+            self.state.resolution_ui.search_query.push(' ');
+        }
+        self.state.resolution_ui.search_query.push_str(transcript);
+
+        // Store for display
+        self.state.resolution_ui.last_voice_transcript = Some(transcript.to_string());
+
+        // Add agent acknowledgment
+        self.state.resolution_ui.messages.push((
+            "agent".to_string(),
+            format!("Refining search with: \"{}\"", transcript),
+        ));
+
+        // Check for auto-resolve opportunity
+        self.check_auto_resolve();
+    }
+
+    /// Check if we can auto-resolve based on search results
+    /// Auto-selects if there's exactly one match with confidence > 95%
+    #[cfg(target_arch = "wasm32")]
+    fn check_auto_resolve(&mut self) {
+        const AUTO_RESOLVE_THRESHOLD: f32 = 0.95;
+
+        // Check if we have search results
+        let auto_select = if let Some(ref results) = self.state.resolution_ui.search_results {
+            // Check if exactly one high-confidence match
+            let high_confidence_matches: Vec<_> = results
+                .matches
+                .iter()
+                .enumerate()
+                .filter(|(_, m)| m.score >= AUTO_RESOLVE_THRESHOLD)
+                .collect();
+
+            if high_confidence_matches.len() == 1 {
+                let (idx, matched) = high_confidence_matches[0];
+                web_sys::console::log_1(
+                    &format!(
+                        "[Auto-resolve] Single high-confidence match: {} ({:.0}%)",
+                        matched.display,
+                        matched.score * 100.0
+                    )
+                    .into(),
+                );
+
+                // Add confirmation message
+                self.state.resolution_ui.messages.push((
+                    "agent".to_string(),
+                    format!(
+                        "Auto-selecting: {} ({:.0}% confidence)",
+                        matched.display,
+                        matched.score * 100.0
+                    ),
+                ));
+
+                Some(idx)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Trigger selection if auto-resolve matched
+        if let Some(selection) = auto_select {
+            if let Ok(mut state) = self.state.async_state.lock() {
+                state.pending_resolution_select = Some(selection);
             }
         }
     }
@@ -917,6 +1163,88 @@ impl eframe::App for App {
         }
 
         // =================================================================
+        // Process Resolution Sub-Session Commands
+        // =================================================================
+
+        // Handle start resolution command - open resolution modal
+        if let Some((subsession_id, total_refs)) = self.state.take_pending_start_resolution() {
+            web_sys::console::log_1(
+                &format!(
+                    "update: start resolution subsession={} total_refs={}",
+                    subsession_id, total_refs
+                )
+                .into(),
+            );
+            let parent_id = self
+                .state
+                .session_id
+                .map(|id| id.to_string())
+                .unwrap_or_default();
+            self.state.window_stack.push(crate::state::WindowEntry {
+                id: subsession_id.clone(),
+                window_type: crate::state::WindowType::Resolution,
+                layer: 2,
+                modal: true,
+                data: Some(crate::state::WindowData::Resolution {
+                    parent_session_id: parent_id,
+                    subsession_id,
+                    current_ref_index: 0,
+                    total_refs,
+                }),
+            });
+        }
+
+        // Handle resolution select command - advance to next ref
+        if let Some(_selection) = self.state.take_pending_resolution_select() {
+            web_sys::console::log_1(&"update: resolution select".into());
+            if let Some(window) = self
+                .state
+                .window_stack
+                .find_by_type_mut(crate::state::WindowType::Resolution)
+            {
+                if let Some(crate::state::WindowData::Resolution {
+                    current_ref_index, ..
+                }) = &mut window.data
+                {
+                    *current_ref_index += 1;
+                }
+            }
+        }
+
+        // Handle resolution skip command - advance to next ref without selection
+        if self.state.take_pending_resolution_skip() {
+            web_sys::console::log_1(&"update: resolution skip".into());
+            if let Some(window) = self
+                .state
+                .window_stack
+                .find_by_type_mut(crate::state::WindowType::Resolution)
+            {
+                if let Some(crate::state::WindowData::Resolution {
+                    current_ref_index, ..
+                }) = &mut window.data
+                {
+                    *current_ref_index += 1;
+                }
+            }
+        }
+
+        // Handle resolution complete command - close modal and apply resolutions
+        if let Some(_apply) = self.state.take_pending_resolution_complete() {
+            web_sys::console::log_1(&"update: resolution complete".into());
+            self.state
+                .window_stack
+                .close_by_type(crate::state::WindowType::Resolution);
+        }
+
+        // Handle resolution cancel command - close modal without applying
+        if self.state.take_pending_resolution_cancel() {
+            web_sys::console::log_1(&"update: resolution cancel".into());
+            self.state
+                .window_stack
+                .close_by_type(crate::state::WindowType::Resolution);
+        }
+
+        // =================================================================
         // Process Extended Esper 3D/Multi-dimensional Navigation Commands
         // =================================================================
 
@@ -1500,11 +1828,70 @@ impl eframe::App for App {
             self.state.cbu_search_ui.just_opened = false;
         }
 
+        // Resolution modal - render if there's a resolution window in the stack
+        let resolution_action = if self
+            .state
+            .window_stack
+            .has(&crate::state::WindowType::Resolution)
+        {
+            // Find the resolution window
+            let window = self
+                .state
+                .window_stack
+                .windows
+                .iter()
+                .find(|w| w.window_type == crate::state::WindowType::Resolution);
+
+            // Convert search results to display format
+            let matches: Vec<EntityMatchDisplay> = self
+                .state
+                .resolution_ui
+                .search_results
+                .as_ref()
+                .map(|r| {
+                    r.matches
+                        .iter()
+                        .map(|m| EntityMatchDisplay {
+                            id: m.id.clone(),
+                            name: m.display.clone(),
+                            score: m.score,
+                            details: m.context.clone(),
+                            entity_type: Some(m.entity_type.clone()),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let resolution_data = ResolutionPanelData {
+                window,
+                matches: if matches.is_empty() {
+                    None
+                } else {
+                    Some(&matches)
+                },
+                searching: false, // TODO: track via async_state
+                current_ref_name: self.state.resolution_ui.current_ref_name.clone(),
+                dsl_context: self.state.resolution_ui.dsl_context.clone(),
+                messages: self.state.resolution_ui.messages.clone(),
+                voice_active: self.state.resolution_ui.voice_active,
+            };
+
+            resolution_modal(
+                ctx,
+                &mut self.state.resolution_ui.search_query,
+                &mut self.state.resolution_ui.chat_buffer,
+                &resolution_data,
+            )
+        } else {
+            None
+        };
+
         // =================================================================
         // STEP 5: Handle actions AFTER rendering (Rule 2: actions return values)
         // =================================================================
         self.handle_toolbar_action(toolbar_action);
         self.handle_cbu_search_action(cbu_search_action);
+        self.handle_resolution_action(resolution_action);
 
         // Container browse panel (side panel, rendered before central)
         // Extract owned copies to avoid borrow conflicts
@@ -1696,6 +2083,129 @@ impl App {
             CbuSearchAction::Close => {
                 self.state.cbu_search_ui.open = false;
                 self.state.cbu_search_ui.results = None;
+            }
+        }
+    }
+
+    /// Handle resolution panel actions
+    fn handle_resolution_action(&mut self, action: Option<ResolutionPanelAction>) {
+        let Some(action) = action else { return };
+
+        match action {
+            ResolutionPanelAction::Search { query } => {
+                web_sys::console::log_1(&format!("Resolution: Search query={}", query).into());
+                // TODO: Trigger search via resolution API
+                // self.state.search_resolution(&query);
+            }
+            ResolutionPanelAction::Select { index, entity_id } => {
+                web_sys::console::log_1(
+                    &format!("Resolution: Select index={} entity_id={}", index, entity_id).into(),
+                );
+                // TODO: Call resolution_select API
+                // Advance to next ref or complete
+                if let Some(window) = self
+                    .state
+                    .window_stack
+                    .find_by_type_mut(crate::state::WindowType::Resolution)
+                {
+                    if let Some(crate::state::WindowData::Resolution {
+                        current_ref_index,
+                        total_refs,
+                        ..
+                    }) = &mut window.data
+                    {
+                        *current_ref_index += 1;
+                        if *current_ref_index >= *total_refs {
+                            // All refs resolved, close modal
+                            self.state
+                                .window_stack
+                                .close_by_type(crate::state::WindowType::Resolution);
+                        }
+                    }
+                }
+                // Clear search for next ref
+                self.state.resolution_ui.search_query.clear();
+                self.state.resolution_ui.search_results = None;
+            }
+            ResolutionPanelAction::Skip => {
+                web_sys::console::log_1(&"Resolution: Skip".into());
+                // Advance to next ref
+                if let Some(window) = self
+                    .state
+                    .window_stack
+                    .find_by_type_mut(crate::state::WindowType::Resolution)
+                {
+                    if let Some(crate::state::WindowData::Resolution {
+                        current_ref_index,
+                        total_refs,
+                        ..
+                    }) = &mut window.data
+                    {
+                        *current_ref_index += 1;
+                        if *current_ref_index >= *total_refs {
+                            self.state
+                                .window_stack
+                                .close_by_type(crate::state::WindowType::Resolution);
+                        }
+                    }
+                }
+                // Clear search for next ref
+                self.state.resolution_ui.search_query.clear();
+                self.state.resolution_ui.search_results = None;
+            }
+            ResolutionPanelAction::CreateNew => {
+                web_sys::console::log_1(&"Resolution: Create New".into());
+                // TODO: Open entity creation flow
+            }
+            ResolutionPanelAction::Complete { apply } => {
+                web_sys::console::log_1(&format!("Resolution: Complete apply={}", apply).into());
+                // Close the resolution modal
+                self.state
+                    .window_stack
+                    .close_by_type(crate::state::WindowType::Resolution);
+                // Clear resolution UI state
+                self.state.resolution_ui.search_query.clear();
+                self.state.resolution_ui.search_results = None;
+                self.state.resolution_ui.messages.clear();
+                // TODO: If apply, merge resolutions to parent session
+            }
+            ResolutionPanelAction::Close => {
+                self.state
+                    .window_stack
+                    .close_by_type(crate::state::WindowType::Resolution);
+                // Clear resolution UI state
+                self.state.resolution_ui.search_query.clear();
+                self.state.resolution_ui.search_results = None;
+                self.state.resolution_ui.messages.clear();
+            }
+            ResolutionPanelAction::SendMessage { message } => {
+                web_sys::console::log_1(&format!("Resolution: SendMessage={}", message).into());
+                // Add user message to chat
+                self.state
+                    .resolution_ui
+                    .messages
+                    .push(("user".to_string(), message.clone()));
+                // TODO: Send message to sub-session chat API
+                // For now, echo back a placeholder response
+                self.state.resolution_ui.messages.push((
+                    "agent".to_string(),
+                    "Processing your refinement...".to_string(),
+                ));
+            }
+            ResolutionPanelAction::ToggleVoice => {
+                web_sys::console::log_1(&"Resolution: ToggleVoice".into());
+                self.state.resolution_ui.voice_active = !self.state.resolution_ui.voice_active;
+                // Start/stop voice listening via JavaScript bridge
+                #[cfg(target_arch = "wasm32")]
+                {
+                    if self.state.resolution_ui.voice_active {
+                        crate::voice_bridge::start_voice_listening(
+                            crate::voice_bridge::VoiceMode::Resolution,
+                        );
+                    } else {
+                        crate::voice_bridge::stop_voice_listening();
+                    }
+                }
             }
         }
     }
@@ -3307,6 +3817,44 @@ impl AppState {
                                     ob_poc_types::AgentCommand::ShowHelp { .. } => {
                                         web_sys::console::log_1(&"Command: ShowHelp".into());
                                         state.pending_show_help = true;
+                                    }
+                                    ob_poc_types::AgentCommand::StartResolution {
+                                        subsession_id,
+                                        total_refs,
+                                    } => {
+                                        web_sys::console::log_1(
+                                            &format!(
+                                                "Command: StartResolution session={} refs={}",
+                                                subsession_id, total_refs
+                                            )
+                                            .into(),
+                                        );
+                                        state.pending_start_resolution =
+                                            Some((subsession_id.clone(), *total_refs));
+                                    }
+                                    ob_poc_types::AgentCommand::ResolutionSelect { selection } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ResolutionSelect {}", selection)
+                                                .into(),
+                                        );
+                                        state.pending_resolution_select = Some(*selection);
+                                    }
+                                    ob_poc_types::AgentCommand::ResolutionSkip => {
+                                        web_sys::console::log_1(&"Command: ResolutionSkip".into());
+                                        state.pending_resolution_skip = true;
+                                    }
+                                    ob_poc_types::AgentCommand::ResolutionComplete { apply } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: ResolutionComplete apply={}", apply)
+                                                .into(),
+                                        );
+                                        state.pending_resolution_complete = Some(*apply);
+                                    }
+                                    ob_poc_types::AgentCommand::ResolutionCancel => {
+                                        web_sys::console::log_1(
+                                            &"Command: ResolutionCancel".into(),
+                                        );
+                                        state.pending_resolution_cancel = true;
                                     }
                                 }
                             }

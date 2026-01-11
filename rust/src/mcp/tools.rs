@@ -336,6 +336,162 @@ Suggested actions:
                 "required": ["query"]
             }),
         },
+        // Resolution sub-session tools
+        Tool {
+            name: "resolution_start".into(),
+            description: r#"Start a resolution sub-session to disambiguate entity references.
+
+Called when DSL validation finds ambiguous entity references that need user input.
+Creates a child session that inherits parent bindings and tracks resolution state.
+
+Returns the sub-session ID and list of unresolved references with initial matches."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Parent session ID"
+                    },
+                    "unresolved_refs": {
+                        "type": "array",
+                        "description": "List of unresolved entity references",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "ref_id": {
+                                    "type": "string",
+                                    "description": "Unique identifier for this reference in the DSL"
+                                },
+                                "search_value": {
+                                    "type": "string",
+                                    "description": "The name/value that needs resolution"
+                                },
+                                "entity_type": {
+                                    "type": "string",
+                                    "description": "Expected entity type (person, company, cbu, etc.)"
+                                },
+                                "dsl_line": {
+                                    "type": "integer",
+                                    "description": "Line number in DSL source"
+                                },
+                                "initial_matches": {
+                                    "type": "array",
+                                    "description": "Initial search matches",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "value": { "type": "string", "description": "Entity UUID" },
+                                            "display": { "type": "string", "description": "Display name" },
+                                            "score_pct": { "type": "integer", "description": "Match score 0-100" },
+                                            "detail": { "type": "string", "description": "Additional context" }
+                                        }
+                                    }
+                                }
+                            },
+                            "required": ["ref_id", "search_value", "entity_type"]
+                        }
+                    },
+                    "parent_dsl_index": {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Index into parent's assembled_dsl that triggered resolution"
+                    }
+                },
+                "required": ["session_id", "unresolved_refs"]
+            }),
+        },
+        Tool {
+            name: "resolution_search".into(),
+            description: r#"Refine search for current unresolved reference using discriminators.
+
+Use when user provides additional information like:
+- Nationality: "the British one", "UK citizen"
+- Date of birth: "born 1965", "DOB March 1980"
+- Role: "the director", "who is UBO"
+- Association: "at BlackRock", "works for Acme"
+
+Returns updated match list filtered by discriminators."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "subsession_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Resolution sub-session ID"
+                    },
+                    "discriminators": {
+                        "type": "object",
+                        "description": "Discriminating attributes to refine search",
+                        "properties": {
+                            "nationality": { "type": "string", "description": "Nationality code (e.g., 'GB', 'US')" },
+                            "dob_year": { "type": "integer", "description": "Year of birth" },
+                            "dob": { "type": "string", "description": "Full date of birth (YYYY-MM-DD)" },
+                            "role": { "type": "string", "description": "Role (e.g., 'DIRECTOR', 'UBO')" },
+                            "associated_entity": { "type": "string", "description": "Name of associated entity" },
+                            "jurisdiction": { "type": "string", "description": "Jurisdiction code" }
+                        }
+                    },
+                    "natural_language": {
+                        "type": "string",
+                        "description": "Natural language refinement (will be parsed for discriminators)"
+                    }
+                },
+                "required": ["subsession_id"]
+            }),
+        },
+        Tool {
+            name: "resolution_select".into(),
+            description: r#"Select a match to resolve the current entity reference.
+
+Called when user confirms which entity they meant. Records the resolution
+and advances to the next unresolved reference if any.
+
+Returns updated state showing next reference or completion status."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "subsession_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Resolution sub-session ID"
+                    },
+                    "selection": {
+                        "type": "integer",
+                        "description": "Index of selected match (0-based)"
+                    },
+                    "entity_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Direct entity UUID (alternative to selection index)"
+                    }
+                },
+                "required": ["subsession_id"]
+            }),
+        },
+        Tool {
+            name: "resolution_complete".into(),
+            description: r#"Complete the resolution sub-session and apply resolutions to parent.
+
+Called when all references are resolved or user wants to finish early.
+Merges resolved bindings into parent session and returns to normal flow."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "subsession_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Resolution sub-session ID"
+                    },
+                    "apply": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Whether to apply resolutions to parent (false to discard)"
+                    }
+                },
+                "required": ["subsession_id"]
+            }),
+        },
         // Workflow orchestration tools
         Tool {
             name: "workflow_status".into(),

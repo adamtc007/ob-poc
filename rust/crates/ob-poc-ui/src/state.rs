@@ -168,6 +168,9 @@ pub struct AppState {
     /// Resolution panel UI state
     pub resolution_ui: ResolutionPanelUi,
 
+    /// Window stack for modal layer management
+    pub window_stack: WindowStack,
+
     /// CBU search modal UI state
     pub cbu_search_ui: CbuSearchUi,
 
@@ -264,6 +267,7 @@ impl Default for AppState {
             panels: PanelState::default(),
             selected_entity_id: None,
             resolution_ui: ResolutionPanelUi::default(),
+            window_stack: WindowStack::default(),
             cbu_search_ui: CbuSearchUi::default(),
             container_browse: ContainerBrowseState::default(),
             token_registry: TokenRegistry::load_defaults().unwrap_or_else(|e| {
@@ -362,6 +366,183 @@ pub enum LayoutMode {
 }
 
 // =============================================================================
+// WINDOW STACK (Modal Layer Management)
+// =============================================================================
+
+/// Window stack for managing modal overlays
+///
+/// Follows the layer architecture from strategy-patterns.md:
+/// - Layer 0: Base (main panels)
+/// - Layer 1: Slide-in panels (entity detail, container browse)
+/// - Layer 2: Modals (resolution, confirmation dialogs)
+/// - Layer 3: Toasts/notifications
+#[derive(Default, Clone)]
+pub struct WindowStack {
+    /// Stack of active windows (LIFO - top is rendered last/on top)
+    pub windows: Vec<WindowEntry>,
+}
+
+/// A window entry in the stack
+#[derive(Clone, Debug)]
+pub struct WindowEntry {
+    /// Unique ID for this window instance
+    pub id: String,
+    /// Type of window
+    pub window_type: WindowType,
+    /// Layer level (higher = on top)
+    pub layer: u8,
+    /// Whether this window blocks interaction with lower layers
+    pub modal: bool,
+    /// Associated data (e.g., subsession ID for resolution)
+    pub data: Option<WindowData>,
+}
+
+/// Types of windows that can be in the stack
+#[derive(Clone, Debug, PartialEq)]
+pub enum WindowType {
+    /// Entity resolution modal
+    Resolution,
+    /// Confirmation dialog
+    Confirmation,
+    /// Entity detail slide-in
+    EntityDetail,
+    /// Container browse slide-in
+    ContainerBrowse,
+    /// Help overlay
+    Help,
+    /// CBU search modal
+    CbuSearch,
+    /// Error/warning toast
+    Toast,
+}
+
+/// Data associated with a window
+#[derive(Clone, Debug)]
+pub enum WindowData {
+    /// Resolution window data
+    Resolution {
+        /// Parent session ID
+        parent_session_id: String,
+        /// Sub-session ID
+        subsession_id: String,
+        /// Current ref index
+        current_ref_index: usize,
+        /// Total refs to resolve
+        total_refs: usize,
+    },
+    /// Confirmation dialog data
+    Confirmation {
+        title: String,
+        message: String,
+        confirm_label: String,
+        cancel_label: String,
+    },
+    /// Toast notification data
+    Toast {
+        message: String,
+        severity: ToastSeverity,
+        auto_dismiss_ms: Option<u64>,
+    },
+}
+
+/// Toast severity levels
+#[derive(Clone, Debug, PartialEq)]
+pub enum ToastSeverity {
+    Info,
+    Success,
+    Warning,
+    Error,
+}
+
+impl WindowStack {
+    /// Push a new window onto the stack
+    pub fn push(&mut self, entry: WindowEntry) {
+        self.windows.push(entry);
+    }
+
+    /// Pop the top window from the stack
+    pub fn pop(&mut self) -> Option<WindowEntry> {
+        self.windows.pop()
+    }
+
+    /// Remove a window by ID
+    pub fn remove(&mut self, id: &str) {
+        self.windows.retain(|w| w.id != id);
+    }
+
+    /// Check if a window type is active
+    pub fn has(&self, window_type: &WindowType) -> bool {
+        self.windows.iter().any(|w| &w.window_type == window_type)
+    }
+
+    /// Get the topmost window
+    pub fn top(&self) -> Option<&WindowEntry> {
+        self.windows.last()
+    }
+
+    /// Check if any modal is blocking
+    pub fn is_blocked(&self) -> bool {
+        self.windows.iter().any(|w| w.modal)
+    }
+
+    /// Open resolution window
+    pub fn open_resolution(
+        &mut self,
+        parent_session_id: String,
+        subsession_id: String,
+        total_refs: usize,
+    ) {
+        let id = format!("resolution-{}", subsession_id);
+        self.push(WindowEntry {
+            id,
+            window_type: WindowType::Resolution,
+            layer: 2,
+            modal: true,
+            data: Some(WindowData::Resolution {
+                parent_session_id,
+                subsession_id,
+                current_ref_index: 0,
+                total_refs,
+            }),
+        });
+    }
+
+    /// Close resolution window
+    pub fn close_resolution(&mut self) {
+        self.windows
+            .retain(|w| w.window_type != WindowType::Resolution);
+    }
+
+    /// Show a toast notification
+    pub fn toast(&mut self, message: String, severity: ToastSeverity) {
+        let id = format!("toast-{}", chrono::Utc::now().timestamp_millis());
+        self.push(WindowEntry {
+            id,
+            window_type: WindowType::Toast,
+            layer: 3,
+            modal: false,
+            data: Some(WindowData::Toast {
+                message,
+                severity,
+                auto_dismiss_ms: Some(3000),
+            }),
+        });
+    }
+
+    /// Find a window by type (mutable)
+    pub fn find_by_type_mut(&mut self, window_type: WindowType) -> Option<&mut WindowEntry> {
+        self.windows
+            .iter_mut()
+            .find(|w| w.window_type == window_type)
+    }
+
+    /// Close all windows of a given type
+    pub fn close_by_type(&mut self, window_type: WindowType) {
+        self.windows.retain(|w| w.window_type != window_type);
+    }
+}
+
+// =============================================================================
 // RESOLUTION PANEL UI STATE
 // =============================================================================
 
@@ -372,6 +553,8 @@ pub struct ResolutionPanelUi {
     pub selected_ref_id: Option<String>,
     /// Search query for current ref
     pub search_query: String,
+    /// Chat buffer for sub-session conversation
+    pub chat_buffer: String,
     /// Search results from last search
     pub search_results: Option<ResolutionSearchResponse>,
     /// Expanded discriminator section
@@ -380,6 +563,16 @@ pub struct ResolutionPanelUi {
     pub discriminator_values: std::collections::HashMap<String, String>,
     /// Show resolution panel (modal/overlay)
     pub show_panel: bool,
+    /// Sub-session messages (role, content)
+    pub messages: Vec<(String, String)>,
+    /// Current ref name being resolved
+    pub current_ref_name: Option<String>,
+    /// DSL context around the ref
+    pub dsl_context: Option<String>,
+    /// Voice input active (listening)
+    pub voice_active: bool,
+    /// Last voice transcript received
+    pub last_voice_transcript: Option<String>,
 }
 
 /// CBU search modal UI state
@@ -526,6 +719,13 @@ pub struct AsyncState {
     pub pending_toggle_orientation: bool, // Toggle VERTICAL/HORIZONTAL layout
     pub pending_search: Option<String>, // Search query for graph
     pub pending_show_help: bool,        // Show help overlay
+
+    // Resolution sub-session commands (from agent chat)
+    pub pending_start_resolution: Option<(String, usize)>, // (subsession_id, total_refs)
+    pub pending_resolution_select: Option<usize>,          // Selection index
+    pub pending_resolution_skip: bool,                     // Skip current ref
+    pub pending_resolution_complete: Option<bool>,         // Complete with apply flag
+    pub pending_resolution_cancel: bool,                   // Cancel resolution
 
     // Extended Esper 3D/Multi-dimensional commands
     // Scale navigation (astronomical metaphor)
@@ -1340,6 +1540,59 @@ impl AppState {
         if let Ok(mut state) = self.async_state.lock() {
             let pending = state.pending_show_help;
             state.pending_show_help = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    // =========================================================================
+    // Resolution Sub-Session Commands - Take Methods
+    // =========================================================================
+
+    /// Check if a start resolution command is pending
+    pub fn take_pending_start_resolution(&self) -> Option<(String, usize)> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_start_resolution.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a resolution select command is pending
+    pub fn take_pending_resolution_select(&self) -> Option<usize> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_resolution_select.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a resolution skip command is pending
+    pub fn take_pending_resolution_skip(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_resolution_skip;
+            state.pending_resolution_skip = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    /// Check if a resolution complete command is pending
+    pub fn take_pending_resolution_complete(&self) -> Option<bool> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_resolution_complete.take()
+        } else {
+            None
+        }
+    }
+
+    /// Check if a resolution cancel command is pending
+    pub fn take_pending_resolution_cancel(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_resolution_cancel;
+            state.pending_resolution_cancel = false;
             pending
         } else {
             false

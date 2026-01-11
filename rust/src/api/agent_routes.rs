@@ -20,8 +20,8 @@
 
 use crate::api::session::{
     create_session_store, AgentSession, ChatRequest, CreateSessionRequest, CreateSessionResponse,
-    ExecuteResponse, ExecutionResult, MessageRole, SessionState, SessionStateResponse,
-    SessionStore,
+    ExecuteResponse, ExecutionResult, MessageRole, ResolutionSubSession, SessionState,
+    SessionStateResponse, SessionStore, SubSessionType, UnresolvedRefInfo,
 };
 
 // API types - SINGLE SOURCE OF TRUTH for HTTP boundary
@@ -677,9 +677,29 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         .route("/api/session/:id/view-mode", post(set_session_view_mode))
         .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
         .route("/api/session/:id/watch", get(watch_session))
+        // Sub-session management
+        .route("/api/session/:id/subsession", post(create_subsession))
+        .route("/api/session/:id/subsession/:child_id", get(get_subsession))
+        .route(
+            "/api/session/:id/subsession/:child_id/chat",
+            post(chat_subsession),
+        )
+        .route(
+            "/api/session/:id/subsession/:child_id/complete",
+            post(complete_subsession),
+        )
+        .route(
+            "/api/session/:id/subsession/:child_id/cancel",
+            post(cancel_subsession),
+        )
         // DSL parsing and entity reference resolution
         .route("/api/dsl/parse", post(parse_dsl))
         .route("/api/dsl/resolve-ref", post(resolve_entity_ref))
+        // Discriminator parsing for resolution
+        .route(
+            "/api/resolution/parse-discriminators",
+            post(parse_discriminators),
+        )
         // Vocabulary and metadata
         .route("/api/agent/generate", post(generate_dsl))
         .route("/api/agent/validate", post(validate_dsl))
@@ -869,6 +889,732 @@ async fn watch_session(
             Ok(Json(WatchResponse::from_snapshot(&initial_snapshot, false)))
         }
     }
+}
+
+// ============================================================================
+// Sub-Session Handlers
+// ============================================================================
+
+/// Request to create a sub-session
+#[derive(Debug, Deserialize)]
+pub struct CreateSubSessionRequest {
+    /// Type of sub-session to create
+    pub session_type: CreateSubSessionType,
+}
+
+/// Sub-session type for API (simplified for JSON)
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CreateSubSessionType {
+    /// Resolution sub-session with unresolved refs
+    Resolution {
+        /// Unresolved refs to resolve
+        unresolved_refs: Vec<UnresolvedRefInfo>,
+        /// Parent DSL statement index
+        parent_dsl_index: usize,
+    },
+    /// Research sub-session
+    Research {
+        /// Target entity ID (optional)
+        target_entity_id: Option<Uuid>,
+        /// Research type
+        research_type: String,
+    },
+    /// Review sub-session
+    Review {
+        /// DSL to review
+        pending_dsl: String,
+    },
+}
+
+/// Response from creating a sub-session
+#[derive(Debug, Serialize)]
+pub struct CreateSubSessionResponse {
+    /// New sub-session ID
+    pub session_id: Uuid,
+    /// Parent session ID
+    pub parent_id: Uuid,
+    /// Inherited symbol names (for display)
+    pub inherited_symbols: Vec<String>,
+    /// Sub-session type
+    pub session_type: String,
+}
+
+/// POST /api/session/:id/subsession - Create a sub-session
+async fn create_subsession(
+    State(state): State<AgentState>,
+    Path(parent_id): Path<Uuid>,
+    Json(req): Json<CreateSubSessionRequest>,
+) -> Result<Json<CreateSubSessionResponse>, (StatusCode, String)> {
+    tracing::info!("Creating sub-session for parent: {}", parent_id);
+
+    // Get parent session
+    let parent = {
+        let sessions = state.sessions.read().await;
+        sessions.get(&parent_id).cloned()
+    };
+
+    let parent = parent.ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Parent session {} not found", parent_id),
+        )
+    })?;
+
+    // Convert API type to internal type
+    let sub_session_type = match req.session_type {
+        CreateSubSessionType::Resolution {
+            unresolved_refs,
+            parent_dsl_index,
+        } => SubSessionType::Resolution(ResolutionSubSession {
+            unresolved_refs,
+            parent_dsl_index,
+            current_ref_index: 0,
+            resolutions: std::collections::HashMap::new(),
+        }),
+        CreateSubSessionType::Research {
+            target_entity_id,
+            research_type,
+        } => SubSessionType::Research(crate::api::session::ResearchSubSession {
+            target_entity_id,
+            research_type,
+            search_query: None,
+        }),
+        CreateSubSessionType::Review { pending_dsl } => {
+            SubSessionType::Review(crate::api::session::ReviewSubSession {
+                pending_dsl,
+                review_status: crate::api::session::ReviewStatus::Pending,
+            })
+        }
+    };
+
+    let session_type_name = match &sub_session_type {
+        SubSessionType::Root => "root",
+        SubSessionType::Resolution(_) => "resolution",
+        SubSessionType::Research(_) => "research",
+        SubSessionType::Review(_) => "review",
+        SubSessionType::Correction(_) => "correction",
+    }
+    .to_string();
+
+    // Create sub-session
+    let child = AgentSession::new_subsession(&parent, sub_session_type);
+    let child_id = child.id;
+    let inherited_symbols: Vec<String> = child.inherited_symbols.keys().cloned().collect();
+
+    // Store in memory
+    {
+        let mut sessions = state.sessions.write().await;
+        sessions.insert(child_id, child);
+    }
+
+    tracing::info!(
+        "Created sub-session {} (type: {})",
+        child_id,
+        session_type_name
+    );
+
+    Ok(Json(CreateSubSessionResponse {
+        session_id: child_id,
+        parent_id,
+        inherited_symbols,
+        session_type: session_type_name,
+    }))
+}
+
+/// GET /api/session/:id/subsession/:child_id - Get sub-session state
+async fn get_subsession(
+    State(state): State<AgentState>,
+    Path((parent_id, child_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<SubSessionStateResponse>, (StatusCode, String)> {
+    let sessions = state.sessions.read().await;
+
+    let child = sessions.get(&child_id).ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Sub-session {} not found", child_id),
+        )
+    })?;
+
+    // Verify parent relationship
+    if child.parent_session_id != Some(parent_id) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Invalid parent-child relationship".to_string(),
+        ));
+    }
+
+    Ok(Json(SubSessionStateResponse::from_session(child)))
+}
+
+/// Response for sub-session state
+#[derive(Debug, Serialize)]
+pub struct SubSessionStateResponse {
+    pub session_id: Uuid,
+    pub parent_id: Option<Uuid>,
+    pub session_type: String,
+    pub state: String,
+    pub messages: Vec<SubSessionMessage>,
+    /// Resolution-specific state
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<ResolutionState>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SubSessionMessage {
+    pub role: String,
+    pub content: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ResolutionState {
+    pub total_refs: usize,
+    pub current_index: usize,
+    pub resolved_count: usize,
+    pub current_ref: Option<UnresolvedRefInfo>,
+    pub pending_refs: Vec<UnresolvedRefInfo>,
+}
+
+impl SubSessionStateResponse {
+    fn from_session(session: &AgentSession) -> Self {
+        let session_type = match &session.sub_session_type {
+            SubSessionType::Root => "root",
+            SubSessionType::Resolution(_) => "resolution",
+            SubSessionType::Research(_) => "research",
+            SubSessionType::Review(_) => "review",
+            SubSessionType::Correction(_) => "correction",
+        }
+        .to_string();
+
+        let state = match session.state {
+            SessionState::New => "new",
+            SessionState::PendingValidation => "pending_validation",
+            SessionState::ReadyToExecute => "ready_to_execute",
+            SessionState::Executing => "executing",
+            SessionState::Executed => "executed",
+            SessionState::Closed => "closed",
+        }
+        .to_string();
+
+        let messages = session
+            .messages
+            .iter()
+            .map(|m| SubSessionMessage {
+                role: match m.role {
+                    MessageRole::User => "user",
+                    MessageRole::Agent => "agent",
+                    MessageRole::System => "system",
+                }
+                .to_string(),
+                content: m.content.clone(),
+                timestamp: m.timestamp,
+            })
+            .collect();
+
+        let resolution = if let SubSessionType::Resolution(r) = &session.sub_session_type {
+            Some(ResolutionState {
+                total_refs: r.unresolved_refs.len(),
+                current_index: r.current_ref_index,
+                resolved_count: r.resolutions.len(),
+                current_ref: r.unresolved_refs.get(r.current_ref_index).cloned(),
+                pending_refs: r
+                    .unresolved_refs
+                    .iter()
+                    .skip(r.current_ref_index + 1)
+                    .cloned()
+                    .collect(),
+            })
+        } else {
+            None
+        };
+
+        Self {
+            session_id: session.id,
+            parent_id: session.parent_session_id,
+            session_type,
+            state,
+            messages,
+            resolution,
+        }
+    }
+}
+
+/// Request for sub-session chat
+#[derive(Debug, Deserialize)]
+pub struct SubSessionChatRequest {
+    pub message: String,
+}
+
+/// POST /api/session/:id/subsession/:child_id/chat - Chat in sub-session
+async fn chat_subsession(
+    State(state): State<AgentState>,
+    Path((parent_id, child_id)): Path<(Uuid, Uuid)>,
+    Json(req): Json<SubSessionChatRequest>,
+) -> Result<Json<ChatResponse>, (StatusCode, String)> {
+    tracing::info!("Sub-session chat: {} -> {}", parent_id, child_id);
+
+    // Get and verify sub-session
+    let mut child = {
+        let sessions = state.sessions.read().await;
+        sessions.get(&child_id).cloned()
+    }
+    .ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Sub-session {} not found", child_id),
+        )
+    })?;
+
+    if child.parent_session_id != Some(parent_id) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Invalid parent-child relationship".to_string(),
+        ));
+    }
+
+    // Add user message
+    child.add_user_message(req.message.clone());
+
+    // Process based on sub-session type
+    let response = match &child.sub_session_type {
+        SubSessionType::Resolution(_) => {
+            process_resolution_message(&mut child, &req.message, &state).await?
+        }
+        SubSessionType::Research(_) => {
+            // TODO: Implement research chat
+            ChatResponse {
+                message: "Research sub-session chat not yet implemented".to_string(),
+                dsl: None,
+                session_state: to_session_state_enum(&child.state),
+                commands: None,
+            }
+        }
+        SubSessionType::Review(_) => {
+            // TODO: Implement review chat
+            ChatResponse {
+                message: "Review sub-session chat not yet implemented".to_string(),
+                dsl: None,
+                session_state: to_session_state_enum(&child.state),
+                commands: None,
+            }
+        }
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Invalid sub-session type for chat".to_string(),
+            ));
+        }
+    };
+
+    // Update session in store
+    {
+        let mut sessions = state.sessions.write().await;
+        sessions.insert(child_id, child);
+    }
+
+    Ok(Json(response))
+}
+
+/// Process a message in a resolution sub-session
+async fn process_resolution_message(
+    session: &mut AgentSession,
+    message: &str,
+    _state: &AgentState,
+) -> Result<ChatResponse, (StatusCode, String)> {
+    let message_lower = message.trim().to_lowercase();
+
+    // Check for selection patterns: "1", "first", "the first one", "select 1"
+    if let Some(selection) = parse_selection(&message_lower) {
+        return handle_resolution_selection(session, selection);
+    }
+
+    // Check for skip pattern
+    if message_lower == "skip" || message_lower == "next" {
+        return handle_resolution_skip(session);
+    }
+
+    // Otherwise treat as refinement/search query
+    // For now, just echo back - full implementation would do discriminator parsing
+    let response_text = if let SubSessionType::Resolution(resolution) = &session.sub_session_type {
+        let current_ref = resolution.unresolved_refs.get(resolution.current_ref_index);
+        if let Some(cref) = current_ref {
+            format!(
+                "I understand you're trying to refine the search for \"{}\".\n\n\
+                 Current matches:\n{}\n\n\
+                 Please select a number (1-{}) or provide more details like:\n\
+                 - \"UK citizen\"\n\
+                 - \"born 1965\"\n\
+                 - \"director at BlackRock\"",
+                cref.search_value,
+                cref.initial_matches
+                    .iter()
+                    .enumerate()
+                    .map(|(i, m)| format!(
+                        "{}. {} ({}%){}",
+                        i + 1,
+                        m.display,
+                        m.score_pct,
+                        m.detail
+                            .as_ref()
+                            .map(|d| format!(" - {}", d))
+                            .unwrap_or_default()
+                    ))
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                cref.initial_matches.len()
+            )
+        } else {
+            "No more entities to resolve.".to_string()
+        }
+    } else {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Expected resolution sub-session".to_string(),
+        ));
+    };
+
+    session.add_agent_message(response_text.clone(), None, None);
+
+    Ok(ChatResponse {
+        message: response_text,
+        dsl: None,
+        session_state: to_session_state_enum(&session.state),
+        commands: None,
+    })
+}
+
+/// Parse selection patterns from user input
+fn parse_selection(input: &str) -> Option<usize> {
+    // Direct number: "1", "2", etc.
+    if let Ok(n) = input.parse::<usize>() {
+        if n >= 1 {
+            return Some(n - 1); // Convert to 0-indexed
+        }
+    }
+
+    // "select N"
+    if let Some(rest) = input.strip_prefix("select ") {
+        if let Ok(n) = rest.trim().parse::<usize>() {
+            if n >= 1 {
+                return Some(n - 1);
+            }
+        }
+    }
+
+    // Ordinals
+    let ordinals = [
+        ("first", 0),
+        ("1st", 0),
+        ("second", 1),
+        ("2nd", 1),
+        ("third", 2),
+        ("3rd", 2),
+        ("fourth", 3),
+        ("4th", 3),
+        ("fifth", 4),
+        ("5th", 4),
+    ];
+
+    for (word, idx) in ordinals {
+        if input.contains(word) {
+            return Some(idx);
+        }
+    }
+
+    None
+}
+
+/// Handle user selecting a match in resolution
+fn handle_resolution_selection(
+    session: &mut AgentSession,
+    selection: usize,
+) -> Result<ChatResponse, (StatusCode, String)> {
+    let SubSessionType::Resolution(resolution) = &mut session.sub_session_type else {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Expected resolution sub-session".to_string(),
+        ));
+    };
+
+    let current_ref = resolution
+        .unresolved_refs
+        .get(resolution.current_ref_index)
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                "No current ref to resolve".to_string(),
+            )
+        })?;
+
+    // Validate selection
+    if selection >= current_ref.initial_matches.len() {
+        let msg = format!(
+            "Please select a number between 1 and {}",
+            current_ref.initial_matches.len()
+        );
+        session.add_agent_message(msg.clone(), None, None);
+        return Ok(ChatResponse {
+            message: msg,
+            dsl: None,
+            session_state: to_session_state_enum(&session.state),
+            commands: None,
+        });
+    }
+
+    let selected = &current_ref.initial_matches[selection];
+
+    // Capture values before mutating
+    let ref_id = current_ref.ref_id.clone();
+    let selected_value = selected.value.clone();
+    let selected_display = selected.display.clone();
+    let selected_detail = selected.detail.clone();
+
+    // Record resolution
+    resolution.resolutions.insert(ref_id, selected_value);
+
+    // Move to next ref
+    resolution.current_ref_index += 1;
+
+    let response_text = if resolution.current_ref_index < resolution.unresolved_refs.len() {
+        let next_ref = &resolution.unresolved_refs[resolution.current_ref_index];
+        format!(
+            "Selected: {} {}\n\n\
+             Next: Which {}?\n\n{}\n\n\
+             Select a number or provide details to refine.",
+            selected_display,
+            selected_detail
+                .map(|d| format!("({})", d))
+                .unwrap_or_default(),
+            next_ref.entity_type,
+            next_ref
+                .initial_matches
+                .iter()
+                .enumerate()
+                .map(|(i, m)| format!(
+                    "{}. {} ({}%){}",
+                    i + 1,
+                    m.display,
+                    m.score_pct,
+                    m.detail
+                        .as_ref()
+                        .map(|d| format!(" - {}", d))
+                        .unwrap_or_default()
+                ))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    } else {
+        // All resolved
+        session.state = SessionState::Executed;
+        format!(
+            "Selected: {} {}\n\n\
+             All {} entities resolved. Ready to apply changes?",
+            selected_display,
+            selected_detail
+                .map(|d| format!("({})", d))
+                .unwrap_or_default(),
+            resolution.resolutions.len()
+        )
+    };
+
+    session.add_agent_message(response_text.clone(), None, None);
+
+    Ok(ChatResponse {
+        message: response_text,
+        dsl: None,
+        session_state: to_session_state_enum(&session.state),
+        commands: None,
+    })
+}
+
+/// Handle skipping current ref in resolution
+fn handle_resolution_skip(
+    session: &mut AgentSession,
+) -> Result<ChatResponse, (StatusCode, String)> {
+    let SubSessionType::Resolution(resolution) = &mut session.sub_session_type else {
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Expected resolution sub-session".to_string(),
+        ));
+    };
+
+    resolution.current_ref_index += 1;
+
+    let response_text = if resolution.current_ref_index < resolution.unresolved_refs.len() {
+        let next_ref = &resolution.unresolved_refs[resolution.current_ref_index];
+        format!(
+            "Skipped.\n\nNext: Which {}?\n\n{}\n\nSelect a number or provide details.",
+            next_ref.entity_type,
+            next_ref
+                .initial_matches
+                .iter()
+                .enumerate()
+                .map(|(i, m)| format!("{}. {} ({}%)", i + 1, m.display, m.score_pct))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    } else {
+        session.state = SessionState::Executed;
+        format!(
+            "Skipped.\n\n{} entities resolved, {} skipped. Ready to apply?",
+            resolution.resolutions.len(),
+            resolution.unresolved_refs.len() - resolution.resolutions.len()
+        )
+    };
+
+    session.add_agent_message(response_text.clone(), None, None);
+
+    Ok(ChatResponse {
+        message: response_text,
+        dsl: None,
+        session_state: to_session_state_enum(&session.state),
+        commands: None,
+    })
+}
+
+/// Request to complete a resolution sub-session
+#[derive(Debug, Deserialize)]
+pub struct CompleteSubSessionRequest {
+    /// Whether to apply resolutions to parent
+    #[serde(default = "default_true")]
+    pub apply: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Response from completing a sub-session
+#[derive(Debug, Serialize)]
+pub struct CompleteSubSessionResponse {
+    pub success: bool,
+    pub resolutions_applied: usize,
+    pub message: String,
+}
+
+/// POST /api/session/:id/subsession/:child_id/complete - Complete sub-session
+async fn complete_subsession(
+    State(state): State<AgentState>,
+    Path((parent_id, child_id)): Path<(Uuid, Uuid)>,
+    Json(req): Json<CompleteSubSessionRequest>,
+) -> Result<Json<CompleteSubSessionResponse>, (StatusCode, String)> {
+    tracing::info!("Completing sub-session: {} (apply={})", child_id, req.apply);
+
+    // Get child session
+    let child = {
+        let mut sessions = state.sessions.write().await;
+        sessions.remove(&child_id)
+    }
+    .ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Sub-session {} not found", child_id),
+        )
+    })?;
+
+    if child.parent_session_id != Some(parent_id) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Invalid parent-child relationship".to_string(),
+        ));
+    }
+
+    // Extract resolution data if this is a Resolution sub-session
+    let (resolutions_count, bound_entities) =
+        if let SubSessionType::Resolution(r) = &child.sub_session_type {
+            // Build BoundEntity entries from resolutions
+            let mut entities = Vec::new();
+            for unresolved in &r.unresolved_refs {
+                if let Some(resolved_value) = r.resolutions.get(&unresolved.ref_id) {
+                    // Find the matching entity info from initial_matches
+                    let match_info = unresolved
+                        .initial_matches
+                        .iter()
+                        .find(|m| &m.value == resolved_value);
+
+                    if let Some(info) = match_info {
+                        // Parse UUID from resolved value
+                        if let Ok(uuid) = Uuid::parse_str(resolved_value) {
+                            entities.push((
+                                unresolved.ref_id.clone(),
+                                crate::api::session::BoundEntity {
+                                    id: uuid,
+                                    entity_type: unresolved.entity_type.clone(),
+                                    display_name: info.display.clone(),
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
+            (r.resolutions.len(), entities)
+        } else {
+            (0, Vec::new())
+        };
+
+    if req.apply && resolutions_count > 0 {
+        // Apply resolutions to parent session's bindings
+        let mut sessions = state.sessions.write().await;
+        if let Some(parent) = sessions.get_mut(&parent_id) {
+            for (ref_id, bound_entity) in &bound_entities {
+                // Add to parent's bindings using the ref_id as the binding name
+                parent
+                    .context
+                    .bindings
+                    .insert(ref_id.clone(), bound_entity.clone());
+                tracing::info!(
+                    "Applied resolution: {} -> {} ({})",
+                    ref_id,
+                    bound_entity.id,
+                    bound_entity.display_name
+                );
+            }
+        }
+    }
+
+    Ok(Json(CompleteSubSessionResponse {
+        success: true,
+        resolutions_applied: if req.apply { resolutions_count } else { 0 },
+        message: format!(
+            "Sub-session completed. {} resolutions {}.",
+            resolutions_count,
+            if req.apply { "applied" } else { "discarded" }
+        ),
+    }))
+}
+
+/// POST /api/session/:id/subsession/:child_id/cancel - Cancel sub-session
+async fn cancel_subsession(
+    State(state): State<AgentState>,
+    Path((parent_id, child_id)): Path<(Uuid, Uuid)>,
+) -> Result<Json<CompleteSubSessionResponse>, (StatusCode, String)> {
+    tracing::info!("Cancelling sub-session: {}", child_id);
+
+    // Remove child session
+    let child = {
+        let mut sessions = state.sessions.write().await;
+        sessions.remove(&child_id)
+    }
+    .ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Sub-session {} not found", child_id),
+        )
+    })?;
+
+    if child.parent_session_id != Some(parent_id) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Invalid parent-child relationship".to_string(),
+        ));
+    }
+
+    Ok(Json(CompleteSubSessionResponse {
+        success: true,
+        resolutions_applied: 0,
+        message: "Sub-session cancelled. No changes applied.".to_string(),
+    }))
 }
 
 /// Generate help text showing all available MCP tools/commands
@@ -3062,6 +3808,330 @@ async fn resolve_entity_ref(
             code: Some(code),
         })),
     }
+}
+
+// ============================================================================
+// Discriminator Parsing Handler
+// ============================================================================
+
+/// Request to parse natural language into discriminators
+#[derive(Debug, Deserialize)]
+pub struct ParseDiscriminatorsRequest {
+    /// The natural language input to parse
+    pub input: String,
+    /// Optional entity type context
+    pub entity_type: Option<String>,
+}
+
+/// Parsed discriminators for entity resolution
+#[derive(Debug, Serialize, Default)]
+pub struct ParsedDiscriminators {
+    /// Nationality code (e.g., "GB", "US")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nationality: Option<String>,
+    /// Year of birth
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dob_year: Option<i32>,
+    /// Full date of birth
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dob: Option<String>,
+    /// Role (e.g., "DIRECTOR", "UBO")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+    /// Associated entity name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub associated_entity: Option<String>,
+    /// Jurisdiction code
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jurisdiction: Option<String>,
+    /// Selection index (e.g., "first", "second", "1", "2")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub selection_index: Option<usize>,
+}
+
+/// Response from discriminator parsing
+#[derive(Debug, Serialize)]
+pub struct ParseDiscriminatorsResponse {
+    pub success: bool,
+    pub discriminators: ParsedDiscriminators,
+    /// Whether input appears to be a selection (number or ordinal)
+    pub is_selection: bool,
+    /// The original input
+    pub input: String,
+    /// Unrecognized parts of the input
+    pub unrecognized: Vec<String>,
+}
+
+/// POST /api/resolution/parse-discriminators - Parse natural language into discriminators
+///
+/// Takes user input like "the British one" or "born 1965" and extracts
+/// structured discriminators for entity resolution filtering.
+///
+/// ## Examples
+///
+/// - "the British one" → nationality: "GB"
+/// - "born 1965" → dob_year: 1965
+/// - "the director" → role: "DIRECTOR"
+/// - "first" or "1" → selection_index: 0
+/// - "UK citizen, director at Acme" → nationality: "GB", role: "DIRECTOR", associated_entity: "Acme"
+async fn parse_discriminators(
+    Json(req): Json<ParseDiscriminatorsRequest>,
+) -> Json<ParseDiscriminatorsResponse> {
+    let input = req.input.trim().to_lowercase();
+    let mut discriminators = ParsedDiscriminators::default();
+    let mut unrecognized = Vec::new();
+    let mut is_selection = false;
+
+    // Check for selection patterns first
+    if let Some(idx) = parse_selection_pattern(&input) {
+        discriminators.selection_index = Some(idx);
+        is_selection = true;
+    }
+
+    // Parse nationality patterns
+    if let Some(nat) = parse_nationality(&input) {
+        discriminators.nationality = Some(nat);
+    }
+
+    // Parse date of birth patterns
+    if let Some(year) = parse_dob_year(&input) {
+        discriminators.dob_year = Some(year);
+    }
+
+    // Parse role patterns
+    if let Some(role) = parse_role(&input) {
+        discriminators.role = Some(role);
+    }
+
+    // Parse association patterns ("at X", "works for X", "from X company")
+    if let Some(entity) = parse_association(&input) {
+        discriminators.associated_entity = Some(entity);
+    }
+
+    // Parse jurisdiction patterns
+    if let Some(juris) = parse_jurisdiction(&input) {
+        discriminators.jurisdiction = Some(juris);
+    }
+
+    // Track what wasn't recognized
+    // (simplified - in production would do proper tokenization)
+    if discriminators.nationality.is_none()
+        && discriminators.dob_year.is_none()
+        && discriminators.role.is_none()
+        && discriminators.associated_entity.is_none()
+        && discriminators.jurisdiction.is_none()
+        && discriminators.selection_index.is_none()
+    {
+        unrecognized.push(req.input.clone());
+    }
+
+    Json(ParseDiscriminatorsResponse {
+        success: true,
+        discriminators,
+        is_selection,
+        input: req.input,
+        unrecognized,
+    })
+}
+
+/// Parse selection patterns: "1", "first", "the first one", "select 2"
+fn parse_selection_pattern(input: &str) -> Option<usize> {
+    // Direct number
+    if let Ok(n) = input.parse::<usize>() {
+        if n >= 1 {
+            return Some(n - 1);
+        }
+    }
+
+    // "select N"
+    if let Some(rest) = input.strip_prefix("select ") {
+        if let Ok(n) = rest.trim().parse::<usize>() {
+            if n >= 1 {
+                return Some(n - 1);
+            }
+        }
+    }
+
+    // Ordinals
+    let ordinals = [
+        ("first", 0),
+        ("1st", 0),
+        ("second", 1),
+        ("2nd", 1),
+        ("third", 2),
+        ("3rd", 2),
+        ("fourth", 3),
+        ("4th", 3),
+        ("fifth", 4),
+        ("5th", 4),
+    ];
+
+    for (word, idx) in ordinals {
+        if input.contains(word) {
+            return Some(idx);
+        }
+    }
+
+    None
+}
+
+/// Parse nationality from natural language
+fn parse_nationality(input: &str) -> Option<String> {
+    // Map of patterns to ISO codes
+    let patterns = [
+        // Demonyms
+        ("british", "GB"),
+        ("uk citizen", "GB"),
+        ("english", "GB"),
+        ("scottish", "GB"),
+        ("welsh", "GB"),
+        ("american", "US"),
+        ("us citizen", "US"),
+        ("german", "DE"),
+        ("french", "FR"),
+        ("italian", "IT"),
+        ("spanish", "ES"),
+        ("dutch", "NL"),
+        ("belgian", "BE"),
+        ("swiss", "CH"),
+        ("austrian", "AT"),
+        ("irish", "IE"),
+        ("luxembourgish", "LU"),
+        ("luxembourg", "LU"),
+        ("canadian", "CA"),
+        ("australian", "AU"),
+        ("japanese", "JP"),
+        ("chinese", "CN"),
+        ("indian", "IN"),
+        ("brazilian", "BR"),
+        ("mexican", "MX"),
+        ("swedish", "SE"),
+        ("norwegian", "NO"),
+        ("danish", "DK"),
+        ("finnish", "FI"),
+        ("polish", "PL"),
+        ("portuguese", "PT"),
+        ("greek", "GR"),
+        ("russian", "RU"),
+        // Direct codes
+        ("from uk", "GB"),
+        ("from us", "US"),
+        ("from usa", "US"),
+        ("from gb", "GB"),
+    ];
+
+    for (pattern, code) in patterns {
+        if input.contains(pattern) {
+            return Some(code.to_string());
+        }
+    }
+
+    None
+}
+
+/// Parse year of birth
+fn parse_dob_year(input: &str) -> Option<i32> {
+    // Pattern: "born YYYY" or "dob YYYY" or "birth year YYYY"
+    let year_patterns = ["born ", "dob ", "birth year ", "year of birth ", "born in "];
+
+    for prefix in year_patterns {
+        if let Some(rest) = input.find(prefix).map(|i| &input[i + prefix.len()..]) {
+            // Extract first 4 digits
+            let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if digits.len() == 4 {
+                if let Ok(year) = digits.parse::<i32>() {
+                    if (1900..=2010).contains(&year) {
+                        return Some(year);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Parse role from natural language
+fn parse_role(input: &str) -> Option<String> {
+    let role_patterns = [
+        ("director", "DIRECTOR"),
+        ("ubo", "UBO"),
+        ("beneficial owner", "UBO"),
+        ("shareholder", "SHAREHOLDER"),
+        ("officer", "OFFICER"),
+        ("secretary", "SECRETARY"),
+        ("chairman", "CHAIRMAN"),
+        ("ceo", "CEO"),
+        ("cfo", "CFO"),
+        ("manager", "MANAGER"),
+        ("partner", "PARTNER"),
+        ("trustee", "TRUSTEE"),
+        ("signatory", "SIGNATORY"),
+        ("authorized", "AUTHORISED_SIGNATORY"),
+    ];
+
+    for (pattern, role) in role_patterns {
+        if input.contains(pattern) {
+            return Some(role.to_string());
+        }
+    }
+
+    None
+}
+
+/// Parse entity association
+fn parse_association(input: &str) -> Option<String> {
+    // Patterns: "at X", "works for X", "from X company", "employed by X"
+    let patterns = [
+        " at ",
+        " works for ",
+        " employed by ",
+        " works at ",
+        " from ",
+    ];
+
+    for pattern in patterns {
+        if let Some(idx) = input.find(pattern) {
+            let rest = &input[idx + pattern.len()..];
+            // Take words until punctuation or end
+            let entity: String = rest
+                .split(|c: char| c == ',' || c == '.' || c == ';')
+                .next()
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if !entity.is_empty() && entity.len() > 2 {
+                return Some(entity);
+            }
+        }
+    }
+
+    None
+}
+
+/// Parse jurisdiction
+fn parse_jurisdiction(input: &str) -> Option<String> {
+    let patterns = [
+        ("luxembourg", "LU"),
+        ("lux ", "LU"),
+        ("cayman", "KY"),
+        ("jersey", "JE"),
+        ("guernsey", "GG"),
+        ("ireland", "IE"),
+        ("delaware", "US-DE"),
+        ("singapore", "SG"),
+        ("hong kong", "HK"),
+        ("switzerland", "CH"),
+        ("liechtenstein", "LI"),
+    ];
+
+    for (pattern, code) in patterns {
+        if input.contains(pattern) {
+            return Some(code.to_string());
+        }
+    }
+
+    None
 }
 
 // ============================================================================

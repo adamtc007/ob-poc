@@ -32,6 +32,114 @@ pub enum SessionMode {
 }
 
 // ============================================================================
+// Sub-Session Types - Scoped agent conversations
+// ============================================================================
+
+/// Sub-session type - determines the purpose and behavior of a child session
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SubSessionType {
+    /// Root session - full agent capabilities (not a sub-session)
+    Root,
+    /// Resolution sub-session - entity disambiguation workflow
+    Resolution(ResolutionSubSession),
+    /// Research sub-session - GLEIF/UBO discovery
+    Research(ResearchSubSession),
+    /// Review sub-session - DSL review before execute
+    Review(ReviewSubSession),
+    /// Correction sub-session - fix screening hits
+    Correction(CorrectionSubSession),
+}
+
+impl Default for SubSessionType {
+    fn default() -> Self {
+        SubSessionType::Root
+    }
+}
+
+/// Resolution sub-session state - entity disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ResolutionSubSession {
+    /// Unresolved refs to work through
+    pub unresolved_refs: Vec<UnresolvedRefInfo>,
+    /// Which DSL statement index triggered this (in parent)
+    pub parent_dsl_index: usize,
+    /// Current ref being resolved (index into unresolved_refs)
+    pub current_ref_index: usize,
+    /// Resolutions made so far: ref_id -> resolved_key
+    pub resolutions: HashMap<String, String>,
+}
+
+/// Info about an unresolved entity reference
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct UnresolvedRefInfo {
+    /// Unique ID for this ref (stmt_idx:arg_name)
+    pub ref_id: String,
+    /// Entity type (e.g., "entity", "cbu", "person")
+    pub entity_type: String,
+    /// The search value from DSL (e.g., "John Smith")
+    pub search_value: String,
+    /// DSL context line for display
+    pub context_line: String,
+    /// Initial search matches (pre-fetched)
+    pub initial_matches: Vec<EntityMatchInfo>,
+}
+
+/// Entity match info for resolution UI
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EntityMatchInfo {
+    /// Primary key (UUID or code)
+    pub value: String,
+    /// Display name
+    pub display: String,
+    /// Additional detail (jurisdiction, DOB, etc.)
+    pub detail: Option<String>,
+    /// Match score as integer percentage (0-100)
+    pub score_pct: u8,
+}
+
+/// Research sub-session state - GLEIF/UBO discovery
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ResearchSubSession {
+    /// Target entity being researched (if known)
+    pub target_entity_id: Option<Uuid>,
+    /// Research type (gleif, ubo, companies_house, etc.)
+    pub research_type: String,
+    /// Search query used
+    pub search_query: Option<String>,
+}
+
+/// Review sub-session state - DSL review before execute
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReviewSubSession {
+    /// The DSL pending review
+    pub pending_dsl: String,
+    /// Review status
+    pub review_status: ReviewStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewStatus {
+    #[default]
+    Pending,
+    Approved,
+    Rejected,
+    Modified,
+}
+
+/// Correction sub-session state - fix screening hits
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CorrectionSubSession {
+    /// Entity with screening hit
+    pub entity_id: Uuid,
+    /// Screening hit ID
+    pub hit_id: Uuid,
+    /// Correction type being applied
+    pub correction_type: Option<String>,
+}
+
+// ============================================================================
 // Session State Machine
 // ============================================================================
 
@@ -164,6 +272,22 @@ pub struct AgentSession {
     /// Current state in the session lifecycle
     pub state: SessionState,
 
+    // =========================================================================
+    // Sub-Session Support
+    // =========================================================================
+    /// Parent session ID (None for root sessions)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_session_id: Option<Uuid>,
+
+    /// Sub-session type (determines behavior and scoped capabilities)
+    #[serde(default)]
+    pub sub_session_type: SubSessionType,
+
+    /// Symbols inherited from parent session (pre-populated on creation)
+    /// These are available in validation context for reference resolution
+    #[serde(default)]
+    pub inherited_symbols: HashMap<String, BoundEntity>,
+
     /// Conversation history
     pub messages: Vec<ChatMessage>,
 
@@ -205,6 +329,10 @@ impl AgentSession {
             created_at: now,
             updated_at: now,
             state: SessionState::New,
+            // Sub-session fields (root session defaults)
+            parent_session_id: None,
+            sub_session_type: SubSessionType::Root,
+            inherited_symbols: HashMap::new(),
             messages: Vec::new(),
             pending_intents: Vec::new(),
             assembled_dsl: Vec::new(),
@@ -220,6 +348,91 @@ impl AgentSession {
     /// Create a new CBU session (anonymous/dev mode)
     pub fn new(domain_hint: Option<String>) -> Self {
         Self::new_for_entity(None, "cbu", None, domain_hint)
+    }
+
+    /// Create a sub-session inheriting context from parent
+    ///
+    /// Sub-sessions are scoped agent conversations for specific workflows
+    /// (resolution, research, review, correction). They inherit:
+    /// - User ID from parent
+    /// - Entity context from parent
+    /// - Symbol bindings for reference resolution
+    pub fn new_subsession(parent: &AgentSession, sub_session_type: SubSessionType) -> Self {
+        let now = Utc::now();
+
+        // Inherit symbols from parent's bindings
+        let inherited_symbols = parent.context.bindings.clone();
+
+        Self {
+            id: Uuid::new_v4(),
+            user_id: parent.user_id,
+            entity_type: parent.entity_type.clone(),
+            entity_id: parent.entity_id,
+            created_at: now,
+            updated_at: now,
+            state: SessionState::New,
+            // Sub-session specific
+            parent_session_id: Some(parent.id),
+            sub_session_type,
+            inherited_symbols,
+            messages: Vec::new(),
+            pending_intents: Vec::new(),
+            assembled_dsl: Vec::new(),
+            pending: None,
+            executed_results: Vec::new(),
+            context: SessionContext {
+                // Inherit key context from parent
+                domain_hint: parent.context.domain_hint.clone(),
+                last_cbu_id: parent.context.last_cbu_id,
+                last_entity_id: parent.context.last_entity_id,
+                active_cbu: parent.context.active_cbu.clone(),
+                ..Default::default()
+            },
+        }
+    }
+
+    /// Check if this is a sub-session
+    pub fn is_subsession(&self) -> bool {
+        self.parent_session_id.is_some()
+    }
+
+    /// Get the sub-session type if this is a resolution session
+    pub fn as_resolution(&self) -> Option<&ResolutionSubSession> {
+        match &self.sub_session_type {
+            SubSessionType::Resolution(r) => Some(r),
+            _ => None,
+        }
+    }
+
+    /// Get mutable resolution sub-session state
+    pub fn as_resolution_mut(&mut self) -> Option<&mut ResolutionSubSession> {
+        match &mut self.sub_session_type {
+            SubSessionType::Resolution(r) => Some(r),
+            _ => None,
+        }
+    }
+
+    /// Get all known symbols for validation (own bindings + inherited from parent)
+    /// Returns HashMap<String, Uuid> suitable for ValidationContext::with_known_symbols
+    pub fn all_known_symbols(&self) -> HashMap<String, Uuid> {
+        let mut symbols = HashMap::new();
+
+        // Add inherited symbols first (can be overridden by own bindings)
+        for (name, bound) in &self.inherited_symbols {
+            symbols.insert(name.clone(), bound.id);
+        }
+
+        // Add own bindings (from context)
+        for (name, bound) in &self.context.bindings {
+            symbols.insert(name.clone(), bound.id);
+        }
+
+        // Add named_refs (legacy UUID-only references)
+        for (name, uuid) in &self.context.named_refs {
+            symbols.insert(name.clone(), *uuid);
+        }
+
+        symbols
     }
 
     /// Set entity ID after creation (e.g., after cbu.ensure executes)

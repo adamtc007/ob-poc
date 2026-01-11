@@ -251,3 +251,101 @@ pub fn dispatch_context_update(
         document.dispatch_event(&event).ok();
     }
 }
+
+// =============================================================================
+// VOICE CONTROL - Start/Stop listening
+// =============================================================================
+
+/// Start voice listening
+/// Dispatches a custom event to JavaScript to start the voice service
+pub fn start_voice_listening(mode: VoiceMode) {
+    dispatch_voice_control("voice-start", mode);
+    web_sys::console::log_1(&format!("[VoiceBridge] Start listening, mode: {:?}", mode).into());
+}
+
+/// Stop voice listening
+/// Dispatches a custom event to JavaScript to stop the voice service
+pub fn stop_voice_listening() {
+    dispatch_voice_control("voice-stop", VoiceMode::Chat);
+    web_sys::console::log_1(&"[VoiceBridge] Stop listening".into());
+}
+
+/// Voice input mode - determines how transcripts are routed
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum VoiceMode {
+    /// Normal chat mode - transcripts go to agent chat
+    Chat,
+    /// Resolution mode - transcripts go to resolution refinement
+    Resolution,
+    /// Command mode - transcripts are parsed as navigation commands
+    Command,
+}
+
+/// Dispatch voice control event to JavaScript
+fn dispatch_voice_control(event_name: &str, mode: VoiceMode) {
+    let window = match web_sys::window() {
+        Some(w) => w,
+        None => return,
+    };
+
+    let document = match window.document() {
+        Some(d) => d,
+        None => return,
+    };
+
+    // Create control object with mode
+    let control = js_sys::Object::new();
+    let mode_str = match mode {
+        VoiceMode::Chat => "chat",
+        VoiceMode::Resolution => "resolution",
+        VoiceMode::Command => "command",
+    };
+    js_sys::Reflect::set(&control, &"mode".into(), &mode_str.into()).ok();
+
+    // Create and dispatch event
+    let event_init = web_sys::CustomEventInit::new();
+    event_init.set_detail(&control);
+
+    if let Ok(event) = web_sys::CustomEvent::new_with_event_init_dict(event_name, &event_init) {
+        document.dispatch_event(&event).ok();
+    }
+}
+
+// =============================================================================
+// RESOLUTION-SPECIFIC VOICE QUEUE
+// =============================================================================
+
+/// Resolution voice transcript - separate from command queue
+#[derive(Debug, Clone)]
+pub struct ResolutionTranscript {
+    pub transcript: String,
+    pub confidence: f32,
+}
+
+thread_local! {
+    static RESOLUTION_QUEUE: RefCell<VecDeque<ResolutionTranscript>> = RefCell::new(VecDeque::new());
+}
+
+/// Push a transcript specifically for resolution refinement
+pub fn push_resolution_transcript(transcript: String, confidence: f32) {
+    RESOLUTION_QUEUE.with(|queue| {
+        let mut q = queue.borrow_mut();
+        if q.len() >= MAX_PENDING_COMMANDS {
+            q.pop_front();
+        }
+        q.push_back(ResolutionTranscript {
+            transcript,
+            confidence,
+        });
+    });
+}
+
+/// Take all pending resolution transcripts
+pub fn take_resolution_transcripts() -> Vec<ResolutionTranscript> {
+    RESOLUTION_QUEUE.with(|queue| queue.borrow_mut().drain(..).collect())
+}
+
+/// Check if there are pending resolution transcripts
+pub fn has_pending_resolution_transcripts() -> bool {
+    RESOLUTION_QUEUE.with(|queue| !queue.borrow().is_empty())
+}

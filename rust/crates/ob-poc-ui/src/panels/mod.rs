@@ -13,6 +13,7 @@ mod dsl_editor;
 mod entity_detail;
 mod investor_register;
 mod repl;
+mod resolution;
 mod results;
 mod session;
 mod taxonomy;
@@ -30,6 +31,9 @@ pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
 pub use investor_register::{investor_register_panel, InvestorRegisterAction};
 pub use repl::repl_panel;
+pub use resolution::{
+    resolution_modal, EntityMatchDisplay, ResolutionPanelAction, ResolutionPanelData,
+};
 pub use results::results_panel;
 pub use session::session_panel;
 pub use taxonomy::{taxonomy_panel, TaxonomyPanelAction};

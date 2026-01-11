@@ -679,6 +679,36 @@ pub enum AgentCommand {
         #[serde(default)]
         topic: Option<String>,
     },
+
+    // =========================================================================
+    // Resolution Commands (Entity disambiguation)
+    // =========================================================================
+    /// Start entity resolution sub-session for ambiguous refs
+    StartResolution {
+        /// Sub-session ID
+        subsession_id: String,
+        /// Number of entities to resolve
+        total_refs: usize,
+    },
+    /// Select a match in resolution (by index)
+    ResolutionSelect {
+        /// Selection index (0-based)
+        selection: usize,
+    },
+    /// Skip current entity in resolution
+    ResolutionSkip,
+    /// Complete resolution and apply to parent session
+    ResolutionComplete {
+        /// Whether to apply resolutions (false to discard)
+        #[serde(default = "default_true")]
+        apply: bool,
+    },
+    /// Cancel resolution and return to parent session
+    ResolutionCancel,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// Direction for pan commands

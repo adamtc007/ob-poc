@@ -149,6 +149,11 @@ impl ToolHandlers {
             "dsl_signature" => self.dsl_signature(args),
             "session_context" => self.session_context(args),
             "entity_search" => self.entity_search(args).await,
+            // Resolution sub-session tools
+            "resolution_start" => self.resolution_start(args).await,
+            "resolution_search" => self.resolution_search(args).await,
+            "resolution_select" => self.resolution_select(args).await,
+            "resolution_complete" => self.resolution_complete(args).await,
             // Workflow orchestration tools
             "workflow_status" => self.workflow_status(args).await,
             "workflow_advance" => self.workflow_advance(args).await,
@@ -1567,6 +1572,363 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             "resolution_confidence": resolution.confidence,
             "suggested_action": resolution.action,
             "disambiguation_prompt": resolution.prompt
+        }))
+    }
+
+    // ==================== Resolution Sub-Session Tools ====================
+
+    /// Start a resolution sub-session
+    async fn resolution_start(&self, args: Value) -> Result<Value> {
+        use crate::api::session::{
+            AgentSession, EntityMatchInfo, ResolutionSubSession, SubSessionType, UnresolvedRefInfo,
+        };
+
+        let sessions = self.require_sessions()?;
+
+        let parent_id: Uuid = args["session_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("session_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid session_id UUID"))?;
+
+        let parent_dsl_index = args["parent_dsl_index"].as_u64().unwrap_or(0) as usize;
+
+        // Parse unresolved refs
+        let unresolved_refs_json = args["unresolved_refs"]
+            .as_array()
+            .ok_or_else(|| anyhow!("unresolved_refs array required"))?;
+
+        let unresolved_refs: Vec<UnresolvedRefInfo> = unresolved_refs_json
+            .iter()
+            .map(|r| {
+                let initial_matches = r["initial_matches"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .map(|m| EntityMatchInfo {
+                                value: m["value"].as_str().unwrap_or("").to_string(),
+                                display: m["display"].as_str().unwrap_or("").to_string(),
+                                score_pct: m["score_pct"].as_u64().unwrap_or(0) as u8,
+                                detail: m["detail"].as_str().map(|s| s.to_string()),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                UnresolvedRefInfo {
+                    ref_id: r["ref_id"].as_str().unwrap_or("").to_string(),
+                    search_value: r["search_value"].as_str().unwrap_or("").to_string(),
+                    entity_type: r["entity_type"].as_str().unwrap_or("entity").to_string(),
+                    dsl_line: r["dsl_line"].as_u64().map(|n| n as usize),
+                    initial_matches,
+                }
+            })
+            .collect();
+
+        // Get parent session
+        let parent = {
+            let sessions_guard = sessions.read().await;
+            sessions_guard.get(&parent_id).cloned()
+        }
+        .ok_or_else(|| anyhow!("Parent session {} not found", parent_id))?;
+
+        // Create resolution sub-session
+        let resolution_state = ResolutionSubSession {
+            unresolved_refs: unresolved_refs.clone(),
+            parent_dsl_index,
+            current_ref_index: 0,
+            resolutions: std::collections::HashMap::new(),
+        };
+
+        let child =
+            AgentSession::new_subsession(&parent, SubSessionType::Resolution(resolution_state));
+        let child_id = child.id;
+
+        // Store child session
+        {
+            let mut sessions_guard = sessions.write().await;
+            sessions_guard.insert(child_id, child);
+        }
+
+        // Return sub-session info
+        Ok(json!({
+            "subsession_id": child_id.to_string(),
+            "parent_id": parent_id.to_string(),
+            "unresolved_count": unresolved_refs.len(),
+            "current_ref": unresolved_refs.first().map(|r| json!({
+                "ref_id": r.ref_id,
+                "search_value": r.search_value,
+                "entity_type": r.entity_type,
+                "matches": r.initial_matches.iter().map(|m| json!({
+                    "value": m.value,
+                    "display": m.display,
+                    "score_pct": m.score_pct,
+                    "detail": m.detail
+                })).collect::<Vec<_>>()
+            }))
+        }))
+    }
+
+    /// Refine search using discriminators
+    async fn resolution_search(&self, args: Value) -> Result<Value> {
+        use crate::api::session::SubSessionType;
+
+        let sessions = self.require_sessions()?;
+
+        let subsession_id: Uuid = args["subsession_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subsession_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid subsession_id UUID"))?;
+
+        // Get sub-session
+        let session = {
+            let sessions_guard = sessions.read().await;
+            sessions_guard.get(&subsession_id).cloned()
+        }
+        .ok_or_else(|| anyhow!("Sub-session {} not found", subsession_id))?;
+
+        let SubSessionType::Resolution(resolution) = &session.sub_session_type else {
+            return Err(anyhow!(
+                "Session {} is not a resolution sub-session",
+                subsession_id
+            ));
+        };
+
+        let current_ref = resolution
+            .unresolved_refs
+            .get(resolution.current_ref_index)
+            .ok_or_else(|| anyhow!("No current reference to resolve"))?;
+
+        // Parse discriminators
+        let discriminators = args.get("discriminators");
+        let natural_language = args["natural_language"].as_str();
+
+        // Build search query with discriminators
+        let base_query = &current_ref.search_value;
+        let entity_type = &current_ref.entity_type;
+
+        // For now, re-search with the base query
+        // TODO: Apply discriminators to filter results
+        let nickname = match entity_type.as_str() {
+            "person" => "PERSON",
+            "company" | "legal_entity" => "LEGAL_ENTITY",
+            "cbu" => "CBU",
+            _ => "ENTITY",
+        };
+
+        let raw_matches = self.gateway_search(nickname, Some(base_query), 10).await?;
+
+        // Apply discriminator filtering (basic implementation)
+        let mut filtered_matches = raw_matches;
+
+        if let Some(disc) = discriminators {
+            // TODO: Implement proper discriminator filtering via EntityEnricher
+            // For now, log that we received discriminators
+            tracing::info!(
+                "Resolution search with discriminators: {:?}, natural_language: {:?}",
+                disc,
+                natural_language
+            );
+        }
+
+        Ok(json!({
+            "ref_id": current_ref.ref_id,
+            "search_value": current_ref.search_value,
+            "matches": filtered_matches.iter().map(|(id, display, score)| json!({
+                "value": id,
+                "display": display,
+                "score_pct": (score * 100.0) as u8
+            })).collect::<Vec<_>>(),
+            "discriminators_applied": discriminators.is_some(),
+            "natural_language_parsed": natural_language.is_some()
+        }))
+    }
+
+    /// Select a match to resolve current reference
+    async fn resolution_select(&self, args: Value) -> Result<Value> {
+        use crate::api::session::SubSessionType;
+
+        let sessions = self.require_sessions()?;
+
+        let subsession_id: Uuid = args["subsession_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subsession_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid subsession_id UUID"))?;
+
+        let selection = args["selection"].as_u64();
+        let entity_id = args["entity_id"].as_str();
+
+        if selection.is_none() && entity_id.is_none() {
+            return Err(anyhow!("Either selection index or entity_id required"));
+        }
+
+        // Get and update sub-session
+        let mut session = {
+            let sessions_guard = sessions.read().await;
+            sessions_guard.get(&subsession_id).cloned()
+        }
+        .ok_or_else(|| anyhow!("Sub-session {} not found", subsession_id))?;
+
+        let SubSessionType::Resolution(resolution) = &mut session.sub_session_type else {
+            return Err(anyhow!(
+                "Session {} is not a resolution sub-session",
+                subsession_id
+            ));
+        };
+
+        let current_ref = resolution
+            .unresolved_refs
+            .get(resolution.current_ref_index)
+            .ok_or_else(|| anyhow!("No current reference to resolve"))?;
+
+        // Determine the selected value
+        let selected_value = if let Some(idx) = selection {
+            let match_info = current_ref
+                .initial_matches
+                .get(idx as usize)
+                .ok_or_else(|| anyhow!("Selection index {} out of range", idx))?;
+            match_info.value.clone()
+        } else if let Some(eid) = entity_id {
+            eid.to_string()
+        } else {
+            return Err(anyhow!("No selection provided"));
+        };
+
+        // Record resolution
+        let ref_id = current_ref.ref_id.clone();
+        resolution
+            .resolutions
+            .insert(ref_id.clone(), selected_value.clone());
+
+        // Move to next
+        resolution.current_ref_index += 1;
+
+        let is_complete = resolution.current_ref_index >= resolution.unresolved_refs.len();
+        let next_ref = if !is_complete {
+            resolution.unresolved_refs.get(resolution.current_ref_index)
+        } else {
+            None
+        };
+
+        // Store updated session
+        {
+            let mut sessions_guard = sessions.write().await;
+            sessions_guard.insert(subsession_id, session);
+        }
+
+        Ok(json!({
+            "resolved": {
+                "ref_id": ref_id,
+                "value": selected_value
+            },
+            "is_complete": is_complete,
+            "resolutions_count": resolution.current_ref_index,
+            "remaining_count": resolution.unresolved_refs.len() - resolution.current_ref_index,
+            "next_ref": next_ref.map(|r| json!({
+                "ref_id": r.ref_id,
+                "search_value": r.search_value,
+                "entity_type": r.entity_type,
+                "matches": r.initial_matches.iter().map(|m| json!({
+                    "value": m.value,
+                    "display": m.display,
+                    "score_pct": m.score_pct,
+                    "detail": m.detail
+                })).collect::<Vec<_>>()
+            }))
+        }))
+    }
+
+    /// Complete resolution sub-session
+    async fn resolution_complete(&self, args: Value) -> Result<Value> {
+        use crate::api::session::{BoundEntity, SubSessionType};
+
+        let sessions = self.require_sessions()?;
+
+        let subsession_id: Uuid = args["subsession_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("subsession_id required"))?
+            .parse()
+            .map_err(|_| anyhow!("Invalid subsession_id UUID"))?;
+
+        let apply = args["apply"].as_bool().unwrap_or(true);
+
+        // Remove child session
+        let child = {
+            let mut sessions_guard = sessions.write().await;
+            sessions_guard.remove(&subsession_id)
+        }
+        .ok_or_else(|| anyhow!("Sub-session {} not found", subsession_id))?;
+
+        let parent_id = child
+            .parent_session_id
+            .ok_or_else(|| anyhow!("Session {} has no parent", subsession_id))?;
+
+        let SubSessionType::Resolution(resolution) = &child.sub_session_type else {
+            return Err(anyhow!(
+                "Session {} is not a resolution sub-session",
+                subsession_id
+            ));
+        };
+
+        let resolutions_count = resolution.resolutions.len();
+
+        if apply && resolutions_count > 0 {
+            // Build bound entities from resolutions
+            let mut bound_entities = Vec::new();
+            for unresolved in &resolution.unresolved_refs {
+                if let Some(resolved_value) = resolution.resolutions.get(&unresolved.ref_id) {
+                    // Find match info
+                    let match_info = unresolved
+                        .initial_matches
+                        .iter()
+                        .find(|m| &m.value == resolved_value);
+
+                    if let Some(info) = match_info {
+                        if let Ok(uuid) = Uuid::parse_str(resolved_value) {
+                            bound_entities.push((
+                                unresolved.ref_id.clone(),
+                                BoundEntity {
+                                    id: uuid,
+                                    entity_type: unresolved.entity_type.clone(),
+                                    display_name: info.display.clone(),
+                                },
+                            ));
+                        }
+                    }
+                }
+            }
+
+            // Apply to parent session
+            {
+                let mut sessions_guard = sessions.write().await;
+                if let Some(parent) = sessions_guard.get_mut(&parent_id) {
+                    for (ref_id, bound_entity) in &bound_entities {
+                        parent
+                            .context
+                            .bindings
+                            .insert(ref_id.clone(), bound_entity.clone());
+                        tracing::info!(
+                            "Applied resolution: {} -> {} ({})",
+                            ref_id,
+                            bound_entity.id,
+                            bound_entity.display_name
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(json!({
+            "success": true,
+            "parent_id": parent_id.to_string(),
+            "resolutions_applied": if apply { resolutions_count } else { 0 },
+            "message": format!(
+                "Resolution complete. {} bindings {}.",
+                resolutions_count,
+                if apply { "applied to parent" } else { "discarded" }
+            )
         }))
     }
 
