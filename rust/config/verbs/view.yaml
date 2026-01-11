@@ -24,6 +24,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewUniverseOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, universe, filtering]
         args:
           - name: client
             type: uuid
@@ -66,6 +72,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewBookOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
+          noun: view_state
+          tags: [navigation, book, client]
         args:
           - name: client
             type: uuid
@@ -87,6 +99,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewCbuOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
+          noun: view_state
+          tags: [navigation, focus, cbu]
         args:
           - name: cbu-id
             type: uuid
@@ -116,6 +134,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewEntityForestOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, entity, filtering]
         args:
           - name: entity-type
             type: string_list
@@ -142,6 +166,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewRefineOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [refinement, filtering]
         args:
           - name: include
             type: object
@@ -168,6 +198,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewClearOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [refinement, reset]
         args: []
         returns:
           type: view_state
@@ -182,6 +218,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewSelectOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [selection]
         args:
           - name: ids
             type: uuid_list
@@ -208,6 +250,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewLayoutOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [visualization, layout]
         args:
           - name: mode
             type: string
@@ -251,6 +299,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewZoomInOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, fractal, zoom]
         args:
           - name: node-id
             type: uuid
@@ -266,6 +320,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewZoomOutOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, fractal, zoom]
         args: []
         returns:
           type: view_state
@@ -277,6 +337,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewBackToOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, fractal, breadcrumbs]
         args:
           - name: depth
             type: integer
@@ -296,6 +362,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewBreadcrumbsOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, fractal, breadcrumbs, introspection]
         args: []
         returns:
           type: object
@@ -311,6 +383,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewDrillOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, esper, drill]
         args:
           - name: entity-id
             type: uuid
@@ -346,6 +424,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewSurfaceOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, esper, drill]
         args:
           - name: levels
             type: integer
@@ -367,6 +451,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewTraceOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [navigation, esper, trace]
         args:
           - name: mode
             type: string
@@ -404,6 +494,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewXrayOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [visualization, esper, transparency]
         args:
           - name: layers
             type: string_list
@@ -430,6 +526,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewPeelOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [visualization, esper, layers]
         args:
           - name: layer
             type: string
@@ -450,6 +552,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewIlluminateOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [visualization, esper, highlighting]
         args:
           - name: aspect
             type: string
@@ -480,6 +588,12 @@ domains:
         behavior: plugin
         plugin:
           handler: ViewShadowOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: global
+          noun: view_state
+          tags: [visualization, esper, risk, highlighting]
         args:
           - name: threshold
             type: string

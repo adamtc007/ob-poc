@@ -5,6 +5,12 @@ domains:
       create:
         description: Create a new Client Business Unit (idempotent by name)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write]
         produces:
           type: cbu
           resolved: false
@@ -63,6 +69,12 @@ domains:
       read:
         description: Read a CBU by ID
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [read, query]
         crud:
           operation: select
           table: cbus
@@ -84,6 +96,12 @@ domains:
       update:
         description: Update a CBU
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write]
         crud:
           operation: update
           table: cbus
@@ -131,6 +149,12 @@ domains:
       delete:
         description: Delete a CBU (fails if has dependencies - use delete-cascade for full cleanup)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, destructive]
         crud:
           operation: delete
           table: cbus
@@ -153,6 +177,12 @@ domains:
       delete-cascade:
         description: Delete a CBU and all related data (entities, roles, documents, etc.)
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, destructive, cascade]
         plugin:
           handler: CbuDeleteCascadeOp
         args:
@@ -177,6 +207,12 @@ domains:
       list:
         description: List CBUs with optional filters
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [read, query, list]
         crud:
           operation: select
           table: cbus
@@ -207,6 +243,12 @@ domains:
       ensure:
         description: Create or update a CBU by natural key
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, idempotent]
         produces:
           type: cbu
           resolved: false
@@ -262,6 +304,12 @@ domains:
       assign-role:
         description: Assign a role to an entity within a CBU
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [relationship, write, role]
         consumes:
           - arg: cbu-id
             type: cbu
@@ -315,6 +363,12 @@ domains:
       remove-role:
         description: Remove a specific role from an entity within a CBU
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [relationship, write, role]
         crud:
           operation: role_unlink
           junction: cbu_entity_roles
@@ -355,6 +409,12 @@ domains:
       parties:
         description: List all parties (entities with their roles) for a CBU
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [read, query, relationship]
         crud:
           operation: list_parties
           junction: cbu_entity_roles
@@ -379,6 +439,12 @@ domains:
       set-category:
         description: Set CBU relationship category (FUND_MANDATE, CORPORATE_GROUP, etc.)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, classification]
         crud:
           operation: update
           table: cbus
@@ -413,6 +479,12 @@ domains:
       check-invariants:
         description: Verify CBU invariants hold (returns list of violations)
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [validation, read]
         plugin:
           handler: CbuCheckInvariantsOp
         args:
@@ -433,6 +505,12 @@ domains:
       show:
         description: Show full CBU structure including entities, roles, documents, screenings
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [read, query, detailed]
         plugin:
           handler: CbuShowOp
         args:
@@ -457,6 +535,12 @@ domains:
       add-product:
         description: Add a product to a CBU (creates service_delivery_map entries for all services)
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [relationship, write, product]
         args:
           - name: cbu-id
             type: uuid
@@ -484,6 +568,12 @@ domains:
       remove-product:
         description: Remove a product from a CBU (deletes service_delivery_map entries)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [relationship, write, product]
         crud:
           operation: delete
           table: service_delivery_map
@@ -517,6 +607,12 @@ domains:
       decide:
         description: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [lifecycle, write, decision, kyc]
         plugin:
           handler: CbuDecideOp
         consumes:
@@ -579,6 +675,12 @@ domains:
       attach-evidence:
         description: Attach evidence (document or attestation) to CBU
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [evidence, write, kyc]
         crud:
           operation: insert
           table: cbu_evidence
@@ -638,6 +740,12 @@ domains:
       verify-evidence:
         description: Mark evidence as verified or rejected
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [evidence, write, kyc, verification]
         crud:
           operation: update
           table: cbu_evidence
@@ -672,6 +780,12 @@ domains:
       list-evidence:
         description: List evidence for a CBU
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [evidence, read, query, kyc]
         crud:
           operation: list_by_fk
           table: cbu_evidence

@@ -207,12 +207,14 @@ pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> 
     // =========================================================================
     if let Some(source) = &metadata.source_of_truth {
         match metadata.tier {
-            Some(VerbTier::Intent) if !matches!(source, SourceOfTruth::Matrix) => {
+            Some(VerbTier::Intent)
+                if !matches!(source, SourceOfTruth::Matrix | SourceOfTruth::Session) =>
+            {
                 diagnostics.add_warning_with_path(
                     codes::TIER_INCONSISTENT_SOURCE,
-                    "Intent tier verbs should have source_of_truth: matrix",
+                    "Intent tier verbs should have source_of_truth: matrix or session",
                     Some("metadata.source_of_truth"),
-                    Some("Intent verbs author the trading matrix document"),
+                    Some("Intent verbs author the trading matrix or manage session state"),
                 );
             }
             Some(VerbTier::Projection) if !matches!(source, SourceOfTruth::Operational) => {

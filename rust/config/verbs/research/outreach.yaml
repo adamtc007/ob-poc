@@ -24,6 +24,12 @@ domains:
           - "request ownership disclosure"
           - "ask for information"
           - "send a request to"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: outreach_request
+          tags: [write, workflow, request-management]
         behavior: crud
         crud:
           operation: insert
@@ -81,6 +87,12 @@ domains:
 
       mark-sent:
         description: "Mark request as sent"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: outreach_request
+          tags: [write, workflow, status-update]
         behavior: crud
         crud:
           operation: update
@@ -101,6 +113,12 @@ domains:
 
       send-reminder:
         description: "Mark that a reminder was sent"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: outreach_request
+          tags: [write, workflow, status-update]
         behavior: crud
         crud:
           operation: update
@@ -126,6 +144,12 @@ domains:
           - "they responded"
           - "got a disclosure"
           - "received ownership information"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: outreach_response
+          tags: [write, workflow, response-capture]
         behavior: plugin
         handler: OutreachRecordResponseOp
         args:
@@ -151,6 +175,12 @@ domains:
 
       close-request:
         description: "Close an outreach request"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: outreach_request
+          tags: [write, workflow, status-update]
         behavior: crud
         crud:
           operation: update
@@ -179,6 +209,12 @@ domains:
 
       list-pending:
         description: "List pending outreach requests"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: outreach_request
+          tags: [read, query, workflow]
         behavior: crud
         crud:
           operation: select
@@ -208,6 +244,12 @@ domains:
           - "what's overdue"
           - "pending outreach"
           - "who hasn't responded"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: outreach_request
+          tags: [read, query, workflow, validation]
         behavior: plugin
         handler: OutreachListOverdueOp
         args:
@@ -220,6 +262,12 @@ domains:
 
       get-request:
         description: "Get details of a specific request"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: outreach_request
+          tags: [read, query, workflow]
         behavior: crud
         crud:
           operation: select
