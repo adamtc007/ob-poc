@@ -1163,32 +1163,39 @@ async fn chat_session(
         }
     };
 
-    // Handle /commands or /help - show available MCP tools without LLM
+    // Handle slash commands: /commands, /verbs, /help with optional domain filter
     let trimmed_msg = req.message.trim().to_lowercase();
-    if trimmed_msg == "/commands" || trimmed_msg == "/help" || trimmed_msg == "show commands" {
-        let commands_help = generate_commands_help();
-        return Ok(Json(ChatResponse {
-            message: commands_help,
-            dsl: None,
-            session_state: to_session_state_enum(&session.state),
-            commands: None,
-        }));
-    }
+    let parts: Vec<&str> = trimmed_msg.split_whitespace().collect();
 
-    // Handle /verbs or /verbs <domain> - show DSL verb vocabulary
-    if trimmed_msg == "/verbs" || trimmed_msg.starts_with("/verbs ") {
-        let domain_filter = if trimmed_msg == "/verbs" {
-            None
-        } else {
-            Some(trimmed_msg.strip_prefix("/verbs ").unwrap_or("").trim())
-        };
-        let verbs_help = generate_verbs_help(domain_filter);
-        return Ok(Json(ChatResponse {
-            message: verbs_help,
-            dsl: None,
-            session_state: to_session_state_enum(&session.state),
-            commands: None,
-        }));
+    match parts.as_slice() {
+        // /help or /commands (no args) - show MCP tools overview
+        ["/help"] | ["/commands"] | ["show", "commands"] => {
+            return Ok(Json(ChatResponse {
+                message: generate_commands_help(),
+                dsl: None,
+                session_state: to_session_state_enum(&session.state),
+                commands: None,
+            }));
+        }
+        // /commands <domain> or /verbs <domain> - show verbs for domain
+        ["/commands" | "/verbs", domain] => {
+            return Ok(Json(ChatResponse {
+                message: generate_verbs_help(Some(domain)),
+                dsl: None,
+                session_state: to_session_state_enum(&session.state),
+                commands: None,
+            }));
+        }
+        // /verbs (no args) - show all verbs
+        ["/verbs"] => {
+            return Ok(Json(ChatResponse {
+                message: generate_verbs_help(None),
+                dsl: None,
+                session_state: to_session_state_enum(&session.state),
+                commands: None,
+            }));
+        }
+        _ => {} // Not a slash command, continue to LLM
     }
 
     // Make session mutable for the rest of the handler
