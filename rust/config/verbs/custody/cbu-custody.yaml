@@ -1,86 +1,15 @@
 domains:
   cbu-custody:
-    description: "CBU custody operations: Universe, SSIs, and Booking Rules"
+    description: "CBU custody diagnostics: Query operational universe, SSIs, and Booking Rules"
     verbs:
-      add-universe:
-        description: Declare what a CBU trades (instrument class + market + currencies)
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: universe
-          internal: true
-          tags: [deprecated, use-trading-profile]
-          replaces: null # This verb IS being replaced by trading-profile.add-market
-        crud:
-          operation: upsert
-          table: cbu_instrument_universe
-          schema: custody
-          conflict_constraint: cbu_instrument_universe_natural_key
-          returning: universe_id
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: instrument-class
-            type: lookup
-            required: true
-            maps_to: instrument_class_id
-            lookup:
-              table: instrument_classes
-              entity_type: instrument_class
-              schema: custody
-              code_column: code
-              id_column: class_id
-          - name: market
-            type: lookup
-            required: false
-            maps_to: market_id
-            lookup:
-              table: markets
-              entity_type: market
-              schema: custody
-              code_column: mic
-              id_column: market_id
-          - name: currencies
-            type: string_list
-            required: true
-            maps_to: currencies
-          - name: settlement-types
-            type: string_list
-            required: false
-            maps_to: settlement_types
-            default:
-              - DVP
-          - name: counterparty
-            type: uuid
-            required: false
-            maps_to: counterparty_entity_id
-          - name: is-held
-            type: boolean
-            required: false
-            maps_to: is_held
-            default: true
-          - name: is-traded
-            type: boolean
-            required: false
-            maps_to: is_traded
-            default: true
-        returns:
-          type: uuid
-          name: universe_id
-          capture: false
+      # ========================================
+      # DIAGNOSTICS - Query operational state
+      # ========================================
+      # These verbs query the operational tables that are WRITTEN by trading-profile:materialize.
+      # For authoring/editing, use trading-profile:* verbs instead.
+
       list-universe:
-        description: List CBU's traded universe
+        description: List CBU's traded universe (read from operational tables)
         behavior: crud
         metadata:
           tier: diagnostics
@@ -105,204 +34,9 @@ domains:
               primary_key: cbu_id
         returns:
           type: record_set
-      remove-universe:
-        description: Remove an entry from CBU's trading universe
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: universe
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: delete
-          table: cbu_instrument_universe
-          schema: custody
-        args:
-          - name: universe-id
-            type: uuid
-            required: true
-            maps_to: universe_id
-        returns:
-          type: affected
-      create-ssi:
-        description: Create a Standing Settlement Instruction (idempotent by cbu+name)
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: ssi
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: upsert
-          table: cbu_ssi
-          schema: custody
-          returning: ssi_id
-          conflict_keys:
-            - cbu_id
-            - ssi_name
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: name
-            type: string
-            required: true
-            maps_to: ssi_name
-          - name: type
-            type: string
-            required: true
-            maps_to: ssi_type
-            valid_values:
-              - SECURITIES
-              - CASH
-              - COLLATERAL
-              - FX_NOSTRO
-          - name: safekeeping-account
-            type: string
-            required: false
-            maps_to: safekeeping_account
-          - name: safekeeping-bic
-            type: string
-            required: false
-            maps_to: safekeeping_bic
-          - name: safekeeping-name
-            type: string
-            required: false
-            maps_to: safekeeping_account_name
-          - name: cash-account
-            type: string
-            required: false
-            maps_to: cash_account
-          - name: cash-bic
-            type: string
-            required: false
-            maps_to: cash_account_bic
-          - name: cash-currency
-            type: string
-            required: false
-            maps_to: cash_currency
-          - name: collateral-account
-            type: string
-            required: false
-            maps_to: collateral_account
-          - name: collateral-bic
-            type: string
-            required: false
-            maps_to: collateral_account_bic
-          - name: pset-bic
-            type: string
-            required: false
-            maps_to: pset_bic
-          - name: effective-date
-            type: date
-            required: true
-            maps_to: effective_date
-        returns:
-          type: uuid
-          name: ssi_id
-          capture: true
-      ensure-ssi:
-        description: Create or update an SSI by name (idempotent)
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: ssi
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: upsert
-          table: cbu_ssi
-          schema: custody
-          conflict_keys:
-            - cbu_id
-            - ssi_name
-          returning: ssi_id
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: name
-            type: string
-            required: true
-            maps_to: ssi_name
-          - name: type
-            type: string
-            required: true
-            maps_to: ssi_type
-            valid_values:
-              - SECURITIES
-              - CASH
-              - COLLATERAL
-              - FX_NOSTRO
-          - name: safekeeping-account
-            type: string
-            required: false
-            maps_to: safekeeping_account
-          - name: safekeeping-bic
-            type: string
-            required: false
-            maps_to: safekeeping_bic
-          - name: safekeeping-name
-            type: string
-            required: false
-            maps_to: safekeeping_account_name
-          - name: cash-account
-            type: string
-            required: false
-            maps_to: cash_account
-          - name: cash-bic
-            type: string
-            required: false
-            maps_to: cash_account_bic
-          - name: cash-currency
-            type: string
-            required: false
-            maps_to: cash_currency
-          - name: collateral-account
-            type: string
-            required: false
-            maps_to: collateral_account
-          - name: collateral-bic
-            type: string
-            required: false
-            maps_to: collateral_account_bic
-          - name: pset-bic
-            type: string
-            required: false
-            maps_to: pset_bic
-          - name: effective-date
-            type: date
-            required: true
-            maps_to: effective_date
-        returns:
-          type: uuid
-          name: ssi_id
-          capture: true
+
       list-ssis:
-        description: List SSIs for a CBU
+        description: List SSIs for a CBU (read from operational tables)
         behavior: crud
         metadata:
           tier: diagnostics
@@ -335,282 +69,9 @@ domains:
             maps_to: ssi_type
         returns:
           type: record_set
-      activate-ssi:
-        description: Activate an SSI
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: ssi
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: update
-          table: cbu_ssi
-          schema: custody
-          key: ssi_id
-          set_values:
-            status: ACTIVE
-        args:
-          - name: ssi-id
-            type: uuid
-            required: true
-            maps_to: ssi_id
-            lookup:
-              table: cbu_ssi
-              entity_type: ssi
-              schema: custody
-              search_key: ssi_name
-              primary_key: ssi_id
-        returns:
-          type: affected
-      suspend-ssi:
-        description: Suspend an SSI
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: ssi
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: update
-          table: cbu_ssi
-          schema: custody
-          key: ssi_id
-          set_values:
-            status: SUSPENDED
-        args:
-          - name: ssi-id
-            type: uuid
-            required: true
-            maps_to: ssi_id
-            lookup:
-              table: cbu_ssi
-              entity_type: ssi
-              schema: custody
-              search_key: ssi_name
-              primary_key: ssi_id
-        returns:
-          type: affected
-      add-booking-rule:
-        description: Add ALERT-style booking rule for SSI routing (idempotent by cbu+name)
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: booking_rule
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: upsert
-          table: ssi_booking_rules
-          schema: custody
-          returning: rule_id
-          conflict_keys:
-            - cbu_id
-            - rule_name
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: ssi-id
-            type: uuid
-            required: true
-            maps_to: ssi_id
-            lookup:
-              table: cbu_ssi
-              entity_type: ssi
-              schema: custody
-              search_key: ssi_name
-              primary_key: ssi_id
-          - name: name
-            type: string
-            required: true
-            maps_to: rule_name
-          - name: priority
-            type: integer
-            required: true
-            maps_to: priority
-          - name: instrument-class
-            type: lookup
-            required: false
-            maps_to: instrument_class_id
-            lookup:
-              table: instrument_classes
-              entity_type: instrument_class
-              schema: custody
-              code_column: code
-              id_column: class_id
-          - name: security-type
-            type: lookup
-            required: false
-            maps_to: security_type_id
-            lookup:
-              table: security_types
-              entity_type: security_type
-              schema: custody
-              code_column: code
-              id_column: security_type_id
-          - name: market
-            type: lookup
-            required: false
-            maps_to: market_id
-            lookup:
-              table: markets
-              entity_type: market
-              schema: custody
-              code_column: mic
-              id_column: market_id
-          - name: currency
-            type: string
-            required: false
-            maps_to: currency
-          - name: settlement-type
-            type: string
-            required: false
-            maps_to: settlement_type
-          - name: counterparty
-            type: uuid
-            required: false
-            maps_to: counterparty_entity_id
-          - name: isda-asset-class
-            type: string
-            required: false
-            maps_to: isda_asset_class
-          - name: isda-base-product
-            type: string
-            required: false
-            maps_to: isda_base_product
-          - name: effective-date
-            type: date
-            required: false
-            maps_to: effective_date
-        returns:
-          type: uuid
-          name: rule_id
-          capture: true
-      ensure-booking-rule:
-        description: Create or update a booking rule by name (idempotent)
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: booking_rule
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: upsert
-          table: ssi_booking_rules
-          schema: custody
-          conflict_keys:
-            - cbu_id
-            - rule_name
-          returning: rule_id
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: ssi-id
-            type: uuid
-            required: true
-            maps_to: ssi_id
-            lookup:
-              table: cbu_ssi
-              entity_type: ssi
-              schema: custody
-              search_key: ssi_name
-              primary_key: ssi_id
-          - name: name
-            type: string
-            required: true
-            maps_to: rule_name
-          - name: priority
-            type: integer
-            required: true
-            maps_to: priority
-          - name: instrument-class
-            type: lookup
-            required: false
-            maps_to: instrument_class_id
-            lookup:
-              table: instrument_classes
-              entity_type: instrument_class
-              schema: custody
-              code_column: code
-              id_column: class_id
-          - name: security-type
-            type: lookup
-            required: false
-            maps_to: security_type_id
-            lookup:
-              table: security_types
-              entity_type: security_type
-              schema: custody
-              code_column: code
-              id_column: security_type_id
-          - name: market
-            type: lookup
-            required: false
-            maps_to: market_id
-            lookup:
-              table: markets
-              entity_type: market
-              schema: custody
-              code_column: mic
-              id_column: market_id
-          - name: currency
-            type: string
-            required: false
-            maps_to: currency
-          - name: settlement-type
-            type: string
-            required: false
-            maps_to: settlement_type
-          - name: counterparty
-            type: uuid
-            required: false
-            maps_to: counterparty_entity_id
-          - name: isda-asset-class
-            type: string
-            required: false
-            maps_to: isda_asset_class
-          - name: isda-base-product
-            type: string
-            required: false
-            maps_to: isda_base_product
-          - name: effective-date
-            type: date
-            required: false
-            maps_to: effective_date
-        returns:
-          type: uuid
-          name: rule_id
-          capture: true
+
       list-booking-rules:
-        description: List booking rules for a CBU
+        description: List booking rules for a CBU (read from operational tables)
         behavior: crud
         metadata:
           tier: diagnostics
@@ -640,92 +101,40 @@ domains:
             maps_to: is_active
         returns:
           type: record_set
-      remove-booking-rule:
-        description: Remove a booking rule
+
+      list-agent-overrides:
+        description: List agent overrides for an SSI
         behavior: crud
         metadata:
-          tier: projection
+          tier: diagnostics
           source_of_truth: operational
           scope: cbu
-          writes_operational: true
-          noun: booking_rule
-          internal: true
-          tags: [deprecated, use-trading-profile]
+          noun: agent_override
+          tags: [read, operational-state]
         crud:
-          operation: delete
-          table: ssi_booking_rules
+          operation: list_by_fk
+          table: cbu_ssi_agent_override
           schema: custody
+          fk_col: ssi_id
+          order_by: sequence_order
         args:
-          - name: rule-id
+          - name: ssi-id
             type: uuid
             required: true
-            maps_to: rule_id
-        returns:
-          type: affected
-      update-rule-priority:
-        description: Update booking rule priority
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: booking_rule
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: update
-          table: ssi_booking_rules
-          schema: custody
-          key: rule_id
-        args:
-          - name: rule-id
-            type: uuid
-            required: true
-            maps_to: rule_id
+            maps_to: ssi_id
             lookup:
-              table: ssi_booking_rules
-              entity_type: booking_rule
+              table: cbu_ssi
+              entity_type: ssi
               schema: custody
-              search_key: rule_name
-              primary_key: rule_id
-          - name: priority
-            type: integer
-            required: true
-            maps_to: priority
+              search_key: ssi_name
+              primary_key: ssi_id
         returns:
-          type: affected
-      deactivate-rule:
-        description: Deactivate a booking rule
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: booking_rule
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: update
-          table: ssi_booking_rules
-          schema: custody
-          key: rule_id
-          set_values:
-            is_active: false
-        args:
-          - name: rule-id
-            type: uuid
-            required: true
-            maps_to: rule_id
-            lookup:
-              table: ssi_booking_rules
-              entity_type: booking_rule
-              schema: custody
-              search_key: rule_name
-              primary_key: rule_id
-        returns:
-          type: affected
+          type: record_set
+
+      # ========================================
+      # VALIDATION - Check coverage and gaps
+      # ========================================
+
       derive-required-coverage:
         description: Compare universe to booking rules, find gaps
         behavior: plugin
@@ -748,6 +157,7 @@ domains:
               primary_key: cbu_id
         returns:
           type: record_set
+
       validate-booking-coverage:
         description: Validate that all universe entries have matching booking rules
         behavior: plugin
@@ -775,6 +185,7 @@ domains:
               primary_key: cbu_id
         returns:
           type: record
+
       lookup-ssi:
         description: Find SSI for given trade characteristics (simulate ALERT lookup)
         behavior: plugin
@@ -819,122 +230,11 @@ domains:
             required: false
         returns:
           type: record
-      add-agent-override:
-        description: Add intermediary agent to SSI settlement chain (idempotent by ssi+role+sequence)
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: agent_override
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: upsert
-          table: cbu_ssi_agent_override
-          schema: custody
-          returning: override_id
-          conflict_keys:
-            - ssi_id
-            - agent_role
-            - sequence_order
-        args:
-          - name: ssi-id
-            type: uuid
-            required: true
-            maps_to: ssi_id
-            lookup:
-              table: cbu_ssi
-              entity_type: ssi
-              schema: custody
-              search_key: ssi_name
-              primary_key: ssi_id
-          - name: agent-role
-            type: string
-            required: true
-            maps_to: agent_role
-            valid_values:
-              - REAG
-              - DEAG
-              - INT1
-              - INT2
-              - RECU
-              - DECU
-          - name: agent-bic
-            type: string
-            required: true
-            maps_to: agent_bic
-          - name: agent-account
-            type: string
-            required: false
-            maps_to: agent_account
-          - name: agent-name
-            type: string
-            required: false
-            maps_to: agent_name
-          - name: sequence-order
-            type: integer
-            required: true
-            maps_to: sequence_order
-          - name: reason
-            type: string
-            required: false
-            maps_to: reason
-        returns:
-          type: uuid
-          name: override_id
-          capture: true
-      list-agent-overrides:
-        description: List agent overrides for an SSI
-        behavior: crud
-        metadata:
-          tier: diagnostics
-          source_of_truth: operational
-          scope: cbu
-          noun: agent_override
-          tags: [read, operational-state]
-        crud:
-          operation: list_by_fk
-          table: cbu_ssi_agent_override
-          schema: custody
-          fk_col: ssi_id
-          order_by: sequence_order
-        args:
-          - name: ssi-id
-            type: uuid
-            required: true
-            maps_to: ssi_id
-            lookup:
-              table: cbu_ssi
-              entity_type: ssi
-              schema: custody
-              search_key: ssi_name
-              primary_key: ssi_id
-        returns:
-          type: record_set
-      remove-agent-override:
-        description: Remove an agent override from SSI settlement chain
-        behavior: crud
-        metadata:
-          tier: projection
-          source_of_truth: operational
-          scope: cbu
-          writes_operational: true
-          noun: agent_override
-          internal: true
-          tags: [deprecated, use-trading-profile]
-        crud:
-          operation: delete
-          table: cbu_ssi_agent_override
-          schema: custody
-        args:
-          - name: override-id
-            type: uuid
-            required: true
-            maps_to: override_id
-        returns:
-          type: affected
+
+      # ========================================
+      # COMPOSITE - Bulk import
+      # ========================================
+
       setup-ssi:
         description: Bulk import SSIs from SSI_ONBOARDING document
         behavior: plugin
