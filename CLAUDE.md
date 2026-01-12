@@ -103,6 +103,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "single authoring surface", "projection-only", "one commit path" → `ai-thoughts/028-verb-lexicon-governance.md`
 - "pitch", "internal sell", "coalition", "bank-safe", "coexistence", "pilot" → `ai-thoughts/030-internal-pitch-strategy.md`
 - "RAG", "vector", "qdrant", "embedding", "stack audit", "round-trip", "reconciliation" → `ai-thoughts/031-rag-cleanup-stack-audit.md`
+- "corporate action", "CA policy", "election policy", "dividend", "rights issue", "proceeds SSI" → `ai-thoughts/032-corporate-actions-integration.md`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -124,6 +125,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/029-implement-verb-governance.md` - ✅ DONE - 46 verbs reclassified, 15 new verbs, idempotency tests
 - `ai-thoughts/030-internal-pitch-strategy.md` - 📝 Strategic - Bank-safe positioning, coalition building, pilot slice definition
 - `ai-thoughts/031-rag-cleanup-stack-audit.md` - 📝 **TODO** - Safe RAG cleanup + full round-trip audit (DB→verbs→Rust→DSL→agent→egui)
+- `ai-thoughts/032-corporate-actions-integration.md` - 📝 **TODO** - CA integration: ISO 15022 compliant (53 CAEV codes), migration, Rust types, intent verbs, materialize (~16h)
 
 ---
 
@@ -613,6 +615,7 @@ Never silently "guess and commit" on complex domain logic.
 | `gleif` | 15 | GLEIF LEI lookup, hierarchy import |
 | `bods` | 9 | BODS 0.4 UBO discovery, import/export |
 | `trading-profile` | 30 | Trading matrix configuration, CA policy, plan/apply |
+| `corporate-action` | 8 | CA event types (ISO 15022), preferences, instruction windows |
 | `capital` | 25 | Share classes, issuance, supply tracking |
 | `ownership` | 20 | Holdings, control, coverage, computation |
 | `dilution` | 10 | Options, warrants, convertibles, exercises |

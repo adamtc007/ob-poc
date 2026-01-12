@@ -61,6 +61,7 @@ mod threshold;
 mod tollgate_ops;
 mod trading_matrix;
 mod trading_profile;
+mod trading_profile_ca_ops;
 mod trust_ops;
 mod ubo_analysis;
 pub mod ubo_graph_ops;
@@ -158,6 +159,12 @@ pub use trading_profile::{
     TradingProfileValidateCoverageOp,
     TradingProfileValidateGoLiveReadyOp,
     TradingProfileValidateOp,
+};
+pub use trading_profile_ca_ops::{
+    TradingProfileCaAddCutoffOp, TradingProfileCaDisableEventTypesOp,
+    TradingProfileCaEnableEventTypesOp, TradingProfileCaGetPolicyOp, TradingProfileCaLinkSsiOp,
+    TradingProfileCaRemoveCutoffOp, TradingProfileCaRemoveDefaultOp, TradingProfileCaRemoveSsiOp,
+    TradingProfileCaSetDefaultOp, TradingProfileCaSetElectionOp, TradingProfileCaSetNotificationOp,
 };
 pub use ubo_analysis::{
     UboCalculateOp, UboCheckCompletenessOp, UboCompareSnapshotOp, UboDiscoverOwnerOp,
@@ -528,6 +535,19 @@ impl CustomOperationRegistry {
 
         // Clone operation
         registry.register(Arc::new(TradingProfileCloneToOp));
+
+        // Corporate Actions policy operations
+        registry.register(Arc::new(TradingProfileCaEnableEventTypesOp));
+        registry.register(Arc::new(TradingProfileCaDisableEventTypesOp));
+        registry.register(Arc::new(TradingProfileCaSetNotificationOp));
+        registry.register(Arc::new(TradingProfileCaSetElectionOp));
+        registry.register(Arc::new(TradingProfileCaSetDefaultOp));
+        registry.register(Arc::new(TradingProfileCaRemoveDefaultOp));
+        registry.register(Arc::new(TradingProfileCaAddCutoffOp));
+        registry.register(Arc::new(TradingProfileCaRemoveCutoffOp));
+        registry.register(Arc::new(TradingProfileCaLinkSsiOp));
+        registry.register(Arc::new(TradingProfileCaRemoveSsiOp));
+        registry.register(Arc::new(TradingProfileCaGetPolicyOp));
 
         // Entity query for batch template execution
         registry.register(Arc::new(EntityQueryOp));

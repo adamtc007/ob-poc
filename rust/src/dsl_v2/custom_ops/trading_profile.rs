@@ -540,6 +540,21 @@ impl CustomOperation for TradingProfileMaterializeOp {
             result.sections_materialized.push("isda".to_string());
         }
 
+        // Materialize Corporate Actions preferences
+        if sections.contains(&"corporate_actions".to_string()) {
+            if let Some(ref ca) = document.corporate_actions {
+                let created =
+                    materialize_corporate_actions(&mut tx, cbu_id, ca, &refs.ssi_name_to_id)
+                        .await?;
+                result
+                    .records_created
+                    .insert("cbu_ca_preferences".to_string(), created);
+                result
+                    .sections_materialized
+                    .push("corporate_actions".to_string());
+            }
+        }
+
         tx.commit().await?;
 
         result.duration_ms = start.elapsed().as_millis() as i64;
@@ -1005,6 +1020,173 @@ async fn materialize_isda_agreements(
             .execute(&mut **tx)
             .await?;
         }
+    }
+
+    Ok(created)
+}
+
+// =============================================================================
+// CORPORATE ACTIONS MATERIALIZATION
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn materialize_corporate_actions(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    cbu_id: Uuid,
+    ca: &ob_poc_types::trading_matrix::TradingMatrixCorporateActions,
+    ssi_name_to_id: &HashMap<String, Uuid>,
+) -> Result<i32> {
+    let mut created = 0;
+
+    // Look up event_type_ids from enabled event codes
+    let mut event_code_to_id: HashMap<String, Uuid> = HashMap::new();
+    for event_code in &ca.enabled_event_types {
+        let row: Option<(Uuid,)> = sqlx::query_as(
+            r#"SELECT event_type_id FROM custody.ca_event_types WHERE event_code = $1"#,
+        )
+        .bind(event_code)
+        .fetch_optional(&mut **tx)
+        .await?;
+
+        if let Some((event_type_id,)) = row {
+            event_code_to_id.insert(event_code.clone(), event_type_id);
+        } else {
+            tracing::warn!(event_code = %event_code, "CA event type not found in reference catalog, skipping");
+        }
+    }
+
+    // Determine processing mode from election policy
+    let processing_mode = match ca.election_policy.as_ref().map(|e| &e.elector) {
+        Some(ob_poc_types::trading_matrix::CaElector::InvestmentManager) => "AUTO_INSTRUCT",
+        Some(ob_poc_types::trading_matrix::CaElector::Admin) => "MANUAL",
+        Some(ob_poc_types::trading_matrix::CaElector::Client) => "MANUAL",
+        None => "DEFAULT_ONLY",
+    };
+
+    // Materialize preferences for each enabled event type
+    for (event_code, event_type_id) in &event_code_to_id {
+        // Find default option if specified
+        let default_election = ca
+            .default_options
+            .iter()
+            .find(|o| &o.event_type == event_code)
+            .map(|o| o.default_option.clone());
+
+        tracing::debug!(
+            event_code = %event_code,
+            processing_mode = %processing_mode,
+            "materialize_corporate_actions: inserting preference"
+        );
+
+        let result = sqlx::query(
+            r#"INSERT INTO custody.cbu_ca_preferences
+               (cbu_id, event_type_id, processing_mode, default_election, created_at)
+               VALUES ($1, $2, $3, $4, NOW())
+               ON CONFLICT (cbu_id, event_type_id, instrument_class_id)
+               DO UPDATE SET
+                   processing_mode = EXCLUDED.processing_mode,
+                   default_election = EXCLUDED.default_election,
+                   updated_at = NOW()"#,
+        )
+        .bind(cbu_id)
+        .bind(event_type_id)
+        .bind(processing_mode)
+        .bind(&default_election)
+        .execute(&mut **tx)
+        .await?;
+
+        if result.rows_affected() > 0 {
+            created += 1;
+        }
+    }
+
+    // Materialize instruction windows (cutoff rules)
+    for rule in &ca.cutoff_rules {
+        // Find event_type_id if event-specific
+        let event_type_id = rule
+            .event_type
+            .as_ref()
+            .and_then(|et| event_code_to_id.get(et))
+            .copied();
+
+        // Look up market_id if market-specific
+        let market_id: Option<Uuid> = if let Some(ref mic) = rule.market_code {
+            sqlx::query_scalar(r#"SELECT market_id FROM custody.markets WHERE mic = $1"#)
+                .bind(mic)
+                .fetch_optional(&mut **tx)
+                .await?
+        } else {
+            None
+        };
+
+        tracing::debug!(
+            market_code = ?rule.market_code,
+            days_before = rule.days_before,
+            "materialize_corporate_actions: inserting instruction window"
+        );
+
+        sqlx::query(
+            r#"INSERT INTO custody.cbu_ca_instruction_windows
+               (cbu_id, event_type_id, market_id, cutoff_days_before, warning_days, escalation_days, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW())
+               ON CONFLICT (cbu_id, event_type_id, market_id)
+               DO UPDATE SET
+                   cutoff_days_before = EXCLUDED.cutoff_days_before,
+                   warning_days = EXCLUDED.warning_days,
+                   escalation_days = EXCLUDED.escalation_days,
+                   updated_at = NOW()"#,
+        )
+        .bind(cbu_id)
+        .bind(event_type_id)
+        .bind(market_id)
+        .bind(rule.days_before)
+        .bind(rule.warning_days)
+        .bind(rule.escalation_days)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    // Materialize SSI mappings for CA proceeds
+    for mapping in &ca.proceeds_ssi_mappings {
+        // Look up SSI ID from name
+        let Some(&ssi_id) = ssi_name_to_id.get(&mapping.ssi_reference) else {
+            tracing::warn!(
+                ssi_ref = %mapping.ssi_reference,
+                "CA proceeds SSI not found in standing_instructions, skipping"
+            );
+            continue;
+        };
+
+        let proceeds_type = match mapping.proceeds_type {
+            ob_poc_types::trading_matrix::CaProceedsType::Cash => "CASH",
+            ob_poc_types::trading_matrix::CaProceedsType::Stock => "STOCK",
+        };
+
+        let currency = mapping.currency.as_deref().unwrap_or("*");
+
+        tracing::debug!(
+            proceeds_type = %proceeds_type,
+            currency = %currency,
+            ssi_ref = %mapping.ssi_reference,
+            "materialize_corporate_actions: inserting SSI mapping"
+        );
+
+        // Note: event_type_id is NULL for global mappings
+        sqlx::query(
+            r#"INSERT INTO custody.cbu_ca_ssi_mappings
+               (cbu_id, currency, proceeds_type, ssi_id, created_at)
+               VALUES ($1, $2, $3, $4, NOW())
+               ON CONFLICT (cbu_id, event_type_id, currency, proceeds_type)
+               DO UPDATE SET
+                   ssi_id = EXCLUDED.ssi_id,
+                   updated_at = NOW()"#,
+        )
+        .bind(cbu_id)
+        .bind(currency)
+        .bind(proceeds_type)
+        .bind(ssi_id)
+        .execute(&mut **tx)
+        .await?;
     }
 
     Ok(created)

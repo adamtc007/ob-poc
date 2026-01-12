@@ -1649,3 +1649,310 @@ domains:
         returns:
           type: record
           description: "{ dsl_statements: [...], pending_inputs: [...], estimated_effort: string }"
+
+      # =========================================================================
+      # CORPORATE ACTIONS POLICY (Intent - writes matrix JSONB)
+      # =========================================================================
+
+      ca.enable-event-types:
+        description: Enable CA event types for this trading profile
+        behavior: plugin
+        handler: TradingProfileCaEnableEventTypesOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            description: Trading profile ID to update
+          - name: event-types
+            type: string_list
+            required: true
+            description: "Event codes to enable: DVCA, DVOP, RHTS, TEND, MRGR, etc."
+        returns:
+          type: record
+          fields:
+            - name: enabled_count
+              type: integer
+
+      ca.disable-event-types:
+        description: Disable CA event types for this trading profile
+        behavior: plugin
+        handler: TradingProfileCaDisableEventTypesOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-types
+            type: string_list
+            required: true
+            description: "Event codes to disable"
+        returns:
+          type: affected
+
+      ca.set-notification-policy:
+        description: Configure CA notification settings
+        behavior: plugin
+        handler: TradingProfileCaSetNotificationOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: channels
+            type: string_list
+            required: true
+            description: "Notification channels: email, portal, swift"
+          - name: sla-hours
+            type: integer
+            required: false
+            default: 24
+            description: SLA hours for notification delivery
+          - name: escalation-contact
+            type: string
+            required: false
+            description: Email or contact for escalations
+        returns:
+          type: affected
+
+      ca.set-election-policy:
+        description: Configure who makes CA elections and requirements
+        behavior: plugin
+        handler: TradingProfileCaSetElectionOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: elector
+            type: string
+            required: true
+            valid_values:
+              - investment_manager
+              - admin
+              - client
+            description: Who makes election decisions
+          - name: evidence-required
+            type: boolean
+            required: false
+            default: true
+            description: Whether documentation is required for elections
+          - name: auto-instruct-threshold
+            type: decimal
+            required: false
+            description: Value threshold below which auto-instruct applies
+        returns:
+          type: affected
+
+      ca.set-default-option:
+        description: Set default election for specific event type
+        behavior: plugin
+        handler: TradingProfileCaSetDefaultOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-type
+            type: string
+            required: true
+            description: "Event code: DVOP, RHTS, TEND, EXOF, etc."
+          - name: default-option
+            type: string
+            required: true
+            valid_values:
+              - CASH
+              - STOCK
+              - ROLLOVER
+              - LAPSE
+              - DECLINE
+            description: Default election option for this event type
+        returns:
+          type: affected
+
+      ca.remove-default-option:
+        description: Remove default election for specific event type
+        behavior: plugin
+        handler: TradingProfileCaRemoveDefaultOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-type
+            type: string
+            required: true
+        returns:
+          type: affected
+
+      ca.add-cutoff-rule:
+        description: Add deadline cutoff rule for market/depository
+        behavior: plugin
+        handler: TradingProfileCaAddCutoffOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: event-type
+            type: string
+            required: false
+            description: "Event code (if rule is event-specific)"
+          - name: market-code
+            type: string
+            required: false
+            description: "MIC code (e.g., XNYS, XLON)"
+          - name: depository-code
+            type: string
+            required: false
+            description: "Depository (e.g., DTCC, CREST, EUROCLEAR)"
+          - name: days-before
+            type: integer
+            required: true
+            description: Days before market deadline for internal cutoff
+          - name: warning-days
+            type: integer
+            required: false
+            default: 3
+            description: Days before cutoff to send warning
+          - name: escalation-days
+            type: integer
+            required: false
+            default: 1
+            description: Days before cutoff to escalate
+        returns:
+          type: affected
+
+      ca.remove-cutoff-rule:
+        description: Remove cutoff rule by market/depository
+        behavior: plugin
+        handler: TradingProfileCaRemoveCutoffOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: market-code
+            type: string
+            required: false
+          - name: depository-code
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      ca.link-proceeds-ssi:
+        description: Map CA proceeds to settlement instruction
+        behavior: plugin
+        handler: TradingProfileCaLinkSsiOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy, ssi]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: proceeds-type
+            type: string
+            required: true
+            valid_values:
+              - cash
+              - stock
+            description: Type of proceeds (cash or stock)
+          - name: currency
+            type: string
+            required: false
+            description: "Currency code (if currency-specific mapping)"
+          - name: ssi-name
+            type: string
+            required: true
+            description: SSI name from standing instructions section
+        returns:
+          type: affected
+
+      ca.remove-proceeds-ssi:
+        description: Remove CA proceeds SSI mapping
+        behavior: plugin
+        handler: TradingProfileCaRemoveSsiOp
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [authoring, ca-policy, ssi]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+          - name: proceeds-type
+            type: string
+            required: true
+            valid_values:
+              - cash
+              - stock
+          - name: currency
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      ca.get-policy:
+        description: Get current CA policy configuration from trading profile
+        behavior: plugin
+        handler: TradingProfileCaGetPolicyOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
+          noun: corporate_actions
+          tags: [read, ca-policy]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+          description: "{ enabled_event_types: [...], notification_policy: {...}, election_policy: {...}, default_options: [...], cutoff_rules: [...], proceeds_ssi_mappings: [...] }"

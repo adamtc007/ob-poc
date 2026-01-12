@@ -40,6 +40,7 @@
 //!             └── CsaAgreement("VM CSA")
 //! ```
 
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 // ============================================================================
@@ -118,6 +119,136 @@ impl AsRef<[String]> for TradingMatrixNodeId {
     fn as_ref(&self) -> &[String] {
         &self.0
     }
+}
+
+// ============================================================================
+// CORPORATE ACTIONS TYPES
+// ============================================================================
+
+/// Who makes CA elections.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CaElector {
+    /// Investment manager makes elections
+    #[default]
+    InvestmentManager,
+    /// Fund administrator makes elections
+    Admin,
+    /// Client/investor makes elections directly
+    Client,
+}
+
+/// Type of CA proceeds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CaProceedsType {
+    /// Cash proceeds
+    Cash,
+    /// Stock/securities proceeds
+    Stock,
+}
+
+/// CA notification policy settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CaNotificationPolicy {
+    /// Notification channels: email, portal, swift
+    pub channels: Vec<String>,
+    /// SLA hours for notification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sla_hours: Option<i32>,
+    /// Contact for escalation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escalation_contact: Option<String>,
+}
+
+/// CA election policy settings.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CaElectionPolicy {
+    /// Who makes the election decision
+    pub elector: CaElector,
+    /// Whether evidence/documentation is required
+    #[serde(default)]
+    pub evidence_required: bool,
+    /// Value threshold below which auto-instruct applies
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_instruct_threshold: Option<Decimal>,
+}
+
+/// Default election option for a specific event type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaDefaultOption {
+    /// Event type code (e.g., "DVOP", "RHTS")
+    pub event_type: String,
+    /// Default option: CASH, STOCK, ROLLOVER, LAPSE, DECLINE
+    pub default_option: String,
+}
+
+/// Cutoff rule for specific market/depository.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaCutoffRule {
+    /// Optional event type (if rule is event-specific)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event_type: Option<String>,
+    /// Market MIC code (e.g., "XNYS")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub market_code: Option<String>,
+    /// Depository code (e.g., "DTCC", "CREST")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depository_code: Option<String>,
+    /// Days before market deadline to set internal cutoff
+    pub days_before: i32,
+    /// Days before cutoff to send warning
+    #[serde(default = "default_warning_days")]
+    pub warning_days: i32,
+    /// Days before cutoff to escalate
+    #[serde(default = "default_escalation_days")]
+    pub escalation_days: i32,
+}
+
+fn default_warning_days() -> i32 {
+    3
+}
+
+fn default_escalation_days() -> i32 {
+    1
+}
+
+/// Mapping of CA proceeds to a settlement instruction.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CaProceedsSsiMapping {
+    /// Type of proceeds (cash or stock)
+    pub proceeds_type: CaProceedsType,
+    /// Currency code (if currency-specific)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+    /// SSI name or reference
+    pub ssi_reference: String,
+}
+
+/// Corporate Actions section of the trading matrix.
+///
+/// This represents the CA policy configuration stored in the matrix JSONB.
+/// Intent verbs write here; materialize projects to operational tables.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TradingMatrixCorporateActions {
+    /// Enabled event type codes (e.g., ["DVCA", "DVOP", "RHTS"])
+    #[serde(default)]
+    pub enabled_event_types: Vec<String>,
+    /// Notification policy settings
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notification_policy: Option<CaNotificationPolicy>,
+    /// Election policy settings
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub election_policy: Option<CaElectionPolicy>,
+    /// Default election options per event type
+    #[serde(default)]
+    pub default_options: Vec<CaDefaultOption>,
+    /// Cutoff/deadline rules
+    #[serde(default)]
+    pub cutoff_rules: Vec<CaCutoffRule>,
+    /// Proceeds SSI mappings
+    #[serde(default)]
+    pub proceeds_ssi_mappings: Vec<CaProceedsSsiMapping>,
 }
 
 // ============================================================================
@@ -425,6 +556,60 @@ pub enum TradingMatrixNodeType {
         #[serde(skip_serializing_if = "Option::is_none")]
         price_type: Option<String>,
     },
+
+    // ========================================================================
+    // CORPORATE ACTIONS LAYER
+    // ========================================================================
+    /// Corporate actions policy summary node
+    CorporateActionsPolicy {
+        /// Number of enabled event types
+        enabled_count: usize,
+        /// Whether custom election defaults exist
+        has_custom_elections: bool,
+        /// Whether cutoff rules are configured
+        has_cutoff_rules: bool,
+        /// Elector type: investment_manager, admin, client
+        #[serde(skip_serializing_if = "Option::is_none")]
+        elector: Option<String>,
+    },
+
+    /// Individual CA event type configuration
+    CaEventTypeConfig {
+        /// Event type code (e.g., "DVCA", "DVOP")
+        event_code: String,
+        /// Event type name (e.g., "Cash Dividend")
+        event_name: String,
+        /// Processing mode: AUTO_INSTRUCT, MANUAL, DEFAULT_ONLY, THRESHOLD
+        processing_mode: String,
+        /// Default election option if applicable
+        #[serde(skip_serializing_if = "Option::is_none")]
+        default_option: Option<String>,
+        /// Whether this event type is elective
+        is_elective: bool,
+    },
+
+    /// CA cutoff rule node
+    CaCutoffRuleNode {
+        /// Rule identifier (market or depository code)
+        rule_key: String,
+        /// Days before market deadline
+        days_before: i32,
+        /// Warning days
+        warning_days: i32,
+        /// Escalation days
+        escalation_days: i32,
+    },
+
+    /// CA proceeds SSI mapping node
+    CaProceedsMappingNode {
+        /// Proceeds type: cash or stock
+        proceeds_type: String,
+        /// Currency (if specified)
+        #[serde(skip_serializing_if = "Option::is_none")]
+        currency: Option<String>,
+        /// Target SSI name
+        ssi_reference: String,
+    },
 }
 
 /// Match criteria for booking rules (for display/debugging)
@@ -646,6 +831,10 @@ pub struct TradingMatrixDocument {
     /// Last modified timestamp (ISO 8601)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated_at: Option<String>,
+
+    /// Corporate actions configuration (stored as typed field for direct access)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub corporate_actions: Option<TradingMatrixCorporateActions>,
 }
 
 /// Document lifecycle status.
@@ -674,6 +863,7 @@ impl TradingMatrixDocument {
             metadata: TradingMatrixMetadata::default(),
             created_at: None,
             updated_at: None,
+            corporate_actions: None,
         }
     }
 
@@ -960,6 +1150,7 @@ pub mod categories {
     pub const ISDA: &str = "ISDA Agreements";
     pub const PRICING: &str = "Pricing Configuration";
     pub const MANAGERS: &str = "Investment Managers";
+    pub const CORPORATE_ACTIONS: &str = "Corporate Actions";
 }
 
 // ============================================================================

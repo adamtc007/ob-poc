@@ -165,6 +165,7 @@ pub async fn create_draft_profile(
             pricing_matrix: vec![],
             valuation_config: None,
             constraints: None,
+            corporate_actions: None,
             metadata: Some(ProfileMetadata {
                 source: Some("DSL".to_string()),
                 source_ref: None,

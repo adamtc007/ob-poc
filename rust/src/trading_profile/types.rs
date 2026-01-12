@@ -75,6 +75,10 @@ pub struct TradingProfileDocument {
     #[serde(default)]
     pub constraints: Option<TradingConstraints>,
 
+    /// Corporate actions policy configuration
+    #[serde(default)]
+    pub corporate_actions: Option<ob_poc_types::trading_matrix::TradingMatrixCorporateActions>,
+
     /// Metadata
     #[serde(default)]
     pub metadata: Option<ProfileMetadata>,
@@ -688,6 +692,9 @@ pub struct TradingProfileImport {
     pub constraints: Option<TradingConstraints>,
 
     #[serde(default)]
+    pub corporate_actions: Option<ob_poc_types::trading_matrix::TradingMatrixCorporateActions>,
+
+    #[serde(default)]
     pub metadata: Option<ProfileMetadata>,
 }
 
@@ -708,6 +715,7 @@ impl TradingProfileImport {
             pricing_matrix: self.pricing_matrix,
             valuation_config: self.valuation_config,
             constraints: self.constraints,
+            corporate_actions: self.corporate_actions,
             metadata: self.metadata,
         }
     }
