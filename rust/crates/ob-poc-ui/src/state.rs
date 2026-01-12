@@ -853,23 +853,12 @@ impl AppState {
             state.loading_session = false;
             match result {
                 Ok(session) => {
-                    // Check if DSL content is present - use the SINGLE source: session.dsl
-                    let has_dsl = session
-                        .dsl
-                        .as_ref()
-                        .and_then(|d| d.source.as_ref())
-                        .map(|s| !s.is_empty())
-                        .unwrap_or(false);
+                    // Check if DSL content is present
+                    let has_dsl = session.has_dsl();
 
-                    // Sync DSL editor from session.dsl if server has content and we're not dirty
-                    if !self.buffers.dsl_dirty {
-                        if let Some(ref dsl_state) = session.dsl {
-                            if let Some(ref source) = dsl_state.source {
-                                if !source.is_empty() {
-                                    self.buffers.dsl_editor = source.clone();
-                                }
-                            }
-                        }
+                    // Sync DSL editor from session.combined_dsl if server has content and we're not dirty
+                    if !self.buffers.dsl_dirty && has_dsl {
+                        self.buffers.dsl_editor = session.combined_dsl.clone();
                     }
 
                     // If DSL is present and no resolution active, trigger resolution check
@@ -1247,8 +1236,8 @@ impl AppState {
         drop(state); // Release lock before accessing self
         self.session
             .as_ref()
-            .and_then(|s| s.active_cbu.as_ref())
-            .and_then(|cbu| Uuid::parse_str(&cbu.id).ok())
+            .and_then(|s| s.active_cbu_id())
+            .and_then(|id| Uuid::parse_str(&id).ok())
     }
 
     /// Check if trading matrix refetch is needed and return the CBU ID to fetch
@@ -1275,8 +1264,8 @@ impl AppState {
         drop(state); // Release lock before accessing self
         self.session
             .as_ref()
-            .and_then(|s| s.active_cbu.as_ref())
-            .and_then(|cbu| Uuid::parse_str(&cbu.id).ok())
+            .and_then(|s| s.active_cbu_id())
+            .and_then(|id| Uuid::parse_str(&id).ok())
     }
 
     /// Check if context refetch is needed and return true if so
@@ -2031,21 +2020,17 @@ impl AppState {
 
     /// Get DSL source from session or editor buffer
     ///
-    /// Priority: editor buffer (user editing) > session.dsl.source (server state)
+    /// Priority: editor buffer (user editing) > session.combined_dsl (server state)
     pub fn get_dsl_source(&self) -> Option<String> {
         // First try the editor buffer if it has content
         if !self.buffers.dsl_editor.trim().is_empty() {
             return Some(self.buffers.dsl_editor.clone());
         }
 
-        // Then try session's DslState.source - the SINGLE source of truth
+        // Then try session's combined_dsl
         if let Some(ref session) = self.session {
-            if let Some(ref dsl_state) = session.dsl {
-                if let Some(ref source) = dsl_state.source {
-                    if !source.trim().is_empty() {
-                        return Some(source.clone());
-                    }
-                }
+            if session.has_dsl() {
+                return Some(session.combined_dsl.clone());
             }
         }
 
@@ -2304,8 +2289,8 @@ impl AppState {
         let cbu_id = self
             .session
             .as_ref()
-            .and_then(|s| s.active_cbu.as_ref())
-            .and_then(|cbu| uuid::Uuid::parse_str(&cbu.id).ok());
+            .and_then(|s| s.active_cbu_id())
+            .and_then(|id| uuid::Uuid::parse_str(&id).ok());
 
         let entry = NavigationLogEntry {
             dsl,

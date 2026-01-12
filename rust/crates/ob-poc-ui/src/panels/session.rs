@@ -35,18 +35,19 @@ pub fn session_panel(ui: &mut Ui, state: &mut AppState) {
 
             // Active CBU context
             if let Some(ref session) = state.session {
-                if let Some(ref cbu) = session.active_cbu {
+                if let Some(cbu_name) = session.active_cbu_name() {
                     ui.horizontal(|ui| {
                         ui.label("CBU:");
-                        ui.strong(&cbu.name);
+                        ui.strong(&cbu_name);
                     });
                 }
 
-                // Symbol bindings (HashMap<String, BoundEntityInfo>)
-                if !session.bindings.is_empty() {
+                // Symbol bindings from context
+                let bindings = session.get_bindings();
+                if !bindings.is_empty() {
                     ui.add_space(4.0);
                     ui.label(egui::RichText::new("Bindings:").small().strong());
-                    for (name, entity) in &session.bindings {
+                    for (name, entity) in &bindings {
                         ui.horizontal(|ui| {
                             ui.label(
                                 egui::RichText::new(format!("@{}", name))
@@ -58,22 +59,18 @@ pub fn session_panel(ui: &mut Ui, state: &mut AppState) {
                     }
                 }
 
-                // Pending DSL preview - use DslState
-                if let Some(ref dsl_state) = session.dsl {
-                    if let Some(ref source) = dsl_state.source {
-                        if !source.is_empty() {
-                            ui.add_space(4.0);
-                            ui.label(egui::RichText::new("Pending DSL:").small().strong());
-                            // Show first 100 chars with ellipsis
-                            let preview: String = source.chars().take(100).collect();
-                            let display = if source.len() > 100 {
-                                format!("{}...", preview)
-                            } else {
-                                preview
-                            };
-                            ui.label(egui::RichText::new(display).monospace().small());
-                        }
-                    }
+                // Pending DSL preview - use combined_dsl
+                if session.has_dsl() {
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new("Pending DSL:").small().strong());
+                    // Show first 100 chars with ellipsis
+                    let preview: String = session.combined_dsl.chars().take(100).collect();
+                    let display = if session.combined_dsl.len() > 100 {
+                        format!("{}...", preview)
+                    } else {
+                        preview
+                    };
+                    ui.label(egui::RichText::new(display).monospace().small());
                 }
 
                 // Session state

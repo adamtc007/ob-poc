@@ -471,13 +471,7 @@ fn render_resolved_ref(ui: &mut Ui, resolved: &ResolvedRefResponse) {
 
 fn has_dsl_content(state: &AppState) -> bool {
     !state.buffers.dsl_editor.trim().is_empty()
-        || state
-            .session
-            .as_ref()
-            .and_then(|s| s.dsl.as_ref())
-            .and_then(|d| d.source.as_ref())
-            .map(|s| !s.trim().is_empty())
-            .unwrap_or(false)
+        || state.session.as_ref().map(|s| s.has_dsl()).unwrap_or(false)
 }
 
 fn render_dsl_section(ui: &mut Ui, state: &mut AppState) {
@@ -570,8 +564,7 @@ fn render_input_area(ui: &mut Ui, state: &mut AppState) {
         let can_execute = state
             .session
             .as_ref()
-            .and_then(|s| s.dsl.as_ref())
-            .map(|d| d.can_execute)
+            .map(|s| s.can_execute)
             .unwrap_or(false)
             && !is_loading
             && has_dsl_content(state);
@@ -609,9 +602,9 @@ fn render_input_area(ui: &mut Ui, state: &mut AppState) {
                     .color(Color32::DARK_GRAY),
             );
 
-            if let Some(ref cbu) = session.active_cbu {
+            if let Some(cbu_name) = session.active_cbu_name() {
                 ui.label(
-                    RichText::new(format!("| CBU: {}", cbu.name))
+                    RichText::new(format!("| CBU: {}", cbu_name))
                         .small()
                         .color(Color32::DARK_GRAY),
                 );

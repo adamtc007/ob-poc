@@ -233,11 +233,7 @@ impl App {
             // Build investigation context from current app state
             let context = InvestigationContext {
                 focused_entity_id: self.state.graph_widget.selected_entity_id(),
-                current_cbu_id: self
-                    .state
-                    .session
-                    .as_ref()
-                    .and_then(|s| s.active_cbu.as_ref().map(|cbu| cbu.id.clone())),
+                current_cbu_id: self.state.session.as_ref().and_then(|s| s.active_cbu_id()),
                 current_view_mode: self.state.graph_widget.view_mode(),
                 current_zoom: 1.0,
                 selected_entities: self
@@ -1668,27 +1664,12 @@ impl eframe::App for App {
                     ui.heading("Server Session");
                     if let Some(ref session) = self.state.session {
                         ui.label(format!("state: {:?}", session.state));
+                        ui.label(format!("can_execute: {}", session.can_execute));
                         ui.label(format!(
-                            "can_execute: {}",
-                            session.dsl.as_ref().map(|d| d.can_execute).unwrap_or(false)
+                            "combined_dsl: {:?}",
+                            session.combined_dsl.chars().take(50).collect::<String>()
                         ));
-                        ui.label(format!(
-                            "dsl source: {:?}",
-                            session
-                                .dsl
-                                .as_ref()
-                                .and_then(|d| d.source.as_ref())
-                                .map(|s| { s.chars().take(50).collect::<String>() })
-                        ));
-                        ui.label(format!(
-                            "dsl source len: {}",
-                            session
-                                .dsl
-                                .as_ref()
-                                .and_then(|d| d.source.as_ref())
-                                .map(|s| s.len())
-                                .unwrap_or(0)
-                        ));
+                        ui.label(format!("combined_dsl len: {}", session.combined_dsl.len()));
                     } else {
                         ui.label("No session data");
                     }
@@ -1765,8 +1746,7 @@ impl eframe::App for App {
                     .state
                     .session
                     .as_ref()
-                    .and_then(|s| s.active_cbu.as_ref())
-                    .map(|c| c.name.clone()),
+                    .and_then(|s| s.active_cbu_name()),
                 view_mode: self.state.view_mode,
                 view_level: self.state.view_level,
                 last_error,

@@ -124,9 +124,9 @@ pub fn dsl_editor_panel(ui: &mut Ui, state: &mut AppState) -> DslEditorAction {
             ui.label(RichText::new(format!("{} lines", line_count)).small());
 
             if let Some(ref session) = state.session {
-                if let Some(ref cbu) = session.active_cbu {
+                if let Some(cbu_name) = session.active_cbu_name() {
                     ui.separator();
-                    ui.label(RichText::new(format!("@cbu: {}", cbu.name)).small());
+                    ui.label(RichText::new(format!("@cbu: {}", cbu_name)).small());
                 }
             }
         });

@@ -8,6 +8,7 @@
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
 > **Verb Tiering:** ✅ Complete - 817 verbs tagged with tier metadata
+> **Verb Governance:** 📝 Planned - Mandatory metadata, deprecation flow, lint enforcement (028)
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 
 This file provides guidance to Claude Code when working with this repository.
@@ -40,6 +41,7 @@ This file provides guidance to Claude Code when working with this repository.
 | **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
 | **Entity Resolution Plan** | `ai-thoughts/026-entity-resolution-implementation-plan.md` | ⚠️ **IN PROGRESS** - Sub-session architecture, 4-phase implementation |
 | **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Types + linter + 817 verbs tagged with tier metadata |
+| **Verb Lexicon Governance** | `ai-thoughts/028-verb-lexicon-governance.md` | 📝 **TODO** - Mandatory metadata, deprecation flow, matrix-first enforcement |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
 
 > **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
@@ -95,6 +97,9 @@ This file provides guidance to Claude Code when working with this repository.
 - "trading matrix", "instrument taxonomy", "materialize", "canonical" → `ai-thoughts/027-*`
 - "entity resolution", "disambiguation", "unresolved ref", "batch resolve" → `ai-thoughts/025-entity-disambiguation-ux.md`, `ai-thoughts/026-entity-resolution-implementation-plan.md`
 - "sub-session", "resolution modal", "inline popup" → `ai-thoughts/026-entity-resolution-implementation-plan.md`
+- "verb governance", "deprecation", "verb lifecycle", "mandatory metadata" → `ai-thoughts/028-verb-lexicon-governance.md`
+- "lint rules", "verb linter", "MINIMAL/BASIC/STANDARD" → `ai-thoughts/028-verb-lexicon-governance.md`
+- "single authoring surface", "projection-only", "one commit path" → `ai-thoughts/028-verb-lexicon-governance.md`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -112,6 +117,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
 - `ai-thoughts/026-entity-resolution-implementation-plan.md` - ⚠️ **IN PROGRESS** - Sub-session architecture, parent-child context inheritance
 - `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ DONE - Types, linter, 817 verbs tagged with tier metadata
+- `ai-thoughts/028-verb-lexicon-governance.md` - 📝 **TODO** - Mandatory metadata, deprecation, lint tiers, matrix-first enforcement
 
 ---
 

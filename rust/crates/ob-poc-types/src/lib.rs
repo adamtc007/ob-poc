@@ -108,7 +108,7 @@ pub struct BoundEntityInfo {
     pub entity_type: String, // e.g., "cbu", "entity"
 }
 
-/// Session state response - the SINGLE source of truth for session state
+/// Session state response - matches server's SessionStateResponse in session.rs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStateResponse {
     #[serde(deserialize_with = "deserialize_uuid_or_string")]
@@ -130,30 +130,76 @@ pub struct SessionStateResponse {
     #[serde(default)]
     pub message_count: usize,
 
-    /// DSL state - the SINGLE source of truth for all DSL content
+    /// Pending intents awaiting validation
     #[serde(default)]
-    pub dsl: Option<DslState>,
+    pub pending_intents: Vec<serde_json::Value>,
 
-    /// Active CBU for this session (if set via bind)
+    /// Assembled DSL statements (list of DSL strings)
     #[serde(default)]
-    pub active_cbu: Option<BoundEntityInfo>,
+    pub assembled_dsl: Vec<String>,
 
-    /// Named bindings available in the session (typed, not serde_json::Value)
+    /// Combined DSL (all statements joined)
     #[serde(default)]
-    pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
+    pub combined_dsl: String,
 
-    /// Session context (typed)
+    /// Session context
     #[serde(default)]
-    pub context: Option<SessionContextInfo>,
+    pub context: serde_json::Value,
 
-    /// Chat messages (typed)
+    /// Conversation history
     #[serde(default)]
-    pub messages: Option<Vec<ChatMessage>>,
+    pub messages: Vec<ChatMessage>,
+
+    /// Whether the session can execute
+    #[serde(default)]
+    pub can_execute: bool,
 
     /// Session version (ISO timestamp from server's updated_at)
     /// UI uses this to detect external changes (MCP/REPL modifying session)
     #[serde(default)]
     pub version: Option<String>,
+}
+
+impl SessionStateResponse {
+    /// Get combined DSL source (for UI compatibility)
+    pub fn dsl_source(&self) -> Option<&str> {
+        if self.combined_dsl.is_empty() {
+            None
+        } else {
+            Some(&self.combined_dsl)
+        }
+    }
+
+    /// Check if there's any DSL content
+    pub fn has_dsl(&self) -> bool {
+        !self.combined_dsl.is_empty()
+    }
+
+    /// Get active CBU name from context (if set)
+    pub fn active_cbu_name(&self) -> Option<String> {
+        self.context
+            .get("active_cbu")
+            .and_then(|cbu| cbu.get("name"))
+            .and_then(|n| n.as_str())
+            .map(|s| s.to_string())
+    }
+
+    /// Get active CBU ID from context (if set)
+    pub fn active_cbu_id(&self) -> Option<String> {
+        self.context
+            .get("active_cbu")
+            .and_then(|cbu| cbu.get("id"))
+            .and_then(|id| id.as_str())
+            .map(|s| s.to_string())
+    }
+
+    /// Get bindings from context
+    pub fn get_bindings(&self) -> std::collections::HashMap<String, BoundEntityInfo> {
+        self.context
+            .get("bindings")
+            .and_then(|b| serde_json::from_value(b.clone()).ok())
+            .unwrap_or_default()
+    }
 }
 
 /// Session context information
@@ -175,19 +221,27 @@ pub struct SessionContextInfo {
 /// Chat message in conversation history
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
+    /// Unique message ID
+    #[serde(default)]
+    pub id: Option<String>,
+
     /// Message role
     pub role: ChatMessageRole,
 
     /// Message content
     pub content: String,
 
-    /// Timestamp (ISO 8601)
+    /// Timestamp (ISO 8601 or DateTime)
     #[serde(default)]
     pub timestamp: Option<String>,
 
-    /// DSL associated with this message (if agent response with DSL)
+    /// Intents extracted from this message (if user message processed)
     #[serde(default)]
-    pub dsl: Option<DslState>,
+    pub intents: Option<serde_json::Value>,
+
+    /// DSL generated from this message (if any) - server sends String, not DslState
+    #[serde(default)]
+    pub dsl: Option<String>,
 }
 
 /// Chat message role
@@ -342,7 +396,7 @@ pub struct ChatResponse {
     pub commands: Option<Vec<AgentCommand>>,
 }
 
-/// Session state enum for typed responses
+/// Session state enum for typed responses - matches server's SessionState
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionStateEnum {
@@ -352,7 +406,7 @@ pub enum SessionStateEnum {
     ReadyToExecute,
     Executing,
     Executed,
-    Error,
+    Closed,
 }
 
 /// SSE stream event - tagged enum for discrimination
