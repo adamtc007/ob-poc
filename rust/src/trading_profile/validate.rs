@@ -195,6 +195,7 @@ mod tests {
             pricing_matrix: vec![],
             valuation_config: None,
             constraints: None,
+            corporate_actions: None,
             metadata: None,
         }
     }

@@ -49,7 +49,7 @@ mod regulatory_ops;
 mod request_ops;
 mod research_workflow_ops;
 mod resource_ops;
-mod rfi;
+
 mod screening_ops;
 mod semantic_ops;
 mod session_ops;
@@ -57,7 +57,7 @@ mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
 mod temporal_ops;
-mod threshold;
+
 mod tollgate_ops;
 mod trading_matrix;
 mod trading_profile;
@@ -67,7 +67,6 @@ mod ubo_analysis;
 pub mod ubo_graph_ops;
 mod verify_ops;
 mod view_ops;
-mod viewport_ops;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -92,10 +91,7 @@ pub use lifecycle_ops::{
     LifecycleGeneratePlanOp, LifecycleProvisionOp,
 };
 pub use matrix_overlay_ops::{MatrixCompareProductsOp, MatrixEffectiveOp, MatrixUnifiedGapsOp};
-pub use onboarding::{
-    OnboardingAutoCompleteOp, OnboardingEnsureOp, OnboardingExecuteOp, OnboardingGetUrlsOp,
-    OnboardingPlanOp, OnboardingShowPlanOp, OnboardingStatusOp,
-};
+pub use onboarding::OnboardingAutoCompleteOp;
 pub use refdata_loader::{
     get_refdata_operations, LoadAllRefdataOp, LoadInstrumentClassesOp, LoadMarketsOp,
     LoadSlaTemplatesOp, LoadSubcustodiansOp,
@@ -105,7 +101,7 @@ pub use request_ops::{
     RequestEscalateOp, RequestExtendOp, RequestFulfillOp, RequestOverdueOp, RequestRemindOp,
     RequestWaiveOp,
 };
-pub use rfi::{RfiCheckCompletionOp, RfiGenerateOp, RfiListByCaseOp};
+
 pub use semantic_ops::{
     SemanticListStagesOp, SemanticMissingEntitiesOp, SemanticNextActionsOp,
     SemanticPromptContextOp, SemanticStagesForProductOp, SemanticStateOp,
@@ -118,47 +114,21 @@ pub use temporal_ops::{
     TemporalCompareOwnershipOp, TemporalEntityHistoryOp, TemporalOwnershipAsOfOp,
     TemporalRelationshipHistoryOp, TemporalUboChainAsOfOp,
 };
-pub use threshold::{ThresholdCheckEntityOp, ThresholdDeriveOp, ThresholdEvaluateOp};
+
 pub use trading_matrix::{FindImForTradeOp, FindPricingForInstrumentOp, ListOpenSlaBreachesOp};
 pub use trading_profile::{
-    TradingProfileActivateOp,
-    TradingProfileAddAllowedCurrencyOp,
-    TradingProfileAddBookingRuleOp,
-    TradingProfileAddCsaCollateralOp,
-    TradingProfileAddCsaConfigOp,
-    TradingProfileAddImMandateOp,
-    TradingProfileAddInstrumentClassOp,
-    TradingProfileAddIsdaConfigOp,
-    TradingProfileAddIsdaCoverageOp,
-    TradingProfileAddMarketOp,
-    TradingProfileAddSsiOp,
-    TradingProfileApproveOp,
-    TradingProfileArchiveOp,
-    TradingProfileCloneToOp,
-    TradingProfileCreateDraftOp,
-    // Versioned lifecycle: create new version from ACTIVE
-    TradingProfileCreateNewVersionOp,
-    TradingProfileDiffOp,
-    TradingProfileGetActiveOp,
-    TradingProfileImportOp,
-    TradingProfileLinkCsaSsiOp,
-    // Versioned lifecycle: mark as ops-validated (DRAFT → VALIDATED)
-    TradingProfileMarkValidatedOp,
-    TradingProfileMaterializeOp,
-    TradingProfileRejectOp,
-    TradingProfileRemoveBookingRuleOp,
-    TradingProfileRemoveImMandateOp,
-    TradingProfileRemoveInstrumentClassOp,
-    TradingProfileRemoveMarketOp,
-    TradingProfileRemoveSsiOp,
-    TradingProfileSetBaseCurrencyOp,
-    // Phase 6: Lifecycle operations
-    TradingProfileSubmitOp,
-    TradingProfileSyncFromOperationalOp,
-    TradingProfileUpdateImScopeOp,
-    TradingProfileValidateCoverageOp,
+    TradingProfileActivateOp, TradingProfileAddAllowedCurrencyOp, TradingProfileAddBookingRuleOp,
+    TradingProfileAddCsaCollateralOp, TradingProfileAddCsaConfigOp, TradingProfileAddImMandateOp,
+    TradingProfileAddInstrumentClassOp, TradingProfileAddIsdaConfigOp,
+    TradingProfileAddIsdaCoverageOp, TradingProfileAddMarketOp, TradingProfileAddSsiOp,
+    TradingProfileApproveOp, TradingProfileArchiveOp, TradingProfileCloneToOp,
+    TradingProfileCreateDraftOp, TradingProfileCreateNewVersionOp, TradingProfileDiffOp,
+    TradingProfileGetActiveOp, TradingProfileImportOp, TradingProfileLinkCsaSsiOp,
+    TradingProfileMaterializeOp, TradingProfileRejectOp, TradingProfileRemoveBookingRuleOp,
+    TradingProfileRemoveImMandateOp, TradingProfileRemoveInstrumentClassOp,
+    TradingProfileRemoveMarketOp, TradingProfileRemoveSsiOp, TradingProfileSetBaseCurrencyOp,
+    TradingProfileSubmitOp, TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
     TradingProfileValidateGoLiveReadyOp,
-    TradingProfileValidateOp,
 };
 pub use trading_profile_ca_ops::{
     TradingProfileCaAddCutoffOp, TradingProfileCaDisableEventTypesOp,
@@ -166,10 +136,7 @@ pub use trading_profile_ca_ops::{
     TradingProfileCaRemoveCutoffOp, TradingProfileCaRemoveDefaultOp, TradingProfileCaRemoveSsiOp,
     TradingProfileCaSetDefaultOp, TradingProfileCaSetElectionOp, TradingProfileCaSetNotificationOp,
 };
-pub use ubo_analysis::{
-    UboCalculateOp, UboCheckCompletenessOp, UboCompareSnapshotOp, UboDiscoverOwnerOp,
-    UboInferChainOp, UboListOwnersOp, UboSnapshotCbuOp, UboSupersedeOp, UboTraceChainsOp,
-};
+pub use ubo_analysis::{UboCalculateOp, UboListOwnersOp, UboTraceChainsOp};
 
 // Domain-specific operation modules
 pub use attribute_ops::{
@@ -183,7 +150,7 @@ pub use cbu_role_ops::{
     CbuRoleAssignServiceOp, CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
 };
 pub use document_ops::{DocumentCatalogOp, DocumentExtractOp};
-pub use entity_ops::{EntityCreateOp, EntityGhostOp, EntityIdentifyOp, EntityRenameOp};
+pub use entity_ops::{EntityGhostOp, EntityIdentifyOp};
 pub use observation_ops::{
     DocumentExtractObservationsOp, ObservationFromDocumentOp, ObservationGetCurrentOp,
     ObservationReconcileOp, ObservationVerifyAllegationsOp,
@@ -194,28 +161,7 @@ pub use resource_ops::{
 };
 pub use screening_ops::{ScreeningAdverseMediaOp, ScreeningPepOp, ScreeningSanctionsOp};
 pub use ubo_graph_ops::{
-    // Phase 6: Decision & review
-    KycDecisionOp,
-    // Phase 2: Graph building
-    UboAllegeOp,
-    // Phase 4: Assertions
-    UboAssertOp,
-    UboConvergenceSupersedeOp,
-    // Phase 5: Evaluation
-    UboEvaluateOp,
-    UboLinkProofOp,
-    // Phase 7: Removal operations
-    UboMarkDeceasedOp,
-    UboMarkDirtyOp,
-    UboRemoveEdgeOp,
-    UboScheduleReviewOp,
-    UboStatusOp,
-    UboTransferControlOp,
-    UboTraverseOp,
-    UboUpdateAllegationOp,
-    // Phase 3: Verification & convergence
-    UboVerifyOp,
-    UboWaiveVerificationOp,
+    UboConvergenceSupersedeOp, UboMarkDeceasedOp, UboTransferControlOp, UboWaiveVerificationOp,
 };
 
 // Team operations (only transfer-member needs plugin, others are CRUD)
@@ -263,12 +209,6 @@ pub use view_ops::{
     ViewXrayOp,
     ViewZoomInOp,
     ViewZoomOutOp,
-};
-
-// Viewport operations (viewport state management for Decker/Esper navigation)
-pub use viewport_ops::{
-    ViewportAscendOp, ViewportCameraOp, ViewportClearOp, ViewportDescendOp, ViewportEnhanceOp,
-    ViewportFilterOp, ViewportFocusOp, ViewportTrackOp, ViewportViewTypeOp,
 };
 
 // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
@@ -354,10 +294,8 @@ impl CustomOperationRegistry {
         };
 
         // Register built-in custom operations
-        registry.register(Arc::new(EntityCreateOp));
         registry.register(Arc::new(EntityGhostOp));
         registry.register(Arc::new(EntityIdentifyOp));
-        registry.register(Arc::new(EntityRenameOp));
         registry.register(Arc::new(DocumentCatalogOp));
         registry.register(Arc::new(DocumentExtractOp));
 
@@ -427,11 +365,6 @@ impl CustomOperationRegistry {
         // Document extraction to observations
         registry.register(Arc::new(DocumentExtractObservationsOp));
 
-        // Threshold operations (Phase 2)
-        registry.register(Arc::new(ThresholdDeriveOp));
-        registry.register(Arc::new(ThresholdEvaluateOp));
-        registry.register(Arc::new(ThresholdCheckEntityOp));
-
         // Semantic stage operations (onboarding journey progress tracking)
         registry.register(Arc::new(SemanticStateOp));
         registry.register(Arc::new(SemanticListStagesOp));
@@ -440,52 +373,17 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(SemanticMissingEntitiesOp));
         registry.register(Arc::new(SemanticPromptContextOp));
 
-        // RFI operations (Phase 3) - works with existing kyc.doc_requests
-        registry.register(Arc::new(RfiGenerateOp));
-        registry.register(Arc::new(RfiCheckCompletionOp));
-        registry.register(Arc::new(RfiListByCaseOp));
-
-        // UBO Analysis operations (Phase 4)
-        registry.register(Arc::new(UboDiscoverOwnerOp));
-        registry.register(Arc::new(UboInferChainOp));
+        // UBO Analysis operations
         registry.register(Arc::new(UboTraceChainsOp));
         registry.register(Arc::new(UboListOwnersOp));
-        registry.register(Arc::new(UboCheckCompletenessOp));
-        registry.register(Arc::new(UboSupersedeOp));
-        registry.register(Arc::new(UboSnapshotCbuOp));
-        registry.register(Arc::new(UboCompareSnapshotOp));
 
-        // UBO Graph/Convergence operations (KYC convergence model)
-        // Phase 2: Graph building
-        registry.register(Arc::new(UboAllegeOp));
-        registry.register(Arc::new(UboLinkProofOp));
-        registry.register(Arc::new(UboUpdateAllegationOp));
-        registry.register(Arc::new(UboRemoveEdgeOp));
-        // Phase 3: Verification & convergence
-        registry.register(Arc::new(UboVerifyOp));
-        registry.register(Arc::new(UboStatusOp));
-        // Phase 4: Assertions
-        registry.register(Arc::new(UboAssertOp));
-        // Phase 5: Evaluation
-        registry.register(Arc::new(UboEvaluateOp));
-        registry.register(Arc::new(UboTraverseOp));
-        // Phase 6: Decision & review
-        registry.register(Arc::new(KycDecisionOp));
-        registry.register(Arc::new(UboMarkDirtyOp));
-        registry.register(Arc::new(UboScheduleReviewOp));
-        // Phase 7: Removal operations
+        // UBO lifecycle operations
         registry.register(Arc::new(UboMarkDeceasedOp));
         registry.register(Arc::new(UboConvergenceSupersedeOp));
         registry.register(Arc::new(UboTransferControlOp));
         registry.register(Arc::new(UboWaiveVerificationOp));
 
-        // Onboarding operations (Terraform-like resource provisioning with dependencies)
-        registry.register(Arc::new(OnboardingPlanOp));
-        registry.register(Arc::new(OnboardingShowPlanOp));
-        registry.register(Arc::new(OnboardingExecuteOp));
-        registry.register(Arc::new(OnboardingStatusOp));
-        registry.register(Arc::new(OnboardingGetUrlsOp));
-        registry.register(Arc::new(OnboardingEnsureOp));
+        // Onboarding operations
         registry.register(Arc::new(OnboardingAutoCompleteOp));
 
         // Trading Profile operations
@@ -493,7 +391,6 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(TradingProfileGetActiveOp));
         registry.register(Arc::new(TradingProfileActivateOp));
         registry.register(Arc::new(TradingProfileMaterializeOp));
-        registry.register(Arc::new(TradingProfileValidateOp));
         // Document construction operations (Phase 1)
         registry.register(Arc::new(TradingProfileCreateDraftOp));
         registry.register(Arc::new(TradingProfileAddInstrumentClassOp));
@@ -518,7 +415,6 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(TradingProfileAddAllowedCurrencyOp));
         // Sync operations (Phase 4)
         registry.register(Arc::new(TradingProfileDiffOp));
-        registry.register(Arc::new(TradingProfileSyncFromOperationalOp));
         // Validation operations (Phase 5)
         registry.register(Arc::new(TradingProfileValidateCoverageOp));
         registry.register(Arc::new(TradingProfileValidateGoLiveReadyOp));
@@ -531,7 +427,6 @@ impl CustomOperationRegistry {
 
         // Versioned document lifecycle operations (Phase 7)
         registry.register(Arc::new(TradingProfileCreateNewVersionOp));
-        registry.register(Arc::new(TradingProfileMarkValidatedOp));
 
         // Clone operation
         registry.register(Arc::new(TradingProfileCloneToOp));
@@ -698,17 +593,6 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ViewDetailOp));
         registry.register(Arc::new(ViewContextOp));
 
-        // Viewport operations (viewport state management for Decker/Esper navigation)
-        registry.register(Arc::new(ViewportFocusOp));
-        registry.register(Arc::new(ViewportEnhanceOp));
-        registry.register(Arc::new(ViewportAscendOp));
-        registry.register(Arc::new(ViewportDescendOp));
-        registry.register(Arc::new(ViewportCameraOp));
-        registry.register(Arc::new(ViewportFilterOp));
-        registry.register(Arc::new(ViewportTrackOp));
-        registry.register(Arc::new(ViewportClearOp));
-        registry.register(Arc::new(ViewportViewTypeOp));
-
         // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
         // Capital operations (share class transfers, reconciliation, ownership chains)
         registry.register(Arc::new(CapitalTransferOp));
@@ -822,7 +706,6 @@ mod tests {
         // Entity ghost lifecycle operations
         assert!(registry.has("entity", "ghost"));
         assert!(registry.has("entity", "identify"));
-        assert!(registry.has("entity", "rename"));
         assert!(registry.has("document", "catalog"));
         assert!(registry.has("document", "extract"));
         // Attribute operations (document-attribute catalogue)
@@ -967,16 +850,6 @@ mod tests {
         assert!(registry.has("view", "black-holes"));
         assert!(registry.has("view", "detail"));
         assert!(registry.has("view", "context"));
-        // Viewport operations (Decker/Esper viewport state management)
-        assert!(registry.has("viewport", "focus"));
-        assert!(registry.has("viewport", "enhance"));
-        assert!(registry.has("viewport", "ascend"));
-        assert!(registry.has("viewport", "descend"));
-        assert!(registry.has("viewport", "camera"));
-        assert!(registry.has("viewport", "filter"));
-        assert!(registry.has("viewport", "track"));
-        assert!(registry.has("viewport", "clear"));
-        assert!(registry.has("viewport", "view-type"));
         // KYC Control Enhancement: Capital operations
         assert!(registry.has("capital", "transfer"));
         assert!(registry.has("capital", "reconcile"));
@@ -1045,7 +918,6 @@ mod tests {
         assert!(registry.has("trading-profile", "remove-booking-rule"));
         // Versioned document lifecycle operations (Phase 7)
         assert!(registry.has("trading-profile", "create-new-version"));
-        assert!(registry.has("trading-profile", "mark-validated"));
         // Investor lifecycle operations (TA KYC-as-a-Service)
         assert!(registry.has("investor", "request-documents"));
         assert!(registry.has("investor", "start-kyc"));
