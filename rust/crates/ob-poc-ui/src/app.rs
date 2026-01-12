@@ -6,6 +6,7 @@
 //! 3. Handling widget responses (no callbacks, return values only)
 
 use crate::api;
+use crate::command::AgentPromptConduit;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
@@ -1768,7 +1769,6 @@ impl eframe::App for App {
                     .map(|c| c.name.clone()),
                 view_mode: self.state.view_mode,
                 view_level: self.state.view_level,
-                layout: self.state.panels.layout,
                 last_error,
                 is_loading: self.state.is_loading(),
                 scope_type: self
@@ -2336,19 +2336,7 @@ impl App {
                 // Clear both highlight and filter on graph
                 self.state.graph_widget.clear_type_filter();
             }
-            TaxonomyPanelAction::FilterToType { type_code } => {
-                web_sys::console::log_1(&format!("Taxonomy: Filter to type {}", type_code).into());
-                self.state.type_filter = Some(type_code.clone());
-                self.state.taxonomy_state.select(Some(&type_code));
-                // Apply hard filter to graph (double-click = filter, dims non-matching)
-                self.state
-                    .graph_widget
-                    .set_type_filter(Some(type_code.clone()));
-                // Also set as highlighted for visual emphasis
-                self.state
-                    .graph_widget
-                    .set_highlighted_type(Some(type_code));
-            }
+
             TaxonomyPanelAction::ExpandAll => {
                 self.state
                     .taxonomy_state
@@ -2496,20 +2484,7 @@ impl App {
                     self.state.fetch_investor_list(issuer_id, page, 50);
                 }
             }
-            InvestorRegisterAction::ApplyFilter {
-                investor_type,
-                kyc_status,
-                jurisdiction,
-            } => {
-                self.state.investor_register_ui.filter_investor_type = investor_type;
-                self.state.investor_register_ui.filter_kyc_status = kyc_status;
-                self.state.investor_register_ui.filter_jurisdiction = jurisdiction;
-                // Refetch with new filters
-                if let Some(ref register) = self.state.investor_register {
-                    let issuer_id = register.issuer.entity_id.clone();
-                    self.state.fetch_investor_list(issuer_id, 1, 50);
-                }
-            }
+
             InvestorRegisterAction::ClearFilters => {
                 self.state.investor_register_ui.filter_investor_type = None;
                 self.state.investor_register_ui.filter_kyc_status = None;
@@ -2527,23 +2502,7 @@ impl App {
                 self.state.selected_entity_id = Some(entity_id.clone());
                 self.state.graph_widget.focus_entity(&entity_id);
             }
-            InvestorRegisterAction::SetSort { field, ascending } => {
-                self.state.investor_register_ui.sort_by = field;
-                self.state.investor_register_ui.sort_ascending = ascending;
-                // Refetch with new sort
-                if let Some(ref register) = self.state.investor_register {
-                    let issuer_id = register.issuer.entity_id.clone();
-                    let page = self.state.investor_register_ui.drill_down_page;
-                    self.state.fetch_investor_list(issuer_id, page, 50);
-                }
-            }
-            InvestorRegisterAction::Search { query } => {
-                self.state.investor_register_ui.search_query = query;
-                if let Some(ref register) = self.state.investor_register {
-                    let issuer_id = register.issuer.entity_id.clone();
-                    self.state.fetch_investor_list(issuer_id, 1, 50);
-                }
-            }
+
             InvestorRegisterAction::ClosePanel => {
                 self.state.investor_register_ui.show_panel = false;
                 self.state.investor_register = None;

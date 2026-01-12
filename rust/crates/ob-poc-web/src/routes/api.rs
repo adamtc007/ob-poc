@@ -4,7 +4,7 @@
 //! This module only contains CBU listing and graph visualization endpoints.
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Query, State},
     http::StatusCode,
     Json,
 };
@@ -26,27 +26,6 @@ pub struct CbuSearchQuery {
 // =============================================================================
 // CBU
 // =============================================================================
-
-pub async fn list_cbus(State(state): State<AppState>) -> Result<Json<Vec<CbuSummary>>, StatusCode> {
-    let rows = sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>)>(
-        r#"SELECT cbu_id, name, jurisdiction, client_type FROM "ob-poc".cbus ORDER BY name LIMIT 50"#
-    )
-    .fetch_all(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let cbus: Vec<CbuSummary> = rows
-        .into_iter()
-        .map(|(cbu_id, name, jurisdiction, client_type)| CbuSummary {
-            cbu_id: cbu_id.to_string(),
-            name,
-            jurisdiction,
-            client_type,
-        })
-        .collect();
-
-    Ok(Json(cbus))
-}
 
 /// Search CBUs by name (case-insensitive, trigram similarity)
 pub async fn search_cbus(
@@ -101,80 +80,4 @@ pub async fn search_cbus(
         .collect();
 
     Ok(Json(cbus))
-}
-
-pub async fn get_cbu(
-    State(state): State<AppState>,
-    Path(cbu_id): Path<Uuid>,
-) -> Result<Json<CbuSummary>, StatusCode> {
-    let row = sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>)>(
-        r#"SELECT cbu_id, name, jurisdiction, client_type FROM "ob-poc".cbus WHERE cbu_id = $1"#,
-    )
-    .bind(cbu_id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .ok_or(StatusCode::NOT_FOUND)?;
-
-    Ok(Json(CbuSummary {
-        cbu_id: row.0.to_string(),
-        name: row.1,
-        jurisdiction: row.2,
-        client_type: row.3,
-    }))
-}
-
-// =============================================================================
-// GRAPH
-// =============================================================================
-
-/// Query parameters for graph endpoint
-#[derive(Debug, serde::Deserialize)]
-pub struct GraphQuery {
-    /// View mode: KYC_UBO (default), SERVICE_DELIVERY, or CUSTODY
-    pub view_mode: Option<String>,
-    /// Layout orientation: VERTICAL (default) or HORIZONTAL
-    pub orientation: Option<String>,
-}
-
-pub async fn get_cbu_graph(
-    State(state): State<AppState>,
-    Path(cbu_id): Path<Uuid>,
-    axum::extract::Query(params): axum::extract::Query<GraphQuery>,
-) -> Result<Json<serde_json::Value>, StatusCode> {
-    use ob_poc::database::VisualizationRepository;
-    use ob_poc::graph::{ConfigDrivenGraphBuilder, LayoutEngineV2};
-
-    let view_mode = params.view_mode.as_deref().unwrap_or("KYC_UBO");
-    let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
-    let horizontal = orientation.eq_ignore_ascii_case("HORIZONTAL");
-
-    // Build graph using config-driven builder
-    let builder = ConfigDrivenGraphBuilder::new(&state.pool, cbu_id, view_mode)
-        .await
-        .map_err(|e| {
-            tracing::error!("Config-driven builder init error: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let repo = VisualizationRepository::new(state.pool.clone());
-    let mut graph = builder.build(&repo).await.map_err(|e| {
-        tracing::error!("Graph build error: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
-
-    // Apply layout using LayoutEngineV2
-    let layout_engine = LayoutEngineV2::from_database(&state.pool, view_mode, horizontal)
-        .await
-        .map_err(|e| {
-            tracing::error!("Layout config load error: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    layout_engine.layout(&mut graph);
-
-    serde_json::to_value(graph).map(Json).map_err(|e| {
-        tracing::error!("Graph serialization error: {}", e);
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
 }

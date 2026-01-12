@@ -94,9 +94,9 @@ pub struct VoiceMatchRequest {
     /// Confidence from speech recognition (0.0-1.0)
     #[serde(default = "default_confidence")]
     pub confidence: f32,
-    /// Voice provider (e.g., "deepgram", "webspeech")
+    /// Voice provider (e.g., "deepgram", "webspeech") - reserved for future use
     #[serde(default)]
-    pub provider: Option<String>,
+    pub _provider: Option<String>,
     /// Current context for disambiguation
     #[serde(default)]
     pub context: Option<VoiceMatchContext>,
@@ -113,8 +113,8 @@ fn default_session_id() -> Uuid {
 /// Context for better matching
 #[derive(Debug, Deserialize, Default)]
 pub struct VoiceMatchContext {
-    /// Currently focused entity ID
-    pub focused_entity_id: Option<String>,
+    /// Currently focused entity ID - reserved for future use
+    pub _focused_entity_id: Option<String>,
     /// Current CBU ID
     pub current_cbu_id: Option<String>,
     /// Current view mode

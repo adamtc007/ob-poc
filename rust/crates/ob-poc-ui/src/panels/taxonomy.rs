@@ -29,8 +29,6 @@ pub enum TaxonomyPanelAction {
     SelectType { type_code: String },
     /// User cleared the type selection
     ClearSelection,
-    /// User double-clicked to filter graph to this type only
-    FilterToType { type_code: String },
     /// User wants to expand all nodes
     ExpandAll,
     /// User wants to collapse all nodes

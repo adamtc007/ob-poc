@@ -342,11 +342,6 @@ pub async fn get_universe_graph_by_client(client_name: &str) -> Result<UniverseG
     .await
 }
 
-/// Get cluster details (CBUs within a cluster)
-pub async fn get_cluster(cluster_id: &str) -> Result<ob_poc_types::galaxy::ClusterNode, String> {
-    get(&format!("/api/cluster/{}", cluster_id)).await
-}
-
 /// Get trading matrix (hierarchical custody configuration) for a CBU
 pub async fn get_trading_matrix(cbu_id: Uuid) -> Result<TradingMatrix, String> {
     use ob_poc_graph::TradingMatrixResponse;

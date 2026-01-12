@@ -1,13 +1,14 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-11
-> **Verb count:** ~816 verbs across 105+ YAML files
-> **Custom ops:** 55+ plugin handlers
+> **Last reviewed:** 2026-01-12
+> **Verb count:** ~873 verbs across 89 verb YAML files (+ 14 workflow templates)
+> **Custom ops:** 50 plugin handlers
 > **Crates:** 13 fine-grained crates
 > **Migrations:** 20 schema migrations (latest: 020_trading_profile_materialization.sql)
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
-> **Verb Tiering:** ⚠️ Partial - Types + linter done, only 5/40 verb files tagged
+> **Verb Tiering:** ✅ Complete - 817 verbs tagged with tier metadata
+> **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -35,8 +36,10 @@ This file provides guidance to Claude Code when working with this repository.
 | **Event Infrastructure (design)** | `ai-thoughts/023a-event-infrastructure.md` | ✅ **DONE** - Always-on, zero-overhead event capture from DSL pipeline + session logging |
 | **Feedback Inspector (design)** | `ai-thoughts/023b-feedback-inspector.md` | ✅ **DONE** - On-demand failure analysis, classification, repro generation, audit trail, MCP interface |
 | **Event Infrastructure (impl)** | `ai-thoughts/025-implement-event-infrastructure.md` | ✅ **DONE** - Lock-free emitter, drain task, session logger |
+| **Entity Disambiguation UX** | `ai-thoughts/025-entity-disambiguation-ux.md` | ✅ **DONE** - Inline popup + batch modal design, voice refinement |
 | **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
-| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ⚠️ **IN PROGRESS** - Types + linter done, 35/40 verb files need tagging |
+| **Entity Resolution Plan** | `ai-thoughts/026-entity-resolution-implementation-plan.md` | ⚠️ **IN PROGRESS** - Sub-session architecture, 4-phase implementation |
+| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Types + linter + 817 verbs tagged with tier metadata |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
 
 > **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
@@ -90,6 +93,8 @@ This file provides guidance to Claude Code when working with this repository.
 - "zoom animation", "astro", "landing", "taxonomy stack" → `docs/session-visualization-architecture.md`
 - "refactor", "rename verb", "delete verb", "deprecate", "cleanup" → `ai-thoughts/027-*`, `docs/architecture/intent-driven-onboarding.md`
 - "trading matrix", "instrument taxonomy", "materialize", "canonical" → `ai-thoughts/027-*`
+- "entity resolution", "disambiguation", "unresolved ref", "batch resolve" → `ai-thoughts/025-entity-disambiguation-ux.md`, `ai-thoughts/026-entity-resolution-implementation-plan.md`
+- "sub-session", "resolution modal", "inline popup" → `ai-thoughts/026-entity-resolution-implementation-plan.md`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -103,8 +108,10 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/023a-event-infrastructure.md` - ✅ DONE - Always-on event capture, zero DSL impact, session logging
 - `ai-thoughts/023b-feedback-inspector.md` - ✅ DONE - On-demand analysis, repro generation, audit trail, MCP server
 - `ai-thoughts/025-implement-event-infrastructure.md` - ✅ DONE - Lock-free emitter, drain task, session logger
+- `ai-thoughts/025-entity-disambiguation-ux.md` - ✅ DONE - Inline popup + batch modal design, Zed-style code actions, voice refinement
 - `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
-- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ⚠️ **IN PROGRESS** - Types + linter done, 35/40 verb files need tier metadata
+- `ai-thoughts/026-entity-resolution-implementation-plan.md` - ⚠️ **IN PROGRESS** - Sub-session architecture, parent-child context inheritance
+- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ DONE - Types, linter, 817 verbs tagged with tier metadata
 
 ---
 
@@ -153,7 +160,7 @@ User/Agent → DSL Source → Parser → Compiler → Executor → PostgreSQL
 ```
 ob-poc/
 ├── rust/
-│   ├── config/verbs/           # Verb YAML definitions (105+ files, ~820 verbs)
+│   ├── config/verbs/           # Verb YAML definitions (89 files + 14 templates, ~873 verbs)
 │   │   ├── cbu.yaml            # CBU domain
 │   │   ├── entity.yaml         # Entity domain
 │   │   ├── custody/            # Custody subdomain
@@ -170,7 +177,7 @@ ob-poc/
 │   ├── src/
 │   │   ├── dsl_v2/             # DSL execution layer
 │   │   │   ├── generic_executor.rs  # YAML-driven CRUD executor
-│   │   │   ├── custom_ops/     # Plugin handlers (~55 files)
+│   │   │   ├── custom_ops/     # Plugin handlers (50 files)
 │   │   │   └── verb_registry.rs
 │   │   ├── research/           # Research module (NEW)
 │   │   ├── agent/              # Agent controller (NEW)
@@ -181,7 +188,7 @@ ob-poc/
 │   └── xtask/                  # Build automation
 ├── prompts/                    # LLM prompt templates (NEW)
 │   └── research/
-├── migrations/                 # SQLx migrations (16 files)
+├── migrations/                 # SQLx migrations (20 files)
 ├── docs/                       # Architecture documentation
 ├── ai-thoughts/                # ADRs and working docs
 └── CLAUDE.md                   # This file
@@ -735,7 +742,7 @@ pub enum ViewLevel {
 
 ## egui Pattern Compliance Checklist
 
-> **Last audited:** 2026-01-11
+> **Last audited:** 2026-01-12
 > **Status:** ✅ All panels compliant with documented patterns
 
 ### Core Rules (from `docs/strategy-patterns.md` §3)

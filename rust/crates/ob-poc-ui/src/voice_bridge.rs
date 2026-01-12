@@ -12,7 +12,6 @@
 //!                                                            egui update() loop
 //! ```
 
-use crate::command::{CommandSource, VoiceProvider};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use wasm_bindgen::prelude::*;
@@ -30,11 +29,9 @@ pub struct VoiceCommandQueue {
 /// A voice command received from JavaScript
 #[derive(Debug, Clone)]
 pub struct VoiceCommand {
-    pub command: String,
     pub transcript: String,
     pub confidence: f32,
     pub provider: String,
-    pub params: serde_json::Value,
 }
 
 impl VoiceCommandQueue {
@@ -50,11 +47,6 @@ impl VoiceCommandQueue {
     /// Take all pending commands
     pub fn take_all(&mut self) -> Vec<VoiceCommand> {
         self.commands.drain(..).collect()
-    }
-
-    /// Check if there are pending commands
-    pub fn has_pending(&self) -> bool {
-        !self.commands.is_empty()
     }
 }
 
@@ -83,11 +75,6 @@ pub fn install_voice_listener() -> Result<(), JsValue> {
     let voice_callback = Closure::wrap(Box::new(move |event: web_sys::CustomEvent| {
         let detail = event.detail();
         if detail.is_object() {
-            let command = js_sys::Reflect::get(&detail, &"command".into())
-                .ok()
-                .and_then(|v| v.as_string())
-                .unwrap_or_default();
-
             let transcript = js_sys::Reflect::get(&detail, &"transcript".into())
                 .ok()
                 .and_then(|v| v.as_string())
@@ -103,18 +90,10 @@ pub fn install_voice_listener() -> Result<(), JsValue> {
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
 
-            let params = js_sys::Reflect::get(&detail, &"params".into())
-                .ok()
-                .map(|v| {
-                    // Convert JsValue to serde_json::Value
-                    serde_wasm_bindgen::from_value(v).unwrap_or(serde_json::Value::Null)
-                })
-                .unwrap_or(serde_json::Value::Null);
-
             web_sys::console::log_1(
                 &format!(
-                    "[VoiceBridge] Received command: {} (confidence: {:.2})",
-                    command, confidence
+                    "[VoiceBridge] Received transcript (confidence: {:.2})",
+                    confidence
                 )
                 .into(),
             );
@@ -122,11 +101,9 @@ pub fn install_voice_listener() -> Result<(), JsValue> {
             // Push to queue
             VOICE_QUEUE.with(|queue| {
                 queue.borrow_mut().push(VoiceCommand {
-                    command,
                     transcript,
                     confidence,
                     provider,
-                    params,
                 });
             });
         }
@@ -164,11 +141,9 @@ pub fn install_voice_listener() -> Result<(), JsValue> {
         // Push as chat input command
         VOICE_QUEUE.with(|queue| {
             queue.borrow_mut().push(VoiceCommand {
-                command: "SendChat".to_string(),
-                transcript: transcript.clone(),
+                transcript,
                 confidence,
                 provider: "voice".to_string(),
-                params: serde_json::json!({ "message": transcript }),
             });
         });
     }) as Box<dyn FnMut(web_sys::CustomEvent)>);
@@ -193,63 +168,6 @@ pub fn install_voice_listener() -> Result<(), JsValue> {
 /// Called from egui update() loop
 pub fn take_pending_voice_commands() -> Vec<VoiceCommand> {
     VOICE_QUEUE.with(|queue| queue.borrow_mut().take_all())
-}
-
-/// Check if there are pending voice commands
-pub fn has_pending_voice_commands() -> bool {
-    VOICE_QUEUE.with(|queue| queue.borrow().has_pending())
-}
-
-/// Convert a VoiceCommand to a CommandSource for unified dispatch
-pub fn voice_command_to_source(cmd: &VoiceCommand) -> CommandSource {
-    let provider = match cmd.provider.as_str() {
-        "deepgram" | "Deepgram" => VoiceProvider::Deepgram,
-        "webspeech" | "WebSpeech" => VoiceProvider::WebSpeech,
-        _ => VoiceProvider::Unknown,
-    };
-
-    CommandSource::Voice {
-        transcript: cmd.transcript.clone(),
-        confidence: cmd.confidence,
-        provider,
-    }
-}
-
-/// Dispatch context update to JavaScript voice service
-/// Called when context changes (entity selected, CBU changed, etc.)
-pub fn dispatch_context_update(
-    focused_entity_id: Option<&str>,
-    current_cbu_id: Option<&str>,
-    view_mode: &str,
-) {
-    let window = match web_sys::window() {
-        Some(w) => w,
-        None => return,
-    };
-
-    let document = match window.document() {
-        Some(d) => d,
-        None => return,
-    };
-
-    // Create context object
-    let context = js_sys::Object::new();
-    if let Some(id) = focused_entity_id {
-        js_sys::Reflect::set(&context, &"focusedEntityId".into(), &id.into()).ok();
-    }
-    if let Some(id) = current_cbu_id {
-        js_sys::Reflect::set(&context, &"currentCbuId".into(), &id.into()).ok();
-    }
-    js_sys::Reflect::set(&context, &"viewMode".into(), &view_mode.into()).ok();
-
-    // Create and dispatch event
-    let event_init = web_sys::CustomEventInit::new();
-    event_init.set_detail(&context);
-
-    if let Ok(event) = web_sys::CustomEvent::new_with_event_init_dict("esper-context", &event_init)
-    {
-        document.dispatch_event(&event).ok();
-    }
 }
 
 // =============================================================================
@@ -277,8 +195,6 @@ pub enum VoiceMode {
     Chat,
     /// Resolution mode - transcripts go to resolution refinement
     Resolution,
-    /// Command mode - transcripts are parsed as navigation commands
-    Command,
 }
 
 /// Dispatch voice control event to JavaScript
@@ -298,7 +214,6 @@ fn dispatch_voice_control(event_name: &str, mode: VoiceMode) {
     let mode_str = match mode {
         VoiceMode::Chat => "chat",
         VoiceMode::Resolution => "resolution",
-        VoiceMode::Command => "command",
     };
     js_sys::Reflect::set(&control, &"mode".into(), &mode_str.into()).ok();
 
@@ -309,43 +224,4 @@ fn dispatch_voice_control(event_name: &str, mode: VoiceMode) {
     if let Ok(event) = web_sys::CustomEvent::new_with_event_init_dict(event_name, &event_init) {
         document.dispatch_event(&event).ok();
     }
-}
-
-// =============================================================================
-// RESOLUTION-SPECIFIC VOICE QUEUE
-// =============================================================================
-
-/// Resolution voice transcript - separate from command queue
-#[derive(Debug, Clone)]
-pub struct ResolutionTranscript {
-    pub transcript: String,
-    pub confidence: f32,
-}
-
-thread_local! {
-    static RESOLUTION_QUEUE: RefCell<VecDeque<ResolutionTranscript>> = RefCell::new(VecDeque::new());
-}
-
-/// Push a transcript specifically for resolution refinement
-pub fn push_resolution_transcript(transcript: String, confidence: f32) {
-    RESOLUTION_QUEUE.with(|queue| {
-        let mut q = queue.borrow_mut();
-        if q.len() >= MAX_PENDING_COMMANDS {
-            q.pop_front();
-        }
-        q.push_back(ResolutionTranscript {
-            transcript,
-            confidence,
-        });
-    });
-}
-
-/// Take all pending resolution transcripts
-pub fn take_resolution_transcripts() -> Vec<ResolutionTranscript> {
-    RESOLUTION_QUEUE.with(|queue| queue.borrow_mut().drain(..).collect())
-}
-
-/// Check if there are pending resolution transcripts
-pub fn has_pending_resolution_transcripts() -> bool {
-    RESOLUTION_QUEUE.with(|queue| !queue.borrow().is_empty())
 }

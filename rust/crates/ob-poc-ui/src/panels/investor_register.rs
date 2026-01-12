@@ -34,20 +34,10 @@ pub enum InvestorRegisterAction {
     CloseDrillDown,
     /// User changed drill-down page
     SetPage(i32),
-    /// User applied filter
-    ApplyFilter {
-        investor_type: Option<String>,
-        kyc_status: Option<String>,
-        jurisdiction: Option<String>,
-    },
     /// User cleared filters
     ClearFilters,
     /// User selected investor from list
     SelectInvestor { entity_id: String },
-    /// User changed sort
-    SetSort { field: String, ascending: bool },
-    /// User searched
-    Search { query: String },
     /// User closed the panel
     ClosePanel,
     /// User requested refresh

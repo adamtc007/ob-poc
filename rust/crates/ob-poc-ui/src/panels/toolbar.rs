@@ -17,8 +17,6 @@ pub struct ToolbarData {
     pub view_mode: ViewMode,
     /// Current navigation level (Universe, Cluster, System, etc.)
     pub view_level: ViewLevel,
-    /// Current layout mode
-    pub layout: LayoutMode,
     /// Last error (if any)
     pub last_error: Option<String>,
     /// Whether any loading is in progress
@@ -155,16 +153,5 @@ fn view_mode_name(mode: ViewMode) -> &'static str {
         ViewMode::ServiceDelivery => "Services",
         ViewMode::ProductsOnly => "Products",
         ViewMode::Trading => "Trading",
-    }
-}
-
-fn view_level_name(level: ViewLevel) -> &'static str {
-    match level {
-        ViewLevel::Universe => "Universe",
-        ViewLevel::Cluster => "Cluster",
-        ViewLevel::System => "CBU",
-        ViewLevel::Planet => "Entity",
-        ViewLevel::Surface => "Details",
-        ViewLevel::Core => "Deep",
     }
 }
