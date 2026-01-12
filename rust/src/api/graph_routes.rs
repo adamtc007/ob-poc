@@ -112,6 +112,7 @@ pub async fn list_cbus(
             name: c.name,
             jurisdiction: c.jurisdiction,
             client_type: c.client_type,
+            cbu_category: c.cbu_category,
             created_at: c.created_at,
             updated_at: c.updated_at,
         })
@@ -137,6 +138,7 @@ pub async fn get_cbu(
         name: cbu.name,
         jurisdiction: cbu.jurisdiction,
         client_type: cbu.client_type,
+        cbu_category: cbu.cbu_category,
         created_at: cbu.created_at,
         updated_at: cbu.updated_at,
     }))

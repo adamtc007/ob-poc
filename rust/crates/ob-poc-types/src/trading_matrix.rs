@@ -1121,6 +1121,17 @@ pub enum TradingMatrixOp {
         ssi_ref: String, // SSI name
     },
 
+    /// Remove an ISDA agreement and all its children (CSAs, product coverage)
+    RemoveIsda {
+        counterparty_ref: String, // Counterparty name or entity ID
+    },
+
+    /// Remove a CSA from an ISDA agreement
+    RemoveCsa {
+        counterparty_ref: String, // ISDA counterparty name or entity ID
+        csa_type: Option<String>, // If None, removes all CSAs for this counterparty
+    },
+
     /// Set base currency for the trading profile
     SetBaseCurrency { currency: String },
 

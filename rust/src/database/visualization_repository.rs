@@ -124,6 +124,8 @@ pub struct CbuSummaryView {
     pub name: String,
     pub jurisdiction: Option<String>,
     pub client_type: Option<String>,
+    /// Template discriminator: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, etc.
+    pub cbu_category: Option<String>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
@@ -596,7 +598,7 @@ impl VisualizationRepository {
     pub async fn list_cbus(&self) -> Result<Vec<CbuSummaryView>> {
         let cbus = sqlx::query_as!(
             CbuSummaryView,
-            r#"SELECT cbu_id, name, jurisdiction, client_type, created_at, updated_at
+            r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category, created_at, updated_at
                FROM "ob-poc".cbus
                ORDER BY name"#
         )
@@ -609,7 +611,7 @@ impl VisualizationRepository {
     pub async fn get_cbu(&self, cbu_id: Uuid) -> Result<Option<CbuSummaryView>> {
         let cbu = sqlx::query_as!(
             CbuSummaryView,
-            r#"SELECT cbu_id, name, jurisdiction, client_type, created_at, updated_at
+            r#"SELECT cbu_id, name, jurisdiction, client_type, cbu_category, created_at, updated_at
                FROM "ob-poc".cbus
                WHERE cbu_id = $1"#,
             cbu_id

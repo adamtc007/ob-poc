@@ -96,6 +96,8 @@ pub struct CbuSummary {
     pub name: String,
     pub jurisdiction: Option<String>,
     pub client_type: Option<String>,
+    /// Template discriminator: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, etc.
+    pub cbu_category: Option<String>,
 }
 
 /// Onboarding status response
@@ -261,7 +263,7 @@ async fn login(
     let cbus = sqlx::query_as!(
         CbuSummary,
         r#"
-        SELECT cbu_id, name, jurisdiction, client_type
+        SELECT cbu_id, name, jurisdiction, client_type, cbu_category
         FROM "ob-poc".cbus
         WHERE cbu_id = ANY($1)
         ORDER BY name

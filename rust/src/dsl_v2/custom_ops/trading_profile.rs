@@ -2730,6 +2730,165 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
     }
 }
 
+/// Remove ISDA configuration from trading profile
+pub struct TradingProfileRemoveIsdaConfigOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "remove-isda-config"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Removes ISDA master agreement and all children from the document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
+            pool,
+            profile_id,
+            TradingMatrixOp::RemoveIsda {
+                counterparty_ref: counterparty_ref.clone(),
+            },
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to remove ISDA config: {}", e))?;
+
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "counterparty_ref": counterparty_ref,
+            "removed": true,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Remove CSA configuration from trading profile
+pub struct TradingProfileRemoveCsaConfigOp;
+
+#[async_trait]
+impl CustomOperation for TradingProfileRemoveCsaConfigOp {
+    fn domain(&self) -> &'static str {
+        "trading-profile"
+    }
+
+    fn verb(&self) -> &'static str {
+        "remove-csa-config"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Removes CSA from ISDA agreement in the document"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let profile_id: Uuid = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "profile-id")
+            .and_then(|a| {
+                if let Some(name) = a.value.as_symbol() {
+                    ctx.resolve(name)
+                } else {
+                    a.value.as_uuid()
+                }
+            })
+            .ok_or_else(|| anyhow::anyhow!("Missing profile-id argument"))?;
+
+        let counterparty_ref = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "counterparty-ref")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string())
+            .ok_or_else(|| anyhow::anyhow!("Missing counterparty-ref argument"))?;
+
+        let csa_type = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "csa-type")
+            .and_then(|a| a.value.as_string())
+            .map(|s| s.to_string());
+
+        // Apply operation to AST and save
+        let doc = ast_db::apply_and_save(
+            pool,
+            profile_id,
+            TradingMatrixOp::RemoveCsa {
+                counterparty_ref: counterparty_ref.clone(),
+                csa_type: csa_type.clone(),
+            },
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to remove CSA config: {}", e))?;
+
+        Ok(ExecutionResult::Record(json!({
+            "profile_id": profile_id,
+            "counterparty_ref": counterparty_ref,
+            "csa_type": csa_type,
+            "removed": true,
+            "version": doc.version,
+            "status": format!("{:?}", doc.status),
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
 // =============================================================================
 // IM MANDATE OPERATIONS (Phase 3)
 // =============================================================================

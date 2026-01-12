@@ -827,6 +827,57 @@ domains:
         returns:
           type: affected
 
+      remove-isda-config:
+        description: Remove ISDA master agreement from trading profile
+        behavior: plugin
+        handler: remove_isda_config_from_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: isda
+          tags: [authoring, isda, otc]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            description: "Trading profile ID"
+          - name: counterparty-ref
+            type: string
+            required: true
+            description: "Counterparty entity name or ID to remove"
+        returns:
+          type: affected
+          description: Number of ISDA configs removed (0 or 1)
+
+      remove-csa-config:
+        description: Remove CSA from ISDA agreement in trading profile
+        behavior: plugin
+        handler: remove_csa_config_from_profile
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
+          noun: csa
+          tags: [authoring, csa, otc]
+        args:
+          - name: profile-id
+            type: uuid
+            required: true
+            description: "Trading profile ID"
+          - name: counterparty-ref
+            type: string
+            required: true
+            description: "Counterparty entity name or ID"
+          - name: csa-type
+            type: string
+            required: false
+            valid_values: [VM, VM_IM, IM]
+            description: "CSA type to remove (if omitted, removes all CSAs for this counterparty)"
+        returns:
+          type: affected
+          description: Number of CSA configs removed
+
       # --- Investment Managers Section ---
 
       add-im-mandate:

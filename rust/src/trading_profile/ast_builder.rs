@@ -329,6 +329,13 @@ pub fn apply_op(doc: &mut TradingMatrixDocument, op: TradingMatrixOp) -> AstBuil
             ssi_ref,
         } => link_csa_ssi(doc, &isda_ref, &csa_ref, &ssi_ref),
 
+        TradingMatrixOp::RemoveIsda { counterparty_ref } => remove_isda(doc, &counterparty_ref),
+
+        TradingMatrixOp::RemoveCsa {
+            counterparty_ref,
+            csa_type,
+        } => remove_csa(doc, &counterparty_ref, csa_type.as_deref()),
+
         TradingMatrixOp::SetBaseCurrency { currency } => set_base_currency(doc, &currency),
 
         TradingMatrixOp::AddAllowedCurrency { currency } => add_allowed_currency(doc, &currency),
@@ -971,6 +978,78 @@ pub fn add_product_coverage(
     .with_sublabel(sublabel);
 
     parent.add_child(node);
+    mark_modified(doc);
+    Ok(())
+}
+
+/// Remove an ISDA agreement and all its children (CSAs, product coverage)
+pub fn remove_isda(doc: &mut TradingMatrixDocument, counterparty_ref: &str) -> AstBuildResult<()> {
+    let isda_category = doc.ensure_category(categories::ISDA);
+    let target_id = isda_category.id.child(counterparty_ref);
+
+    let original_len = isda_category.children.len();
+    isda_category.children.retain(|c| c.id != target_id);
+
+    if isda_category.children.len() == original_len {
+        return Err(AstBuildError::NodeNotFound {
+            path: format!("{}/{}", categories::ISDA, counterparty_ref),
+        });
+    }
+
+    mark_modified(doc);
+    Ok(())
+}
+
+/// Remove a CSA from an ISDA agreement
+pub fn remove_csa(
+    doc: &mut TradingMatrixDocument,
+    counterparty_ref: &str,
+    csa_type: Option<&str>,
+) -> AstBuildResult<()> {
+    let isda_category = doc.ensure_category(categories::ISDA);
+    let parent_id = isda_category.id.child(counterparty_ref);
+
+    let parent = isda_category
+        .children
+        .iter_mut()
+        .find(|c| c.id == parent_id)
+        .ok_or_else(|| AstBuildError::ReferenceNotFound {
+            ref_type: "ISDA".to_string(),
+            ref_value: counterparty_ref.to_string(),
+        })?;
+
+    let original_len = parent.children.len();
+
+    match csa_type {
+        Some(csa_t) => {
+            // Remove specific CSA type
+            parent.children.retain(|c| {
+                if let TradingMatrixNodeType::CsaAgreement { csa_type, .. } = &c.node_type {
+                    csa_type != csa_t
+                } else {
+                    true // Keep non-CSA children (product coverage, etc.)
+                }
+            });
+        }
+        None => {
+            // Remove all CSAs
+            parent
+                .children
+                .retain(|c| !matches!(c.node_type, TradingMatrixNodeType::CsaAgreement { .. }));
+        }
+    }
+
+    if parent.children.len() == original_len {
+        return Err(AstBuildError::NodeNotFound {
+            path: format!(
+                "{}/{}/{}",
+                categories::ISDA,
+                counterparty_ref,
+                csa_type.unwrap_or("*")
+            ),
+        });
+    }
+
     mark_modified(doc);
     Ok(())
 }

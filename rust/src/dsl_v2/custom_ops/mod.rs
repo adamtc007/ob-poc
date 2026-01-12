@@ -125,7 +125,8 @@ pub use trading_profile::{
     TradingProfileCreateDraftOp, TradingProfileCreateNewVersionOp, TradingProfileDiffOp,
     TradingProfileGetActiveOp, TradingProfileImportOp, TradingProfileLinkCsaSsiOp,
     TradingProfileMaterializeOp, TradingProfileRejectOp, TradingProfileRemoveBookingRuleOp,
-    TradingProfileRemoveImMandateOp, TradingProfileRemoveInstrumentClassOp,
+    TradingProfileRemoveCsaConfigOp, TradingProfileRemoveImMandateOp,
+    TradingProfileRemoveInstrumentClassOp, TradingProfileRemoveIsdaConfigOp,
     TradingProfileRemoveMarketOp, TradingProfileRemoveSsiOp, TradingProfileSetBaseCurrencyOp,
     TradingProfileSubmitOp, TradingProfileUpdateImScopeOp, TradingProfileValidateCoverageOp,
     TradingProfileValidateGoLiveReadyOp,
@@ -407,6 +408,8 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(TradingProfileAddCsaConfigOp));
         registry.register(Arc::new(TradingProfileAddCsaCollateralOp));
         registry.register(Arc::new(TradingProfileLinkCsaSsiOp));
+        registry.register(Arc::new(TradingProfileRemoveIsdaConfigOp));
+        registry.register(Arc::new(TradingProfileRemoveCsaConfigOp));
         // IM mandate and settlement config operations (Phase 3)
         registry.register(Arc::new(TradingProfileAddImMandateOp));
         registry.register(Arc::new(TradingProfileUpdateImScopeOp));

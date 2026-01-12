@@ -2589,6 +2589,8 @@ pub struct CbuSummary {
     pub name: String,
     pub jurisdiction: Option<String>,
     pub client_type: Option<String>,
+    /// Template discriminator: FUND_MANDATE, CORPORATE_GROUP, INSTITUTIONAL_ACCOUNT, etc.
+    pub cbu_category: Option<String>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }

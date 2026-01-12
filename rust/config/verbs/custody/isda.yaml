@@ -3,12 +3,13 @@ domains:
     description: ISDA and CSA agreement management for OTC derivatives
     verbs:
       create:
-        description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date)
+        description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date). Internal - use trading-profile.add-isda-config for authoring.
         metadata:
-          tier: intent
+          tier: projection
           source_of_truth: operational
           scope: cbu
           noun: isda
+          internal: true
         behavior: crud
         crud:
           operation: upsert
@@ -57,12 +58,13 @@ domains:
           name: isda_id
           capture: true
       add-coverage:
-        description: Add instrument class coverage to ISDA (idempotent by isda+instrument_class)
+        description: Add instrument class coverage to ISDA (idempotent by isda+instrument_class). Internal - use trading-profile.add-isda-coverage for authoring.
         metadata:
-          tier: intent
+          tier: projection
           source_of_truth: operational
           scope: cbu
           noun: isda
+          internal: true
         behavior: crud
         crud:
           operation: upsert
@@ -106,12 +108,13 @@ domains:
           type: uuid
           name: coverage_id
       add-csa:
-        description: Add CSA (Credit Support Annex) to ISDA (idempotent by isda+csa_type)
+        description: Add CSA (Credit Support Annex) to ISDA (idempotent by isda+csa_type). Internal - use trading-profile.add-csa-config for authoring.
         metadata:
-          tier: intent
+          tier: projection
           source_of_truth: operational
           scope: cbu
           noun: isda
+          internal: true
         behavior: crud
         crud:
           operation: upsert
@@ -162,12 +165,13 @@ domains:
           name: csa_id
           capture: true
       remove-coverage:
-        description: Remove instrument class coverage from ISDA
+        description: Remove instrument class coverage from ISDA. Internal - use trading-profile.remove-isda-config for authoring.
         metadata:
-          tier: intent
+          tier: projection
           source_of_truth: operational
           scope: cbu
           noun: isda
+          internal: true
         behavior: crud
         crud:
           operation: delete
@@ -181,12 +185,13 @@ domains:
         returns:
           type: affected
       remove-csa:
-        description: Remove CSA from ISDA
+        description: Remove CSA from ISDA. Internal - use trading-profile.remove-csa-config for authoring.
         metadata:
-          tier: intent
+          tier: projection
           source_of_truth: operational
           scope: cbu
           noun: isda
+          internal: true
         behavior: crud
         crud:
           operation: delete
@@ -202,7 +207,7 @@ domains:
       list:
         description: List ISDA agreements for CBU
         metadata:
-          tier: reference
+          tier: diagnostics
           source_of_truth: operational
           scope: cbu
           noun: isda
