@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6hFED8hISa7MqgrdYXikT8RfZLf3VvAnPq9M7EIIrtwck6v8O8Iddxb9Pshe8ax
+\restrict UhevCCGW18lifr3G4hg8AXjj0hjxg6QrSVrFT4BMPDsJBWaTVdiJMbpLae7084Z
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -31,6 +31,27 @@ CREATE SCHEMA client_portal;
 --
 
 CREATE SCHEMA custody;
+
+
+--
+-- Name: events; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA events;
+
+
+--
+-- Name: feedback; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA feedback;
+
+
+--
+-- Name: SCHEMA feedback; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON SCHEMA feedback IS 'Feedback Inspector: failure analysis, repro generation, audit trail';
 
 
 --
@@ -80,6 +101,13 @@ CREATE SCHEMA ob_ref;
 --
 
 COMMENT ON SCHEMA public IS 'Runtime API Endpoints System - Phase 1 Foundation';
+
+
+--
+-- Name: sessions; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA sessions;
 
 
 --
@@ -143,6 +171,107 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 --
 
 COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access methods';
+
+
+--
+-- Name: actor_type; Type: TYPE; Schema: feedback; Owner: -
+--
+
+CREATE TYPE feedback.actor_type AS ENUM (
+    'SYSTEM',
+    'MCP_AGENT',
+    'REPL_USER',
+    'EGUI_USER',
+    'CI_PIPELINE',
+    'CLAUDE_CODE',
+    'CRON_JOB'
+);
+
+
+--
+-- Name: audit_action; Type: TYPE; Schema: feedback; Owner: -
+--
+
+CREATE TYPE feedback.audit_action AS ENUM (
+    'CAPTURED',
+    'CLASSIFIED',
+    'DEDUPLICATED',
+    'RUNTIME_ATTEMPT',
+    'RUNTIME_SUCCESS',
+    'RUNTIME_EXHAUSTED',
+    'REPRO_GENERATED',
+    'REPRO_VERIFIED_FAILS',
+    'REPRO_VERIFICATION_FAILED',
+    'TODO_CREATED',
+    'TODO_ASSIGNED',
+    'FIX_COMMITTED',
+    'REPRO_VERIFIED_PASSES',
+    'DEPLOYED',
+    'SEMANTIC_REPLAY_PASSED',
+    'SEMANTIC_REPLAY_FAILED',
+    'RESOLVED',
+    'MARKED_WONT_FIX',
+    'MARKED_DUPLICATE',
+    'REOPENED',
+    'COMMENT_ADDED'
+);
+
+
+--
+-- Name: error_type; Type: TYPE; Schema: feedback; Owner: -
+--
+
+CREATE TYPE feedback.error_type AS ENUM (
+    'TIMEOUT',
+    'RATE_LIMITED',
+    'CONNECTION_RESET',
+    'SERVICE_UNAVAILABLE',
+    'POOL_EXHAUSTED',
+    'ENUM_DRIFT',
+    'SCHEMA_DRIFT',
+    'PARSE_ERROR',
+    'HANDLER_PANIC',
+    'HANDLER_ERROR',
+    'DSL_PARSE_ERROR',
+    'API_ENDPOINT_MOVED',
+    'API_AUTH_CHANGED',
+    'VALIDATION_FAILED',
+    'UNKNOWN'
+);
+
+
+--
+-- Name: issue_status; Type: TYPE; Schema: feedback; Owner: -
+--
+
+CREATE TYPE feedback.issue_status AS ENUM (
+    'NEW',
+    'RUNTIME_RESOLVED',
+    'RUNTIME_ESCALATED',
+    'REPRO_GENERATED',
+    'REPRO_VERIFIED',
+    'TODO_CREATED',
+    'IN_PROGRESS',
+    'FIX_COMMITTED',
+    'FIX_VERIFIED',
+    'DEPLOYED_STAGING',
+    'DEPLOYED_PROD',
+    'RESOLVED',
+    'WONT_FIX',
+    'DUPLICATE',
+    'INVALID'
+);
+
+
+--
+-- Name: remediation_path; Type: TYPE; Schema: feedback; Owner: -
+--
+
+CREATE TYPE feedback.remediation_path AS ENUM (
+    'RUNTIME',
+    'CODE',
+    'LOG_ONLY'
+);
 
 
 --
@@ -242,6 +371,106 @@ $$;
 
 
 --
+-- Name: cleanup_old_events(integer); Type: FUNCTION; Schema: events; Owner: -
+--
+
+CREATE FUNCTION events.cleanup_old_events(retention_days integer DEFAULT 30) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM events.log
+    WHERE timestamp < NOW() - (retention_days || ' days')::INTERVAL;
+
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION cleanup_old_events(retention_days integer); Type: COMMENT; Schema: events; Owner: -
+--
+
+COMMENT ON FUNCTION events.cleanup_old_events(retention_days integer) IS 'Delete events older than retention_days (default 30)';
+
+
+--
+-- Name: cleanup_old_resolved(); Type: FUNCTION; Schema: feedback; Owner: -
+--
+
+CREATE FUNCTION feedback.cleanup_old_resolved() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_deleted INTEGER;
+BEGIN
+    DELETE FROM feedback.failures
+    WHERE status = 'RESOLVED'
+      AND resolved_at < NOW() - INTERVAL '90 days';
+
+    GET DIAGNOSTICS v_deleted = ROW_COUNT;
+    RETURN v_deleted;
+END;
+$$;
+
+
+--
+-- Name: record_occurrence(text, uuid, timestamp with time zone, uuid, text, bigint, text, text); Type: FUNCTION; Schema: feedback; Owner: -
+--
+
+CREATE FUNCTION feedback.record_occurrence(p_fingerprint text, p_event_id uuid, p_event_timestamp timestamp with time zone, p_session_id uuid, p_verb text, p_duration_ms bigint, p_error_message text, p_error_backtrace text) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_failure_id UUID;
+    v_occurrence_id UUID;
+BEGIN
+    -- Get failure ID
+    SELECT id INTO v_failure_id
+    FROM feedback.failures
+    WHERE fingerprint = p_fingerprint;
+
+    IF v_failure_id IS NULL THEN
+        RAISE EXCEPTION 'Failure not found for fingerprint: %', p_fingerprint;
+    END IF;
+
+    -- Insert occurrence
+    INSERT INTO feedback.occurrences (
+        failure_id, event_id, event_timestamp, session_id,
+        verb, duration_ms, error_message, error_backtrace
+    ) VALUES (
+        v_failure_id, p_event_id, p_event_timestamp, p_session_id,
+        p_verb, p_duration_ms, p_error_message, p_error_backtrace
+    ) RETURNING id INTO v_occurrence_id;
+
+    -- Update failure counts
+    UPDATE feedback.failures
+    SET occurrence_count = occurrence_count + 1,
+        last_seen_at = p_event_timestamp
+    WHERE id = v_failure_id;
+
+    RETURN v_occurrence_id;
+END;
+$$;
+
+
+--
+-- Name: update_timestamps(); Type: FUNCTION; Schema: feedback; Owner: -
+--
+
+CREATE FUNCTION feedback.update_timestamps() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$;
+
+
+--
 -- Name: check_case_doc_completion(uuid); Type: FUNCTION; Schema: kyc; Owner: -
 --
 
@@ -264,6 +493,342 @@ SELECT
 FROM kyc.doc_requests dr
 JOIN kyc.entity_workstreams w ON w.workstream_id = dr.workstream_id
 WHERE w.case_id = p_case_id;
+$$;
+
+
+--
+-- Name: fn_derive_ownership_snapshots(uuid, date); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.fn_derive_ownership_snapshots(p_issuer_entity_id uuid, p_as_of date DEFAULT CURRENT_DATE) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_count INTEGER := 0;
+    v_temp INTEGER;
+BEGIN
+    -- Insert VOTING basis snapshots
+    INSERT INTO kyc.ownership_snapshots (
+        issuer_entity_id, owner_entity_id, share_class_id, as_of_date,
+        basis, units, percentage, numerator, denominator,
+        derived_from, is_direct, is_aggregated, confidence
+    )
+    SELECT
+        p_issuer_entity_id,
+        hcp.holder_entity_id,
+        NULL,
+        p_as_of,
+        'VOTES',
+        hcp.holder_units,
+        hcp.voting_pct,
+        hcp.holder_votes,
+        hcp.total_issuer_votes,
+        'REGISTER',
+        true,
+        true,
+        'HIGH'
+    FROM kyc.fn_holder_control_position(p_issuer_entity_id, p_as_of, 'VOTES') hcp
+    WHERE hcp.holder_votes > 0;
+
+    GET DIAGNOSTICS v_temp = ROW_COUNT;
+    v_count := v_count + v_temp;
+
+    -- Insert ECONOMIC basis snapshots
+    INSERT INTO kyc.ownership_snapshots (
+        issuer_entity_id, owner_entity_id, share_class_id, as_of_date,
+        basis, units, percentage, numerator, denominator,
+        derived_from, is_direct, is_aggregated, confidence
+    )
+    SELECT
+        p_issuer_entity_id,
+        hcp.holder_entity_id,
+        NULL,
+        p_as_of,
+        'ECONOMIC',
+        hcp.holder_units,
+        hcp.economic_pct,
+        hcp.holder_economic,
+        hcp.total_issuer_economic,
+        'REGISTER',
+        true,
+        true,
+        'HIGH'
+    FROM kyc.fn_holder_control_position(p_issuer_entity_id, p_as_of, 'ECONOMIC') hcp
+    WHERE hcp.holder_economic > 0;
+
+    GET DIAGNOSTICS v_temp = ROW_COUNT;
+    v_count := v_count + v_temp;
+
+    RETURN v_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION fn_derive_ownership_snapshots(p_issuer_entity_id uuid, p_as_of date); Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON FUNCTION kyc.fn_derive_ownership_snapshots(p_issuer_entity_id uuid, p_as_of date) IS 'Derive ownership snapshots from register holdings for an issuer at a given date. Returns count of snapshots created.';
+
+
+--
+-- Name: fn_diluted_supply_at(uuid, date, text); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.fn_diluted_supply_at(p_share_class_id uuid, p_as_of date DEFAULT CURRENT_DATE, p_basis text DEFAULT 'FULLY_DILUTED'::text) RETURNS TABLE(share_class_id uuid, issued_units numeric, outstanding_units numeric, dilution_units numeric, fully_diluted_units numeric, total_votes numeric, total_economic numeric, dilution_source_count integer, as_of_date date)
+    LANGUAGE plpgsql STABLE
+    AS $$
+DECLARE
+    v_base RECORD;
+    v_dilution NUMERIC := 0;
+    v_dilution_count INTEGER := 0;
+    v_votes_per_unit NUMERIC;
+    v_economic_per_unit NUMERIC;
+BEGIN
+    -- Get base supply from issuance events
+    SELECT * INTO v_base
+    FROM kyc.fn_share_class_supply_at(p_share_class_id, p_as_of);
+
+    -- Get voting/economic multipliers
+    SELECT COALESCE(sc.votes_per_unit, sc.voting_rights_per_share, 1), COALESCE(sc.economic_per_unit, 1)
+    INTO v_votes_per_unit, v_economic_per_unit
+    FROM kyc.share_classes sc
+    WHERE sc.id = p_share_class_id;
+
+    -- Compute dilution from instruments that convert INTO this share class
+    IF p_basis = 'FULLY_DILUTED' THEN
+        -- All outstanding instruments (vested or not)
+        SELECT
+            COALESCE(SUM((di.units_granted - di.units_exercised - di.units_forfeited) * di.conversion_ratio), 0),
+            COUNT(*)
+        INTO v_dilution, v_dilution_count
+        FROM kyc.dilution_instruments di
+        WHERE di.converts_to_share_class_id = p_share_class_id
+          AND di.status = 'ACTIVE'
+          AND (di.expiration_date IS NULL OR di.expiration_date > p_as_of);
+
+    ELSIF p_basis = 'EXERCISABLE' THEN
+        -- Only currently exercisable instruments
+        SELECT
+            COALESCE(SUM((di.units_granted - di.units_exercised - di.units_forfeited) * di.conversion_ratio), 0),
+            COUNT(*)
+        INTO v_dilution, v_dilution_count
+        FROM kyc.dilution_instruments di
+        WHERE di.converts_to_share_class_id = p_share_class_id
+          AND di.status = 'ACTIVE'
+          AND (di.exercisable_from IS NULL OR di.exercisable_from <= p_as_of)
+          AND (di.expiration_date IS NULL OR di.expiration_date > p_as_of);
+    ELSE
+        -- Default to no dilution for ISSUED/OUTSTANDING
+        v_dilution := 0;
+        v_dilution_count := 0;
+    END IF;
+
+    RETURN QUERY SELECT
+        p_share_class_id,
+        v_base.issued_units,
+        v_base.outstanding_units,
+        v_dilution,
+        v_base.outstanding_units + v_dilution,
+        (v_base.outstanding_units + v_dilution) * COALESCE(v_votes_per_unit, 1),
+        (v_base.outstanding_units + v_dilution) * COALESCE(v_economic_per_unit, 1),
+        v_dilution_count,
+        p_as_of;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION fn_diluted_supply_at(p_share_class_id uuid, p_as_of date, p_basis text); Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON FUNCTION kyc.fn_diluted_supply_at(p_share_class_id uuid, p_as_of date, p_basis text) IS 'Compute supply including potential dilution from options/warrants/convertibles.
+     FULLY_DILUTED = all outstanding instruments. EXERCISABLE = only currently exercisable.';
+
+
+--
+-- Name: fn_holder_control_position(uuid, date, text); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.fn_holder_control_position(p_issuer_entity_id uuid, p_as_of date DEFAULT CURRENT_DATE, p_basis text DEFAULT 'VOTES'::text) RETURNS TABLE(issuer_entity_id uuid, issuer_name text, holder_entity_id uuid, holder_name text, holder_type text, holder_units numeric, holder_votes numeric, holder_economic numeric, total_issuer_votes numeric, total_issuer_economic numeric, voting_pct numeric, economic_pct numeric, control_threshold_pct numeric, significant_threshold_pct numeric, has_control boolean, has_significant_influence boolean, has_board_rights boolean, board_seats integer)
+    LANGUAGE plpgsql STABLE
+    AS $$
+BEGIN
+    RETURN QUERY
+    WITH issuer_supply AS (
+        -- Aggregate supply across all share classes for issuer
+        SELECT
+            SUM(COALESCE(scs.issued_units, sc.issued_shares, 0) * COALESCE(sc.votes_per_unit, sc.voting_rights_per_share, 1)) AS total_votes,
+            SUM(COALESCE(scs.issued_units, sc.issued_shares, 0) * COALESCE(sc.economic_per_unit, 1)) AS total_economic
+        FROM kyc.share_classes sc
+        LEFT JOIN kyc.share_class_supply scs ON scs.share_class_id = sc.id
+            AND scs.as_of_date = (SELECT MAX(as_of_date) FROM kyc.share_class_supply WHERE share_class_id = sc.id AND as_of_date <= p_as_of)
+        WHERE sc.issuer_entity_id = p_issuer_entity_id
+    ),
+    holder_positions AS (
+        -- Aggregate holdings per holder across all classes
+        SELECT
+            h.investor_entity_id,
+            SUM(h.units) AS units,
+            SUM(h.units * COALESCE(sc.votes_per_unit, sc.voting_rights_per_share, 1)) AS votes,
+            SUM(h.units * COALESCE(sc.economic_per_unit, 1)) AS economic
+        FROM kyc.holdings h
+        JOIN kyc.share_classes sc ON sc.id = h.share_class_id
+        WHERE sc.issuer_entity_id = p_issuer_entity_id
+          AND h.status = 'active'
+        GROUP BY h.investor_entity_id
+    ),
+    holder_rights AS (
+        -- Check for board appointment rights
+        SELECT
+            sr.holder_entity_id,
+            COALESCE(SUM(sr.board_seats), 0) AS board_seats
+        FROM kyc.special_rights sr
+        WHERE sr.issuer_entity_id = p_issuer_entity_id
+          AND sr.holder_entity_id IS NOT NULL
+          AND sr.right_type = 'BOARD_APPOINTMENT'
+          AND (sr.effective_to IS NULL OR sr.effective_to > p_as_of)
+          AND (sr.effective_from IS NULL OR sr.effective_from <= p_as_of)
+        GROUP BY sr.holder_entity_id
+    ),
+    config AS (
+        SELECT
+            COALESCE(icc.control_threshold_pct, 50) AS control_threshold,
+            COALESCE(icc.significant_threshold_pct, 25) AS significant_threshold
+        FROM kyc.issuer_control_config icc
+        WHERE icc.issuer_entity_id = p_issuer_entity_id
+          AND (icc.effective_to IS NULL OR icc.effective_to > p_as_of)
+          AND icc.effective_from <= p_as_of
+        ORDER BY icc.effective_from DESC
+        LIMIT 1
+    )
+    SELECT
+        p_issuer_entity_id,
+        ie.name::TEXT,
+        hp.investor_entity_id,
+        he.name::TEXT,
+        het.type_code::TEXT,
+        hp.units,
+        hp.votes,
+        hp.economic,
+        isu.total_votes,
+        isu.total_economic,
+        CASE WHEN isu.total_votes > 0 THEN ROUND((hp.votes / isu.total_votes) * 100, 4) ELSE 0 END,
+        CASE WHEN isu.total_economic > 0 THEN ROUND((hp.economic / isu.total_economic) * 100, 4) ELSE 0 END,
+        COALESCE(cfg.control_threshold, 50),
+        COALESCE(cfg.significant_threshold, 25),
+        CASE WHEN isu.total_votes > 0 AND (hp.votes / isu.total_votes) * 100 > COALESCE(cfg.control_threshold, 50) THEN true ELSE false END,
+        CASE WHEN isu.total_votes > 0 AND (hp.votes / isu.total_votes) * 100 > COALESCE(cfg.significant_threshold, 25) THEN true ELSE false END,
+        COALESCE(hr.board_seats, 0) > 0,
+        COALESCE(hr.board_seats, 0)::INTEGER
+    FROM holder_positions hp
+    CROSS JOIN issuer_supply isu
+    LEFT JOIN config cfg ON true
+    LEFT JOIN holder_rights hr ON hr.holder_entity_id = hp.investor_entity_id
+    JOIN "ob-poc".entities ie ON ie.entity_id = p_issuer_entity_id
+    JOIN "ob-poc".entities he ON he.entity_id = hp.investor_entity_id
+    LEFT JOIN "ob-poc".entity_types het ON he.entity_type_id = het.entity_type_id
+    ORDER BY hp.votes DESC;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION fn_holder_control_position(p_issuer_entity_id uuid, p_as_of date, p_basis text); Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON FUNCTION kyc.fn_holder_control_position(p_issuer_entity_id uuid, p_as_of date, p_basis text) IS 'Compute holder control positions for an issuer including voting %, economic %, control flags, and board rights.';
+
+
+--
+-- Name: fn_share_class_supply_at(uuid, date); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.fn_share_class_supply_at(p_share_class_id uuid, p_as_of date DEFAULT CURRENT_DATE) RETURNS TABLE(share_class_id uuid, authorized_units numeric, issued_units numeric, outstanding_units numeric, treasury_units numeric, total_votes numeric, total_economic numeric, as_of_date date)
+    LANGUAGE plpgsql STABLE
+    AS $$
+DECLARE
+    v_votes_per_unit NUMERIC;
+    v_economic_per_unit NUMERIC;
+    v_authorized NUMERIC;
+    v_issued NUMERIC := 0;
+    v_treasury NUMERIC := 0;
+BEGIN
+    -- Get share class attributes
+    SELECT
+        COALESCE(sc.votes_per_unit, sc.voting_rights_per_share, 1),
+        COALESCE(sc.economic_per_unit, 1),
+        sc.authorized_shares
+    INTO v_votes_per_unit, v_economic_per_unit, v_authorized
+    FROM kyc.share_classes sc
+    WHERE sc.id = p_share_class_id;
+
+    -- Compute issued from events up to as_of
+    SELECT COALESCE(SUM(
+        CASE
+            WHEN ie.event_type IN ('INITIAL_ISSUE', 'NEW_ISSUE', 'BONUS_ISSUE', 'MERGER_IN', 'TREASURY_RELEASE', 'CONVERSION')
+                THEN ie.units_delta
+            WHEN ie.event_type IN ('CANCELLATION', 'BUYBACK', 'MERGER_OUT')
+                THEN -ABS(ie.units_delta)
+            WHEN ie.event_type = 'STOCK_SPLIT'
+                THEN (SELECT COALESCE(SUM(ie2.units_delta), 0) FROM kyc.issuance_events ie2
+                      WHERE ie2.share_class_id = p_share_class_id
+                      AND ie2.effective_date < ie.effective_date
+                      AND ie2.status = 'EFFECTIVE') * (ie.ratio_to::NUMERIC / ie.ratio_from - 1)
+            ELSE 0
+        END
+    ), 0)
+    INTO v_issued
+    FROM kyc.issuance_events ie
+    WHERE ie.share_class_id = p_share_class_id
+      AND ie.effective_date <= p_as_of
+      AND ie.status = 'EFFECTIVE';
+
+    -- Compute treasury
+    SELECT COALESCE(SUM(
+        CASE
+            WHEN ie.event_type = 'BUYBACK' THEN ie.units_delta
+            WHEN ie.event_type IN ('TREASURY_RELEASE', 'TREASURY_TRANSFER') THEN -ie.units_delta
+            ELSE 0
+        END
+    ), 0)
+    INTO v_treasury
+    FROM kyc.issuance_events ie
+    WHERE ie.share_class_id = p_share_class_id
+      AND ie.effective_date <= p_as_of
+      AND ie.status = 'EFFECTIVE';
+
+    RETURN QUERY SELECT
+        p_share_class_id,
+        v_authorized,
+        v_issued,
+        v_issued - v_treasury,
+        v_treasury,
+        v_issued * COALESCE(v_votes_per_unit, 1),
+        v_issued * COALESCE(v_economic_per_unit, 1),
+        p_as_of;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION fn_share_class_supply_at(p_share_class_id uuid, p_as_of date); Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON FUNCTION kyc.fn_share_class_supply_at(p_share_class_id uuid, p_as_of date) IS 'Compute supply at any as-of date from the issuance events ledger.';
+
+
+--
+-- Name: fn_update_supply_timestamp(); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.fn_update_supply_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
 $$;
 
 
@@ -570,6 +1135,27 @@ $$;
 
 
 --
+-- Name: uuid_to_lock_id(uuid); Type: FUNCTION; Schema: kyc; Owner: -
+--
+
+CREATE FUNCTION kyc.uuid_to_lock_id(p_uuid uuid) RETURNS bigint
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    -- Use hashtext on the UUID string to get a stable bigint
+    RETURN ('x' || substr(md5(p_uuid::text), 1, 16))::bit(64)::bigint;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION uuid_to_lock_id(p_uuid uuid); Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON FUNCTION kyc.uuid_to_lock_id(p_uuid uuid) IS 'Convert UUID to bigint for use with pg_advisory_xact_lock. Uses MD5 hash for stability.';
+
+
+--
 -- Name: validate_investor_lifecycle_transition(); Type: FUNCTION; Schema: kyc; Owner: -
 --
 
@@ -618,6 +1204,106 @@ BEGIN
     RETURN aborted;
 END;
 $$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: session_scopes; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".session_scopes (
+    session_scope_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid NOT NULL,
+    user_id uuid,
+    scope_type character varying(50) DEFAULT 'empty'::character varying NOT NULL,
+    apex_entity_id uuid,
+    apex_entity_name character varying(255),
+    cbu_id uuid,
+    cbu_name character varying(255),
+    jurisdiction_code character varying(10),
+    focal_entity_id uuid,
+    focal_entity_name character varying(255),
+    neighborhood_hops integer DEFAULT 2,
+    scope_filters jsonb DEFAULT '{}'::jsonb,
+    cursor_entity_id uuid,
+    cursor_entity_name character varying(255),
+    total_entities integer DEFAULT 0,
+    total_cbus integer DEFAULT 0,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    expires_at timestamp with time zone DEFAULT (now() + '24:00:00'::interval),
+    history_position integer DEFAULT 0,
+    active_cbu_ids uuid[] DEFAULT '{}'::uuid[]
+);
+
+
+--
+-- Name: TABLE session_scopes; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".session_scopes IS 'Persistent storage for user session scope state (galaxy, book, CBU, jurisdiction, neighborhood)';
+
+
+--
+-- Name: COLUMN session_scopes.scope_type; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".session_scopes.scope_type IS 'Discriminator: empty, galaxy, book, cbu, jurisdiction, neighborhood, custom';
+
+
+--
+-- Name: COLUMN session_scopes.scope_filters; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".session_scopes.scope_filters IS 'Additional filters for book scope: jurisdictions[], entity_types[], etc.';
+
+
+--
+-- Name: COLUMN session_scopes.history_position; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".session_scopes.history_position IS 'Current position in history stack. -1 means at latest, >=0 means navigated back.';
+
+
+--
+-- Name: COLUMN session_scopes.active_cbu_ids; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".session_scopes.active_cbu_ids IS 'Set of active CBU IDs (0..n) for multi-CBU selection workflows.';
+
+
+--
+-- Name: add_cbu_to_set(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".add_cbu_to_set(p_session_id uuid, p_cbu_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+BEGIN
+    UPDATE "ob-poc".session_scopes
+    SET active_cbu_ids = CASE
+            WHEN p_cbu_id = ANY(active_cbu_ids) THEN active_cbu_ids  -- Already in set
+            ELSE array_append(active_cbu_ids, p_cbu_id)
+        END,
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION add_cbu_to_set(p_session_id uuid, p_cbu_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".add_cbu_to_set(p_session_id uuid, p_cbu_id uuid) IS 'Add a CBU to the active set';
 
 
 --
@@ -1326,57 +2012,32 @@ END;
 $$;
 
 
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
-
 --
--- Name: session_scopes; Type: TABLE; Schema: ob-poc; Owner: -
+-- Name: clear_cbu_set(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
-CREATE TABLE "ob-poc".session_scopes (
-    session_scope_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    session_id uuid NOT NULL,
-    user_id uuid,
-    scope_type character varying(50) DEFAULT 'empty'::character varying NOT NULL,
-    apex_entity_id uuid,
-    apex_entity_name character varying(255),
-    cbu_id uuid,
-    cbu_name character varying(255),
-    jurisdiction_code character varying(10),
-    focal_entity_id uuid,
-    focal_entity_name character varying(255),
-    neighborhood_hops integer DEFAULT 2,
-    scope_filters jsonb DEFAULT '{}'::jsonb,
-    cursor_entity_id uuid,
-    cursor_entity_name character varying(255),
-    total_entities integer DEFAULT 0,
-    total_cbus integer DEFAULT 0,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    expires_at timestamp with time zone DEFAULT (now() + '24:00:00'::interval)
-);
+CREATE FUNCTION "ob-poc".clear_cbu_set(p_session_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+BEGIN
+    UPDATE "ob-poc".session_scopes
+    SET active_cbu_ids = '{}',
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
 
 
 --
--- Name: TABLE session_scopes; Type: COMMENT; Schema: ob-poc; Owner: -
+-- Name: FUNCTION clear_cbu_set(p_session_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON TABLE "ob-poc".session_scopes IS 'Persistent storage for user session scope state (galaxy, book, CBU, jurisdiction, neighborhood)';
-
-
---
--- Name: COLUMN session_scopes.scope_type; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".session_scopes.scope_type IS 'Discriminator: empty, galaxy, book, cbu, jurisdiction, neighborhood, custom';
-
-
---
--- Name: COLUMN session_scopes.scope_filters; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".session_scopes.scope_filters IS 'Additional filters for book scope: jurisdictions[], entity_types[], etc.';
+COMMENT ON FUNCTION "ob-poc".clear_cbu_set(p_session_id uuid) IS 'Clear the active CBU set';
 
 
 --
@@ -2526,6 +3187,193 @@ $$;
 
 
 --
+-- Name: navigate_back(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".navigate_back(p_session_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_scope "ob-poc".session_scopes;
+    v_current_pos INTEGER;
+    v_target_pos INTEGER;
+    v_max_pos INTEGER;
+    v_snapshot JSONB;
+    v_result "ob-poc".session_scopes;
+BEGIN
+    -- Get current scope and position
+    SELECT * INTO v_current_scope
+    FROM "ob-poc".session_scopes
+    WHERE session_id = p_session_id;
+
+    IF v_current_scope IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    -- Get max history position
+    SELECT MAX(position) INTO v_max_pos
+    FROM "ob-poc".session_scope_history
+    WHERE session_id = p_session_id;
+
+    IF v_max_pos IS NULL THEN
+        -- No history, return current scope unchanged
+        RETURN v_current_scope;
+    END IF;
+
+    -- Calculate current effective position
+    IF v_current_scope.history_position < 0 THEN
+        -- At end of history, need to save current state first
+        PERFORM "ob-poc".push_scope_history(p_session_id, 'navigation', 'session.back');
+        v_current_pos := v_max_pos + 1;
+    ELSE
+        v_current_pos := v_current_scope.history_position;
+    END IF;
+
+    -- Calculate target position (one step back)
+    v_target_pos := v_current_pos - 1;
+
+    IF v_target_pos < 0 THEN
+        -- Already at oldest history entry
+        RETURN v_current_scope;
+    END IF;
+
+    -- Get the snapshot at target position
+    SELECT scope_snapshot INTO v_snapshot
+    FROM "ob-poc".session_scope_history
+    WHERE session_id = p_session_id
+      AND position = v_target_pos;
+
+    IF v_snapshot IS NULL THEN
+        RETURN v_current_scope;
+    END IF;
+
+    -- Restore scope from snapshot
+    UPDATE "ob-poc".session_scopes
+    SET scope_type = v_snapshot->>'scope_type',
+        apex_entity_id = (v_snapshot->>'apex_entity_id')::UUID,
+        apex_entity_name = v_snapshot->>'apex_entity_name',
+        cbu_id = (v_snapshot->>'cbu_id')::UUID,
+        cbu_name = v_snapshot->>'cbu_name',
+        jurisdiction_code = v_snapshot->>'jurisdiction_code',
+        focal_entity_id = (v_snapshot->>'focal_entity_id')::UUID,
+        focal_entity_name = v_snapshot->>'focal_entity_name',
+        neighborhood_hops = (v_snapshot->>'neighborhood_hops')::INTEGER,
+        scope_filters = COALESCE(v_snapshot->'scope_filters', '{}'),
+        cursor_entity_id = (v_snapshot->>'cursor_entity_id')::UUID,
+        cursor_entity_name = v_snapshot->>'cursor_entity_name',
+        active_cbu_ids = COALESCE(
+            ARRAY(SELECT jsonb_array_elements_text(v_snapshot->'active_cbu_ids')::UUID),
+            '{}'
+        ),
+        history_position = v_target_pos,
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION navigate_back(p_session_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".navigate_back(p_session_id uuid) IS 'Navigate back one step in scope history. Returns updated session_scopes row.';
+
+
+--
+-- Name: navigate_forward(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".navigate_forward(p_session_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_scope "ob-poc".session_scopes;
+    v_target_pos INTEGER;
+    v_max_pos INTEGER;
+    v_snapshot JSONB;
+    v_result "ob-poc".session_scopes;
+BEGIN
+    -- Get current scope and position
+    SELECT * INTO v_current_scope
+    FROM "ob-poc".session_scopes
+    WHERE session_id = p_session_id;
+
+    IF v_current_scope IS NULL THEN
+        RETURN NULL;
+    END IF;
+
+    -- If already at end of history, nothing to do
+    IF v_current_scope.history_position < 0 THEN
+        RETURN v_current_scope;
+    END IF;
+
+    -- Get max history position
+    SELECT MAX(position) INTO v_max_pos
+    FROM "ob-poc".session_scope_history
+    WHERE session_id = p_session_id;
+
+    -- Calculate target position (one step forward)
+    v_target_pos := v_current_scope.history_position + 1;
+
+    IF v_target_pos > v_max_pos THEN
+        -- Moving past end of history - mark as "at end"
+        UPDATE "ob-poc".session_scopes
+        SET history_position = -1,
+            updated_at = NOW()
+        WHERE session_id = p_session_id
+        RETURNING * INTO v_result;
+        RETURN v_result;
+    END IF;
+
+    -- Get the snapshot at target position
+    SELECT scope_snapshot INTO v_snapshot
+    FROM "ob-poc".session_scope_history
+    WHERE session_id = p_session_id
+      AND position = v_target_pos;
+
+    IF v_snapshot IS NULL THEN
+        RETURN v_current_scope;
+    END IF;
+
+    -- Restore scope from snapshot
+    UPDATE "ob-poc".session_scopes
+    SET scope_type = v_snapshot->>'scope_type',
+        apex_entity_id = (v_snapshot->>'apex_entity_id')::UUID,
+        apex_entity_name = v_snapshot->>'apex_entity_name',
+        cbu_id = (v_snapshot->>'cbu_id')::UUID,
+        cbu_name = v_snapshot->>'cbu_name',
+        jurisdiction_code = v_snapshot->>'jurisdiction_code',
+        focal_entity_id = (v_snapshot->>'focal_entity_id')::UUID,
+        focal_entity_name = v_snapshot->>'focal_entity_name',
+        neighborhood_hops = (v_snapshot->>'neighborhood_hops')::INTEGER,
+        scope_filters = COALESCE(v_snapshot->'scope_filters', '{}'),
+        cursor_entity_id = (v_snapshot->>'cursor_entity_id')::UUID,
+        cursor_entity_name = v_snapshot->>'cursor_entity_name',
+        active_cbu_ids = COALESCE(
+            ARRAY(SELECT jsonb_array_elements_text(v_snapshot->'active_cbu_ids')::UUID),
+            '{}'
+        ),
+        history_position = v_target_pos,
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION navigate_forward(p_session_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".navigate_forward(p_session_id uuid) IS 'Navigate forward one step in scope history. Returns updated session_scopes row.';
+
+
+--
 -- Name: needs_ast_migration(jsonb); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -2579,6 +3427,82 @@ BEGIN
       AND (r.effective_to IS NULL OR r.effective_to > p_as_of_date);
 END;
 $$;
+
+
+--
+-- Name: push_scope_history(uuid, character varying, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".push_scope_history(p_session_id uuid, p_change_source character varying DEFAULT 'dsl'::character varying, p_change_verb character varying DEFAULT NULL::character varying) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_current_scope "ob-poc".session_scopes;
+    v_new_position INTEGER;
+    v_snapshot JSONB;
+BEGIN
+    -- Get current scope
+    SELECT * INTO v_current_scope
+    FROM "ob-poc".session_scopes
+    WHERE session_id = p_session_id;
+
+    IF v_current_scope IS NULL THEN
+        RETURN -1;
+    END IF;
+
+    -- If we're not at the end of history, truncate forward history
+    -- (like when you navigate back then make a new change)
+    IF v_current_scope.history_position >= 0 THEN
+        DELETE FROM "ob-poc".session_scope_history
+        WHERE session_id = p_session_id
+          AND position > v_current_scope.history_position;
+    END IF;
+
+    -- Get next position
+    SELECT COALESCE(MAX(position), -1) + 1 INTO v_new_position
+    FROM "ob-poc".session_scope_history
+    WHERE session_id = p_session_id;
+
+    -- Build snapshot from current scope
+    v_snapshot := jsonb_build_object(
+        'scope_type', v_current_scope.scope_type,
+        'apex_entity_id', v_current_scope.apex_entity_id,
+        'apex_entity_name', v_current_scope.apex_entity_name,
+        'cbu_id', v_current_scope.cbu_id,
+        'cbu_name', v_current_scope.cbu_name,
+        'jurisdiction_code', v_current_scope.jurisdiction_code,
+        'focal_entity_id', v_current_scope.focal_entity_id,
+        'focal_entity_name', v_current_scope.focal_entity_name,
+        'neighborhood_hops', v_current_scope.neighborhood_hops,
+        'scope_filters', v_current_scope.scope_filters,
+        'cursor_entity_id', v_current_scope.cursor_entity_id,
+        'cursor_entity_name', v_current_scope.cursor_entity_name,
+        'active_cbu_ids', v_current_scope.active_cbu_ids
+    );
+
+    -- Insert history entry
+    INSERT INTO "ob-poc".session_scope_history (
+        session_id, position, scope_snapshot, change_source, change_verb
+    ) VALUES (
+        p_session_id, v_new_position, v_snapshot, p_change_source, p_change_verb
+    );
+
+    -- Update current position to "at end" (-1)
+    UPDATE "ob-poc".session_scopes
+    SET history_position = -1,
+        updated_at = NOW()
+    WHERE session_id = p_session_id;
+
+    RETURN v_new_position;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION push_scope_history(p_session_id uuid, p_change_source character varying, p_change_verb character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".push_scope_history(p_session_id uuid, p_change_source character varying, p_change_verb character varying) IS 'Push current scope state to history stack. Call before making scope changes.';
 
 
 --
@@ -2782,6 +3706,34 @@ $$;
 
 
 --
+-- Name: remove_cbu_from_set(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".remove_cbu_from_set(p_session_id uuid, p_cbu_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+BEGIN
+    UPDATE "ob-poc".session_scopes
+    SET active_cbu_ids = array_remove(active_cbu_ids, p_cbu_id),
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION remove_cbu_from_set(p_session_id uuid, p_cbu_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".remove_cbu_from_set(p_session_id uuid, p_cbu_id uuid) IS 'Remove a CBU from the active set';
+
+
+--
 -- Name: reset_layout_overrides(uuid, character varying, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -2880,6 +3832,34 @@ $$;
 
 
 --
+-- Name: set_cbu_set(uuid, uuid[]); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_cbu_set(p_session_id uuid, p_cbu_ids uuid[]) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_result "ob-poc".session_scopes;
+BEGIN
+    UPDATE "ob-poc".session_scopes
+    SET active_cbu_ids = COALESCE(p_cbu_ids, '{}'),
+        updated_at = NOW()
+    WHERE session_id = p_session_id
+    RETURNING * INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION set_cbu_set(p_session_id uuid, p_cbu_ids uuid[]); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".set_cbu_set(p_session_id uuid, p_cbu_ids uuid[]) IS 'Replace the entire active CBU set';
+
+
+--
 -- Name: set_scope_book(uuid, uuid, jsonb); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -2927,6 +3907,20 @@ BEGIN
     RETURNING * INTO v_result;
 
     RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_book_with_history(uuid, uuid, jsonb); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_book_with_history(p_session_id uuid, p_apex_entity_id uuid, p_filters jsonb DEFAULT '{}'::jsonb) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM "ob-poc".push_scope_history(p_session_id, 'dsl', 'session.set-book');
+    RETURN "ob-poc".set_scope_book(p_session_id, p_apex_entity_id, p_filters);
 END;
 $$;
 
@@ -2982,6 +3976,20 @@ BEGIN
     RETURNING * INTO v_result;
 
     RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_cbu_with_history(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_cbu_with_history(p_session_id uuid, p_cbu_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM "ob-poc".push_scope_history(p_session_id, 'dsl', 'session.set-cbu');
+    RETURN "ob-poc".set_scope_cbu(p_session_id, p_cbu_id);
 END;
 $$;
 
@@ -3072,6 +4080,22 @@ $$;
 
 
 --
+-- Name: set_scope_galaxy_with_history(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_galaxy_with_history(p_session_id uuid, p_apex_entity_id uuid) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Push current state to history
+    PERFORM "ob-poc".push_scope_history(p_session_id, 'dsl', 'session.set-galaxy');
+    -- Set new scope
+    RETURN "ob-poc".set_scope_galaxy(p_session_id, p_apex_entity_id);
+END;
+$$;
+
+
+--
 -- Name: set_scope_jurisdiction(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -3118,6 +4142,20 @@ $$;
 
 
 --
+-- Name: set_scope_jurisdiction_with_history(uuid, character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_jurisdiction_with_history(p_session_id uuid, p_jurisdiction_code character varying) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM "ob-poc".push_scope_history(p_session_id, 'dsl', 'session.set-jurisdiction');
+    RETURN "ob-poc".set_scope_jurisdiction(p_session_id, p_jurisdiction_code);
+END;
+$$;
+
+
+--
 -- Name: set_scope_neighborhood(uuid, uuid, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -3158,6 +4196,20 @@ BEGIN
     RETURNING * INTO v_result;
 
     RETURN v_result;
+END;
+$$;
+
+
+--
+-- Name: set_scope_neighborhood_with_history(uuid, uuid, integer); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".set_scope_neighborhood_with_history(p_session_id uuid, p_entity_id uuid, p_hops integer DEFAULT 2) RETURNS "ob-poc".session_scopes
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM "ob-poc".push_scope_history(p_session_id, 'dsl', 'session.set-neighborhood');
+    RETURN "ob-poc".set_scope_neighborhood(p_session_id, p_entity_id, p_hops);
 END;
 $$;
 
@@ -3739,6 +4791,32 @@ $$;
 
 
 --
+-- Name: cleanup_old_logs(integer); Type: FUNCTION; Schema: sessions; Owner: -
+--
+
+CREATE FUNCTION sessions.cleanup_old_logs(retention_days integer DEFAULT 30) RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    deleted_count INTEGER;
+BEGIN
+    DELETE FROM sessions.log
+    WHERE timestamp < NOW() - (retention_days || ' days')::INTERVAL;
+
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RETURN deleted_count;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION cleanup_old_logs(retention_days integer); Type: COMMENT; Schema: sessions; Owner: -
+--
+
+COMMENT ON FUNCTION sessions.cleanup_old_logs(retention_days integer) IS 'Delete session logs older than retention_days (default 30)';
+
+
+--
 -- Name: generate_attestation_signature(uuid, uuid, uuid[], text, timestamp with time zone); Type: FUNCTION; Schema: teams; Owner: -
 --
 
@@ -4183,6 +5261,108 @@ CREATE VIEW client_portal.v_client_outstanding AS
    FROM (kyc.outstanding_requests r
      LEFT JOIN "ob-poc".entities e ON ((r.entity_id = e.entity_id)))
   WHERE ((r.client_visible = true) AND ((r.status)::text <> ALL ((ARRAY['FULFILLED'::character varying, 'CANCELLED'::character varying, 'WAIVED'::character varying])::text[])));
+
+
+--
+-- Name: ca_event_types; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.ca_event_types (
+    event_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_code text NOT NULL,
+    event_name text NOT NULL,
+    category text NOT NULL,
+    is_elective boolean DEFAULT false NOT NULL,
+    default_election text,
+    iso_event_code text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ca_event_types_category_check CHECK ((category = ANY (ARRAY['INCOME'::text, 'REORGANIZATION'::text, 'VOLUNTARY'::text, 'MANDATORY'::text, 'INFORMATION'::text]))),
+    CONSTRAINT ca_event_types_default_election_check CHECK ((default_election = ANY (ARRAY['CASH'::text, 'STOCK'::text, 'ROLLOVER'::text, 'LAPSE'::text, 'DECLINE'::text, 'NO_ACTION'::text])))
+);
+
+
+--
+-- Name: TABLE ca_event_types; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.ca_event_types IS 'Reference catalog of corporate action event types';
+
+
+--
+-- Name: cbu_ca_instruction_windows; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_ca_instruction_windows (
+    window_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    event_type_id uuid,
+    market_id uuid,
+    cutoff_days_before integer NOT NULL,
+    warning_days integer DEFAULT 3,
+    escalation_days integer DEFAULT 1,
+    escalation_contact text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE cbu_ca_instruction_windows; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_ca_instruction_windows IS 'CBU deadline/cutoff rules for CA instructions';
+
+
+--
+-- Name: cbu_ca_preferences; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_ca_preferences (
+    preference_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    event_type_id uuid NOT NULL,
+    instrument_class_id uuid,
+    processing_mode text NOT NULL,
+    default_election text,
+    threshold_value numeric(18,4),
+    threshold_currency text,
+    notification_email text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_ca_preferences_processing_mode_check CHECK ((processing_mode = ANY (ARRAY['AUTO_INSTRUCT'::text, 'MANUAL'::text, 'DEFAULT_ONLY'::text, 'THRESHOLD'::text])))
+);
+
+
+--
+-- Name: TABLE cbu_ca_preferences; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_ca_preferences IS 'CBU-specific CA processing preferences (written by materialize)';
+
+
+--
+-- Name: cbu_ca_ssi_mappings; Type: TABLE; Schema: custody; Owner: -
+--
+
+CREATE TABLE custody.cbu_ca_ssi_mappings (
+    mapping_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cbu_id uuid NOT NULL,
+    event_type_id uuid,
+    currency text NOT NULL,
+    proceeds_type text NOT NULL,
+    ssi_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cbu_ca_ssi_mappings_proceeds_type_check CHECK ((proceeds_type = ANY (ARRAY['CASH'::text, 'STOCK'::text])))
+);
+
+
+--
+-- Name: TABLE cbu_ca_ssi_mappings; Type: COMMENT; Schema: custody; Owner: -
+--
+
+COMMENT ON TABLE custody.cbu_ca_ssi_mappings IS 'Which SSI receives CA proceeds (cash/stock) per currency';
 
 
 --
@@ -5012,6 +6192,265 @@ COMMENT ON TABLE custody.tax_treaty_rates IS 'Bilateral tax treaty rates between
 
 
 --
+-- Name: log; Type: TABLE; Schema: events; Owner: -
+--
+
+CREATE TABLE events.log (
+    id bigint NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
+    session_id uuid,
+    event_type text NOT NULL,
+    payload jsonb NOT NULL,
+    CONSTRAINT valid_event_type CHECK ((event_type = ANY (ARRAY['command_succeeded'::text, 'command_failed'::text, 'session_started'::text, 'session_ended'::text])))
+);
+
+
+--
+-- Name: TABLE log; Type: COMMENT; Schema: events; Owner: -
+--
+
+COMMENT ON TABLE events.log IS 'Append-only DSL execution events for observability and failure analysis';
+
+
+--
+-- Name: log_id_seq; Type: SEQUENCE; Schema: events; Owner: -
+--
+
+CREATE SEQUENCE events.log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: log_id_seq; Type: SEQUENCE OWNED BY; Schema: events; Owner: -
+--
+
+ALTER SEQUENCE events.log_id_seq OWNED BY events.log.id;
+
+
+--
+-- Name: recent_failures; Type: VIEW; Schema: events; Owner: -
+--
+
+CREATE VIEW events.recent_failures AS
+ SELECT id AS event_id,
+    "timestamp",
+    session_id,
+    (payload ->> 'verb'::text) AS verb,
+    ((payload -> 'error'::text) ->> 'message'::text) AS error_message,
+    ((payload -> 'error'::text) ->> 'error_type'::text) AS error_type,
+    ((payload ->> 'duration_ms'::text))::integer AS duration_ms
+   FROM events.log e
+  WHERE (event_type = 'command_failed'::text)
+  ORDER BY "timestamp" DESC
+ LIMIT 100;
+
+
+--
+-- Name: VIEW recent_failures; Type: COMMENT; Schema: events; Owner: -
+--
+
+COMMENT ON VIEW events.recent_failures IS 'Recent command failures for quick inspection';
+
+
+--
+-- Name: session_summary; Type: VIEW; Schema: events; Owner: -
+--
+
+CREATE VIEW events.session_summary AS
+ SELECT session_id,
+    min("timestamp") AS started_at,
+    max("timestamp") AS last_activity,
+    count(*) FILTER (WHERE (event_type = 'command_succeeded'::text)) AS success_count,
+    count(*) FILTER (WHERE (event_type = 'command_failed'::text)) AS failure_count,
+    count(*) AS total_events
+   FROM events.log
+  WHERE (session_id IS NOT NULL)
+  GROUP BY session_id
+  ORDER BY (max("timestamp")) DESC;
+
+
+--
+-- Name: VIEW session_summary; Type: COMMENT; Schema: events; Owner: -
+--
+
+COMMENT ON VIEW events.session_summary IS 'Per-session event summary';
+
+
+--
+-- Name: failures; Type: TABLE; Schema: feedback; Owner: -
+--
+
+CREATE TABLE feedback.failures (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    fingerprint text NOT NULL,
+    fingerprint_version smallint DEFAULT 1 NOT NULL,
+    error_type feedback.error_type NOT NULL,
+    remediation_path feedback.remediation_path NOT NULL,
+    status feedback.issue_status DEFAULT 'NEW'::feedback.issue_status NOT NULL,
+    verb text NOT NULL,
+    source text,
+    error_message text NOT NULL,
+    error_context jsonb,
+    user_intent text,
+    command_sequence text[],
+    repro_type text,
+    repro_path text,
+    repro_verified boolean DEFAULT false,
+    fix_commit text,
+    fix_notes text,
+    occurrence_count integer DEFAULT 1 NOT NULL,
+    first_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    resolved_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE failures; Type: COMMENT; Schema: feedback; Owner: -
+--
+
+COMMENT ON TABLE feedback.failures IS 'Deduplicated failure records, keyed by fingerprint';
+
+
+--
+-- Name: active_issues; Type: VIEW; Schema: feedback; Owner: -
+--
+
+CREATE VIEW feedback.active_issues AS
+ SELECT id,
+    fingerprint,
+    error_type,
+    remediation_path,
+    status,
+    verb,
+    source,
+    error_message,
+    user_intent,
+    occurrence_count,
+    first_seen_at,
+    last_seen_at,
+    repro_verified
+   FROM feedback.failures f
+  WHERE (status <> ALL (ARRAY['RESOLVED'::feedback.issue_status, 'WONT_FIX'::feedback.issue_status, 'DUPLICATE'::feedback.issue_status, 'INVALID'::feedback.issue_status]))
+  ORDER BY
+        CASE remediation_path
+            WHEN 'CODE'::feedback.remediation_path THEN 1
+            WHEN 'RUNTIME'::feedback.remediation_path THEN 2
+            ELSE 3
+        END, occurrence_count DESC, last_seen_at DESC;
+
+
+--
+-- Name: VIEW active_issues; Type: COMMENT; Schema: feedback; Owner: -
+--
+
+COMMENT ON VIEW feedback.active_issues IS 'Issues needing attention, prioritized by remediation path';
+
+
+--
+-- Name: audit_log; Type: TABLE; Schema: feedback; Owner: -
+--
+
+CREATE TABLE feedback.audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    failure_id uuid NOT NULL,
+    action feedback.audit_action NOT NULL,
+    actor_type feedback.actor_type NOT NULL,
+    actor_id text,
+    details jsonb,
+    evidence text,
+    evidence_hash text,
+    previous_status feedback.issue_status,
+    new_status feedback.issue_status,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE audit_log; Type: COMMENT; Schema: feedback; Owner: -
+--
+
+COMMENT ON TABLE feedback.audit_log IS 'Full audit trail of all state transitions';
+
+
+--
+-- Name: occurrences; Type: TABLE; Schema: feedback; Owner: -
+--
+
+CREATE TABLE feedback.occurrences (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    failure_id uuid NOT NULL,
+    event_id uuid,
+    event_timestamp timestamp with time zone NOT NULL,
+    session_id uuid,
+    verb text NOT NULL,
+    duration_ms bigint,
+    error_message text NOT NULL,
+    error_backtrace text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE occurrences; Type: COMMENT; Schema: feedback; Owner: -
+--
+
+COMMENT ON TABLE feedback.occurrences IS 'Individual occurrences of each failure';
+
+
+--
+-- Name: ready_for_todo; Type: VIEW; Schema: feedback; Owner: -
+--
+
+CREATE VIEW feedback.ready_for_todo AS
+ SELECT id,
+    fingerprint,
+    error_type,
+    verb,
+    source,
+    error_message,
+    user_intent,
+    repro_path,
+    occurrence_count
+   FROM feedback.failures f
+  WHERE ((status = 'REPRO_VERIFIED'::feedback.issue_status) AND (repro_verified = true))
+  ORDER BY occurrence_count DESC;
+
+
+--
+-- Name: VIEW ready_for_todo; Type: COMMENT; Schema: feedback; Owner: -
+--
+
+COMMENT ON VIEW feedback.ready_for_todo IS 'Issues with verified repro, ready for TODO generation';
+
+
+--
+-- Name: recent_activity; Type: VIEW; Schema: feedback; Owner: -
+--
+
+CREATE VIEW feedback.recent_activity AS
+ SELECT a.id,
+    a.failure_id,
+    f.fingerprint,
+    a.action,
+    a.actor_type,
+    a.actor_id,
+    a.previous_status,
+    a.new_status,
+    a.created_at
+   FROM (feedback.audit_log a
+     JOIN feedback.failures f ON ((f.id = a.failure_id)))
+  ORDER BY a.created_at DESC
+ LIMIT 100;
+
+
+--
 -- Name: approval_requests; Type: TABLE; Schema: kyc; Owner: -
 --
 
@@ -5027,6 +6466,28 @@ CREATE TABLE kyc.approval_requests (
     decision_at timestamp with time zone,
     comments text
 );
+
+
+--
+-- Name: bods_right_type_mapping; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.bods_right_type_mapping (
+    bods_interest_type character varying(50) NOT NULL,
+    maps_to_right_type character varying(30),
+    maps_to_control boolean DEFAULT false,
+    maps_to_voting boolean DEFAULT false,
+    maps_to_economic boolean DEFAULT false,
+    notes text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE bods_right_type_mapping; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.bods_right_type_mapping IS 'Maps BODS 0.4 interest types to special_rights.right_type for reconciliation.';
 
 
 --
@@ -5089,6 +6550,78 @@ CREATE TABLE kyc.cases (
 --
 
 COMMENT ON TABLE kyc.cases IS 'KYC cases for client onboarding and periodic review';
+
+
+--
+-- Name: dilution_exercise_events; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.dilution_exercise_events (
+    exercise_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    instrument_id uuid NOT NULL,
+    units_exercised numeric(20,6) NOT NULL,
+    exercise_date date NOT NULL,
+    exercise_price_paid numeric(20,6),
+    shares_issued numeric(20,6) NOT NULL,
+    resulting_holding_id uuid,
+    is_cashless boolean DEFAULT false,
+    shares_withheld_for_tax numeric(20,6),
+    created_at timestamp with time zone DEFAULT now(),
+    notes text,
+    idempotency_key character varying(100)
+);
+
+
+--
+-- Name: TABLE dilution_exercise_events; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.dilution_exercise_events IS 'Audit trail of option/warrant exercises. Links to resulting holdings.';
+
+
+--
+-- Name: dilution_instruments; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.dilution_instruments (
+    instrument_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    issuer_entity_id uuid NOT NULL,
+    converts_to_share_class_id uuid,
+    instrument_type character varying(30) NOT NULL,
+    holder_entity_id uuid,
+    units_granted numeric(20,6) NOT NULL,
+    units_exercised numeric(20,6) DEFAULT 0,
+    units_forfeited numeric(20,6) DEFAULT 0,
+    conversion_ratio numeric(10,4) DEFAULT 1.0,
+    exercise_price numeric(20,6),
+    exercise_currency character varying(3),
+    valuation_cap numeric(20,2),
+    discount_pct numeric(5,2),
+    principal_amount numeric(20,2),
+    vesting_start_date date,
+    vesting_end_date date,
+    vesting_cliff_months integer,
+    exercisable_from date,
+    expiration_date date,
+    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    grant_document_id uuid,
+    board_approval_ref character varying(100),
+    plan_name character varying(100),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    notes text,
+    CONSTRAINT chk_dilution_status CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'EXERCISED'::character varying, 'EXPIRED'::character varying, 'FORFEITED'::character varying, 'CANCELLED'::character varying])::text[]))),
+    CONSTRAINT chk_exercised_lte_granted CHECK ((units_exercised <= units_granted)),
+    CONSTRAINT chk_instrument_type CHECK (((instrument_type)::text = ANY ((ARRAY['STOCK_OPTION'::character varying, 'WARRANT'::character varying, 'CONVERTIBLE_NOTE'::character varying, 'SAFE'::character varying, 'CONVERTIBLE_PREFERRED'::character varying, 'RSU'::character varying, 'PHANTOM_STOCK'::character varying, 'SAR'::character varying, 'OTHER'::character varying])::text[]))),
+    CONSTRAINT chk_units_positive CHECK ((units_granted > (0)::numeric))
+);
+
+
+--
+-- Name: TABLE dilution_instruments; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.dilution_instruments IS 'Options, warrants, convertibles, SAFEs that may dilute existing shareholders. Required for FULLY_DILUTED computation.';
 
 
 --
@@ -5292,6 +6825,29 @@ COMMENT ON COLUMN kyc.holdings.usage_type IS 'TA (Transfer Agency - client inves
 
 
 --
+-- Name: instrument_identifier_schemes; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.instrument_identifier_schemes (
+    scheme_code character varying(20) NOT NULL,
+    scheme_name character varying(100) NOT NULL,
+    issuing_authority character varying(100),
+    format_regex character varying(200),
+    is_global boolean DEFAULT false,
+    validation_url character varying(500),
+    display_order integer DEFAULT 100,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE instrument_identifier_schemes; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.instrument_identifier_schemes IS 'Reference table for security identifier types (ISIN, SEDOL, CUSIP, INTERNAL, etc.)';
+
+
+--
 -- Name: investor_lifecycle_history; Type: TABLE; Schema: kyc; Owner: -
 --
 
@@ -5424,6 +6980,77 @@ COMMENT ON COLUMN kyc.investors.owning_cbu_id IS 'The BNY client (fund manager) 
 
 
 --
+-- Name: issuance_events; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.issuance_events (
+    event_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    share_class_id uuid NOT NULL,
+    issuer_entity_id uuid NOT NULL,
+    event_type character varying(30) NOT NULL,
+    units_delta numeric(20,6) NOT NULL,
+    ratio_from integer,
+    ratio_to integer,
+    price_per_unit numeric(20,6),
+    price_currency character varying(3),
+    total_amount numeric(20,2),
+    effective_date date NOT NULL,
+    announcement_date date,
+    record_date date,
+    status character varying(20) DEFAULT 'EFFECTIVE'::character varying,
+    board_resolution_ref character varying(100),
+    regulatory_filing_ref character varying(100),
+    source_document_id uuid,
+    created_by character varying(100),
+    created_at timestamp with time zone DEFAULT now(),
+    notes text,
+    idempotency_key character varying(100),
+    CONSTRAINT chk_event_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PENDING_APPROVAL'::character varying, 'EFFECTIVE'::character varying, 'REVERSED'::character varying, 'CANCELLED'::character varying])::text[]))),
+    CONSTRAINT chk_event_type CHECK (((event_type)::text = ANY ((ARRAY['INITIAL_ISSUE'::character varying, 'NEW_ISSUE'::character varying, 'STOCK_SPLIT'::character varying, 'BONUS_ISSUE'::character varying, 'CANCELLATION'::character varying, 'BUYBACK'::character varying, 'CONSOLIDATION'::character varying, 'TREASURY_RELEASE'::character varying, 'TREASURY_TRANSFER'::character varying, 'MERGER_IN'::character varying, 'MERGER_OUT'::character varying, 'SPINOFF'::character varying, 'CONVERSION'::character varying])::text[]))),
+    CONSTRAINT chk_split_ratio CHECK ((((event_type)::text <> ALL ((ARRAY['STOCK_SPLIT'::character varying, 'CONSOLIDATION'::character varying])::text[])) OR ((ratio_from IS NOT NULL) AND (ratio_to IS NOT NULL) AND (ratio_from > 0) AND (ratio_to > 0))))
+);
+
+
+--
+-- Name: TABLE issuance_events; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.issuance_events IS 'Append-only ledger of supply changes. Source for computing share_class_supply at any as-of date.';
+
+
+--
+-- Name: issuer_control_config; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.issuer_control_config (
+    config_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    issuer_entity_id uuid NOT NULL,
+    control_threshold_pct numeric(5,2) DEFAULT 50.00,
+    significant_threshold_pct numeric(5,2) DEFAULT 25.00,
+    material_threshold_pct numeric(5,2) DEFAULT 10.00,
+    disclosure_threshold_pct numeric(5,2) DEFAULT 5.00,
+    control_basis character varying(20) DEFAULT 'VOTES'::character varying,
+    disclosure_basis character varying(20) DEFAULT 'ECONOMIC'::character varying,
+    voting_basis character varying(20) DEFAULT 'OUTSTANDING'::character varying,
+    jurisdiction character varying(10),
+    applies_voting_caps boolean DEFAULT false,
+    effective_from date DEFAULT CURRENT_DATE,
+    effective_to date,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_control_basis CHECK (((control_basis)::text = ANY ((ARRAY['VOTES'::character varying, 'ECONOMIC'::character varying, 'UNITS'::character varying])::text[]))),
+    CONSTRAINT chk_disclosure_basis CHECK (((disclosure_basis)::text = ANY ((ARRAY['VOTES'::character varying, 'ECONOMIC'::character varying, 'UNITS'::character varying])::text[]))),
+    CONSTRAINT chk_voting_basis CHECK (((voting_basis)::text = ANY ((ARRAY['ISSUED'::character varying, 'OUTSTANDING'::character varying, 'FULLY_DILUTED'::character varying, 'EXERCISABLE'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE issuer_control_config; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.issuer_control_config IS 'Jurisdiction/articles-specific thresholds for control determination per issuer.';
+
+
+--
 -- Name: movements; Type: TABLE; Schema: kyc; Owner: -
 --
 
@@ -5479,6 +7106,135 @@ COMMENT ON COLUMN kyc.movements.distribution_type IS 'For distributions: INCOME,
 
 
 --
+-- Name: outreach_requests; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.outreach_requests (
+    request_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    target_entity_id uuid NOT NULL,
+    request_type character varying(30) NOT NULL,
+    recipient_entity_id uuid,
+    recipient_email character varying(255),
+    recipient_name character varying(255),
+    status character varying(20) DEFAULT 'DRAFT'::character varying,
+    deadline_date date,
+    sent_at timestamp with time zone,
+    reminder_sent_at timestamp with time zone,
+    response_type character varying(30),
+    response_received_at timestamp with time zone,
+    response_document_id uuid,
+    request_notes text,
+    resolution_notes text,
+    trigger_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    created_by uuid,
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_request_status CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PENDING'::character varying, 'SENT'::character varying, 'REMINDED'::character varying, 'RESPONDED'::character varying, 'CLOSED'::character varying, 'EXPIRED'::character varying])::text[]))),
+    CONSTRAINT chk_request_type CHECK (((request_type)::text = ANY ((ARRAY['NOMINEE_DISCLOSURE'::character varying, 'UBO_DECLARATION'::character varying, 'SHARE_REGISTER'::character varying, 'BOARD_COMPOSITION'::character varying, 'BENEFICIAL_OWNERSHIP'::character varying, 'GENERAL_INQUIRY'::character varying])::text[]))),
+    CONSTRAINT chk_response_type CHECK (((response_type IS NULL) OR ((response_type)::text = ANY ((ARRAY['FULL_DISCLOSURE'::character varying, 'PARTIAL_DISCLOSURE'::character varying, 'DECLINED'::character varying, 'NO_RESPONSE'::character varying])::text[]))))
+);
+
+
+--
+-- Name: TABLE outreach_requests; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.outreach_requests IS 'Tracks outreach requests to counterparties for ownership disclosures,
+UBO declarations, and other information gathering.';
+
+
+--
+-- Name: ownership_reconciliation_findings; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.ownership_reconciliation_findings (
+    finding_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    run_id uuid NOT NULL,
+    owner_entity_id uuid NOT NULL,
+    source_a_pct numeric(8,4),
+    source_b_pct numeric(8,4),
+    delta_bps integer,
+    finding_type character varying(30) NOT NULL,
+    severity character varying(10),
+    resolution_status character varying(20) DEFAULT 'OPEN'::character varying,
+    resolution_notes text,
+    resolved_by character varying(100),
+    resolved_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_finding_severity CHECK (((severity IS NULL) OR ((severity)::text = ANY ((ARRAY['INFO'::character varying, 'WARN'::character varying, 'ERROR'::character varying, 'CRITICAL'::character varying])::text[])))),
+    CONSTRAINT chk_finding_type CHECK (((finding_type)::text = ANY ((ARRAY['MATCH'::character varying, 'MISMATCH'::character varying, 'MISSING_IN_REGISTER'::character varying, 'MISSING_IN_EXTERNAL'::character varying, 'ENTITY_NOT_MAPPED'::character varying, 'BASIS_MISMATCH'::character varying])::text[]))),
+    CONSTRAINT chk_resolution_status CHECK (((resolution_status)::text = ANY ((ARRAY['OPEN'::character varying, 'ACKNOWLEDGED'::character varying, 'INVESTIGATING'::character varying, 'RESOLVED'::character varying, 'FALSE_POSITIVE'::character varying])::text[])))
+);
+
+
+--
+-- Name: ownership_reconciliation_runs; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.ownership_reconciliation_runs (
+    run_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    issuer_entity_id uuid NOT NULL,
+    as_of_date date NOT NULL,
+    basis character varying(20) NOT NULL,
+    source_a character varying(20) NOT NULL,
+    source_b character varying(20) NOT NULL,
+    tolerance_bps integer DEFAULT 100,
+    status character varying(20) DEFAULT 'RUNNING'::character varying,
+    total_entities integer,
+    matched_count integer,
+    mismatched_count integer,
+    missing_in_a_count integer,
+    missing_in_b_count integer,
+    started_at timestamp with time zone DEFAULT now(),
+    completed_at timestamp with time zone,
+    triggered_by character varying(100),
+    notes text,
+    CONSTRAINT chk_recon_status CHECK (((status)::text = ANY ((ARRAY['RUNNING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'CANCELLED'::character varying])::text[])))
+);
+
+
+--
+-- Name: ownership_snapshots; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.ownership_snapshots (
+    snapshot_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    issuer_entity_id uuid NOT NULL,
+    owner_entity_id uuid NOT NULL,
+    share_class_id uuid,
+    as_of_date date NOT NULL,
+    basis character varying(20) NOT NULL,
+    units numeric(20,6),
+    percentage numeric(8,4),
+    percentage_min numeric(8,4),
+    percentage_max numeric(8,4),
+    numerator numeric(20,6),
+    denominator numeric(20,6),
+    derived_from character varying(20) NOT NULL,
+    source_holding_ids uuid[],
+    source_bods_statement_id character varying(100),
+    source_gleif_rel_id uuid,
+    source_document_id uuid,
+    is_direct boolean DEFAULT true,
+    is_aggregated boolean DEFAULT false,
+    confidence character varying(20) DEFAULT 'HIGH'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    superseded_at timestamp with time zone,
+    superseded_by uuid,
+    CONSTRAINT chk_snapshot_basis CHECK (((basis)::text = ANY ((ARRAY['UNITS'::character varying, 'VOTES'::character varying, 'ECONOMIC'::character varying, 'CAPITAL'::character varying, 'DECLARED'::character varying])::text[]))),
+    CONSTRAINT chk_snapshot_confidence CHECK (((confidence)::text = ANY ((ARRAY['HIGH'::character varying, 'MEDIUM'::character varying, 'LOW'::character varying, 'UNVERIFIED'::character varying])::text[]))),
+    CONSTRAINT chk_snapshot_source CHECK (((derived_from)::text = ANY ((ARRAY['REGISTER'::character varying, 'BODS'::character varying, 'GLEIF'::character varying, 'PSC'::character varying, 'MANUAL'::character varying, 'INFERRED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE ownership_snapshots; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.ownership_snapshots IS 'Computed ownership positions from register, or imported from BODS/GLEIF. Bridge for reconciliation.';
+
+
+--
 -- Name: red_flags; Type: TABLE; Schema: kyc; Owner: -
 --
 
@@ -5512,6 +7268,172 @@ CREATE TABLE kyc.red_flags (
 --
 
 COMMENT ON TABLE kyc.red_flags IS 'Risk indicators and issues found during KYC review';
+
+
+--
+-- Name: research_actions; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.research_actions (
+    action_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    target_entity_id uuid NOT NULL,
+    decision_id uuid,
+    action_type character varying(50) NOT NULL,
+    source_provider character varying(30) NOT NULL,
+    source_key character varying(100) NOT NULL,
+    source_key_type character varying(20) NOT NULL,
+    verb_domain character varying(30) NOT NULL,
+    verb_name character varying(50) NOT NULL,
+    verb_args jsonb DEFAULT '{}'::jsonb NOT NULL,
+    success boolean NOT NULL,
+    entities_created integer DEFAULT 0,
+    entities_updated integer DEFAULT 0,
+    relationships_created integer DEFAULT 0,
+    fields_updated jsonb,
+    error_code character varying(50),
+    error_message text,
+    duration_ms integer,
+    api_calls_made integer,
+    executed_at timestamp with time zone DEFAULT now(),
+    executed_by uuid,
+    session_id uuid,
+    is_rolled_back boolean DEFAULT false,
+    rolled_back_at timestamp with time zone,
+    rolled_back_by uuid,
+    rollback_reason text
+);
+
+
+--
+-- Name: TABLE research_actions; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.research_actions IS 'Audit trail for Phase 2 (DSL execution). Every import/update via research verbs
+is logged here with full details for reproducibility and rollback.';
+
+
+--
+-- Name: research_anomalies; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.research_anomalies (
+    anomaly_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    action_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    rule_code character varying(50) NOT NULL,
+    severity character varying(10) NOT NULL,
+    description text NOT NULL,
+    expected_value text,
+    actual_value text,
+    status character varying(20) DEFAULT 'OPEN'::character varying,
+    resolution text,
+    resolved_by uuid,
+    resolved_at timestamp with time zone,
+    detected_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_anomaly_severity CHECK (((severity)::text = ANY ((ARRAY['ERROR'::character varying, 'WARNING'::character varying, 'INFO'::character varying])::text[]))),
+    CONSTRAINT chk_anomaly_status CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'ACKNOWLEDGED'::character varying, 'RESOLVED'::character varying, 'FALSE_POSITIVE'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE research_anomalies; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.research_anomalies IS 'Post-import validation anomalies. Flags issues like jurisdiction mismatch,
+circular ownership, or duplicate entities for human review.';
+
+
+--
+-- Name: research_confidence_config; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.research_confidence_config (
+    config_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_provider character varying(30),
+    auto_proceed_threshold numeric(3,2) DEFAULT 0.90,
+    ambiguous_threshold numeric(3,2) DEFAULT 0.70,
+    reject_threshold numeric(3,2) DEFAULT 0.50,
+    require_human_checkpoint boolean DEFAULT false,
+    checkpoint_contexts text[],
+    max_auto_imports_per_session integer DEFAULT 50,
+    max_chain_depth integer DEFAULT 10,
+    effective_from date DEFAULT CURRENT_DATE,
+    effective_to date
+);
+
+
+--
+-- Name: TABLE research_confidence_config; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.research_confidence_config IS 'Configurable thresholds for confidence-based routing. Determines when to
+auto-proceed, ask user to disambiguate, or reject matches.';
+
+
+--
+-- Name: research_corrections; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.research_corrections (
+    correction_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    original_decision_id uuid NOT NULL,
+    original_action_id uuid,
+    correction_type character varying(20) NOT NULL,
+    wrong_key character varying(100),
+    wrong_key_type character varying(20),
+    correct_key character varying(100),
+    correct_key_type character varying(20),
+    new_action_id uuid,
+    correction_reason text NOT NULL,
+    corrected_at timestamp with time zone DEFAULT now(),
+    corrected_by uuid NOT NULL,
+    CONSTRAINT chk_correction_type CHECK (((correction_type)::text = ANY ((ARRAY['WRONG_ENTITY'::character varying, 'WRONG_JURISDICTION'::character varying, 'STALE_DATA'::character varying, 'MERGE_REQUIRED'::character varying, 'UNLINK'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE research_corrections; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.research_corrections IS 'Tracks corrections when Phase 1 selected the wrong identifier.
+Supports learning and audit trail for regulatory inquiries.';
+
+
+--
+-- Name: research_decisions; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.research_decisions (
+    decision_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    trigger_id uuid,
+    target_entity_id uuid,
+    search_query text NOT NULL,
+    search_context jsonb,
+    source_provider character varying(30) NOT NULL,
+    candidates_found jsonb DEFAULT '[]'::jsonb NOT NULL,
+    candidates_count integer DEFAULT 0 NOT NULL,
+    selected_key character varying(100),
+    selected_key_type character varying(20),
+    selection_confidence numeric(3,2),
+    selection_reasoning text NOT NULL,
+    decision_type character varying(20) NOT NULL,
+    auto_selected boolean DEFAULT false NOT NULL,
+    verified_by uuid,
+    verified_at timestamp with time zone,
+    resulting_action_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    session_id uuid,
+    CONSTRAINT chk_decision_type CHECK (((decision_type)::text = ANY ((ARRAY['AUTO_SELECTED'::character varying, 'USER_SELECTED'::character varying, 'USER_CONFIRMED'::character varying, 'NO_MATCH'::character varying, 'AMBIGUOUS'::character varying, 'REJECTED'::character varying])::text[]))),
+    CONSTRAINT chk_source_provider CHECK (((source_provider)::text = ANY ((ARRAY['gleif'::character varying, 'companies_house'::character varying, 'sec'::character varying, 'orbis'::character varying, 'open_corporates'::character varying, 'screening'::character varying, 'manual'::character varying, 'document'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE research_decisions; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.research_decisions IS 'Audit trail for Phase 1 (LLM exploration) decisions. Captures the non-deterministic
+search and selection process for later review and correction.';
 
 
 --
@@ -5564,6 +7486,57 @@ COMMENT ON TABLE kyc.screenings IS 'Screening results from various providers';
 
 
 --
+-- Name: share_class_identifiers; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.share_class_identifiers (
+    identifier_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    share_class_id uuid NOT NULL,
+    scheme_code character varying(20) NOT NULL,
+    identifier_value character varying(100) NOT NULL,
+    is_primary boolean DEFAULT false,
+    valid_from date DEFAULT CURRENT_DATE,
+    valid_to date,
+    source character varying(50),
+    verified_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE share_class_identifiers; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.share_class_identifiers IS 'Security identifiers for share classes. Every class has at least INTERNAL. External IDs (ISIN, etc.) optional.';
+
+
+--
+-- Name: share_class_supply; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.share_class_supply (
+    supply_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    share_class_id uuid NOT NULL,
+    authorized_units numeric(20,6),
+    issued_units numeric(20,6) DEFAULT 0 NOT NULL,
+    outstanding_units numeric(20,6) DEFAULT 0 NOT NULL,
+    treasury_units numeric(20,6) DEFAULT 0,
+    reserved_units numeric(20,6) DEFAULT 0,
+    as_of_date date DEFAULT CURRENT_DATE NOT NULL,
+    as_of_event_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE share_class_supply; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.share_class_supply IS 'Current supply state per share class. Source of truth for denominators in control computation.';
+
+
+--
 -- Name: share_classes; Type: TABLE; Schema: kyc; Owner: -
 --
 
@@ -5594,7 +7567,21 @@ CREATE TABLE kyc.share_classes (
     entity_id uuid,
     class_category character varying(20) DEFAULT 'FUND'::character varying,
     issuer_entity_id uuid,
-    CONSTRAINT chk_class_category CHECK (((class_category)::text = ANY ((ARRAY['CORPORATE'::character varying, 'FUND'::character varying])::text[])))
+    instrument_kind character varying(30) DEFAULT 'FUND_UNIT'::character varying,
+    votes_per_unit numeric(10,4) DEFAULT 1.0,
+    voting_cap_pct numeric(5,2),
+    voting_threshold_pct numeric(5,2),
+    economic_per_unit numeric(10,4) DEFAULT 1.0,
+    dividend_rate numeric(10,4),
+    liquidation_rank integer DEFAULT 100,
+    converts_to_share_class_id uuid,
+    conversion_ratio_num numeric(10,4),
+    conversion_price numeric(20,6),
+    commitment_currency character varying(3),
+    vintage_year integer,
+    is_carried_interest boolean DEFAULT false,
+    CONSTRAINT chk_class_category CHECK (((class_category)::text = ANY ((ARRAY['CORPORATE'::character varying, 'FUND'::character varying])::text[]))),
+    CONSTRAINT chk_instrument_kind CHECK (((instrument_kind IS NULL) OR ((instrument_kind)::text = ANY ((ARRAY['ORDINARY_EQUITY'::character varying, 'PREFERENCE_EQUITY'::character varying, 'DEFERRED_EQUITY'::character varying, 'FUND_UNIT'::character varying, 'FUND_SHARE'::character varying, 'LP_INTEREST'::character varying, 'GP_INTEREST'::character varying, 'DEBT'::character varying, 'CONVERTIBLE'::character varying, 'WARRANT'::character varying, 'OTHER'::character varying])::text[]))))
 );
 
 
@@ -5676,6 +7663,157 @@ COMMENT ON COLUMN kyc.share_classes.issuer_entity_id IS 'The sub-fund/fund entit
 
 
 --
+-- Name: COLUMN share_classes.instrument_kind; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.share_classes.instrument_kind IS 'Determines calculation method for ownership/control derivation';
+
+
+--
+-- Name: COLUMN share_classes.votes_per_unit; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.share_classes.votes_per_unit IS '0 = non-voting, 1 = standard, >1 = super-voting (founder shares)';
+
+
+--
+-- Name: COLUMN share_classes.liquidation_rank; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON COLUMN kyc.share_classes.liquidation_rank IS 'Priority in liquidation. Lower = more senior. 100 = common equity.';
+
+
+--
+-- Name: special_rights; Type: TABLE; Schema: kyc; Owner: -
+--
+
+CREATE TABLE kyc.special_rights (
+    right_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    share_class_id uuid,
+    holder_entity_id uuid,
+    issuer_entity_id uuid NOT NULL,
+    right_type character varying(30) NOT NULL,
+    threshold_pct numeric(5,2),
+    threshold_basis character varying(20),
+    requires_class_vote boolean DEFAULT false,
+    board_seats integer,
+    board_seat_type character varying(20),
+    source_type character varying(20),
+    source_document_id uuid,
+    source_clause_ref character varying(50),
+    effective_from date,
+    effective_to date,
+    notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_board_seat_type CHECK (((board_seat_type IS NULL) OR ((board_seat_type)::text = ANY ((ARRAY['DIRECTOR'::character varying, 'OBSERVER'::character varying, 'ALTERNATE'::character varying, 'CHAIRMAN'::character varying])::text[])))),
+    CONSTRAINT chk_right_scope CHECK ((((share_class_id IS NOT NULL) AND (holder_entity_id IS NULL)) OR ((share_class_id IS NULL) AND (holder_entity_id IS NOT NULL)))),
+    CONSTRAINT chk_right_type CHECK (((right_type)::text = ANY ((ARRAY['BOARD_APPOINTMENT'::character varying, 'BOARD_OBSERVER'::character varying, 'VETO_MA'::character varying, 'VETO_FUNDRAISE'::character varying, 'VETO_DIVIDEND'::character varying, 'VETO_LIQUIDATION'::character varying, 'ANTI_DILUTION'::character varying, 'DRAG_ALONG'::character varying, 'TAG_ALONG'::character varying, 'FIRST_REFUSAL'::character varying, 'REDEMPTION'::character varying, 'CONVERSION_TRIGGER'::character varying, 'PROTECTIVE_PROVISION'::character varying, 'INFORMATION_RIGHTS'::character varying, 'OTHER'::character varying])::text[]))),
+    CONSTRAINT chk_source_type CHECK (((source_type IS NULL) OR ((source_type)::text = ANY ((ARRAY['ARTICLES'::character varying, 'SHA'::character varying, 'SIDE_LETTER'::character varying, 'BOARD_RESOLUTION'::character varying, 'INVESTMENT_AGREEMENT'::character varying])::text[]))))
+);
+
+
+--
+-- Name: TABLE special_rights; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON TABLE kyc.special_rights IS 'Control rights not reducible to voting percentage. Attached to either share class or specific holder.';
+
+
+--
+-- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_types (
+    entity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(255) NOT NULL,
+    description text,
+    table_name character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    type_code character varying(100),
+    semantic_context jsonb DEFAULT '{}'::jsonb,
+    parent_type_id uuid,
+    type_hierarchy_path text[],
+    embedding public.vector(768),
+    embedding_model character varying(100),
+    embedding_updated_at timestamp with time zone,
+    entity_category character varying(20),
+    deprecated boolean DEFAULT false,
+    deprecation_note text
+);
+
+
+--
+-- Name: COLUMN entity_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_types.semantic_context IS 'Rich semantic metadata: category, parent_type, synonyms[], typical_documents[], typical_attributes[]';
+
+
+--
+-- Name: COLUMN entity_types.type_hierarchy_path; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".entity_types.type_hierarchy_path IS 'Materialized path for efficient ancestor queries, e.g., ["ENTITY", "LEGAL_ENTITY", "LIMITED_COMPANY"]';
+
+
+--
+-- Name: v_capital_structure_extended; Type: VIEW; Schema: kyc; Owner: -
+--
+
+CREATE VIEW kyc.v_capital_structure_extended AS
+ SELECT sc.id AS share_class_id,
+    sc.cbu_id,
+    sc.issuer_entity_id,
+    sc.name AS share_class_name,
+    COALESCE(sc.instrument_kind, 'FUND_UNIT'::character varying) AS instrument_kind,
+    sc.class_category,
+    COALESCE(scs.authorized_units, (0)::numeric) AS authorized_shares,
+    COALESCE(scs.issued_units, (0)::numeric) AS issued_shares,
+    COALESCE(scs.outstanding_units, (0)::numeric) AS outstanding_shares,
+    COALESCE(scs.treasury_units, (0)::numeric) AS treasury_shares,
+    COALESCE(sc.votes_per_unit, (1)::numeric) AS votes_per_unit,
+    COALESCE(sc.economic_per_unit, (1)::numeric) AS economic_per_unit,
+    sc.dividend_rate,
+    sc.liquidation_rank,
+    sci.scheme_code AS primary_id_scheme,
+    sci.identifier_value AS primary_id_value,
+    h.id AS holding_id,
+    h.investor_entity_id,
+    h.units,
+    h.cost_basis,
+    h.status AS holding_status,
+        CASE
+            WHEN (COALESCE(scs.issued_units, (0)::numeric) > (0)::numeric) THEN round(((h.units / scs.issued_units) * (100)::numeric), 4)
+            ELSE (0)::numeric
+        END AS ownership_pct,
+    (h.units * COALESCE(sc.votes_per_unit, (1)::numeric)) AS holder_voting_rights,
+    (COALESCE(scs.issued_units, (0)::numeric) * COALESCE(sc.votes_per_unit, (1)::numeric)) AS total_class_voting_rights,
+    e.name AS investor_name,
+    et.type_code AS investor_entity_type,
+    ie.name AS issuer_name,
+    iet.type_code AS issuer_entity_type
+   FROM (((((((kyc.share_classes sc
+     LEFT JOIN kyc.share_class_supply scs ON (((scs.share_class_id = sc.id) AND (scs.as_of_date = ( SELECT max(share_class_supply.as_of_date) AS max
+           FROM kyc.share_class_supply
+          WHERE (share_class_supply.share_class_id = sc.id))))))
+     LEFT JOIN kyc.share_class_identifiers sci ON (((sci.share_class_id = sc.id) AND (sci.is_primary = true) AND (sci.valid_to IS NULL))))
+     LEFT JOIN kyc.holdings h ON (((h.share_class_id = sc.id) AND ((h.status)::text = 'active'::text))))
+     LEFT JOIN "ob-poc".entities e ON ((e.entity_id = h.investor_entity_id)))
+     LEFT JOIN "ob-poc".entity_types et ON ((et.entity_type_id = e.entity_type_id)))
+     LEFT JOIN "ob-poc".entities ie ON ((ie.entity_id = sc.issuer_entity_id)))
+     LEFT JOIN "ob-poc".entity_types iet ON ((iet.entity_type_id = ie.entity_type_id)))
+  WHERE ((sc.status)::text = 'active'::text);
+
+
+--
+-- Name: VIEW v_capital_structure_extended; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON VIEW kyc.v_capital_structure_extended IS 'Extended capital structure view with holdings and ownership calculations';
+
+
+--
 -- Name: v_case_summary; Type: VIEW; Schema: kyc; Owner: -
 --
 
@@ -5693,6 +7831,115 @@ SELECT
     NULL::bigint AS completed_workstreams,
     NULL::bigint AS open_red_flags,
     NULL::bigint AS pending_docs;
+
+
+--
+-- Name: v_dilution_summary; Type: VIEW; Schema: kyc; Owner: -
+--
+
+CREATE VIEW kyc.v_dilution_summary AS
+ SELECT sc.id AS share_class_id,
+    sc.issuer_entity_id,
+    sc.name AS share_class_name,
+    sc.instrument_kind,
+    COALESCE(scs.issued_units, (0)::numeric) AS current_issued,
+    COALESCE(scs.outstanding_units, (0)::numeric) AS current_outstanding,
+    COALESCE(di.total_options, (0)::numeric) AS total_options,
+    COALESCE(di.total_warrants, (0)::numeric) AS total_warrants,
+    COALESCE(di.total_safes, (0)::numeric) AS total_safes,
+    COALESCE(di.total_convertibles, (0)::numeric) AS total_convertibles,
+        CASE
+            WHEN (COALESCE(scs.outstanding_units, (0)::numeric) > (0)::numeric) THEN round(((((((COALESCE(scs.outstanding_units, (0)::numeric) + COALESCE(di.total_options, (0)::numeric)) + COALESCE(di.total_warrants, (0)::numeric)) + COALESCE(di.total_safes, (0)::numeric)) + COALESCE(di.total_convertibles, (0)::numeric)) / scs.outstanding_units) * (100)::numeric), 2)
+            ELSE (100)::numeric
+        END AS dilution_factor_pct
+   FROM ((kyc.share_classes sc
+     LEFT JOIN kyc.share_class_supply scs ON (((scs.share_class_id = sc.id) AND (scs.as_of_date = ( SELECT max(share_class_supply.as_of_date) AS max
+           FROM kyc.share_class_supply
+          WHERE (share_class_supply.share_class_id = sc.id))))))
+     LEFT JOIN LATERAL ( SELECT sum(
+                CASE
+                    WHEN (((dilution_instruments.instrument_type)::text = 'STOCK_OPTION'::text) AND ((dilution_instruments.status)::text = 'ACTIVE'::text)) THEN ((dilution_instruments.units_granted - COALESCE(dilution_instruments.units_exercised, (0)::numeric)) - COALESCE(dilution_instruments.units_forfeited, (0)::numeric))
+                    ELSE (0)::numeric
+                END) AS total_options,
+            sum(
+                CASE
+                    WHEN (((dilution_instruments.instrument_type)::text = 'WARRANT'::text) AND ((dilution_instruments.status)::text = 'ACTIVE'::text)) THEN ((dilution_instruments.units_granted - COALESCE(dilution_instruments.units_exercised, (0)::numeric)) - COALESCE(dilution_instruments.units_forfeited, (0)::numeric))
+                    ELSE (0)::numeric
+                END) AS total_warrants,
+            sum(
+                CASE
+                    WHEN (((dilution_instruments.instrument_type)::text = 'SAFE'::text) AND ((dilution_instruments.status)::text = 'ACTIVE'::text)) THEN ((dilution_instruments.units_granted - COALESCE(dilution_instruments.units_exercised, (0)::numeric)) - COALESCE(dilution_instruments.units_forfeited, (0)::numeric))
+                    ELSE (0)::numeric
+                END) AS total_safes,
+            sum(
+                CASE
+                    WHEN (((dilution_instruments.instrument_type)::text = 'CONVERTIBLE_NOTE'::text) AND ((dilution_instruments.status)::text = 'ACTIVE'::text)) THEN ((dilution_instruments.units_granted - COALESCE(dilution_instruments.units_exercised, (0)::numeric)) - COALESCE(dilution_instruments.units_forfeited, (0)::numeric))
+                    ELSE (0)::numeric
+                END) AS total_convertibles
+           FROM kyc.dilution_instruments
+          WHERE (dilution_instruments.converts_to_share_class_id = sc.id)) di ON (true))
+  WHERE ((sc.status)::text = 'active'::text);
+
+
+--
+-- Name: VIEW v_dilution_summary; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON VIEW kyc.v_dilution_summary IS 'Summary of dilution instruments and fully-diluted share counts per share class';
+
+
+--
+-- Name: v_pending_decisions; Type: VIEW; Schema: kyc; Owner: -
+--
+
+CREATE VIEW kyc.v_pending_decisions AS
+ SELECT d.decision_id,
+    d.target_entity_id,
+    e.name AS entity_name,
+    d.search_query,
+    d.source_provider,
+    d.candidates_count,
+    d.candidates_found,
+    d.decision_type,
+    d.created_at
+   FROM (kyc.research_decisions d
+     JOIN "ob-poc".entities e ON ((e.entity_id = d.target_entity_id)))
+  WHERE (((d.decision_type)::text = 'AMBIGUOUS'::text) AND (d.verified_by IS NULL))
+  ORDER BY d.created_at;
+
+
+--
+-- Name: VIEW v_pending_decisions; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON VIEW kyc.v_pending_decisions IS 'Decisions awaiting user disambiguation or confirmation.';
+
+
+--
+-- Name: v_research_activity; Type: VIEW; Schema: kyc; Owner: -
+--
+
+CREATE VIEW kyc.v_research_activity AS
+ SELECT e.entity_id,
+    e.name AS entity_name,
+    count(DISTINCT d.decision_id) AS decision_count,
+    count(DISTINCT a.action_id) AS action_count,
+    count(DISTINCT c.correction_id) AS correction_count,
+    count(DISTINCT an.anomaly_id) FILTER (WHERE ((an.status)::text = 'OPEN'::text)) AS open_anomalies,
+    max(a.executed_at) AS last_research_action
+   FROM (((("ob-poc".entities e
+     LEFT JOIN kyc.research_decisions d ON ((d.target_entity_id = e.entity_id)))
+     LEFT JOIN kyc.research_actions a ON ((a.target_entity_id = e.entity_id)))
+     LEFT JOIN kyc.research_corrections c ON ((c.original_decision_id = d.decision_id)))
+     LEFT JOIN kyc.research_anomalies an ON ((an.entity_id = e.entity_id)))
+  GROUP BY e.entity_id, e.name;
+
+
+--
+-- Name: VIEW v_research_activity; Type: COMMENT; Schema: kyc; Owner: -
+--
+
+COMMENT ON VIEW kyc.v_research_activity IS 'Summary of research activity per entity for monitoring and reporting.';
 
 
 --
@@ -6564,44 +8811,6 @@ CREATE TABLE "ob-poc".entity_relationships (
     CONSTRAINT chk_er_relationship_type CHECK (((relationship_type)::text = ANY ((ARRAY['ownership'::character varying, 'control'::character varying, 'trust_role'::character varying, 'employment'::character varying, 'management'::character varying])::text[]))),
     CONSTRAINT chk_er_temporal_valid CHECK (((effective_to IS NULL) OR (effective_from IS NULL) OR (effective_from <= effective_to)))
 );
-
-
---
--- Name: entity_types; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".entity_types (
-    entity_type_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name character varying(255) NOT NULL,
-    description text,
-    table_name character varying(255) NOT NULL,
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    type_code character varying(100),
-    semantic_context jsonb DEFAULT '{}'::jsonb,
-    parent_type_id uuid,
-    type_hierarchy_path text[],
-    embedding public.vector(768),
-    embedding_model character varying(100),
-    embedding_updated_at timestamp with time zone,
-    entity_category character varying(20),
-    deprecated boolean DEFAULT false,
-    deprecation_note text
-);
-
-
---
--- Name: COLUMN entity_types.semantic_context; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".entity_types.semantic_context IS 'Rich semantic metadata: category, parent_type, synonyms[], typical_documents[], typical_attributes[]';
-
-
---
--- Name: COLUMN entity_types.type_hierarchy_path; Type: COMMENT; Schema: ob-poc; Owner: -
---
-
-COMMENT ON COLUMN "ob-poc".entity_types.type_hierarchy_path IS 'Materialized path for efficient ancestor queries, e.g., ["ENTITY", "LEGAL_ENTITY", "LIMITED_COMPANY"]';
 
 
 --
@@ -10503,6 +12712,13 @@ CREATE TABLE "ob-poc".trading_profile_materializations (
 
 
 --
+-- Name: TABLE trading_profile_materializations; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".trading_profile_materializations IS 'Audit trail for trading-profile:materialize operations - tracks when documents are projected to operational tables';
+
+
+--
 -- Name: trading_profile_migration_backup; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -12969,6 +15185,50 @@ ALTER SEQUENCE public.rules_id_seq OWNED BY public.rules.id;
 
 
 --
+-- Name: log; Type: TABLE; Schema: sessions; Owner: -
+--
+
+CREATE TABLE sessions.log (
+    id bigint NOT NULL,
+    session_id uuid NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL,
+    entry_type text NOT NULL,
+    content text NOT NULL,
+    event_id bigint,
+    source text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    CONSTRAINT valid_entry_type CHECK ((entry_type = ANY (ARRAY['user_input'::text, 'agent_thought'::text, 'dsl_command'::text, 'response'::text, 'error'::text]))),
+    CONSTRAINT valid_source CHECK ((source = ANY (ARRAY['repl'::text, 'egui'::text, 'mcp'::text, 'api'::text])))
+);
+
+
+--
+-- Name: TABLE log; Type: COMMENT; Schema: sessions; Owner: -
+--
+
+COMMENT ON TABLE sessions.log IS 'Conversation context log for session replay and failure analysis';
+
+
+--
+-- Name: log_id_seq; Type: SEQUENCE; Schema: sessions; Owner: -
+--
+
+CREATE SEQUENCE sessions.log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: log_id_seq; Type: SEQUENCE OWNED BY; Schema: sessions; Owner: -
+--
+
+ALTER SEQUENCE sessions.log_id_seq OWNED BY sessions.log.id;
+
+
+--
 -- Name: access_attestations; Type: TABLE; Schema: teams; Owner: -
 --
 
@@ -13456,6 +15716,13 @@ CREATE VIEW teams.v_user_cbu_access AS
 
 
 --
+-- Name: log id; Type: DEFAULT; Schema: events; Owner: -
+--
+
+ALTER TABLE ONLY events.log ALTER COLUMN id SET DEFAULT nextval('events.log_id_seq'::regclass);
+
+
+--
 -- Name: attribute_values_typed id; Type: DEFAULT; Schema: ob-poc; Owner: -
 --
 
@@ -13540,6 +15807,13 @@ ALTER TABLE ONLY public.rules ALTER COLUMN id SET DEFAULT nextval('public.rules_
 
 
 --
+-- Name: log id; Type: DEFAULT; Schema: sessions; Owner: -
+--
+
+ALTER TABLE ONLY sessions.log ALTER COLUMN id SET DEFAULT nextval('sessions.log_id_seq'::regclass);
+
+
+--
 -- Name: clients clients_email_key; Type: CONSTRAINT; Schema: client_portal; Owner: -
 --
 
@@ -13593,6 +15867,70 @@ ALTER TABLE ONLY client_portal.sessions
 
 ALTER TABLE ONLY client_portal.submissions
     ADD CONSTRAINT submissions_pkey PRIMARY KEY (submission_id);
+
+
+--
+-- Name: ca_event_types ca_event_types_event_code_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.ca_event_types
+    ADD CONSTRAINT ca_event_types_event_code_key UNIQUE (event_code);
+
+
+--
+-- Name: ca_event_types ca_event_types_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.ca_event_types
+    ADD CONSTRAINT ca_event_types_pkey PRIMARY KEY (event_type_id);
+
+
+--
+-- Name: cbu_ca_instruction_windows cbu_ca_instruction_windows_cbu_id_event_type_id_market_id_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_instruction_windows
+    ADD CONSTRAINT cbu_ca_instruction_windows_cbu_id_event_type_id_market_id_key UNIQUE (cbu_id, event_type_id, market_id);
+
+
+--
+-- Name: cbu_ca_instruction_windows cbu_ca_instruction_windows_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_instruction_windows
+    ADD CONSTRAINT cbu_ca_instruction_windows_pkey PRIMARY KEY (window_id);
+
+
+--
+-- Name: cbu_ca_preferences cbu_ca_preferences_cbu_id_event_type_id_instrument_class_id_key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_preferences
+    ADD CONSTRAINT cbu_ca_preferences_cbu_id_event_type_id_instrument_class_id_key UNIQUE (cbu_id, event_type_id, instrument_class_id);
+
+
+--
+-- Name: cbu_ca_preferences cbu_ca_preferences_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_preferences
+    ADD CONSTRAINT cbu_ca_preferences_pkey PRIMARY KEY (preference_id);
+
+
+--
+-- Name: cbu_ca_ssi_mappings cbu_ca_ssi_mappings_cbu_id_event_type_id_currency_proceeds__key; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_ssi_mappings
+    ADD CONSTRAINT cbu_ca_ssi_mappings_cbu_id_event_type_id_currency_proceeds__key UNIQUE (cbu_id, event_type_id, currency, proceeds_type);
+
+
+--
+-- Name: cbu_ca_ssi_mappings cbu_ca_ssi_mappings_pkey; Type: CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_ssi_mappings
+    ADD CONSTRAINT cbu_ca_ssi_mappings_pkey PRIMARY KEY (mapping_id);
 
 
 --
@@ -14044,11 +16382,59 @@ ALTER TABLE ONLY custody.tax_treaty_rates
 
 
 --
+-- Name: log log_pkey; Type: CONSTRAINT; Schema: events; Owner: -
+--
+
+ALTER TABLE ONLY events.log
+    ADD CONSTRAINT log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: feedback; Owner: -
+--
+
+ALTER TABLE ONLY feedback.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: failures failures_fingerprint_key; Type: CONSTRAINT; Schema: feedback; Owner: -
+--
+
+ALTER TABLE ONLY feedback.failures
+    ADD CONSTRAINT failures_fingerprint_key UNIQUE (fingerprint);
+
+
+--
+-- Name: failures failures_pkey; Type: CONSTRAINT; Schema: feedback; Owner: -
+--
+
+ALTER TABLE ONLY feedback.failures
+    ADD CONSTRAINT failures_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: occurrences occurrences_pkey; Type: CONSTRAINT; Schema: feedback; Owner: -
+--
+
+ALTER TABLE ONLY feedback.occurrences
+    ADD CONSTRAINT occurrences_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: approval_requests approval_requests_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
 ALTER TABLE ONLY kyc.approval_requests
     ADD CONSTRAINT approval_requests_pkey PRIMARY KEY (approval_id);
+
+
+--
+-- Name: bods_right_type_mapping bods_right_type_mapping_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.bods_right_type_mapping
+    ADD CONSTRAINT bods_right_type_mapping_pkey PRIMARY KEY (bods_interest_type);
 
 
 --
@@ -14065,6 +16451,30 @@ ALTER TABLE ONLY kyc.case_events
 
 ALTER TABLE ONLY kyc.cases
     ADD CONSTRAINT cases_pkey PRIMARY KEY (case_id);
+
+
+--
+-- Name: dilution_exercise_events dilution_exercise_events_idempotency_key_key; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_exercise_events
+    ADD CONSTRAINT dilution_exercise_events_idempotency_key_key UNIQUE (idempotency_key);
+
+
+--
+-- Name: dilution_exercise_events dilution_exercise_events_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_exercise_events
+    ADD CONSTRAINT dilution_exercise_events_pkey PRIMARY KEY (exercise_id);
+
+
+--
+-- Name: dilution_instruments dilution_instruments_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_instruments
+    ADD CONSTRAINT dilution_instruments_pkey PRIMARY KEY (instrument_id);
 
 
 --
@@ -14124,6 +16534,14 @@ ALTER TABLE ONLY kyc.holdings
 
 
 --
+-- Name: instrument_identifier_schemes instrument_identifier_schemes_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.instrument_identifier_schemes
+    ADD CONSTRAINT instrument_identifier_schemes_pkey PRIMARY KEY (scheme_code);
+
+
+--
 -- Name: investor_lifecycle_history investor_lifecycle_history_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -14156,11 +16574,43 @@ ALTER TABLE ONLY kyc.investors
 
 
 --
+-- Name: issuance_events issuance_events_idempotency_key_key; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuance_events
+    ADD CONSTRAINT issuance_events_idempotency_key_key UNIQUE (idempotency_key);
+
+
+--
+-- Name: issuance_events issuance_events_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuance_events
+    ADD CONSTRAINT issuance_events_pkey PRIMARY KEY (event_id);
+
+
+--
+-- Name: issuer_control_config issuer_control_config_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuer_control_config
+    ADD CONSTRAINT issuer_control_config_pkey PRIMARY KEY (config_id);
+
+
+--
 -- Name: movements movements_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
 ALTER TABLE ONLY kyc.movements
     ADD CONSTRAINT movements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: outreach_requests outreach_requests_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outreach_requests
+    ADD CONSTRAINT outreach_requests_pkey PRIMARY KEY (request_id);
 
 
 --
@@ -14172,11 +16622,75 @@ ALTER TABLE ONLY kyc.outstanding_requests
 
 
 --
+-- Name: ownership_reconciliation_findings ownership_reconciliation_findings_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_reconciliation_findings
+    ADD CONSTRAINT ownership_reconciliation_findings_pkey PRIMARY KEY (finding_id);
+
+
+--
+-- Name: ownership_reconciliation_runs ownership_reconciliation_runs_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_reconciliation_runs
+    ADD CONSTRAINT ownership_reconciliation_runs_pkey PRIMARY KEY (run_id);
+
+
+--
+-- Name: ownership_snapshots ownership_snapshots_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_snapshots
+    ADD CONSTRAINT ownership_snapshots_pkey PRIMARY KEY (snapshot_id);
+
+
+--
 -- Name: red_flags red_flags_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
 ALTER TABLE ONLY kyc.red_flags
     ADD CONSTRAINT red_flags_pkey PRIMARY KEY (red_flag_id);
+
+
+--
+-- Name: research_actions research_actions_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_actions
+    ADD CONSTRAINT research_actions_pkey PRIMARY KEY (action_id);
+
+
+--
+-- Name: research_anomalies research_anomalies_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_anomalies
+    ADD CONSTRAINT research_anomalies_pkey PRIMARY KEY (anomaly_id);
+
+
+--
+-- Name: research_confidence_config research_confidence_config_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_confidence_config
+    ADD CONSTRAINT research_confidence_config_pkey PRIMARY KEY (config_id);
+
+
+--
+-- Name: research_corrections research_corrections_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_corrections
+    ADD CONSTRAINT research_corrections_pkey PRIMARY KEY (correction_id);
+
+
+--
+-- Name: research_decisions research_decisions_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_decisions
+    ADD CONSTRAINT research_decisions_pkey PRIMARY KEY (decision_id);
 
 
 --
@@ -14204,6 +16718,22 @@ ALTER TABLE ONLY kyc.screenings
 
 
 --
+-- Name: share_class_identifiers share_class_identifiers_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_class_identifiers
+    ADD CONSTRAINT share_class_identifiers_pkey PRIMARY KEY (identifier_id);
+
+
+--
+-- Name: share_class_supply share_class_supply_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_class_supply
+    ADD CONSTRAINT share_class_supply_pkey PRIMARY KEY (supply_id);
+
+
+--
 -- Name: share_classes share_classes_cbu_id_isin_key; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -14220,11 +16750,51 @@ ALTER TABLE ONLY kyc.share_classes
 
 
 --
+-- Name: special_rights special_rights_pkey; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.special_rights
+    ADD CONSTRAINT special_rights_pkey PRIMARY KEY (right_id);
+
+
+--
 -- Name: entity_workstreams uq_case_entity; Type: CONSTRAINT; Schema: kyc; Owner: -
 --
 
 ALTER TABLE ONLY kyc.entity_workstreams
     ADD CONSTRAINT uq_case_entity UNIQUE (case_id, entity_id);
+
+
+--
+-- Name: research_confidence_config uq_confidence_source; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_confidence_config
+    ADD CONSTRAINT uq_confidence_source UNIQUE (source_provider, effective_from);
+
+
+--
+-- Name: issuer_control_config uq_issuer_control_config; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuer_control_config
+    ADD CONSTRAINT uq_issuer_control_config UNIQUE (issuer_entity_id, effective_from);
+
+
+--
+-- Name: share_class_identifiers uq_share_class_scheme_value; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_class_identifiers
+    ADD CONSTRAINT uq_share_class_scheme_value UNIQUE (share_class_id, scheme_code, identifier_value);
+
+
+--
+-- Name: share_class_supply uq_supply_class_date; Type: CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_class_supply
+    ADD CONSTRAINT uq_supply_class_date UNIQUE (share_class_id, as_of_date);
 
 
 --
@@ -16492,6 +19062,14 @@ ALTER TABLE ONLY public.rules
 
 
 --
+-- Name: log log_pkey; Type: CONSTRAINT; Schema: sessions; Owner: -
+--
+
+ALTER TABLE ONLY sessions.log
+    ADD CONSTRAINT log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: access_attestations access_attestations_pkey; Type: CONSTRAINT; Schema: teams; Owner: -
 --
 
@@ -16696,6 +19274,27 @@ CREATE INDEX idx_booking_rules_lookup ON custody.ssi_booking_rules USING btree (
 
 
 --
+-- Name: idx_ca_preferences_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_ca_preferences_cbu ON custody.cbu_ca_preferences USING btree (cbu_id);
+
+
+--
+-- Name: idx_ca_ssi_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_ca_ssi_cbu ON custody.cbu_ca_ssi_mappings USING btree (cbu_id);
+
+
+--
+-- Name: idx_ca_windows_cbu; Type: INDEX; Schema: custody; Owner: -
+--
+
+CREATE INDEX idx_ca_windows_cbu ON custody.cbu_ca_instruction_windows USING btree (cbu_id);
+
+
+--
 -- Name: idx_cbu_cross_border_cbu; Type: INDEX; Schema: custody; Owner: -
 --
 
@@ -16878,10 +19477,143 @@ CREATE INDEX idx_tax_treaty_source ON custody.tax_treaty_rates USING btree (sour
 
 
 --
+-- Name: idx_events_log_failures; Type: INDEX; Schema: events; Owner: -
+--
+
+CREATE INDEX idx_events_log_failures ON events.log USING btree ("timestamp") WHERE (event_type = 'command_failed'::text);
+
+
+--
+-- Name: idx_events_log_session; Type: INDEX; Schema: events; Owner: -
+--
+
+CREATE INDEX idx_events_log_session ON events.log USING btree (session_id, "timestamp") WHERE (session_id IS NOT NULL);
+
+
+--
+-- Name: idx_events_log_timestamp; Type: INDEX; Schema: events; Owner: -
+--
+
+CREATE INDEX idx_events_log_timestamp ON events.log USING btree ("timestamp");
+
+
+--
+-- Name: idx_audit_action; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_audit_action ON feedback.audit_log USING btree (action);
+
+
+--
+-- Name: idx_audit_created_at; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_audit_created_at ON feedback.audit_log USING btree (created_at DESC);
+
+
+--
+-- Name: idx_audit_failure_id; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_audit_failure_id ON feedback.audit_log USING btree (failure_id);
+
+
+--
+-- Name: idx_failures_fingerprint; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_failures_fingerprint ON feedback.failures USING btree (fingerprint);
+
+
+--
+-- Name: idx_failures_first_seen; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_failures_first_seen ON feedback.failures USING btree (first_seen_at DESC);
+
+
+--
+-- Name: idx_failures_last_seen; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_failures_last_seen ON feedback.failures USING btree (last_seen_at DESC);
+
+
+--
+-- Name: idx_failures_source; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_failures_source ON feedback.failures USING btree (source) WHERE (source IS NOT NULL);
+
+
+--
+-- Name: idx_failures_status; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_failures_status ON feedback.failures USING btree (status);
+
+
+--
+-- Name: idx_failures_status_error_type; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_failures_status_error_type ON feedback.failures USING btree (status, error_type);
+
+
+--
+-- Name: idx_failures_verb; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_failures_verb ON feedback.failures USING btree (verb);
+
+
+--
+-- Name: idx_occurrences_failure_id; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_occurrences_failure_id ON feedback.occurrences USING btree (failure_id);
+
+
+--
+-- Name: idx_occurrences_session_id; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_occurrences_session_id ON feedback.occurrences USING btree (session_id) WHERE (session_id IS NOT NULL);
+
+
+--
+-- Name: idx_occurrences_timestamp; Type: INDEX; Schema: feedback; Owner: -
+--
+
+CREATE INDEX idx_occurrences_timestamp ON feedback.occurrences USING btree (event_timestamp DESC);
+
+
+--
 -- Name: cases_cbu_type_active_uniq; Type: INDEX; Schema: kyc; Owner: -
 --
 
 CREATE UNIQUE INDEX cases_cbu_type_active_uniq ON kyc.cases USING btree (cbu_id, case_type) WHERE (closed_at IS NULL);
+
+
+--
+-- Name: idx_anomalies_action; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_anomalies_action ON kyc.research_anomalies USING btree (action_id);
+
+
+--
+-- Name: idx_anomalies_entity; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_anomalies_entity ON kyc.research_anomalies USING btree (entity_id);
+
+
+--
+-- Name: idx_anomalies_status; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_anomalies_status ON kyc.research_anomalies USING btree (status);
 
 
 --
@@ -16934,6 +19666,48 @@ CREATE INDEX idx_cases_status ON kyc.cases USING btree (status);
 
 
 --
+-- Name: idx_control_config_issuer; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_control_config_issuer ON kyc.issuer_control_config USING btree (issuer_entity_id) WHERE (effective_to IS NULL);
+
+
+--
+-- Name: idx_corrections_corrected; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_corrections_corrected ON kyc.research_corrections USING btree (corrected_at);
+
+
+--
+-- Name: idx_corrections_decision; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_corrections_decision ON kyc.research_corrections USING btree (original_decision_id);
+
+
+--
+-- Name: idx_dilution_converts_to; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_dilution_converts_to ON kyc.dilution_instruments USING btree (converts_to_share_class_id);
+
+
+--
+-- Name: idx_dilution_holder; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_dilution_holder ON kyc.dilution_instruments USING btree (holder_entity_id) WHERE (holder_entity_id IS NOT NULL);
+
+
+--
+-- Name: idx_dilution_issuer; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_dilution_issuer ON kyc.dilution_instruments USING btree (issuer_entity_id) WHERE ((status)::text = 'ACTIVE'::text);
+
+
+--
 -- Name: idx_doc_request_types_request; Type: INDEX; Schema: kyc; Owner: -
 --
 
@@ -16973,6 +19747,20 @@ CREATE INDEX idx_doc_requests_type ON kyc.doc_requests USING btree (doc_type);
 --
 
 CREATE INDEX idx_doc_requests_workstream ON kyc.doc_requests USING btree (workstream_id);
+
+
+--
+-- Name: idx_exercise_idempotency; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_exercise_idempotency ON kyc.dilution_exercise_events USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
+
+
+--
+-- Name: idx_exercise_instrument; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_exercise_instrument ON kyc.dilution_exercise_events USING btree (instrument_id);
 
 
 --
@@ -17074,6 +19862,34 @@ CREATE INDEX idx_investors_provider ON kyc.investors USING btree (provider, prov
 
 
 --
+-- Name: idx_issuance_class; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_issuance_class ON kyc.issuance_events USING btree (share_class_id, effective_date);
+
+
+--
+-- Name: idx_issuance_idempotency; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_issuance_idempotency ON kyc.issuance_events USING btree (idempotency_key) WHERE (idempotency_key IS NOT NULL);
+
+
+--
+-- Name: idx_issuance_issuer; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_issuance_issuer ON kyc.issuance_events USING btree (issuer_entity_id);
+
+
+--
+-- Name: idx_issuance_status; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_issuance_status ON kyc.issuance_events USING btree (status) WHERE ((status)::text = 'EFFECTIVE'::text);
+
+
+--
 -- Name: idx_movements_commitment; Type: INDEX; Schema: kyc; Owner: -
 --
 
@@ -17158,6 +19974,41 @@ CREATE INDEX idx_oreq_workstream ON kyc.outstanding_requests USING btree (workst
 
 
 --
+-- Name: idx_outreach_deadline; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_outreach_deadline ON kyc.outreach_requests USING btree (deadline_date);
+
+
+--
+-- Name: idx_outreach_status; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_outreach_status ON kyc.outreach_requests USING btree (status);
+
+
+--
+-- Name: idx_outreach_target; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_outreach_target ON kyc.outreach_requests USING btree (target_entity_id);
+
+
+--
+-- Name: idx_recon_findings_open; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_recon_findings_open ON kyc.ownership_reconciliation_findings USING btree (resolution_status) WHERE ((resolution_status)::text = 'OPEN'::text);
+
+
+--
+-- Name: idx_recon_findings_run; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_recon_findings_run ON kyc.ownership_reconciliation_findings USING btree (run_id);
+
+
+--
 -- Name: idx_red_flags_case; Type: INDEX; Schema: kyc; Owner: -
 --
 
@@ -17193,6 +20044,69 @@ CREATE INDEX idx_red_flags_workstream ON kyc.red_flags USING btree (workstream_i
 
 
 --
+-- Name: idx_research_actions_decision; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_actions_decision ON kyc.research_actions USING btree (decision_id);
+
+
+--
+-- Name: idx_research_actions_executed; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_actions_executed ON kyc.research_actions USING btree (executed_at);
+
+
+--
+-- Name: idx_research_actions_success; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_actions_success ON kyc.research_actions USING btree (success);
+
+
+--
+-- Name: idx_research_actions_target; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_actions_target ON kyc.research_actions USING btree (target_entity_id);
+
+
+--
+-- Name: idx_research_actions_verb; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_actions_verb ON kyc.research_actions USING btree (verb_domain, verb_name);
+
+
+--
+-- Name: idx_research_decisions_created; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_decisions_created ON kyc.research_decisions USING btree (created_at);
+
+
+--
+-- Name: idx_research_decisions_source; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_decisions_source ON kyc.research_decisions USING btree (source_provider);
+
+
+--
+-- Name: idx_research_decisions_target; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_decisions_target ON kyc.research_decisions USING btree (target_entity_id);
+
+
+--
+-- Name: idx_research_decisions_type; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_research_decisions_type ON kyc.research_decisions USING btree (decision_type);
+
+
+--
 -- Name: idx_screenings_status; Type: INDEX; Schema: kyc; Owner: -
 --
 
@@ -17214,6 +20128,20 @@ CREATE INDEX idx_screenings_workstream ON kyc.screenings USING btree (workstream
 
 
 --
+-- Name: idx_share_class_identifiers_lookup; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_share_class_identifiers_lookup ON kyc.share_class_identifiers USING btree (scheme_code, identifier_value) WHERE (valid_to IS NULL);
+
+
+--
+-- Name: idx_share_class_primary_identifier; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_share_class_primary_identifier ON kyc.share_class_identifiers USING btree (share_class_id) WHERE ((is_primary = true) AND (valid_to IS NULL));
+
+
+--
 -- Name: idx_share_classes_cbu; Type: INDEX; Schema: kyc; Owner: -
 --
 
@@ -17232,6 +20160,62 @@ CREATE INDEX idx_share_classes_entity ON kyc.share_classes USING btree (entity_i
 --
 
 CREATE INDEX idx_share_classes_isin ON kyc.share_classes USING btree (isin) WHERE (isin IS NOT NULL);
+
+
+--
+-- Name: idx_snapshot_current; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_snapshot_current ON kyc.ownership_snapshots USING btree (issuer_entity_id, owner_entity_id, COALESCE(share_class_id, '00000000-0000-0000-0000-000000000000'::uuid), as_of_date, basis, derived_from) WHERE (superseded_at IS NULL);
+
+
+--
+-- Name: idx_snapshot_issuer; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_snapshot_issuer ON kyc.ownership_snapshots USING btree (issuer_entity_id, as_of_date) WHERE (superseded_at IS NULL);
+
+
+--
+-- Name: idx_snapshot_owner; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_snapshot_owner ON kyc.ownership_snapshots USING btree (owner_entity_id, as_of_date) WHERE (superseded_at IS NULL);
+
+
+--
+-- Name: idx_special_rights_class; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_special_rights_class ON kyc.special_rights USING btree (share_class_id) WHERE ((share_class_id IS NOT NULL) AND (effective_to IS NULL));
+
+
+--
+-- Name: idx_special_rights_holder; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_special_rights_holder ON kyc.special_rights USING btree (holder_entity_id) WHERE ((holder_entity_id IS NOT NULL) AND (effective_to IS NULL));
+
+
+--
+-- Name: idx_special_rights_issuer; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_special_rights_issuer ON kyc.special_rights USING btree (issuer_entity_id);
+
+
+--
+-- Name: idx_supply_class; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_supply_class ON kyc.share_class_supply USING btree (share_class_id);
+
+
+--
+-- Name: idx_supply_date; Type: INDEX; Schema: kyc; Owner: -
+--
+
+CREATE INDEX idx_supply_date ON kyc.share_class_supply USING btree (as_of_date DESC);
 
 
 --
@@ -19237,10 +22221,24 @@ CREATE INDEX idx_master_entity_xref_type ON "ob-poc".master_entity_xref USING bt
 
 
 --
+-- Name: idx_materializations_at; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_materializations_at ON "ob-poc".trading_profile_materializations USING btree (materialized_at DESC);
+
+
+--
 -- Name: idx_materializations_profile; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE INDEX idx_materializations_profile ON "ob-poc".trading_profile_materializations USING btree (profile_id);
+
+
+--
+-- Name: idx_materializations_profile_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_materializations_profile_id ON "ob-poc".trading_profile_materializations USING btree (profile_id);
 
 
 --
@@ -20378,6 +23376,20 @@ CREATE INDEX idx_rules_target ON public.rules USING btree (target_attribute_id);
 
 
 --
+-- Name: idx_sessions_log_event; Type: INDEX; Schema: sessions; Owner: -
+--
+
+CREATE INDEX idx_sessions_log_event ON sessions.log USING btree (event_id) WHERE (event_id IS NOT NULL);
+
+
+--
+-- Name: idx_sessions_log_session; Type: INDEX; Schema: sessions; Owner: -
+--
+
+CREATE INDEX idx_sessions_log_session ON sessions.log USING btree (session_id, "timestamp");
+
+
+--
 -- Name: idx_attestations_attester; Type: INDEX; Schema: teams; Owner: -
 --
 
@@ -20684,6 +23696,13 @@ CREATE TRIGGER update_tax_treaty_rates_updated_at BEFORE UPDATE ON custody.tax_t
 
 
 --
+-- Name: failures failures_update_timestamps; Type: TRIGGER; Schema: feedback; Owner: -
+--
+
+CREATE TRIGGER failures_update_timestamps BEFORE UPDATE ON feedback.failures FOR EACH ROW EXECUTE FUNCTION feedback.update_timestamps();
+
+
+--
 -- Name: investors trg_log_investor_lifecycle; Type: TRIGGER; Schema: kyc; Owner: -
 --
 
@@ -20695,6 +23714,13 @@ CREATE TRIGGER trg_log_investor_lifecycle AFTER UPDATE OF lifecycle_state ON kyc
 --
 
 CREATE TRIGGER trg_outstanding_requests_updated BEFORE UPDATE ON kyc.outstanding_requests FOR EACH ROW EXECUTE FUNCTION kyc.update_outstanding_request_timestamp();
+
+
+--
+-- Name: share_class_supply trg_supply_timestamp; Type: TRIGGER; Schema: kyc; Owner: -
+--
+
+CREATE TRIGGER trg_supply_timestamp BEFORE UPDATE ON kyc.share_class_supply FOR EACH ROW EXECUTE FUNCTION kyc.fn_update_supply_timestamp();
 
 
 --
@@ -20926,6 +23952,78 @@ ALTER TABLE ONLY client_portal.sessions
 
 ALTER TABLE ONLY client_portal.submissions
     ADD CONSTRAINT submissions_client_id_fkey FOREIGN KEY (client_id) REFERENCES client_portal.clients(client_id);
+
+
+--
+-- Name: cbu_ca_instruction_windows cbu_ca_instruction_windows_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_instruction_windows
+    ADD CONSTRAINT cbu_ca_instruction_windows_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: cbu_ca_instruction_windows cbu_ca_instruction_windows_event_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_instruction_windows
+    ADD CONSTRAINT cbu_ca_instruction_windows_event_type_id_fkey FOREIGN KEY (event_type_id) REFERENCES custody.ca_event_types(event_type_id);
+
+
+--
+-- Name: cbu_ca_instruction_windows cbu_ca_instruction_windows_market_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_instruction_windows
+    ADD CONSTRAINT cbu_ca_instruction_windows_market_id_fkey FOREIGN KEY (market_id) REFERENCES custody.markets(market_id);
+
+
+--
+-- Name: cbu_ca_preferences cbu_ca_preferences_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_preferences
+    ADD CONSTRAINT cbu_ca_preferences_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: cbu_ca_preferences cbu_ca_preferences_event_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_preferences
+    ADD CONSTRAINT cbu_ca_preferences_event_type_id_fkey FOREIGN KEY (event_type_id) REFERENCES custody.ca_event_types(event_type_id);
+
+
+--
+-- Name: cbu_ca_preferences cbu_ca_preferences_instrument_class_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_preferences
+    ADD CONSTRAINT cbu_ca_preferences_instrument_class_id_fkey FOREIGN KEY (instrument_class_id) REFERENCES custody.instrument_classes(class_id);
+
+
+--
+-- Name: cbu_ca_ssi_mappings cbu_ca_ssi_mappings_cbu_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_ssi_mappings
+    ADD CONSTRAINT cbu_ca_ssi_mappings_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: cbu_ca_ssi_mappings cbu_ca_ssi_mappings_event_type_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_ssi_mappings
+    ADD CONSTRAINT cbu_ca_ssi_mappings_event_type_id_fkey FOREIGN KEY (event_type_id) REFERENCES custody.ca_event_types(event_type_id);
+
+
+--
+-- Name: cbu_ca_ssi_mappings cbu_ca_ssi_mappings_ssi_id_fkey; Type: FK CONSTRAINT; Schema: custody; Owner: -
+--
+
+ALTER TABLE ONLY custody.cbu_ca_ssi_mappings
+    ADD CONSTRAINT cbu_ca_ssi_mappings_ssi_id_fkey FOREIGN KEY (ssi_id) REFERENCES custody.cbu_ssi(ssi_id);
 
 
 --
@@ -21513,6 +24611,22 @@ ALTER TABLE ONLY custody.tax_treaty_rates
 
 
 --
+-- Name: audit_log audit_log_failure_id_fkey; Type: FK CONSTRAINT; Schema: feedback; Owner: -
+--
+
+ALTER TABLE ONLY feedback.audit_log
+    ADD CONSTRAINT audit_log_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES feedback.failures(id) ON DELETE CASCADE;
+
+
+--
+-- Name: occurrences occurrences_failure_id_fkey; Type: FK CONSTRAINT; Schema: feedback; Owner: -
+--
+
+ALTER TABLE ONLY feedback.occurrences
+    ADD CONSTRAINT occurrences_failure_id_fkey FOREIGN KEY (failure_id) REFERENCES feedback.failures(id) ON DELETE CASCADE;
+
+
+--
 -- Name: approval_requests approval_requests_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -21574,6 +24688,54 @@ ALTER TABLE ONLY kyc.cases
 
 ALTER TABLE ONLY kyc.cases
     ADD CONSTRAINT cases_subject_entity_id_fkey FOREIGN KEY (subject_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: dilution_exercise_events dilution_exercise_events_instrument_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_exercise_events
+    ADD CONSTRAINT dilution_exercise_events_instrument_id_fkey FOREIGN KEY (instrument_id) REFERENCES kyc.dilution_instruments(instrument_id);
+
+
+--
+-- Name: dilution_exercise_events dilution_exercise_events_resulting_holding_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_exercise_events
+    ADD CONSTRAINT dilution_exercise_events_resulting_holding_id_fkey FOREIGN KEY (resulting_holding_id) REFERENCES kyc.holdings(id);
+
+
+--
+-- Name: dilution_instruments dilution_instruments_converts_to_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_instruments
+    ADD CONSTRAINT dilution_instruments_converts_to_share_class_id_fkey FOREIGN KEY (converts_to_share_class_id) REFERENCES kyc.share_classes(id);
+
+
+--
+-- Name: dilution_instruments dilution_instruments_grant_document_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_instruments
+    ADD CONSTRAINT dilution_instruments_grant_document_id_fkey FOREIGN KEY (grant_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: dilution_instruments dilution_instruments_holder_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_instruments
+    ADD CONSTRAINT dilution_instruments_holder_entity_id_fkey FOREIGN KEY (holder_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: dilution_instruments dilution_instruments_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.dilution_instruments
+    ADD CONSTRAINT dilution_instruments_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -21681,11 +24843,59 @@ ALTER TABLE ONLY kyc.investors
 
 
 --
+-- Name: issuance_events issuance_events_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuance_events
+    ADD CONSTRAINT issuance_events_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: issuance_events issuance_events_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuance_events
+    ADD CONSTRAINT issuance_events_share_class_id_fkey FOREIGN KEY (share_class_id) REFERENCES kyc.share_classes(id);
+
+
+--
+-- Name: issuance_events issuance_events_source_document_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuance_events
+    ADD CONSTRAINT issuance_events_source_document_id_fkey FOREIGN KEY (source_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
+
+
+--
+-- Name: issuer_control_config issuer_control_config_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.issuer_control_config
+    ADD CONSTRAINT issuer_control_config_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: movements movements_holding_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
 --
 
 ALTER TABLE ONLY kyc.movements
     ADD CONSTRAINT movements_holding_id_fkey FOREIGN KEY (holding_id) REFERENCES kyc.holdings(id);
+
+
+--
+-- Name: outreach_requests outreach_requests_recipient_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outreach_requests
+    ADD CONSTRAINT outreach_requests_recipient_entity_id_fkey FOREIGN KEY (recipient_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: outreach_requests outreach_requests_target_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.outreach_requests
+    ADD CONSTRAINT outreach_requests_target_entity_id_fkey FOREIGN KEY (target_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -21721,6 +24931,62 @@ ALTER TABLE ONLY kyc.outstanding_requests
 
 
 --
+-- Name: ownership_reconciliation_findings ownership_reconciliation_findings_owner_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_reconciliation_findings
+    ADD CONSTRAINT ownership_reconciliation_findings_owner_entity_id_fkey FOREIGN KEY (owner_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: ownership_reconciliation_findings ownership_reconciliation_findings_run_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_reconciliation_findings
+    ADD CONSTRAINT ownership_reconciliation_findings_run_id_fkey FOREIGN KEY (run_id) REFERENCES kyc.ownership_reconciliation_runs(run_id) ON DELETE CASCADE;
+
+
+--
+-- Name: ownership_reconciliation_runs ownership_reconciliation_runs_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_reconciliation_runs
+    ADD CONSTRAINT ownership_reconciliation_runs_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: ownership_snapshots ownership_snapshots_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_snapshots
+    ADD CONSTRAINT ownership_snapshots_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: ownership_snapshots ownership_snapshots_owner_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_snapshots
+    ADD CONSTRAINT ownership_snapshots_owner_entity_id_fkey FOREIGN KEY (owner_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: ownership_snapshots ownership_snapshots_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_snapshots
+    ADD CONSTRAINT ownership_snapshots_share_class_id_fkey FOREIGN KEY (share_class_id) REFERENCES kyc.share_classes(id);
+
+
+--
+-- Name: ownership_snapshots ownership_snapshots_superseded_by_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.ownership_snapshots
+    ADD CONSTRAINT ownership_snapshots_superseded_by_fkey FOREIGN KEY (superseded_by) REFERENCES kyc.ownership_snapshots(snapshot_id);
+
+
+--
 -- Name: red_flags red_flags_case_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
 --
 
@@ -21734,6 +25000,70 @@ ALTER TABLE ONLY kyc.red_flags
 
 ALTER TABLE ONLY kyc.red_flags
     ADD CONSTRAINT red_flags_workstream_id_fkey FOREIGN KEY (workstream_id) REFERENCES kyc.entity_workstreams(workstream_id) ON DELETE CASCADE;
+
+
+--
+-- Name: research_actions research_actions_decision_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_actions
+    ADD CONSTRAINT research_actions_decision_id_fkey FOREIGN KEY (decision_id) REFERENCES kyc.research_decisions(decision_id);
+
+
+--
+-- Name: research_actions research_actions_target_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_actions
+    ADD CONSTRAINT research_actions_target_entity_id_fkey FOREIGN KEY (target_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: research_anomalies research_anomalies_action_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_anomalies
+    ADD CONSTRAINT research_anomalies_action_id_fkey FOREIGN KEY (action_id) REFERENCES kyc.research_actions(action_id);
+
+
+--
+-- Name: research_anomalies research_anomalies_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_anomalies
+    ADD CONSTRAINT research_anomalies_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: research_corrections research_corrections_new_action_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_corrections
+    ADD CONSTRAINT research_corrections_new_action_id_fkey FOREIGN KEY (new_action_id) REFERENCES kyc.research_actions(action_id);
+
+
+--
+-- Name: research_corrections research_corrections_original_action_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_corrections
+    ADD CONSTRAINT research_corrections_original_action_id_fkey FOREIGN KEY (original_action_id) REFERENCES kyc.research_actions(action_id);
+
+
+--
+-- Name: research_corrections research_corrections_original_decision_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_corrections
+    ADD CONSTRAINT research_corrections_original_decision_id_fkey FOREIGN KEY (original_decision_id) REFERENCES kyc.research_decisions(decision_id);
+
+
+--
+-- Name: research_decisions research_decisions_target_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.research_decisions
+    ADD CONSTRAINT research_decisions_target_entity_id_fkey FOREIGN KEY (target_entity_id) REFERENCES "ob-poc".entities(entity_id);
 
 
 --
@@ -21769,11 +25099,43 @@ ALTER TABLE ONLY kyc.screenings
 
 
 --
+-- Name: share_class_identifiers share_class_identifiers_scheme_code_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_class_identifiers
+    ADD CONSTRAINT share_class_identifiers_scheme_code_fkey FOREIGN KEY (scheme_code) REFERENCES kyc.instrument_identifier_schemes(scheme_code);
+
+
+--
+-- Name: share_class_identifiers share_class_identifiers_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_class_identifiers
+    ADD CONSTRAINT share_class_identifiers_share_class_id_fkey FOREIGN KEY (share_class_id) REFERENCES kyc.share_classes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: share_class_supply share_class_supply_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_class_supply
+    ADD CONSTRAINT share_class_supply_share_class_id_fkey FOREIGN KEY (share_class_id) REFERENCES kyc.share_classes(id) ON DELETE CASCADE;
+
+
+--
 -- Name: share_classes share_classes_cbu_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
 --
 
 ALTER TABLE ONLY kyc.share_classes
     ADD CONSTRAINT share_classes_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id);
+
+
+--
+-- Name: share_classes share_classes_converts_to_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.share_classes
+    ADD CONSTRAINT share_classes_converts_to_share_class_id_fkey FOREIGN KEY (converts_to_share_class_id) REFERENCES kyc.share_classes(id);
 
 
 --
@@ -21790,6 +25152,38 @@ ALTER TABLE ONLY kyc.share_classes
 
 ALTER TABLE ONLY kyc.share_classes
     ADD CONSTRAINT share_classes_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: special_rights special_rights_holder_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.special_rights
+    ADD CONSTRAINT special_rights_holder_entity_id_fkey FOREIGN KEY (holder_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: special_rights special_rights_issuer_entity_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.special_rights
+    ADD CONSTRAINT special_rights_issuer_entity_id_fkey FOREIGN KEY (issuer_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: special_rights special_rights_share_class_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.special_rights
+    ADD CONSTRAINT special_rights_share_class_id_fkey FOREIGN KEY (share_class_id) REFERENCES kyc.share_classes(id);
+
+
+--
+-- Name: special_rights special_rights_source_document_id_fkey; Type: FK CONSTRAINT; Schema: kyc; Owner: -
+--
+
+ALTER TABLE ONLY kyc.special_rights
+    ADD CONSTRAINT special_rights_source_document_id_fkey FOREIGN KEY (source_document_id) REFERENCES "ob-poc".document_catalog(doc_id);
 
 
 --
@@ -23689,6 +27083,14 @@ ALTER TABLE ONLY public.rules
 
 
 --
+-- Name: log log_event_id_fkey; Type: FK CONSTRAINT; Schema: sessions; Owner: -
+--
+
+ALTER TABLE ONLY sessions.log
+    ADD CONSTRAINT log_event_id_fkey FOREIGN KEY (event_id) REFERENCES events.log(id);
+
+
+--
 -- Name: access_attestations access_attestations_campaign_id_fkey; Type: FK CONSTRAINT; Schema: teams; Owner: -
 --
 
@@ -23788,5 +27190,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6hFED8hISa7MqgrdYXikT8RfZLf3VvAnPq9M7EIIrtwck6v8O8Iddxb9Pshe8ax
+\unrestrict UhevCCGW18lifr3G4hg8AXjj0hjxg6QrSVrFT4BMPDsJBWaTVdiJMbpLae7084Z
 
