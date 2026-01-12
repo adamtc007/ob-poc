@@ -641,29 +641,6 @@ domains:
         returns:
           type: affected
 
-      list-due-for-review:
-        description: List investors due for periodic review
-        metadata:
-          tier: reference
-          source_of_truth: register
-          scope: cbu
-          noun: investor
-        behavior: plugin
-        plugin_handler: investor_list_due_for_review
-        args:
-          - name: cbu-id
-            type: uuid
-            required: false
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-        returns:
-          type: record_set
-
       # ============================================
       # Query/reporting verbs
       # ============================================

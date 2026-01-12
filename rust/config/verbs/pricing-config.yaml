@@ -669,31 +669,3 @@ domains:
       # =========================================================================
       # VALIDATION
       # =========================================================================
-
-      validate-pricing-config:
-        description: "Validate pricing configuration completeness"
-        metadata:
-          tier: diagnostics
-          source_of_truth: catalog
-          scope: cbu
-          noun: pricing_config
-        behavior: plugin
-        handler: validate_pricing_configuration
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-        returns:
-          type: record
-          description: "{ complete: bool, missing_sources: [...], missing_schedules: [...] }"
-        lifecycle:
-          reads_tables:
-            - custody.cbu_pricing_config
-            - custody.cbu_valuation_schedule
-            - custody.cbu_instrument_universe

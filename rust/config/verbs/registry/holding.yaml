@@ -422,27 +422,6 @@ domains:
         returns:
           type: record_set
 
-      list-ubo-holdings:
-        description: List holdings that qualify for UBO tracking (>=25% ownership)
-        metadata:
-          tier: reference
-          source_of_truth: register
-          scope: cbu
-          noun: holding
-        behavior: plugin
-        args:
-          - name: share-class-id
-            type: uuid
-            required: false
-            lookup:
-              table: share_classes
-              entity_type: share_class
-              schema: kyc
-              search_key: name
-              primary_key: id
-        returns:
-          type: record_set
-
       close:
         description: Close a holding (mark as inactive)
         metadata:

@@ -687,33 +687,6 @@ domains:
         returns:
           type: record_set
 
-      list-capital-activity:
-        description: List PE/VC capital activity (commitments, calls, distributions)
-        metadata:
-          tier: reference
-          source_of_truth: register
-          scope: cbu
-          noun: movement
-        behavior: plugin
-        plugin_handler: movement_list_capital_activity
-        args:
-          - name: holding-id
-            type: uuid
-            required: false
-            maps_to: holding_id
-            lookup:
-              table: holdings
-              entity_type: holding
-              schema: kyc
-              search_key: id
-              primary_key: id
-          - name: movement-type
-            type: string
-            required: false
-            maps_to: movement_type
-        returns:
-          type: record_set
-
       read:
         description: Read a movement by ID
         metadata:

@@ -476,32 +476,6 @@ domains:
                 - CORRESPONDENT_BANK
         returns:
           type: affected
-      check-invariants:
-        description: Verify CBU invariants hold (returns list of violations)
-        behavior: plugin
-        metadata:
-          tier: diagnostics
-          source_of_truth: operational
-          scope: global
-          noun: cbu
-          tags: [validation, read]
-        plugin:
-          handler: CbuCheckInvariantsOp
-        args:
-          - name: cbu-id
-            type: uuid
-            required: false
-            description: CBU to check (if null, checks all CBUs)
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-        returns:
-          type: record_set
-          description: List of violations (empty if valid)
-
       show:
         description: Show full CBU structure including entities, roles, documents, screenings
         behavior: plugin

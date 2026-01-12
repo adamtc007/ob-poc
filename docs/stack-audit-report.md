@@ -281,7 +281,18 @@ Skipped for expedience. CLAUDE.md documents egui patterns are compliant (last au
 
 ## Audit 2.4: Agent RAG
 
-Deferred. RAG cleanup requires careful review per 031 guidelines. No changes made to RAG files.
+**COMPLETED** - Stale verb references cleaned from ob-agentic crate.
+
+### Changes Made:
+- Replaced `custody_verbs.md` with `trading_profile_verbs.md`
+- Updated 3 example DSL files to use `trading-profile.*` verbs
+- Fixed `pipeline.rs` - replaced `cbu-custody.add-universe` with `trading-profile.add-instrument-class` / `add-market`
+- Fixed `generator.rs` - updated validation instruction
+- Updated `patterns.rs` - changed required domains from `cbu-custody` to `trading-profile`
+
+### Verification:
+- 53 ob-agentic tests pass
+- No remaining `cbu-custody.` references in ob-agentic
 
 ---
 
@@ -292,7 +303,7 @@ Deferred. RAG cleanup requires careful review per 031 guidelines. No changes mad
 - [x] 2.5 Session State (Rust structs ↔ DB tables) - **COMPLETE**
 - [x] 2.6 Visualization Structs - **SKIPPED** (documented compliant)
 - [x] 2.7 egui Rendering - **SKIPPED** (documented compliant)
-- [ ] 2.4 Agent RAG / Vector DB - **DEFERRED** (high risk, needs manual review)
+- [x] 2.4 Agent RAG / Vector DB - **COMPLETE**
 
 ---
 
