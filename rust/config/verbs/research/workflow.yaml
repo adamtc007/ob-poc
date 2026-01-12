@@ -19,6 +19,12 @@ domains:
 
       record-decision:
         description: "Record a research decision (Phase 1 outcome)"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: research_decision
+          tags: [write, workflow, audit-trail]
         behavior: crud
         crud:
           operation: insert
@@ -87,6 +93,12 @@ domains:
           - "yes that's right"
           - "use that one"
           - "select this match"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: research_decision
+          tags: [write, workflow, user-confirmation]
         behavior: plugin
         handler: WorkflowConfirmDecisionOp
         args:
@@ -109,6 +121,12 @@ domains:
           - "reject"
           - "not that one"
           - "none of these"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: research_decision
+          tags: [write, workflow, user-rejection]
         behavior: plugin
         handler: WorkflowRejectDecisionOp
         args:
@@ -127,6 +145,12 @@ domains:
 
       record-action:
         description: "Record a research action (Phase 2 execution)"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: research_action
+          tags: [write, workflow, audit-trail]
         behavior: crud
         crud:
           operation: insert
@@ -213,6 +237,12 @@ domains:
           - "fix the mistake"
           - "wrong entity was selected"
           - "undo that selection"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: research_correction
+          tags: [write, workflow, correction]
         behavior: crud
         crud:
           operation: insert
@@ -262,6 +292,12 @@ domains:
 
       record-anomaly:
         description: "Record a post-import validation anomaly"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: research_anomaly
+          tags: [write, workflow, validation]
         behavior: crud
         crud:
           operation: insert
@@ -303,6 +339,12 @@ domains:
 
       resolve-anomaly:
         description: "Resolve an anomaly"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: global
+          noun: research_anomaly
+          tags: [write, workflow, validation, resolution]
         behavior: crud
         crud:
           operation: update
@@ -336,6 +378,12 @@ domains:
           - "history of decisions"
           - "how did we get this data"
           - "where did this come from"
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: global
+          noun: research_audit
+          tags: [read, query, workflow, audit-trail]
         behavior: plugin
         handler: WorkflowAuditTrailOp
         args:
@@ -369,6 +417,12 @@ domains:
 
       pending-decisions:
         description: "List decisions awaiting user input"
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: global
+          noun: research_decision
+          tags: [read, query, workflow]
         behavior: crud
         crud:
           operation: select

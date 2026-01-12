@@ -10,6 +10,10 @@ domains:
       # ============================================
       create:
         description: Create a new investor record (starts in ENQUIRY state)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -71,6 +75,10 @@ domains:
 
       ensure:
         description: Create or update investor by entity_id + cbu_id (idempotent)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -134,6 +142,10 @@ domains:
 
       read:
         description: Read investor by ID
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -155,6 +167,10 @@ domains:
 
       list-by-cbu:
         description: List investors for a CBU (fund)
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -180,6 +196,10 @@ domains:
 
       list-by-entity:
         description: List investor records for an entity across all CBUs
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -205,6 +225,10 @@ domains:
       # ============================================
       request-documents:
         description: Transition from ENQUIRY to PENDING_DOCUMENTS
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_request_documents
         args:
@@ -227,6 +251,10 @@ domains:
 
       start-kyc:
         description: Transition from PENDING_DOCUMENTS to KYC_IN_PROGRESS
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_start_kyc
         args:
@@ -256,6 +284,10 @@ domains:
 
       approve-kyc:
         description: Transition from KYC_IN_PROGRESS to KYC_APPROVED
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_approve_kyc
         args:
@@ -291,6 +323,10 @@ domains:
 
       reject-kyc:
         description: Transition from KYC_IN_PROGRESS to KYC_REJECTED
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_reject_kyc
         args:
@@ -315,6 +351,10 @@ domains:
 
       mark-eligible:
         description: Transition from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_mark_eligible
         args:
@@ -337,6 +377,10 @@ domains:
 
       record-subscription:
         description: Transition from ELIGIBLE_TO_SUBSCRIBE to SUBSCRIBED
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_record_subscription
         args:
@@ -366,6 +410,10 @@ domains:
 
       activate:
         description: Transition from SUBSCRIBED to ACTIVE_HOLDER
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_activate
         args:
@@ -384,6 +432,10 @@ domains:
 
       start-redemption:
         description: Transition from ACTIVE_HOLDER to REDEEMING
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_start_redemption
         args:
@@ -407,6 +459,10 @@ domains:
 
       complete-redemption:
         description: Complete redemption - return to ACTIVE_HOLDER or proceed to OFFBOARDED
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_complete_redemption
         args:
@@ -429,6 +485,10 @@ domains:
 
       offboard:
         description: Transition to OFFBOARDED (terminal state)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_offboard
         args:
@@ -460,6 +520,10 @@ domains:
 
       suspend:
         description: Suspend investor (can be done from most states)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_suspend
         args:
@@ -491,6 +555,10 @@ domains:
 
       reinstate:
         description: Reinstate suspended investor to previous state
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_reinstate
         args:
@@ -527,6 +595,10 @@ domains:
       # ============================================
       schedule-review:
         description: Schedule periodic KYC review
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -553,6 +625,10 @@ domains:
 
       list-due-for-review:
         description: List investors due for periodic review
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_list_due_for_review
         args:
@@ -574,6 +650,10 @@ domains:
       # ============================================
       get-lifecycle-history:
         description: Get lifecycle state change history for an investor
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -596,6 +676,10 @@ domains:
 
       count-by-state:
         description: Count investors by lifecycle state for a CBU
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: investor_count_by_state
         args:

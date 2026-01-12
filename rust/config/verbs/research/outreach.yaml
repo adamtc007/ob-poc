@@ -26,7 +26,7 @@ domains:
           - "send a request to"
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_request
           tags: [write, workflow, request-management]
@@ -89,7 +89,7 @@ domains:
         description: "Mark request as sent"
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
@@ -115,7 +115,7 @@ domains:
         description: "Mark that a reminder was sent"
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
@@ -146,7 +146,7 @@ domains:
           - "received ownership information"
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_response
           tags: [write, workflow, response-capture]
@@ -177,7 +177,7 @@ domains:
         description: "Close an outreach request"
         metadata:
           tier: intent
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_request
           tags: [write, workflow, status-update]
@@ -211,7 +211,7 @@ domains:
         description: "List pending outreach requests"
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_request
           tags: [read, query, workflow]
@@ -246,7 +246,7 @@ domains:
           - "who hasn't responded"
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_request
           tags: [read, query, workflow, validation]
@@ -264,7 +264,7 @@ domains:
         description: "Get details of a specific request"
         metadata:
           tier: diagnostics
-          source_of_truth: operational
+          source_of_truth: workflow
           scope: global
           noun: outreach_request
           tags: [read, query, workflow]

@@ -9,6 +9,10 @@ domains:
     verbs:
       set:
         description: Set pricing source for instrument class
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -129,6 +133,10 @@ domains:
 
       link-resource:
         description: Link pricing config to pricing feed resource
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -155,6 +163,10 @@ domains:
 
       list:
         description: List pricing configurations for CBU
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -185,6 +197,10 @@ domains:
 
       remove:
         description: Remove pricing configuration
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -200,6 +216,10 @@ domains:
 
       deactivate:
         description: Deactivate pricing configuration
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -218,6 +238,10 @@ domains:
 
       find-for-instrument:
         description: Find pricing source for given instrument characteristics
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: cbu
         behavior: plugin
         handler: find_pricing_for_instrument
         args:
@@ -252,6 +276,10 @@ domains:
 
       set-valuation-schedule:
         description: "Set position valuation frequency and timing"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -322,6 +350,10 @@ domains:
 
       list-valuation-schedules:
         description: "List valuation schedules for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -350,6 +382,10 @@ domains:
 
       set-fallback-chain:
         description: "Define multi-source pricing fallback chain"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -411,6 +447,10 @@ domains:
 
       list-fallback-chains:
         description: "List pricing fallback chains for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -439,6 +479,10 @@ domains:
 
       set-stale-policy:
         description: "Configure stale price handling policy"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -492,6 +536,10 @@ domains:
 
       list-stale-policies:
         description: "List stale price policies for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -520,6 +568,10 @@ domains:
 
       set-nav-threshold:
         description: "Set NAV impact alert threshold"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -574,6 +626,10 @@ domains:
 
       list-nav-thresholds:
         description: "List NAV impact thresholds for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -602,6 +658,10 @@ domains:
 
       validate-pricing-config:
         description: "Validate pricing configuration completeness"
+        metadata:
+          tier: diagnostics
+          source_of_truth: catalog
+          scope: cbu
         behavior: plugin
         handler: validate_pricing_configuration
         args:

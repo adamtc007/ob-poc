@@ -30,6 +30,12 @@ domains:
       create-limited-company:
         description: Create a limited company entity
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, creation]
         produces:
           type: entity
           subtype: limited_company
@@ -70,6 +76,12 @@ domains:
       create-proper-person:
         description: Create a natural person entity
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, creation]
         produces:
           type: entity
           subtype: proper_person
@@ -114,6 +126,12 @@ domains:
       create-trust-discretionary:
         description: Create a discretionary trust entity
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, creation]
         produces:
           type: entity
           subtype: trust
@@ -158,6 +176,12 @@ domains:
       create-partnership-limited:
         description: Create a limited partnership entity
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, creation]
         produces:
           type: entity
           subtype: partnership
@@ -203,6 +227,12 @@ domains:
       ensure-limited-company:
         description: Create or update a limited company entity (idempotent by name)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, upsert]
         produces:
           type: entity
           subtype: limited_company
@@ -244,6 +274,12 @@ domains:
       ensure-proper-person:
         description: Create or update a natural person entity (idempotent by name)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, upsert]
         produces:
           type: entity
           subtype: proper_person
@@ -289,6 +325,12 @@ domains:
       ensure-trust-discretionary:
         description: Create or update a discretionary trust entity (idempotent by name)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, upsert]
         produces:
           type: entity
           subtype: trust
@@ -334,6 +376,12 @@ domains:
       ensure-partnership-limited:
         description: Create or update a limited partnership entity (idempotent by name)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, upsert]
         produces:
           type: entity
           subtype: partnership
@@ -375,6 +423,11 @@ domains:
       read:
         description: Read an entity by ID
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: entity
+          noun: entity
+          tags: [query]
         crud:
           operation: select
           table: entities
@@ -395,6 +448,12 @@ domains:
       update:
         description: Update an entity's base fields
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, modification]
         crud:
           operation: update
           table: entities
@@ -428,6 +487,12 @@ domains:
       delete:
         description: Delete an entity (cascades to type extension)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, deletion]
         crud:
           operation: delete
           table: entities
@@ -449,6 +514,11 @@ domains:
       list:
         description: List entities with optional filters
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: entity
+          noun: entity
+          tags: [query, listing]
         crud:
           operation: select
           table: entities
@@ -479,6 +549,11 @@ domains:
       query:
         description: Query entities for batch template iteration (returns entity refs, not records)
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: entity
+          noun: entity
+          tags: [query, batch]
         plugin:
           handler: entity_query
         args:
@@ -511,6 +586,12 @@ domains:
       ghost:
         description: Create a ghost person entity (name only, minimal attributes)
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, ghost, creation]
         plugin:
           handler: entity_ghost
         produces:
@@ -542,6 +623,12 @@ domains:
       identify:
         description: Add identifying attributes to a ghost entity (transitions to IDENTIFIED state)
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, ghost, identification]
         plugin:
           handler: entity_identify
         args:
@@ -586,6 +673,12 @@ domains:
       verify:
         description: Mark an identified entity as verified (transitions to VERIFIED state)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, ghost, verification]
         crud:
           operation: update
           table: entity_proper_persons
@@ -611,6 +704,11 @@ domains:
       list-ghosts:
         description: List ghost entities requiring identification
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: entity
+          noun: entity
+          tags: [query, ghost, listing]
         crud:
           operation: select
           table: entity_proper_persons

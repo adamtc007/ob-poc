@@ -7,6 +7,10 @@ domains:
     verbs:
       load-markets:
         description: Load markets from YAML file into custody.markets table
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: load_markets_from_yaml
         args:
@@ -25,6 +29,10 @@ domains:
 
       load-instrument-classes:
         description: Load instrument class taxonomy from YAML into custody.instrument_classes
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: load_instrument_classes_from_yaml
         args:
@@ -42,6 +50,10 @@ domains:
 
       load-subcustodians:
         description: Load subcustodian network from YAML into custody.subcustodian_network
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: load_subcustodians_from_yaml
         args:
@@ -59,6 +71,10 @@ domains:
 
       load-sla-templates:
         description: Load SLA templates from YAML into ob-poc.sla_templates
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: load_sla_templates_from_yaml
         args:
@@ -76,6 +92,10 @@ domains:
 
       load-all:
         description: Load all reference data from directory
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: load_all_refdata
         args:

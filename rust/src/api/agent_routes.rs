@@ -4095,7 +4095,7 @@ fn parse_association(input: &str) -> Option<String> {
             let rest = &input[idx + pattern.len()..];
             // Take words until punctuation or end
             let entity: String = rest
-                .split(|c: char| c == ',' || c == '.' || c == ';')
+                .split([',', '.', ';'])
                 .next()
                 .unwrap_or("")
                 .trim()

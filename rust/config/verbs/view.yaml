@@ -616,6 +616,10 @@ domains:
 
       red-flag:
         description: "Scan and highlight red flags"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ViewRedFlagOp
@@ -641,6 +645,10 @@ domains:
 
       black-holes:
         description: "Show data gaps as 'black holes'"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ViewBlackHolesOp
@@ -670,6 +678,10 @@ domains:
 
       detail:
         description: "Change detail level for current focus"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ViewDetailOp
@@ -689,6 +701,10 @@ domains:
 
       context:
         description: "Set UI context mode (changes workflow adaptation)"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ViewContextOp
@@ -714,6 +730,10 @@ domains:
 
       status:
         description: "Get current view state summary"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ViewStatusOp
@@ -724,6 +744,10 @@ domains:
 
       selection-info:
         description: "Get detailed info about current selection"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ViewSelectionInfoOp

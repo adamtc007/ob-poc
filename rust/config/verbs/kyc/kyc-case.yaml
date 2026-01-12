@@ -4,6 +4,10 @@ domains:
     verbs:
       create:
         description: Create a new KYC case for a CBU
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         produces:
           type: case
@@ -63,6 +67,10 @@ domains:
           capture: true
       update-status:
         description: Update case status
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -101,6 +109,10 @@ domains:
           type: affected
       escalate:
         description: Escalate case to higher authority
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -132,6 +144,10 @@ domains:
           type: affected
       assign:
         description: Assign case to analyst and/or reviewer
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -174,6 +190,10 @@ domains:
           type: affected
       set-risk-rating:
         description: Set case risk rating
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -206,6 +226,10 @@ domains:
           type: affected
       close:
         description: Close the case
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -245,6 +269,10 @@ domains:
           type: affected
       read:
         description: Read case details
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -265,6 +293,10 @@ domains:
           type: record
       list-by-cbu:
         description: List cases for a CBU
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -289,6 +321,10 @@ domains:
           type: record_set
       reopen:
         description: Reopen a closed case for remediation or review
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -334,6 +370,10 @@ domains:
           type: affected
       state:
         description: Get full case state with workstreams and embedded awaiting requests
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         handler: KycCaseStateOp
         args:

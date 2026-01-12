@@ -8,6 +8,10 @@ domains:
     verbs:
       define:
         description: "Define a new attribute in the registry"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: upsert
@@ -93,6 +97,10 @@ domains:
 
       update:
         description: "Update an existing attribute"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: update
@@ -123,6 +131,10 @@ domains:
 
       read:
         description: "Read an attribute by semantic ID"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: select
@@ -137,6 +149,10 @@ domains:
 
       list:
         description: "List attributes, optionally filtered by category or domain"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: select
@@ -154,6 +170,10 @@ domains:
 
       map-to-document:
         description: "Map attribute to document type (source or sink relationship)"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: upsert
@@ -221,6 +241,10 @@ domains:
 
       unmap-from-document:
         description: "Remove attribute mapping from document type"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: delete
@@ -250,6 +274,10 @@ domains:
 
       list-sources:
         description: "List all document types that provide (source) a given attribute"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         handler: attribute_list_sources
         args:
@@ -260,6 +288,10 @@ domains:
 
       list-sinks:
         description: "List all document types that require (sink) a given attribute"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         handler: attribute_list_sinks
         args:
@@ -270,6 +302,10 @@ domains:
 
       trace-lineage:
         description: "Show complete lineage for an attribute - sources, sinks, and resources that require it"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         handler: attribute_trace_lineage
         args:
@@ -280,6 +316,10 @@ domains:
 
       list-by-document:
         description: "List all attributes linked to a document type"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         handler: attribute_list_by_document
         args:
@@ -295,6 +335,10 @@ domains:
 
       check-coverage:
         description: "Check attribute coverage for a document type - what's mapped vs what's required"
+        metadata:
+          tier: diagnostics
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         handler: attribute_check_coverage
         args:

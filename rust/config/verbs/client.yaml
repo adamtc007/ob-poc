@@ -16,6 +16,13 @@ verbs:
     description: "Get current onboarding status for client's accessible CBU(s)"
     behavior: plugin
     plugin: ClientGetStatus
+    metadata:
+      tier: diagnostics
+      source_of_truth: workflow
+      scope: cbu
+      internal: false
+      noun: onboarding_status
+      tags: [client-portal, read-only]
     args:
       - name: cbu-id
         type: uuid
@@ -29,6 +36,13 @@ verbs:
     description: "Get list of outstanding requests with WHY context"
     behavior: plugin
     plugin: ClientGetOutstanding
+    metadata:
+      tier: diagnostics
+      source_of_truth: workflow
+      scope: cbu
+      internal: false
+      noun: outstanding_request
+      tags: [client-portal, read-only]
     args:
       - name: cbu-id
         type: uuid
@@ -47,6 +61,13 @@ verbs:
     description: "Get full detail for a specific request including guidance"
     behavior: plugin
     plugin: ClientGetRequestDetail
+    metadata:
+      tier: diagnostics
+      source_of_truth: workflow
+      scope: cbu
+      internal: false
+      noun: request_detail
+      tags: [client-portal, read-only]
     args:
       - name: request-id
         type: uuid
@@ -60,6 +81,13 @@ verbs:
     description: "Get summary information about an entity (for verification/update)"
     behavior: plugin
     plugin: ClientGetEntityInfo
+    metadata:
+      tier: diagnostics
+      source_of_truth: entity
+      scope: cbu
+      internal: false
+      noun: entity_info
+      tags: [client-portal, read-only]
     args:
       - name: entity-id
         type: uuid
@@ -77,6 +105,14 @@ verbs:
     description: "Submit a document in response to a request"
     behavior: plugin
     plugin: ClientSubmitDocument
+    metadata:
+      tier: intent
+      source_of_truth: document
+      scope: cbu
+      writes_operational: true
+      internal: false
+      noun: document_submission
+      tags: [client-portal, write]
     args:
       - name: request-id
         type: uuid
@@ -106,6 +142,14 @@ verbs:
     description: "Provide structured information in response to a request"
     behavior: plugin
     plugin: ClientProvideInfo
+    metadata:
+      tier: intent
+      source_of_truth: workflow
+      scope: cbu
+      writes_operational: true
+      internal: false
+      noun: info_submission
+      tags: [client-portal, write]
     args:
       - name: request-id
         type: uuid
@@ -132,6 +176,14 @@ verbs:
     description: "Add a note to a request (e.g., 'accountant sending next week')"
     behavior: plugin
     plugin: ClientAddNote
+    metadata:
+      tier: intent
+      source_of_truth: workflow
+      scope: cbu
+      writes_operational: true
+      internal: false
+      noun: request_note
+      tags: [client-portal, write]
     args:
       - name: request-id
         type: uuid
@@ -153,6 +205,14 @@ verbs:
     description: "Ask for clarification about a request"
     behavior: plugin
     plugin: ClientRequestClarification
+    metadata:
+      tier: intent
+      source_of_truth: workflow
+      scope: cbu
+      writes_operational: true
+      internal: false
+      noun: clarification_request
+      tags: [client-portal, write]
     args:
       - name: request-id
         type: uuid
@@ -174,6 +234,13 @@ verbs:
     description: "Begin guided collection for a structured info request"
     behavior: plugin
     plugin: ClientStartCollection
+    metadata:
+      tier: intent
+      source_of_truth: session
+      scope: cbu
+      internal: false
+      noun: collection_session
+      tags: [client-portal, guided-collection]
     args:
       - name: request-id
         type: uuid
@@ -187,6 +254,13 @@ verbs:
     description: "Provide a response during guided collection"
     behavior: plugin
     plugin: ClientCollectionResponse
+    metadata:
+      tier: intent
+      source_of_truth: session
+      scope: cbu
+      internal: false
+      noun: collection_response
+      tags: [client-portal, guided-collection]
     args:
       - name: field
         type: string
@@ -205,6 +279,13 @@ verbs:
     description: "Confirm collected data before submission"
     behavior: plugin
     plugin: ClientCollectionConfirm
+    metadata:
+      tier: intent
+      source_of_truth: session
+      scope: cbu
+      internal: false
+      noun: collection_confirmation
+      tags: [client-portal, guided-collection]
     args:
       - name: confirmed
         type: boolean
@@ -222,6 +303,14 @@ verbs:
     description: "Request human assistance from relationship manager"
     behavior: plugin
     plugin: ClientEscalate
+    metadata:
+      tier: intent
+      source_of_truth: workflow
+      scope: cbu
+      writes_operational: true
+      internal: false
+      noun: escalation_request
+      tags: [client-portal, escalation]
     args:
       - name: reason
         type: string

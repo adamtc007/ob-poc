@@ -7,6 +7,10 @@ domains:
     verbs:
       create:
         description: "Create KYC service agreement with sponsor (idempotent by sponsor+reference)"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -70,6 +74,10 @@ domains:
 
       read:
         description: "Get service agreement details"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -89,6 +97,10 @@ domains:
 
       list:
         description: "List service agreements for a sponsor"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -109,6 +121,10 @@ domains:
 
       update-status:
         description: "Update agreement status"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update

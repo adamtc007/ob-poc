@@ -9,6 +9,10 @@ domains:
     verbs:
       configure:
         description: Configure cash sweep for currency
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -106,6 +110,10 @@ domains:
 
       link-resource:
         description: Link sweep config to cash management resource
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -132,6 +140,10 @@ domains:
 
       list:
         description: List cash sweep configurations for CBU
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -158,6 +170,10 @@ domains:
 
       update-threshold:
         description: Update sweep threshold amount
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -178,6 +194,10 @@ domains:
 
       update-timing:
         description: Update sweep timing
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -211,6 +231,10 @@ domains:
 
       change-vehicle:
         description: Change sweep investment vehicle
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -246,6 +270,10 @@ domains:
 
       suspend:
         description: Suspend cash sweep
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -264,6 +292,10 @@ domains:
 
       reactivate:
         description: Reactivate cash sweep
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -282,6 +314,10 @@ domains:
 
       remove:
         description: Remove cash sweep configuration
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete

@@ -4,6 +4,10 @@ domains:
     verbs:
       pause:
         description: Pause the current batch execution
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: batch_pause
@@ -14,6 +18,10 @@ domains:
 
       resume:
         description: Resume a paused batch execution
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: batch_resume
@@ -24,6 +32,10 @@ domains:
 
       continue:
         description: Continue batch execution for N more items
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: batch_continue
@@ -39,6 +51,10 @@ domains:
 
       skip:
         description: Skip the current batch item
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: batch_skip
@@ -53,6 +69,10 @@ domains:
 
       abort:
         description: Abort the current batch execution
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: batch_abort
@@ -67,6 +87,10 @@ domains:
 
       status:
         description: Get the current batch execution status
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: batch_status
@@ -77,6 +101,10 @@ domains:
 
       add-products:
         description: Add products to multiple CBUs in bulk
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: batch_add_products

@@ -9,6 +9,10 @@ domains:
 
       define-message-type:
         description: "Define instruction message type for a lifecycle event"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -56,6 +60,10 @@ domains:
 
       list-message-types:
         description: "List available message types"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -79,6 +87,10 @@ domains:
 
       create-template:
         description: "Create instruction message template"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -126,6 +138,10 @@ domains:
 
       read-template:
         description: "Read instruction template"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -145,6 +161,10 @@ domains:
 
       list-templates:
         description: "List instruction templates"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -164,6 +184,10 @@ domains:
 
       assign-template:
         description: "Assign instruction template to CBU for instrument/market/event"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -249,6 +273,10 @@ domains:
 
       list-assignments:
         description: "List instruction template assignments for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -278,6 +306,10 @@ domains:
 
       remove-assignment:
         description: "Remove template assignment"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -297,6 +329,10 @@ domains:
 
       add-field-override:
         description: "Add field-level override to CBU's instruction profile"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -341,6 +377,10 @@ domains:
 
       list-field-overrides:
         description: "List field overrides for assignment"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -357,6 +397,10 @@ domains:
 
       remove-field-override:
         description: "Remove field override"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -376,6 +420,10 @@ domains:
 
       find-template:
         description: "Find applicable template for trade characteristics"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: find_instruction_template
         args:
@@ -411,6 +459,10 @@ domains:
 
       validate-profile:
         description: "Validate instruction profile completeness"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: validate_instruction_profile
         args:
@@ -433,6 +485,10 @@ domains:
 
       derive-required-templates:
         description: "Derive required templates from universe"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: derive_required_instruction_templates
         args:

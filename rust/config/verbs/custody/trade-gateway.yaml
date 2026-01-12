@@ -9,6 +9,10 @@ domains:
 
       define-gateway:
         description: "Define available trade gateway"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -60,6 +64,10 @@ domains:
 
       read-gateway:
         description: "Read gateway definition"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -82,6 +90,10 @@ domains:
 
       list-gateways:
         description: "List available gateways"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -108,6 +120,10 @@ domains:
 
       enable-gateway:
         description: "Enable gateway connectivity for CBU"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -180,6 +196,10 @@ domains:
 
       activate-gateway:
         description: "Activate gateway connectivity"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -202,6 +222,10 @@ domains:
 
       suspend-gateway:
         description: "Suspend gateway connectivity"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -227,6 +251,10 @@ domains:
 
       list-cbu-gateways:
         description: "List gateway connectivity for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -259,6 +287,10 @@ domains:
 
       add-routing-rule:
         description: "Add gateway routing rule for CBU"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -348,6 +380,10 @@ domains:
 
       list-routing-rules:
         description: "List gateway routing rules for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -381,6 +417,10 @@ domains:
 
       remove-routing-rule:
         description: "Remove routing rule"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -400,6 +440,10 @@ domains:
 
       set-fallback:
         description: "Configure fallback gateway"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -465,6 +509,10 @@ domains:
 
       list-fallbacks:
         description: "List fallback configurations"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -493,6 +541,10 @@ domains:
 
       find-gateway:
         description: "Find applicable gateway for trade"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: plugin
         handler: find_trade_gateway
         args:
@@ -529,6 +581,10 @@ domains:
 
       validate-routing:
         description: "Validate gateway routing completeness"
+        metadata:
+          tier: diagnostics
+          source_of_truth: matrix
+          scope: cbu
         behavior: plugin
         handler: validate_gateway_routing
         args:
@@ -552,6 +608,10 @@ domains:
 
       derive-required-routes:
         description: "Derive required gateway routes from universe"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: plugin
         handler: derive_required_gateway_routes
         args:

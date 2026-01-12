@@ -9,6 +9,10 @@ domains:
     verbs:
       assign:
         description: Assign investment manager to CBU with trading scope (idempotent by cbu+manager_lei+role)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -134,6 +138,10 @@ domains:
 
       set-scope:
         description: Update scope for existing IM assignment
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -170,6 +178,10 @@ domains:
 
       link-connectivity:
         description: Link IM assignment to instruction delivery resource
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -196,6 +208,10 @@ domains:
 
       list:
         description: List IM assignments for CBU
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -222,6 +238,10 @@ domains:
 
       suspend:
         description: Suspend an IM assignment
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -240,6 +260,10 @@ domains:
 
       terminate:
         description: Terminate an IM assignment
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -262,6 +286,10 @@ domains:
 
       find-for-trade:
         description: Find IM assignment that covers given trade characteristics
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         handler: find_im_for_trade
         args:

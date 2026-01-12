@@ -4,6 +4,10 @@ domains:
     verbs:
       read:
         description: Read a service by ID or code
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: select
@@ -29,6 +33,10 @@ domains:
 
       list:
         description: List services with optional filters
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: select
@@ -56,6 +64,10 @@ domains:
 
       list-by-product:
         description: List services for a product
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: crud
         crud:
           operation: select_with_join

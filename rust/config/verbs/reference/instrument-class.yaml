@@ -4,6 +4,10 @@ domains:
     verbs:
       ensure:
         description: Create or update instrument class with CFI/SMPG/ISDA mappings
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -66,6 +70,10 @@ domains:
           capture: true
       read:
         description: Read instrument class by code
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -80,6 +88,10 @@ domains:
           type: record
       list:
         description: List instrument classes with filters
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select

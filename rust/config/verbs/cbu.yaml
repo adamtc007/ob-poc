@@ -541,6 +541,8 @@ domains:
           scope: global
           noun: cbu
           tags: [relationship, write, product]
+        plugin:
+          handler: CbuAddProductOp
         args:
           - name: cbu-id
             type: uuid

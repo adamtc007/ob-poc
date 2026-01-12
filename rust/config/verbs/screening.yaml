@@ -4,6 +4,10 @@ domains:
     verbs:
       pep:
         description: Run PEP (Politically Exposed Persons) screening
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: cbu
         behavior: plugin
         args:
         - name: entity-id
@@ -23,6 +27,10 @@ domains:
           capture: true
       sanctions:
         description: Run sanctions list screening
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: cbu
         behavior: plugin
         args:
         - name: entity-id
@@ -42,6 +50,10 @@ domains:
           capture: true
       adverse-media:
         description: Run adverse media screening
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: cbu
         behavior: plugin
         args:
         - name: entity-id

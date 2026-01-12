@@ -318,6 +318,7 @@ mod tests {
                     },
                 ],
                 returns: None,
+                metadata: None,
             },
         );
 
@@ -411,6 +412,7 @@ mod tests {
                     },
                 ],
                 returns: None,
+                metadata: None,
             },
         );
 

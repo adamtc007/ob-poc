@@ -4,6 +4,10 @@ domains:
     verbs:
       create:
         description: Create a new investor holding in a share class (idempotent by share_class+investor)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -54,6 +58,10 @@ domains:
 
       create-for-investor:
         description: Create holding linked to an investor record (for TA KYC-as-a-Service)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -136,6 +144,10 @@ domains:
 
       ensure:
         description: Ensure investor holding exists (upsert)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -223,6 +235,10 @@ domains:
 
       update-units:
         description: Update holding units (for position adjustments)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -253,6 +269,10 @@ domains:
 
       update-status:
         description: Update holding status
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -287,6 +307,10 @@ domains:
 
       read:
         description: Read a holding by ID
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -308,6 +332,10 @@ domains:
 
       list-by-share-class:
         description: List holdings for a share class
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -337,6 +365,10 @@ domains:
 
       list-by-investor:
         description: List holdings for an investor across all share classes
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -358,6 +390,10 @@ domains:
 
       list-by-investor-record:
         description: List holdings for an investor record (TA workflow)
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -379,6 +415,10 @@ domains:
 
       list-ubo-holdings:
         description: List holdings that qualify for UBO tracking (>=25% ownership)
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         args:
           - name: share-class-id
@@ -395,6 +435,10 @@ domains:
 
       close:
         description: Close a holding (mark as inactive)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update

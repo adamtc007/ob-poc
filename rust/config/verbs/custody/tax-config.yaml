@@ -9,6 +9,10 @@ domains:
 
       define-jurisdiction:
         description: "Define tax jurisdiction with withholding rates"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -65,6 +69,10 @@ domains:
 
       list-jurisdictions:
         description: "List tax jurisdictions"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -91,6 +99,10 @@ domains:
 
       set-treaty-rate:
         description: "Set bilateral tax treaty rate"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -179,6 +191,10 @@ domains:
 
       list-treaty-rates:
         description: "List treaty rates for jurisdiction pair"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -207,6 +223,10 @@ domains:
 
       set-tax-status:
         description: "Set CBU tax status for jurisdiction"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -308,6 +328,10 @@ domains:
 
       list-tax-status:
         description: "List tax status for CBU"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -336,6 +360,10 @@ domains:
 
       set-reclaim-config:
         description: "Configure tax reclaim processing"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -422,6 +450,10 @@ domains:
 
       list-reclaim-configs:
         description: "List reclaim configurations for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -450,6 +482,10 @@ domains:
 
       deactivate-reclaim:
         description: "Deactivate reclaim configuration"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -475,6 +511,10 @@ domains:
 
       set-reporting:
         description: "Set tax reporting obligation"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -571,6 +611,10 @@ domains:
 
       list-reporting:
         description: "List tax reporting obligations for CBU"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -603,6 +647,10 @@ domains:
 
       find-applicable-rate:
         description: "Find applicable tax rate for income event"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: find_applicable_tax_rate
         args:
@@ -635,6 +683,10 @@ domains:
 
       validate-tax-config:
         description: "Validate tax configuration completeness"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: validate_tax_configuration
         args:

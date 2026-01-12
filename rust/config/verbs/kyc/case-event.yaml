@@ -4,6 +4,10 @@ domains:
     verbs:
       log:
         description: Log a case event
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -69,6 +73,10 @@ domains:
           capture: false
       list-by-case:
         description: List events for a case
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

@@ -10,6 +10,10 @@ domains:
       # === Template Operations (read-only reference data) ===
       list-templates:
         description: List available SLA templates
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -40,6 +44,10 @@ domains:
 
       read-template:
         description: Read SLA template by code
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -56,6 +64,10 @@ domains:
       # === Commitment Operations ===
       commit:
         description: Create SLA commitment for CBU (idempotent by cbu+template+profile)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -139,6 +151,10 @@ domains:
 
       bind-to-profile:
         description: Bind SLA commitment to trading profile
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -164,6 +180,10 @@ domains:
 
       bind-to-service:
         description: Bind SLA commitment to service
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -190,6 +210,10 @@ domains:
 
       bind-to-resource:
         description: Bind SLA commitment to service resource instance
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -216,6 +240,10 @@ domains:
 
       bind-to-isda:
         description: Bind SLA commitment to ISDA agreement
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -236,6 +264,10 @@ domains:
 
       bind-to-csa:
         description: Bind SLA commitment to CSA agreement
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -256,6 +288,10 @@ domains:
 
       list-commitments:
         description: List SLA commitments for CBU
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -281,6 +317,10 @@ domains:
 
       suspend-commitment:
         description: Suspend an SLA commitment
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -300,6 +340,10 @@ domains:
       # === Measurement Operations ===
       record-measurement:
         description: Record SLA measurement for period
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -359,6 +403,10 @@ domains:
 
       list-measurements:
         description: List measurements for SLA commitment
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -385,6 +433,10 @@ domains:
       # === Breach Operations ===
       report-breach:
         description: Report SLA breach
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -443,6 +495,10 @@ domains:
 
       update-remediation:
         description: Update breach remediation status
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -477,6 +533,10 @@ domains:
 
       resolve-breach:
         description: Mark breach as resolved
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -495,6 +555,10 @@ domains:
 
       escalate-breach:
         description: Escalate breach
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -515,6 +579,10 @@ domains:
 
       list-open-breaches:
         description: List open breaches for CBU
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: list_open_sla_breaches
         args:

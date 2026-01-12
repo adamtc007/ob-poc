@@ -4,6 +4,10 @@ domains:
     verbs:
       catalog:
         description: Catalog a document for an entity within a CBU
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -44,6 +48,10 @@ domains:
           capture: true
       extract:
         description: Extract attributes from a cataloged document
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         args:
           - name: document-id
@@ -66,6 +74,10 @@ domains:
           type: record
       extract-to-observations:
         description: Extract document data and create observations
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         handler: document_extract_observations
         args:
@@ -100,6 +112,10 @@ domains:
 
       request:
         description: Request a document (creates outstanding request, fire-and-forget)
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         plugin:
           handler: DocumentRequestOp
@@ -168,6 +184,10 @@ domains:
 
       upload:
         description: Upload a document (auto-fulfills matching outstanding request)
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         plugin:
           handler: DocumentUploadOp
@@ -216,6 +236,10 @@ domains:
 
       waive-request:
         description: Waive document requirement (for outstanding requests)
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         plugin:
           handler: DocumentWaiveOp
@@ -252,6 +276,10 @@ domains:
 
       list-attributes:
         description: List all attributes linked to a document type with extraction/requirement details
+        metadata:
+          tier: reference
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         handler: document_list_attributes
         args:
@@ -273,6 +301,10 @@ domains:
 
       set-required-attributes:
         description: Set required_attributes JSONB for a document type (validation rules)
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -311,6 +343,10 @@ domains:
 
       get-type:
         description: Get document type details including required_attributes and applicability
+        metadata:
+          tier: reference
+          source_of_truth: document
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -327,6 +363,10 @@ domains:
 
       list-types:
         description: List document types, optionally filtered by category or domain
+        metadata:
+          tier: reference
+          source_of_truth: document
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -348,6 +388,10 @@ domains:
 
       check-extraction-coverage:
         description: Check what percentage of attributes can be extracted from available documents for an entity
+        metadata:
+          tier: diagnostics
+          source_of_truth: document
+          scope: cbu
         behavior: plugin
         handler: document_check_extraction_coverage
         args:
@@ -383,6 +427,10 @@ domains:
     verbs:
       ensure:
         description: Create or update a document type in the catalogue (upsert by type_code)
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -472,6 +520,10 @@ domains:
 
       read:
         description: Read a document type by code
+        metadata:
+          tier: reference
+          source_of_truth: document
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -488,6 +540,10 @@ domains:
 
       list:
         description: List document types with optional filters
+        metadata:
+          tier: reference
+          source_of_truth: document
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -507,6 +563,10 @@ domains:
 
       delete:
         description: Delete a document type (will fail if documents exist)
+        metadata:
+          tier: intent
+          source_of_truth: document
+          scope: cbu
         behavior: crud
         crud:
           operation: delete

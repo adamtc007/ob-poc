@@ -4,6 +4,10 @@ domains:
     verbs:
       discover-ubos:
         description: Discover Ultimate Beneficial Owners for an entity using GLEIF + BODS data
+        metadata:
+          tier: composite
+          source_of_truth: external
+          scope: global
         behavior: plugin
         args:
           - name: entity-id
@@ -26,6 +30,10 @@ domains:
 
       import:
         description: Bulk import BODS statements from data dump
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: global
         behavior: plugin
         args:
           - name: source
@@ -53,6 +61,10 @@ domains:
 
       link-entity:
         description: Link a local entity to a BODS entity statement
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: global
         behavior: crud
         crud:
           operation: upsert
@@ -100,6 +112,10 @@ domains:
 
       get-statement:
         description: Get a BODS statement by ID
+        metadata:
+          tier: reference
+          source_of_truth: external
+          scope: global
         behavior: plugin
         args:
           - name: statement-id
@@ -119,6 +135,10 @@ domains:
 
       list-by-entity:
         description: List BODS statements linked to an entity
+        metadata:
+          tier: reference
+          source_of_truth: external
+          scope: global
         behavior: crud
         crud:
           operation: list_by_fk
@@ -140,6 +160,10 @@ domains:
 
       find-by-lei:
         description: Find BODS entity statement by LEI
+        metadata:
+          tier: reference
+          source_of_truth: external
+          scope: global
         behavior: plugin
         args:
           - name: lei
@@ -151,6 +175,10 @@ domains:
 
       list-persons:
         description: List person statements with beneficial ownership
+        metadata:
+          tier: reference
+          source_of_truth: external
+          scope: global
         behavior: crud
         crud:
           operation: select
@@ -174,6 +202,10 @@ domains:
 
       list-ownership:
         description: List ownership statements for an entity
+        metadata:
+          tier: reference
+          source_of_truth: external
+          scope: global
         behavior: plugin
         args:
           - name: subject-lei
@@ -200,6 +232,10 @@ domains:
 
       sync-from-gleif:
         description: Sync BODS data from GLEIF reporting exceptions
+        metadata:
+          tier: composite
+          source_of_truth: external
+          scope: global
         behavior: plugin
         args:
           - name: entity-id

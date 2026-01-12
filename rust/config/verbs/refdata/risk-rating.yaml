@@ -4,6 +4,10 @@ domains:
     verbs:
       ensure:
         description: Create or update a risk rating
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -47,6 +51,10 @@ domains:
 
       read:
         description: Read a risk rating by code
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -62,6 +70,10 @@ domains:
 
       list:
         description: List all risk ratings
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -78,6 +90,10 @@ domains:
 
       deactivate:
         description: Deactivate a risk rating
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update

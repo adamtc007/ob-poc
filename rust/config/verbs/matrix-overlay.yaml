@@ -15,6 +15,10 @@ domains:
 
       subscribe:
         description: "Subscribe a CBU to a product"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -60,6 +64,10 @@ domains:
 
       unsubscribe:
         description: "Terminate a product subscription"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -79,6 +87,10 @@ domains:
 
       suspend:
         description: "Suspend a product subscription"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -97,6 +109,10 @@ domains:
 
       reactivate:
         description: "Reactivate a suspended subscription"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -115,6 +131,10 @@ domains:
 
       list:
         description: "List product subscriptions for a CBU"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -153,6 +173,10 @@ domains:
 
       add:
         description: "Add a product overlay to matrix entries"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -243,6 +267,10 @@ domains:
 
       remove:
         description: "Remove a product overlay"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -259,6 +287,10 @@ domains:
 
       suspend:
         description: "Suspend a product overlay"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -277,6 +309,10 @@ domains:
 
       activate:
         description: "Activate a suspended overlay"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -295,6 +331,10 @@ domains:
 
       list:
         description: "List overlays for a CBU"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -324,6 +364,10 @@ domains:
 
       list-by-subscription:
         description: "List overlays for a product subscription"
+        metadata:
+          tier: reference
+          source_of_truth: matrix
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -344,6 +388,10 @@ domains:
 
       effective-matrix:
         description: "Get effective matrix with all product overlays"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: plugin
         plugin:
           handler: MatrixEffectiveOp
@@ -391,6 +439,10 @@ domains:
 
       unified-gaps:
         description: "Get all gaps from both lifecycle and service domains"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: plugin
         plugin:
           handler: MatrixUnifiedGapsOp
@@ -423,6 +475,10 @@ domains:
 
       compare-products:
         description: "Compare what different products add to a matrix entry"
+        metadata:
+          tier: intent
+          source_of_truth: matrix
+          scope: cbu
         behavior: plugin
         plugin:
           handler: MatrixCompareProductsOp

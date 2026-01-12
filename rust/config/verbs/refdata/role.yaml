@@ -4,6 +4,10 @@ domains:
     verbs:
       ensure:
         description: Create or update a role
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -28,6 +32,10 @@ domains:
 
       read:
         description: Read a role by name
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -43,6 +51,10 @@ domains:
 
       list:
         description: List all roles
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -55,6 +67,10 @@ domains:
 
       delete:
         description: Delete a role
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete

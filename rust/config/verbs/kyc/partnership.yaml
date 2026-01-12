@@ -13,6 +13,10 @@ domains:
     verbs:
       add-partner:
         description: Add a partner to the partnership with capital commitment
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -101,6 +105,10 @@ domains:
 
       record-contribution:
         description: Record capital contribution (drawdown)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: PartnershipContributionOp
@@ -138,6 +146,10 @@ domains:
 
       record-distribution:
         description: Record distribution to partner
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: PartnershipDistributionOp
@@ -175,6 +187,10 @@ domains:
 
       withdraw-partner:
         description: Record partner withdrawal/exit
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -208,6 +224,10 @@ domains:
 
       list-partners:
         description: List all partners in a partnership
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -241,6 +261,10 @@ domains:
           - Verify profit shares sum to 100%
           - Calculate total committed/contributed/unfunded
           - Identify control (GP or majority LP)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: PartnershipReconcileOp
@@ -284,6 +308,10 @@ domains:
           Analyze control structure of partnership for UBO identification.
           GPs have presumptive control regardless of capital percentage.
           LPs may have control through voting rights or super-majority stake.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: PartnershipAnalyzeControlOp

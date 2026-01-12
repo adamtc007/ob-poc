@@ -4,6 +4,10 @@ domains:
     verbs:
       run:
         description: Initiate a screening. Idempotent via (workstream_id, screening_type) - one screening per type per workstream.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         produces:
           type: screening
@@ -54,6 +58,10 @@ domains:
           capture: true
       complete:
         description: Record screening completion
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         consumes:
           - arg: screening-id
@@ -98,6 +106,10 @@ domains:
           type: affected
       review-hit:
         description: Review a screening hit
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -143,6 +155,10 @@ domains:
           type: affected
       list-by-workstream:
         description: List screenings for a workstream
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

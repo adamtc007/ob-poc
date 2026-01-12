@@ -16,6 +16,10 @@ domains:
 
       ownership-as-of:
         description: Get ownership relationships for an entity as of a specific date
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_ownership_as_of
@@ -41,6 +45,10 @@ domains:
 
       ubo-chain-as-of:
         description: Trace ownership chain to UBOs as of a specific date
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_ubo_chain_as_of
@@ -75,6 +83,10 @@ domains:
 
       cbu-relationships-as-of:
         description: Get all relationships (ownership, control, trust) for a CBU as of a date
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_cbu_relationships_as_of
@@ -100,6 +112,10 @@ domains:
 
       cbu-roles-as-of:
         description: Get entity roles within a CBU as of a specific date
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_cbu_roles_as_of
@@ -125,6 +141,10 @@ domains:
 
       cbu-state-at-approval:
         description: Get CBU state at the time its KYC case was approved
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_cbu_state_at_approval
@@ -149,6 +169,10 @@ domains:
 
       relationship-history:
         description: Get change history for a specific relationship
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_relationship_history
@@ -168,6 +192,10 @@ domains:
 
       entity-history:
         description: Get all relationship changes involving an entity
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_entity_history
@@ -205,6 +233,10 @@ domains:
 
       compare-ownership:
         description: Compare ownership structure between two dates
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: temporal_compare_ownership

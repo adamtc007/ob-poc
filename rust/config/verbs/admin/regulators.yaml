@@ -7,6 +7,10 @@ domains:
     verbs:
       list:
         description: "List recognized regulators"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -32,6 +36,10 @@ domains:
 
       read:
         description: "Get regulator by code"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -47,6 +55,10 @@ domains:
 
       create:
         description: "Add new recognized regulator (idempotent by code)"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -87,6 +99,10 @@ domains:
 
       update:
         description: "Update regulator"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -114,6 +130,10 @@ domains:
 
       deactivate:
         description: "Deactivate regulator"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -135,6 +155,10 @@ domains:
     verbs:
       list:
         description: "List regulatory tiers"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -147,6 +171,10 @@ domains:
 
       read:
         description: "Get tier by code"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select

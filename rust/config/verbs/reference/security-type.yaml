@@ -4,6 +4,10 @@ domains:
     verbs:
       ensure:
         description: Create or update ALERT security type
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -41,6 +45,10 @@ domains:
           capture: true
       list:
         description: List security types for an instrument class
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

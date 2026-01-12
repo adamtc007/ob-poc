@@ -4,6 +4,10 @@ domains:
     verbs:
       record:
         description: Record a service delivery for a CBU (upsert by cbu+product+service)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -65,6 +69,10 @@ domains:
 
       complete:
         description: Mark a service delivery as complete
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -122,6 +130,10 @@ domains:
 
       fail:
         description: Mark a service delivery as failed
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update

@@ -21,6 +21,12 @@ domains:
           - "search SEC"
           - "find US public company"
           - "look up in EDGAR"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: company_search_result
+          tags: [read, external-source, registry-lookup]
         behavior: plugin
         handler: SecSearchOp
         args:
@@ -42,6 +48,12 @@ domains:
           - "get SEC company"
           - "fetch from EDGAR"
           - "company from SEC"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: company_profile
+          tags: [read, external-source, registry-fetch]
         behavior: plugin
         handler: SecFetchCompanyOp
         args:
@@ -63,6 +75,12 @@ domains:
           - "13G beneficial owners"
           - "who owns this US company"
           - "SEC beneficial ownership"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: beneficial_owner
+          tags: [read, external-source, registry-fetch, ownership]
         behavior: plugin
         handler: SecFetchBeneficialOwnersOp
         args:
@@ -97,6 +115,12 @@ domains:
           - "get SEC filings"
           - "recent EDGAR filings"
           - "company filings"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: filing
+          tags: [read, external-source, registry-fetch]
         behavior: plugin
         handler: SecFetchFilingsOp
         args:
@@ -122,6 +146,12 @@ domains:
           - "import from SEC"
           - "add US company to database"
           - "import EDGAR company"
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: global
+          noun: entity
+          tags: [write, import, registry-import]
         behavior: plugin
         handler: SecImportCompanyOp
         args:

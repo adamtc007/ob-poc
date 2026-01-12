@@ -4,6 +4,10 @@ domains:
     verbs:
       record:
         description: Record a client allegation about an entity attribute
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -83,6 +87,10 @@ domains:
           capture: true
       verify:
         description: Mark allegation as verified by an observation
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -125,6 +133,10 @@ domains:
           type: affected
       contradict:
         description: Mark allegation as contradicted by evidence
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -167,6 +179,10 @@ domains:
           type: affected
       mark-partial:
         description: Mark allegation as partially verified
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -205,6 +221,10 @@ domains:
           type: affected
       list-by-entity:
         description: List allegations for an entity
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -229,6 +249,10 @@ domains:
           type: record_set
       list-pending:
         description: List pending allegations for a CBU
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select

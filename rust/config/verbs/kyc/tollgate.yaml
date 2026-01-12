@@ -16,6 +16,10 @@ domains:
         description: |
           Run tollgate evaluation for a case.
           Computes all metrics and compares against thresholds.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: TollgateEvaluateOp
@@ -65,6 +69,10 @@ domains:
 
       get-metrics:
         description: Compute current metrics for a CBU without recording evaluation
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: TollgateGetMetricsOp
@@ -107,6 +115,10 @@ domains:
 
       set-threshold:
         description: Update a tollgate threshold
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -164,6 +176,10 @@ domains:
 
       override:
         description: Record management override of tollgate failure
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: TollgateOverrideOp
@@ -207,6 +223,10 @@ domains:
 
       list-evaluations:
         description: List tollgate evaluations for a case
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -237,6 +257,10 @@ domains:
 
       list-thresholds:
         description: List all configured thresholds
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -257,9 +281,13 @@ domains:
       get-decision-readiness:
         description: |
           Summary view of decision readiness:
-          - What's blocking?
-          - What's complete?
-          - What needs attention?
+            - What's blocking?
+            - What's complete?
+            - What needs attention?
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: TollgateDecisionReadinessOp
@@ -290,6 +318,10 @@ domains:
 
       list-overrides:
         description: List overrides for a case or evaluation
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -309,6 +341,10 @@ domains:
 
       expire-override:
         description: Manually expire an override
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update

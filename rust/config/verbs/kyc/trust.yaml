@@ -8,6 +8,10 @@ domains:
     verbs:
       record-provision:
         description: Record a provision from the trust deed affecting control or benefit
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -126,6 +130,10 @@ domains:
 
       update-provision:
         description: Update an existing trust provision
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -167,6 +175,10 @@ domains:
 
       end-provision:
         description: End/revoke a trust provision
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -189,6 +201,10 @@ domains:
 
       list-provisions:
         description: List all provisions for a trust
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -217,6 +233,10 @@ domains:
 
       list-by-holder:
         description: List all trust provisions held by an entity
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -247,6 +267,10 @@ domains:
           - Appointor with trustee removal = control
           - Protector with veto = influence
           - Settlor with reserved powers = control
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: TrustAnalyzeControlOp
@@ -278,10 +302,14 @@ domains:
       identify-ubos:
         description: |
           Identify UBOs from trust structure:
-          - Fixed interest beneficiaries >= 25%
-          - Settlor (if reserved powers)
-          - Trustee with absolute discretion
-          - Appointor/Protector with removal power
+            - Fixed interest beneficiaries >= 25%
+            - Settlor (if reserved powers)
+            - Trustee with absolute discretion
+            - Appointor/Protector with removal power
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: TrustIdentifyUbosOp
@@ -312,12 +340,16 @@ domains:
       classify:
         description: |
           Classify trust type based on provisions:
-          - DISCRETIONARY: Trustee has absolute discretion over distributions
-          - FIXED_INTEREST: Beneficiaries have fixed entitlements
-          - BARE: Beneficiary has absolute right to capital and income
-          - ACCUMULATION: Income can be accumulated
-          - PURPOSE: Non-charitable purpose trust
-          - CHARITABLE: Charitable trust
+            - DISCRETIONARY: Trustee has absolute discretion over distributions
+            - FIXED_INTEREST: Beneficiaries have fixed entitlements
+            - BARE: Beneficiary has absolute right to capital and income
+            - ACCUMULATION: Income can be accumulated
+            - PURPOSE: Non-charitable purpose trust
+            - CHARITABLE: Charitable trust
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: TrustClassifyOp

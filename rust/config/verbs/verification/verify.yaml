@@ -7,6 +7,10 @@ domains:
       # ============================================
       detect-patterns:
         description: Run adversarial pattern detection on CBU (circular ownership, layering, nominees, opacity)
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -33,6 +37,10 @@ domains:
 
       detect-evasion:
         description: Analyze doc_request history for evasion signals (delays, selective response, changing explanations)
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         args:
           - name: case-id
@@ -53,6 +61,10 @@ domains:
       # ============================================
       challenge:
         description: Raise formal verification challenge requiring client response
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -147,6 +159,10 @@ domains:
 
       respond-to-challenge:
         description: Record client response to verification challenge
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -181,6 +197,10 @@ domains:
 
       resolve-challenge:
         description: Resolve verification challenge (accept/reject/escalate)
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -230,6 +250,10 @@ domains:
 
       list-challenges:
         description: List verification challenges for CBU or case
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -267,6 +291,10 @@ domains:
       # ============================================
       escalate:
         description: Escalate verification issue to higher authority
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -333,6 +361,10 @@ domains:
 
       resolve-escalation:
         description: Record escalation decision
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -376,6 +408,10 @@ domains:
 
       list-escalations:
         description: List escalations for CBU
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -412,6 +448,10 @@ domains:
       # ============================================
       calculate-confidence:
         description: Aggregate confidence score across observations for entity/attribute
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         args:
           - name: entity-id
@@ -433,6 +473,10 @@ domains:
 
       get-status:
         description: Get comprehensive verification status report for CBU
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -450,6 +494,10 @@ domains:
 
       verify-against-registry:
         description: Check entity against external registry (GLEIF, Companies House)
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         args:
           - name: entity-id
@@ -475,6 +523,10 @@ domains:
 
       assert:
         description: Declarative gate - assert minimum confidence threshold for CBU/entity
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -517,6 +569,10 @@ domains:
       # ============================================
       record-pattern:
         description: Manually record a detected pattern
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -586,6 +642,10 @@ domains:
 
       resolve-pattern:
         description: Resolve or dismiss a detected pattern
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -625,6 +685,10 @@ domains:
 
       list-patterns:
         description: List detected patterns for CBU
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

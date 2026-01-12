@@ -17,6 +17,12 @@ domains:
           - "what sources are available"
           - "which registries can you access"
           - "show data sources"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: research_source
+          tags: [read, meta, source-discovery]
         behavior: plugin
         handler: SourceListOp
         returns:
@@ -28,6 +34,12 @@ domains:
           - "tell me about this source"
           - "source capabilities"
           - "what can this source provide"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: research_source
+          tags: [read, meta, source-info]
         behavior: plugin
         handler: SourceInfoOp
         args:
@@ -48,6 +60,12 @@ domains:
           - "search source for"
           - "find in source"
           - "look up in"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: entity_search_result
+          tags: [read, external-source, registry-lookup]
         behavior: plugin
         handler: SourceSearchOp
         args:
@@ -82,6 +100,12 @@ domains:
           - "fetch from source"
           - "get record from"
           - "import from source"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: entity_data
+          tags: [read, external-source, registry-fetch]
         behavior: plugin
         handler: SourceFetchOp
         args:
@@ -111,6 +135,12 @@ domains:
           - "which source for"
           - "best source for jurisdiction"
           - "find source for"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: research_source
+          tags: [read, meta, source-routing]
         behavior: plugin
         handler: SourceFindForJurisdictionOp
         args:

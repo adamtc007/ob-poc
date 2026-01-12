@@ -7,6 +7,10 @@ domains:
     verbs:
       list:
         description: "List all role types"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -28,6 +32,10 @@ domains:
 
       read:
         description: "Get role type by code"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -43,6 +51,10 @@ domains:
 
       create:
         description: "Create new role type (idempotent by code)"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -103,6 +115,10 @@ domains:
 
       update:
         description: "Update role type"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -138,6 +154,10 @@ domains:
 
       deactivate:
         description: "Deactivate a role type"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update

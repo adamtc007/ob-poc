@@ -805,6 +805,7 @@ mod tests {
                     name: Some("cbu_id".to_string()),
                     capture: Some(true),
                 }),
+                metadata: None,
             },
         );
 

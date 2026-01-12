@@ -5,6 +5,12 @@ domains:
       create:
         description: Create a new share class for a fund CBU (idempotent by cbu+name)
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+          tags: [fund, share_class, creation]
         crud:
           operation: upsert
           table: share_classes
@@ -134,6 +140,12 @@ domains:
       ensure:
         description: Create or update share class by ISIN
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+          tags: [fund, share_class, upsert, isin]
         crud:
           operation: upsert
           table: share_classes
@@ -262,6 +274,12 @@ domains:
       update-nav:
         description: Update NAV for a share class
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+          tags: [fund, share_class, nav, update]
         crud:
           operation: update
           table: share_classes
@@ -291,6 +309,12 @@ domains:
       read:
         description: Read a share class by ID
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+          tags: [fund, share_class, query]
         crud:
           operation: select
           table: share_classes
@@ -311,6 +335,12 @@ domains:
       list:
         description: List share classes for a fund
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+          tags: [fund, share_class, query, list]
         crud:
           operation: list_by_fk
           table: share_classes
@@ -335,6 +365,12 @@ domains:
       close:
         description: Close a share class to new subscriptions
         behavior: crud
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+          tags: [fund, share_class, lifecycle, close]
         crud:
           operation: update
           table: share_classes

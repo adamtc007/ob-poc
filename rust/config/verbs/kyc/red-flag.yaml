@@ -4,6 +4,10 @@ domains:
     verbs:
       raise:
         description: Raise a new red flag
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -87,6 +91,10 @@ domains:
           capture: true
       mitigate:
         description: Mark red flag as mitigated
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -117,6 +125,10 @@ domains:
           type: affected
       waive:
         description: Waive red flag with justification
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -151,6 +163,10 @@ domains:
           type: affected
       dismiss:
         description: Dismiss red flag as false positive
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -181,6 +197,10 @@ domains:
           type: affected
       set-blocking:
         description: Set red flag as blocking the case
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -205,6 +225,10 @@ domains:
           type: affected
       list-by-case:
         description: List red flags for a case
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -233,6 +257,10 @@ domains:
           type: record_set
       list-by-workstream:
         description: List red flags for a workstream
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

@@ -15,6 +15,10 @@ domains:
       
       read:
         description: "Read a lifecycle by ID or code"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -34,6 +38,10 @@ domains:
 
       list:
         description: "List lifecycles with optional filters"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -65,6 +73,10 @@ domains:
 
       list-by-instrument:
         description: "List lifecycles for an instrument class"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select_with_join
@@ -95,6 +107,10 @@ domains:
 
       read-resource-type:
         description: "Read a lifecycle resource type"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -114,6 +130,10 @@ domains:
 
       list-resource-types:
         description: "List lifecycle resource types"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -141,6 +161,10 @@ domains:
 
       list-resources-for-lifecycle:
         description: "List resource types required by a lifecycle"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: select_with_join
@@ -171,6 +195,10 @@ domains:
 
       provision:
         description: "Provision a lifecycle resource instance for a CBU"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleProvisionOp
@@ -252,6 +280,10 @@ domains:
 
       activate:
         description: "Activate a lifecycle resource instance"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -271,6 +303,10 @@ domains:
 
       suspend:
         description: "Suspend a lifecycle resource instance"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -293,6 +329,10 @@ domains:
 
       decommission:
         description: "Decommission a lifecycle resource instance"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -315,6 +355,10 @@ domains:
 
       list-instances:
         description: "List lifecycle resource instances for a CBU"
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -348,6 +392,10 @@ domains:
 
       analyze-gaps:
         description: "Analyze lifecycle provisioning gaps for a CBU"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleAnalyzeGapsOp
@@ -387,6 +435,10 @@ domains:
 
       check-readiness:
         description: "Check if CBU is ready to trade an instrument"
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleCheckReadinessOp
@@ -437,6 +489,10 @@ domains:
 
       generate-plan:
         description: "Generate DSL provisioning plan for lifecycle gaps"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleGeneratePlanOp
@@ -465,6 +521,10 @@ domains:
 
       execute-plan:
         description: "Execute a provisioning plan"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleExecutePlanOp
@@ -494,6 +554,10 @@ domains:
 
       discover:
         description: "Discover all lifecycles and resources for an instrument"
+        metadata:
+          tier: composite
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleDiscoverOp
@@ -530,6 +594,10 @@ domains:
 
       visualize-coverage:
         description: "Generate coverage visualization for CBU"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleVisualizeCoverageOp
@@ -556,6 +624,10 @@ domains:
 
       visualize-dependencies:
         description: "Generate dependency graph for instrument lifecycles"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: LifecycleVisualizeDepsOp

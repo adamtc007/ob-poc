@@ -4,6 +4,10 @@ domains:
     verbs:
       create:
         description: Create a document request (idempotent by workstream+doc_type)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -77,6 +81,10 @@ domains:
           capture: true
       mark-requested:
         description: Mark document as formally requested
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -102,6 +110,10 @@ domains:
           type: affected
       receive:
         description: Record document received
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -137,6 +149,10 @@ domains:
           type: affected
       verify:
         description: Verify document as valid
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -166,6 +182,10 @@ domains:
           type: affected
       reject:
         description: Reject document
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -194,6 +214,10 @@ domains:
           type: affected
       waive:
         description: Waive document requirement
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -222,6 +246,10 @@ domains:
           type: affected
       list-by-workstream:
         description: List document requests for a workstream
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

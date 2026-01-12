@@ -1,9 +1,26 @@
 # 027: Trading Matrix Canonical Pivot — Instrument Taxonomy as Generative Core
 
-> **Status:** TODO
+> **Status:** IN PROGRESS (Phase 1 partial - types + linter done, tagging incomplete)
 > **Priority:** HIGH — Architectural cleanup, stops verb drift
-> **Effort:** ~62 hours across 7 phases
+> **Effort:** ~62 hours across 7 phases (~12h done, ~50h remaining)
 > **Depends on:** Existing trading-profile verbs, verb YAML schema
+
+---
+
+## Implementation Status
+
+**✅ DONE:**
+- Rust types: `VerbTier`, `SourceOfTruth`, `VerbScope`, `VerbMetadata` enums
+- Verb tiering linter: `rust/src/session/verb_tiering_linter.rs` (432 lines)
+- Migration: `020_trading_profile_materialization.sql` (audit trail)
+- Tagged verb files (5/40): `trading-profile.yaml`, `session.yaml`, `cbu.yaml`, `view.yaml`, `ubo.yaml`
+
+**❌ REMAINING:**
+- Tag 35 verb files with tier metadata (entity, fund, ownership, capital, document, etc.)
+- Update linter for domain-specific rules (not all domains are "matrix → operational")
+- Verb inventory generation (`cargo xtask verb-inventory`)
+- Deprecated verb cleanup (delete old, replace with canonical)
+- Materialize pipeline for non-trading-profile domains
 
 ---
 
@@ -146,17 +163,40 @@ metadata:
 - `rust/src/dsl_v2/verb_loader.rs` — parse new fields (ignore if absent)
 - `rust/src/dsl_v2/verb.rs` — add VerbMetadata struct
 
-### 1.2 Tag Existing Verbs
+### 1.2 Tag ALL Domain Verbs
 
-Audit and tag all verbs in these domains:
-- `trading-profile` → mostly `intent`
-- `cbu-custody` → split: some `diagnostics`, some need `projection`
-- `instruction-profile` → split: templates are `reference`, assignments are `projection`
-- `trade-gateway` → split: definitions are `reference`, routing is `projection`
-- `settlement-chain` → split: catalog is `reference`, cbu config is `projection`
-- `pricing-config` → likely `projection`
-- `tax-config` → likely `projection`
-- `corporate-action` → split: event types are `reference`, preferences are `projection`
+**Current State (Phase 1 partially done):**
+- ✅ `trading-profile.yaml` - 50 verbs tagged
+- ✅ `session.yaml` - 20 verbs tagged  
+- ✅ `cbu.yaml` - 19 verbs tagged
+- ✅ `view.yaml` - 19 verbs tagged
+- ✅ `ubo.yaml` - 16 verbs tagged
+- ❌ **35 other verb files - ZERO metadata**
+
+**Full tagging scope by domain:**
+
+| Domain | Source of Truth | Default Tier | File(s) |
+|--------|-----------------|--------------|---------- |
+| **Entity/Ownership** | `entity` | intent | `entity.yaml`, `ownership.yaml`, `control.yaml` |
+| **Fund/Capital** | `register` | intent | `fund.yaml`, `capital.yaml`, `investment-manager.yaml` |
+| **KYC/Agreement** | `workflow` | intent | `kyc-agreement.yaml`, `screening.yaml`, `document.yaml` |
+| **Research/External** | `external` | intent | `gleif.yaml`, `bods.yaml` |
+| **Reference Catalogs** | `catalog` | reference | `attribute.yaml`, `template.yaml`, `identifier.yaml` |
+| **Agent/Semantic** | `session` | diagnostics | `agent.yaml`, `semantic.yaml`, `batch.yaml` |
+| **Product/Service** | `catalog` | reference | `product.yaml`, `service.yaml`, `service-resource.yaml` |
+| **Regulatory** | `catalog` | reference | `regulatory.yaml`, `sla.yaml` |
+| **Custody subdomain** | mixed | mixed | `custody/*.yaml` (8 files) |
+| **Lifecycle/Onboarding** | `workflow` | composite | `lifecycle.yaml`, `onboarding.yaml`, `delivery.yaml` |
+| **Graph/Temporal** | `entity` | diagnostics | `graph.yaml`, `temporal.yaml` |
+| **Team/Delegation** | `entity` | intent | `team.yaml`, `delegation.yaml`, `client.yaml` |
+| **Pricing/Config** | `operational` | projection | `pricing-config.yaml`, `cash-sweep.yaml`, `matrix-overlay.yaml` |
+
+**Tagging heuristics:**
+- `create-*`, `ensure-*`, `add-*`, `set-*` → typically `intent`
+- `list-*`, `get-*`, `find-*`, `search-*` → typically `diagnostics`
+- `define-*`, `register-*` (global) → typically `reference`
+- `materialize-*`, `sync-*`, `project-*` → typically `projection` + `internal: true`
+- `run-*`, `execute-*`, `process-*` → typically `composite`
 
 ### 1.3 Generate Verb Inventory
 
@@ -668,18 +708,18 @@ fn test_linter_catches_projection_not_internal() {
 ## Implementation Order
 
 ```
-Phase 1  (Tagging)        ████████░░░░░░░░░░░░  ~8h   ← START HERE
-Phase 2  (Linter)         ░░░░░░░░████████████  ~12h
-Phase 3  (Delete/Replace) ░░░░░░░░░░░░████████  ~12h  ← Rip out old, wire new
-Phase 4  (Plan/Exec)      ░░░░░░░░░░░░░░░░████  ~12h
-Phase 5  (CA)             ░░░░░░░░░░░░░░░░░░██  ~8h   ← Can parallel with 4
-Phase 6  (Session)        ░░░░░░░░░░░░░░░░░░░█  ~4h
+Phase 1  (Tagging)        ███░░░░░░░░░░░░░░░░░  ~8h   ← PARTIAL (5/40 files, types done)
+Phase 2  (Linter)         ████████████████████  ~12h  ← ✅ DONE (needs multi-domain rules)
+Phase 3  (Delete/Replace) ░░░░░░░░░░░░░░░░░░░░  ~12h  ← Rip out old, wire new
+Phase 4  (Plan/Exec)      ░░░░░░░░░░░░░░░░░░░░  ~12h
+Phase 5  (CA)             ░░░░░░░░░░░░░░░░░░░░  ~8h   ← Can parallel with 4
+Phase 6  (Session)        ░░░░░░░░░░░░░░░░░░░░  ~4h
 Phase 7  (Docs)           ░░░░░░░░░░░░░░░░░░░░  ~6h
                                             ─────
-                                            ~62h
+                          ~12h done         ~50h remaining
 ```
 
-**Simplified:** No deprecation/alias machinery. Just delete old verbs, replace with canonical, fix references. Compiler errors guide cleanup.
+**Current blocker:** 35 verb files need tier metadata before linter can enforce across all domains.
 
 ---
 

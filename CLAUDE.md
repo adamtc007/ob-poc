@@ -7,7 +7,7 @@
 > **Migrations:** 20 schema migrations (latest: 020_trading_profile_materialization.sql)
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
-> **Verb Tiering:** ✅ Implemented - Tiering metadata, linter, canonical pivot (Phase 1-7 complete)
+> **Verb Tiering:** ⚠️ Partial - Types + linter done, only 5/40 verb files tagged
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -36,7 +36,7 @@ This file provides guidance to Claude Code when working with this repository.
 | **Feedback Inspector (design)** | `ai-thoughts/023b-feedback-inspector.md` | ✅ **DONE** - On-demand failure analysis, classification, repro generation, audit trail, MCP interface |
 | **Event Infrastructure (impl)** | `ai-thoughts/025-implement-event-infrastructure.md` | ✅ **DONE** - Lock-free emitter, drain task, session logger |
 | **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
-| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Verb tiering, linter, deprecated verb cleanup, materialize pipeline |
+| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ⚠️ **IN PROGRESS** - Types + linter done, 35/40 verb files need tagging |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
 
 > **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
@@ -104,7 +104,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/023b-feedback-inspector.md` - ✅ DONE - On-demand analysis, repro generation, audit trail, MCP server
 - `ai-thoughts/025-implement-event-infrastructure.md` - ✅ DONE - Lock-free emitter, drain task, session logger
 - `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
-- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ **DONE** - Verb tiering system, linter, deprecated verb cleanup, materialize pipeline
+- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ⚠️ **IN PROGRESS** - Types + linter done, 35/40 verb files need tier metadata
 
 ---
 

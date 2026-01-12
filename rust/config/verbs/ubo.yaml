@@ -633,6 +633,10 @@ domains:
 
       trace-chains:
         description: Trace all ownership and control chains to natural persons for a CBU
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -674,6 +678,10 @@ domains:
 
       mark-deceased:
         description: Mark a person as deceased and cascade effects to ownership/control relationships
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         args:
           - name: entity-id
@@ -699,6 +707,10 @@ domains:
 
       convergence-supersede:
         description: Atomically supersede an ownership relationship with a new one in the convergence model
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -747,6 +759,10 @@ domains:
 
       transfer-control:
         description: Transfer control relationship from one entity to another
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -812,6 +828,10 @@ domains:
 
       waive-verification:
         description: Waive verification requirement for a relationship with documented justification
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         args:
           - name: cbu-id
@@ -860,6 +880,10 @@ domains:
 
       mark-terminus:
         description: Mark an entity as a UBO chain terminus (ownership tracing stops here)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert

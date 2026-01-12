@@ -7,6 +7,10 @@ domains:
     verbs:
       add:
         description: "Add regulatory registration for an entity (idempotent by entity+regulator+type)"
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -66,6 +70,10 @@ domains:
 
       list:
         description: "List regulatory registrations for an entity"
+        metadata:
+          tier: reference
+          source_of_truth: external
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -87,6 +95,10 @@ domains:
 
       verify:
         description: "Verify a regulatory registration"
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RegistrationVerifyOp
@@ -121,6 +133,10 @@ domains:
 
       remove:
         description: "Remove/withdraw registration"
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -148,6 +164,10 @@ domains:
     verbs:
       check:
         description: "Check entity's overall regulatory status"
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RegulatoryStatusCheckOp

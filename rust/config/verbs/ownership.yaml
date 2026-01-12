@@ -14,6 +14,10 @@ domains:
 
       compute:
         description: Derive ownership snapshots from register holdings
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: plugin
         plugin:
           handler: OwnershipComputeOp
@@ -174,6 +178,10 @@ domains:
 
       control-positions:
         description: Get control positions for an issuer (who controls what %)
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: plugin
         plugin:
           handler: OwnershipControlPositionsOp
@@ -222,6 +230,10 @@ domains:
 
       who-controls:
         description: Find who controls an issuer (>50% voting or board majority)
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: plugin
         plugin:
           handler: OwnershipWhoControlsOp
@@ -525,6 +537,10 @@ domains:
 
       reconcile:
         description: Compare ownership from different sources
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: plugin
         plugin:
           handler: OwnershipReconcileOp
@@ -693,6 +709,10 @@ domains:
 
       analyze-gaps:
         description: Analyze ownership gaps for an issuer
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: plugin
         plugin:
           handler: OwnershipAnalyzeGapsOp
@@ -723,6 +743,10 @@ domains:
 
       trace-chain:
         description: Trace ownership chain from one entity to another
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: plugin
         plugin:
           handler: OwnershipTraceChainOp

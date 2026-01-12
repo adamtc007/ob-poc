@@ -8,6 +8,10 @@ domains:
 
       create-umbrella:
         description: Create an umbrella fund structure (SICAV, ICAV, OEIC, etc.)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -132,6 +136,10 @@ domains:
 
       create-subfund:
         description: Create a sub-fund/compartment within an umbrella
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -216,6 +224,10 @@ domains:
 
       create-share-class:
         description: Create a share class within a sub-fund
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -294,6 +306,10 @@ domains:
 
       create-standalone:
         description: Create a standalone fund (not part of umbrella structure)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -377,6 +393,10 @@ domains:
 
       ensure-umbrella:
         description: Create or update an umbrella fund (idempotent by name)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -468,6 +488,10 @@ domains:
 
       ensure-subfund:
         description: Create or update a sub-fund (idempotent by name)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -548,6 +572,10 @@ domains:
 
       ensure-share-class:
         description: Create or update a share class (idempotent by name)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -615,6 +643,10 @@ domains:
 
       create-master:
         description: Create a master fund (for master-feeder structures)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -677,6 +709,10 @@ domains:
 
       create-feeder:
         description: Create a feeder fund linked to a master
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         produces:
           type: entity
@@ -759,6 +795,10 @@ domains:
 
       link-feeder:
         description: Link an existing feeder fund to a master fund (idempotent by parent+child+type)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -804,6 +844,10 @@ domains:
 
       add-to-umbrella:
         description: Add an existing sub-fund to an umbrella (idempotent by parent+child+type)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -845,6 +889,10 @@ domains:
 
       add-share-class:
         description: Add a share class to a sub-fund (idempotent by parent+child+type)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -886,6 +934,10 @@ domains:
 
       list-subfunds:
         description: List all sub-funds within an umbrella
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -908,6 +960,10 @@ domains:
 
       list-share-classes:
         description: List all share classes for a sub-fund
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -930,6 +986,10 @@ domains:
 
       list-feeders:
         description: List all feeder funds for a master
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -956,6 +1016,10 @@ domains:
 
       add-investment:
         description: Record a fund's investment in another fund (idempotent by investor+investee)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -1017,6 +1081,10 @@ domains:
 
       update-investment:
         description: Update investment allocation percentage
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -1041,6 +1109,10 @@ domains:
 
       end-investment:
         description: End/redeem a fund investment
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -1061,6 +1133,10 @@ domains:
 
       list-investments:
         description: List all investments made by a fund (what does this FoF hold)
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1083,6 +1159,10 @@ domains:
 
       list-investors:
         description: List all fund investors in a fund (who holds this fund)
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

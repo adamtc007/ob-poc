@@ -8,6 +8,10 @@ domains:
 
       create:
         description: Create an outstanding request (generic)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestCreateOp
@@ -79,6 +83,10 @@ domains:
 
       list:
         description: List outstanding requests
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -126,6 +134,10 @@ domains:
 
       overdue:
         description: List overdue requests
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestOverdueOp
@@ -161,6 +173,10 @@ domains:
 
       fulfill:
         description: Mark request as fulfilled
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestFulfillOp
@@ -199,6 +215,10 @@ domains:
 
       cancel:
         description: Cancel a pending request
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestCancelOp
@@ -221,6 +241,10 @@ domains:
 
       extend:
         description: Extend request due date
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestExtendOp
@@ -248,6 +272,10 @@ domains:
 
       remind:
         description: Send reminder for pending request
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestRemindOp
@@ -277,6 +305,10 @@ domains:
 
       escalate:
         description: Escalate overdue request
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestEscalateOp
@@ -303,6 +335,10 @@ domains:
 
       waive:
         description: Waive a request requirement
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: RequestWaiveOp

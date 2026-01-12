@@ -8,6 +8,10 @@ domains:
     verbs:
       define-share-class:
         description: Define a corporate share class (ordinary, preference, etc.)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -108,6 +112,10 @@ domains:
         description: |
           Allocate shares to a shareholder. Creates holding record.
           Validates total allocations don't exceed issued_shares.
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -159,6 +167,10 @@ domains:
 
       transfer:
         description: Transfer shares between shareholders (creates movement records)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalTransferOp
@@ -212,6 +224,10 @@ domains:
           - SUM(holdings.units) = issued_shares
           - All shareholders have verified identity
           Returns ownership% and voting% for each holder.
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalReconcileOp
@@ -244,6 +260,10 @@ domains:
         description: |
           Traverse ownership upward from entity to all terminus points.
           Computes indirect ownership percentages multiplicatively.
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalOwnershipChainOp
@@ -268,6 +288,10 @@ domains:
 
       issue-shares:
         description: Issue additional shares (increases issued_shares)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalIssueSharesOp
@@ -295,6 +319,10 @@ domains:
 
       cancel-shares:
         description: Cancel/buyback shares (decreases issued_shares)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalCancelSharesOp
@@ -322,6 +350,10 @@ domains:
 
       list-by-issuer:
         description: List all share classes for an issuing entity
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -343,6 +375,10 @@ domains:
 
       list-shareholders:
         description: List all shareholders for a share class
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

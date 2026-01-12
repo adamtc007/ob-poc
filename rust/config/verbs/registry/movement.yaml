@@ -4,6 +4,10 @@ domains:
     verbs:
       subscribe:
         description: Record a subscription (investor buying units). Idempotent via (holding_id, trade_date, reference).
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -67,6 +71,10 @@ domains:
 
       redeem:
         description: Record a redemption (investor selling units). Idempotent via (holding_id, trade_date, reference).
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -130,6 +138,10 @@ domains:
 
       transfer-in:
         description: Record an incoming transfer of units. Idempotent via (holding_id, trade_date, reference).
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -180,6 +192,10 @@ domains:
 
       transfer-out:
         description: Record an outgoing transfer of units. Idempotent via (holding_id, trade_date, reference).
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -231,6 +247,10 @@ domains:
       # PE/VC specific movement types
       commitment:
         description: Record LP commitment to PE/VC fund (total amount investor commits to invest)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -289,6 +309,10 @@ domains:
 
       capital-call:
         description: Record capital call (drawdown from LP commitment)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -352,6 +376,10 @@ domains:
 
       distribution:
         description: Record distribution to LP (return of capital or profit)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -426,6 +454,10 @@ domains:
 
       recallable-distribution:
         description: Record a recallable distribution (can be called back by GP)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -483,6 +515,10 @@ domains:
 
       confirm:
         description: Confirm a pending movement
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -507,6 +543,10 @@ domains:
 
       settle:
         description: Mark a movement as settled
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -535,6 +575,10 @@ domains:
 
       cancel:
         description: Cancel a pending movement
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -563,6 +607,10 @@ domains:
 
       fail:
         description: Mark a movement as failed
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -595,6 +643,10 @@ domains:
 
       list-by-holding:
         description: List movements for a holding
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -624,6 +676,10 @@ domains:
 
       list-capital-activity:
         description: List PE/VC capital activity (commitments, calls, distributions)
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin_handler: movement_list_capital_activity
         args:
@@ -646,6 +702,10 @@ domains:
 
       read:
         description: Read a movement by ID
+        metadata:
+          tier: reference
+          source_of_truth: register
+          scope: cbu
         behavior: crud
         crud:
           operation: select

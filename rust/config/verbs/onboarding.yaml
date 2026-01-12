@@ -4,6 +4,10 @@ domains:
     verbs:
       auto-complete:
         description: "Automatically progress onboarding by generating and executing DSL for missing entities"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: OnboardingAutoCompleteOp

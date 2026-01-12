@@ -4,6 +4,10 @@ domains:
     verbs:
       ensure:
         description: Create or update a jurisdiction
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -54,6 +58,10 @@ domains:
 
       read:
         description: Read a jurisdiction by code
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -69,6 +77,10 @@ domains:
 
       list:
         description: List all jurisdictions
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -89,6 +101,10 @@ domains:
 
       delete:
         description: Delete a jurisdiction
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete

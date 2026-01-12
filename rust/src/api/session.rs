@@ -36,10 +36,11 @@ pub enum SessionMode {
 // ============================================================================
 
 /// Sub-session type - determines the purpose and behavior of a child session
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum SubSessionType {
     /// Root session - full agent capabilities (not a sub-session)
+    #[default]
     Root,
     /// Resolution sub-session - entity disambiguation workflow
     Resolution(ResolutionSubSession),
@@ -49,12 +50,6 @@ pub enum SubSessionType {
     Review(ReviewSubSession),
     /// Correction sub-session - fix screening hits
     Correction(CorrectionSubSession),
-}
-
-impl Default for SubSessionType {
-    fn default() -> Self {
-        SubSessionType::Root
-    }
 }
 
 /// Resolution sub-session state - entity disambiguation

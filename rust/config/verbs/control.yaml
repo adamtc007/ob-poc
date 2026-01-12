@@ -4,6 +4,10 @@ domains:
     verbs:
       add:
         description: Add a control relationship between entities (idempotent by controller+controlled+type)
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -79,6 +83,10 @@ domains:
 
       end:
         description: End a control relationship
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -104,6 +112,10 @@ domains:
 
       list-controllers:
         description: List who controls an entity
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -128,6 +140,10 @@ domains:
 
       list-controlled:
         description: List what an entity controls
+        metadata:
+          tier: reference
+          source_of_truth: workflow
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -160,6 +176,10 @@ domains:
           Comprehensive control analysis for any entity type.
           Routes to appropriate analyzer based on entity_type.
           Aggregates all control vectors: ownership, board, trust, partnership.
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ControlAnalyzeOp
@@ -206,6 +226,10 @@ domains:
           Build full control graph for a CBU.
           Nodes: entities, persons, positions
           Edges: OWNS, CONTROLS, APPOINTS, INFLUENCES, HOLDS_POSITION
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ControlBuildGraphOp
@@ -251,6 +275,10 @@ domains:
           - Board majority control
           - Trust control (trustee discretion, appointor power)
           - Partnership GP control
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ControlIdentifyUbosOp
@@ -297,6 +325,10 @@ domains:
         description: |
           Trace a specific control chain from one entity to another.
           Returns the path and cumulative control percentage.
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ControlTraceChainOp
@@ -342,9 +374,13 @@ domains:
       reconcile-ownership:
         description: |
           Reconcile ownership for an entity:
-          - Verify voting shares sum to 100%
-          - Identify gaps or overlaps
-          - Flag discrepancies
+            - Verify voting shares sum to 100%
+            - Identify gaps or overlaps
+            - Flag discrepancies
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: ControlReconcileOwnershipOp

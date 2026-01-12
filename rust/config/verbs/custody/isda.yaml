@@ -4,6 +4,10 @@ domains:
     verbs:
       create:
         description: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -53,6 +57,10 @@ domains:
           capture: true
       add-coverage:
         description: Add instrument class coverage to ISDA (idempotent by isda+instrument_class)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -97,6 +105,10 @@ domains:
           name: coverage_id
       add-csa:
         description: Add CSA (Credit Support Annex) to ISDA (idempotent by isda+csa_type)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -148,6 +160,10 @@ domains:
           capture: true
       remove-coverage:
         description: Remove instrument class coverage from ISDA
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -162,6 +178,10 @@ domains:
           type: affected
       remove-csa:
         description: Remove CSA from ISDA
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -176,6 +196,10 @@ domains:
           type: affected
       list:
         description: List ISDA agreements for CBU
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

@@ -251,6 +251,10 @@ domains:
 
       split:
         description: Stock split (e.g., 2:1 doubles shares)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalSplitOp
@@ -286,6 +290,10 @@ domains:
 
       buyback:
         description: Share buyback into treasury
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalBuybackOp
@@ -316,6 +324,10 @@ domains:
 
       cancel:
         description: Permanent share cancellation
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalCancelOp
@@ -794,6 +806,10 @@ domains:
 
       cap-table:
         description: Get full cap table for an issuer
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalCapTableOp
@@ -831,6 +847,10 @@ domains:
 
       holders:
         description: List all holders for an issuer with ownership percentages
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
         behavior: plugin
         plugin:
           handler: CapitalHoldersOp

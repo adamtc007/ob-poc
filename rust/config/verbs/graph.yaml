@@ -17,6 +17,10 @@ domains:
 
       view:
         description: "Build full graph view from a CBU root"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: view
@@ -56,6 +60,10 @@ domains:
 
       focus:
         description: "Focus on a specific node with its immediate neighborhood"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: focus
@@ -99,6 +107,10 @@ domains:
 
       filter:
         description: "Filter graph by criteria (node types, layers, roles, etc.)"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: filter
@@ -156,6 +168,10 @@ domains:
 
       group-by:
         description: "Group nodes by an attribute (jurisdiction, role, type, etc.)"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: group_by
@@ -192,6 +208,10 @@ domains:
 
       path:
         description: "Find shortest path between two nodes"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: path
@@ -239,6 +259,10 @@ domains:
 
       find-connected:
         description: "Find all nodes connected to a starting point within depth"
+        metadata:
+          tier: reference
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: find_connected
@@ -281,6 +305,10 @@ domains:
 
       ancestors:
         description: "Find all ancestors (owners/controllers) of an entity"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: ancestors
@@ -311,6 +339,10 @@ domains:
 
       descendants:
         description: "Find all descendants (owned/controlled entities) of an entity"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: descendants
@@ -345,6 +377,10 @@ domains:
 
       compare:
         description: "Compare two graph snapshots to find differences"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: graph_query
         graph_query:
           operation: compare

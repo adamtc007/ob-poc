@@ -24,6 +24,12 @@ domains:
           - "fetch LEI record"
           - "import from GLEIF"
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, enrichment]
         args:
           - name: lei
             type: string
@@ -56,6 +62,12 @@ domains:
           - "look up LEI"
           - "search for entity"
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, search]
         args:
           - name: name
             type: string
@@ -98,6 +110,12 @@ domains:
           - "load corporate structure"
           - "import ownership tree"
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, import, hierarchy]
         args:
           - name: root-lei
             type: string
@@ -137,6 +155,12 @@ domains:
           - "load fund portfolio"
           - "import investment manager funds"
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, import, funds]
         args:
           - name: manager-lei
             type: string
@@ -170,6 +194,12 @@ domains:
       refresh:
         description: Refresh stale GLEIF data for entities
         behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, refresh]
         args:
           - name: entity-id
             type: uuid
@@ -197,6 +227,12 @@ domains:
       get-record:
         description: Fetch raw GLEIF record for an LEI (does not persist)
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup]
         args:
           - name: lei
             type: string
@@ -208,6 +244,12 @@ domains:
       get-parent:
         description: Get direct parent relationship from GLEIF
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, relationship]
         args:
           - name: lei
             type: string
@@ -219,6 +261,12 @@ domains:
       get-children:
         description: Get direct children from GLEIF
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, relationship]
         args:
           - name: lei
             type: string
@@ -240,6 +288,12 @@ domains:
           - "who owns this ultimately"
           - "trace to UBO"
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, trace, ownership]
         args:
           - name: lei
             type: string
@@ -263,6 +317,12 @@ domains:
       get-managed-funds:
         description: Get all funds managed by an investment manager from GLEIF
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, funds]
         args:
           - name: manager-lei
             type: string
@@ -285,6 +345,12 @@ domains:
       resolve-successor:
         description: Resolve a merged or inactive LEI to its current successor entity
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, successor]
         args:
           - name: lei
             type: string
@@ -303,6 +369,12 @@ domains:
       get-umbrella:
         description: Get umbrella fund for a sub-fund (IS_SUBFUND_OF relationship). SICAVs have no umbrella - use get-manager instead.
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, relationship, funds]
         args:
           - name: lei
             type: string
@@ -326,6 +398,12 @@ domains:
       get-manager:
         description: Get fund manager for a fund (IS_FUND-MANAGED_BY relationship). Use this for SICAVs which have no umbrella above them.
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, relationship, funds]
         args:
           - name: lei
             type: string
@@ -349,6 +427,12 @@ domains:
       get-master-fund:
         description: Get master fund for a feeder fund (IS_FEEDER_TO relationship)
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, relationship, funds]
         args:
           - name: lei
             type: string
@@ -372,6 +456,12 @@ domains:
       lookup-by-isin:
         description: Look up entity LEI by ISIN (uses GLEIF ISIN-LEI mapping)
         behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: external
+          scope: global
+          noun: lei
+          tags: [gleif, external-api, lookup, isin]
         args:
           - name: isin
             type: string

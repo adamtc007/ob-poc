@@ -8,6 +8,10 @@ domains:
     verbs:
       appoint:
         description: Appoint a person to a board position
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -111,6 +115,10 @@ domains:
 
       resign:
         description: Record resignation/removal from board
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -137,6 +145,10 @@ domains:
 
       list-by-entity:
         description: List current board composition for an entity
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -162,6 +174,10 @@ domains:
 
       list-by-person:
         description: List all board positions held by a person
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -187,6 +203,10 @@ domains:
 
       grant-appointment-right:
         description: Record an appointment right from SHA/articles
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -295,6 +315,10 @@ domains:
 
       revoke-appointment-right:
         description: Revoke an appointment right
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -321,6 +345,10 @@ domains:
 
       list-appointment-rights:
         description: List who has appointment rights over an entity's board
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -346,6 +374,10 @@ domains:
 
       list-rights-held:
         description: List appointment rights held by an entity
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -375,6 +407,10 @@ domains:
           - Majority of appointments
           - Appointment/removal rights
           - Veto powers
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         plugin:
           handler: BoardAnalyzeControlOp

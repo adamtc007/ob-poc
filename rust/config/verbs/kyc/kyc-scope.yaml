@@ -7,6 +7,10 @@ domains:
     verbs:
       preview-scope:
         description: "Preview KYC scope for a CBU - shows entities and their obligations"
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: KycPreviewScopeOp
@@ -38,6 +42,10 @@ domains:
 
       recommend:
         description: "Record our KYC recommendation (for KYC-aaS cases)"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: KycRecommendOp
@@ -72,6 +80,10 @@ domains:
 
       sponsor-decision:
         description: "Record sponsor's decision on KYC case"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
         behavior: plugin
         plugin:
           handler: KycSponsorDecisionOp

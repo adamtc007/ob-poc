@@ -26,6 +26,10 @@ domains:
       # ============================================
       start:
         description: Start agent mode with a specific task
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentStartOp
         invocation_phrases:
@@ -71,6 +75,10 @@ domains:
 
       pause:
         description: Pause the running agent loop
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentPauseOp
         invocation_phrases:
@@ -84,6 +92,10 @@ domains:
 
       resume:
         description: Resume a paused agent loop
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentResumeOp
         invocation_phrases:
@@ -97,6 +109,10 @@ domains:
 
       stop:
         description: Stop the agent loop completely
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentStopOp
         invocation_phrases:
@@ -113,6 +129,10 @@ domains:
       # ============================================
       confirm:
         description: Confirm a checkpoint decision
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentConfirmOp
         invocation_phrases:
@@ -137,6 +157,10 @@ domains:
 
       reject:
         description: Reject a checkpoint and skip this decision
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentRejectOp
         invocation_phrases:
@@ -159,6 +183,10 @@ domains:
 
       select:
         description: Select a specific candidate from checkpoint options
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentSelectOp
         invocation_phrases:
@@ -184,6 +212,10 @@ domains:
       # ============================================
       status:
         description: Get current agent status
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentStatusOp
         invocation_phrases:
@@ -198,6 +230,10 @@ domains:
 
       history:
         description: Get agent decision and action history for current session
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentHistoryOp
         invocation_phrases:
@@ -220,6 +256,10 @@ domains:
       # ============================================
       set-threshold:
         description: Set confidence thresholds for auto-selection
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentSetThresholdOp
         args:
@@ -236,6 +276,10 @@ domains:
 
       set-mode:
         description: Switch between agent and hybrid modes
+        metadata:
+          tier: intent
+          source_of_truth: session
+          scope: cbu
         behavior: plugin
         handler: AgentSetModeOp
         args:

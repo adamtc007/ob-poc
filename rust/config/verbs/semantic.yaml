@@ -21,6 +21,10 @@ domains:
 
       get-state:
         description: "Derive semantic state for a CBU - shows stage progress, gaps, and blockers"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: SemanticStateOp
@@ -47,6 +51,10 @@ domains:
 
       list-stages:
         description: "List all defined semantic stages with their dependencies"
+        metadata:
+          tier: reference
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: SemanticListStagesOp
@@ -58,6 +66,10 @@ domains:
 
       stages-for-product:
         description: "Get required stages for a specific product"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: SemanticStagesForProductOp
@@ -84,6 +96,10 @@ domains:
 
       next-actions:
         description: "Get the next actionable stages for a CBU (unblocked, incomplete stages)"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: SemanticNextActionsOp
@@ -106,6 +122,10 @@ domains:
 
       missing-entities:
         description: "Get entities that are missing for stage completion"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: SemanticMissingEntitiesOp
@@ -136,6 +156,10 @@ domains:
 
       prompt-context:
         description: "Get semantic state formatted for agent prompt injection"
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: SemanticPromptContextOp

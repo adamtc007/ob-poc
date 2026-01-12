@@ -4,6 +4,10 @@ domains:
     verbs:
       ensure:
         description: Create or update market reference
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -43,6 +47,10 @@ domains:
           capture: true
       read:
         description: Read market by MIC
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -57,6 +65,10 @@ domains:
           type: record
       list:
         description: List markets
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select

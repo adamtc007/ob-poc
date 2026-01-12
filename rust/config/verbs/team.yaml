@@ -9,6 +9,10 @@ domains:
 
       create:
         description: "Create a new team with delegated authority"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -69,6 +73,10 @@ domains:
 
       read:
         description: "Read team details"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -89,6 +97,10 @@ domains:
 
       archive:
         description: "Archive team (soft delete)"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -120,6 +132,10 @@ domains:
 
       add-member:
         description: "Add user to team with role"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -167,6 +183,10 @@ domains:
 
       remove-member:
         description: "Remove user from team (specific role)"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -201,6 +221,10 @@ domains:
 
       update-member:
         description: "Update member's role key"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -219,6 +243,10 @@ domains:
 
       transfer-member:
         description: "Move user from one team to another (end old, create new)"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: team_transfer_member
         args:
@@ -259,6 +287,10 @@ domains:
 
       add-governance-member:
         description: "Add governance member with optional legal appointment link"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -308,6 +340,10 @@ domains:
 
       verify-governance-access:
         description: "Audit governance access against legal appointments"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -326,6 +362,10 @@ domains:
 
       add-cbu-access:
         description: "Add CBU to team's explicit access list"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -351,6 +391,10 @@ domains:
 
       remove-cbu-access:
         description: "Remove CBU from team's access"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -372,6 +416,10 @@ domains:
 
       grant-service:
         description: "Grant service entitlement to team"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -406,6 +454,10 @@ domains:
 
       revoke-service:
         description: "Revoke service entitlement"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -433,6 +485,10 @@ domains:
 
       list-members:
         description: "List team members"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -452,6 +508,10 @@ domains:
 
       list-cbus:
         description: "List CBUs team can access"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -480,6 +540,10 @@ domains:
     verbs:
       create:
         description: "Create portal user"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -516,6 +580,10 @@ domains:
 
       suspend:
         description: "Suspend user access"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -532,6 +600,10 @@ domains:
 
       reactivate:
         description: "Reactivate suspended user"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -548,6 +620,10 @@ domains:
 
       offboard:
         description: "Offboard user completely (left company)"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -579,6 +655,10 @@ domains:
 
       list-teams:
         description: "List user's team memberships"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -592,6 +672,10 @@ domains:
 
       list-cbus:
         description: "List all CBUs user can access"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -612,6 +696,10 @@ domains:
 
       check-access:
         description: "Check user access to specific CBU"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select

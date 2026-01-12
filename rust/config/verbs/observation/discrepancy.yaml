@@ -4,6 +4,10 @@ domains:
     verbs:
       record:
         description: Record a discrepancy between observations
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -97,6 +101,10 @@ domains:
           capture: true
       resolve:
         description: Resolve a discrepancy
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -143,6 +151,10 @@ domains:
           type: affected
       escalate:
         description: Escalate a discrepancy
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -170,6 +182,10 @@ domains:
           type: affected
       list-open:
         description: List open discrepancies
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select

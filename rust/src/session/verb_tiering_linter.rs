@@ -284,11 +284,38 @@ mod tests {
             behavior: VerbBehavior::Crud,
             crud: Some(CrudConfig {
                 operation: CrudOperation::Insert,
-                table: "test".to_string(),
-                schema: "ob-poc".to_string(),
-                ..Default::default()
+                table: Some("test".to_string()),
+                schema: Some("ob-poc".to_string()),
+                key: None,
+                returning: None,
+                conflict_keys: None,
+                conflict_constraint: None,
+                junction: None,
+                from_col: None,
+                to_col: None,
+                role_table: None,
+                role_col: None,
+                fk_col: None,
+                filter_col: None,
+                primary_table: None,
+                join_table: None,
+                join_col: None,
+                base_table: None,
+                extension_table: None,
+                extension_table_column: None,
+                type_id_column: None,
+                type_code: None,
+                order_by: None,
+                set_values: None,
             }),
-            ..Default::default()
+            handler: None,
+            graph_query: None,
+            args: vec![],
+            returns: None,
+            produces: None,
+            consumes: vec![],
+            lifecycle: None,
+            metadata: None,
         }
     }
 
@@ -298,11 +325,54 @@ mod tests {
             behavior: VerbBehavior::Crud,
             crud: Some(CrudConfig {
                 operation: CrudOperation::Select,
-                table: "test".to_string(),
-                schema: "ob-poc".to_string(),
-                ..Default::default()
+                table: Some("test".to_string()),
+                schema: Some("ob-poc".to_string()),
+                key: None,
+                returning: None,
+                conflict_keys: None,
+                conflict_constraint: None,
+                junction: None,
+                from_col: None,
+                to_col: None,
+                role_table: None,
+                role_col: None,
+                fk_col: None,
+                filter_col: None,
+                primary_table: None,
+                join_table: None,
+                join_col: None,
+                base_table: None,
+                extension_table: None,
+                extension_table_column: None,
+                type_id_column: None,
+                type_code: None,
+                order_by: None,
+                set_values: None,
             }),
-            ..Default::default()
+            handler: None,
+            graph_query: None,
+            args: vec![],
+            returns: None,
+            produces: None,
+            consumes: vec![],
+            lifecycle: None,
+            metadata: None,
+        }
+    }
+
+    fn make_plugin_config() -> VerbConfig {
+        VerbConfig {
+            description: "Test verb".to_string(),
+            behavior: VerbBehavior::Plugin,
+            crud: None,
+            handler: Some("test_handler".to_string()),
+            graph_query: None,
+            args: vec![],
+            returns: None,
+            produces: None,
+            consumes: vec![],
+            lifecycle: None,
+            metadata: None,
         }
     }
 
@@ -341,19 +411,15 @@ mod tests {
     }
 
     #[test]
-    fn test_intent_cannot_write_operational() {
-        let config = VerbConfig {
-            description: "Test verb".to_string(),
-            behavior: VerbBehavior::Plugin,
-            handler: Some("test_handler".to_string()),
-            metadata: Some(VerbMetadata {
-                tier: Some(VerbTier::Intent),
-                source_of_truth: Some(SourceOfTruth::Matrix),
-                writes_operational: true, // ERROR: intent can't write operational
-                ..Default::default()
-            }),
+    fn test_writes_operational_requires_projection_or_composite() {
+        // Intent verb that writes_operational should error (must be projection or composite)
+        let mut config = make_plugin_config();
+        config.metadata = Some(VerbMetadata {
+            tier: Some(VerbTier::Intent),
+            source_of_truth: Some(SourceOfTruth::Matrix),
+            writes_operational: true, // ERROR: intent can't write operational
             ..Default::default()
-        };
+        });
 
         let result = lint_verb_tiering("test", "verb", &config);
         assert!(result.has_errors());
@@ -361,7 +427,7 @@ mod tests {
             .diagnostics
             .errors
             .iter()
-            .any(|e| e.code == codes::TIER_INTENT_WRITES_OPERATIONAL));
+            .any(|e| e.code == codes::TIER_WRITE_NOT_PROJECTION));
     }
 
     #[test]
@@ -400,18 +466,13 @@ mod tests {
 
     #[test]
     fn test_valid_intent_verb() {
-        let config = VerbConfig {
-            description: "Test verb".to_string(),
-            behavior: VerbBehavior::Plugin,
-            handler: Some("test_handler".to_string()),
-            metadata: Some(VerbMetadata {
-                tier: Some(VerbTier::Intent),
-                source_of_truth: Some(SourceOfTruth::Matrix),
-                writes_operational: false,
-                ..Default::default()
-            }),
+        let mut config = make_plugin_config();
+        config.metadata = Some(VerbMetadata {
+            tier: Some(VerbTier::Intent),
+            source_of_truth: Some(SourceOfTruth::Matrix),
+            writes_operational: false,
             ..Default::default()
-        };
+        });
 
         let result = lint_verb_tiering("test", "verb", &config);
         assert!(!result.has_errors());
@@ -419,16 +480,14 @@ mod tests {
 
     #[test]
     fn test_valid_diagnostics_verb() {
-        let config = make_crud_select_config();
-
-        let mut config_with_metadata = config;
-        config_with_metadata.metadata = Some(VerbMetadata {
+        let mut config = make_crud_select_config();
+        config.metadata = Some(VerbMetadata {
             tier: Some(VerbTier::Diagnostics),
             source_of_truth: Some(SourceOfTruth::Operational),
             ..Default::default()
         });
 
-        let result = lint_verb_tiering("test", "verb", &config_with_metadata);
+        let result = lint_verb_tiering("test", "verb", &config);
         assert!(!result.has_errors());
     }
 }

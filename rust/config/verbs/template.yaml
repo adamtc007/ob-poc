@@ -4,6 +4,10 @@ domains:
     verbs:
       invoke:
         description: Invoke a single template with parameters
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: template_invoke
@@ -23,6 +27,10 @@ domains:
 
       batch:
         description: Execute template in batch over query results
+        metadata:
+          tier: intent
+          source_of_truth: catalog
+          scope: global
         behavior: plugin
         plugin:
           handler: template_batch

@@ -4,6 +4,10 @@ domains:
     verbs:
       set-identity:
         description: Set primary settlement identity for an entity
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -46,6 +50,10 @@ domains:
           capture: true
       add-ssi:
         description: Add counterparty SSI (idempotent by entity+counterparty_bic+market+currency)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -132,6 +140,10 @@ domains:
           capture: true
       remove-ssi:
         description: Remove a counterparty SSI
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete

@@ -15,6 +15,10 @@ domains:
         description: |
           Assign a role to an entity within a CBU.
           Validates entity type compatibility and role conflicts before assignment.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_assign
 
@@ -76,6 +80,10 @@ domains:
         description: |
           Specialized verb for assigning ownership roles with percentage.
           Creates both the role assignment AND the ownership relationship edge.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_assign_ownership
 
@@ -140,6 +148,10 @@ domains:
         description: |
           Assign control role (director, officer, etc.) to an entity.
           Control roles don't require ownership percentage.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_assign_control
 
@@ -204,6 +216,10 @@ domains:
         description: |
           Assign trust-specific role (settlor, trustee, beneficiary, protector).
           Handles special UBO treatment for trust participants.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_assign_trust
 
@@ -272,6 +288,10 @@ domains:
         description: |
           Assign fund structure or management role.
           Handles ManCo, IM, depositary, and fund hierarchy relationships.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_assign_fund
 
@@ -344,6 +364,10 @@ domains:
         description: |
           Assign service provider role (depositary, custodian, admin, etc.).
           These are flat relationships with no ownership implications.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_assign_service
 
@@ -402,6 +426,10 @@ domains:
         description: |
           Assign authorized signatory, trader, or other operational role.
           These are always natural persons.
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_assign_signatory
 
@@ -457,6 +485,10 @@ domains:
 
       remove:
         description: "Remove a role assignment from entity within CBU"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -485,6 +517,10 @@ domains:
 
       list:
         description: "List all role assignments for a CBU"
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -509,6 +545,10 @@ domains:
 
       validate:
         description: "Validate all role assignments for a CBU (check requirements)"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         custom_handler: cbu_role_validate_all
 

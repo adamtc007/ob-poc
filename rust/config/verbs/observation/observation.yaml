@@ -4,6 +4,10 @@ domains:
     verbs:
       record:
         description: Record an attribute observation
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: insert
@@ -83,6 +87,10 @@ domains:
           capture: true
       record-from-document:
         description: Record observation extracted from a document
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: observation_from_document
         args:
@@ -122,6 +130,10 @@ domains:
           capture: true
       supersede:
         description: Supersede an observation with a newer one
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -150,6 +162,10 @@ domains:
           type: affected
       list-for-entity:
         description: List all observations for an entity
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -174,6 +190,10 @@ domains:
           type: record_set
       list-for-attribute:
         description: List observations of a specific attribute for an entity
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -208,6 +228,10 @@ domains:
           type: record_set
       get-current:
         description: Get current best observation for an attribute
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: observation_get_current
         args:
@@ -227,6 +251,10 @@ domains:
           type: record
       reconcile:
         description: Compare observations for an attribute and auto-create discrepancies
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: observation_reconcile
         args:
@@ -259,6 +287,10 @@ domains:
           type: record_set
       verify-allegations:
         description: Batch verify pending allegations against observations
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: plugin
         handler: observation_verify_allegations
         args:

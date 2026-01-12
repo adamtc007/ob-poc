@@ -4,6 +4,10 @@ domains:
     verbs:
       add:
         description: Add a delegation relationship (idempotent by delegator+delegate+scope+cbu)
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -87,6 +91,10 @@ domains:
 
       end:
         description: End a delegation
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -107,6 +115,10 @@ domains:
 
       list-delegates:
         description: List who an entity delegates to
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -129,6 +141,10 @@ domains:
 
       list-delegations-received:
         description: List delegations an entity has received
+        metadata:
+          tier: reference
+          source_of_truth: operational
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk

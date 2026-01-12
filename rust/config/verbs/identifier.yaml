@@ -11,6 +11,10 @@ domains:
     verbs:
       attach:
         description: Attach an external identifier to an entity (idempotent by entity+scheme+id)
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -92,6 +96,10 @@ domains:
 
       attach-lei:
         description: Attach LEI with GLEIF-specific metadata (convenience wrapper)
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -158,6 +166,10 @@ domains:
 
       attach-clearstream:
         description: Attach Clearstream KV reference or account number
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: upsert
@@ -211,6 +223,10 @@ domains:
 
       validate:
         description: Mark an identifier as validated
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -235,6 +251,10 @@ domains:
 
       invalidate:
         description: Mark an identifier as invalid or expired
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: update
@@ -258,6 +278,10 @@ domains:
 
       remove:
         description: Remove an identifier from an entity (hard delete)
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: delete
@@ -274,6 +298,10 @@ domains:
 
       list-by-entity:
         description: List all identifiers for an entity
+        metadata:
+          tier: reference
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: list_by_fk
@@ -300,6 +328,10 @@ domains:
 
       find-by-lei:
         description: Find entity by LEI
+        metadata:
+          tier: reference
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -317,6 +349,10 @@ domains:
 
       find-by-clearstream:
         description: Find entity by Clearstream reference
+        metadata:
+          tier: reference
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -337,6 +373,10 @@ domains:
 
       find-by-isin:
         description: Find entity by ISIN (for share classes/funds)
+        metadata:
+          tier: reference
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: select
@@ -354,6 +394,10 @@ domains:
 
       update-lei-status:
         description: Update LEI status after GLEIF refresh
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
         behavior: crud
         crud:
           operation: update
