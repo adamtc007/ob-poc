@@ -1,103 +1,39 @@
-# Session Scope Management Verbs
+# Session Verbs - Simplified
 #
-# Controls the session scope (what data the user is viewing/operating on).
-# Scope types: galaxy, book, cbu, jurisdiction, neighborhood
+# Session state = HashSet<Uuid> of loaded CBUs
+# Everything else (clusters, galaxies, control spheres) is DERIVED from edges
 #
-# Integration: UnifiedSessionContext, ViewState, AgentGraphContext
+# Focus/camera/viewport = CLIENT SIDE, not DSL verbs
 #
-# Tiering: These are "infrastructure" verbs - they manage UI/session state,
-# not business data. Tier: intent (user-invoked navigation actions).
+# History: undo/redo stack of session states
 
 domains:
   session:
     description: |
-      Session scope management for navigation and data windowing.
-      Controls what CBUs/entities are visible and what the agent context is.
-      Scope changes trigger viewport rebuild and agent context refresh.
+      Manages which CBUs are loaded into the session.
+      CBU is the atomic unit. Clusters/galaxies derived from group edges.
+      Viewport focus is client-side, not managed here.
+
     verbs:
       # ============================================
-      # Scope Setting Operations
+      # Load CBUs into session (mutates state, pushes history)
       # ============================================
-      set-galaxy:
-        description: Set scope to all CBUs under an apex entity (commercial client)
-        behavior: plugin
-        handler: SessionSetGalaxyOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_scope
-          tags: [navigation, scope-change]
-        args:
-          - name: apex-entity-id
-            type: uuid
-            required: true
-            maps_to: apex_entity_id
-            description: The apex entity (e.g., Allianz SE, Blackrock Inc)
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-        returns:
-          type: record
-          capture: false
 
-      set-book:
-        description: Set scope to filtered subset of a galaxy (by jurisdiction, entity type, etc.)
+      load-cbu:
+        description: Add a single CBU to the session
         behavior: plugin
-        handler: SessionSetBookOp
+        handler: SessionLoadCbuOp
         metadata:
           tier: intent
           source_of_truth: session
-          scope: global
-          noun: session_scope
-          tags: [navigation, scope-change, filtering]
-        args:
-          - name: apex-entity-id
-            type: uuid
-            required: true
-            maps_to: apex_entity_id
-            description: The apex entity for the book
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-          - name: jurisdictions
-            type: string_list
-            required: false
-            description: Filter to these jurisdiction codes (e.g., ["LU", "IE"])
-          - name: entity-types
-            type: string_list
-            required: false
-            description: Filter to these entity types
-          - name: cbu-types
-            type: string_list
-            required: false
-            description: Filter to these CBU types (fund, subfund, etc.)
-        returns:
-          type: record
-          capture: false
-
-      set-cbu:
-        description: Set scope to a single CBU
-        behavior: plugin
-        handler: SessionSetCbuOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_scope
-          tags: [navigation, scope-change]
+          noun: session_cbus
+          tags: [load, cbu]
         args:
           - name: cbu-id
             type: uuid
             required: true
             maps_to: cbu_id
-            description: The CBU to focus on
+            description: The CBU to load
             lookup:
               table: cbus
               schema: ob-poc
@@ -106,350 +42,164 @@ domains:
               primary_key: cbu_id
         returns:
           type: record
-          capture: false
+          fields: [cbu_id, name, jurisdiction, total_loaded]
 
-      set-jurisdiction:
-        description: Set scope to all CBUs in a jurisdiction
+      load-jurisdiction:
+        description: Load all CBUs in a jurisdiction
         behavior: plugin
-        handler: SessionSetJurisdictionOp
+        handler: SessionLoadJurisdictionOp
         metadata:
           tier: intent
           source_of_truth: session
-          scope: global
-          noun: session_scope
-          tags: [navigation, scope-change]
+          noun: session_cbus
+          tags: [load, jurisdiction, bulk]
         args:
-          - name: jurisdiction-code
+          - name: jurisdiction
             type: string
             required: true
-            maps_to: jurisdiction_code
-            description: ISO country code (e.g., LU, IE, DE)
+            description: ISO country code (LU, IE, DE, US, etc.)
         returns:
           type: record
-          capture: false
+          fields: [jurisdiction, count_added, total_loaded]
 
-      set-neighborhood:
-        description: Set scope to N hops from a focal entity
+      load-galaxy:
+        description: Load all CBUs under an apex entity (e.g., Allianz SE)
         behavior: plugin
-        handler: SessionSetNeighborhoodOp
+        handler: SessionLoadGalaxyOp
         metadata:
           tier: intent
           source_of_truth: session
-          scope: global
-          noun: session_scope
-          tags: [navigation, scope-change, graph-traversal]
-        args:
-          - name: entity-id
-            type: uuid
-            required: true
-            maps_to: focal_entity_id
-            description: The focal entity to center on
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-          - name: hops
-            type: integer
-            required: false
-            default: 2
-            description: Number of relationship hops to include
-        returns:
-          type: record
-          capture: false
-
-      # ============================================
-      # Cursor Operations (focus within scope)
-      # ============================================
-      focus:
-        description: Set cursor to a specific entity within the current scope
-        behavior: plugin
-        handler: SessionFocusOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_cursor
-          tags: [navigation, focus]
-        args:
-          - name: entity-id
-            type: uuid
-            required: true
-            maps_to: cursor_entity_id
-            description: Entity to focus on
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-        returns:
-          type: record
-          capture: false
-
-      clear-focus:
-        description: Clear cursor (unfocus)
-        behavior: plugin
-        handler: SessionClearFocusOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_cursor
-          tags: [navigation, focus]
-        args: []
-        returns:
-          type: affected
-
-      # ============================================
-      # Navigation Operations
-      # ============================================
-      back:
-        description: Navigate back to previous scope
-        behavior: plugin
-        handler: SessionBackOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_history
-          tags: [navigation, history]
-        args: []
-        returns:
-          type: record
-          capture: false
-
-      forward:
-        description: Navigate forward (undo back)
-        behavior: plugin
-        handler: SessionForwardOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_history
-          tags: [navigation, history]
-        args: []
-        returns:
-          type: record
-          capture: false
-
-      # ============================================
-      # Query Operations
-      # ============================================
-      info:
-        description: Get current scope information
-        behavior: plugin
-        handler: SessionInfoOp
-        metadata:
-          tier: diagnostics
-          source_of_truth: session
-          scope: global
-          noun: session_info
-          tags: [read, introspection]
-        args: []
-        returns:
-          type: record
-          capture: false
-
-      list-cbus:
-        description: List CBUs in current scope
-        behavior: plugin
-        handler: SessionListCbusOp
-        metadata:
-          tier: diagnostics
-          source_of_truth: session
-          scope: global
           noun: session_cbus
-          tags: [read, listing]
+          tags: [load, galaxy, bulk]
+        args:
+          - name: apex-entity-id
+            type: uuid
+            required: true
+            maps_to: apex_entity_id
+            description: The apex/parent entity
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields: [apex_name, count_added, total_loaded]
+
+      # ============================================
+      # Unload CBUs from session
+      # ============================================
+
+      unload-cbu:
+        description: Remove a single CBU from the session
+        behavior: plugin
+        handler: SessionUnloadCbuOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [unload, cbu]
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            description: The CBU to unload
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          fields: [cbu_id, name, total_loaded]
+
+      clear:
+        description: Remove all CBUs from session
+        behavior: plugin
+        handler: SessionClearOp2
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [clear, reset]
+        args: []
+        returns:
+          type: record
+          fields: [count_removed]
+
+      # ============================================
+      # History navigation
+      # ============================================
+
+      undo:
+        description: Rollback to previous session state
+        behavior: plugin
+        handler: SessionUndoOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_history
+          tags: [history, undo]
+        args: []
+        returns:
+          type: record
+          fields: [success, total_loaded, history_depth]
+
+      redo:
+        description: Re-apply undone state change
+        behavior: plugin
+        handler: SessionRedoOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_history
+          tags: [history, redo]
+        args: []
+        returns:
+          type: record
+          fields: [success, total_loaded, future_depth]
+
+      # ============================================
+      # Query (read-only)
+      # ============================================
+
+      info:
+        description: Get session summary
+        behavior: plugin
+        handler: SessionInfoOp2
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          noun: session_info
+          tags: [read, info]
+        args: []
+        returns:
+          type: record
+          fields:
+            [total_cbus, jurisdictions, galaxies, history_depth, future_depth]
+
+      list:
+        description: List loaded CBUs
+        behavior: plugin
+        handler: SessionListOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          noun: session_cbus
+          tags: [read, list]
         args:
           - name: limit
             type: integer
             required: false
             default: 100
-            description: Maximum number of CBUs to return
-        returns:
-          type: record
-          capture: false
-
-      # ============================================
-      # Clear/Reset Operations
-      # ============================================
-      clear:
-        description: Clear scope (reset to empty)
-        behavior: plugin
-        handler: SessionClearOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_scope
-          tags: [navigation, reset]
-        args: []
-        returns:
-          type: affected
-
-      # ============================================
-      # Bookmark Operations
-      # ============================================
-      save-bookmark:
-        description: Save current scope as a named bookmark
-        behavior: plugin
-        handler: SessionSaveBookmarkOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_bookmark
-          tags: [bookmark, persistence]
-        args:
-          - name: name
-            type: string
-            required: true
-            description: Bookmark name
-          - name: description
+            description: Max results
+          - name: jurisdiction
             type: string
             required: false
-            description: Optional description
+            description: Filter by jurisdiction
         returns:
-          type: uuid
-          name: bookmark_id
-          capture: true
-
-      load-bookmark:
-        description: Load scope from a saved bookmark
-        behavior: plugin
-        handler: SessionLoadBookmarkOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_bookmark
-          tags: [bookmark, navigation]
-        args:
-          - name: name
-            type: string
-            required: true
-            description: Bookmark name to load
-        returns:
-          type: record
-          capture: false
-
-      list-bookmarks:
-        description: List saved bookmarks
-        behavior: plugin
-        handler: SessionListBookmarksOp
-        metadata:
-          tier: diagnostics
-          source_of_truth: session
-          scope: global
-          noun: session_bookmark
-          tags: [read, listing]
-        args: []
-        returns:
-          type: record
-          capture: false
-
-      delete-bookmark:
-        description: Delete a saved bookmark
-        behavior: plugin
-        handler: SessionDeleteBookmarkOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_bookmark
-          tags: [bookmark, deletion]
-        args:
-          - name: name
-            type: string
-            required: true
-            description: Bookmark name to delete
-        returns:
-          type: affected
-
-      # ============================================
-      # Multi-CBU Set Operations
-      # ============================================
-      add-cbu:
-        description: Add a CBU to the active CBU set (for multi-CBU workflows)
-        behavior: plugin
-        handler: SessionAddCbuOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_cbu_set
-          tags: [multi-cbu, selection]
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            description: The CBU to add to the active set
-            lookup:
-              table: cbus
-              schema: ob-poc
-              entity_type: cbu
-              search_key: name
-              primary_key: cbu_id
-        returns:
-          type: record
-          capture: false
-
-      remove-cbu:
-        description: Remove a CBU from the active CBU set
-        behavior: plugin
-        handler: SessionRemoveCbuOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_cbu_set
-          tags: [multi-cbu, selection]
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            description: The CBU to remove from the active set
-            lookup:
-              table: cbus
-              schema: ob-poc
-              entity_type: cbu
-              search_key: name
-              primary_key: cbu_id
-        returns:
-          type: record
-          capture: false
-
-      clear-cbu-set:
-        description: Clear all CBUs from the active set
-        behavior: plugin
-        handler: SessionClearCbuSetOp
-        metadata:
-          tier: intent
-          source_of_truth: session
-          scope: global
-          noun: session_cbu_set
-          tags: [multi-cbu, reset]
-        args: []
-        returns:
-          type: record
-          capture: false
-
-      list-active-cbus:
-        description: List all CBUs in the active set with details
-        behavior: plugin
-        handler: SessionListActiveCbusOp
-        metadata:
-          tier: diagnostics
-          source_of_truth: session
-          scope: global
-          noun: session_cbu_set
-          tags: [read, listing]
-        args: []
-        returns:
-          type: record
-          capture: false
+          type: list
+          item_fields: [cbu_id, name, jurisdiction, apex_entity]

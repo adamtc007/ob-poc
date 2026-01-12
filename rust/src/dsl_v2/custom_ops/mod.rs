@@ -53,7 +53,6 @@ mod resource_ops;
 mod screening_ops;
 mod semantic_ops;
 mod session_ops;
-mod session_ops_v2;
 mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
@@ -662,11 +661,8 @@ impl CustomOperationRegistry {
         // Investor lifecycle operations (TA KYC-as-a-Service)
         investor_ops::register_investor_ops(&mut registry);
 
-        // Session scope management operations (legacy - 20 verbs)
-        session_ops::register_session_ops(&mut registry);
-
         // Session v2 operations (Phase 6 - 9 verbs, memory-first)
-        session_ops_v2::register_session_ops_v2(&mut registry);
+        session_ops::register_session_ops_v2(&mut registry);
 
         // Agent control operations (agent mode lifecycle, checkpoints)
         agent_ops::register_agent_ops(&mut registry);
