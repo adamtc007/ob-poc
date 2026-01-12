@@ -475,6 +475,50 @@ impl CustomOperation for TradingProfileMaterializeOp {
 
         // Materialize SSIs first (booking rules reference them)
         if sections.contains(&"ssis".to_string()) {
+            // Collect all SSI names from the incoming matrix
+            let incoming_ssi_names: std::collections::HashSet<String> = document
+                .standing_instructions
+                .values()
+                .flat_map(|ssis| ssis.iter().map(|s| s.name.clone()))
+                .collect();
+
+            // Delete orphaned SSIs (exist in DB but not in matrix)
+            let existing_ssis: Vec<(Uuid, String)> = sqlx::query_as(
+                r#"SELECT ssi_id, ssi_name FROM custody.cbu_ssi
+                   WHERE cbu_id = $1 AND source = 'TRADING_PROFILE'"#,
+            )
+            .bind(cbu_id)
+            .fetch_all(&mut *tx)
+            .await?;
+
+            let mut deleted = 0;
+            for (ssi_id, ssi_name) in existing_ssis {
+                if !incoming_ssi_names.contains(&ssi_name) {
+                    tracing::info!(
+                        ssi_id = %ssi_id,
+                        ssi_name = %ssi_name,
+                        "materialize: deleting orphaned SSI"
+                    );
+                    // Delete booking rules referencing this SSI first
+                    sqlx::query("DELETE FROM custody.ssi_booking_rules WHERE ssi_id = $1")
+                        .bind(ssi_id)
+                        .execute(&mut *tx)
+                        .await?;
+                    // Delete the SSI
+                    sqlx::query("DELETE FROM custody.cbu_ssi WHERE ssi_id = $1")
+                        .bind(ssi_id)
+                        .execute(&mut *tx)
+                        .await?;
+                    deleted += 1;
+                }
+            }
+            if deleted > 0 {
+                result
+                    .records_deleted
+                    .insert("cbu_ssi".to_string(), deleted);
+            }
+
+            // Now upsert SSIs from the matrix
             let mut created = 0;
             for (category, ssis) in &document.standing_instructions {
                 for ssi in ssis {
@@ -889,6 +933,63 @@ async fn materialize_isda_agreements(
 ) -> Result<i32> {
     let mut created = 0;
 
+    // =========================================================================
+    // ORPHAN CLEANUP: Delete ISDAs that are no longer in the matrix
+    // =========================================================================
+
+    // Build set of (counterparty_entity_id, agreement_date) keys from incoming matrix
+    let mut incoming_keys: Vec<(Uuid, chrono::NaiveDate)> = Vec::new();
+    for isda in isda_agreements {
+        if let Ok(counterparty_id) = resolve_entity_ref(pool, &isda.counterparty).await {
+            if let Ok(date) = chrono::NaiveDate::parse_from_str(&isda.agreement_date, "%Y-%m-%d") {
+                incoming_keys.push((counterparty_id, date));
+            }
+        }
+    }
+
+    // Get existing ISDA IDs for this CBU
+    let existing: Vec<(Uuid, Uuid, chrono::NaiveDate)> = sqlx::query_as(
+        r#"SELECT isda_id, counterparty_entity_id, agreement_date
+           FROM custody.isda_agreements WHERE cbu_id = $1"#,
+    )
+    .bind(cbu_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    // Find orphans (exist in DB but not in incoming matrix)
+    for (isda_id, counterparty_id, agreement_date) in existing {
+        let key = (counterparty_id, agreement_date);
+        if !incoming_keys.contains(&key) {
+            tracing::info!(
+                isda_id = %isda_id,
+                counterparty = %counterparty_id,
+                "materialize_isda_agreements: deleting orphaned ISDA"
+            );
+
+            // Delete CSAs first (FK constraint)
+            sqlx::query("DELETE FROM custody.csa_agreements WHERE isda_id = $1")
+                .bind(isda_id)
+                .execute(&mut **tx)
+                .await?;
+
+            // Delete product coverage (FK constraint)
+            sqlx::query("DELETE FROM custody.isda_product_coverage WHERE isda_id = $1")
+                .bind(isda_id)
+                .execute(&mut **tx)
+                .await?;
+
+            // Delete ISDA
+            sqlx::query("DELETE FROM custody.isda_agreements WHERE isda_id = $1")
+                .bind(isda_id)
+                .execute(&mut **tx)
+                .await?;
+        }
+    }
+
+    // =========================================================================
+    // UPSERT: Insert or update ISDAs from the matrix
+    // =========================================================================
+
     for isda in isda_agreements {
         // Resolve counterparty EntityRef → entity_id
         let counterparty_entity_id = resolve_entity_ref(pool, &isda.counterparty)
@@ -999,8 +1100,7 @@ async fn materialize_isda_agreements(
                    (csa_id, isda_id, csa_type, threshold_amount, threshold_currency,
                     minimum_transfer_amount, rounding_amount, collateral_ssi_id, effective_date)
                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                   ON CONFLICT (csa_id) DO UPDATE SET
-                       csa_type = EXCLUDED.csa_type,
+                   ON CONFLICT (isda_id, csa_type) DO UPDATE SET
                        threshold_amount = EXCLUDED.threshold_amount,
                        threshold_currency = EXCLUDED.threshold_currency,
                        minimum_transfer_amount = EXCLUDED.minimum_transfer_amount,
@@ -3808,4 +3908,3 @@ impl CustomOperation for TradingProfileCreateNewVersionOp {
         ))
     }
 }
-
