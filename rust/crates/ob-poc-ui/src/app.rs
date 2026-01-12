@@ -898,6 +898,9 @@ impl crate::command::AgentPromptConduit for App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Store ctx for async callbacks that need to request repaint
+        self.state.ctx = Some(ctx.clone());
+
         // =================================================================
         // STEP 1: Process any pending async results
         // =================================================================
