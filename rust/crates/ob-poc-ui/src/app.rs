@@ -3423,6 +3423,12 @@ impl AppState {
             state.needs_context_refetch = true;
         }
 
+        // Request repaint to trigger the refetch in next frame
+        // (egui in WASM doesn't auto-repaint without interaction)
+        if let Some(ref ctx) = self.ctx {
+            ctx.request_repaint();
+        }
+
         let async_state = Arc::clone(&self.async_state);
         let ctx = self.ctx.clone();
         let display_name = display_name.to_string();
