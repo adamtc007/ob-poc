@@ -42,6 +42,7 @@ This file provides guidance to Claude Code when working with this repository.
 | **Entity Resolution Plan** | `ai-thoughts/026-entity-resolution-implementation-plan.md` | ⚠️ **IN PROGRESS** - Sub-session architecture, 4-phase implementation |
 | **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Types + linter + 817 verbs tagged with tier metadata |
 | **Verb Lexicon Governance** | `ai-thoughts/028-verb-lexicon-governance.md` | 📝 **TODO** - Mandatory metadata, deprecation flow, matrix-first enforcement |
+| **Implement Verb Governance** | `ai-thoughts/029-implement-verb-governance.md` | 📝 **TODO** - 3-phase impl plan with file paths, code snippets, verification |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
 
 > **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
@@ -118,6 +119,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/026-entity-resolution-implementation-plan.md` - ⚠️ **IN PROGRESS** - Sub-session architecture, parent-child context inheritance
 - `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ DONE - Types, linter, 817 verbs tagged with tier metadata
 - `ai-thoughts/028-verb-lexicon-governance.md` - 📝 **TODO** - Mandatory metadata, deprecation, lint tiers, matrix-first enforcement
+- `ai-thoughts/029-implement-verb-governance.md` - 📝 **TODO** - 3-phase implementation with code snippets, file paths, verification steps
 
 ---
 

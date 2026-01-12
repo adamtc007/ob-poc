@@ -130,23 +130,23 @@ pub struct SessionStateResponse {
     #[serde(default)]
     pub message_count: usize,
 
-    /// Pending intents awaiting validation
+    /// Pending intents awaiting validation (empty vec if none, skipped in JSON if empty)
     #[serde(default)]
     pub pending_intents: Vec<serde_json::Value>,
 
-    /// Assembled DSL statements (list of DSL strings)
+    /// Assembled DSL statements (empty vec if none, skipped in JSON if empty)
     #[serde(default)]
     pub assembled_dsl: Vec<String>,
 
-    /// Combined DSL (all statements joined)
+    /// Combined DSL (None if no DSL assembled, skipped in JSON if None)
     #[serde(default)]
-    pub combined_dsl: String,
+    pub combined_dsl: Option<String>,
 
     /// Session context
     #[serde(default)]
     pub context: serde_json::Value,
 
-    /// Conversation history
+    /// Conversation history (empty vec if none, skipped in JSON if empty)
     #[serde(default)]
     pub messages: Vec<ChatMessage>,
 
@@ -163,16 +163,15 @@ pub struct SessionStateResponse {
 impl SessionStateResponse {
     /// Get combined DSL source (for UI compatibility)
     pub fn dsl_source(&self) -> Option<&str> {
-        if self.combined_dsl.is_empty() {
-            None
-        } else {
-            Some(&self.combined_dsl)
-        }
+        self.combined_dsl.as_deref()
     }
 
     /// Check if there's any DSL content
     pub fn has_dsl(&self) -> bool {
-        !self.combined_dsl.is_empty()
+        self.combined_dsl
+            .as_ref()
+            .map(|s| !s.is_empty())
+            .unwrap_or(false)
     }
 
     /// Get active CBU name from context (if set)

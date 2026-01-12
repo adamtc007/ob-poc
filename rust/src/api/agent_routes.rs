@@ -802,11 +802,15 @@ async fn get_session(
         message_count: session.messages.len(),
         pending_intents: session.pending_intents.clone(),
         assembled_dsl: session.assembled_dsl.clone(),
-        combined_dsl: session.assembled_dsl.join("\n"),
+        combined_dsl: if session.assembled_dsl.is_empty() {
+            None
+        } else {
+            Some(session.assembled_dsl.join("\n"))
+        },
         context: session.context.clone(),
         messages: session.messages.clone(),
         can_execute: !session.assembled_dsl.is_empty(),
-        version: session.updated_at.to_rfc3339(),
+        version: Some(session.updated_at.to_rfc3339()),
     })
 }
 
@@ -2884,11 +2888,11 @@ async fn clear_session_dsl(
         message_count: session.messages.len(),
         pending_intents: session.pending_intents.clone(),
         assembled_dsl: session.assembled_dsl.clone(),
-        combined_dsl: String::new(),
+        combined_dsl: None,
         context: session.context.clone(),
         messages: session.messages.clone(),
         can_execute: false,
-        version: session.updated_at.to_rfc3339(),
+        version: Some(session.updated_at.to_rfc3339()),
     }))
 }
 

@@ -1667,9 +1667,16 @@ impl eframe::App for App {
                         ui.label(format!("can_execute: {}", session.can_execute));
                         ui.label(format!(
                             "combined_dsl: {:?}",
-                            session.combined_dsl.chars().take(50).collect::<String>()
+                            session
+                                .combined_dsl
+                                .as_ref()
+                                .map(|s| s.chars().take(50).collect::<String>())
+                                .unwrap_or_default()
                         ));
-                        ui.label(format!("combined_dsl len: {}", session.combined_dsl.len()));
+                        ui.label(format!(
+                            "combined_dsl len: {}",
+                            session.combined_dsl.as_ref().map(|s| s.len()).unwrap_or(0)
+                        ));
                     } else {
                         ui.label("No session data");
                     }

@@ -2065,21 +2065,26 @@ pub struct SessionStateResponse {
     pub state: SessionState,
     /// Number of messages in the session
     pub message_count: usize,
-    /// Pending intents awaiting validation
+    /// Pending intents awaiting validation (empty vec if none)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub pending_intents: Vec<VerbIntent>,
-    /// Assembled DSL statements
+    /// Assembled DSL statements (empty vec if none)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assembled_dsl: Vec<String>,
-    /// Combined DSL
-    pub combined_dsl: String,
+    /// Combined DSL (None if no DSL assembled)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub combined_dsl: Option<String>,
     /// Session context
     pub context: SessionContext,
-    /// Conversation history
+    /// Conversation history (empty vec if none)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub messages: Vec<ChatMessage>,
     /// Whether the session can execute
     pub can_execute: bool,
     /// Session version (ISO timestamp from updated_at)
     /// UI uses this to detect external changes (MCP/REPL modifying session)
-    pub version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 /// Request to execute accumulated DSL

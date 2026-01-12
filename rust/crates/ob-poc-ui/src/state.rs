@@ -857,8 +857,10 @@ impl AppState {
                     let has_dsl = session.has_dsl();
 
                     // Sync DSL editor from session.combined_dsl if server has content and we're not dirty
-                    if !self.buffers.dsl_dirty && has_dsl {
-                        self.buffers.dsl_editor = session.combined_dsl.clone();
+                    if !self.buffers.dsl_dirty {
+                        if let Some(ref dsl) = session.combined_dsl {
+                            self.buffers.dsl_editor = dsl.clone();
+                        }
                     }
 
                     // If DSL is present and no resolution active, trigger resolution check
@@ -2029,8 +2031,10 @@ impl AppState {
 
         // Then try session's combined_dsl
         if let Some(ref session) = self.session {
-            if session.has_dsl() {
-                return Some(session.combined_dsl.clone());
+            if let Some(ref dsl) = session.combined_dsl {
+                if !dsl.is_empty() {
+                    return Some(dsl.clone());
+                }
             }
         }
 

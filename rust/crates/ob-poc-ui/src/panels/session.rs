@@ -60,17 +60,19 @@ pub fn session_panel(ui: &mut Ui, state: &mut AppState) {
                 }
 
                 // Pending DSL preview - use combined_dsl
-                if session.has_dsl() {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new("Pending DSL:").small().strong());
-                    // Show first 100 chars with ellipsis
-                    let preview: String = session.combined_dsl.chars().take(100).collect();
-                    let display = if session.combined_dsl.len() > 100 {
-                        format!("{}...", preview)
-                    } else {
-                        preview
-                    };
-                    ui.label(egui::RichText::new(display).monospace().small());
+                if let Some(ref dsl) = session.combined_dsl {
+                    if !dsl.is_empty() {
+                        ui.add_space(4.0);
+                        ui.label(egui::RichText::new("Pending DSL:").small().strong());
+                        // Show first 100 chars with ellipsis
+                        let preview: String = dsl.chars().take(100).collect();
+                        let display = if dsl.len() > 100 {
+                            format!("{}...", preview)
+                        } else {
+                            preview
+                        };
+                        ui.label(egui::RichText::new(display).monospace().small());
+                    }
                 }
 
                 // Session state
