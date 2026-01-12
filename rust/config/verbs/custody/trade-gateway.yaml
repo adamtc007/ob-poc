@@ -13,6 +13,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: upsert
@@ -68,6 +69,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: select
@@ -94,6 +96,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: select
@@ -124,6 +127,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: upsert
@@ -200,6 +204,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: update
@@ -226,6 +231,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: update
@@ -255,6 +261,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: list_by_fk
@@ -291,6 +298,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: upsert
@@ -384,6 +392,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: list_by_fk
@@ -421,6 +430,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: delete
@@ -444,6 +454,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: upsert
@@ -513,6 +524,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: crud
         crud:
           operation: list_by_fk
@@ -545,6 +557,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: plugin
         handler: find_trade_gateway
         args:
@@ -585,6 +598,7 @@ domains:
           tier: diagnostics
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: plugin
         handler: validate_gateway_routing
         args:
@@ -612,6 +626,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: trade_gateway
         behavior: plugin
         handler: derive_required_gateway_routes
         args:

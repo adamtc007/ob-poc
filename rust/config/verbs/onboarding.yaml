@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: onboarding
         behavior: plugin
         plugin:
           handler: OnboardingAutoCompleteOp

@@ -13,6 +13,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: upsert
@@ -137,6 +138,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: update
@@ -167,6 +169,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -201,6 +204,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: delete
@@ -220,6 +224,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: update
@@ -242,6 +247,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: plugin
         handler: find_pricing_for_instrument
         args:
@@ -280,6 +286,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: upsert
@@ -354,6 +361,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -386,6 +394,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: upsert
@@ -451,6 +460,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -483,6 +493,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: upsert
@@ -540,6 +551,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -572,6 +584,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: upsert
@@ -630,6 +643,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -662,6 +676,7 @@ domains:
           tier: diagnostics
           source_of_truth: catalog
           scope: cbu
+          noun: pricing_config
         behavior: plugin
         handler: validate_pricing_configuration
         args:

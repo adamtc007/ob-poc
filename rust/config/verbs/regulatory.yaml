@@ -11,6 +11,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: cbu
+          noun: regulatory
         behavior: crud
         crud:
           operation: upsert
@@ -74,6 +75,7 @@ domains:
           tier: reference
           source_of_truth: external
           scope: cbu
+          noun: regulatory
         behavior: crud
         crud:
           operation: select
@@ -99,6 +101,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: cbu
+          noun: regulatory
         behavior: plugin
         plugin:
           handler: RegistrationVerifyOp
@@ -137,6 +140,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: cbu
+          noun: regulatory
         behavior: crud
         crud:
           operation: update
@@ -168,6 +172,7 @@ domains:
           tier: diagnostics
           source_of_truth: external
           scope: cbu
+          noun: regulatory
         behavior: plugin
         plugin:
           handler: RegulatoryStatusCheckOp

@@ -11,6 +11,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: bulk_load
         behavior: plugin
         handler: load_markets_from_yaml
         args:
@@ -33,6 +34,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: bulk_load
         behavior: plugin
         handler: load_instrument_classes_from_yaml
         args:
@@ -54,6 +56,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: bulk_load
         behavior: plugin
         handler: load_subcustodians_from_yaml
         args:
@@ -75,6 +78,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: bulk_load
         behavior: plugin
         handler: load_sla_templates_from_yaml
         args:
@@ -96,6 +100,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: bulk_load
         behavior: plugin
         handler: load_all_refdata
         args:

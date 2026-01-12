@@ -13,6 +13,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: crud
         crud:
           operation: upsert
@@ -64,6 +65,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: crud
         crud:
           operation: select
@@ -91,6 +93,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: crud
         crud:
           operation: upsert
@@ -142,6 +145,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: crud
         crud:
           operation: select
@@ -165,6 +169,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: crud
         crud:
           operation: select
@@ -179,97 +184,9 @@ domains:
           type: record_set
 
       # =========================================================================
-      # CBU TEMPLATE ASSIGNMENTS
+      # CBU TEMPLATE ASSIGNMENTS (Diagnostics Only)
+      # Write operations removed - use trading-profile verbs for authoring
       # =========================================================================
-
-      assign-template:
-        description: "Assign instruction template to CBU for instrument/market/event"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-        behavior: crud
-        crud:
-          operation: upsert
-          table: cbu_instruction_assignments
-          schema: custody
-          conflict_keys:
-            - cbu_id
-            - instrument_class_id
-            - market_id
-            - lifecycle_event
-            - counterparty_entity_id
-          returning: assignment_id
-        args:
-          - name: cbu-id
-            type: uuid
-            required: true
-            maps_to: cbu_id
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: template-id
-            type: uuid
-            required: true
-            maps_to: template_id
-            lookup:
-              table: instruction_templates
-              schema: custody
-              search_key: template_code
-              primary_key: template_id
-          - name: lifecycle-event
-            type: string
-            required: true
-            maps_to: lifecycle_event
-          - name: instrument-class
-            type: lookup
-            required: false
-            maps_to: instrument_class_id
-            lookup:
-              table: instrument_classes
-              entity_type: instrument_class
-              schema: custody
-              code_column: class_code
-              id_column: class_id
-          - name: market
-            type: lookup
-            required: false
-            maps_to: market_id
-            lookup:
-              table: markets
-              entity_type: market
-              schema: custody
-              code_column: mic
-              id_column: market_id
-          - name: counterparty
-            type: uuid
-            required: false
-            maps_to: counterparty_entity_id
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: priority
-            type: integer
-            required: true
-            maps_to: priority
-            default: 50
-          - name: effective-date
-            type: date
-            required: false
-            maps_to: effective_date
-        returns:
-          type: uuid
-          name: assignment_id
-          capture: true
-        lifecycle:
-          writes_tables:
-            - custody.cbu_instruction_assignments
 
       list-assignments:
         description: "List instruction template assignments for CBU"
@@ -277,6 +194,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: crud
         crud:
           operation: list_by_fk
@@ -304,76 +222,10 @@ domains:
           reads_tables:
             - custody.cbu_instruction_assignments
 
-      remove-assignment:
-        description: "Remove template assignment"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-        behavior: crud
-        crud:
-          operation: delete
-          table: cbu_instruction_assignments
-          schema: custody
-        args:
-          - name: assignment-id
-            type: uuid
-            required: true
-            maps_to: assignment_id
-        returns:
-          type: affected
-
       # =========================================================================
-      # FIELD OVERRIDES
+      # FIELD OVERRIDES (Diagnostics Only)
+      # Write operations removed - use trading-profile verbs for authoring
       # =========================================================================
-
-      add-field-override:
-        description: "Add field-level override to CBU's instruction profile"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-        behavior: crud
-        crud:
-          operation: upsert
-          table: cbu_instruction_field_overrides
-          schema: custody
-          conflict_keys:
-            - assignment_id
-            - field_path
-          returning: override_id
-        args:
-          - name: assignment-id
-            type: uuid
-            required: true
-            maps_to: assignment_id
-          - name: field-path
-            type: string
-            required: true
-            maps_to: field_path
-            description: "JSON path or SWIFT tag path (e.g., '95P/REAG/BIC')"
-          - name: override-type
-            type: string
-            required: true
-            maps_to: override_type
-            description: "STATIC (fixed value), DERIVED (computed), CONDITIONAL (based on rules), SUPPRESS (remove field)"
-          - name: override-value
-            type: string
-            required: false
-            maps_to: override_value
-          - name: derivation-rule
-            type: json
-            required: false
-            maps_to: derivation_rule
-            description: "Rule for DERIVED/CONDITIONAL types"
-          - name: reason
-            type: string
-            required: false
-            maps_to: reason
-        returns:
-          type: uuid
-          name: override_id
-          capture: true
 
       list-field-overrides:
         description: "List field overrides for assignment"
@@ -381,6 +233,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: crud
         crud:
           operation: list_by_fk
@@ -395,25 +248,6 @@ domains:
         returns:
           type: record_set
 
-      remove-field-override:
-        description: "Remove field override"
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: cbu
-        behavior: crud
-        crud:
-          operation: delete
-          table: cbu_instruction_field_overrides
-          schema: custody
-        args:
-          - name: override-id
-            type: uuid
-            required: true
-            maps_to: override_id
-        returns:
-          type: affected
-
       # =========================================================================
       # RESOLUTION & VALIDATION
       # =========================================================================
@@ -424,6 +258,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: plugin
         handler: find_instruction_template
         args:
@@ -463,6 +298,7 @@ domains:
           tier: diagnostics
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: plugin
         handler: validate_instruction_profile
         args:
@@ -489,6 +325,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: instruction_profile
         behavior: plugin
         handler: derive_required_instruction_templates
         args:

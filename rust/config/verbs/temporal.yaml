@@ -20,6 +20,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_ownership_as_of
@@ -49,6 +50,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_ubo_chain_as_of
@@ -87,6 +89,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_cbu_relationships_as_of
@@ -116,6 +119,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_cbu_roles_as_of
@@ -145,6 +149,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_cbu_state_at_approval
@@ -173,6 +178,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_relationship_history
@@ -196,6 +202,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_entity_history
@@ -237,6 +244,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: temporal
         behavior: plugin
         plugin:
           handler: temporal_compare_ownership

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-12
-> **Verb count:** ~812 verbs across 92+ YAML files
+> **Verb count:** ~808 verbs across 92+ YAML files
 > **Custom ops:** 50 plugin handlers
 > **Crates:** 13 fine-grained crates
 > **Migrations:** 20 schema migrations (latest: 020_trading_profile_materialization.sql)
@@ -102,6 +102,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "lint rules", "verb linter", "MINIMAL/BASIC/STANDARD" → `ai-thoughts/028-verb-lexicon-governance.md`
 - "single authoring surface", "projection-only", "one commit path" → `ai-thoughts/028-verb-lexicon-governance.md`
 - "pitch", "internal sell", "coalition", "bank-safe", "coexistence", "pilot" → `ai-thoughts/030-internal-pitch-strategy.md`
+- "RAG", "vector", "qdrant", "embedding", "stack audit", "round-trip", "reconciliation" → `ai-thoughts/031-rag-cleanup-stack-audit.md`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -122,6 +123,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/028-verb-lexicon-governance.md` - ✅ DONE - Mandatory metadata, rip-and-replace, lint tiers, matrix-first enforcement
 - `ai-thoughts/029-implement-verb-governance.md` - ✅ DONE - 46 verbs reclassified, 15 new verbs, idempotency tests
 - `ai-thoughts/030-internal-pitch-strategy.md` - 📝 Strategic - Bank-safe positioning, coalition building, pilot slice definition
+- `ai-thoughts/031-rag-cleanup-stack-audit.md` - 📝 **TODO** - Safe RAG cleanup + full round-trip audit (DB→verbs→Rust→DSL→agent→egui)
 
 ---
 

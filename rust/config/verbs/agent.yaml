@@ -30,6 +30,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentStartOp
         invocation_phrases:
@@ -79,6 +80,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentPauseOp
         invocation_phrases:
@@ -96,6 +98,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentResumeOp
         invocation_phrases:
@@ -113,6 +116,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentStopOp
         invocation_phrases:
@@ -133,6 +137,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentConfirmOp
         invocation_phrases:
@@ -161,6 +166,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentRejectOp
         invocation_phrases:
@@ -187,6 +193,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentSelectOp
         invocation_phrases:
@@ -216,6 +223,7 @@ domains:
           tier: diagnostics
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentStatusOp
         invocation_phrases:
@@ -234,6 +242,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentHistoryOp
         invocation_phrases:
@@ -260,6 +269,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentSetThresholdOp
         args:
@@ -280,6 +290,7 @@ domains:
           tier: intent
           source_of_truth: session
           scope: cbu
+          noun: agent_session
         behavior: plugin
         handler: AgentSetModeOp
         args:

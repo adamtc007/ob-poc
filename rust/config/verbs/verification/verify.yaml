@@ -11,6 +11,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: plugin
         args:
           - name: cbu-id
@@ -41,6 +42,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: plugin
         args:
           - name: case-id
@@ -65,6 +67,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: insert
@@ -163,6 +166,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: update
@@ -201,6 +205,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: update
@@ -254,6 +259,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: list_by_fk
@@ -295,6 +301,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: insert
@@ -365,6 +372,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: update
@@ -412,6 +420,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: list_by_fk
@@ -452,6 +461,7 @@ domains:
           tier: diagnostics
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: plugin
         args:
           - name: entity-id
@@ -477,6 +487,7 @@ domains:
           tier: diagnostics
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: plugin
         args:
           - name: cbu-id
@@ -498,6 +509,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: plugin
         args:
           - name: entity-id
@@ -527,6 +539,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: plugin
         args:
           - name: cbu-id
@@ -573,6 +586,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: insert
@@ -646,6 +660,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: update
@@ -689,6 +704,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: verify
         behavior: crud
         crud:
           operation: list_by_fk

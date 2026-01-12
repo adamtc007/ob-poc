@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -75,6 +76,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -142,6 +144,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -196,6 +199,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -251,6 +255,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -313,6 +318,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -380,6 +386,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -458,6 +465,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: upsert
@@ -519,6 +527,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: update
@@ -547,6 +556,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: update
@@ -579,6 +589,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: update
@@ -611,6 +622,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: update
@@ -647,6 +659,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: list_by_fk
@@ -680,6 +693,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: plugin
         plugin_handler: movement_list_capital_activity
         args:
@@ -706,6 +720,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: movement
         behavior: crud
         crud:
           operation: select

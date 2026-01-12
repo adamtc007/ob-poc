@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: delegation
         behavior: crud
         crud:
           operation: upsert
@@ -95,6 +96,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: delegation
         behavior: crud
         crud:
           operation: update
@@ -119,6 +121,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: delegation
         behavior: crud
         crud:
           operation: list_by_fk
@@ -145,6 +148,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: delegation
         behavior: crud
         crud:
           operation: list_by_fk

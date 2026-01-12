@@ -20,6 +20,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: plugin
         plugin:
           handler: TollgateEvaluateOp
@@ -73,6 +74,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: plugin
         plugin:
           handler: TollgateGetMetricsOp
@@ -119,6 +121,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: crud
         crud:
           operation: update
@@ -180,6 +183,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: plugin
         plugin:
           handler: TollgateOverrideOp
@@ -227,6 +231,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: crud
         crud:
           operation: list_by_fk
@@ -261,6 +266,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: crud
         crud:
           operation: select
@@ -288,6 +294,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: plugin
         plugin:
           handler: TollgateDecisionReadinessOp
@@ -322,6 +329,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: crud
         crud:
           operation: select
@@ -345,6 +353,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tollgate
         behavior: crud
         crud:
           operation: update

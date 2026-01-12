@@ -362,6 +362,10 @@ enum VerbsAction {
         /// Show tier distribution and additional details
         #[arg(long, short = 'v')]
         verbose: bool,
+
+        /// Lint tier level: minimal, basic, standard (default: minimal)
+        #[arg(long, short = 't', default_value = "minimal")]
+        tier: String,
     },
 
     /// Generate verb inventory report
@@ -517,7 +521,8 @@ fn main() -> Result<()> {
                 VerbsAction::Lint {
                     errors_only,
                     verbose,
-                } => rt.block_on(verbs::verbs_lint(errors_only, verbose)),
+                    tier,
+                } => rt.block_on(verbs::verbs_lint(errors_only, verbose, &tier)),
                 VerbsAction::Inventory {
                     output,
                     update_claude_md,

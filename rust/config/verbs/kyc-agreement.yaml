@@ -11,6 +11,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: kyc_agreement
         behavior: crud
         crud:
           operation: upsert
@@ -78,6 +79,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: kyc_agreement
         behavior: crud
         crud:
           operation: select
@@ -101,6 +103,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: kyc_agreement
         behavior: crud
         crud:
           operation: select
@@ -125,6 +128,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: kyc_agreement
         behavior: crud
         crud:
           operation: update

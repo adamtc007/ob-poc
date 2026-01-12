@@ -25,6 +25,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: global
+          noun: semantic
         behavior: plugin
         plugin:
           handler: SemanticStateOp
@@ -55,6 +56,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: global
+          noun: semantic
         behavior: plugin
         plugin:
           handler: SemanticListStagesOp
@@ -70,6 +72,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: semantic
         behavior: plugin
         plugin:
           handler: SemanticStagesForProductOp
@@ -100,6 +103,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: semantic
         behavior: plugin
         plugin:
           handler: SemanticNextActionsOp
@@ -126,6 +130,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: semantic
         behavior: plugin
         plugin:
           handler: SemanticMissingEntitiesOp
@@ -160,6 +165,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: semantic
         behavior: plugin
         plugin:
           handler: SemanticPromptContextOp

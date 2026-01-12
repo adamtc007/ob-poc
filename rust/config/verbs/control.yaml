@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: crud
         crud:
           operation: upsert
@@ -87,6 +88,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: crud
         crud:
           operation: update
@@ -116,6 +118,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: crud
         crud:
           operation: list_by_fk
@@ -144,6 +147,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: crud
         crud:
           operation: list_by_fk
@@ -180,6 +184,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: plugin
         plugin:
           handler: ControlAnalyzeOp
@@ -230,6 +235,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: plugin
         plugin:
           handler: ControlBuildGraphOp
@@ -279,6 +285,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: plugin
         plugin:
           handler: ControlIdentifyUbosOp
@@ -329,6 +336,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: plugin
         plugin:
           handler: ControlTraceChainOp
@@ -381,6 +389,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: control
         behavior: plugin
         plugin:
           handler: ControlReconcileOwnershipOp

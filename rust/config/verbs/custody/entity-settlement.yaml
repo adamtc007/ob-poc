@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: entity_settlement
         behavior: crud
         crud:
           operation: upsert
@@ -54,6 +55,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: entity_settlement
         behavior: crud
         crud:
           operation: upsert
@@ -144,6 +146,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: entity_settlement
         behavior: crud
         crud:
           operation: delete

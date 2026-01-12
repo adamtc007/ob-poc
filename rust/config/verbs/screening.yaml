@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: cbu
+          noun: screening
         behavior: plugin
         args:
         - name: entity-id
@@ -31,6 +32,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: cbu
+          noun: screening
         behavior: plugin
         args:
         - name: entity-id
@@ -54,6 +56,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: cbu
+          noun: screening
         behavior: plugin
         args:
         - name: entity-id

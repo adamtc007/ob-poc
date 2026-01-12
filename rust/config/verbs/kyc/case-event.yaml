@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: case_event
         behavior: crud
         crud:
           operation: insert
@@ -77,6 +78,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: case_event
         behavior: crud
         crud:
           operation: list_by_fk

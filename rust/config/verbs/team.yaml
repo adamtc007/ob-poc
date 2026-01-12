@@ -13,6 +13,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: insert
@@ -77,6 +78,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: select
@@ -101,6 +103,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: update
@@ -136,6 +139,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: upsert
@@ -187,6 +191,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: delete
@@ -225,6 +230,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: update
@@ -247,6 +253,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: plugin
         handler: team_transfer_member
         args:
@@ -291,6 +298,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: upsert
@@ -344,6 +352,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: select
@@ -366,6 +375,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: upsert
@@ -395,6 +405,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: delete
@@ -420,6 +431,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: upsert
@@ -458,6 +470,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: delete
@@ -489,6 +502,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: list_by_fk
@@ -512,6 +526,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: list_by_fk
@@ -544,6 +559,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: insert
@@ -584,6 +600,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: update
@@ -604,6 +621,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: update
@@ -624,6 +642,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: update
@@ -659,6 +678,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: list_by_fk
@@ -676,6 +696,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: list_by_fk
@@ -700,6 +721,7 @@ domains:
           tier: diagnostics
           source_of_truth: operational
           scope: cbu
+          noun: team
         behavior: crud
         crud:
           operation: select

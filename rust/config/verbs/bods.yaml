@@ -8,6 +8,7 @@ domains:
           tier: composite
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: plugin
         args:
           - name: entity-id
@@ -34,6 +35,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: plugin
         args:
           - name: source
@@ -65,6 +67,7 @@ domains:
           tier: intent
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: crud
         crud:
           operation: upsert
@@ -116,6 +119,7 @@ domains:
           tier: reference
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: plugin
         args:
           - name: statement-id
@@ -139,6 +143,7 @@ domains:
           tier: reference
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: crud
         crud:
           operation: list_by_fk
@@ -164,6 +169,7 @@ domains:
           tier: reference
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: plugin
         args:
           - name: lei
@@ -179,6 +185,7 @@ domains:
           tier: reference
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: crud
         crud:
           operation: select
@@ -206,6 +213,7 @@ domains:
           tier: reference
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: plugin
         args:
           - name: subject-lei
@@ -236,6 +244,7 @@ domains:
           tier: composite
           source_of_truth: external
           scope: global
+          noun: bods_statement
         behavior: plugin
         args:
           - name: entity-id

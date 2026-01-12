@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         produces:
           type: workstream
@@ -87,6 +88,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         crud:
           operation: update
@@ -126,6 +128,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         crud:
           operation: update
@@ -159,6 +162,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         crud:
           operation: update
@@ -197,6 +201,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         crud:
           operation: update
@@ -226,6 +231,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         crud:
           operation: update
@@ -258,6 +264,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         crud:
           operation: list_by_fk
@@ -286,6 +293,7 @@ domains:
           tier: reference
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: crud
         crud:
           operation: select
@@ -310,6 +318,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: entity_workstream
         behavior: plugin
         handler: WorkstreamStateOp
         args:

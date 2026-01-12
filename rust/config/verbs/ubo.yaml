@@ -637,6 +637,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: ubo
         behavior: plugin
         args:
           - name: cbu-id
@@ -682,6 +683,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: ubo
         behavior: plugin
         args:
           - name: entity-id
@@ -711,6 +713,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: ubo
         behavior: plugin
         args:
           - name: cbu-id
@@ -763,6 +766,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: ubo
         behavior: plugin
         args:
           - name: cbu-id
@@ -832,6 +836,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: ubo
         behavior: plugin
         args:
           - name: cbu-id
@@ -884,6 +889,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: ubo
         behavior: crud
         crud:
           operation: upsert

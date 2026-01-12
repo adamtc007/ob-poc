@@ -9,6 +9,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: crud
         crud:
           operation: select
@@ -38,6 +39,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: crud
         crud:
           operation: select
@@ -74,6 +76,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: crud
         crud:
           operation: select_with_join
@@ -102,6 +105,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: crud
         crud:
           operation: list_by_fk
@@ -131,6 +135,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: plugin
         handler: resource_instance_create
         args:
@@ -217,6 +222,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: plugin
         handler: resource_set_attr
         args:
@@ -253,6 +259,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: plugin
         handler: resource_activate
         args:
@@ -266,6 +273,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: plugin
         handler: resource_suspend
         args:
@@ -288,6 +296,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: plugin
         handler: resource_decommission
         args:
@@ -310,6 +319,7 @@ domains:
           tier: diagnostics
           source_of_truth: catalog
           scope: cbu
+          noun: service_resource
         behavior: plugin
         handler: resource_validate_attrs
         args:

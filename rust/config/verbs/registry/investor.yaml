@@ -14,6 +14,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: crud
         crud:
           operation: insert
@@ -79,6 +80,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: crud
         crud:
           operation: upsert
@@ -146,6 +148,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: crud
         crud:
           operation: select
@@ -171,6 +174,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: crud
         crud:
           operation: list_by_fk
@@ -200,6 +204,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: crud
         crud:
           operation: list_by_fk
@@ -229,6 +234,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_request_documents
         args:
@@ -255,6 +261,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_start_kyc
         args:
@@ -288,6 +295,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_approve_kyc
         args:
@@ -327,6 +335,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_reject_kyc
         args:
@@ -355,6 +364,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_mark_eligible
         args:
@@ -381,6 +391,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_record_subscription
         args:
@@ -414,6 +425,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_activate
         args:
@@ -436,6 +448,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_start_redemption
         args:
@@ -463,6 +476,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_complete_redemption
         args:
@@ -489,6 +503,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_offboard
         args:
@@ -524,6 +539,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_suspend
         args:
@@ -559,6 +575,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_reinstate
         args:
@@ -599,6 +616,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: crud
         crud:
           operation: update
@@ -629,6 +647,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_list_due_for_review
         args:
@@ -654,6 +673,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: crud
         crud:
           operation: list_by_fk
@@ -680,6 +700,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: investor
         behavior: plugin
         plugin_handler: investor_count_by_state
         args:

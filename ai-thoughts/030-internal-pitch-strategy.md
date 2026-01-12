@@ -252,6 +252,80 @@ Already scoped in the codebase:
 
 ---
 
+## Appendix: Kotter's 8-Step Change Model
+
+John Kotter, Harvard Business School, 1996. The canonical framework for organizational change. Banks love it because it's structured and risk-aware.
+
+| Step | What It Means | Your Context |
+|------|---------------|--------------|
+| 1. Create urgency | People need to feel "we must change" | Allianz onboarding pain, competitive pressure, audit findings |
+| 2. Build guiding coalition | Small group of influential people who champion it | 2-3 allies: Product + Ops + maybe Compliance |
+| 3. Form strategic vision | Clear picture of the future state | "Intent-driven onboarding with full audit trail" |
+| 4. Enlist volunteer army | Broader group who execute | Not needed yet — you're pre-pilot |
+| 5. Enable action by removing barriers | Clear blockers (budget, politics, tech) | Coexistence pitch removes "but the Java team..." blocker |
+| 6. Generate short-term wins | Visible, unambiguous successes early | "Fund configured in 20 minutes" demo |
+| 7. Sustain acceleration | Build on wins, don't declare victory | Expand pilot scope after first win |
+| 8. Institute change | Make it stick (process, culture, incentives) | Production rollout, team training |
+
+---
+
+## Appendix: Why Short-Term Wins Matter
+
+Kotter's research: change efforts fail when early wins don't materialize within 12-24 months. For internal pitches, shrink that to **weeks**.
+
+A short-term win must be:
+- **Visible** — Leadership can see it without explanation
+- **Unambiguous** — Clear success, not "it kinda worked"
+- **Related to the change** — Proves the new approach works
+
+**Your candidates:**
+
+| Win | Timeline | Why It's Visible |
+|-----|----------|------------------|
+| Configure fund trading profile in one session | 1 hour demo | Contrast with current 3-day process |
+| SSI assignment with replayable audit log | Same demo | Show the log, click replay |
+| CA policy materialized to all systems | Minutes | No manual sync emails afterward |
+
+---
+
+## Appendix: Ally Roles (Guiding Coalition)
+
+You need 2-3 people, not a committee. Each serves a different function:
+
+| Role | What They Provide | Who to Look For |
+|------|-------------------|------------------|
+| **Power sponsor** | Air cover, budget sign-off, removes blockers | Someone at MD/Director level who owns onboarding outcomes |
+| **Expert credibility** | Technical validation, "this is sound" | Could be you, or a respected architect peer |
+| **Operational voice** | "This solves real pain" testimony | Implementation manager or ops lead who lives the current mess |
+| **Political navigator** | Knows where the landmines are | Someone who's been there 10+ years, knows the players |
+
+You don't need all four. **Power sponsor + Operational voice** is the minimum viable coalition.
+
+---
+
+## Appendix: The Pattern That Works
+
+```
+1. Find someone who OWNS THE PAIN (ops/implementation lead)
+         │
+         ▼
+2. Show them a demo, get them saying "this would save us X"
+         │
+         ▼
+3. Together, approach someone with BUDGET/AUTHORITY
+         │
+         ▼
+4. Pitch: "Here's the pain, here's the proof, here's the ask (60-day pilot)"
+         │
+         ▼
+5. Deliver a visible win in WEEK 2-3, not month 3
+         │
+         ▼
+   Win creates momentum → Momentum creates permission → Permission creates scope
+```
+
+---
+
 *Related documents:*
 - `003-paradigm-sell-problem.md` — Why novel combinations are hard to explain
 - `005-the-allianz-play.md` — Strategic entry point

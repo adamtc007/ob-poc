@@ -255,6 +255,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalSplitOp
@@ -294,6 +295,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalBuybackOp
@@ -328,6 +330,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalCancelOp
@@ -810,6 +813,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalCapTableOp
@@ -851,6 +855,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: capital
         behavior: plugin
         plugin:
           handler: CapitalHoldersOp

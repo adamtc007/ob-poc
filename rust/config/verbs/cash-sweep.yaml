@@ -13,6 +13,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: upsert
@@ -114,6 +115,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: update
@@ -144,6 +146,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: list_by_fk
@@ -174,6 +177,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: update
@@ -198,6 +202,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: update
@@ -235,6 +240,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: update
@@ -274,6 +280,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: update
@@ -296,6 +303,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: update
@@ -318,6 +326,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cash_sweep
         behavior: crud
         crud:
           operation: delete

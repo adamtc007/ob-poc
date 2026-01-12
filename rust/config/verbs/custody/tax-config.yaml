@@ -13,6 +13,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: upsert
@@ -73,6 +74,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: select
@@ -103,6 +105,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: upsert
@@ -195,6 +198,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: select
@@ -227,6 +231,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: upsert
@@ -332,6 +337,7 @@ domains:
           tier: diagnostics
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -364,6 +370,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: upsert
@@ -454,6 +461,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -486,6 +494,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: update
@@ -515,6 +524,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: upsert
@@ -615,6 +625,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: crud
         crud:
           operation: list_by_fk
@@ -651,6 +662,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: plugin
         handler: find_applicable_tax_rate
         args:
@@ -687,6 +699,7 @@ domains:
           tier: diagnostics
           source_of_truth: operational
           scope: cbu
+          noun: tax_config
         behavior: plugin
         handler: validate_tax_configuration
         args:

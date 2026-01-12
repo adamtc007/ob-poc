@@ -620,6 +620,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: view
         behavior: plugin
         plugin:
           handler: ViewRedFlagOp
@@ -649,6 +650,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: view
         behavior: plugin
         plugin:
           handler: ViewBlackHolesOp
@@ -682,6 +684,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: view
         behavior: plugin
         plugin:
           handler: ViewDetailOp
@@ -705,6 +708,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: view
         behavior: plugin
         plugin:
           handler: ViewContextOp
@@ -734,6 +738,7 @@ domains:
           tier: diagnostics
           source_of_truth: operational
           scope: cbu
+          noun: view
         behavior: plugin
         plugin:
           handler: ViewStatusOp
@@ -748,6 +753,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: view
         behavior: plugin
         plugin:
           handler: ViewSelectionInfoOp

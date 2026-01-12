@@ -19,6 +19,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_assign
 
@@ -84,6 +85,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_assign_ownership
 
@@ -152,6 +154,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_assign_control
 
@@ -220,6 +223,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_assign_trust
 
@@ -292,6 +296,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_assign_fund
 
@@ -368,6 +373,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_assign_service
 
@@ -430,6 +436,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_assign_signatory
 
@@ -489,6 +496,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: crud
         crud:
           operation: delete
@@ -521,6 +529,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: crud
         crud:
           operation: select
@@ -549,6 +558,7 @@ domains:
           tier: diagnostics
           source_of_truth: operational
           scope: cbu
+          noun: cbu_role
         behavior: plugin
         custom_handler: cbu_role_validate_all
 

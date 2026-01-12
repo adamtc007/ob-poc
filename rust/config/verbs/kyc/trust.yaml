@@ -12,6 +12,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: crud
         crud:
           operation: upsert
@@ -134,6 +135,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: crud
         crud:
           operation: update
@@ -179,6 +181,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: crud
         crud:
           operation: update
@@ -205,6 +208,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: crud
         crud:
           operation: list_by_fk
@@ -237,6 +241,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: crud
         crud:
           operation: list_by_fk
@@ -271,6 +276,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: plugin
         plugin:
           handler: TrustAnalyzeControlOp
@@ -310,6 +316,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: plugin
         plugin:
           handler: TrustIdentifyUbosOp
@@ -350,6 +357,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: trust
         behavior: plugin
         plugin:
           handler: TrustClassifyOp

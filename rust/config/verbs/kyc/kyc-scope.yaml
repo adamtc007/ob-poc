@@ -11,6 +11,7 @@ domains:
           tier: diagnostics
           source_of_truth: workflow
           scope: cbu
+          noun: kyc_scope
         behavior: plugin
         plugin:
           handler: KycPreviewScopeOp
@@ -46,6 +47,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: kyc_scope
         behavior: plugin
         plugin:
           handler: KycRecommendOp
@@ -84,6 +86,7 @@ domains:
           tier: intent
           source_of_truth: workflow
           scope: cbu
+          noun: kyc_scope
         behavior: plugin
         plugin:
           handler: KycSponsorDecisionOp

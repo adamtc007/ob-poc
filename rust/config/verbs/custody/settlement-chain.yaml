@@ -13,6 +13,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: upsert
@@ -68,6 +69,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: select
@@ -98,6 +100,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: upsert
@@ -177,6 +180,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: list_by_fk
@@ -212,6 +216,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: update
@@ -241,6 +246,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: upsert
@@ -321,6 +327,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: list_by_fk
@@ -345,6 +352,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: delete
@@ -371,6 +379,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: upsert
@@ -448,6 +457,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: list_by_fk
@@ -481,6 +491,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: upsert
@@ -577,6 +588,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: list_by_fk
@@ -609,6 +621,7 @@ domains:
           tier: intent
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: crud
         crud:
           operation: update
@@ -638,6 +651,7 @@ domains:
           tier: diagnostics
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: plugin
         handler: validate_settlement_configuration
         args:
@@ -666,6 +680,7 @@ domains:
           tier: reference
           source_of_truth: matrix
           scope: cbu
+          noun: settlement_chain
         behavior: plugin
         handler: find_settlement_chain
         args:

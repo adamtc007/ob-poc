@@ -12,6 +12,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestCreateOp
@@ -87,6 +88,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: crud
         crud:
           operation: select
@@ -138,6 +140,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestOverdueOp
@@ -177,6 +180,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestFulfillOp
@@ -219,6 +223,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestCancelOp
@@ -245,6 +250,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestExtendOp
@@ -276,6 +282,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestRemindOp
@@ -309,6 +316,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestEscalateOp
@@ -339,6 +347,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: request
         behavior: plugin
         plugin:
           handler: RequestWaiveOp

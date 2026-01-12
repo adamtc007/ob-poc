@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: discrepancy
         behavior: crud
         crud:
           operation: insert
@@ -105,6 +106,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: discrepancy
         behavior: crud
         crud:
           operation: update
@@ -155,6 +157,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: discrepancy
         behavior: crud
         crud:
           operation: update
@@ -186,6 +189,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: discrepancy
         behavior: crud
         crud:
           operation: select

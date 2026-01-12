@@ -351,9 +351,13 @@ pub async fn verbs_check(verbose: bool) -> Result<()> {
 /// - Intent verbs cannot write to operational tables
 /// - Diagnostics verbs must be read-only
 /// - etc.
-pub async fn verbs_lint(errors_only: bool, verbose: bool) -> Result<()> {
+pub async fn verbs_lint(errors_only: bool, verbose: bool, tier: &str) -> Result<()> {
+    // Parse lint tier
+    let lint_tier: verb_tiering_linter::LintTier =
+        tier.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
+
     println!("===========================================");
-    println!("  Verb Tiering Lint Report");
+    println!("  Verb Tiering Lint Report (tier: {})", lint_tier);
     println!("===========================================\n");
 
     // Load verb config from YAML
@@ -361,8 +365,13 @@ pub async fn verbs_lint(errors_only: bool, verbose: bool) -> Result<()> {
     let loader = ConfigLoader::from_env();
     let verbs_config = loader.load_verbs().context("Failed to load verb config")?;
 
-    // Run the tiering linter
-    let report = verb_tiering_linter::lint_all_verbs(&verbs_config.domains);
+    // Run the tiering linter with specified tier
+    let config = verb_tiering_linter::LintConfig {
+        tier: lint_tier,
+        fail_on_warning: false,
+        issues_only: false,
+    };
+    let report = verb_tiering_linter::lint_all_verbs_with_config(&verbs_config.domains, &config);
 
     println!("  Scanned {} verbs\n", report.total_verbs);
 

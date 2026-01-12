@@ -12,6 +12,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -140,6 +141,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -228,6 +230,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -310,6 +313,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -397,6 +401,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -492,6 +497,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -576,6 +582,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -647,6 +654,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -713,6 +721,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         produces:
           type: entity
@@ -799,6 +808,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: upsert
@@ -848,6 +858,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: upsert
@@ -893,6 +904,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: upsert
@@ -938,6 +950,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: list_by_fk
@@ -964,6 +977,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: list_by_fk
@@ -990,6 +1004,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1020,6 +1035,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: upsert
@@ -1085,6 +1101,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: update
@@ -1113,6 +1130,7 @@ domains:
           tier: intent
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: update
@@ -1137,6 +1155,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: list_by_fk
@@ -1163,6 +1182,7 @@ domains:
           tier: reference
           source_of_truth: register
           scope: cbu
+          noun: fund
         behavior: crud
         crud:
           operation: list_by_fk

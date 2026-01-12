@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: crud
         crud:
           operation: insert
@@ -91,6 +92,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: plugin
         handler: observation_from_document
         args:
@@ -134,6 +136,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: crud
         crud:
           operation: update
@@ -166,6 +169,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: crud
         crud:
           operation: list_by_fk
@@ -194,6 +198,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: crud
         crud:
           operation: select
@@ -232,6 +237,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: plugin
         handler: observation_get_current
         args:
@@ -255,6 +261,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: plugin
         handler: observation_reconcile
         args:
@@ -291,6 +298,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: observation
         behavior: plugin
         handler: observation_verify_allegations
         args:

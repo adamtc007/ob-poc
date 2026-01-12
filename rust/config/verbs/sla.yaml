@@ -14,6 +14,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: select
@@ -48,6 +49,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: select
@@ -68,6 +70,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: upsert
@@ -155,6 +158,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -184,6 +188,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -214,6 +219,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -244,6 +250,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -268,6 +275,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -292,6 +300,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: list_by_fk
@@ -321,6 +330,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -344,6 +354,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: insert
@@ -407,6 +418,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: list_by_fk
@@ -437,6 +449,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: insert
@@ -499,6 +512,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -537,6 +551,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -559,6 +574,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: crud
         crud:
           operation: update
@@ -583,6 +599,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: sla
         behavior: plugin
         handler: list_open_sla_breaches
         args:

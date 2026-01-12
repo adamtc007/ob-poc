@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: security_type
         behavior: crud
         crud:
           operation: upsert
@@ -49,6 +50,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: security_type
         behavior: crud
         crud:
           operation: list_by_fk

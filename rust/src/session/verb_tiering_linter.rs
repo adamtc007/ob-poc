@@ -577,6 +577,7 @@ pub fn lint_all_verbs_with_config(
 ) -> LintReport {
     let mut report = LintReport::default();
 
+    // First pass: collect all verbs and run single-verb rules
     for (domain_name, domain_config) in domains {
         for (verb_name, verb_config) in &domain_config.verbs {
             report.total_verbs += 1;
@@ -597,7 +598,85 @@ pub fn lint_all_verbs_with_config(
         }
     }
 
+    // Second pass: cross-verb STANDARD rules (S001)
+    if config.tier.includes(LintTier::Standard) {
+        check_cross_verb_standard_rules(domains, &mut report);
+    }
+
     report
+}
+
+/// Check STANDARD tier rules that require cross-verb analysis
+fn check_cross_verb_standard_rules(
+    domains: &std::collections::HashMap<String, dsl_core::config::types::DomainConfig>,
+    report: &mut LintReport,
+) {
+    use std::collections::HashMap;
+
+    // S001: Single authoring surface - only one intent verb per noun with source_of_truth: matrix
+    // Build map of noun -> list of (full_name, source_of_truth) for intent verbs
+    let mut intent_verbs_by_noun: HashMap<String, Vec<(String, Option<SourceOfTruth>)>> =
+        HashMap::new();
+
+    for (domain_name, domain_config) in domains {
+        for (verb_name, verb_config) in &domain_config.verbs {
+            if let Some(metadata) = &verb_config.metadata {
+                if matches!(metadata.tier, Some(VerbTier::Intent)) {
+                    if let Some(noun) = &metadata.noun {
+                        let full_name = format!("{}.{}", domain_name, verb_name);
+                        intent_verbs_by_noun
+                            .entry(noun.clone())
+                            .or_default()
+                            .push((full_name, metadata.source_of_truth.clone()));
+                    }
+                }
+            }
+        }
+    }
+
+    // Check for conflicts: multiple intent verbs for same noun where one is matrix source
+    for (noun, verbs) in &intent_verbs_by_noun {
+        let matrix_verbs: Vec<_> = verbs
+            .iter()
+            .filter(|(_, src)| matches!(src, Some(SourceOfTruth::Matrix)))
+            .collect();
+
+        if !matrix_verbs.is_empty() && verbs.len() > 1 {
+            // There's a matrix verb and other intent verbs for same noun
+            let matrix_names: Vec<_> = matrix_verbs.iter().map(|(n, _)| n.as_str()).collect();
+            let other_names: Vec<_> = verbs
+                .iter()
+                .filter(|(_, src)| !matches!(src, Some(SourceOfTruth::Matrix)))
+                .map(|(n, _)| n.as_str())
+                .collect();
+
+            if !other_names.is_empty() {
+                // Add warning to the non-matrix verbs
+                for other_name in &other_names {
+                    // Find the result for this verb and add a diagnostic
+                    for result in &mut report.results {
+                        if result.full_name == *other_name {
+                            result.diagnostics.add_warning_with_path(
+                                codes::S001_DUPLICATE_INTENT,
+                                &format!(
+                                    "Multiple intent verbs for noun '{}': {} is matrix source, {} should use it",
+                                    noun,
+                                    matrix_names.join(", "),
+                                    other_name
+                                ),
+                                Some("metadata.source_of_truth"),
+                                Some("Use the matrix verb for authoring, or mark this verb as tier: diagnostics"),
+                            );
+                            if !result.has_errors() {
+                                report.verbs_with_warnings += 1;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]

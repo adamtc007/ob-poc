@@ -8,6 +8,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: template
         behavior: plugin
         plugin:
           handler: template_invoke
@@ -31,6 +32,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: template
         behavior: plugin
         plugin:
           handler: template_batch

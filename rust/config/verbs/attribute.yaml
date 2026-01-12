@@ -12,6 +12,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: crud
         crud:
           operation: upsert
@@ -101,6 +102,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: crud
         crud:
           operation: update
@@ -135,6 +137,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: crud
         crud:
           operation: select
@@ -153,6 +156,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: crud
         crud:
           operation: select
@@ -174,6 +178,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: crud
         crud:
           operation: upsert
@@ -245,6 +250,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: crud
         crud:
           operation: delete
@@ -278,6 +284,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: plugin
         handler: attribute_list_sources
         args:
@@ -292,6 +299,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: plugin
         handler: attribute_list_sinks
         args:
@@ -306,6 +314,7 @@ domains:
           tier: intent
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: plugin
         handler: attribute_trace_lineage
         args:
@@ -320,6 +329,7 @@ domains:
           tier: reference
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: plugin
         handler: attribute_list_by_document
         args:
@@ -339,6 +349,7 @@ domains:
           tier: diagnostics
           source_of_truth: catalog
           scope: global
+          noun: attribute
         behavior: plugin
         handler: attribute_check_coverage
         args:

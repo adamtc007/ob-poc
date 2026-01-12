@@ -21,6 +21,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: view
@@ -64,6 +65,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: focus
@@ -111,6 +113,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: filter
@@ -172,6 +175,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: group_by
@@ -212,6 +216,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: path
@@ -263,6 +268,7 @@ domains:
           tier: reference
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: find_connected
@@ -309,6 +315,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: ancestors
@@ -343,6 +350,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: descendants
@@ -381,6 +389,7 @@ domains:
           tier: intent
           source_of_truth: entity
           scope: cbu
+          noun: graph
         behavior: graph_query
         graph_query:
           operation: compare

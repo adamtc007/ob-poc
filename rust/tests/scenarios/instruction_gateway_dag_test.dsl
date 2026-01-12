@@ -1,8 +1,10 @@
-;; Test DAG ordering for instruction-profile and trade-gateway verbs
+;; Test DAG ordering for trade-gateway verbs
 ;; This test verifies that:
 ;; 1. Gateway definitions come before routing rules (gateway is referenced)
-;; 2. Template definitions come before assignments (template is referenced)
-;; 3. Assignments come before field overrides (assignment is referenced)
+;; 2. Connectivity comes before routing (connectivity establishes CBU-gateway link)
+;;
+;; Note: instruction-profile write verbs (assign-template, add-field-override) have been
+;; removed as part of the matrix-first pivot. Use trading-profile verbs for authoring.
 
 ;; CBU setup
 (cbu.ensure :name "DAG Test Fund" :jurisdiction "LU" :client-type "fund" :as @fund)
@@ -41,7 +43,7 @@
   :priority 1
   :as @fallback)
 
-;; === INSTRUCTION PROFILE DOMAIN ===
+;; === INSTRUCTION PROFILE DOMAIN (Reference Data Only) ===
 ;; Define message type (reference data)
 (instruction-profile.define-message-type
   :lifecycle-event "SETTLEMENT_INSTRUCTION"
@@ -59,23 +61,6 @@
   :base-template "{}"
   :as @template)
 
-;; Assign template to CBU - depends on both CBU and template
-(instruction-profile.assign-template
-  :cbu-id @fund
-  :template-id @template
-  :lifecycle-event "SETTLEMENT_INSTRUCTION"
-  :priority 10
-  :as @assignment)
-
-;; Add field override - depends on assignment
-(instruction-profile.add-field-override
-  :assignment-id @assignment
-  :field-path "95P/REAG/BIC"
-  :override-type "STATIC"
-  :override-value "TESTBIC1"
-  :reason "Test override"
-  :as @override)
-
 ;; === VALIDATION VERBS (read operations) ===
 ;; These should come AFTER all the writes they read from
 
@@ -85,4 +70,3 @@
 (trade-gateway.list-routing-rules :cbu-id @fund)
 (instruction-profile.list-message-types)
 (instruction-profile.list-templates)
-(instruction-profile.list-assignments :cbu-id @fund)

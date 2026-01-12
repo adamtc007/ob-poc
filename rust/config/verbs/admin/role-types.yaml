@@ -11,6 +11,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: role_types
         behavior: crud
         crud:
           operation: select
@@ -36,6 +37,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: role_types
         behavior: crud
         crud:
           operation: select
@@ -55,6 +57,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: role_types
         behavior: crud
         crud:
           operation: upsert
@@ -119,6 +122,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: role_types
         behavior: crud
         crud:
           operation: update
@@ -158,6 +162,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: role_types
         behavior: crud
         crud:
           operation: update

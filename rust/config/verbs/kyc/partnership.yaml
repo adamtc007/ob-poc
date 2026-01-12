@@ -17,6 +17,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: partnership
         behavior: crud
         crud:
           operation: upsert
@@ -109,6 +110,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: partnership
         behavior: plugin
         plugin:
           handler: PartnershipContributionOp
@@ -150,6 +152,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: partnership
         behavior: plugin
         plugin:
           handler: PartnershipDistributionOp
@@ -191,6 +194,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: partnership
         behavior: crud
         crud:
           operation: update
@@ -228,6 +232,7 @@ domains:
           tier: reference
           source_of_truth: operational
           scope: cbu
+          noun: partnership
         behavior: crud
         crud:
           operation: list_by_fk
@@ -265,6 +270,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: partnership
         behavior: plugin
         plugin:
           handler: PartnershipReconcileOp
@@ -312,6 +318,7 @@ domains:
           tier: intent
           source_of_truth: operational
           scope: cbu
+          noun: partnership
         behavior: plugin
         plugin:
           handler: PartnershipAnalyzeControlOp
