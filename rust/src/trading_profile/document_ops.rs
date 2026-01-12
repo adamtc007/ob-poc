@@ -1522,6 +1522,58 @@ pub async fn validate_go_live_ready(
         });
     }
 
+    // Validate CSA collateral_ssi_ref references existing SSIs
+    for isda in &doc.isda_agreements {
+        if let Some(ref csa) = isda.csa {
+            if let Some(ref ssi_ref) = csa.collateral_ssi_ref {
+                if !ssi_names.contains(ssi_ref) {
+                    issues.push(ValidationIssue {
+                        severity: ValidationSeverity::Error,
+                        category: "isda".to_string(),
+                        message: format!(
+                            "CSA for '{}' references unknown collateral SSI '{}'",
+                            isda.counterparty.value, ssi_ref
+                        ),
+                        path: Some(format!(
+                            "isda_agreements[{}].csa.collateral_ssi_ref",
+                            isda.counterparty.value
+                        )),
+                    });
+                }
+            }
+        }
+    }
+
+    // Validate IM mandate scope references valid markets
+    let valid_markets: std::collections::HashSet<&String> = doc
+        .universe
+        .allowed_markets
+        .iter()
+        .map(|m| &m.mic)
+        .collect();
+    for mandate in &doc.investment_managers {
+        // Skip if scope.all is true (IM can trade everything)
+        if mandate.scope.all {
+            continue;
+        }
+        for mic in &mandate.scope.mics {
+            if !valid_markets.contains(mic) {
+                issues.push(ValidationIssue {
+                    severity: ValidationSeverity::Warning,
+                    category: "investment_manager".to_string(),
+                    message: format!(
+                        "IM '{}' scope includes market '{}' not in trading universe",
+                        mandate.manager.value, mic
+                    ),
+                    path: Some(format!(
+                        "investment_managers[{}].scope.mics",
+                        mandate.manager.value
+                    )),
+                });
+            }
+        }
+    }
+
     let checklist = GoLiveChecklist {
         has_base_currency,
         has_allowed_markets,
