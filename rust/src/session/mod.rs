@@ -64,7 +64,10 @@ pub use verb_discovery::{
     VerbDiscoveryService, VerbSuggestion, WorkflowPhaseInfo,
 };
 pub use verb_sync::{SyncResult, VerbSyncError, VerbSyncService};
-pub use verb_tiering_linter::{lint_all_verbs, lint_verb_tiering, LintReport, VerbLintResult};
+pub use verb_tiering_linter::{
+    lint_all_verbs, lint_all_verbs_with_config, lint_verb_tiering, lint_verb_with_config,
+    LintConfig, LintReport, LintTier, VerbLintResult,
+};
 pub use view_state::{
     BatchOperation, ContextMode, CrossSectionAxis, DetailLevel, DrillDirection, GapType,
     HighlightMode, IlluminateAspect, LayoutBounds, LayoutResult, NavStackEntry, NodePosition,

@@ -4,7 +4,10 @@
 
 use anyhow::{Context, Result};
 use sqlx::PgPool;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
+use dsl_core::config::types::{SourceOfTruth, VerbScope, VerbTier};
 use dsl_core::config::ConfigLoader;
 use ob_poc::dsl_v2::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
@@ -574,6 +577,295 @@ pub async fn verbs_diagnostics(errors_only: bool) -> Result<()> {
         "Total: {} errors, {} warnings",
         total_errors, total_warnings
     );
+
+    Ok(())
+}
+
+/// Generate verb inventory report
+///
+/// Creates a comprehensive markdown report of all verbs grouped by domain, tier, and noun.
+pub fn verbs_inventory(
+    output: Option<PathBuf>,
+    update_claude_md: bool,
+    show_untagged: bool,
+) -> Result<()> {
+    use chrono::Utc;
+    use std::fmt::Write;
+    use std::fs;
+
+    println!("===========================================");
+    println!("  Verb Inventory Generation");
+    println!("===========================================\n");
+
+    // Load verb config from YAML
+    println!("Loading verb definitions from YAML...");
+    let loader = ConfigLoader::from_env();
+    let verbs_config = loader.load_verbs().context("Failed to load verb config")?;
+
+    // Collect statistics
+    let mut total_verbs = 0;
+    let mut verbs_with_metadata = 0;
+    let mut tier_counts: HashMap<String, usize> = HashMap::new();
+    let mut source_counts: HashMap<String, usize> = HashMap::new();
+    let mut scope_counts: HashMap<String, usize> = HashMap::new();
+    let mut noun_counts: HashMap<String, usize> = HashMap::new();
+    let mut domain_counts: HashMap<String, usize> = HashMap::new();
+    let mut untagged_verbs: Vec<(String, String)> = Vec::new(); // (domain, verb_name)
+
+    // Domain verb details for the report
+    #[allow(dead_code)]
+    struct VerbInfo {
+        name: String,
+        description: String,
+        tier: Option<VerbTier>,
+        source: Option<SourceOfTruth>,
+        scope: Option<VerbScope>,
+        noun: Option<String>,
+        internal: bool,
+    }
+
+    let mut domain_verbs: HashMap<String, Vec<VerbInfo>> = HashMap::new();
+
+    for (domain_name, domain_config) in &verbs_config.domains {
+        let mut verbs: Vec<VerbInfo> = Vec::new();
+
+        for (verb_name, verb_config) in &domain_config.verbs {
+            total_verbs += 1;
+            *domain_counts.entry(domain_name.clone()).or_insert(0) += 1;
+
+            let info = if let Some(ref metadata) = verb_config.metadata {
+                verbs_with_metadata += 1;
+
+                let tier_name = metadata
+                    .tier
+                    .as_ref()
+                    .map(|t| format!("{:?}", t).to_lowercase())
+                    .unwrap_or_else(|| "unset".to_string());
+                *tier_counts.entry(tier_name).or_insert(0) += 1;
+
+                let source_name = metadata
+                    .source_of_truth
+                    .as_ref()
+                    .map(|s| format!("{:?}", s).to_lowercase())
+                    .unwrap_or_else(|| "unset".to_string());
+                *source_counts.entry(source_name).or_insert(0) += 1;
+
+                let scope_name = metadata
+                    .scope
+                    .as_ref()
+                    .map(|s| format!("{:?}", s).to_lowercase())
+                    .unwrap_or_else(|| "unset".to_string());
+                *scope_counts.entry(scope_name).or_insert(0) += 1;
+
+                if let Some(ref noun) = metadata.noun {
+                    *noun_counts.entry(noun.clone()).or_insert(0) += 1;
+                }
+
+                VerbInfo {
+                    name: verb_name.clone(),
+                    description: verb_config.description.clone(),
+                    tier: metadata.tier,
+                    source: metadata.source_of_truth,
+                    scope: metadata.scope,
+                    noun: metadata.noun.clone(),
+                    internal: metadata.internal,
+                }
+            } else {
+                untagged_verbs.push((domain_name.clone(), verb_name.clone()));
+                *tier_counts.entry("no_metadata".to_string()).or_insert(0) += 1;
+
+                VerbInfo {
+                    name: verb_name.clone(),
+                    description: verb_config.description.clone(),
+                    tier: None,
+                    source: None,
+                    scope: None,
+                    noun: None,
+                    internal: false,
+                }
+            };
+
+            verbs.push(info);
+        }
+
+        // Sort verbs by name
+        verbs.sort_by(|a, b| a.name.cmp(&b.name));
+        domain_verbs.insert(domain_name.clone(), verbs);
+    }
+
+    // Print summary
+    println!("  Total verbs:        {}", total_verbs);
+    println!("  With metadata:      {}", verbs_with_metadata);
+    println!(
+        "  Missing metadata:   {}",
+        total_verbs - verbs_with_metadata
+    );
+    println!("  Domains:            {}", domain_counts.len());
+
+    // Show untagged if requested
+    if show_untagged && !untagged_verbs.is_empty() {
+        println!("\n--- Verbs Missing Metadata ---");
+        for (domain, verb) in &untagged_verbs {
+            println!("  {}.{}", domain, verb);
+        }
+    }
+
+    // Generate markdown report
+    let mut md = String::new();
+    let now = Utc::now();
+
+    writeln!(md, "# Verb Inventory\n").unwrap();
+    writeln!(md, "> Auto-generated by `cargo x verbs inventory`").unwrap();
+    writeln!(md, "> Generated: {}\n", now.format("%Y-%m-%d %H:%M UTC")).unwrap();
+
+    // Summary section
+    writeln!(md, "## Summary\n").unwrap();
+    writeln!(md, "| Metric | Count |").unwrap();
+    writeln!(md, "|--------|-------|").unwrap();
+    writeln!(md, "| Total verbs | {} |", total_verbs).unwrap();
+    writeln!(md, "| With metadata | {} |", verbs_with_metadata).unwrap();
+    writeln!(
+        md,
+        "| Missing metadata | {} |",
+        total_verbs - verbs_with_metadata
+    )
+    .unwrap();
+    writeln!(md, "| Domains | {} |", domain_counts.len()).unwrap();
+
+    // Tier distribution
+    writeln!(md, "\n## Tier Distribution\n").unwrap();
+    writeln!(md, "| Tier | Count |").unwrap();
+    writeln!(md, "|------|-------|").unwrap();
+    let mut tiers: Vec<_> = tier_counts.iter().collect();
+    tiers.sort_by(|a, b| b.1.cmp(a.1));
+    for (tier, count) in tiers {
+        writeln!(md, "| {} | {} |", tier, count).unwrap();
+    }
+
+    // Source of truth distribution
+    writeln!(md, "\n## Source of Truth Distribution\n").unwrap();
+    writeln!(md, "| Source | Count |").unwrap();
+    writeln!(md, "|--------|-------|").unwrap();
+    let mut sources: Vec<_> = source_counts.iter().collect();
+    sources.sort_by(|a, b| b.1.cmp(a.1));
+    for (source, count) in sources {
+        writeln!(md, "| {} | {} |", source, count).unwrap();
+    }
+
+    // Domain summary
+    writeln!(md, "\n## Domain Summary\n").unwrap();
+    writeln!(md, "| Domain | Verbs |").unwrap();
+    writeln!(md, "|--------|-------|").unwrap();
+    let mut domains: Vec<_> = domain_counts.iter().collect();
+    domains.sort_by(|a, b| b.1.cmp(a.1));
+    for (domain, count) in domains {
+        writeln!(md, "| {} | {} |", domain, count).unwrap();
+    }
+
+    // Noun distribution (top 20)
+    writeln!(md, "\n## Top Nouns\n").unwrap();
+    writeln!(md, "| Noun | Count |").unwrap();
+    writeln!(md, "|------|-------|").unwrap();
+    let mut nouns: Vec<_> = noun_counts.iter().collect();
+    nouns.sort_by(|a, b| b.1.cmp(a.1));
+    for (noun, count) in nouns.iter().take(20) {
+        writeln!(md, "| {} | {} |", noun, count).unwrap();
+    }
+
+    // Detailed domain sections
+    writeln!(md, "\n---\n").unwrap();
+    writeln!(md, "## Verbs by Domain\n").unwrap();
+
+    let mut sorted_domains: Vec<_> = domain_verbs.keys().collect();
+    sorted_domains.sort();
+
+    for domain_name in sorted_domains {
+        let verbs = domain_verbs.get(domain_name).unwrap();
+        writeln!(md, "### {}\n", domain_name).unwrap();
+        writeln!(md, "| Verb | Tier | Source | Description |").unwrap();
+        writeln!(md, "|------|------|--------|-------------|").unwrap();
+
+        for verb in verbs {
+            let tier_str = verb
+                .tier
+                .as_ref()
+                .map(|t| format!("{:?}", t).to_lowercase())
+                .unwrap_or_else(|| "-".to_string());
+            let source_str = verb
+                .source
+                .as_ref()
+                .map(|s| format!("{:?}", s).to_lowercase())
+                .unwrap_or_else(|| "-".to_string());
+            let internal_marker = if verb.internal { " (internal)" } else { "" };
+            let desc = verb.description.replace('|', "\\|");
+            let desc_short = if desc.len() > 60 {
+                format!("{}...", &desc[..57])
+            } else {
+                desc
+            };
+
+            writeln!(
+                md,
+                "| {}{} | {} | {} | {} |",
+                verb.name, internal_marker, tier_str, source_str, desc_short
+            )
+            .unwrap();
+        }
+        writeln!(md).unwrap();
+    }
+
+    // Write output file
+    let output_path = output.unwrap_or_else(|| PathBuf::from("docs/verb-inventory.md"));
+
+    // Ensure parent directory exists
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).context("Failed to create output directory")?;
+    }
+
+    fs::write(&output_path, &md).context("Failed to write inventory file")?;
+    println!("\nInventory written to: {}", output_path.display());
+
+    // Update CLAUDE.md if requested
+    if update_claude_md {
+        update_claude_md_stats(total_verbs, domain_counts.len())?;
+    }
+
+    Ok(())
+}
+
+/// Update CLAUDE.md header stats with verb count
+fn update_claude_md_stats(verb_count: usize, file_count: usize) -> Result<()> {
+    use regex::Regex;
+    use std::fs;
+
+    // CLAUDE.md is in the project root (one level up from rust/)
+    let claude_md_path = PathBuf::from("../CLAUDE.md");
+    if !claude_md_path.exists() {
+        println!(
+            "CLAUDE.md not found at {:?}, skipping update",
+            claude_md_path
+        );
+        return Ok(());
+    }
+
+    let content = fs::read_to_string(&claude_md_path).context("Failed to read CLAUDE.md")?;
+
+    // Update verb count line
+    let verb_re = Regex::new(r#">\s*\*\*Verb count:\*\*[^\n]+"#).unwrap();
+    let updated = verb_re.replace(
+        &content,
+        format!(
+            "> **Verb count:** ~{} verbs across {}+ YAML files",
+            verb_count, file_count
+        ),
+    );
+
+    if updated != content {
+        fs::write(&claude_md_path, updated.as_ref()).context("Failed to write CLAUDE.md")?;
+        println!("Updated CLAUDE.md verb count: ~{} verbs", verb_count);
+    } else {
+        println!("CLAUDE.md verb count already up-to-date");
+    }
 
     Ok(())
 }

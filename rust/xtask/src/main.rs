@@ -363,6 +363,24 @@ enum VerbsAction {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
+
+    /// Generate verb inventory report
+    ///
+    /// Creates a comprehensive report of all verbs grouped by domain, tier, and noun.
+    /// Useful for documentation and auditing.
+    Inventory {
+        /// Output markdown file (default: docs/verb-inventory.md)
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+
+        /// Also update CLAUDE.md header stats
+        #[arg(long)]
+        update_claude_md: bool,
+
+        /// Show verbs missing metadata
+        #[arg(long)]
+        show_untagged: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -500,6 +518,11 @@ fn main() -> Result<()> {
                     errors_only,
                     verbose,
                 } => rt.block_on(verbs::verbs_lint(errors_only, verbose)),
+                VerbsAction::Inventory {
+                    output,
+                    update_claude_md,
+                    show_untagged,
+                } => verbs::verbs_inventory(output, update_claude_md, show_untagged),
             }
         }
     }

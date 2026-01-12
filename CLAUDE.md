@@ -1,14 +1,14 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-12
-> **Verb count:** ~873 verbs across 89 verb YAML files (+ 14 workflow templates)
+> **Verb count:** ~812 verbs across 92+ YAML files
 > **Custom ops:** 50 plugin handlers
 > **Crates:** 13 fine-grained crates
 > **Migrations:** 20 schema migrations (latest: 020_trading_profile_materialization.sql)
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
-> **Verb Tiering:** ✅ Complete - 817 verbs tagged with tier metadata
-> **Verb Governance:** 📝 Planned - Mandatory metadata, deprecation flow, lint enforcement (028)
+> **Verb Tiering:** ✅ Complete - 888 verbs tagged with tier metadata
+> **Verb Governance:** ✅ Complete - Mandatory metadata, single authoring surface, STANDARD lint enforcement
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 
 This file provides guidance to Claude Code when working with this repository.
@@ -40,9 +40,9 @@ This file provides guidance to Claude Code when working with this repository.
 | **Entity Disambiguation UX** | `ai-thoughts/025-entity-disambiguation-ux.md` | ✅ **DONE** - Inline popup + batch modal design, voice refinement |
 | **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
 | **Entity Resolution Plan** | `ai-thoughts/026-entity-resolution-implementation-plan.md` | ⚠️ **IN PROGRESS** - Sub-session architecture, 4-phase implementation |
-| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Types + linter + 817 verbs tagged with tier metadata |
-| **Verb Lexicon Governance** | `ai-thoughts/028-verb-lexicon-governance.md` | 📝 **TODO** - Mandatory metadata, deprecation flow, matrix-first enforcement |
-| **Implement Verb Governance** | `ai-thoughts/029-implement-verb-governance.md` | 📝 **TODO** - 3-phase impl plan with file paths, code snippets, verification |
+| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Types + linter + 888 verbs tagged with tier metadata |
+| **Verb Lexicon Governance** | `ai-thoughts/028-verb-lexicon-governance.md` | ✅ **DONE** - Mandatory metadata, rip-and-replace, lint tiers, matrix-first enforcement |
+| **Implement Verb Governance** | `ai-thoughts/029-implement-verb-governance.md` | ✅ **DONE** - 46 verbs reclassified, 15 new CA/plan-apply verbs, 6 proof tests |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
 
 > **DEPRECATED:** `TODO-semantic-intent-matching.md` - replaced by 023 unified learning system
@@ -98,9 +98,10 @@ This file provides guidance to Claude Code when working with this repository.
 - "trading matrix", "instrument taxonomy", "materialize", "canonical" → `ai-thoughts/027-*`
 - "entity resolution", "disambiguation", "unresolved ref", "batch resolve" → `ai-thoughts/025-entity-disambiguation-ux.md`, `ai-thoughts/026-entity-resolution-implementation-plan.md`
 - "sub-session", "resolution modal", "inline popup" → `ai-thoughts/026-entity-resolution-implementation-plan.md`
-- "verb governance", "deprecation", "verb lifecycle", "mandatory metadata" → `ai-thoughts/028-verb-lexicon-governance.md`
+- "verb governance", "verb lifecycle", "mandatory metadata" → `ai-thoughts/028-verb-lexicon-governance.md`
 - "lint rules", "verb linter", "MINIMAL/BASIC/STANDARD" → `ai-thoughts/028-verb-lexicon-governance.md`
 - "single authoring surface", "projection-only", "one commit path" → `ai-thoughts/028-verb-lexicon-governance.md`
+- "pitch", "internal sell", "coalition", "bank-safe", "coexistence", "pilot" → `ai-thoughts/030-internal-pitch-strategy.md`
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -117,9 +118,10 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/025-entity-disambiguation-ux.md` - ✅ DONE - Inline popup + batch modal design, Zed-style code actions, voice refinement
 - `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
 - `ai-thoughts/026-entity-resolution-implementation-plan.md` - ⚠️ **IN PROGRESS** - Sub-session architecture, parent-child context inheritance
-- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ DONE - Types, linter, 817 verbs tagged with tier metadata
-- `ai-thoughts/028-verb-lexicon-governance.md` - 📝 **TODO** - Mandatory metadata, deprecation, lint tiers, matrix-first enforcement
-- `ai-thoughts/029-implement-verb-governance.md` - 📝 **TODO** - 3-phase implementation with code snippets, file paths, verification steps
+- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ DONE - Types, linter, 888 verbs tagged with tier metadata
+- `ai-thoughts/028-verb-lexicon-governance.md` - ✅ DONE - Mandatory metadata, rip-and-replace, lint tiers, matrix-first enforcement
+- `ai-thoughts/029-implement-verb-governance.md` - ✅ DONE - 46 verbs reclassified, 15 new verbs, idempotency tests
+- `ai-thoughts/030-internal-pitch-strategy.md` - 📝 Strategic - Bank-safe positioning, coalition building, pilot slice definition
 
 ---
 
@@ -373,7 +375,7 @@ Verbs are categorized by their role in the data flow:
 |------|---------|---------|
 | `reference` | Global reference data (catalogs) | `corporate-action:define-event-type` |
 | `intent` | User-facing authoring operations | `trading-profile:add-market` |
-| `projection` | Internal writes to operational tables | `cbu-custody:add-universe` (deprecated) |
+| `projection` | Internal writes to operational tables | `_write-instrument` (internal) |
 | `diagnostics` | Read-only queries and validation | `cbu-custody:list-ssis` |
 | `composite` | Multi-table orchestration | `trading-profile:materialize` |
 
@@ -408,6 +410,64 @@ my-verb:
 - T007: All verbs should have metadata (warning)
 - T002: Projection verbs must be `internal: true`
 - T006: Diagnostics verbs must be read-only
+
+### Verb Governance (Enforced)
+
+> **Full details:** `ai-thoughts/028-verb-lexicon-governance.md`, `ai-thoughts/029-implement-verb-governance.md`
+
+**Linter Tiers (Buf-style):**
+
+| Tier | Rules Enforced | CI Status |
+|------|----------------|----------|
+| `MINIMAL` | Required metadata fields present | ✅ Pass |
+| `BASIC` | Naming conventions, create/ensure semantics | ✅ Pass |
+| `STANDARD` | Single authoring surface, projection-only writes, one commit path | ✅ Pass |
+
+**Run linter:**
+```bash
+cargo x verbs lint                    # Default: STANDARD tier
+cargo x verbs lint --tier minimal     # Check only required fields
+cargo x verbs lint --tier basic       # Check naming + semantics
+```
+
+**Hard Enforcement Rules:**
+
+| Rule | Description | Violation = |
+|------|-------------|-------------|
+| S001 | If `source_of_truth: matrix`, no other verb can be `tier: intent` for same noun | Error |
+| S002 | If `writes_operational: true`, must be `tier: projection` or `composite` | Error |
+| S003 | If `tier: projection` + `writes_operational`, must be `internal: true` | Error |
+| B001 | `create-*` must use `operation: insert` | Error |
+| B002 | `ensure-*` must use `operation: upsert` | Error |
+| B003 | `delete-*` on regulated nouns requires `dangerous: true` | Error |
+
+### Deleted Verbs (Rip and Replace)
+
+This is a POC - no deprecation period needed. The following verbs were **deleted** (not deprecated):
+
+| Deleted From | Verbs Removed | Use Instead |
+|--------------|---------------|-------------|
+| `instruction-profile` | `assign-template`, `override-field`, `remove-assignment`, `bulk-assign` | `trading-profile.add-standing-instruction`, etc. |
+| `cbu-custody` | `add-instrument`, `add-market`, `add-universe`, `remove-instrument` | `trading-profile.add-*` |
+| `trade-gateway` | `assign-gateway`, `set-routing` | `trading-profile.add-gateway` |
+| `settlement-chain` | `assign-chain` | `trading-profile.add-settlement-chain` |
+| `pricing-config` | `set-source` | `trading-profile.set-pricing-source` |
+| `tax-config` | `set-treatment` | `trading-profile.set-tax-treatment` |
+| `corporate-action` | `set-preference` | `trading-profile.ca.set-election-policy` |
+
+**Single authoring surface:** `trading-profile.*` is the ONLY way to configure CBU trading setup.
+
+### Materialize Plan/Apply
+
+The `trading-profile.materialize` composite now supports plan/apply separation:
+
+| Verb | Purity | DB Writes | Use Case |
+|------|--------|-----------|----------|
+| `generate-materialization-plan` | Pure | None | Preview changes, dry-run |
+| `apply-materialization-plan` | Transactional | Yes | Apply after review |
+| `materialize` | Orchestrator | Yes | Convenience (generate + apply) |
+
+**Idempotency guarantee:** Running materialize twice produces no changes on second run.
 
 ---
 
@@ -550,7 +610,7 @@ Never silently "guess and commit" on complex domain logic.
 | `screening` | 10 | Sanctions, PEP screening |
 | `gleif` | 15 | GLEIF LEI lookup, hierarchy import |
 | `bods` | 9 | BODS 0.4 UBO discovery, import/export |
-| `trading-profile` | 15 | Trading matrix configuration |
+| `trading-profile` | 30 | Trading matrix configuration, CA policy, plan/apply |
 | `capital` | 25 | Share classes, issuance, supply tracking |
 | `ownership` | 20 | Holdings, control, coverage, computation |
 | `dilution` | 10 | Options, warrants, convertibles, exercises |

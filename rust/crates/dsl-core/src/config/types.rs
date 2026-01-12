@@ -130,6 +130,31 @@ pub struct VerbMetadata {
     /// If this verb replaces another (for migration tracking)
     #[serde(default)]
     pub replaces: Option<String>,
+
+    // =========================================================================
+    // Lifecycle fields (for deprecation, migration, governance)
+    // =========================================================================
+    /// Verb lifecycle status: active (default) or deprecated
+    #[serde(default)]
+    pub status: VerbStatus,
+
+    /// For deprecated verbs: the canonical verb that replaces this one
+    /// Format: "domain.verb-name" (e.g., "trading-profile.add-standing-instruction")
+    #[serde(default)]
+    pub replaced_by: Option<String>,
+
+    /// Version when this verb was introduced (for documentation)
+    #[serde(default)]
+    pub since_version: Option<String>,
+
+    /// Version when this verb will be removed (for deprecated verbs)
+    #[serde(default)]
+    pub removal_version: Option<String>,
+
+    /// Whether this verb performs dangerous operations (delete on regulated nouns)
+    /// Requires explicit confirmation or elevated permissions
+    #[serde(default)]
+    pub dangerous: bool,
 }
 
 /// Verb tier classification
@@ -189,6 +214,21 @@ pub enum VerbScope {
     Global,
     /// Operates within CBU context
     Cbu,
+}
+
+/// Verb lifecycle status
+///
+/// Used for deprecation tracking and migration:
+/// - `active`: Normal verb, fully supported
+/// - `deprecated`: Marked for removal, should use `replaced_by` instead
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbStatus {
+    /// Normal verb, fully supported (default)
+    #[default]
+    Active,
+    /// Marked for removal, use `replaced_by` instead
+    Deprecated,
 }
 
 // =============================================================================

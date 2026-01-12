@@ -174,7 +174,51 @@ pub mod codes {
     pub const PRODUCES_EMPTY_TYPE: &str = "PRODUCES_EMPTY_TYPE";
     pub const PLUGIN_EMPTY_HANDLER: &str = "PLUGIN_EMPTY_HANDLER";
 
-    // Tiering lint codes (T0xx series)
+    // =========================================================================
+    // MINIMAL tier rules (M0xx) - Required fields present
+    // =========================================================================
+    /// M001: Verb missing metadata block entirely
+    pub const M001_MISSING_METADATA: &str = "M001";
+    /// M002: Verb metadata missing tier field
+    pub const M002_MISSING_TIER: &str = "M002";
+    /// M003: Verb metadata missing source_of_truth field
+    pub const M003_MISSING_SOURCE: &str = "M003";
+    /// M004: Verb metadata missing scope field
+    pub const M004_MISSING_SCOPE: &str = "M004";
+    /// M005: Verb metadata missing noun field
+    pub const M005_MISSING_NOUN: &str = "M005";
+    /// M006: Deprecated verb missing replaced_by field
+    pub const M006_DEPRECATED_NO_REPLACEMENT: &str = "M006";
+
+    // =========================================================================
+    // BASIC tier rules (B0xx) - Naming + semantics
+    // =========================================================================
+    /// B001: create-* verb should use insert operation
+    pub const B001_CREATE_NOT_INSERT: &str = "B001";
+    /// B002: ensure-* verb should use upsert operation
+    pub const B002_ENSURE_NOT_UPSERT: &str = "B002";
+    /// B003: delete-* on regulated noun missing dangerous: true
+    pub const B003_DELETE_NOT_DANGEROUS: &str = "B003";
+    /// B004: Deprecated verb has invalid replaced_by target
+    pub const B004_INVALID_REPLACEMENT: &str = "B004";
+    /// B005: list-* verb should be tier: diagnostics
+    pub const B005_LIST_NOT_DIAGNOSTICS: &str = "B005";
+    /// B006: get-* verb should be tier: diagnostics
+    pub const B006_GET_NOT_DIAGNOSTICS: &str = "B006";
+
+    // =========================================================================
+    // STANDARD tier rules (S0xx) - Matrix-first enforcement
+    // =========================================================================
+    /// S001: Multiple intent verbs for same noun (single authoring surface)
+    pub const S001_DUPLICATE_INTENT: &str = "S001";
+    /// S002: writes_operational requires tier: projection or composite
+    pub const S002_WRITES_OP_WRONG_TIER: &str = "S002";
+    /// S003: projection + writes_operational requires internal: true
+    pub const S003_PROJECTION_NOT_INTERNAL: &str = "S003";
+
+    // =========================================================================
+    // Legacy T0xx codes (kept for backward compatibility, mapped to new codes)
+    // =========================================================================
     /// Verb writes to operational table but is not tier: projection or composite
     pub const TIER_WRITE_NOT_PROJECTION: &str = "T001";
     /// Verb is tier: projection but missing internal: true
@@ -187,8 +231,8 @@ pub mod codes {
     pub const TIER_INTENT_WRITES_OPERATIONAL: &str = "T005";
     /// Verb is tier: diagnostics but has write behavior
     pub const TIER_DIAGNOSTICS_HAS_WRITE: &str = "T006";
-    /// Verb missing metadata (no tiering info)
-    pub const TIER_MISSING_METADATA: &str = "T007";
+    /// Verb missing metadata (no tiering info) - now M001
+    pub const TIER_MISSING_METADATA: &str = "M001";
     /// Verb has inconsistent source_of_truth
     pub const TIER_INCONSISTENT_SOURCE: &str = "T008";
 }

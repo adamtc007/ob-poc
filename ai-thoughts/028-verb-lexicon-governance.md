@@ -75,7 +75,7 @@ Implement linter strictness tiers for gradual rollout:
 
 ### B1. "Single authoring surface" rule
 
-If `source_of_truth: matrix`, no other verb may be `tier: intent` for the same `noun + scope` combination unless explicitly a compat alias.
+If `source_of_truth: matrix`, no other verb may be `tier: intent` for the same `noun + scope` combination.
 
 **Enforcement targets:**
 Any verb writing `custody.cbu_*` (or equivalent per-CBU operational tables) must be:
@@ -107,65 +107,62 @@ Sub-steps allowed but must be `internal: true` and called only by materialize.
 
 ---
 
-## C. Deprecation + Aliasing
+## C. Verb Removal (Rip and Replace)
 
-### C1. Deprecation semantics in YAML
+> **POC Context:** This is not a production system. No deprecation period or compat aliases needed.
+> Just delete the verbs and update any test fixtures.
 
-```yaml
-my-deprecated-verb:
-  description: "..."
-  metadata:
-    status: deprecated
-    replaced_by: trading-profile.add-standing-instruction
-    removal_version: "1.0.0"
-```
+### C1. Removal semantics
 
-### C2. Alias implementation in executor (optional but recommended)
+For a POC:
+- **Delete** the verb definition from YAML entirely
+- **Delete** any orphaned plugin handlers
+- **Update** test fixtures that reference deleted verbs
+- **Run** `cargo x verify-verbs` to confirm clean load
 
-Allow verb to alias another:
-- Same args (or defined arg mapping)
-- Emit warning in execution log: `"deprecated; use X"`
-- Can be globally disabled via config
+No `status: deprecated`, no `replaced_by`, no alias handlers.
 
-### C3. "Fail on deprecated" execution mode
+### C2. When to use deprecation (future production)
 
-Runtime flag (env/config):
-```bash
-ALLOW_DEPRECATED_VERBS=true|false  # Default: true until migration done
-```
+If this becomes a production system with external consumers:
+- Add `status: deprecated` + `replaced_by` to verb metadata
+- Implement alias handlers that translate old → new
+- Add `ALLOW_DEPRECATED_VERBS` runtime flag
+- Define `removal_version` for scheduled removal
+
+**For now: just delete.**
 
 ---
 
-## D. Migration: instruction-profile to projection/compat
+## D. Migration: instruction-profile → DELETE
 
-### D1. Classify current verbs
+### D1. Classify and remove
 
-| Verb Type | New Classification |
-|-----------|-------------------|
-| Template library verbs | `tier: reference`, `source_of_truth: catalog` |
-| Assignment/override verbs | `status: deprecated` with alias OR `tier: projection` + `internal: true` |
+| Verb Type | Action |
+|-----------|--------|
+| Template library verbs (`define-template`, `list-templates`) | **KEEP** as `tier: reference`, `source_of_truth: catalog` |
+| Assignment/override verbs (`assign-*`, `override-*`, `remove-*`) | **DELETE** - replaced by `trading-profile.*` |
+| Read-only verbs (`list-assignments`, `get-assignment`) | **KEEP** as `tier: diagnostics` for debugging |
 
-### D2. Migration mechanics
+### D2. Verbs to delete
 
-**Option A — Compat alias (preferred for speed):**
-```yaml
-instruction-profile.assign-template:
-  metadata:
-    status: deprecated
-    replaced_by: trading-profile.add-standing-instruction
-  # Executor translates to matrix mutation
-```
-
-**Option B — Hard cutover:**
-- Block direct assignment writes immediately
-- Require matrix authoring + materialize for all new changes
-- Keep `instruction-profile.list-*` as read-only inspection
+| Domain | Delete These Verbs |
+|--------|-------------------|
+| `instruction-profile` | `assign-template`, `override-field`, `remove-assignment`, `bulk-assign` |
+| `cbu-custody` | `add-instrument`, `add-market`, `add-universe`, `remove-instrument` |
+| `trade-gateway` | `assign-gateway`, `set-routing` |
+| `settlement-chain` | `assign-chain` |
+| `pricing-config` | `set-source` |
+| `tax-config` | `set-treatment` |
+| `corporate-action` | `set-preference` |
 
 ### D3. Backsliding prevention linter rule
 
 ```
-IF domain == instruction-profile AND writes_operational == true:
-  REQUIRE tier: projection OR (status: deprecated AND replaced_by: present)
+IF domain IN [instruction-profile, cbu-custody, trade-gateway, settlement-chain, pricing-config, tax-config, corporate-action]
+  AND writes_operational == true
+  AND tier == intent:
+    ERROR: "Use trading-profile.* for CBU configuration"
 ```
 
 ---
@@ -213,7 +210,7 @@ trading-profile.ca.link-proceeds-ssi
 
 During `trading-profile.materialize`:
 - Generate/update `custody.cbu_ca_*` tables
-- Direct CA preference CRUD becomes `tier: projection` or `status: deprecated`
+- Direct CA preference CRUD verbs are **deleted** (see D2)
 
 ---
 

@@ -24,10 +24,10 @@ Verb metadata is an **API lifecycle tool**:
 
 | Purpose | How Metadata Enables It |
 |---------|-------------------------|
-| Deprecation + migration | `status: deprecated` + `replaced_by: <verb>` enables phased removal |
-| Structured removal schedules | `removal_version` field → Kubernetes-style deprecation policy |
+| Single authoring surface | `source_of_truth: matrix` enforces one write path per noun |
+| Internal projection isolation | `internal: true` hides implementation verbs from users |
 | Strictness tiers for linting | Buf-style MINIMAL/BASIC/STANDARD → gradual enforcement rollout |
-| SemVer expectations | Marking public API deprecated is a versioned event, not casual |
+| Domain organization | `tier`, `scope`, `noun` enable inventory and governance |
 
 **Enforcement:** Missing required metadata → `cargo x verify-verbs` fails (Phase 2+).
 
@@ -37,48 +37,28 @@ Verb metadata is an **API lifecycle tool**:
 
 This is the explicit enumeration of verb fate. **No verb escapes classification.**
 
-#### 2a. Verbs Removed Outright
+#### 2a. Verbs Removed (Hard Delete)
 
 | Domain | Verb | Reason |
 |--------|------|--------|
-| (none yet) | | Phase 3 may identify candidates after migration |
+| `instruction-profile` | `assign-template` | Replaced by `trading-profile.add-standing-instruction` |
+| `instruction-profile` | `override-field` | Replaced by `trading-profile.set-ssi-override` |
+| `instruction-profile` | `remove-assignment` | Replaced by `trading-profile.remove-standing-instruction` |
+| `instruction-profile` | `bulk-assign` | Replaced by `trading-profile.import` |
+| `cbu-custody` | `add-instrument` | Replaced by `trading-profile.add-instrument` |
+| `cbu-custody` | `add-market` | Replaced by `trading-profile.add-market` |
+| `cbu-custody` | `add-universe` | Replaced by `trading-profile.set-universe` |
+| `cbu-custody` | `remove-instrument` | Replaced by `trading-profile.remove-instrument` |
+| `trade-gateway` | `assign-gateway` | Replaced by `trading-profile.add-gateway` |
+| `trade-gateway` | `set-routing` | Replaced by `trading-profile.set-gateway-routing` |
+| `settlement-chain` | `assign-chain` | Replaced by `trading-profile.add-settlement-chain` |
+| `pricing-config` | `set-source` | Replaced by `trading-profile.set-pricing-source` |
+| `tax-config` | `set-treatment` | Replaced by `trading-profile.set-tax-treatment` |
+| `corporate-action` | `set-preference` | Replaced by `trading-profile.ca.set-election-policy` |
 
-#### 2b. Verbs Deprecated + replaced_by
+**Total: 14 verbs deleted**
 
-| Domain | Verb | Replaced By |
-|--------|------|-------------|
-| `instruction-profile` | `assign-template` | `trading-profile.add-standing-instruction` |
-| `instruction-profile` | `override-field` | `trading-profile.set-ssi-override` |
-| `instruction-profile` | `remove-assignment` | `trading-profile.remove-standing-instruction` |
-| `instruction-profile` | `bulk-assign` | `trading-profile.import` (with SSI section) |
-| `cbu-custody` | `add-instrument` | `trading-profile.add-instrument` |
-| `cbu-custody` | `add-market` | `trading-profile.add-market` |
-| `cbu-custody` | `add-universe` | `trading-profile.set-universe` |
-| `cbu-custody` | `remove-instrument` | `trading-profile.remove-instrument` |
-| `trade-gateway` | `assign-gateway` | `trading-profile.add-gateway` |
-| `trade-gateway` | `set-routing` | `trading-profile.set-gateway-routing` |
-| `settlement-chain` | `assign-chain` | `trading-profile.add-settlement-chain` |
-| `pricing-config` | `set-source` | `trading-profile.set-pricing-source` |
-| `tax-config` | `set-treatment` | `trading-profile.set-tax-treatment` |
-| `corporate-action` | `set-preference` | `trading-profile.ca.set-election-policy` |
-
-#### 2c. Verbs Becoming Internal Projection-Only
-
-| Domain | Verb | Called By |
-|--------|------|----------|
-| `cbu-custody` | `_write-instrument` | `trading-profile.materialize` |
-| `cbu-custody` | `_write-market` | `trading-profile.materialize` |
-| `cbu-custody` | `_write-universe` | `trading-profile.materialize` |
-| `instruction-profile` | `_write-assignment` | `trading-profile.materialize` |
-| `trade-gateway` | `_write-routing` | `trading-profile.materialize` |
-| `settlement-chain` | `_write-chain` | `trading-profile.materialize` |
-| `pricing-config` | `_write-source` | `trading-profile.materialize` |
-| `tax-config` | `_write-treatment` | `trading-profile.materialize` |
-| `corporate-action` | `_write-preference` | `trading-profile.materialize` |
-
-**Convention:** Internal projection verbs prefixed with `_` to signal non-public.
-
-#### 2d. Verbs Remaining Reference/Catalog (Unchanged)
+#### 2b. Verbs Remaining Reference/Catalog (Unchanged)
 
 | Domain | Verb Pattern | Source of Truth |
 |--------|--------------|----------------|
@@ -89,7 +69,7 @@ This is the explicit enumeration of verb fate. **No verb escapes classification.
 | `trade-gateway` | `define-gateway`, `list-gateways` | catalog |
 | `settlement-chain` | `define-chain`, `list-chains` | catalog |
 
-#### 2e. Verbs Remaining Diagnostics (Read-Only)
+#### 2c. Verbs Remaining Diagnostics (Read-Only)
 
 | Domain | Verb Pattern |
 |--------|-------------|
@@ -109,34 +89,37 @@ This is the explicit enumeration of verb fate. **No verb escapes classification.
 |-------------|-----------|-------------|
 | **Loader validation** | Missing required metadata → `Err()` | Phase 2 |
 | **Linter MINIMAL** | Required fields present | Phase 1 (warn) |
-| **Linter BASIC** | Naming + semantics + deprecation coherence | Phase 2 (fail) |
+| **Linter BASIC** | Naming + semantics | Phase 2 (fail) |
 | **Linter STANDARD** | Single authoring surface, projection rules | Phase 3 (fail) |
-| **Runtime flag** | `ALLOW_DEPRECATED_VERBS=false` → block execution | Phase 3 (opt-in) |
 | **CI gate** | `cargo x verbs lint --tier standard` in PR checks | Phase 3 |
 
 ---
 
 ### 4. Instruction-Profile Leak Closure
 
-**Decision: Compat Alias Approach**
+**Decision: Hard Cutover (Rip and Replace)**
 
-Rationale: Faster migration, existing DSL scripts don't break immediately.
+Rationale: This is a POC with no production consumers. No need for deprecation/alias complexity.
 
-| Old Verb | Behavior | New Target |
-|----------|----------|------------|
-| `instruction-profile.assign-template` | Alias → rewrite to matrix mutation | `trading-profile.add-standing-instruction` |
-| `instruction-profile.override-field` | Alias → rewrite to matrix mutation | `trading-profile.set-ssi-override` |
-| `instruction-profile.remove-assignment` | Alias → rewrite to matrix mutation | `trading-profile.remove-standing-instruction` |
+| Action | Verbs |
+|--------|-------|
+| **DELETE** | `instruction-profile.assign-template`, `override-field`, `remove-assignment`, `bulk-assign` |
+| **DELETE** | `cbu-custody.add-instrument`, `add-market`, `add-universe`, `remove-instrument` |
+| **DELETE** | `trade-gateway.assign-gateway`, `set-routing` |
+| **DELETE** | `settlement-chain.assign-chain` |
+| **DELETE** | `pricing-config.set-source` |
+| **DELETE** | `tax-config.set-treatment` |
+| **DELETE** | `corporate-action.set-preference` |
+| **KEEP** | All `list-*`, `get-*` diagnostics verbs (read-only) |
+| **KEEP** | All `define-*` reference/catalog verbs |
 
 **Implementation:**
-```rust
-// In executor, when verb.metadata.status == Deprecated:
-// 1. Log warning: "deprecated; use X"
-// 2. If alias_handler present, delegate to alias target
-// 3. If ALLOW_DEPRECATED_VERBS=false, return Err
-```
+1. Delete the verb definitions from YAML files
+2. Delete any orphaned plugin handlers
+3. Update any test fixtures that reference deleted verbs
+4. Run `cargo x verify-verbs` to confirm clean load
 
-**Read-only verbs remain:** `list-assignments`, `get-assignment`, `list-templates`, `get-template` stay as `tier: diagnostics` pointing at operational tables.
+**Single authoring surface:** `trading-profile.*` is the ONLY way to configure CBU trading setup.
 
 ---
 
@@ -163,8 +146,7 @@ Rationale: Faster migration, existing DSL scripts don't break immediately.
 | `linter_catches_ops_intent` | New verb with `writes_operational + tier:intent` fails | `tests/linter_rules.rs` |
 | `ca_policy_materialize` | CA policy in matrix → operational tables populated | `tests/ca_materialize.rs` |
 | `ssi_reference_integrity` | SSI refs in matrix → correct assignment rows | `tests/ssi_materialize.rs` |
-| `deprecated_verb_warning` | Deprecated verb logs warning, executes | `tests/deprecation.rs` |
-| `deprecated_verb_blocked` | With flag, deprecated verb returns Err | `tests/deprecation.rs` |
+| `deleted_verbs_not_found` | Old verbs (e.g., `instruction-profile.assign-template`) return "verb not found" | `tests/verb_deletion.rs` |
 
 ---
 
@@ -172,71 +154,16 @@ Rationale: Faster migration, existing DSL scripts don't break immediately.
 
 | Domain | Files Modified | Verbs Affected |
 |--------|----------------|----------------|
-| `instruction-profile` | `custody/instruction-profile.yaml` | 8 verbs (4 deprecated, 4 internal) |
-| `cbu-custody` | `custody/cbu-custody.yaml` | 12 verbs (4 deprecated, 4 internal, 4 diagnostics) |
-| `trade-gateway` | `custody/trade-gateway.yaml` | 6 verbs (2 deprecated, 2 internal, 2 diagnostics) |
-| `settlement-chain` | `custody/settlement-chain.yaml` | 6 verbs (2 deprecated, 2 internal, 2 diagnostics) |
-| `pricing-config` | `pricing-config.yaml` | 4 verbs (1 deprecated, 1 internal, 2 diagnostics) |
-| `tax-config` | `custody/tax-config.yaml` | 4 verbs (1 deprecated, 1 internal, 2 diagnostics) |
-| `corporate-action` | `custody/corporate-action.yaml` | 6 verbs (2 deprecated, 2 internal, 2 diagnostics) |
+| `instruction-profile` | `custody/instruction-profile.yaml` | 4 verbs deleted, 4 diagnostics remain |
+| `cbu-custody` | `custody/cbu-custody.yaml` | 4 verbs deleted, 4 diagnostics remain |
+| `trade-gateway` | `custody/trade-gateway.yaml` | 2 verbs deleted, 2 diagnostics remain |
+| `settlement-chain` | `custody/settlement-chain.yaml` | 1 verb deleted, 2 diagnostics remain |
+| `pricing-config` | `pricing-config.yaml` | 1 verb deleted, 2 diagnostics remain |
+| `tax-config` | `custody/tax-config.yaml` | 1 verb deleted, 2 diagnostics remain |
+| `corporate-action` | `custody/corporate-action.yaml` | 1 verb deleted, 2 diagnostics remain |
 | `trading-profile` | `trading-profile.yaml` | +15 new verbs (CA policy, plan/apply) |
 
-**Total:** ~46 existing verbs reclassified + 15 new verbs added
-
----
-
-## Deprecation/Alias Mapping (Machine-Readable)
-
-```yaml
-# Can be used to auto-generate alias handlers
-deprecation_map:
-  - old: instruction-profile.assign-template
-    new: trading-profile.add-standing-instruction
-    arg_map:
-      cbu-id: cbu-id
-      template-id: template-id
-      # new verb expects these in matrix context
-    
-  - old: instruction-profile.override-field
-    new: trading-profile.set-ssi-override
-    arg_map:
-      cbu-id: cbu-id
-      assignment-id: ssi-id
-      field: field
-      value: value
-      
-  - old: cbu-custody.add-instrument
-    new: trading-profile.add-instrument
-    arg_map:
-      cbu-id: cbu-id
-      instrument-class: instrument-class
-      
-  - old: cbu-custody.add-market
-    new: trading-profile.add-market
-    arg_map:
-      cbu-id: cbu-id
-      market-code: market-code
-      
-  - old: trade-gateway.assign-gateway
-    new: trading-profile.add-gateway
-    arg_map:
-      cbu-id: cbu-id
-      gateway-id: gateway-id
-      
-  - old: settlement-chain.assign-chain
-    new: trading-profile.add-settlement-chain
-    arg_map:
-      cbu-id: cbu-id
-      chain-id: chain-id
-      market-code: market-code
-      
-  - old: corporate-action.set-preference
-    new: trading-profile.ca.set-election-policy
-    arg_map:
-      cbu-id: cbu-id
-      event-type: event-type
-      default-option: default-option
-```
+**Total:** 14 verbs deleted + 15 new verbs added
 
 ---
 
@@ -260,24 +187,9 @@ pub struct VerbMetadata {
     pub noun: Option<String>,
     pub tags: Option<Vec<String>>,
     
-    // NEW: Lifecycle fields
-    #[serde(default)]
-    pub status: VerbStatus,           // active | deprecated
-    pub replaced_by: Option<String>,  // canonical verb name
-    pub since_version: Option<String>,
-    pub removal_version: Option<String>,
-    
     // NEW: Behavioral flags
     #[serde(default)]
     pub dangerous: bool,              // for delete on regulated nouns
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum VerbStatus {
-    #[default]
-    Active,
-    Deprecated,
 }
 ```
 
@@ -332,7 +244,6 @@ Add these rules (warn only in Phase 1):
 | M003 | `source_of_truth` field present | Warn |
 | M004 | `scope` field present | Warn |
 | M005 | `noun` field present | Warn |
-| M006 | If `status: deprecated`, `replaced_by` should be present | Warn |
 
 ```rust
 fn check_minimal_rules(&self, verb: &VerbDefinition, domain: &str) -> Vec<LintViolation> {
@@ -500,9 +411,8 @@ pub fn load_verb_file(path: &Path) -> Result<Vec<VerbDefinition>> {
 | B001 | `create-*` verbs must use `operation: insert` (not upsert) | Error |
 | B002 | `ensure-*` verbs must use `operation: upsert` | Error |
 | B003 | `delete-*` on regulated nouns requires `dangerous: true` | Error |
-| B004 | Deprecated verb must have valid `replaced_by` target | Error |
-| B005 | `read-*` must be `tier: diagnostics` | Warn |
-| B006 | `list-*` must be `tier: diagnostics` | Warn |
+| B004 | `read-*` must be `tier: diagnostics` | Warn |
+| B005 | `list-*` must be `tier: diagnostics` | Warn |
 
 ```rust
 fn check_basic_rules(&self, verb: &VerbDefinition, domain: &str) -> Vec<LintViolation> {
@@ -561,43 +471,27 @@ cargo x verb-inventory --show-untagged
 ```
 
 For each untagged verb, add proper metadata. Priority order:
-1. `instruction-profile.yaml` — migrate to deprecated or projection
-2. `cbu-custody.yaml` — ensure projection tier
-3. `trade-gateway.yaml` — ensure projection tier
+1. `instruction-profile.yaml` — delete write verbs, keep diagnostics
+2. `cbu-custody.yaml` — delete write verbs, keep diagnostics
+3. `trade-gateway.yaml` — delete write verbs, keep diagnostics
 4. Remaining files alphabetically
 
 ---
 
-### 2.4 Add deprecation warning to executor
+### 2.4 Delete obsolete verbs
 
-**File:** `rust/src/dsl_v2/executor.rs`
+**Files to modify:**
+- `rust/config/verbs/custody/instruction-profile.yaml`
+- `rust/config/verbs/custody/cbu-custody.yaml`
+- `rust/config/verbs/custody/trade-gateway.yaml`
+- `rust/config/verbs/custody/settlement-chain.yaml`
+- `rust/config/verbs/pricing-config.yaml`
+- `rust/config/verbs/custody/tax-config.yaml`
+- `rust/config/verbs/custody/corporate-action.yaml`
 
-```rust
-pub async fn execute_verb(&self, verb: &VerbDefinition, args: &OpArgs) -> Result<OpResult> {
-    // Check deprecation
-    if let Some(meta) = &verb.metadata {
-        if meta.status == VerbStatus::Deprecated {
-            let replacement = meta.replaced_by.as_deref().unwrap_or("(none specified)");
-            warn!(
-                "DEPRECATED: {}:{} is deprecated. Use {} instead.",
-                verb.domain, verb.name, replacement
-            );
-            
-            // Check runtime flag
-            if !self.config.allow_deprecated_verbs {
-                return Err(anyhow!(
-                    "Deprecated verb {}:{} blocked. Set ALLOW_DEPRECATED_VERBS=true to override.",
-                    verb.domain, verb.name
-                ));
-            }
-        }
-    }
-    
-    // Continue with execution...
-}
-```
+**Action:** Delete the verb definitions listed in section 2a (14 verbs total).
 
-**Verify:** Execute a deprecated verb and check logs for warning.
+**Verify:** `cargo x verify-verbs` passes with no errors.
 
 ---
 
@@ -700,35 +594,15 @@ fn check_standard_rules(&self, all_verbs: &[VerbDefinition]) -> Vec<LintViolatio
 
 ---
 
-### 3.2 Migrate instruction-profile verbs
+### 3.2 Delete instruction-profile write verbs
 
 **File:** `rust/config/verbs/custody/instruction-profile.yaml`
 
-For each assignment/override verb:
-
-```yaml
-# BEFORE
-assign-template:
-  description: "Assign SSI template to CBU"
-  behavior: plugin
-  handler: assign_ssi_template
-  metadata:
-    tier: intent  # WRONG - parallel authoring surface
-    # ...
-
-# AFTER
-assign-template:
-  description: "DEPRECATED - Use trading-profile.add-standing-instruction"
-  behavior: plugin
-  handler: assign_ssi_template_compat
-  metadata:
-    tier: projection
-    status: deprecated
-    replaced_by: trading-profile.add-standing-instruction
-    internal: true
-    writes_operational: true
-    # ...
-```
+**Action:** Delete these verb definitions entirely:
+- `assign-template`
+- `override-field`
+- `remove-assignment`
+- `bulk-assign`
 
 Keep read-only verbs as `tier: diagnostics`:
 ```yaml
@@ -740,6 +614,8 @@ list-assignments:
     source_of_truth: operational
     # ...
 ```
+
+**Verify:** `cargo x verify-verbs` and `cargo x verbs lint`
 
 ---
 
@@ -933,11 +809,11 @@ cargo x verb-inventory               # No untagged verbs, no S001 violations
 
 ## Final Acceptance Criteria
 
-- [ ] `VerbMetadata` has all required fields (tier, source_of_truth, scope, noun, status)
+- [ ] `VerbMetadata` has all required fields (tier, source_of_truth, scope, noun)
 - [ ] `cargo x verify-verbs` fails on missing metadata
 - [ ] `cargo x verbs lint --tier standard` passes with no errors
 - [ ] All 870+ verbs have proper metadata
-- [ ] `instruction-profile` assignment verbs are deprecated with `replaced_by`
+- [ ] 14 obsolete verbs deleted (instruction-profile, cbu-custody write verbs, etc.)
 - [ ] `trading-profile.materialize` has plan/apply variants
 - [ ] CA policy verbs exist and are `source_of_truth: matrix`
 - [ ] Idempotency test passes

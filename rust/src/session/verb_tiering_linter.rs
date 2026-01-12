@@ -35,8 +35,115 @@
 //! - `operational` - Derived/projected tables
 
 use dsl_core::config::types::{CrudOperation, SourceOfTruth, VerbBehavior, VerbConfig, VerbTier};
+use serde::{Deserialize, Serialize};
 
 use super::verb_contract::{codes, VerbDiagnostics};
+
+// =============================================================================
+// LINT TIERS (Buf-style graduated enforcement)
+// =============================================================================
+
+/// Lint enforcement tier - controls which rules are applied
+///
+/// Modeled after Buf's MINIMAL/BASIC/STANDARD tiers for gradual adoption.
+/// Each tier includes all rules from lower tiers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LintTier {
+    /// Required fields present (metadata block, tier, source_of_truth)
+    /// Warns only - doesn't block
+    #[default]
+    Minimal,
+    /// Naming conventions + semantic consistency + deprecation coherence
+    /// Errors block execution
+    Basic,
+    /// Full matrix-first enforcement, single authoring surface
+    /// Strictest - used in CI gates
+    Standard,
+}
+
+impl LintTier {
+    /// Check if this tier includes the given rule tier
+    pub fn includes(&self, rule_tier: LintTier) -> bool {
+        match self {
+            LintTier::Minimal => matches!(rule_tier, LintTier::Minimal),
+            LintTier::Basic => matches!(rule_tier, LintTier::Minimal | LintTier::Basic),
+            LintTier::Standard => true,
+        }
+    }
+
+    /// Get the tier name for display
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LintTier::Minimal => "minimal",
+            LintTier::Basic => "basic",
+            LintTier::Standard => "standard",
+        }
+    }
+}
+
+impl std::fmt::Display for LintTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl std::str::FromStr for LintTier {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "minimal" => Ok(LintTier::Minimal),
+            "basic" => Ok(LintTier::Basic),
+            "standard" => Ok(LintTier::Standard),
+            _ => Err(format!(
+                "Unknown lint tier: '{}'. Valid tiers: minimal, basic, standard",
+                s
+            )),
+        }
+    }
+}
+
+/// Configuration for the verb linter
+#[derive(Debug, Clone)]
+pub struct LintConfig {
+    /// Which tier of rules to enforce
+    pub tier: LintTier,
+    /// Treat warnings as errors (for CI strictness)
+    pub fail_on_warning: bool,
+    /// Only show verbs with issues (hide clean verbs)
+    pub issues_only: bool,
+}
+
+impl Default for LintConfig {
+    fn default() -> Self {
+        Self {
+            tier: LintTier::Minimal,
+            fail_on_warning: false,
+            issues_only: true,
+        }
+    }
+}
+
+impl LintConfig {
+    /// Create config for CI gate (strictest)
+    pub fn ci() -> Self {
+        Self {
+            tier: LintTier::Standard,
+            fail_on_warning: true,
+            issues_only: true,
+        }
+    }
+
+    /// Create config for development (lenient)
+    pub fn dev() -> Self {
+        Self {
+            tier: LintTier::Minimal,
+            fail_on_warning: false,
+            issues_only: true,
+        }
+    }
+}
 
 /// Check if a CRUD operation is a write operation
 fn is_crud_write_operation(op: &CrudOperation) -> bool {
@@ -95,82 +202,297 @@ impl LintReport {
 }
 
 /// Lint a single verb configuration for tiering rule compliance
+///
+/// Uses default LintConfig (MINIMAL tier). For tier-specific linting, use `lint_verb_with_config`.
 pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> VerbLintResult {
+    lint_verb_with_config(domain, verb_name, config, &LintConfig::default())
+}
+
+/// Lint a single verb with explicit configuration
+pub fn lint_verb_with_config(
+    domain: &str,
+    verb_name: &str,
+    config: &VerbConfig,
+    lint_config: &LintConfig,
+) -> VerbLintResult {
     let full_name = format!("{}.{}", domain, verb_name);
     let mut diagnostics = VerbDiagnostics::default();
 
-    let metadata = match &config.metadata {
-        Some(m) => m,
-        None => {
-            // Missing metadata is a warning, not an error (for incremental adoption)
-            diagnostics.add_warning_with_path(
-                codes::TIER_MISSING_METADATA,
-                "Verb missing tiering metadata",
-                Some("metadata"),
-                Some("Add metadata: { tier: ..., source_of_truth: ... } to verb definition"),
-            );
-            return VerbLintResult {
-                full_name,
-                diagnostics,
-            };
-        }
+    // =========================================================================
+    // MINIMAL TIER RULES (M001-M006) - Always run
+    // =========================================================================
+    if lint_config.tier.includes(LintTier::Minimal) {
+        check_minimal_rules(domain, verb_name, config, &mut diagnostics);
+    }
+
+    // If no metadata, we can't check higher-tier rules
+    let Some(metadata) = &config.metadata else {
+        return VerbLintResult {
+            full_name,
+            diagnostics,
+        };
     };
 
     // Determine if this verb writes (based on behavior)
     let is_write_behavior = match config.behavior {
-        VerbBehavior::Crud => {
-            // Check the crud config for the operation type
-            config
-                .crud
-                .as_ref()
-                .map(|c| is_crud_write_operation(&c.operation))
-                .unwrap_or(false)
-        }
-        VerbBehavior::Plugin => {
-            // Plugin handlers may or may not write - rely on metadata.writes_operational
-            metadata.writes_operational
-        }
+        VerbBehavior::Crud => config
+            .crud
+            .as_ref()
+            .map(|c| is_crud_write_operation(&c.operation))
+            .unwrap_or(false),
+        VerbBehavior::Plugin => metadata.writes_operational,
         VerbBehavior::GraphQuery => false,
     };
 
-    // Check if tagged as deprecated
-    let is_deprecated = metadata.tags.iter().any(|t| t == "deprecated");
-
     // =========================================================================
-    // Rule 1: Projection verbs must be internal
+    // BASIC TIER RULES (B001-B006) - Naming + semantics
     // =========================================================================
-    if matches!(metadata.tier, Some(VerbTier::Projection)) && !metadata.internal {
-        diagnostics.add_error_with_path(
-            codes::TIER_PROJECTION_NOT_INTERNAL,
-            "Projection tier verbs must be internal: true",
-            Some("metadata.internal"),
-            Some("Add 'internal: true' - projection verbs are only called by materialize pipeline"),
-        );
+    if lint_config.tier.includes(LintTier::Basic) {
+        check_basic_rules(domain, verb_name, config, metadata, &mut diagnostics);
     }
 
     // =========================================================================
-    // Rule 2: Deprecated verbs should be tier: projection
+    // STANDARD TIER RULES (S001-S003) - Matrix-first enforcement
+    // These are checked in lint_all_verbs_with_config for cross-verb analysis
+    // Here we only check single-verb standard rules
     // =========================================================================
-    if is_deprecated && !matches!(metadata.tier, Some(VerbTier::Projection)) {
+    if lint_config.tier.includes(LintTier::Standard) {
+        check_standard_single_verb_rules(metadata, is_write_behavior, &mut diagnostics);
+    }
+
+    // =========================================================================
+    // Legacy rules (always run for backward compat)
+    // =========================================================================
+    check_legacy_rules(metadata, is_write_behavior, &mut diagnostics);
+
+    VerbLintResult {
+        full_name,
+        diagnostics,
+    }
+}
+
+/// MINIMAL tier rules (M001-M006): Required fields present
+fn check_minimal_rules(
+    domain: &str,
+    verb_name: &str,
+    config: &VerbConfig,
+    diagnostics: &mut VerbDiagnostics,
+) {
+    let full_name = format!("{}.{}", domain, verb_name);
+
+    // M001: metadata block present
+    let Some(metadata) = &config.metadata else {
         diagnostics.add_warning_with_path(
-            codes::TIER_DEPRECATED_NOT_PROJECTION,
-            "Deprecated verbs should be tier: projection",
+            codes::M001_MISSING_METADATA,
+            &format!("{} missing metadata block", full_name),
+            Some("metadata"),
+            Some("Add metadata: { tier: ..., source_of_truth: ..., scope: ..., noun: ... }"),
+        );
+        return; // Can't check other MINIMAL rules without metadata
+    };
+
+    // M002: tier field present
+    if metadata.tier.is_none() {
+        diagnostics.add_warning_with_path(
+            codes::M002_MISSING_TIER,
+            &format!("{} missing metadata.tier", full_name),
             Some("metadata.tier"),
-            Some("Set tier: projection for deprecated verbs that write to operational tables"),
+            Some("Add tier: reference|intent|projection|diagnostics|composite"),
         );
     }
 
-    // =========================================================================
-    // Rule 3: REMOVED - was trading-matrix-specific
-    // =========================================================================
-    // Previously: "Intent verbs cannot write to operational tables"
-    // This was wrong for non-trading-matrix domains (entity, kyc, fund, etc.)
-    // where intent verbs write directly to their canonical source.
-    // The writes_operational flag is now informational, not prescriptive.
+    // M003: source_of_truth field present
+    if metadata.source_of_truth.is_none() {
+        diagnostics.add_warning_with_path(
+            codes::M003_MISSING_SOURCE,
+            &format!("{} missing metadata.source_of_truth", full_name),
+            Some("metadata.source_of_truth"),
+            Some("Add source_of_truth: matrix|catalog|operational|session|entity|workflow|external|register|document"),
+        );
+    }
 
-    // =========================================================================
-    // Rule 4: Diagnostics verbs must be read-only
-    // =========================================================================
+    // M004: scope field present
+    if metadata.scope.is_none() {
+        diagnostics.add_warning_with_path(
+            codes::M004_MISSING_SCOPE,
+            &format!("{} missing metadata.scope", full_name),
+            Some("metadata.scope"),
+            Some("Add scope: global|cbu"),
+        );
+    }
+
+    // M005: noun field present
+    if metadata.noun.is_none() {
+        diagnostics.add_warning_with_path(
+            codes::M005_MISSING_NOUN,
+            &format!("{} missing metadata.noun", full_name),
+            Some("metadata.noun"),
+            Some("Add noun: <domain_object> (e.g., trading_matrix, ssi, entity, kyc_case)"),
+        );
+    }
+
+    // M006: deprecated verbs must have replaced_by
+    if matches!(
+        metadata.status,
+        dsl_core::config::types::VerbStatus::Deprecated
+    ) {
+        if metadata.replaced_by.is_none() {
+            diagnostics.add_warning_with_path(
+                codes::M006_DEPRECATED_NO_REPLACEMENT,
+                &format!("{} is deprecated but missing replaced_by", full_name),
+                Some("metadata.replaced_by"),
+                Some("Add replaced_by: 'domain.verb-name' pointing to the canonical replacement"),
+            );
+        }
+    }
+}
+
+/// BASIC tier rules (B001-B006): Naming conventions + semantics
+fn check_basic_rules(
+    domain: &str,
+    verb_name: &str,
+    config: &VerbConfig,
+    metadata: &dsl_core::config::types::VerbMetadata,
+    diagnostics: &mut VerbDiagnostics,
+) {
+    let full_name = format!("{}.{}", domain, verb_name);
+
+    // B001: create-* verbs should use insert operation
+    if verb_name.starts_with("create-") {
+        if let Some(crud) = &config.crud {
+            if !matches!(crud.operation, CrudOperation::Insert) {
+                diagnostics.add_error_with_path(
+                    codes::B001_CREATE_NOT_INSERT,
+                    &format!(
+                        "{} uses 'create-' prefix but operation is {:?}, expected insert",
+                        full_name, crud.operation
+                    ),
+                    Some("crud.operation"),
+                    Some("Use 'ensure-' prefix for upsert, or change operation to insert"),
+                );
+            }
+        }
+    }
+
+    // B002: ensure-* verbs should use upsert operation
+    if verb_name.starts_with("ensure-") {
+        if let Some(crud) = &config.crud {
+            if !matches!(crud.operation, CrudOperation::Upsert) {
+                diagnostics.add_error_with_path(
+                    codes::B002_ENSURE_NOT_UPSERT,
+                    &format!(
+                        "{} uses 'ensure-' prefix but operation is {:?}, expected upsert",
+                        full_name, crud.operation
+                    ),
+                    Some("crud.operation"),
+                    Some("Use 'create-' prefix for insert, or change operation to upsert"),
+                );
+            }
+        }
+    }
+
+    // B003: delete-* on regulated nouns requires dangerous: true
+    if verb_name.starts_with("delete-") || verb_name.starts_with("remove-") {
+        const REGULATED_NOUNS: &[&str] = &[
+            "entity",
+            "cbu",
+            "kyc_case",
+            "investor",
+            "holding",
+            "fund",
+            "share_class",
+        ];
+        if let Some(noun) = &metadata.noun {
+            if REGULATED_NOUNS.contains(&noun.as_str()) && !metadata.dangerous {
+                diagnostics.add_error_with_path(
+                    codes::B003_DELETE_NOT_DANGEROUS,
+                    &format!(
+                        "{} deletes regulated noun '{}' but missing dangerous: true",
+                        full_name, noun
+                    ),
+                    Some("metadata.dangerous"),
+                    Some("Add dangerous: true for delete operations on regulated nouns"),
+                );
+            }
+        }
+    }
+
+    // B005: list-* verbs should be tier: diagnostics
+    if verb_name.starts_with("list-") {
+        if !matches!(metadata.tier, Some(VerbTier::Diagnostics)) {
+            diagnostics.add_warning_with_path(
+                codes::B005_LIST_NOT_DIAGNOSTICS,
+                &format!(
+                    "{} uses 'list-' prefix but tier is not diagnostics",
+                    full_name
+                ),
+                Some("metadata.tier"),
+                Some("List verbs are read-only, use tier: diagnostics"),
+            );
+        }
+    }
+
+    // B006: get-* verbs should be tier: diagnostics
+    if verb_name.starts_with("get-") {
+        if !matches!(metadata.tier, Some(VerbTier::Diagnostics)) {
+            diagnostics.add_warning_with_path(
+                codes::B006_GET_NOT_DIAGNOSTICS,
+                &format!(
+                    "{} uses 'get-' prefix but tier is not diagnostics",
+                    full_name
+                ),
+                Some("metadata.tier"),
+                Some("Get verbs are read-only, use tier: diagnostics"),
+            );
+        }
+    }
+}
+
+/// STANDARD tier single-verb rules (cross-verb rules checked in lint_all_verbs)
+fn check_standard_single_verb_rules(
+    metadata: &dsl_core::config::types::VerbMetadata,
+    _is_write_behavior: bool,
+    diagnostics: &mut VerbDiagnostics,
+) {
+    // S002: writes_operational requires tier: projection or composite
+    if metadata.writes_operational
+        && !matches!(
+            metadata.tier,
+            Some(VerbTier::Projection) | Some(VerbTier::Composite)
+        )
+    {
+        diagnostics.add_error_with_path(
+            codes::S002_WRITES_OP_WRONG_TIER,
+            "writes_operational: true requires tier: projection or composite",
+            Some("metadata.tier"),
+            Some("Only projection and composite verbs may write to operational tables"),
+        );
+    }
+
+    // S003: projection + writes_operational requires internal: true
+    if matches!(metadata.tier, Some(VerbTier::Projection))
+        && metadata.writes_operational
+        && !metadata.internal
+    {
+        diagnostics.add_error_with_path(
+            codes::S003_PROJECTION_NOT_INTERNAL,
+            "Projection tier with writes_operational requires internal: true",
+            Some("metadata.internal"),
+            Some("Projection verbs are internal implementation details, not user-facing"),
+        );
+    }
+}
+
+/// Legacy rules for backward compatibility (always run regardless of tier)
+fn check_legacy_rules(
+    metadata: &dsl_core::config::types::VerbMetadata,
+    is_write_behavior: bool,
+    diagnostics: &mut VerbDiagnostics,
+) {
+    // Check if tagged as deprecated (legacy tag-based deprecation)
+    let is_deprecated_tag = metadata.tags.iter().any(|t| t == "deprecated");
+
+    // T006: Diagnostics verbs must be read-only
     if matches!(metadata.tier, Some(VerbTier::Diagnostics)) && is_write_behavior {
         diagnostics.add_error_with_path(
             codes::TIER_DIAGNOSTICS_HAS_WRITE,
@@ -180,11 +502,28 @@ pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> 
         );
     }
 
-    // =========================================================================
-    // Rule 5: writes_operational should match behavior
-    // =========================================================================
+    // T002: Projection verbs must be internal
+    if matches!(metadata.tier, Some(VerbTier::Projection)) && !metadata.internal {
+        diagnostics.add_error_with_path(
+            codes::TIER_PROJECTION_NOT_INTERNAL,
+            "Projection tier verbs must be internal: true",
+            Some("metadata.internal"),
+            Some("Add 'internal: true' - projection verbs are only called by materialize pipeline"),
+        );
+    }
+
+    // T003: Deprecated tag verbs should be tier: projection
+    if is_deprecated_tag && !matches!(metadata.tier, Some(VerbTier::Projection)) {
+        diagnostics.add_warning_with_path(
+            codes::TIER_DEPRECATED_NOT_PROJECTION,
+            "Deprecated verbs should be tier: projection",
+            Some("metadata.tier"),
+            Some("Set tier: projection for deprecated verbs that write to operational tables"),
+        );
+    }
+
+    // T004: writes_operational should match behavior
     if metadata.writes_operational && !is_write_behavior {
-        // This is a consistency warning - metadata says it writes but behavior is read-only
         diagnostics.add_warning_with_path(
             codes::TIER_WRITES_OP_MISMATCH,
             "writes_operational: true but behavior appears read-only",
@@ -193,9 +532,7 @@ pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> 
         );
     }
 
-    // =========================================================================
-    // Rule 6: Verbs that write but aren't projection/composite
-    // =========================================================================
+    // T001: Verbs that write but aren't projection/composite (only if writes_operational is set)
     if is_write_behavior
         && metadata.writes_operational
         && !matches!(
@@ -211,42 +548,32 @@ pub fn lint_verb_tiering(domain: &str, verb_name: &str, config: &VerbConfig) -> 
         );
     }
 
-    // =========================================================================
-    // Rule 7: Source of truth consistency
-    // =========================================================================
-    // NOTE: We no longer enforce strict source_of_truth matching because different
-    // domains have different canonical sources:
-    // - Trading profile → matrix
-    // - Entity/ownership → entity
-    // - KYC/cases → workflow
-    // - Research → external
-    // - Fund/investor → register
-    // - Session/view → session
-    //
-    // The only strict rule: projection verbs must have source_of_truth: operational
-    // (they derive from some other canonical source)
+    // T008: Projection verbs should have source_of_truth: operational
     if let Some(source) = &metadata.source_of_truth {
-        if let Some(VerbTier::Projection) = metadata.tier {
-            if !matches!(source, SourceOfTruth::Operational) {
-                diagnostics.add_warning_with_path(
-                    codes::TIER_INCONSISTENT_SOURCE,
-                    "Projection tier verbs should have source_of_truth: operational",
-                    Some("metadata.source_of_truth"),
-                    Some("Projection verbs write to operational tables (derived from a canonical source)"),
-                );
-            }
+        if matches!(metadata.tier, Some(VerbTier::Projection))
+            && !matches!(source, SourceOfTruth::Operational)
+        {
+            diagnostics.add_warning_with_path(
+                codes::TIER_INCONSISTENT_SOURCE,
+                "Projection tier verbs should have source_of_truth: operational",
+                Some("metadata.source_of_truth"),
+                Some("Projection verbs write to operational tables (derived from a canonical source)"),
+            );
         }
-    }
-
-    VerbLintResult {
-        full_name,
-        diagnostics,
     }
 }
 
-/// Lint all verbs from a domain configuration map
+/// Lint all verbs from a domain configuration map (uses default LintConfig)
 pub fn lint_all_verbs(
     domains: &std::collections::HashMap<String, dsl_core::config::types::DomainConfig>,
+) -> LintReport {
+    lint_all_verbs_with_config(domains, &LintConfig::default())
+}
+
+/// Lint all verbs with explicit configuration
+pub fn lint_all_verbs_with_config(
+    domains: &std::collections::HashMap<String, dsl_core::config::types::DomainConfig>,
+    config: &LintConfig,
 ) -> LintReport {
     let mut report = LintReport::default();
 
@@ -254,7 +581,7 @@ pub fn lint_all_verbs(
         for (verb_name, verb_config) in &domain_config.verbs {
             report.total_verbs += 1;
 
-            let result = lint_verb_tiering(domain_name, verb_name, verb_config);
+            let result = lint_verb_with_config(domain_name, verb_name, verb_config, config);
 
             if result.has_errors() {
                 report.verbs_with_errors += 1;
