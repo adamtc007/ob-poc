@@ -1,24 +1,24 @@
-;; =============================================================================
-;; SIMPLE US EQUITY SETUP
-;; =============================================================================
+;; Simple Equity Pattern - Single market, single currency
+(entity.create-limited-company :name "Simple Fund LLC" :jurisdiction "US" :as @head-office)
+(cbu.ensure :name "Simple Equity Fund" :jurisdiction "KY" :client-type "FUND" :commercial-client-entity-id @head-office :as @cbu)
 
-;; --- CBU ---
-(cbu.ensure :name "Apex Capital" :jurisdiction "US" :client-type "FUND" :as @cbu)
+;; Create trading profile
+(trading-profile.create-draft :cbu-id @cbu :base-currency "USD" :as @profile)
 
-;; --- Layer 1: Universe ---
-(cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])
+;; Add trading universe
+(trading-profile.add-instrument-class :profile-id @profile :class-code "EQUITY")
+(trading-profile.add-market :profile-id @profile :market-code "XNYS" :currencies ["USD"])
 
-;; --- Layer 2: SSI ---
-(cbu-custody.create-ssi :cbu-id @cbu :name "US Primary" :type "SECURITIES"
-  :safekeeping-account "SAFE-001" :safekeeping-bic "BABOROCP"
-  :cash-account "CASH-001" :cash-bic "BABOROCP" :cash-currency "USD"
+;; Add SSI
+(trading-profile.add-standing-instruction :profile-id @profile :ssi-name "US Primary" :ssi-type "SECURITIES"
+  :safekeeping-account "SAFE-US-001" :safekeeping-bic "BABOROCP"
+  :cash-account "CASH-USD-001" :cash-bic "BABOROCP" :cash-currency "USD"
   :pset-bic "DTCYUS33" :effective-date "2024-12-01" :as @ssi-us)
-(cbu-custody.activate-ssi :ssi-id @ssi-us)
 
-;; --- Layer 3: Booking Rules ---
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "US Equity DVP" :priority 10
-  :instrument-class "EQUITY" :market "XNYS" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "USD Fallback" :priority 50 :currency "USD" :effective-date "2024-12-01")
+;; Add booking rule
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "US Equity DVP"
+  :priority 10 :instrument-class "EQUITY" :market "XNYS" :currency "USD")
 
-;; --- Validation ---
-(cbu-custody.validate-booking-coverage :cbu-id @cbu)
+;; Validate and submit
+(trading-profile.validate-go-live-ready :profile-id @profile)
+(trading-profile.submit :profile-id @profile)

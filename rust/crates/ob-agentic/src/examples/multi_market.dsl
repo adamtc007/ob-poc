@@ -1,55 +1,44 @@
-;; =============================================================================
-;; MULTI-MARKET EQUITY WITH CROSS-CURRENCY
-;; =============================================================================
+;; Multi-Market Pattern - Multiple markets with cross-currency
+(entity.create-limited-company :name "Global Alpha LLC" :jurisdiction "US" :as @head-office)
+(cbu.ensure :name "Global Alpha Master Fund" :jurisdiction "KY" :client-type "FUND" :commercial-client-entity-id @head-office :as @cbu)
 
-;; --- CBU ---
-(cbu.ensure :name "Global Fund" :jurisdiction "LU" :client-type "FUND" :as @cbu)
+;; Create trading profile
+(trading-profile.create-draft :cbu-id @cbu :base-currency "USD" :as @profile)
 
-;; --- Layer 1: Universe ---
-(cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])
-(cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XLON" :currencies ["GBP" "USD"] :settlement-types ["DVP"])
-(cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XETR" :currencies ["EUR" "USD"] :settlement-types ["DVP"])
+;; Add trading universe - multiple markets
+(trading-profile.add-instrument-class :profile-id @profile :class-code "EQUITY")
+(trading-profile.add-market :profile-id @profile :market-code "XNYS" :currencies ["USD"])
+(trading-profile.add-market :profile-id @profile :market-code "XLON" :currencies ["GBP" "USD"])
+(trading-profile.add-market :profile-id @profile :market-code "XETR" :currencies ["EUR" "USD"])
 
-;; --- Layer 2: SSIs ---
-(cbu-custody.create-ssi :cbu-id @cbu :name "US Primary" :type "SECURITIES"
-  :safekeeping-account "SAFE-US" :safekeeping-bic "BABOROCP"
-  :cash-account "CASH-USD" :cash-bic "BABOROCP" :cash-currency "USD"
-  :pset-bic "DTCYUS33" :effective-date "2024-12-01" :as @ssi-us)
+;; Add SSIs for each market
+(trading-profile.add-standing-instruction :profile-id @profile :ssi-name "US Primary" :ssi-type "SECURITIES"
+  :safekeeping-account "SAFE-US-001" :safekeeping-bic "BABOROCP"
+  :cash-account "CASH-USD-001" :cash-bic "BABOROCP" :cash-currency "USD"
+  :pset-bic "DTCYUS33" :effective-date "2024-12-01")
 
-(cbu-custody.create-ssi :cbu-id @cbu :name "UK Primary" :type "SECURITIES"
-  :safekeeping-account "SAFE-UK" :safekeeping-bic "CABOROCP"
-  :cash-account "CASH-GBP" :cash-bic "CABOROCP" :cash-currency "GBP"
-  :pset-bic "CABOROCP" :effective-date "2024-12-01" :as @ssi-uk)
+(trading-profile.add-standing-instruction :profile-id @profile :ssi-name "UK Primary" :ssi-type "SECURITIES"
+  :safekeeping-account "SAFE-UK-001" :safekeeping-bic "MIDLGB22"
+  :cash-account "CASH-GBP-001" :cash-bic "MIDLGB22" :cash-currency "GBP"
+  :pset-bic "CABOROCP" :effective-date "2024-12-01")
 
-(cbu-custody.create-ssi :cbu-id @cbu :name "DE Primary" :type "SECURITIES"
-  :safekeeping-account "SAFE-DE" :safekeeping-bic "DAKVDEFF"
-  :cash-account "CASH-EUR" :cash-bic "DAKVDEFF" :cash-currency "EUR"
-  :pset-bic "DAKVDEFF" :effective-date "2024-12-01" :as @ssi-de)
+(trading-profile.add-standing-instruction :profile-id @profile :ssi-name "DE Primary" :ssi-type "SECURITIES"
+  :safekeeping-account "SAFE-DE-001" :safekeeping-bic "COBADEFF"
+  :cash-account "CASH-EUR-001" :cash-bic "COBADEFF" :cash-currency "EUR"
+  :pset-bic "DAKVDEFF" :effective-date "2024-12-01")
 
-(cbu-custody.activate-ssi :ssi-id @ssi-us)
-(cbu-custody.activate-ssi :ssi-id @ssi-uk)
-(cbu-custody.activate-ssi :ssi-id @ssi-de)
+;; Add booking rules - market specific
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "US Equity USD" :priority 10 :instrument-class "EQUITY" :market "XNYS" :currency "USD")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "UK Primary" :rule-name "UK Equity GBP" :priority 15 :instrument-class "EQUITY" :market "XLON" :currency "GBP")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "UK Equity USD" :priority 16 :instrument-class "EQUITY" :market "XLON" :currency "USD")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "DE Primary" :rule-name "DE Equity EUR" :priority 20 :instrument-class "EQUITY" :market "XETR" :currency "EUR")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "DE Equity USD" :priority 21 :instrument-class "EQUITY" :market "XETR" :currency "USD")
 
-;; --- Layer 3: Booking Rules ---
-;; Specific rules (high priority)
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "US Equity USD" :priority 10
-  :instrument-class "EQUITY" :market "XNYS" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-uk :name "UK Equity GBP" :priority 15
-  :instrument-class "EQUITY" :market "XLON" :currency "GBP" :settlement-type "DVP" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "UK Equity USD" :priority 16
-  :instrument-class "EQUITY" :market "XLON" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-de :name "DE Equity EUR" :priority 20
-  :instrument-class "EQUITY" :market "XETR" :currency "EUR" :settlement-type "DVP" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "DE Equity USD" :priority 21
-  :instrument-class "EQUITY" :market "XETR" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
+;; Currency fallbacks
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "USD Fallback" :priority 50 :currency "USD")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "UK Primary" :rule-name "GBP Fallback" :priority 51 :currency "GBP")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "DE Primary" :rule-name "EUR Fallback" :priority 52 :currency "EUR")
 
-;; Currency fallbacks (medium priority)
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "USD Fallback" :priority 50 :currency "USD" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-uk :name "GBP Fallback" :priority 51 :currency "GBP" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-de :name "EUR Fallback" :priority 52 :currency "EUR" :effective-date "2024-12-01")
-
-;; Ultimate fallback (low priority)
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "Ultimate Fallback" :priority 100 :effective-date "2024-12-01")
-
-;; --- Validation ---
-(cbu-custody.validate-booking-coverage :cbu-id @cbu)
+;; Validate and submit
+(trading-profile.validate-go-live-ready :profile-id @profile)
+(trading-profile.submit :profile-id @profile)

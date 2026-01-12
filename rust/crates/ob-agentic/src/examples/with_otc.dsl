@@ -1,47 +1,42 @@
-;; =============================================================================
-;; EQUITY + OTC IRS WITH ISDA/CSA
-;; =============================================================================
+;; OTC Pattern - Includes ISDA/CSA for derivatives
+(entity.create-limited-company :name "Derivatives Alpha LLC" :jurisdiction "US" :as @head-office)
+(entity.create-limited-company :name "Morgan Stanley International" :jurisdiction "GB" :as @ms)
+(cbu.ensure :name "Derivatives Alpha Master Fund" :jurisdiction "KY" :client-type "FUND" :commercial-client-entity-id @head-office :as @cbu)
 
-;; --- Entities (lookup existing counterparties) ---
-(entity.read :name "Morgan Stanley" :as @ms)
+;; Create trading profile
+(trading-profile.create-draft :cbu-id @cbu :base-currency "USD" :as @profile)
 
-;; --- CBU ---
-(cbu.ensure :name "Pacific Fund" :jurisdiction "US" :client-type "FUND" :as @cbu)
+;; Add trading universe - equities + OTC
+(trading-profile.add-instrument-class :profile-id @profile :class-code "EQUITY")
+(trading-profile.add-instrument-class :profile-id @profile :class-code "OTC_IRS")
+(trading-profile.add-market :profile-id @profile :market-code "XNYS" :currencies ["USD"])
 
-;; --- Layer 1: Universe ---
-;; Cash instruments
-(cbu-custody.add-universe :cbu-id @cbu :instrument-class "EQUITY" :market "XNYS" :currencies ["USD"] :settlement-types ["DVP"])
-;; OTC (counterparty-specific)
-(cbu-custody.add-universe :cbu-id @cbu :instrument-class "OTC_IRS" :currencies ["USD"] :counterparty @ms :settlement-types ["DVP"])
+;; Add SSIs
+(trading-profile.add-standing-instruction :profile-id @profile :ssi-name "US Primary" :ssi-type "SECURITIES"
+  :safekeeping-account "SAFE-US-001" :safekeeping-bic "BABOROCP"
+  :cash-account "CASH-USD-001" :cash-bic "BABOROCP" :cash-currency "USD"
+  :pset-bic "DTCYUS33" :effective-date "2024-12-01")
 
-;; --- Layer 2: SSIs ---
-(cbu-custody.create-ssi :cbu-id @cbu :name "US Primary" :type "SECURITIES"
-  :safekeeping-account "SAFE-001" :safekeeping-bic "BABOROCP"
-  :cash-account "CASH-USD" :cash-bic "BABOROCP" :cash-currency "USD"
-  :pset-bic "DTCYUS33" :effective-date "2024-12-01" :as @ssi-us)
+(trading-profile.add-standing-instruction :profile-id @profile :ssi-name "Collateral" :ssi-type "COLLATERAL"
+  :cash-account "COLL-USD-001" :cash-bic "BABOROCP" :cash-currency "USD"
+  :effective-date "2024-12-01")
 
-(cbu-custody.create-ssi :cbu-id @cbu :name "Collateral" :type "COLLATERAL"
-  :safekeeping-account "COLL-001" :safekeeping-bic "BABOROCP"
-  :cash-account "COLL-CASH-001" :cash-bic "BABOROCP" :cash-currency "USD"
-  :pset-bic "DTCYUS33" :effective-date "2024-12-01" :as @ssi-collateral)
+;; Add booking rules
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "US Equity DVP" :priority 10 :instrument-class "EQUITY" :market "XNYS" :currency "USD")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "OTC IRS" :priority 20 :instrument-class "OTC_IRS" :currency "USD")
+(trading-profile.add-booking-rule :profile-id @profile :ssi-ref "US Primary" :rule-name "USD Fallback" :priority 50 :currency "USD")
 
-(cbu-custody.activate-ssi :ssi-id @ssi-us)
-(cbu-custody.activate-ssi :ssi-id @ssi-collateral)
+;; Add ISDA config for Morgan Stanley
+(trading-profile.add-isda-config :profile-id @profile :counterparty-name "Morgan Stanley International" :agreement-date "2024-01-15")
+(trading-profile.add-isda-coverage :profile-id @profile :counterparty-ref "Morgan Stanley International" :asset-class "RATES" :base-products ["IRS" "XCCY"])
 
-;; --- Layer 3: Booking Rules ---
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "US Equity DVP" :priority 10
-  :instrument-class "EQUITY" :market "XNYS" :currency "USD" :settlement-type "DVP" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "OTC IRS MS" :priority 20
-  :instrument-class "OTC_IRS" :currency "USD" :counterparty @ms :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "USD Fallback" :priority 50 :currency "USD" :effective-date "2024-12-01")
-(cbu-custody.add-booking-rule :cbu-id @cbu :ssi-id @ssi-us :name "Ultimate Fallback" :priority 100 :effective-date "2024-12-01")
+;; Add CSA for collateral
+(trading-profile.add-csa-config :profile-id @profile :counterparty-ref "Morgan Stanley International"
+  :threshold-amount 10000000 :threshold-currency "USD" :minimum-transfer 500000)
+(trading-profile.add-csa-collateral :profile-id @profile :counterparty-ref "Morgan Stanley International"
+  :collateral-type "CASH" :currencies ["USD" "EUR" "GBP"])
+(trading-profile.link-csa-ssi :profile-id @profile :counterparty-ref "Morgan Stanley International" :ssi-ref "Collateral")
 
-;; --- ISDA ---
-(isda.create :cbu-id @cbu :counterparty @ms :agreement-date "2024-12-01"
-  :governing-law "NY" :effective-date "2024-12-01" :as @isda-ms)
-(isda.add-coverage :isda-id @isda-ms :instrument-class "OTC_IRS")
-(isda.add-csa :isda-id @isda-ms :csa-type "VM" :threshold 250000
-  :threshold-currency "USD" :collateral-ssi @ssi-collateral :effective-date "2024-12-01" :as @csa-ms)
-
-;; --- Validation ---
-(cbu-custody.validate-booking-coverage :cbu-id @cbu)
+;; Validate and submit
+(trading-profile.validate-go-live-ready :profile-id @profile)
+(trading-profile.submit :profile-id @profile)

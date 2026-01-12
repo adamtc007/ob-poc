@@ -25,9 +25,9 @@ impl OnboardingPattern {
     /// Domains required for this pattern
     pub fn required_domains(&self) -> Vec<&'static str> {
         match self {
-            Self::SimpleEquity => vec!["cbu", "cbu-custody"],
-            Self::MultiMarket => vec!["cbu", "cbu-custody"],
-            Self::WithOtc => vec!["cbu", "cbu-custody", "isda", "entity"],
+            Self::SimpleEquity => vec!["cbu", "trading-profile"],
+            Self::MultiMarket => vec!["cbu", "trading-profile"],
+            Self::WithOtc => vec!["cbu", "trading-profile", "entity"],
         }
     }
 
@@ -82,15 +82,15 @@ mod tests {
     fn test_required_domains() {
         assert_eq!(
             OnboardingPattern::SimpleEquity.required_domains(),
-            vec!["cbu", "cbu-custody"]
+            vec!["cbu", "trading-profile"]
         );
         assert_eq!(
             OnboardingPattern::MultiMarket.required_domains(),
-            vec!["cbu", "cbu-custody"]
+            vec!["cbu", "trading-profile"]
         );
         assert!(OnboardingPattern::WithOtc
             .required_domains()
-            .contains(&"isda"));
+            .contains(&"trading-profile"));
     }
 
     #[test]

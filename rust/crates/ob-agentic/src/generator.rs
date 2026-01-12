@@ -77,7 +77,7 @@ Return ONLY the corrected DSL code, no explanations."#,
     }
 
     fn build_system_prompt(&self, pattern: OnboardingPattern) -> String {
-        let verb_schemas = include_str!("schemas/custody_verbs.md");
+        let verb_schemas = include_str!("schemas/trading_profile_verbs.md");
         let reference_data = include_str!("schemas/reference_data.md");
         let example = pattern.example_dsl();
 
