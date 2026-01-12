@@ -255,7 +255,7 @@ impl LexiconPipeline {
                     let cbu_id = self.get_cbu_id();
                     for inst in instruments {
                         dsl.push_str(&format!(
-                            "\n(cbu-custody.add-universe :cbu-id {} :instrument-class \"{}\")",
+                            "\n(trading-profile.add-instrument-class :profile-id {} :class-code \"{}\")",
                             cbu_id,
                             inst.as_str()
                         ));
@@ -363,14 +363,13 @@ impl LexiconPipeline {
                         currencies.iter().map(|c| c.as_str().to_string()).collect()
                     };
 
-                    for inst in &insts {
+                    for _inst in &insts {
                         if !dsl.is_empty() {
                             dsl.push('\n');
                         }
                         dsl.push_str(&format!(
-                            "(cbu-custody.add-universe :cbu-id {} :instrument-class \"{}\" :market \"{}\" :currencies [{}])",
+                            "(trading-profile.add-market :profile-id {} :market-code \"{}\" :currencies [{}])",
                             cbu_id,
-                            inst,
                             market.as_str(),
                             currs.iter().map(|c| format!("\"{}\"", c)).collect::<Vec<_>>().join(" ")
                         ));

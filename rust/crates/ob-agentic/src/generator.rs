@@ -117,7 +117,7 @@ S-expression format:
 2. Use `:as @variable` to capture results for later reference
 3. Order statements so dependencies are defined before use
 4. Include section comments for readability
-5. Add validation at the end: `(cbu-custody.validate-booking-coverage :cbu-id @cbu)`
+5. Add validation at the end: `(trading-profile.validate-go-live-ready :profile-id @profile)`
 6. Use placeholder values for account numbers (e.g., "SAFE-001", "CASH-001")
 7. Use today's date for effective-date: "2024-12-01"
 8. Output ONLY the DSL code, no explanations
