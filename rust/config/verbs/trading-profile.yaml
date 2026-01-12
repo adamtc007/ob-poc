@@ -733,10 +733,10 @@ domains:
           type: record
           description: Created ISDA config with isda_id
 
-      add-isda-product-coverage:
+      add-isda-coverage:
         description: Add product coverage to ISDA config
         behavior: plugin
-        handler: add_isda_coverage_to_profile
+        handler: TradingProfileAddIsdaCoverageOp
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -808,10 +808,10 @@ domains:
           type: record
           description: Created CSA config with csa_id
 
-      add-csa-eligible-collateral:
+      add-csa-collateral:
         description: Add eligible collateral to CSA
         behavior: plugin
-        handler: add_csa_collateral_to_profile
+        handler: TradingProfileAddCsaCollateralOp
         metadata:
           tier: intent
           source_of_truth: matrix

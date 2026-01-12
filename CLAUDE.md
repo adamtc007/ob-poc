@@ -244,7 +244,8 @@ cargo x deploy              # Full: WASM + server + start
 cargo x deploy --skip-wasm  # Skip WASM rebuild
 
 # Utilities
-cargo x verify-verbs        # Check all verb YAML files parse correctly
+cargo x verbs check         # Check verb YAML files are up-to-date with DB
+cargo x verbs lint          # Lint verbs for tiering rule compliance
 cargo x schema-export       # Export DB schema
 cargo x dsl-tests           # Run DSL test scenarios
 ```
@@ -367,8 +368,10 @@ my-domain:
 ### Verify Verbs Load
 
 ```bash
-cargo x verify-verbs   # Shows parse errors for all YAML files
-cargo x verbs lint     # Check tiering rule violations
+cargo x verbs check       # Check if YAML configs match DB (CI check)
+cargo x verbs lint        # Check tiering rule violations
+cargo x verbs compile     # Compile YAML → sync to database
+cargo x verbs diagnostics # Show verbs with errors/warnings
 ```
 
 ### Verb Tiering System
