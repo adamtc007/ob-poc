@@ -32,8 +32,10 @@
 //! graph_widget.ui(ui);
 //! ```
 
+pub mod aggregation;
 pub mod animation;
 pub mod astronomy;
+pub mod board_control;
 pub mod camera;
 pub mod colors;
 pub mod edges;
@@ -50,15 +52,25 @@ pub mod spatial;
 pub mod trading_matrix;
 pub mod types;
 pub mod viewport;
+pub mod viewport_fit;
 
 pub use animation::{EsperTransition, EsperTransitionState, SpringConfig, SpringF32, SpringVec2};
 pub use astronomy::{AstronomyView, NavigationEntry, TransitionAction, ViewTransition};
+pub use board_control::{
+    compute_ownership_tree_layout, render_board_control_hud, render_evidence_panel,
+    render_psc_badges, render_source_indicator, BoardControlAction, BoardControlState,
+    ControlSphereData, ControlSphereEdge, ControlSphereNode, EvidenceItem,
+};
 pub use camera::Camera2D;
 pub use force_sim::{ClusterNode, ForceConfig, ForceSimulation};
 #[allow(deprecated)]
 pub use galaxy::{ClusterData, ClusterType, GalaxyAction, GalaxyView, RiskSummary};
+pub use lod::{DetailLevel, LodConfig};
 
 // Re-export NavigationAction from shared types for galaxy navigation
+pub use aggregation::{
+    aggregate_to_galaxies, aggregate_to_regions, create_aggregated_graph, GalaxyNode, RegionNode,
+};
 pub use input::{EnhanceAction, InputHandler, InputState};
 pub use layout::LayoutEngine;
 pub use ob_poc_types::galaxy::NavigationAction;
@@ -78,6 +90,7 @@ pub use viewport::{
     render_focus_ring, render_node_with_confidence, render_viewport_hud, EsperRenderState, GapType,
     IlluminateAspect, RedFlagCategory, ViewportAction, ViewportRenderState,
 };
+pub use viewport_fit::{ViewLevel, ViewportFit, MAX_VISIBLE_NODES};
 
 // SDF primitives and operations for hit testing and confidence visualization
 pub use sdf::{cluster_blob, hit_test_circle, hit_test_rect, ConfidenceHalo, HitResult};
@@ -103,6 +116,8 @@ pub enum ViewMode {
     ProductsOnly,
     /// Trading view - CBU as container with trading entities (Asset Owner, IM, ManCo, etc.)
     Trading,
+    /// Board Control view - ownership tree from anchor entity, flows upward to UBOs
+    BoardControl,
 }
 
 impl ViewMode {
@@ -113,6 +128,7 @@ impl ViewMode {
             ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
             ViewMode::ProductsOnly => "PRODUCTS_ONLY",
             ViewMode::Trading => "TRADING",
+            ViewMode::BoardControl => "BOARD_CONTROL",
         }
     }
 
@@ -123,10 +139,12 @@ impl ViewMode {
             ViewMode::ServiceDelivery => "Services",
             ViewMode::ProductsOnly => "Products",
             ViewMode::Trading => "Trading",
+            ViewMode::BoardControl => "Board Control",
         }
     }
 
     /// Get all available view modes (in display order)
+    /// Note: BoardControl is not in this list as it's navigated to via portal click
     pub fn all() -> &'static [ViewMode] {
         &[
             ViewMode::KycUbo,
@@ -143,6 +161,7 @@ impl ViewMode {
             "SERVICE_DELIVERY" | "SERVICEDELIVERY" | "SERVICES" => Some(ViewMode::ServiceDelivery),
             "PRODUCTS_ONLY" | "PRODUCTSONLY" | "PRODUCTS" => Some(ViewMode::ProductsOnly),
             "TRADING" | "CUSTODY" => Some(ViewMode::Trading),
+            "BOARD_CONTROL" | "BOARDCONTROL" | "CONTROL" => Some(ViewMode::BoardControl),
             _ => None,
         }
     }
@@ -161,6 +180,19 @@ pub struct GraphWidgetAction {
     pub open_container: Option<ContainerInfo>,
     /// Entity was selected (update detail panel)
     pub select_entity: Option<String>,
+    /// Navigate back from current view (BoardControl → CBU, Matrix → CBU)
+    pub navigate_back: Option<NavigateBackAction>,
+}
+
+/// Navigation back action with context
+#[derive(Debug, Clone)]
+pub struct NavigateBackAction {
+    /// CBU to return to
+    pub target_cbu_id: uuid::Uuid,
+    /// CBU name for display
+    pub target_cbu_name: Option<String>,
+    /// Source view we're navigating from
+    pub from_view: ViewMode,
 }
 
 /// Information about a container node for the browse panel
@@ -198,10 +230,17 @@ pub struct CbuGraphWidget {
     view_mode: ViewMode,
     /// Whether to auto-fit on first render
     needs_initial_fit: bool,
+    /// Auto-fit state (tracks optimal zoom, auto/manual mode)
+    viewport_fit: ViewportFit,
+    /// Last known viewport size (for resize detection)
+    last_viewport_size: Option<egui::Vec2>,
     /// Type filter - if set, only show nodes matching this type (and their connected edges)
     type_filter: Option<String>,
     /// Highlighted type - nodes of this type are highlighted but others still visible
     highlighted_type: Option<String>,
+    /// Focused matrix node path - when set, highlights trading-related graph nodes
+    /// The path is a list of segments like ["Equities", "Listed", "NYSE"]
+    matrix_focus_path: Option<Vec<String>>,
     /// Viewport render state for HUD animations
     viewport_render_state: ViewportRenderState,
     /// Current viewport state from DSL (for HUD rendering)
@@ -212,6 +251,8 @@ pub struct CbuGraphWidget {
     esper_transition: Option<EsperTransition>,
     /// Current enhance level (0-4)
     current_enhance_level: u8,
+    /// Evidence panel expanded state (for BoardControl view)
+    evidence_panel_expanded: bool,
 }
 
 impl Default for CbuGraphWidget {
@@ -230,13 +271,17 @@ impl CbuGraphWidget {
             renderer: GraphRenderer::new(),
             view_mode: ViewMode::KycUbo,
             needs_initial_fit: true,
+            viewport_fit: ViewportFit::new(),
+            last_viewport_size: None,
             type_filter: None,
             highlighted_type: None,
+            matrix_focus_path: None,
             viewport_render_state: ViewportRenderState::new(),
             viewport_state: None,
             esper_render_state: EsperRenderState::new(),
             esper_transition: None,
             current_enhance_level: 0,
+            evidence_panel_expanded: false,
         }
     }
 
@@ -413,6 +458,31 @@ impl CbuGraphWidget {
         self.highlighted_type = None;
     }
 
+    /// Set matrix focus path - highlights trading entities when set
+    pub fn set_matrix_focus_path(&mut self, path: Option<Vec<String>>) {
+        self.matrix_focus_path = path;
+    }
+
+    /// Get current matrix focus path
+    pub fn matrix_focus_path(&self) -> Option<&[String]> {
+        self.matrix_focus_path.as_deref()
+    }
+
+    /// Clear matrix focus highlighting
+    pub fn clear_matrix_focus(&mut self) {
+        self.matrix_focus_path = None;
+    }
+
+    /// Toggle evidence panel visibility (BoardControl mode)
+    pub fn toggle_evidence_panel(&mut self) {
+        self.evidence_panel_expanded = !self.evidence_panel_expanded;
+    }
+
+    /// Check if evidence panel is expanded
+    pub fn is_evidence_panel_expanded(&self) -> bool {
+        self.evidence_panel_expanded
+    }
+
     /// Get reference to layout graph (for ontology population)
     pub fn get_layout_graph(&self) -> Option<&LayoutGraph> {
         self.layout_graph.as_ref()
@@ -472,6 +542,27 @@ impl CbuGraphWidget {
     /// Reset camera to default position
     pub fn reset_camera(&mut self) {
         self.camera.reset();
+    }
+
+    /// Reset view to auto-fit mode (re-enables auto-fit after manual zoom)
+    pub fn reset_to_auto_fit(&mut self) {
+        self.viewport_fit.enable_auto();
+        self.needs_initial_fit = true;
+    }
+
+    /// Check if auto-fit is currently enabled
+    pub fn is_auto_fit_enabled(&self) -> bool {
+        self.viewport_fit.auto_enabled
+    }
+
+    /// Get current view level (Galaxy/Region/Cluster/Solar)
+    pub fn current_view_level(&self) -> ViewLevel {
+        self.viewport_fit.current_view_level()
+    }
+
+    /// Check if aggregation is needed at current view level
+    pub fn needs_aggregation(&self) -> bool {
+        self.viewport_fit.needs_aggregation()
     }
 
     // =========================================================================
@@ -618,6 +709,129 @@ impl CbuGraphWidget {
     pub fn go_back(&mut self) {
         // For now, just center the view
         self.center_view();
+    }
+
+    /// Navigate back from special views (BoardControl, InstrumentMatrix) to CBU view
+    /// Returns NavigateBackAction if we're in a special view with a source CBU
+    pub fn navigate_back_from_view(&mut self) -> Option<NavigateBackAction> {
+        // Check if we're in a special view mode with a source CBU
+        if let Some(ref state) = self.viewport_state {
+            match &state.focus.state {
+                ViewportFocusState::BoardControl { source_cbu, .. } => {
+                    let action = NavigateBackAction {
+                        target_cbu_id: source_cbu.0,
+                        target_cbu_name: None, // Will be resolved by caller
+                        from_view: ViewMode::BoardControl,
+                    };
+                    // Reset to KycUbo view mode
+                    self.view_mode = ViewMode::KycUbo;
+                    return Some(action);
+                }
+                ViewportFocusState::InstrumentMatrix { cbu, .. }
+                | ViewportFocusState::InstrumentType { cbu, .. }
+                | ViewportFocusState::ConfigNode { cbu, .. } => {
+                    let action = NavigateBackAction {
+                        target_cbu_id: cbu.0,
+                        target_cbu_name: None,
+                        from_view: ViewMode::Trading,
+                    };
+                    // Reset to KycUbo view mode and clear matrix focus
+                    self.view_mode = ViewMode::KycUbo;
+                    self.matrix_focus_path = None;
+                    return Some(action);
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
+    /// Check if we're in a special view that can navigate back
+    pub fn can_navigate_back(&self) -> bool {
+        if let Some(ref state) = self.viewport_state {
+            matches!(
+                &state.focus.state,
+                ViewportFocusState::BoardControl { .. }
+                    | ViewportFocusState::InstrumentMatrix { .. }
+                    | ViewportFocusState::InstrumentType { .. }
+                    | ViewportFocusState::ConfigNode { .. }
+            )
+        } else {
+            false
+        }
+    }
+
+    /// Get the current view mode
+    pub fn current_view_mode(&self) -> ViewMode {
+        self.view_mode
+    }
+
+    /// Set focus to an instrument matrix node
+    /// Used when user clicks on a trading matrix node
+    pub fn set_instrument_matrix_focus(&mut self, cbu_id: uuid::Uuid, node_path: Vec<String>) {
+        use ob_poc_types::viewport::{
+            CbuRef, FocusManager, InstrumentMatrixRef, ViewportFocusState, ViewportState,
+        };
+
+        let cbu_ref = CbuRef::new(cbu_id);
+        // Use cbu_id as matrix ref since they're 1:1
+        let matrix_ref = InstrumentMatrixRef(cbu_id);
+
+        let focus_state = if node_path.is_empty() {
+            // Root matrix focus
+            ViewportFocusState::InstrumentMatrix {
+                cbu: cbu_ref,
+                matrix: matrix_ref,
+                matrix_enhance: 0,
+                container_enhance: 1,
+            }
+        } else {
+            // Specific node in matrix - still use InstrumentMatrix for now
+            // Could be enhanced to use InstrumentType if we parse the path
+            ViewportFocusState::InstrumentMatrix {
+                cbu: cbu_ref,
+                matrix: matrix_ref,
+                matrix_enhance: 1, // Show more detail when specific node selected
+                container_enhance: 1,
+            }
+        };
+
+        // Create or update viewport state
+        let state = ViewportState {
+            focus: FocusManager {
+                state: focus_state,
+                focus_stack: Vec::new(),
+                focus_mode: Default::default(),
+                view_memory: Default::default(),
+            },
+            view_type: ob_poc_types::viewport::CbuViewType::Instruments,
+            camera: self
+                .viewport_state
+                .as_ref()
+                .map(|s| s.camera.clone())
+                .unwrap_or_default(),
+            confidence_threshold: 0.0,
+            filters: Default::default(),
+        };
+
+        self.viewport_state = Some(state);
+        self.view_mode = ViewMode::Trading;
+
+        // Store the matrix focus path for graph highlighting
+        self.matrix_focus_path = if node_path.is_empty() {
+            None
+        } else {
+            Some(node_path.clone())
+        };
+
+        #[cfg(target_arch = "wasm32")]
+        web_sys::console::log_1(
+            &format!(
+                "set_instrument_matrix_focus: cbu={}, path={:?}",
+                cbu_id, node_path
+            )
+            .into(),
+        );
     }
 
     /// Zoom to fit all content (triggers fit on next frame)
@@ -849,14 +1063,29 @@ impl CbuGraphWidget {
             .into(),
         );
 
-        // Initial fit on first render
+        // Auto-fit: initial fit, resize detection, content change
+        let current_size = screen_rect.size();
+        let size_changed = self.last_viewport_size.map_or(true, |prev| {
+            (prev.x - current_size.x).abs() > 10.0 || (prev.y - current_size.y).abs() > 10.0
+        });
+
         if self.needs_initial_fit {
+            // First render - compute and apply auto-fit
+            self.viewport_fit.on_content_change(graph, current_size);
             self.camera.fit_to_bounds(graph.bounds, screen_rect, 50.0);
             self.camera.snap_to_target();
             self.needs_initial_fit = false;
+            self.last_viewport_size = Some(current_size);
+        } else if size_changed && self.viewport_fit.auto_enabled {
+            // Viewport resized and auto-fit is on - recalculate
+            self.viewport_fit.on_resize(current_size);
+            self.camera
+                .fly_to_bounds(self.viewport_fit.content_bounds, screen_rect, 50.0);
+            self.last_viewport_size = Some(current_size);
         }
 
-        // Handle input
+        // Handle input - track zoom before to detect user zoom
+        let zoom_before = self.camera.target_zoom();
         let needs_repaint = InputHandler::handle_input(
             &response,
             &mut self.camera,
@@ -864,6 +1093,14 @@ impl CbuGraphWidget {
             graph,
             screen_rect,
         );
+
+        // Disable auto-fit if user manually zoomed or panned
+        if needs_repaint && (self.camera.target_zoom() - zoom_before).abs() > 0.001 {
+            self.viewport_fit.disable_auto();
+        }
+
+        // Update view level based on current zoom (for future aggregation)
+        let _view_level_changed = self.viewport_fit.update_view_level(self.camera.zoom());
 
         // Capture pending enhance action (will handle after graph borrow released)
         let pending_enhance = self.input_state.take_pending_enhance_action();
@@ -883,6 +1120,7 @@ impl CbuGraphWidget {
                 type_filter: self.type_filter.as_deref(),
                 highlighted_type: self.highlighted_type.as_deref(),
                 esper_state: Some(&self.esper_render_state),
+                matrix_focus_path: self.matrix_focus_path.as_deref(),
             },
         );
 
@@ -923,6 +1161,33 @@ impl CbuGraphWidget {
                     focus_card::FocusCardAction::None => {}
                 }
             }
+        }
+
+        // Render evidence panel when in BoardControl mode
+        if self.view_mode == ViewMode::BoardControl {
+            // Sample evidence items for demo - in production these would come from server
+            let evidence = vec![
+                board_control::EvidenceItem {
+                    source: "GLEIF".to_string(),
+                    document_type: "LEI Registration".to_string(),
+                    date: Some("2024-01-15".to_string()),
+                    description: "Legal Entity Identifier registration record".to_string(),
+                    url: Some("https://gleif.org".to_string()),
+                },
+                board_control::EvidenceItem {
+                    source: "UK_PSC".to_string(),
+                    document_type: "PSC Statement".to_string(),
+                    date: Some("2023-11-22".to_string()),
+                    description: "Persons with Significant Control register".to_string(),
+                    url: None,
+                },
+            ];
+            board_control::render_evidence_panel(
+                &painter,
+                screen_rect,
+                &evidence,
+                self.evidence_panel_expanded,
+            );
         }
 
         // Handle pending enhance action (after graph borrows released)
@@ -1191,6 +1456,11 @@ impl CbuGraphWidget {
             }
             ViewportFocusState::ConfigNode { node_enhance, .. } => {
                 self.set_enhance_level(*node_enhance);
+            }
+            ViewportFocusState::BoardControl { enhance_level, .. } => {
+                // Board control view - switch view mode and set enhance level
+                self.view_mode = ViewMode::BoardControl;
+                self.set_enhance_level(*enhance_level);
             }
         }
 

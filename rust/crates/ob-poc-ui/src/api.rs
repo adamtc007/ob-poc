@@ -14,7 +14,7 @@ use ob_poc_types::{
     SessionStateResponse, SetBindingRequest, SetBindingResponse, StartResolutionRequest,
     ValidateDslRequest, ValidateDslResponse,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
@@ -302,6 +302,33 @@ pub async fn execute_session(session_id: Uuid) -> Result<ExecuteResponse, String
         &ExecuteRequest { dsl: None },
     )
     .await
+}
+
+// =============================================================================
+// Entity Search API
+// =============================================================================
+
+/// Search for entities by type
+pub async fn search_entities(
+    query: &str,
+    entity_type: &str,
+    limit: u32,
+) -> Result<Vec<ob_poc_types::EntityMatch>, String> {
+    #[derive(Deserialize)]
+    struct SearchResponse {
+        matches: Vec<ob_poc_types::EntityMatch>,
+    }
+
+    let encoded_query = js_sys::encode_uri_component(query);
+    let encoded_type = js_sys::encode_uri_component(entity_type);
+
+    let response: SearchResponse = get(&format!(
+        "/api/entity/search?q={}&type={}&limit={}",
+        encoded_query, encoded_type, limit
+    ))
+    .await?;
+
+    Ok(response.matches)
 }
 
 // =============================================================================

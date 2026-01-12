@@ -619,6 +619,23 @@ pub fn render_viewport_hud(
         action = breadcrumb_action;
     }
 
+    // Render specialized HUD based on focus state
+    match &viewport.focus.state {
+        ViewportFocusState::BoardControl {
+            anchor_entity_name,
+            source_cbu,
+            ..
+        } => {
+            render_board_control_title_hud(ui, anchor_entity_name, Some(source_cbu), screen_rect);
+        }
+        ViewportFocusState::InstrumentMatrix { .. }
+        | ViewportFocusState::InstrumentType { .. }
+        | ViewportFocusState::ConfigNode { .. } => {
+            render_matrix_title_hud(ui, &viewport.focus.state, screen_rect);
+        }
+        _ => {}
+    }
+
     // Enhance level indicator (top-right)
     let enhance_rect = Rect::from_min_size(
         Pos2::new(screen_rect.right() - 120.0, screen_rect.min.y + 8.0),
@@ -652,6 +669,129 @@ pub fn render_viewport_hud(
     }
 
     action
+}
+
+/// Render Board Control title HUD (centered title bar below breadcrumbs)
+fn render_board_control_title_hud(
+    ui: &mut Ui,
+    anchor_entity_name: &str,
+    source_cbu: Option<&ob_poc_types::viewport::CbuRef>,
+    screen_rect: Rect,
+) {
+    let painter = ui.painter();
+
+    // Title bar below breadcrumbs
+    let title_rect = Rect::from_min_size(
+        Pos2::new(screen_rect.min.x, screen_rect.min.y + 44.0),
+        Vec2::new(screen_rect.width(), 36.0),
+    );
+
+    // Background
+    painter.rect_filled(
+        title_rect,
+        0.0,
+        Color32::from_rgba_unmultiplied(20, 25, 35, 200),
+    );
+    painter.line_segment(
+        [title_rect.left_bottom(), title_rect.right_bottom()],
+        Stroke::new(1.0, Color32::from_rgb(70, 80, 100)),
+    );
+
+    // Title: "BOARD CONTROL"
+    painter.text(
+        Pos2::new(title_rect.center().x, title_rect.center().y - 6.0),
+        egui::Align2::CENTER_CENTER,
+        "BOARD CONTROL",
+        egui::FontId::proportional(14.0),
+        Color32::from_rgb(147, 197, 253), // Blue accent
+    );
+
+    // Anchor entity name below
+    painter.text(
+        Pos2::new(title_rect.center().x, title_rect.center().y + 8.0),
+        egui::Align2::CENTER_CENTER,
+        anchor_entity_name,
+        egui::FontId::proportional(11.0),
+        Color32::from_rgb(180, 190, 210),
+    );
+
+    // Source CBU indicator (left side)
+    if let Some(cbu_ref) = source_cbu {
+        let back_text = format!("← CBU: {:8}", cbu_ref.0.to_string().get(..8).unwrap_or(""));
+        painter.text(
+            Pos2::new(title_rect.left() + 12.0, title_rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            &back_text,
+            egui::FontId::proportional(10.0),
+            Color32::from_rgb(100, 116, 139), // Muted
+        );
+    }
+}
+
+/// Render Trading Matrix title HUD (centered title bar below breadcrumbs)
+fn render_matrix_title_hud(ui: &mut Ui, focus_state: &ViewportFocusState, screen_rect: Rect) {
+    let painter = ui.painter();
+
+    // Title bar below breadcrumbs
+    let title_rect = Rect::from_min_size(
+        Pos2::new(screen_rect.min.x, screen_rect.min.y + 44.0),
+        Vec2::new(screen_rect.width(), 36.0),
+    );
+
+    // Background
+    painter.rect_filled(
+        title_rect,
+        0.0,
+        Color32::from_rgba_unmultiplied(20, 25, 35, 200),
+    );
+    painter.line_segment(
+        [title_rect.left_bottom(), title_rect.right_bottom()],
+        Stroke::new(1.0, Color32::from_rgb(70, 80, 100)),
+    );
+
+    // Title and subtitle based on focus state
+    let (title, subtitle): (&str, String) = match focus_state {
+        ViewportFocusState::InstrumentMatrix { .. } => {
+            ("TRADING MATRIX", "Instrument Configuration".to_string())
+        }
+        ViewportFocusState::InstrumentType {
+            instrument_type, ..
+        } => ("INSTRUMENT TYPE", format!("{:?}", instrument_type)),
+        ViewportFocusState::ConfigNode { config_node, .. } => {
+            let node_name = match config_node {
+                ob_poc_types::viewport::ConfigNodeRef::Mic { code } => format!("MIC: {}", code),
+                ob_poc_types::viewport::ConfigNodeRef::Bic { code } => format!("BIC: {}", code),
+                ob_poc_types::viewport::ConfigNodeRef::Pricing { .. } => {
+                    "Pricing Config".to_string()
+                }
+                ob_poc_types::viewport::ConfigNodeRef::Restrictions { .. } => {
+                    "Restrictions".to_string()
+                }
+            };
+            ("CONFIG NODE", node_name)
+        }
+        _ => ("MATRIX", String::new()),
+    };
+
+    // Title
+    painter.text(
+        Pos2::new(title_rect.center().x, title_rect.center().y - 6.0),
+        egui::Align2::CENTER_CENTER,
+        title,
+        egui::FontId::proportional(14.0),
+        Color32::from_rgb(253, 224, 71), // Yellow accent for trading
+    );
+
+    // Subtitle
+    if !subtitle.is_empty() {
+        painter.text(
+            Pos2::new(title_rect.center().x, title_rect.center().y + 8.0),
+            egui::Align2::CENTER_CENTER,
+            subtitle,
+            egui::FontId::proportional(11.0),
+            Color32::from_rgb(180, 190, 210),
+        );
+    }
 }
 
 /// Render focus breadcrumb navigation bar
@@ -1217,6 +1357,13 @@ fn breadcrumb_item_for_state(state: &ViewportFocusState, _index: usize) -> Bread
             },
             is_current: false,
             icon: "⚙",
+        },
+        ViewportFocusState::BoardControl {
+            anchor_entity_name, ..
+        } => BreadcrumbItem {
+            label: format!("Board Control: {}", anchor_entity_name),
+            is_current: false,
+            icon: "🎯",
         },
     }
 }

@@ -53,7 +53,10 @@ pub struct ClusterNode {
     /// Base radius (before zoom scaling)
     pub base_radius: f32,
 
-    /// Parent cluster ID (for hierarchical layouts)
+    /// Cluster this node belongs to (for cluster attraction)
+    pub cluster_id: Option<String>,
+
+    /// Parent node ID (for hierarchical attraction)
     pub parent_id: Option<String>,
 
     /// Color for rendering
@@ -82,6 +85,7 @@ impl ClusterNode {
             position: Pos2::ZERO,
             velocity: Vec2::ZERO,
             base_radius: Self::radius_for_count(count),
+            cluster_id: None,
             parent_id: None,
             color: egui::Color32::from_rgb(100, 149, 237), // Cornflower blue
             pinned: false,
@@ -134,6 +138,12 @@ pub struct ForceConfig {
     /// Attraction to center (keeps nodes from flying away)
     pub center_attraction: f32,
 
+    /// Attraction to cluster center (nodes in same cluster attract)
+    pub cluster_attraction: f32,
+
+    /// Attraction to parent node (hierarchical layouts)
+    pub parent_attraction: f32,
+
     /// Velocity damping (0.0 = no damping, 1.0 = instant stop)
     pub damping: f32,
 
@@ -150,11 +160,18 @@ pub struct ForceConfig {
     pub boundary_stiffness: f32,
 }
 
+/// Reference viewport size for scaling calculations
+const REFERENCE_VIEWPORT_WIDTH: f32 = 800.0;
+const REFERENCE_VIEWPORT_HEIGHT: f32 = 600.0;
+const REFERENCE_VIEWPORT_AREA: f32 = REFERENCE_VIEWPORT_WIDTH * REFERENCE_VIEWPORT_HEIGHT;
+
 impl Default for ForceConfig {
     fn default() -> Self {
         Self {
             repulsion: 8000.0,
             center_attraction: 0.02,
+            cluster_attraction: 0.05,
+            parent_attraction: 0.03,
             damping: 0.9,
             min_distance: 50.0,
             max_velocity: 500.0,
@@ -165,11 +182,38 @@ impl Default for ForceConfig {
 }
 
 impl ForceConfig {
+    /// Scale boundary radius based on viewport dimensions.
+    ///
+    /// Larger viewport = larger boundary, allowing nodes more room to spread.
+    /// Uses the smaller dimension to maintain reasonable aspect ratio.
+    pub fn scale_to_viewport(&mut self, width: f32, height: f32) {
+        let min_dim = width.min(height);
+        // Use 80% of the smaller dimension as boundary, with a minimum
+        let scaled_boundary = (min_dim * 0.4).max(200.0);
+        self.boundary_radius = scaled_boundary;
+
+        // Also scale repulsion slightly - larger viewport can handle more spread
+        let area_ratio = (width * height) / REFERENCE_VIEWPORT_AREA;
+        let repulsion_scale = area_ratio.sqrt().clamp(0.7, 1.5);
+        self.repulsion = 8000.0 * repulsion_scale;
+    }
+
+    /// Create config scaled for a specific viewport size
+    pub fn for_viewport(width: f32, height: f32) -> Self {
+        let mut config = Self::default();
+        config.scale_to_viewport(width, height);
+        config
+    }
+}
+
+impl ForceConfig {
     /// Config for galaxy view (few large clusters)
     pub fn galaxy() -> Self {
         Self {
             repulsion: 15000.0,
             center_attraction: 0.01,
+            cluster_attraction: 0.08,
+            parent_attraction: 0.02,
             damping: 0.85,
             min_distance: 80.0,
             max_velocity: 300.0,
@@ -183,6 +227,8 @@ impl ForceConfig {
         Self {
             repulsion: 5000.0,
             center_attraction: 0.03,
+            cluster_attraction: 0.04,
+            parent_attraction: 0.05,
             damping: 0.92,
             min_distance: 40.0,
             max_velocity: 400.0,
@@ -435,6 +481,44 @@ impl ForceSimulation {
                 let push = to_center.normalized() * overshoot * self.config.boundary_stiffness;
                 forces[i] += push;
             }
+
+            // Parent attraction (hierarchical layout)
+            if let Some(ref parent_id) = node.parent_id {
+                if let Some(&parent_idx) = self.node_index.get(parent_id) {
+                    let to_parent = self.nodes[parent_idx].position - node.position;
+                    forces[i] += to_parent * self.config.parent_attraction;
+                }
+            }
+        }
+
+        // Cluster attraction (nodes in same cluster attract to cluster centroid)
+        if self.config.cluster_attraction > 0.0 {
+            // Build cluster centroids
+            let mut cluster_sums: HashMap<String, (Pos2, usize)> = HashMap::new();
+            for node in &self.nodes {
+                if let Some(ref cid) = node.cluster_id {
+                    let entry = cluster_sums.entry(cid.clone()).or_insert((Pos2::ZERO, 0));
+                    entry.0 += node.position.to_vec2();
+                    entry.1 += 1;
+                }
+            }
+            let cluster_centers: HashMap<String, Pos2> = cluster_sums
+                .into_iter()
+                .filter(|(_, (_, count))| *count > 1)
+                .map(|(cid, (sum, count))| {
+                    (cid, Pos2::new(sum.x / count as f32, sum.y / count as f32))
+                })
+                .collect();
+
+            // Apply attraction to cluster center
+            for (i, node) in self.nodes.iter().enumerate() {
+                if let Some(ref cid) = node.cluster_id {
+                    if let Some(&center) = cluster_centers.get(cid) {
+                        let to_center = center - node.position;
+                        forces[i] += to_center * self.config.cluster_attraction;
+                    }
+                }
+            }
         }
 
         forces
@@ -506,6 +590,34 @@ impl ForceSimulation {
         if let Some(node) = self.get_node_mut(id) {
             node.position = new_pos;
         }
+    }
+
+    // =========================================================================
+    // VIEWPORT SCALING
+    // =========================================================================
+
+    /// Update simulation bounds for new viewport size.
+    ///
+    /// Call this when the viewport is resized. Updates:
+    /// - Boundary radius (containment area)
+    /// - Repulsion strength (scaled for viewport area)
+    /// - Center point (optional, if viewport center changed)
+    pub fn set_viewport_size(&mut self, width: f32, height: f32) {
+        self.config.scale_to_viewport(width, height);
+        // Optionally update center to viewport center
+        self.center = Pos2::new(width / 2.0, height / 2.0);
+        // Destabilize to allow re-layout
+        self.stabilized = false;
+    }
+
+    /// Update just the center point (e.g., when viewport pans)
+    pub fn set_center(&mut self, center: Pos2) {
+        self.center = center;
+    }
+
+    /// Get the current boundary radius
+    pub fn boundary_radius(&self) -> f32 {
+        self.config.boundary_radius
     }
 }
 

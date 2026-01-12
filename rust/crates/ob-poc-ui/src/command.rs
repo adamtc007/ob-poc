@@ -227,6 +227,12 @@ pub enum NavigationVerb {
     BlackHole,
 
     // =========================================================================
+    // Trading Matrix Navigation
+    // =========================================================================
+    /// "Inspect trading matrix" - navigate to InstrumentMatrix focus
+    InspectMatrix,
+
+    // =========================================================================
     // Context Intentions
     // =========================================================================
     SetContext {
@@ -282,6 +288,7 @@ impl NavigationVerb {
                     ViewMode::ServiceDelivery => "service-delivery",
                     ViewMode::ProductsOnly => "products-only",
                     ViewMode::Trading => "trading",
+                    ViewMode::BoardControl => "board-control",
                 };
                 format!("(nav.set-view-mode :mode {})", mode_str)
             }
@@ -395,6 +402,9 @@ impl NavigationVerb {
             NavigationVerb::Shadow => "(nav.shadow)".to_string(),
             NavigationVerb::RedFlagScan => "(nav.red-flag-scan)".to_string(),
             NavigationVerb::BlackHole => "(nav.black-hole)".to_string(),
+
+            // Trading Matrix Navigation
+            NavigationVerb::InspectMatrix => "(nav.inspect-matrix)".to_string(),
 
             // Context
             NavigationVerb::SetContext { context } => {
@@ -1184,6 +1194,26 @@ fn match_verb_from_transcript(transcript: &str, ctx: &InvestigationContext) -> N
 
     if matches_any(&text, &["black hole", "missing data", "gaps", "unknowns"]) {
         return NavigationVerb::BlackHole;
+    }
+
+    // =========================================================================
+    // Trading Matrix Navigation
+    // =========================================================================
+    if matches_any(
+        &text,
+        &[
+            "inspect matrix",
+            "inspect trading matrix",
+            "show matrix",
+            "trading matrix",
+            "show trading matrix",
+            "zoom into matrix",
+            "open matrix",
+            "instruments",
+            "instrument matrix",
+        ],
+    ) {
+        return NavigationVerb::InspectMatrix;
     }
 
     // =========================================================================

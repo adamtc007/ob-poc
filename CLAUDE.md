@@ -1,14 +1,16 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-12
-> **Verb count:** ~808 verbs across 92+ YAML files
-> **Custom ops:** 50 plugin handlers
+> **Verb count:** 781 verbs across 102 YAML files
+> **Custom ops:** 48 plugin handlers
 > **Crates:** 13 fine-grained crates
-> **Migrations:** 20 schema migrations (latest: 020_trading_profile_materialization.sql)
+> **Migrations:** 23 schema migrations (latest: 023_sessions_persistence.sql)
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
-> **Verb Tiering:** ✅ Complete - 888 verbs tagged with tier metadata
+> **CBU Session v2:** ✅ Complete - In-memory sessions, 9 MCP tools, REST API, undo/redo, persistence
+> **Verb Tiering:** ✅ Complete - All verbs tagged with tier metadata
 > **Verb Governance:** ✅ Complete - Mandatory metadata, single authoring surface, STANDARD lint enforcement
+> **Viewport Scaling:** ✅ Complete - Force simulation + LOD thresholds scale to viewport size
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 
 This file provides guidance to Claude Code when working with this repository.
@@ -40,7 +42,7 @@ This file provides guidance to Claude Code when working with this repository.
 | **Entity Disambiguation UX** | `ai-thoughts/025-entity-disambiguation-ux.md` | ✅ **DONE** - Inline popup + batch modal design, voice refinement |
 | **Feedback Inspector (impl)** | `ai-thoughts/026-implement-feedback-inspector.md` | ✅ **DONE** - Classifier, redactor, repro gen, audit trail, 6 MCP tools, REPL commands |
 | **Entity Resolution Plan** | `ai-thoughts/026-entity-resolution-implementation-plan.md` | ⚠️ **IN PROGRESS** - Sub-session architecture, 4-phase implementation |
-| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Types + linter + 888 verbs tagged with tier metadata |
+| **Trading Matrix Pivot** | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ **DONE** - Types + linter + all verbs tagged with tier metadata |
 | **Verb Lexicon Governance** | `ai-thoughts/028-verb-lexicon-governance.md` | ✅ **DONE** - Mandatory metadata, rip-and-replace, lint tiers, matrix-first enforcement |
 | **Implement Verb Governance** | `ai-thoughts/029-implement-verb-governance.md` | ✅ **DONE** - 46 verbs reclassified, 15 new CA/plan-apply verbs, 6 proof tests |
 | **Research/agent quick reference** | `docs/research-agent-annex.md` | Invocation phrases, confidence thresholds, agent loop |
@@ -104,6 +106,8 @@ This file provides guidance to Claude Code when working with this repository.
 - "pitch", "internal sell", "coalition", "bank-safe", "coexistence", "pilot" → `ai-thoughts/030-internal-pitch-strategy.md`
 - "RAG", "vector", "qdrant", "embedding", "stack audit", "round-trip", "reconciliation" → `ai-thoughts/031-rag-cleanup-stack-audit.md`
 - "corporate action", "CA policy", "election policy", "dividend", "rights issue", "proceeds SSI" → `ai-thoughts/032-corporate-actions-integration.md`
+- "cbu session", "session persistence", "load cbu", "unload cbu", "session undo", "session redo" → See CBU Session v2 section below
+- "force simulation", "viewport scaling", "LOD", "detail level", "graph density" → See Viewport Scaling section below
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -120,7 +124,7 @@ This file provides guidance to Claude Code when working with this repository.
 - `ai-thoughts/025-entity-disambiguation-ux.md` - ✅ DONE - Inline popup + batch modal design, Zed-style code actions, voice refinement
 - `ai-thoughts/026-implement-feedback-inspector.md` - ✅ DONE - Classifier, redactor, repro gen, audit trail, 6 MCP tools
 - `ai-thoughts/026-entity-resolution-implementation-plan.md` - ⚠️ **IN PROGRESS** - Sub-session architecture, parent-child context inheritance
-- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ DONE - Types, linter, 888 verbs tagged with tier metadata
+- `ai-thoughts/027-trading-matrix-canonical-pivot.md` - ✅ DONE - Types, linter, all verbs tagged with tier metadata
 - `ai-thoughts/028-verb-lexicon-governance.md` - ✅ DONE - Mandatory metadata, rip-and-replace, lint tiers, matrix-first enforcement
 - `ai-thoughts/029-implement-verb-governance.md` - ✅ DONE - 46 verbs reclassified, 15 new verbs, idempotency tests
 - `ai-thoughts/030-internal-pitch-strategy.md` - 📝 Strategic - Bank-safe positioning, coalition building, pilot slice definition
@@ -174,14 +178,14 @@ User/Agent → DSL Source → Parser → Compiler → Executor → PostgreSQL
 ```
 ob-poc/
 ├── rust/
-│   ├── config/verbs/           # Verb YAML definitions (89 files + 14 templates, ~873 verbs)
+│   ├── config/verbs/           # Verb YAML definitions (102 files, 781 verbs)
 │   │   ├── cbu.yaml            # CBU domain
 │   │   ├── entity.yaml         # Entity domain
 │   │   ├── custody/            # Custody subdomain
 │   │   ├── kyc/                # KYC subdomain
 │   │   ├── registry/           # Investor registry
-│   │   ├── research/           # Research workflows (NEW)
-│   │   └── agent/              # Agent mode verbs (NEW)
+│   │   ├── research/           # Research workflows
+│   │   └── agent/              # Agent mode verbs
 │   ├── crates/
 │   │   ├── dsl-core/           # Parser, AST, compiler (NO DB dependency)
 │   │   ├── ob-agentic/         # LLM agent for DSL generation
@@ -191,18 +195,18 @@ ob-poc/
 │   ├── src/
 │   │   ├── dsl_v2/             # DSL execution layer
 │   │   │   ├── generic_executor.rs  # YAML-driven CRUD executor
-│   │   │   ├── custom_ops/     # Plugin handlers (50 files)
+│   │   │   ├── custom_ops/     # Plugin handlers (48 files)
 │   │   │   └── verb_registry.rs
-│   │   ├── research/           # Research module (NEW)
-│   │   ├── agent/              # Agent controller (NEW)
+│   │   ├── research/           # Research module
+│   │   ├── agent/              # Agent controller
 │   │   ├── api/                # REST API routes
 │   │   └── bin/
 │   │       ├── dsl_api.rs      # Main Axum server
 │   │       └── dsl_cli.rs      # CLI tool
 │   └── xtask/                  # Build automation
-├── prompts/                    # LLM prompt templates (NEW)
+├── prompts/                    # LLM prompt templates
 │   └── research/
-├── migrations/                 # SQLx migrations (20 files)
+├── migrations/                 # SQLx migrations (21 files)
 ├── docs/                       # Architecture documentation
 ├── ai-thoughts/                # ADRs and working docs
 └── CLAUDE.md                   # This file
@@ -796,6 +800,124 @@ pub enum ViewLevel {
 ```
 
 **MCP equivalent:** `verbs_list` tool with `domain` parameter
+
+---
+
+## CBU Session v2 (In-Memory Sessions)
+
+> **Migration:** `023_sessions_persistence.sql`
+> **Design:** Memory is truth, DB is backup
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     CbuSession (in-memory)                      │
+│  - id: Uuid                                                     │
+│  - cbu_ids: HashSet<Uuid>     ← Current loaded CBUs             │
+│  - history: Vec<HashSet>      ← Undo stack                      │
+│  - future: Vec<HashSet>       ← Redo stack                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                    fire-and-forget (2s debounce)
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   PostgreSQL (backup only)                      │
+│  ob-poc.sessions table                                          │
+│  - Auto-extends expiry on activity (7 days)                     │
+│  - Graceful degradation if DB unavailable                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### MCP Tools (9 tools)
+
+| Tool | Description |
+|------|-------------|
+| `session_load_cbu` | Load a CBU into session |
+| `session_load_jurisdiction` | Load all CBUs in jurisdiction |
+| `session_load_galaxy` | Load all CBUs under apex entity |
+| `session_unload_cbu` | Remove CBU from session |
+| `session_clear` | Clear all CBUs |
+| `session_undo` | Undo last action |
+| `session_redo` | Redo undone action |
+| `session_info` | Get session state |
+| `session_list` | List all sessions |
+
+### REST API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/cbu-session` | Create new session |
+| `GET` | `/api/cbu-session` | List all sessions |
+| `GET` | `/api/cbu-session/:id` | Get session by ID |
+| `DELETE` | `/api/cbu-session/:id` | Delete session |
+| `POST` | `/api/cbu-session/:id/load-cbu` | Load CBU |
+| `POST` | `/api/cbu-session/:id/load-jurisdiction` | Load by jurisdiction |
+| `POST` | `/api/cbu-session/:id/load-galaxy` | Load by apex entity |
+| `POST` | `/api/cbu-session/:id/unload-cbu` | Unload CBU |
+| `POST` | `/api/cbu-session/:id/clear` | Clear session |
+| `POST` | `/api/cbu-session/:id/undo` | Undo |
+| `POST` | `/api/cbu-session/:id/redo` | Redo |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/session/cbu_session.rs` | Core session struct + operations |
+| `rust/src/session/mod.rs` | Module exports |
+| `rust/src/mcp/tools.rs` | MCP tool definitions |
+| `rust/src/mcp/handlers/core.rs` | MCP tool handlers |
+| `rust/src/api/cbu_session_routes.rs` | REST API routes |
+
+---
+
+## Viewport Scaling (Graph Visualization)
+
+Force simulation and LOD thresholds automatically scale to viewport dimensions.
+
+### Force Simulation Scaling
+
+```rust
+// Reference viewport: 800x600 (480,000 px²)
+impl ForceConfig {
+    pub fn scale_to_viewport(&mut self, width: f32, height: f32) {
+        // Boundary scales to 40% of smaller dimension
+        let min_dim = width.min(height);
+        self.boundary_radius = (min_dim * 0.4).max(200.0);
+        
+        // Repulsion scales with sqrt of area ratio
+        let area_ratio = (width * height) / REFERENCE_VIEWPORT_AREA;
+        let repulsion_scale = area_ratio.sqrt().clamp(0.7, 1.5);
+        self.repulsion = 8000.0 * repulsion_scale;
+    }
+}
+```
+
+### LOD (Level of Detail) Scaling
+
+```rust
+impl LodConfig {
+    pub fn for_viewport(width: f32, height: f32) -> Self {
+        let area_ratio = (width * height) / REFERENCE_VIEWPORT_AREA;
+        let scaled_base = 20.0 * area_ratio.sqrt();
+        Self {
+            density_base: scaled_base.clamp(10.0, 60.0),
+            density_weight: 0.3,
+            viewport_area: width * height,
+        }
+    }
+}
+```
+
+**Effect:** Larger viewports show more detail (higher density thresholds).
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/ob-poc-graph/src/graph/force_sim.rs` | Force simulation + viewport scaling |
+| `rust/crates/ob-poc-graph/src/graph/lod.rs` | LOD config + density thresholds |
+| `rust/crates/ob-poc-graph/src/graph/galaxy.rs` | Resize detection + wiring |
 
 ---
 

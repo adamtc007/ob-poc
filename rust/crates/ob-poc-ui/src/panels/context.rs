@@ -95,6 +95,13 @@ fn render_context(ui: &mut Ui, context: &SessionContext) -> Option<ContextPanelA
                             ui.label(client_type);
                         });
                     }
+                    if let Some(ref category) = cbu.cbu_category {
+                        ui.horizontal(|ui| {
+                            ui.label(category_icon(category));
+                            ui.label("Category:");
+                            ui.label(category);
+                        });
+                    }
                     ui.horizontal(|ui| {
                         ui.label("Entities:");
                         ui.label(format!("{}", cbu.entity_count));
@@ -248,6 +255,22 @@ fn risk_label(rating: &str) -> RichText {
         _ => Color32::WHITE,
     };
     RichText::new(rating).color(color).small()
+}
+
+/// Get icon for CBU category
+fn category_icon(category: &str) -> &'static str {
+    match category.to_uppercase().as_str() {
+        "SICAV" => "🏛",       // Umbrella fund structure
+        "SEGREGATED" => "🔒", // Isolated/segregated
+        "POOLED" => "🔗",     // Pooled/commingled
+        "SIF" => "📊",        // Specialized Investment Fund
+        "RAIF" => "📈",       // Reserved Alternative Investment Fund
+        "UCITS" => "🌐",      // UCITS (regulated, cross-border)
+        "AIF" => "🎯",        // Alternative Investment Fund
+        "SPV" => "📦",        // Special Purpose Vehicle
+        "HOLDING" => "🏢",    // Holding company
+        _ => "📁",            // Default folder icon
+    }
 }
 
 /// Render the semantic stages (onboarding journey progress)

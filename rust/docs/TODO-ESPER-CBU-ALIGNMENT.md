@@ -1,185 +1,55 @@
 # TODO: ESPER Navigation + CBU Struct Alignment
 
-> **Status:** READY FOR EXECUTION  
-> **Priority:** HIGH (ESPER is 95% done, just needs UI wiring)  
+> **Status:** PARTIALLY COMPLETE - Reassessed 2026-01-12
+> **Priority:** MEDIUM (Most ESPER infrastructure done, CBU category gaps remain)
 > **Related:** TODO-ISDA-MATRIX-CONSOLIDATION.md
 
 ---
 
-## Issue 1: ESPER UI "Last Mile" Problem
+## Issue 1: ESPER UI Infrastructure - ✅ LARGELY COMPLETE
 
-### Current State
-```
-DSL Command → Rust Handler → ViewState → Session → API → ✅ Works
-                                                    ↓
-                                              egui Panel → ❌ Not reading ViewState
-```
+### What's Been Implemented
 
-### Gap Analysis
+Claude Code has implemented the core ESPER infrastructure:
 
-| ViewState Field | Set By | Read By egui? | Visual Effect Missing |
-|-----------------|--------|---------------|----------------------|
-| `trace_mode` | `view.trace` | ❌ No | Path highlighting in graph |
-| `xray_layers` | `view.xray` | ❌ No | Layer transparency toggles |
-| `drill_depth` | `view.drill` | ❌ No | Depth-limited node expansion |
-| `surface_level` | `view.surface` | ❌ No | Aggregation level display |
-| `focus_entity_id` | `view.focus` | ❌ No | Centered/highlighted node |
-| `taxonomy_stack` | `zoom-in/out` | ⚠️ Partial | Breadcrumb navigation |
+| Component | File | Status |
+|-----------|------|--------|
+| `ViewportState` type | `ob-poc-types/src/viewport.rs` | ✅ Complete |
+| `EsperRenderState` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| `ViewportRenderState` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| `render_viewport_hud()` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| `render_focus_ring()` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| `render_focus_breadcrumbs()` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| `render_enhance_level_indicator()` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| `render_confidence_zone_legend()` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| `render_view_type_selector()` | `ob-poc-graph/src/graph/viewport.rs` | ✅ Complete |
+| Taxonomy breadcrumbs | `ob-poc-ui/src/panels/taxonomy.rs` | ✅ Complete |
+| ViewportState propagation | `ob-poc-ui/src/state.rs` (apply_viewport_state) | ✅ Complete |
+| Agent navigation commands | `ob-poc-types/src/lib.rs` (AgentCommand) | ✅ Complete |
+| Async pending handlers | `ob-poc-ui/src/state.rs` (take_pending_*) | ✅ Complete |
 
-### Fix: Wire ViewState to egui Panels
+### EsperRenderState Modes Implemented
 
-**File:** `crates/ob-poc-ui/src/panels/graph_panel.rs`
+All Blade Runner-style visual modes are implemented in `viewport.rs`:
 
-#### Step 1.1: Add ViewState to panel render context
+- `xray_enabled` / `xray_alpha` - Make non-focused elements semi-transparent
+- `peel_enabled` / `peel_depth` - Hide outer layers progressively  
+- `shadow_enabled` / `shadow_alpha` - Dim non-relevant entities
+- `illuminate_enabled` / `illuminate_aspect` - Glow specific aspects
+- `red_flag_scan_enabled` - Highlight entities with risk indicators
+- `black_hole_enabled` - Highlight entities with data gaps
+- `depth_indicator_enabled` - Show depth cues
+- `cross_section_enabled` - Show slice through structure
 
-```rust
-pub fn render_graph_panel(ui: &mut egui::Ui, state: &AppState) {
-    // Get current ViewState from session
-    let view_state = state.session_context
-        .as_ref()
-        .and_then(|ctx| ctx.view_state.as_ref());
-    
-    // Apply view state to rendering
-    if let Some(vs) = view_state {
-        apply_view_state_effects(ui, vs, &mut state.graph_data);
-    }
-    
-    // ... existing graph rendering ...
-}
+### Remaining ESPER Work (Low Priority)
 
-fn apply_view_state_effects(
-    ui: &mut egui::Ui, 
-    vs: &ViewState, 
-    graph: &mut GraphData
-) {
-    // 1. Trace mode - highlight path
-    if let Some(ref trace) = vs.trace_mode {
-        for node_id in &trace.path_node_ids {
-            graph.set_node_highlight(*node_id, TraceHighlight {
-                color: egui::Color32::from_rgb(255, 200, 0), // Blade Runner amber
-                pulse: true,
-            });
-        }
-    }
-    
-    // 2. X-ray layers - set transparency
-    for (layer_name, opacity) in &vs.xray_layers {
-        graph.set_layer_opacity(layer_name, *opacity);
-    }
-    
-    // 3. Drill depth - collapse nodes beyond depth
-    if let Some(depth) = vs.drill_depth {
-        graph.set_max_visible_depth(depth);
-    }
-    
-    // 4. Focus entity - center and highlight
-    if let Some(focus_id) = vs.focus_entity_id {
-        graph.center_on_node(focus_id);
-        graph.set_node_highlight(focus_id, FocusHighlight::Primary);
-    }
-}
-```
-
-#### Step 1.2: Add breadcrumb UI for drill navigation
-
-**File:** `crates/ob-poc-ui/src/panels/breadcrumb_bar.rs` (NEW)
-
-```rust
-pub fn render_breadcrumb_bar(ui: &mut egui::Ui, state: &mut AppState) -> Vec<ViewAction> {
-    let mut actions = Vec::new();
-    
-    let taxonomy_stack = state.session_context
-        .as_ref()
-        .map(|ctx| &ctx.taxonomy_stack)
-        .unwrap_or(&TaxonomyStack::default());
-    
-    ui.horizontal(|ui| {
-        // Root
-        if ui.selectable_label(taxonomy_stack.is_empty(), "🏠 Root").clicked() {
-            actions.push(ViewAction::ZoomBackTo { level: 0 });
-        }
-        
-        // Breadcrumb segments
-        for (idx, segment) in taxonomy_stack.segments().iter().enumerate() {
-            ui.label("›");
-            let is_current = idx == taxonomy_stack.len() - 1;
-            if ui.selectable_label(is_current, &segment.display_name).clicked() {
-                actions.push(ViewAction::ZoomBackTo { level: idx + 1 });
-            }
-        }
-    });
-    
-    actions
-}
-```
-
-#### Step 1.3: Add trace path overlay to graph
-
-**File:** `crates/ob-poc-ui/src/panels/graph_panel.rs`
-
-```rust
-fn render_trace_overlay(painter: &egui::Painter, vs: &ViewState, layout: &GraphLayout) {
-    if let Some(ref trace) = vs.trace_mode {
-        // Draw connecting lines between trace path nodes
-        let points: Vec<egui::Pos2> = trace.path_node_ids
-            .iter()
-            .filter_map(|id| layout.node_positions.get(id))
-            .cloned()
-            .collect();
-        
-        if points.len() >= 2 {
-            // Blade Runner style: amber glow with pulse
-            let stroke = egui::Stroke::new(3.0, egui::Color32::from_rgb(255, 176, 0));
-            painter.add(egui::Shape::line(points, stroke));
-            
-            // Add direction arrows
-            for window in points.windows(2) {
-                let (from, to) = (window[0], window[1]);
-                draw_arrow(painter, from, to, stroke.color);
-            }
-        }
-    }
-}
-```
-
-#### Step 1.4: Add xray layer controls
-
-**File:** `crates/ob-poc-ui/src/panels/layer_control_panel.rs` (NEW)
-
-```rust
-pub fn render_layer_controls(ui: &mut egui::Ui, state: &mut AppState) -> Vec<ViewAction> {
-    let mut actions = Vec::new();
-    
-    let layers = ["entities", "ownership", "roles", "documents", "kyc", "custody"];
-    
-    ui.heading("X-Ray Layers");
-    
-    for layer in layers {
-        let current_opacity = state.view_state
-            .as_ref()
-            .and_then(|vs| vs.xray_layers.get(layer))
-            .copied()
-            .unwrap_or(1.0);
-        
-        ui.horizontal(|ui| {
-            ui.label(layer);
-            let mut opacity = current_opacity;
-            if ui.add(egui::Slider::new(&mut opacity, 0.0..=1.0)).changed() {
-                actions.push(ViewAction::SetLayerOpacity { 
-                    layer: layer.to_string(), 
-                    opacity 
-                });
-            }
-        });
-    }
-    
-    actions
-}
-```
+1. **Verify HUD is called** - Confirm `render_viewport_hud()` is invoked in graph rendering
+2. **Layer control panel** - Add optional slider UI for xray/shadow alpha (currently toggle-only)
+3. **DSL verb binding** - Verify `view.trace`, `view.xray` DSL commands update ViewportState
 
 ---
 
-## Issue 2: CBU Struct Misalignment
+## Issue 2: CBU Struct Misalignment - ⚠️ STILL NEEDS WORK
 
 ### Current State
 
@@ -187,148 +57,126 @@ pub fn render_layer_controls(ui: &mut egui::Ui, state: &mut AppState) -> Vec<Vie
 Database (cbus table)
 ├── cbu_category: VARCHAR(50) ✅ EXISTS
 │
-├── CbuRow (Rust struct)
-│   └── cbu_category: ❌ MISSING
+├── visualization_repository.rs
+│   ├── CbuSummaryView: ✅ HAS cbu_category
+│   └── CbuBasicView: ✅ HAS cbu_category
 │
-├── CbuSummary (API response)  
-│   └── cbu_category: ❌ MISSING
+├── client_routes.rs
+│   └── CbuSummary: ✅ HAS cbu_category (local struct)
 │
-├── CbuGraphResponse (Graph API)
-│   └── cbu_category: ✅ EXISTS
+├── graph_routes.rs  
+│   └── CbuSummary mapping: ✅ MAPS cbu_category
 │
-└── egui Context Panel
-    └── cbu_category display: ❌ MISSING
+├── ob-poc-types/src/lib.rs (SHARED TYPES)
+│   ├── CbuSummary: ❌ MISSING cbu_category  ← FIX NEEDED
+│   ├── CbuGraphResponse: ✅ HAS cbu_category
+│   └── CbuContext: ❌ MISSING cbu_category  ← FIX NEEDED
+│
+└── ob-poc-ui/src/panels/context.rs
+    └── cbu_category display: ❌ MISSING  ← FIX NEEDED
 ```
 
-### Fix: Propagate cbu_category Through All Layers
+### Fix 2.1: Add cbu_category to CbuSummary in ob-poc-types
 
-#### Step 2.1: Add to CbuRow
-
-**File:** `src/services/cbu_service.rs`
+**File:** `crates/ob-poc-types/src/lib.rs` (~line 823)
 
 ```rust
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct CbuRow {
-    pub cbu_id: Uuid,
-    pub name: String,
-    pub jurisdiction: Option<String>,
-    pub status: String,
-    pub client_type: Option<String>,
-    pub cbu_category: Option<String>,  // ADD THIS
-    pub description: Option<String>,   // ADD THIS
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-```
-
-Update the query:
-
-```rust
-pub async fn get_cbu_by_id(pool: &PgPool, cbu_id: Uuid) -> Result<Option<CbuRow>> {
-    sqlx::query_as!(
-        CbuRow,
-        r#"
-        SELECT 
-            cbu_id, name, jurisdiction, status, client_type,
-            cbu_category,  -- ADD
-            description,   -- ADD
-            created_at, updated_at
-        FROM "ob-poc".cbus
-        WHERE cbu_id = $1
-        "#,
-        cbu_id
-    )
-    .fetch_optional(pool)
-    .await
-    .map_err(Into::into)
-}
-```
-
-#### Step 2.2: Add to CbuSummary API type
-
-**File:** `src/api/types.rs`
-
-```rust
-#[derive(Debug, Serialize, Deserialize)]
+/// CBU summary for list views
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CbuSummary {
-    pub cbu_id: Uuid,
+    pub cbu_id: String,
     pub name: String,
+    #[serde(default)]
     pub jurisdiction: Option<String>,
-    pub status: String,
+    #[serde(default)]
     pub client_type: Option<String>,
+    #[serde(default)]
     pub cbu_category: Option<String>,  // ADD THIS
-    pub created_at: DateTime<Utc>,
 }
 ```
 
-#### Step 2.3: Update list endpoint
-
-**File:** `src/api/cbu_routes.rs`
+Also update the `CbuSummary::new()` constructor (~line 1672):
 
 ```rust
-pub async fn list_cbus(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<CbuSummary>>, ApiError> {
-    let cbus = sqlx::query_as!(
-        CbuSummary,
-        r#"
-        SELECT 
-            cbu_id, name, jurisdiction, status, client_type,
-            cbu_category,  -- ADD
-            created_at
-        FROM "ob-poc".cbus
-        ORDER BY name
-        "#
-    )
-    .fetch_all(&state.pool)
-    .await?;
-    
-    Ok(Json(cbus))
-}
-```
-
-#### Step 2.4: Add to egui context panel
-
-**File:** `crates/ob-poc-ui/src/panels/context_panel.rs`
-
-```rust
-fn render_cbu_details(ui: &mut egui::Ui, cbu: &CbuSummary) {
-    egui::Grid::new("cbu_details").show(ui, |ui| {
-        ui.label("Name:");
-        ui.label(&cbu.name);
-        ui.end_row();
-        
-        ui.label("Status:");
-        ui.label(&cbu.status);
-        ui.end_row();
-        
-        ui.label("Jurisdiction:");
-        ui.label(cbu.jurisdiction.as_deref().unwrap_or("-"));
-        ui.end_row();
-        
-        // ADD: Category with template indicator
-        ui.label("Category:");
-        if let Some(ref category) = cbu.cbu_category {
-            let template_icon = match category.as_str() {
-                "FUND" => "📊",
-                "CORPORATE" => "🏢",
-                "FAMILY_OFFICE" => "👨‍👩‍👧‍👦",
-                "BANK" => "🏦",
-                "INSURANCE" => "🛡️",
-                _ => "📁",
-            };
-            ui.label(format!("{} {}", template_icon, category));
-        } else {
-            ui.label("-");
+impl CbuSummary {
+    pub fn new(
+        cbu_id: Uuid,
+        name: String,
+        jurisdiction: Option<String>,
+        client_type: Option<String>,
+        cbu_category: Option<String>,  // ADD THIS
+    ) -> Self {
+        Self {
+            cbu_id: cbu_id.to_string(),
+            name,
+            jurisdiction,
+            client_type,
+            cbu_category,  // ADD THIS
         }
-        ui.end_row();
+    }
+}
+```
+
+### Fix 2.2: Add cbu_category to CbuContext
+
+**File:** `crates/ob-poc-types/src/lib.rs` (~line 1600)
+
+```rust
+/// CBU-specific context with summary info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CbuContext {
+    /// CBU UUID
+    pub id: String,
+    /// CBU name
+    pub name: String,
+    /// Jurisdiction code (e.g., "LU", "US")
+    #[serde(default)]
+    pub jurisdiction: Option<String>,
+    /// Client type (e.g., "FUND", "CORPORATE")
+    #[serde(default)]
+    pub client_type: Option<String>,
+    /// Template discriminator: FUND_MANDATE, CORPORATE_GROUP, etc.
+    #[serde(default)]
+    pub cbu_category: Option<String>,  // ADD THIS
+    /// Number of linked entities
+    #[serde(default)]
+    pub entity_count: i32,
+    // ... rest of fields unchanged
+}
+```
+
+### Fix 2.3: Update context_discovery_service to populate cbu_category
+
+**File:** `src/database/context_discovery_service.rs`
+
+Find where `CbuContext` is constructed and add cbu_category from the database query.
+
+### Fix 2.4: Display cbu_category in context panel
+
+**File:** `crates/ob-poc-ui/src/panels/context.rs` (~line 70)
+
+In `render_context()` function, add after client_type display:
+
+```rust
+if let Some(ref category) = cbu.cbu_category {
+    ui.horizontal(|ui| {
+        ui.label("Category:");
+        let icon = match category.as_str() {
+            "FUND_MANDATE" | "FUND" => "📊",
+            "CORPORATE_GROUP" | "CORPORATE" => "🏢", 
+            "FAMILY_OFFICE" => "👨‍👩‍👧‍👦",
+            "BANK" | "INSTITUTIONAL" => "🏦",
+            "INSURANCE" => "🛡️",
+            _ => "📁",
+        };
+        ui.label(format!("{} {}", icon, category));
     });
 }
 ```
 
 ---
 
-## Issue 3: Trading Matrix - No Changes Needed ✅
+## Issue 3: Trading Matrix - ✅ NO CHANGES NEEDED
 
 The trading matrix architecture is confirmed solid:
 - Single source of truth in `ob-poc-types/src/trading_matrix.rs`
@@ -336,26 +184,23 @@ The trading matrix architecture is confirmed solid:
 - Clear separation between UI AST and config documents
 - egui compliance verified
 
-**Action:** Continue using existing pattern. Focus on ESPER UI wiring.
-
 ---
 
 ## Execution Order
 
 ```
-1. ESPER UI (Issue 1) - High impact, 95% already done
-   ├── 1.1 Wire ViewState to graph_panel
-   ├── 1.2 Add breadcrumb bar
-   ├── 1.3 Add trace overlay
-   └── 1.4 Add layer controls
+1. CBU Category Alignment (Issue 2) - Quick wins
+   ├── 2.1 Add to CbuSummary in ob-poc-types ⬜ TODO
+   ├── 2.2 Add to CbuContext ⬜ TODO  
+   ├── 2.3 Update context_discovery_service ⬜ TODO
+   └── 2.4 Add to context panel ⬜ TODO
 
-2. CBU Struct (Issue 2) - Medium impact, quick fix
-   ├── 2.1 Add to CbuRow
-   ├── 2.2 Add to CbuSummary
-   ├── 2.3 Update list endpoint
-   └── 2.4 Add to context panel
+2. ESPER Verification (Issue 1) - Low priority polish
+   ├── Verify HUD rendering ⬜ TODO (optional)
+   ├── Layer control sliders ⬜ TODO (optional)
+   └── DSL verb binding verification ⬜ TODO (optional)
 
-3. Trading Matrix - No action needed ✅
+3. Trading Matrix - ✅ DONE
 ```
 
 ---
@@ -363,17 +208,15 @@ The trading matrix architecture is confirmed solid:
 ## Verification
 
 ```bash
-# After ESPER fixes
+# After CBU fixes - verify compilation
+cargo build -p ob-poc-types
 cargo build -p ob-poc-ui
-# Test view commands in DSL REPL:
-# > view.trace entity: $acme
-# > view.xray layers: ["ownership", "kyc"] opacity: 0.5
-# > view.drill entity: $acme depth: 2
 
-# After CBU fixes
-cargo test cbu_category
-# Verify API returns category:
-# curl localhost:8080/api/cbu | jq '.[0].cbu_category'
+# Verify API returns category
+curl localhost:8080/api/cbu | jq '.[0].cbu_category'
+
+# Verify context includes category  
+curl localhost:8080/api/session/{id}/context | jq '.cbu.cbu_category'
 ```
 
 ---
@@ -382,6 +225,11 @@ cargo test cbu_category
 
 | Issue | Effort | Impact | Status |
 |-------|--------|--------|--------|
-| ESPER UI wiring | 4-6 hours | HIGH - Completes Blade Runner vision | ⬜ TODO |
-| CBU struct alignment | 1-2 hours | MEDIUM - Enables template discrimination | ⬜ TODO |
-| Trading Matrix | 0 | N/A - Already solid | ✅ DONE |
+| ESPER UI infrastructure | N/A | N/A | ✅ DONE |
+| ESPER UI polish (HUD, sliders) | 2-3 hours | LOW | ⬜ Optional |
+| CBU cbu_category in types | 1 hour | MEDIUM | ⬜ TODO |
+| CBU cbu_category in context | 1 hour | MEDIUM | ⬜ TODO |
+| CBU cbu_category in UI | 30 min | LOW | ⬜ TODO |
+| Trading Matrix | 0 | N/A | ✅ DONE |
+
+**Total remaining effort: ~2.5 hours for CBU category alignment**

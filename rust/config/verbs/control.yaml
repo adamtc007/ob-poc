@@ -423,3 +423,321 @@ domains:
             - name: discrepancies
               type: array
               description: "Any discrepancy details"
+
+      # ============================================================
+      # Board Controller Verbs (Phase 2f - Control Anchors)
+      # Computes and manages board controller designation
+      # ============================================================
+
+      show-board-controller:
+        description: |
+          Show the computed board controller for a CBU.
+          Returns the natural person or entity that controls the board,
+          with derivation explanation, confidence level, and data gaps.
+        invocation_phrases:
+          - "show board controller"
+          - "who controls the board"
+          - "board controller for"
+          - "get board controller"
+        metadata:
+          tier: diagnostics
+          source_of_truth: workflow
+          scope: cbu
+          noun: board_controller
+        behavior: plugin
+        plugin:
+          handler: ShowBoardControllerOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          fields:
+            - name: cbu_id
+              type: uuid
+            - name: cbu_name
+              type: string
+            - name: board_controller_entity_id
+              type: uuid
+              description: "The entity that controls the board (may be null if unknown)"
+            - name: board_controller_name
+              type: string
+            - name: board_controller_type
+              type: string
+              description: "NATURAL_PERSON, LEGAL_ENTITY, or UNKNOWN"
+            - name: confidence
+              type: string
+              description: "HIGH, MEDIUM, or LOW"
+            - name: derivation_rule
+              type: string
+              description: "Rule used to determine controller (e.g., MAJORITY_APPOINTER)"
+            - name: derivation_explanation
+              type: string
+              description: "Human-readable explanation of derivation"
+            - name: data_gaps
+              type: array
+              description: "Missing information that affects confidence"
+            - name: evidence_sources
+              type: array
+              description: "Sources used: GLEIF, PSC_REGISTER, MANUAL, COMPUTED"
+            - name: computed_at
+              type: timestamp
+
+      recompute-board-controller:
+        description: |
+          Recompute the board controller for a CBU.
+          Traverses ownership/control graph, analyzes board compositions,
+          and determines who has effective control.
+        invocation_phrases:
+          - "recompute board controller"
+          - "recalculate board controller"
+          - "refresh board controller"
+        metadata:
+          tier: composite
+          source_of_truth: workflow
+          scope: cbu
+          noun: board_controller
+        behavior: plugin
+        plugin:
+          handler: RecomputeBoardControllerOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: force
+            type: boolean
+            required: false
+            default: false
+            description: "Force recomputation even if recently computed"
+        returns:
+          type: record
+          fields:
+            - name: cbu_id
+              type: uuid
+            - name: board_controller_entity_id
+              type: uuid
+            - name: board_controller_name
+              type: string
+            - name: confidence
+              type: string
+            - name: derivation_rule
+              type: string
+            - name: previous_controller_entity_id
+              type: uuid
+              description: "Previous board controller if changed"
+            - name: changed
+              type: boolean
+              description: "True if controller changed from previous computation"
+            - name: recomputed_at
+              type: timestamp
+
+      set-board-controller:
+        description: |
+          Manually set the board controller for a CBU.
+          Creates an override that takes precedence over computed values.
+          Requires justification and evidence document.
+        invocation_phrases:
+          - "set board controller"
+          - "override board controller"
+          - "manually set board controller"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: board_controller
+        behavior: plugin
+        plugin:
+          handler: SetBoardControllerOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: controller-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: justification
+            type: string
+            required: true
+            description: "Reason for manual override"
+          - name: evidence-doc-id
+            type: uuid
+            required: false
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+        returns:
+          type: record
+          fields:
+            - name: cbu_id
+              type: uuid
+            - name: board_controller_entity_id
+              type: uuid
+            - name: override_id
+              type: uuid
+              description: "ID of the manual override record"
+            - name: set_at
+              type: timestamp
+
+      clear-board-controller-override:
+        description: |
+          Clear a manual board controller override.
+          Returns to computed value.
+        invocation_phrases:
+          - "clear board controller override"
+          - "remove board controller override"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: board_controller
+        behavior: plugin
+        plugin:
+          handler: ClearBoardControllerOverrideOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          fields:
+            - name: cbu_id
+              type: uuid
+            - name: override_cleared
+              type: boolean
+            - name: now_using_computed
+              type: boolean
+            - name: computed_controller_entity_id
+              type: uuid
+
+      import-psc-register:
+        description: |
+          Import board controller data from a PSC (Persons with Significant Control) register.
+          Supports UK Companies House PSC format.
+        invocation_phrases:
+          - "import psc register"
+          - "import persons with significant control"
+          - "load psc data"
+        metadata:
+          tier: composite
+          source_of_truth: external
+          scope: cbu
+          noun: board_controller
+        behavior: plugin
+        plugin:
+          handler: ImportPscRegisterOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: company-number
+            type: string
+            required: true
+            description: "Companies House company number"
+          - name: source
+            type: string
+            required: false
+            default: "COMPANIES_HOUSE"
+            validation:
+              enum:
+                - COMPANIES_HOUSE
+                - MANUAL
+        returns:
+          type: record
+          fields:
+            - name: cbu_id
+              type: uuid
+            - name: company_number
+              type: string
+            - name: pscs_imported
+              type: integer
+            - name: board_controller_updated
+              type: boolean
+            - name: imported_at
+              type: timestamp
+
+      import-gleif-control:
+        description: |
+          Import control data from GLEIF (Global LEI Foundation).
+          Uses the LEI-RR (Relationship Record) data for parent/child control.
+        invocation_phrases:
+          - "import gleif control"
+          - "import lei control data"
+          - "load gleif hierarchy"
+        metadata:
+          tier: composite
+          source_of_truth: external
+          scope: cbu
+          noun: board_controller
+        behavior: plugin
+        plugin:
+          handler: ImportGleifControlOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: lei
+            type: string
+            required: true
+            description: "Legal Entity Identifier"
+          - name: include-ultimate-parent
+            type: boolean
+            required: false
+            default: true
+            description: "Also import ultimate parent chain"
+        returns:
+          type: record
+          fields:
+            - name: cbu_id
+              type: uuid
+            - name: lei
+              type: string
+            - name: direct_parent_imported
+              type: boolean
+            - name: ultimate_parent_imported
+              type: boolean
+            - name: control_relationships_created
+              type: integer
+            - name: board_controller_updated
+              type: boolean
+            - name: imported_at
+              type: timestamp

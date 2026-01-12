@@ -217,6 +217,10 @@ pub enum EntityType {
     Counterparty,
     IsdaAgreement,
     CsaAgreement,
+    // Control layer types
+    /// Portal node representing computed board controller for a CBU
+    /// Rendered as hexagon with confidence-based coloring
+    ControlPortal,
 }
 
 impl std::str::FromStr for EntityType {
@@ -255,6 +259,11 @@ impl std::str::FromStr for EntityType {
             Self::IsdaAgreement
         } else if lower == "csa_agreement" || lower == "csaagreement" || lower == "csa" {
             Self::CsaAgreement
+        } else if lower == "control_portal"
+            || lower == "controlportal"
+            || lower == "board_controller"
+        {
+            Self::ControlPortal
         } else {
             Self::Unknown
         })
@@ -333,6 +342,14 @@ pub struct GraphNodeData {
     #[serde(default)]
     pub person_state: Option<String>,
 
+    /// Cluster ID - which logical cluster this node belongs to
+    #[serde(default)]
+    pub cluster_id: Option<String>,
+
+    /// Parent node ID - for hierarchical/orbital layouts
+    #[serde(default)]
+    pub parent_id: Option<String>,
+
     // =========================================================================
     // CONTAINER FIELDS - for nodes that contain browseable children
     // =========================================================================
@@ -355,6 +372,25 @@ pub struct GraphNodeData {
     /// Parent key for scoped queries (e.g., cbu_id)
     #[serde(default)]
     pub parent_key: Option<String>,
+
+    // =========================================================================
+    // CONTROL PORTAL FIELDS - for ControlPortal node type
+    // =========================================================================
+    /// Control confidence level: "high", "medium", "low"
+    #[serde(default)]
+    pub control_confidence: Option<String>,
+
+    /// Explanation of how control was determined
+    #[serde(default)]
+    pub control_explanation: Option<String>,
+
+    /// Data gaps that affect confidence
+    #[serde(default)]
+    pub control_data_gaps: Option<Vec<String>>,
+
+    /// Rule that determined control: "A", "B", "C", "D"
+    #[serde(default)]
+    pub control_rule: Option<String>,
 }
 
 /// Verification status summary for entity relationships
@@ -469,6 +505,31 @@ pub struct LayoutNode {
     /// ID of the container node this node belongs to (for visual grouping)
     /// Used in SERVICE_DELIVERY view to show entities inside the CBU container
     pub container_parent_id: Option<String>,
+
+    // =========================================================================
+    // CONTROL PORTAL METADATA - for ControlPortal entity type
+    // =========================================================================
+    /// Control confidence level: "high", "medium", "low"
+    /// Used to determine hexagon color: green/amber/red
+    pub control_confidence: Option<String>,
+
+    /// Brief explanation of how control was determined (for tooltip)
+    pub control_explanation: Option<String>,
+
+    /// Data gaps that affect confidence (for tooltip)
+    pub control_data_gaps: Option<Vec<String>>,
+
+    /// Rule that determined control: "A" (appointment), "B" (voting), "C" (special), "D" (none)
+    pub control_rule: Option<String>,
+
+    // =========================================================================
+    // CLUSTER / HIERARCHY - for orbital layouts and force simulation
+    // =========================================================================
+    /// Cluster ID - which logical cluster this node belongs to
+    pub cluster_id: Option<String>,
+
+    /// Parent node ID - for hierarchical/orbital layouts (force sim attraction)
+    pub parent_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -538,6 +599,9 @@ pub enum EdgeType {
     CoveredByIsda,
     HasCsa,
     ImMandate,
+    // Control layer edge types
+    /// Board controller edge - links ControlPortal to the entity that controls the board
+    BoardController,
     Other,
 }
 
@@ -563,6 +627,7 @@ impl std::str::FromStr for EdgeType {
             "covered_by_isda" | "coveredbyisda" => Self::CoveredByIsda,
             "has_csa" | "hascsa" => Self::HasCsa,
             "im_mandate" | "immandate" => Self::ImMandate,
+            "board_controller" | "boardcontroller" => Self::BoardController,
             _ => Self::Other,
         })
     }
@@ -875,6 +940,14 @@ impl From<ob_poc_types::GraphNode> for GraphNodeData {
             child_count: node.child_count,
             browse_nickname: node.browse_nickname,
             parent_key: node.parent_key,
+            // Control portal fields - not in shared types yet, default to None
+            control_confidence: None,
+            control_explanation: None,
+            control_data_gaps: None,
+            control_rule: None,
+            // Cluster/hierarchy fields - not in shared types yet, default to None
+            cluster_id: None,
+            parent_id: None,
         }
     }
 }

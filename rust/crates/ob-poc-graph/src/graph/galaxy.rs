@@ -196,6 +196,12 @@ pub struct GalaxyView {
     /// Currently keyboard-selected cluster ID (for keyboard navigation)
     /// Separate from `hovered` which is mouse-driven
     keyboard_selected: Option<String>,
+
+    // =========================================================================
+    // PHASE 7: Viewport Scaling
+    // =========================================================================
+    /// Last known viewport size (for resize detection)
+    last_viewport_size: Option<Vec2>,
 }
 
 // =============================================================================
@@ -384,6 +390,8 @@ impl GalaxyView {
             depth_level: 0,
             // Phase 8: Accessibility (Keyboard Navigation)
             keyboard_selected: None,
+            // Phase 7: Viewport Scaling
+            last_viewport_size: None,
         }
     }
 
@@ -1451,6 +1459,17 @@ impl GalaxyView {
         screen_rect: Rect,
         dt: f32,
     ) -> GalaxyAction {
+        // Phase 7: Handle viewport resize - scale simulation bounds
+        let current_size = screen_rect.size();
+        let size_changed = self.last_viewport_size.map_or(true, |prev| {
+            (prev.x - current_size.x).abs() > 10.0 || (prev.y - current_size.y).abs() > 10.0
+        });
+        if size_changed {
+            self.simulation
+                .set_viewport_size(current_size.x, current_size.y);
+            self.last_viewport_size = Some(current_size);
+        }
+
         // Update simulation
         self.simulation.set_zoom(camera.zoom());
         self.simulation.tick(dt);

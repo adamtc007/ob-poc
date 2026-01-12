@@ -323,6 +323,14 @@ impl LayoutEngine {
                 parent_key: node.parent_key.clone(),
                 // Container parent (set below for SERVICE_DELIVERY view)
                 container_parent_id: None,
+                // Control portal fields
+                control_confidence: hints.control_confidence,
+                control_explanation: hints.control_explanation,
+                control_data_gaps: hints.control_data_gaps,
+                control_rule: hints.control_rule,
+                // Cluster/hierarchy fields
+                cluster_id: node.cluster_id.clone(),
+                parent_id: node.parent_id.clone(),
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -533,6 +541,14 @@ impl LayoutEngine {
                 browse_nickname: node.browse_nickname.clone(),
                 parent_key: node.parent_key.clone(),
                 container_parent_id: None,
+                // Control portal fields
+                control_confidence: hints.control_confidence,
+                control_explanation: hints.control_explanation,
+                control_data_gaps: hints.control_data_gaps,
+                control_rule: hints.control_rule,
+                // Cluster/hierarchy fields
+                cluster_id: node.cluster_id.clone(),
+                parent_id: node.parent_id.clone(),
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -590,6 +606,14 @@ impl LayoutEngine {
                 browse_nickname: node.browse_nickname.clone(),
                 parent_key: node.parent_key.clone(),
                 container_parent_id: None,
+                // Control portal fields
+                control_confidence: hints.control_confidence,
+                control_explanation: hints.control_explanation,
+                control_data_gaps: hints.control_data_gaps,
+                control_rule: hints.control_rule,
+                // Cluster/hierarchy fields
+                cluster_id: node.cluster_id.clone(),
+                parent_id: node.parent_id.clone(),
             };
 
             graph.nodes.insert(node.id.clone(), layout_node);
@@ -690,6 +714,14 @@ impl LayoutEngine {
                     browse_nickname: None,
                     parent_key: None,
                     container_parent_id: None,
+                    // Control portal fields (not applicable for service layer)
+                    control_confidence: None,
+                    control_explanation: None,
+                    control_data_gaps: None,
+                    control_rule: None,
+                    // Cluster/hierarchy fields (not applicable for template layout)
+                    cluster_id: None,
+                    parent_id: None,
                 };
                 graph.nodes.insert(product.id.clone(), layout_node);
 
@@ -745,6 +777,14 @@ impl LayoutEngine {
                             browse_nickname: None,
                             parent_key: None,
                             container_parent_id: None,
+                            // Control portal fields (not applicable for service layer)
+                            control_confidence: None,
+                            control_explanation: None,
+                            control_data_gaps: None,
+                            control_rule: None,
+                            // Cluster/hierarchy fields (not applicable for template layout)
+                            cluster_id: None,
+                            parent_id: None,
                         };
                         graph.nodes.insert(service.id.clone(), svc_node);
 
@@ -800,6 +840,14 @@ impl LayoutEngine {
                                     browse_nickname: None,
                                     parent_key: None,
                                     container_parent_id: None,
+                                    // Control portal fields (not applicable for service layer)
+                                    control_confidence: None,
+                                    control_explanation: None,
+                                    control_data_gaps: None,
+                                    control_rule: None,
+                                    // Cluster/hierarchy fields (not applicable for template layout)
+                                    cluster_id: None,
+                                    parent_id: None,
                                 };
                                 graph.nodes.insert(resource.id.clone(), res_node);
                             }
@@ -870,6 +918,14 @@ impl LayoutEngine {
                     browse_nickname: None,
                     parent_key: None,
                     container_parent_id: None,
+                    // Control portal fields (not applicable for service layer)
+                    control_confidence: None,
+                    control_explanation: None,
+                    control_data_gaps: None,
+                    control_rule: None,
+                    // Cluster/hierarchy fields (not applicable for template layout)
+                    cluster_id: None,
+                    parent_id: None,
                 };
                 graph.nodes.insert(service.id.clone(), layout_node);
             }
@@ -936,6 +992,14 @@ impl LayoutEngine {
                     browse_nickname: None,
                     parent_key: None,
                     container_parent_id: None,
+                    // Control portal fields (not applicable for service layer)
+                    control_confidence: None,
+                    control_explanation: None,
+                    control_data_gaps: None,
+                    control_rule: None,
+                    // Cluster/hierarchy fields (not applicable for template layout)
+                    cluster_id: None,
+                    parent_id: None,
                 };
                 graph.nodes.insert(resource.id.clone(), layout_node);
             }
@@ -1425,6 +1489,12 @@ fn edge_style_for_type(edge_type: EdgeType) -> EdgeStyle {
             width: 1.5,
             dashed: false,
         },
+        // Control layer edge
+        EdgeType::BoardController => EdgeStyle {
+            color,
+            width: 2.5,
+            dashed: false,
+        },
         EdgeType::Other => EdgeStyle::default(),
     }
 }
@@ -1442,6 +1512,11 @@ struct NodeVisualHints {
     needs_attention: bool,
     entity_category: Option<String>,
     person_state: Option<String>,
+    // Control portal fields
+    control_confidence: Option<String>,
+    control_explanation: Option<String>,
+    control_data_gaps: Option<Vec<String>>,
+    control_rule: Option<String>,
 }
 
 impl NodeVisualHints {
@@ -1455,6 +1530,11 @@ impl NodeVisualHints {
             needs_attention: node.needs_attention,
             entity_category: node.entity_category.clone(),
             person_state: node.person_state.clone(),
+            // Control portal fields
+            control_confidence: node.control_confidence.clone(),
+            control_explanation: node.control_explanation.clone(),
+            control_data_gaps: node.control_data_gaps.clone(),
+            control_rule: node.control_rule.clone(),
         }
     }
 
@@ -1468,6 +1548,11 @@ impl NodeVisualHints {
             needs_attention: false,
             entity_category: None,
             person_state: None,
+            // Control portal fields
+            control_confidence: None,
+            control_explanation: None,
+            control_data_gaps: None,
+            control_rule: None,
         }
     }
 }

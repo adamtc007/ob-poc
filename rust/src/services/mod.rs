@@ -33,7 +33,11 @@ pub mod dsl_enrichment;
 // Viewport resolution (lazy loading for viewport state)
 pub mod viewport_resolution_service;
 
+// Board control rules engine (computes who controls the board)
+pub mod board_control_rules;
+
 // Re-exports
+pub use board_control_rules::{BoardControlResult, BoardControlRulesEngine, RulesEngineConfig};
 pub use dictionary_service_impl::DictionaryServiceImpl;
 pub use document_attribute_crud_service::DocumentAttributeCrudService;
 pub use document_extraction_service::DocumentExtractionService;

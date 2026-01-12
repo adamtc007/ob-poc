@@ -269,6 +269,178 @@ Stage focus enables "research mode" - set stage_code to:
                 "required": ["action"]
             }),
         },
+        // =====================================================================
+        // Session v2 Tools - Simplified CBU session management
+        // Memory-first with graceful DB persistence
+        // =====================================================================
+        Tool {
+            name: "session_load_cbu".into(),
+            description: r#"Load a single CBU into the session scope.
+
+Pushes current scope to history (for undo) and sets the new scope to the specified CBU.
+Returns the loaded CBU details including name and jurisdiction.
+
+Use when user says "focus on Allianz" or "show me CBU X"."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "CBU UUID to load"
+                    },
+                    "cbu_name": {
+                        "type": "string",
+                        "description": "CBU name (alternative to cbu_id - will be resolved)"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "session_load_jurisdiction".into(),
+            description: r#"Load all CBUs in a jurisdiction.
+
+Finds all CBUs with the specified jurisdiction and loads them into scope.
+Pushes current scope to history for undo.
+
+Use when user says "show me all Luxembourg funds" or "focus on IE CBUs"."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "jurisdiction": {
+                        "type": "string",
+                        "description": "Jurisdiction code (e.g., 'LU', 'IE', 'DE')"
+                    }
+                },
+                "required": ["jurisdiction"]
+            }),
+        },
+        Tool {
+            name: "session_load_galaxy".into(),
+            description: r#"Load all CBUs under a commercial client (galaxy).
+
+Finds all CBUs that belong to the specified commercial client entity
+and loads them into scope. This is the "galaxy" view - all funds/entities
+under one institutional client like Allianz or BlackRock.
+
+Use when user says "show me everything under Allianz" or "load BlackRock galaxy"."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "apex_entity_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Commercial client entity UUID"
+                    },
+                    "apex_name": {
+                        "type": "string",
+                        "description": "Commercial client name (alternative - will be resolved)"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "session_unload_cbu".into(),
+            description: r#"Remove a CBU from the current session scope.
+
+Removes the specified CBU from the active set without affecting others.
+Pushes current scope to history for undo.
+
+Use when user says "remove this CBU from view" or "hide Apex Fund I"."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "CBU UUID to remove from scope"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
+        Tool {
+            name: "session_clear".into(),
+            description: r#"Clear session scope to empty (universe view).
+
+Removes all CBUs from scope, showing the "universe" view.
+Pushes current scope to history for undo.
+
+Use when user says "clear selection", "show everything", or "reset view"."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        Tool {
+            name: "session_undo".into(),
+            description: r#"Undo the last scope change.
+
+Restores the previous scope from history stack.
+The current scope is pushed to the future stack (for redo).
+
+Use when user says "undo", "go back", or "previous view"."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        Tool {
+            name: "session_redo".into(),
+            description: r#"Redo a previously undone scope change.
+
+Restores scope from the future stack (if available).
+Only works after undo - any new navigation clears future stack.
+
+Use when user says "redo" or "go forward"."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        Tool {
+            name: "session_info".into(),
+            description: r#"Get current session state and scope.
+
+Returns:
+- id: Session UUID
+- name: Session name (if named)
+- cbu_count: Number of CBUs in current scope
+- cbu_ids: List of CBU UUIDs in scope
+- cbu_names: List of CBU names in scope (for display)
+- history_depth: How many undos are available
+- future_depth: How many redos are available
+- dirty: Whether session has unsaved changes
+
+Use to understand current session state before operations."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        Tool {
+            name: "session_list".into(),
+            description: r#"List saved sessions.
+
+Returns summary of all persisted sessions:
+- id: Session UUID
+- name: Session name (if set)
+- cbu_count: Number of CBUs in scope
+- updated_at: Last modification time
+- expires_at: When session expires
+
+Use to find previous sessions to resume."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Max sessions to return"
+                    }
+                }
+            }),
+        },
         Tool {
             name: "entity_search".into(),
             description: r#"Search for entities with rich context for smart disambiguation.

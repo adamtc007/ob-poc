@@ -61,6 +61,12 @@ pub mod universe_routes;
 pub mod capital_routes;
 
 #[cfg(feature = "server")]
+pub mod control_routes;
+
+#[cfg(feature = "server")]
+pub mod cbu_session_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -109,3 +115,12 @@ pub use universe_routes::create_universe_router;
 
 #[cfg(feature = "server")]
 pub use capital_routes::create_capital_router;
+
+#[cfg(feature = "server")]
+pub use control_routes::control_routes;
+
+#[cfg(feature = "server")]
+pub use cbu_session_routes::{
+    create_cbu_session_router, create_cbu_session_router_with_pool, CbuSessionState,
+    CbuSessionStore,
+};

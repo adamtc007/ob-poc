@@ -267,6 +267,25 @@ pub enum ViewportFocusState {
         /// Container enhance level
         container_enhance: u8,
     },
+
+    /// Board Control view - ownership tree from anchor entity
+    /// Shows control sphere with ownership chains flowing upward to UBOs
+    BoardControl {
+        /// Source CBU that triggered navigation to board control view
+        source_cbu: CbuRef,
+        /// Anchor entity (the board controller / governance anchor)
+        anchor_entity_id: uuid::Uuid,
+        /// Anchor entity name for display
+        anchor_entity_name: String,
+        /// Depth of ownership tree to display (1-5)
+        depth: u8,
+        /// Enhance level 0-3:
+        /// - L0: Anchor + direct owners only
+        /// - L1: + grandparent level
+        /// - L2: Full chain to ultimate controllers
+        /// - L3: + evidence panel expanded
+        enhance_level: u8,
+    },
 }
 
 impl ViewportFocusState {
@@ -280,6 +299,7 @@ impl ViewportFocusState {
             Self::InstrumentMatrix { cbu, .. } => Some(cbu),
             Self::InstrumentType { cbu, .. } => Some(cbu),
             Self::ConfigNode { cbu, .. } => Some(cbu),
+            Self::BoardControl { source_cbu, .. } => Some(source_cbu),
         }
     }
 
@@ -293,6 +313,7 @@ impl ViewportFocusState {
             Self::InstrumentMatrix { matrix_enhance, .. } => *matrix_enhance,
             Self::InstrumentType { type_enhance, .. } => *type_enhance,
             Self::ConfigNode { node_enhance, .. } => *node_enhance,
+            Self::BoardControl { enhance_level, .. } => *enhance_level,
         }
     }
 
@@ -306,6 +327,7 @@ impl ViewportFocusState {
             Self::InstrumentMatrix { .. } => 2,
             Self::InstrumentType { .. } => 3,
             Self::ConfigNode { .. } => 2,
+            Self::BoardControl { .. } => 3,
         }
     }
 
@@ -328,6 +350,7 @@ impl ViewportFocusState {
             Self::InstrumentMatrix { .. } => 2,
             Self::InstrumentType { .. } => 3,
             Self::ConfigNode { .. } => 4,
+            Self::BoardControl { .. } => 2, // Same level as entity focus
         }
     }
 }

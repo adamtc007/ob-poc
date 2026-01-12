@@ -154,6 +154,7 @@ impl TradingMatrix {
             children: response.children,
             total_leaf_count: response.total_leaf_count,
             metadata: TradingMatrixMetadata::default(),
+            corporate_actions: None,
             created_at: None,
             updated_at: None,
         };
@@ -483,6 +484,10 @@ pub fn get_node_type_color(node_type: &TradingMatrixNodeType) -> Color32 {
         TradingMatrixNodeType::ProductCoverage { .. } => matrix_colors::isda(),
         TradingMatrixNodeType::InvestmentManagerMandate { .. } => matrix_colors::counterparty(),
         TradingMatrixNodeType::PricingRule { .. } => matrix_colors::universe_entry(),
+        TradingMatrixNodeType::CorporateActionsPolicy { .. } => matrix_colors::market(),
+        TradingMatrixNodeType::CaEventTypeConfig { .. } => matrix_colors::market(),
+        TradingMatrixNodeType::CaCutoffRuleNode { .. } => matrix_colors::settlement_chain(),
+        TradingMatrixNodeType::CaProceedsMappingNode { .. } => matrix_colors::ssi(),
     }
 }
 
@@ -511,6 +516,10 @@ pub fn get_node_type_icon(node_type: &TradingMatrixNodeType) -> &'static str {
         TradingMatrixNodeType::ProductCoverage { .. } => "📦",
         TradingMatrixNodeType::InvestmentManagerMandate { .. } => "👔",
         TradingMatrixNodeType::PricingRule { .. } => "💹",
+        TradingMatrixNodeType::CorporateActionsPolicy { .. } => "📋",
+        TradingMatrixNodeType::CaEventTypeConfig { .. } => "📅",
+        TradingMatrixNodeType::CaCutoffRuleNode { .. } => "⏰",
+        TradingMatrixNodeType::CaProceedsMappingNode { .. } => "💸",
     }
 }
 
@@ -1022,6 +1031,61 @@ pub fn render_node_detail_panel(ui: &mut Ui, node: &TradingMatrixNode) -> Tradin
                     }
                     if let Some(pt) = price_type {
                         detail_row(ui, "Price Type", pt);
+                    }
+                }
+                TradingMatrixNodeType::CaEventTypeConfig {
+                    event_code,
+                    event_name,
+                    processing_mode,
+                    is_elective,
+                    ..
+                } => {
+                    detail_row(ui, "Event", event_name);
+                    detail_row(ui, "Code", event_code);
+                    detail_row(ui, "Mode", processing_mode);
+                    detail_row(ui, "Elective", if *is_elective { "Yes" } else { "No" });
+                }
+                TradingMatrixNodeType::CaCutoffRuleNode {
+                    rule_key,
+                    days_before,
+                    warning_days,
+                    escalation_days,
+                } => {
+                    detail_row(ui, "Rule", rule_key);
+                    detail_row(ui, "Days Before", &days_before.to_string());
+                    detail_row(ui, "Warning", &warning_days.to_string());
+                    detail_row(ui, "Escalation", &escalation_days.to_string());
+                }
+                TradingMatrixNodeType::CaProceedsMappingNode {
+                    proceeds_type,
+                    currency,
+                    ssi_reference,
+                } => {
+                    detail_row(ui, "Type", proceeds_type);
+                    if let Some(ccy) = currency {
+                        detail_row(ui, "Currency", ccy);
+                    }
+                    detail_row(ui, "SSI", ssi_reference);
+                }
+                TradingMatrixNodeType::CorporateActionsPolicy {
+                    enabled_count,
+                    has_custom_elections,
+                    has_cutoff_rules,
+                    elector,
+                } => {
+                    detail_row(ui, "Enabled Events", &enabled_count.to_string());
+                    detail_row(
+                        ui,
+                        "Custom Elections",
+                        if *has_custom_elections { "Yes" } else { "No" },
+                    );
+                    detail_row(
+                        ui,
+                        "Cutoff Rules",
+                        if *has_cutoff_rules { "Yes" } else { "No" },
+                    );
+                    if let Some(e) = elector {
+                        detail_row(ui, "Elector", e);
                     }
                 }
             }

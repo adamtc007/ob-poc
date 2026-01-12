@@ -18,6 +18,7 @@ pub struct CbuContextRow {
     pub name: String,
     pub jurisdiction: Option<String>,
     pub client_type: Option<String>,
+    pub cbu_category: Option<String>,
     pub entity_count: i64,
     pub role_count: i64,
 }
@@ -89,6 +90,7 @@ impl ContextDiscoveryService {
                 c.name,
                 c.jurisdiction,
                 c.client_type,
+                c.cbu_category,
                 (SELECT COUNT(*) FROM "ob-poc".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id) as "entity_count!",
                 (SELECT COUNT(DISTINCT role_id) FROM "ob-poc".cbu_entity_roles cer WHERE cer.cbu_id = c.cbu_id) as "role_count!"
             FROM "ob-poc".cbus c
@@ -104,6 +106,7 @@ impl ContextDiscoveryService {
             name: r.name,
             jurisdiction: r.jurisdiction,
             client_type: r.client_type,
+            cbu_category: r.cbu_category,
             entity_count: r.entity_count,
             role_count: r.role_count,
         }))
@@ -304,6 +307,7 @@ impl From<CbuContextRow> for ob_poc_types::CbuContext {
             name: row.name,
             jurisdiction: row.jurisdiction,
             client_type: row.client_type,
+            cbu_category: row.cbu_category,
             entity_count: row.entity_count as i32,
             role_count: row.role_count as i32,
             kyc_status: None,
@@ -365,6 +369,7 @@ mod tests {
             name: "Test Fund".to_string(),
             jurisdiction: Some("LU".to_string()),
             client_type: Some("FUND".to_string()),
+            cbu_category: Some("SICAV".to_string()),
             entity_count: 5,
             role_count: 3,
         };
@@ -372,6 +377,7 @@ mod tests {
         let api_ctx: ob_poc_types::CbuContext = row.into();
         assert_eq!(api_ctx.name, "Test Fund");
         assert_eq!(api_ctx.jurisdiction, Some("LU".to_string()));
+        assert_eq!(api_ctx.cbu_category, Some("SICAV".to_string()));
         assert_eq!(api_ctx.entity_count, 5);
     }
 

@@ -76,6 +76,7 @@ pub async fn search_cbus(
             name,
             jurisdiction,
             client_type,
+            cbu_category: None,
         })
         .collect();
 

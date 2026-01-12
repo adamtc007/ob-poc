@@ -19,6 +19,7 @@
 pub mod agent_context;
 pub mod agent_mode;
 pub mod canonical_hash;
+pub mod cbu_session;
 pub mod enhanced_context;
 pub mod research_context;
 pub mod scope;
@@ -48,6 +49,11 @@ pub use agent_mode::{
     CheckpointType, DecisionRef, SessionMode,
 };
 pub use canonical_hash::{canonical_json_hash, hash_to_hex, hex_to_hash, sha256};
+pub use cbu_session::{
+    CbuSession, CbuSessionState, CbuSummary, ClearResult, HistoryResult, JurisdictionCount,
+    LoadCbuResult, LoadGalaxyResult, LoadJurisdictionResult, SessionInfo, SessionSummary,
+    UnloadCbuResult,
+};
 pub use enhanced_context::{
     get_verb_suggestions, EnhancedAgentContext, EnhancedContextBuilder, SerializableAgentContext,
     SerializableBinding,

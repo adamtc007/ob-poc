@@ -117,6 +117,8 @@ pub fn entity_type_fill(entity_type: EntityType) -> Color32 {
         EntityType::Counterparty => Color32::from_rgb(196, 181, 253),  // Violet-300
         EntityType::IsdaAgreement => Color32::from_rgb(252, 165, 165), // Red-300 (legal)
         EntityType::CsaAgreement => Color32::from_rgb(253, 186, 186),  // Red-200 (legal, lighter)
+        // Control layer - hexagon portal (default color, actual color from confidence)
+        EntityType::ControlPortal => Color32::from_rgb(147, 197, 253), // Blue-300 (neutral)
         EntityType::Unknown => Color32::from_rgb(176, 190, 197),       // Gray
     }
 }
@@ -140,7 +142,9 @@ pub fn entity_type_border(entity_type: EntityType) -> Color32 {
         EntityType::Counterparty => Color32::from_rgb(124, 58, 237),  // Violet-600
         EntityType::IsdaAgreement => Color32::from_rgb(220, 38, 38),  // Red-600
         EntityType::CsaAgreement => Color32::from_rgb(239, 68, 68),   // Red-500
-        EntityType::Unknown => Color32::from_rgb(96, 125, 139),       // Gray dark
+        // Control layer
+        EntityType::ControlPortal => Color32::from_rgb(30, 64, 175), // Blue-800
+        EntityType::Unknown => Color32::from_rgb(96, 125, 139),      // Gray dark
     }
 }
 
@@ -232,7 +236,62 @@ pub fn edge_color(edge_type: EdgeType) -> Color32 {
         EdgeType::CoveredByIsda => Color32::from_rgb(220, 38, 38),     // Red-600 (dashed)
         EdgeType::HasCsa => Color32::from_rgb(239, 68, 68),            // Red-500
         EdgeType::ImMandate => Color32::from_rgb(59, 130, 246),        // Blue-500 (dashed)
-        EdgeType::Other => Color32::from_rgb(156, 163, 175),           // Light gray
+        // Control layer
+        EdgeType::BoardController => Color32::from_rgb(168, 85, 247), // Purple-500
+        EdgeType::Other => Color32::from_rgb(156, 163, 175),          // Light gray
+    }
+}
+
+// =============================================================================
+// CONTROL PORTAL COLORS (confidence-based)
+// =============================================================================
+
+/// Confidence level for control computation
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlConfidence {
+    High,
+    Medium,
+    Low,
+}
+
+impl std::str::FromStr for ControlConfidence {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
+            "high" => Self::High,
+            "medium" => Self::Medium,
+            "low" => Self::Low,
+            _ => Self::Medium, // Default to medium for unknown
+        })
+    }
+}
+
+/// Get fill color for control portal based on confidence level
+/// High = green, Medium = amber, Low = red
+pub fn control_portal_fill(confidence: ControlConfidence) -> Color32 {
+    match confidence {
+        ControlConfidence::High => Color32::from_rgb(34, 197, 94), // Green-500
+        ControlConfidence::Medium => Color32::from_rgb(251, 191, 36), // Amber-400
+        ControlConfidence::Low => Color32::from_rgb(239, 68, 68),  // Red-500
+    }
+}
+
+/// Get border color for control portal based on confidence level
+pub fn control_portal_border(confidence: ControlConfidence) -> Color32 {
+    match confidence {
+        ControlConfidence::High => Color32::from_rgb(22, 163, 74), // Green-600
+        ControlConfidence::Medium => Color32::from_rgb(217, 119, 6), // Amber-600
+        ControlConfidence::Low => Color32::from_rgb(220, 38, 38),  // Red-600
+    }
+}
+
+/// Get glow color for control portal (used for hover/focus effects)
+pub fn control_portal_glow(confidence: ControlConfidence) -> Color32 {
+    match confidence {
+        ControlConfidence::High => Color32::from_rgba_unmultiplied(34, 197, 94, 80),
+        ControlConfidence::Medium => Color32::from_rgba_unmultiplied(251, 191, 36, 80),
+        ControlConfidence::Low => Color32::from_rgba_unmultiplied(239, 68, 68, 80),
     }
 }
 

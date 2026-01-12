@@ -17,6 +17,7 @@
 //! 2. Tagged enums only: `#[serde(tag = "type")]`
 //! 3. UUIDs as strings for JSON compatibility
 
+pub mod control;
 pub mod galaxy;
 pub mod investor_register;
 pub mod resolution;
@@ -393,6 +394,10 @@ pub struct ChatResponse {
     /// UI commands to execute (show CBU, highlight entity, etc.)
     #[serde(default)]
     pub commands: Option<Vec<AgentCommand>>,
+
+    /// Disambiguation request if agent needs user to resolve ambiguous entities
+    #[serde(default)]
+    pub disambiguation_request: Option<DisambiguationRequest>,
 }
 
 /// Session state enum for typed responses - matches server's SessionState
@@ -828,6 +833,8 @@ pub struct CbuSummary {
     pub jurisdiction: Option<String>,
     #[serde(default)]
     pub client_type: Option<String>,
+    #[serde(default)]
+    pub cbu_category: Option<String>,
 }
 
 // ============================================================================
@@ -1464,6 +1471,9 @@ pub struct CbuContext {
     /// Risk rating
     #[serde(default)]
     pub risk_rating: Option<String>,
+    /// CBU category (e.g., "SICAV", "SEGREGATED", "POOLED")
+    #[serde(default)]
+    pub cbu_category: Option<String>,
 }
 
 /// Generic linked context for related entities (cases, agreements, etc.)
@@ -1574,12 +1584,14 @@ impl CbuSummary {
         name: String,
         jurisdiction: Option<String>,
         client_type: Option<String>,
+        cbu_category: Option<String>,
     ) -> Self {
         Self {
             cbu_id: cbu_id.to_string(),
             name,
             jurisdiction,
             client_type,
+            cbu_category,
         }
     }
 }
@@ -1924,7 +1936,7 @@ mod tests {
     #[test]
     fn uuid_as_string() {
         let id = Uuid::new_v4();
-        let summary = CbuSummary::new(id, "Test Fund".into(), Some("LU".into()), None);
+        let summary = CbuSummary::new(id, "Test Fund".into(), Some("LU".into()), None, None);
 
         let json = serde_json::to_string(&summary).unwrap();
 

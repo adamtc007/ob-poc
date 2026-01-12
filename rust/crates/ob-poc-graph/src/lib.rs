@@ -30,6 +30,9 @@ pub use graph::{
     GalaxyView,
     GraphEdgeData,
     GraphNodeData,
+    // Navigation actions
+    GraphWidgetAction,
+    NavigateBackAction,
     NavigationEntry,
     RiskSummary,
     // Animation

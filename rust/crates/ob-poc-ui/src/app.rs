@@ -789,6 +789,28 @@ impl App {
                 }
             }
 
+            // Trading Matrix Navigation
+            NavigationVerb::InspectMatrix => {
+                // Navigate to InstrumentMatrix focus for current CBU
+                if let Some(cbu_id_str) =
+                    self.state.session.as_ref().and_then(|s| s.active_cbu_id())
+                {
+                    if let Ok(cbu_id) = uuid::Uuid::parse_str(&cbu_id_str) {
+                        // Set the viewport to InstrumentMatrix focus
+                        self.state
+                            .graph_widget
+                            .set_instrument_matrix_focus(cbu_id, vec![]);
+                        web_sys::console::log_1(
+                            &format!("Inspecting trading matrix for CBU: {}", cbu_id).into(),
+                        );
+                    }
+                } else {
+                    web_sys::console::log_1(
+                        &"No active CBU selected - cannot inspect matrix".into(),
+                    );
+                }
+            }
+
             // Context
             NavigationVerb::SetContext { context } => {
                 // Switch investigation context
@@ -1624,6 +1646,32 @@ impl eframe::App for App {
         }
 
         // =================================================================
+        // ESCAPE: Navigate back from special views (BoardControl, Matrix)
+        // =================================================================
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            // Check if we're in a special view that can navigate back
+            if self.state.graph_widget.can_navigate_back() {
+                if let Some(nav_action) = self.state.graph_widget.navigate_back_from_view() {
+                    // Trigger CBU graph refetch using the standard pattern
+                    let cbu_id = nav_action.target_cbu_id;
+                    if let Ok(mut async_state) = self.state.async_state.lock() {
+                        async_state.pending_cbu_id = Some(cbu_id);
+                        async_state.needs_graph_refetch = true;
+                    }
+                    self.state.view_mode = ob_poc_graph::ViewMode::KycUbo;
+                    #[cfg(target_arch = "wasm32")]
+                    web_sys::console::log_1(
+                        &format!(
+                            "Escape: navigating back from {:?} to CBU {}",
+                            nav_action.from_view, cbu_id
+                        )
+                        .into(),
+                    );
+                }
+            }
+        }
+
+        // =================================================================
         // DEBUG: F1 toggles debug window (dev builds only)
         // =================================================================
         #[cfg(debug_assertions)]
@@ -1873,12 +1921,47 @@ impl eframe::App for App {
             None
         };
 
+        // Disambiguation modal - check if there's a Disambiguation window data
+        let disambiguation_action = {
+            use crate::panels::{disambiguation_modal, DisambiguationModalData};
+            use crate::state::WindowData;
+
+            // Check if there's a disambiguation modal in the window stack
+            let has_disambiguation = self
+                .state
+                .window_stack
+                .find_by_type(crate::state::WindowType::Resolution)
+                .map(|w| matches!(&w.data, Some(WindowData::Disambiguation { .. })))
+                .unwrap_or(false);
+
+            if has_disambiguation {
+                let searching = self
+                    .state
+                    .async_state
+                    .lock()
+                    .map(|s| s.loading_disambiguation)
+                    .unwrap_or(false);
+
+                let window = self
+                    .state
+                    .window_stack
+                    .find_by_type(crate::state::WindowType::Resolution);
+
+                let data = DisambiguationModalData { window, searching };
+
+                disambiguation_modal(ctx, &mut self.state.resolution_ui.search_query, &data)
+            } else {
+                None
+            }
+        };
+
         // =================================================================
         // STEP 5: Handle actions AFTER rendering (Rule 2: actions return values)
         // =================================================================
         self.handle_toolbar_action(toolbar_action);
         self.handle_cbu_search_action(cbu_search_action);
         self.handle_resolution_action(resolution_action);
+        self.handle_disambiguation_action(disambiguation_action);
 
         // Container browse panel (side panel, rendered before central)
         // Extract owned copies to avoid borrow conflicts
@@ -2197,6 +2280,199 @@ impl App {
         }
     }
 
+    /// Handle disambiguation modal actions
+    fn handle_disambiguation_action(
+        &mut self,
+        action: Option<crate::panels::DisambiguationAction>,
+    ) {
+        use crate::panels::DisambiguationAction;
+
+        let Some(action) = action else { return };
+
+        match action {
+            DisambiguationAction::Select {
+                entity_id,
+                entity_type,
+                display_name,
+            } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "Disambiguation: Select entity_id={} type={} name={}",
+                        entity_id, entity_type, display_name
+                    )
+                    .into(),
+                );
+
+                // Close modal
+                self.state
+                    .window_stack
+                    .close_by_type(crate::state::WindowType::Resolution);
+
+                // Bind entity to session
+                if let Some(session_id) = self.state.session_id {
+                    self.bind_entity_to_session(
+                        session_id,
+                        &entity_id,
+                        &entity_type,
+                        &display_name,
+                    );
+                }
+
+                // Clear search
+                self.state.resolution_ui.search_query.clear();
+            }
+
+            DisambiguationAction::Search { query, entity_type } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "Disambiguation: Search query={} type={}",
+                        query, entity_type
+                    )
+                    .into(),
+                );
+                self.search_disambiguation_matches(&query, &entity_type);
+            }
+
+            DisambiguationAction::Skip => {
+                web_sys::console::log_1(&"Disambiguation: Skip".into());
+                self.advance_disambiguation_item();
+            }
+
+            DisambiguationAction::Cancel | DisambiguationAction::Close => {
+                web_sys::console::log_1(&"Disambiguation: Cancel/Close".into());
+                self.state
+                    .window_stack
+                    .close_by_type(crate::state::WindowType::Resolution);
+                self.state.resolution_ui.search_query.clear();
+            }
+        }
+    }
+
+    /// Bind an entity to the session and trigger refresh
+    fn bind_entity_to_session(
+        &mut self,
+        session_id: Uuid,
+        entity_id: &str,
+        entity_type: &str,
+        display_name: &str,
+    ) {
+        let entity_uuid = match Uuid::parse_str(entity_id) {
+            Ok(id) => id,
+            Err(e) => {
+                web_sys::console::error_1(&format!("Invalid entity UUID: {}", e).into());
+                return;
+            }
+        };
+
+        let async_state = Arc::clone(&self.state.async_state);
+        let ctx = self.state.ctx.clone();
+        let entity_type = entity_type.to_string();
+        let display_name = display_name.to_string();
+
+        {
+            let mut state = self.state.async_state.lock().unwrap();
+            state.loading_session = true;
+        }
+
+        spawn_local(async move {
+            // Call bind API
+            let result =
+                crate::api::bind_entity(session_id, entity_uuid, &entity_type, &display_name).await;
+
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_session = false;
+
+                match result {
+                    Ok(_response) => {
+                        web_sys::console::log_1(
+                            &format!("Bound {} {} to session", entity_type, display_name).into(),
+                        );
+                        // Trigger full session refresh to get updated context
+                        state.pending_session_refetch = true;
+                    }
+                    Err(e) => {
+                        state.last_error = Some(format!("Failed to bind entity: {}", e));
+                    }
+                }
+            }
+
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Search for disambiguation matches
+    fn search_disambiguation_matches(&mut self, query: &str, entity_type: &str) {
+        let Some(session_id) = self.state.session_id else {
+            return;
+        };
+
+        let async_state = Arc::clone(&self.state.async_state);
+        let ctx = self.state.ctx.clone();
+        let query = query.to_string();
+        let entity_type = entity_type.to_string();
+
+        {
+            let mut state = self.state.async_state.lock().unwrap();
+            state.loading_disambiguation = true;
+        }
+
+        spawn_local(async move {
+            // Use entity search API
+            let result = crate::api::search_entities(&query, &entity_type, 10).await;
+
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_disambiguation = false;
+                state.pending_disambiguation_results = Some(result);
+            }
+
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+
+            let _ = session_id; // Silence unused warning
+        });
+    }
+
+    /// Advance to next disambiguation item or close if done
+    fn advance_disambiguation_item(&mut self) {
+        use crate::state::WindowData;
+
+        if let Some(window) = self
+            .state
+            .window_stack
+            .find_by_type_mut(crate::state::WindowType::Resolution)
+        {
+            if let Some(WindowData::Disambiguation {
+                ref request,
+                ref mut current_item_index,
+                ref mut search_results,
+            }) = window.data
+            {
+                *current_item_index += 1;
+                if *current_item_index >= request.items.len() {
+                    // All items processed, close modal
+                    self.state
+                        .window_stack
+                        .close_by_type(crate::state::WindowType::Resolution);
+                } else {
+                    // Clear results and update search buffer for next item
+                    *search_results = None;
+                    if let Some(item) = request.items.get(*current_item_index) {
+                        if let ob_poc_types::DisambiguationItem::EntityMatch {
+                            ref search_text,
+                            ..
+                        } = item
+                        {
+                            self.state.resolution_ui.search_query = search_text.clone();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Handle DSL editor actions
     fn handle_dsl_editor_action(&mut self, action: DslEditorAction) {
         match action {
@@ -2377,8 +2653,19 @@ impl App {
                 } else {
                     node_key.split('/').map(|s| s.to_string()).collect()
                 };
-                let node_id = ob_poc_graph::TradingMatrixNodeId::new(path);
+                let node_id = ob_poc_graph::TradingMatrixNodeId::new(path.clone());
                 self.state.trading_matrix_state.select(Some(&node_id));
+
+                // Also set viewport focus to the matrix node
+                if let Some(cbu_id_str) =
+                    self.state.session.as_ref().and_then(|s| s.active_cbu_id())
+                {
+                    if let Ok(cbu_id) = Uuid::parse_str(&cbu_id_str) {
+                        self.state
+                            .graph_widget
+                            .set_instrument_matrix_focus(cbu_id, path);
+                    }
+                }
             }
             TradingMatrixPanelAction::ClearSelection => {
                 self.state.trading_matrix_state.select(None);
@@ -3186,6 +3473,7 @@ impl AppState {
                 ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
                 ViewMode::ProductsOnly => "PRODUCTS_ONLY",
                 ViewMode::Trading => "TRADING",
+                ViewMode::BoardControl => "BOARD_CONTROL",
             };
             let view_level_str = format!("{:?}", self.view_level);
             spawn_local(async move {
@@ -3236,6 +3524,7 @@ impl AppState {
                 ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
                 ViewMode::ProductsOnly => "PRODUCTS_ONLY",
                 ViewMode::Trading => "TRADING",
+                ViewMode::BoardControl => "BOARD_CONTROL",
             };
             let view_level_str = format!("{:?}", level);
             spawn_local(async move {
@@ -3806,6 +4095,18 @@ impl AppState {
                             }
                         } else {
                             web_sys::console::log_1(&"send_chat: no commands in response".into());
+                        }
+
+                        // Handle disambiguation request - opens resolution modal
+                        if let Some(disambig) = chat_response.disambiguation_request {
+                            web_sys::console::log_1(
+                                &format!(
+                                    "send_chat: disambiguation requested for {} items",
+                                    disambig.items.len()
+                                )
+                                .into(),
+                            );
+                            state.pending_disambiguation = Some(disambig);
                         }
                     }
                     Err(e) => {

@@ -53,6 +53,7 @@ mod resource_ops;
 mod screening_ops;
 mod semantic_ops;
 mod session_ops;
+mod session_ops_v2;
 mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
@@ -221,8 +222,9 @@ pub use capital_ops::{
     CapitalTransferOp,
 };
 pub use control_ops::{
-    ControlAnalyzeOp, ControlBuildGraphOp, ControlIdentifyUbosOp, ControlReconcileOwnershipOp,
-    ControlTraceChainOp,
+    ClearBoardControllerOverrideOp, ControlAnalyzeOp, ControlBuildGraphOp, ControlIdentifyUbosOp,
+    ControlReconcileOwnershipOp, ControlTraceChainOp, ImportGleifControlOp, ImportPscRegisterOp,
+    RecomputeBoardControllerOp, SetBoardControllerOp, ShowBoardControllerOp,
 };
 pub use dilution_ops::{
     DilutionCreateConvertibleNoteOp, DilutionCreateSafeOp, DilutionExerciseOp, DilutionForfeitOp,
@@ -650,12 +652,21 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ControlIdentifyUbosOp));
         registry.register(Arc::new(ControlTraceChainOp));
         registry.register(Arc::new(ControlReconcileOwnershipOp));
+        registry.register(Arc::new(ShowBoardControllerOp));
+        registry.register(Arc::new(RecomputeBoardControllerOp));
+        registry.register(Arc::new(SetBoardControllerOp));
+        registry.register(Arc::new(ClearBoardControllerOverrideOp));
+        registry.register(Arc::new(ImportPscRegisterOp));
+        registry.register(Arc::new(ImportGleifControlOp));
 
         // Investor lifecycle operations (TA KYC-as-a-Service)
         investor_ops::register_investor_ops(&mut registry);
 
-        // Session scope management operations
+        // Session scope management operations (legacy - 20 verbs)
         session_ops::register_session_ops(&mut registry);
+
+        // Session v2 operations (Phase 6 - 9 verbs, memory-first)
+        session_ops_v2::register_session_ops_v2(&mut registry);
 
         // Agent control operations (agent mode lifecycle, checkpoints)
         agent_ops::register_agent_ops(&mut registry);

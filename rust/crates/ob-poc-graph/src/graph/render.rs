@@ -59,6 +59,9 @@ pub struct RenderOptions<'a> {
     pub highlighted_type: Option<&'a str>,
     /// Esper render modes (xray, peel, shadow, etc.)
     pub esper_state: Option<&'a EsperRenderState>,
+    /// Matrix focus path - when set, highlights trading-related nodes
+    /// Path segments like ["Equities", "Listed"] trigger trading entity highlighting
+    pub matrix_focus_path: Option<&'a [String]>,
 }
 
 impl GraphRenderer {
@@ -87,6 +90,8 @@ impl GraphRenderer {
         let type_filter = opts.type_filter;
         let highlighted_type = opts.highlighted_type;
         let esper_state = opts.esper_state;
+        let matrix_focus_path = opts.matrix_focus_path;
+
         // Render container backgrounds first (below everything)
         self.render_containers(painter, graph, camera, screen_rect);
 
@@ -177,9 +182,15 @@ impl GraphRenderer {
                 .map(|hl| self.node_matches_type(node, hl))
                 .unwrap_or(false);
 
+            // Check matrix focus - when matrix node is selected, highlight trading entities
+            let is_matrix_highlighted = matrix_focus_path.is_some() && self.is_trading_entity(node);
+
             // Combine focus states: in_focus if (node focus AND type filter match)
             // If type filter is set but node doesn't match, treat as not in focus
             let in_focus = node_in_focus && matches_type_filter;
+
+            // Combine highlight states
+            let combined_highlight = is_highlighted || is_matrix_highlighted;
 
             self.render_node(
                 painter,
@@ -188,7 +199,7 @@ impl GraphRenderer {
                 screen_rect,
                 in_focus,
                 is_focused,
-                is_highlighted,
+                combined_highlight,
                 esper_state,
             );
         }
@@ -789,6 +800,7 @@ impl GraphRenderer {
             EntityType::Counterparty => "COUNTERPARTY",
             EntityType::IsdaAgreement => "ISDA_AGREEMENT",
             EntityType::CsaAgreement => "CSA_AGREEMENT",
+            EntityType::ControlPortal => "CONTROL_PORTAL",
             EntityType::Unknown => "ENTITY",
         };
 
@@ -855,6 +867,20 @@ impl GraphRenderer {
         }
 
         false
+    }
+
+    /// Check if a node is a trading layer entity (for matrix highlighting)
+    fn is_trading_entity(&self, node: &LayoutNode) -> bool {
+        matches!(
+            node.entity_type,
+            EntityType::TradingProfile
+                | EntityType::InstrumentMatrix
+                | EntityType::InstrumentClass
+                | EntityType::Market
+                | EntityType::Counterparty
+                | EntityType::IsdaAgreement
+                | EntityType::CsaAgreement
+        )
     }
 
     /// Check if edge is in focus

@@ -109,6 +109,8 @@ pub fn curve_strength_for_edge(edge_type: EdgeType, _role: Option<&PrimaryRole>)
         EdgeType::CoveredByIsda => 0.18,    // curved legal relationships
         EdgeType::HasCsa => 0.10,           // slight curve for CSA
         EdgeType::ImMandate => 0.22,        // curved IM mandates
+        // Control layer edges
+        EdgeType::BoardController => 0.18, // curved for control relationship
         EdgeType::Other => 0.10,
     }
 }
@@ -154,6 +156,8 @@ pub fn edge_priority(edge_type: EdgeType) -> u32 {
         EdgeType::CoveredByIsda => 72,
         EdgeType::HasCsa => 68,
         EdgeType::ImMandate => 78, // IM mandates are important
+        // Control layer edges
+        EdgeType::BoardController => 95, // Board controller is very important
         EdgeType::Other => 30,
     }
 }

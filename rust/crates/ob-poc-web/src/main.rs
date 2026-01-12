@@ -24,10 +24,11 @@ use crate::state::AppState;
 
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
-    create_agent_router_with_sessions, create_attribute_router, create_client_router,
-    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
-    create_session_graph_router, create_session_store, create_taxonomy_router,
-    create_trading_matrix_router, create_universe_router, create_verb_discovery_router,
+    control_routes, create_agent_router_with_sessions, create_attribute_router,
+    create_client_router, create_dsl_viewer_router, create_entity_router, create_graph_router,
+    create_resolution_router, create_session_graph_router, create_session_store,
+    create_taxonomy_router, create_trading_matrix_router, create_universe_router,
+    create_verb_discovery_router,
 };
 
 // Import resolution store from services
@@ -353,7 +354,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Session-scoped graph (shares state with REPL and taxonomy)
         .merge(create_session_graph_router(pool.clone(), sessions.clone()))
         // Galaxy navigation - universe view and cluster detail
-        .merge(create_universe_router(pool.clone()));
+        .merge(create_universe_router(pool.clone()))
+        // Control/ownership routes (board controller, control sphere)
+        .merge(control_routes(pool.clone()));
 
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());

@@ -9,6 +9,7 @@ mod cbu_search;
 mod chat;
 mod container_browse;
 mod context;
+mod disambiguation;
 mod dsl_editor;
 mod entity_detail;
 mod investor_register;
@@ -27,6 +28,7 @@ pub use container_browse::{
     container_browse_panel, ContainerBrowseAction, ContainerBrowseData, ContainerBrowseState,
 };
 pub use context::{context_panel, ContextPanelAction};
+pub use disambiguation::{disambiguation_modal, DisambiguationAction, DisambiguationModalData};
 pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
 pub use investor_register::{investor_register_panel, InvestorRegisterAction};

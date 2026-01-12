@@ -189,6 +189,8 @@ impl EntityTypeOntology {
             EntityType::Counterparty => "COUNTERPARTY".to_string(),
             EntityType::IsdaAgreement => "ISDA_AGREEMENT".to_string(),
             EntityType::CsaAgreement => "CSA_AGREEMENT".to_string(),
+            // Control layer types
+            EntityType::ControlPortal => "CONTROL_PORTAL".to_string(),
             EntityType::Unknown => "ENTITY".to_string(),
         }
     }

@@ -1,0 +1,205 @@
+# Session Verbs - Simplified
+#
+# Session state = HashSet<Uuid> of loaded CBUs
+# Everything else (clusters, galaxies, control spheres) is DERIVED from edges
+#
+# Focus/camera/viewport = CLIENT SIDE, not DSL verbs
+#
+# History: undo/redo stack of session states
+
+domains:
+  session:
+    description: |
+      Manages which CBUs are loaded into the session.
+      CBU is the atomic unit. Clusters/galaxies derived from group edges.
+      Viewport focus is client-side, not managed here.
+
+    verbs:
+      # ============================================
+      # Load CBUs into session (mutates state, pushes history)
+      # ============================================
+
+      load-cbu:
+        description: Add a single CBU to the session
+        behavior: plugin
+        handler: SessionLoadCbuOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [load, cbu]
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            description: The CBU to load
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          fields: [cbu_id, name, jurisdiction, total_loaded]
+
+      load-jurisdiction:
+        description: Load all CBUs in a jurisdiction
+        behavior: plugin
+        handler: SessionLoadJurisdictionOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [load, jurisdiction, bulk]
+        args:
+          - name: jurisdiction
+            type: string
+            required: true
+            description: ISO country code (LU, IE, DE, US, etc.)
+        returns:
+          type: record
+          fields: [jurisdiction, count_added, total_loaded]
+
+      load-galaxy:
+        description: Load all CBUs under an apex entity (e.g., Allianz SE)
+        behavior: plugin
+        handler: SessionLoadGalaxyOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [load, galaxy, bulk]
+        args:
+          - name: apex-entity-id
+            type: uuid
+            required: true
+            maps_to: apex_entity_id
+            description: The apex/parent entity
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields: [apex_name, count_added, total_loaded]
+
+      # ============================================
+      # Unload CBUs from session
+      # ============================================
+
+      unload-cbu:
+        description: Remove a single CBU from the session
+        behavior: plugin
+        handler: SessionUnloadCbuOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [unload, cbu]
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            description: The CBU to unload
+            lookup:
+              table: cbus
+              schema: ob-poc
+              entity_type: cbu
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          fields: [cbu_id, name, total_loaded]
+
+      clear:
+        description: Remove all CBUs from session
+        behavior: plugin
+        handler: SessionClearOp2
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [clear, reset]
+        args: []
+        returns:
+          type: record
+          fields: [count_removed]
+
+      # ============================================
+      # History navigation
+      # ============================================
+
+      undo:
+        description: Rollback to previous session state
+        behavior: plugin
+        handler: SessionUndoOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_history
+          tags: [history, undo]
+        args: []
+        returns:
+          type: record
+          fields: [success, total_loaded, history_depth]
+
+      redo:
+        description: Re-apply undone state change
+        behavior: plugin
+        handler: SessionRedoOp
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_history
+          tags: [history, redo]
+        args: []
+        returns:
+          type: record
+          fields: [success, total_loaded, future_depth]
+
+      # ============================================
+      # Query (read-only)
+      # ============================================
+
+      info:
+        description: Get session summary
+        behavior: plugin
+        handler: SessionInfoOp2
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          noun: session_info
+          tags: [read, info]
+        args: []
+        returns:
+          type: record
+          fields:
+            [total_cbus, jurisdictions, galaxies, history_depth, future_depth]
+
+      list:
+        description: List loaded CBUs
+        behavior: plugin
+        handler: SessionListOp
+        metadata:
+          tier: diagnostics
+          source_of_truth: session
+          noun: session_cbus
+          tags: [read, list]
+        args:
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Max results
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Filter by jurisdiction
+        returns:
+          type: list
+          item_fields: [cbu_id, name, jurisdiction, apex_entity]

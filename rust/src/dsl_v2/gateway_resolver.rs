@@ -58,23 +58,21 @@ impl GatewayRefResolver {
     ) -> Result<ResolveResult, String> {
         let nickname = ref_type_to_nickname(ref_type);
 
-        // For UUID-based lookups, we search by ID directly
-        let (search_value, search_key) = if is_uuid_lookup(ref_type) {
-            // Validate UUID format first
-            if Uuid::parse_str(value).is_err() {
-                return Ok(ResolveResult::NotFound {
-                    suggestions: vec![],
-                });
-            }
-            (value.to_string(), Some("id".to_string()))
-        } else {
-            (value.to_string(), None)
-        };
+        // For UUID-based lookups, we search by ID directly if value looks like a UUID
+        // Otherwise, search by name (default search key)
+        let (search_value, search_key) =
+            if is_uuid_lookup(ref_type) && Uuid::parse_str(value).is_ok() {
+                // Value is a valid UUID - search by ID
+                (value.to_string(), Some("id".to_string()))
+            } else {
+                // Value is a name - search by default key (name)
+                (value.to_string(), None)
+            };
 
         let request = SearchRequest {
             nickname: nickname.to_string(),
-            values: vec![search_value],
-            search_key,
+            values: vec![search_value.clone()],
+            search_key: search_key.clone(),
             mode: SearchMode::Exact as i32,
             limit: Some(5), // Get suggestions if not found
             discriminators: std::collections::HashMap::new(),
@@ -89,10 +87,41 @@ impl GatewayRefResolver {
         let matches: Vec<_> = response.into_inner().matches;
 
         if matches.is_empty() {
-            // No matches - return not found with suggestions
-            return Ok(ResolveResult::NotFound {
-                suggestions: vec![],
-            });
+            // No exact matches - try fuzzy search for suggestions
+            let fuzzy_request = SearchRequest {
+                nickname: nickname.to_string(),
+                values: vec![search_value.clone()],
+                search_key: search_key.clone(),
+                mode: SearchMode::Fuzzy as i32,
+                limit: Some(10),
+                discriminators: std::collections::HashMap::new(),
+            };
+
+            let fuzzy_response = self
+                .client
+                .search(fuzzy_request)
+                .await
+                .map_err(|e| format!("EntityGateway fuzzy search failed: {}", e))?;
+
+            let fuzzy_matches = fuzzy_response.into_inner().matches;
+
+            if fuzzy_matches.is_empty() {
+                return Ok(ResolveResult::NotFound {
+                    suggestions: vec![],
+                });
+            }
+
+            // Return fuzzy matches as suggestions
+            let suggestions: Vec<SuggestedMatch> = fuzzy_matches
+                .into_iter()
+                .map(|m| SuggestedMatch {
+                    value: m.token,
+                    display: m.display,
+                    score: m.score,
+                })
+                .collect();
+
+            return Ok(ResolveResult::NotFound { suggestions });
         }
 
         // Check for exact match (case-insensitive)

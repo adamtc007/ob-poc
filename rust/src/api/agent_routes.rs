@@ -77,6 +77,61 @@ fn to_api_span(span: &dsl_core::Span) -> AstSpan {
     }
 }
 
+/// Convert internal DisambiguationRequest to API DisambiguationRequest
+/// Server uses Uuid, client uses String for JSON compatibility
+fn to_api_disambiguation_request(
+    req: &crate::api::session::DisambiguationRequest,
+) -> ob_poc_types::DisambiguationRequest {
+    ob_poc_types::DisambiguationRequest {
+        request_id: req.request_id.to_string(),
+        items: req.items.iter().map(to_api_disambiguation_item).collect(),
+        prompt: req.prompt.clone(),
+    }
+}
+
+/// Convert internal DisambiguationItem to API DisambiguationItem
+fn to_api_disambiguation_item(
+    item: &crate::api::session::DisambiguationItem,
+) -> ob_poc_types::DisambiguationItem {
+    match item {
+        crate::api::session::DisambiguationItem::EntityMatch {
+            param,
+            search_text,
+            matches,
+        } => ob_poc_types::DisambiguationItem::EntityMatch {
+            param: param.clone(),
+            search_text: search_text.clone(),
+            matches: matches.iter().map(to_api_entity_match).collect(),
+        },
+        crate::api::session::DisambiguationItem::InterpretationChoice { text, options } => {
+            ob_poc_types::DisambiguationItem::InterpretationChoice {
+                text: text.clone(),
+                options: options
+                    .iter()
+                    .map(|opt| ob_poc_types::Interpretation {
+                        id: opt.id.clone(),
+                        label: opt.label.clone(),
+                        description: opt.description.clone(),
+                        effect: opt.effect.clone(),
+                    })
+                    .collect(),
+            }
+        }
+    }
+}
+
+/// Convert internal EntityMatchOption to API EntityMatch
+fn to_api_entity_match(opt: &crate::api::session::EntityMatchOption) -> ob_poc_types::EntityMatch {
+    ob_poc_types::EntityMatch {
+        entity_id: opt.entity_id.to_string(),
+        name: opt.name.clone(),
+        entity_type: opt.entity_type.clone(),
+        jurisdiction: opt.jurisdiction.clone(),
+        context: opt.context.clone(),
+        score: opt.score.map(|s| s as f64),
+    }
+}
+
 /// Convert internal dsl_core::Statement to API AstStatement
 fn to_api_ast_statement(stmt: &dsl_core::Statement) -> AstStatement {
     match stmt {
@@ -1192,6 +1247,7 @@ async fn chat_subsession(
                 dsl: None,
                 session_state: to_session_state_enum(&child.state),
                 commands: None,
+                disambiguation_request: None,
             }
         }
         SubSessionType::Review(_) => {
@@ -1201,6 +1257,7 @@ async fn chat_subsession(
                 dsl: None,
                 session_state: to_session_state_enum(&child.state),
                 commands: None,
+                disambiguation_request: None,
             }
         }
         _ => {
@@ -1285,6 +1342,7 @@ async fn process_resolution_message(
         dsl: None,
         session_state: to_session_state_enum(&session.state),
         commands: None,
+        disambiguation_request: None,
     })
 }
 
@@ -1363,6 +1421,7 @@ fn handle_resolution_selection(
             dsl: None,
             session_state: to_session_state_enum(&session.state),
             commands: None,
+            disambiguation_request: None,
         });
     }
 
@@ -1429,6 +1488,7 @@ fn handle_resolution_selection(
         dsl: None,
         session_state: to_session_state_enum(&session.state),
         commands: None,
+        disambiguation_request: None,
     })
 }
 
@@ -1474,6 +1534,7 @@ fn handle_resolution_skip(
         dsl: None,
         session_state: to_session_state_enum(&session.state),
         commands: None,
+        disambiguation_request: None,
     })
 }
 
@@ -1932,6 +1993,7 @@ async fn chat_session(
                 dsl: None,
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
+                disambiguation_request: None,
             }));
         }
         // /commands <domain> or /verbs <domain> - show verbs for domain
@@ -1941,6 +2003,7 @@ async fn chat_session(
                 dsl: None,
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
+                disambiguation_request: None,
             }));
         }
         // /verbs (no args) - show all verbs
@@ -1950,6 +2013,7 @@ async fn chat_session(
                 dsl: None,
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
+                disambiguation_request: None,
             }));
         }
         _ => {} // Not a slash command, continue to LLM
@@ -1968,6 +2032,7 @@ async fn chat_session(
                 dsl: None,
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
+                disambiguation_request: None,
             }));
         }
     };
@@ -2000,6 +2065,7 @@ async fn chat_session(
                 dsl: None,
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
+                disambiguation_request: None,
             }));
         }
     };
@@ -2029,6 +2095,10 @@ async fn chat_session(
         dsl: dsl_state,
         session_state: to_session_state_enum(&response.session_state),
         commands: response.commands,
+        disambiguation_request: response
+            .disambiguation
+            .as_ref()
+            .map(to_api_disambiguation_request),
     }))
 }
 

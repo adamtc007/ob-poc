@@ -4,6 +4,7 @@
 
 use egui::{Color32, FontId, Pos2, Stroke, Vec2};
 
+use super::colors::{control_portal_border, control_portal_fill, ControlConfidence};
 use super::types::{EntityType, LayoutNode, PrimaryRole};
 
 // =============================================================================
@@ -53,6 +54,9 @@ impl RenderContext {
 // DETAIL LEVEL
 // =============================================================================
 
+/// Reference viewport area for LOD scaling (800x600 = 480,000 px²)
+const REFERENCE_VIEWPORT_AREA: f32 = 480_000.0;
+
 /// Level of detail for node rendering
 /// Thresholds: Micro < 8px < Icon < 30px < Compact < 80px < Standard < 120px < Expanded
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,6 +75,59 @@ pub enum DetailLevel {
     Focused,
 }
 
+/// Configuration for viewport-aware LOD thresholds
+#[derive(Debug, Clone, Copy)]
+pub struct LodConfig {
+    /// Base node count threshold for density calculations
+    /// Scales with viewport area
+    pub density_base: f32,
+    /// Multiplier applied to density factor (0.0-1.0)
+    /// Higher = more aggressive aggregation at same node count
+    pub density_weight: f32,
+    /// Current viewport area in pixels
+    pub viewport_area: f32,
+}
+
+impl Default for LodConfig {
+    fn default() -> Self {
+        Self {
+            density_base: 20.0,
+            density_weight: 0.3,
+            viewport_area: REFERENCE_VIEWPORT_AREA,
+        }
+    }
+}
+
+impl LodConfig {
+    /// Create LOD config for a specific viewport size
+    pub fn for_viewport(width: f32, height: f32) -> Self {
+        let area = width * height;
+        let area_ratio = area / REFERENCE_VIEWPORT_AREA;
+
+        // Larger viewport = higher density threshold (can show more nodes before aggregating)
+        // Smaller viewport = lower threshold (aggregate sooner)
+        let scaled_base = 20.0 * area_ratio.sqrt();
+
+        Self {
+            density_base: scaled_base.clamp(10.0, 60.0),
+            density_weight: 0.3,
+            viewport_area: area,
+        }
+    }
+
+    /// Update config for new viewport dimensions
+    pub fn update_viewport(&mut self, width: f32, height: f32) {
+        let new = Self::for_viewport(width, height);
+        self.density_base = new.density_base;
+        self.viewport_area = new.viewport_area;
+    }
+
+    /// Calculate density factor for current node count
+    pub fn density_factor(&self, node_count: usize) -> f32 {
+        (node_count as f32 / self.density_base).min(1.0)
+    }
+}
+
 impl DetailLevel {
     /// Determine LOD from screen-space radius
     pub fn from_screen_size(screen_width: f32, is_focused: bool) -> Self {
@@ -86,6 +143,48 @@ impl DetailLevel {
             w if w < 40.0 => DetailLevel::Icon,
             w if w < 70.0 => DetailLevel::Compact,
             w if w < 120.0 => DetailLevel::Standard,
+            _ => DetailLevel::Expanded,
+        }
+    }
+
+    /// Determine LOD from compression factor and node density
+    ///
+    /// Compression is inverse of zoom (0.0 = zoomed in, 1.0 = zoomed out).
+    /// Density factor adjusts for crowded views.
+    ///
+    /// Visual progression:
+    /// - compression > 0.8: Icon (dot + count badge)
+    /// - compression 0.5-0.8: Compact (shape + 2-char code)
+    /// - compression 0.2-0.5: Standard (full name)
+    /// - compression < 0.2: Expanded (full + inline detail)
+    pub fn for_compression(compression: f32, node_count: usize) -> Self {
+        let density_factor = (node_count as f32 / 20.0).min(1.0);
+        let effective = compression + (density_factor * 0.3);
+
+        match effective {
+            c if c > 0.8 => DetailLevel::Icon,
+            c if c > 0.5 => DetailLevel::Compact,
+            c if c > 0.2 => DetailLevel::Standard,
+            _ => DetailLevel::Expanded,
+        }
+    }
+
+    /// Determine LOD with viewport-aware density scaling
+    ///
+    /// Uses LodConfig to adjust thresholds based on viewport size.
+    /// Larger viewport = can show more detail at same node count.
+    pub fn for_compression_with_config(
+        compression: f32,
+        node_count: usize,
+        config: &LodConfig,
+    ) -> Self {
+        let density_factor = config.density_factor(node_count);
+        let effective = compression + (density_factor * config.density_weight);
+
+        match effective {
+            c if c > 0.8 => DetailLevel::Icon,
+            c if c > 0.5 => DetailLevel::Compact,
+            c if c > 0.2 => DetailLevel::Standard,
             _ => DetailLevel::Expanded,
         }
     }
@@ -145,6 +244,17 @@ fn render_icon(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) 
         }
         EntityType::Trust => {
             render_triangle(painter, ctx.pos, radius, ctx.fill, ctx.border, ctx.is_ghost);
+        }
+        EntityType::ControlPortal => {
+            // Hexagon shape with confidence-based coloring
+            let confidence = node
+                .control_confidence
+                .as_deref()
+                .and_then(|s| s.parse::<ControlConfidence>().ok())
+                .unwrap_or(ControlConfidence::Medium);
+            let fill = apply_opacity(control_portal_fill(confidence), ctx.opacity);
+            let border = apply_opacity(control_portal_border(confidence), ctx.opacity);
+            render_hexagon(painter, ctx.pos, radius, fill, border);
         }
         _ => {
             let rect = egui::Rect::from_center_size(ctx.pos, Vec2::splat(radius * 1.8));
@@ -208,6 +318,12 @@ fn render_compact(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContex
 /// Standard: Name at top (wrapped), role labels at bottom-right
 /// Clean layout - no jurisdiction or entity type clutter
 fn render_standard(painter: &egui::Painter, node: &LayoutNode, ctx: &RenderContext) {
+    // Special handling for ControlPortal nodes - use hexagon
+    if node.entity_type == EntityType::ControlPortal {
+        render_hexagon_with_label(painter, node, ctx.pos, ctx.size, ctx.opacity);
+        return;
+    }
+
     let rect = ctx.rect();
     let border_width = if node.is_cbu_root { 3.0 } else { 2.0 };
     let stroke = Stroke::new(border_width, ctx.border);
@@ -472,6 +588,119 @@ fn render_triangle(
             fill,
             Stroke::new(1.5, border),
         ));
+    }
+}
+
+/// Render a hexagon shape for ControlPortal nodes
+fn render_hexagon(
+    painter: &egui::Painter,
+    center: Pos2,
+    radius: f32,
+    fill: Color32,
+    border: Color32,
+) {
+    // 6 points, starting from top, going clockwise
+    let mut points = Vec::with_capacity(6);
+    for i in 0..6 {
+        let angle = std::f32::consts::FRAC_PI_3 * i as f32 - std::f32::consts::FRAC_PI_2;
+        let x = center.x + radius * angle.cos();
+        let y = center.y + radius * angle.sin();
+        points.push(Pos2::new(x, y));
+    }
+
+    painter.add(egui::Shape::convex_polygon(
+        points,
+        fill,
+        Stroke::new(2.0, border),
+    ));
+}
+
+/// Render a hexagon with label and optional glow for Standard/Expanded LOD
+fn render_hexagon_with_label(
+    painter: &egui::Painter,
+    node: &LayoutNode,
+    center: Pos2,
+    size: Vec2,
+    opacity: f32,
+) {
+    let confidence = node
+        .control_confidence
+        .as_deref()
+        .and_then(|s| s.parse::<ControlConfidence>().ok())
+        .unwrap_or(ControlConfidence::Medium);
+
+    let fill = apply_opacity(control_portal_fill(confidence), opacity);
+    let border = apply_opacity(control_portal_border(confidence), opacity);
+
+    // Use width as radius base (hexagon fits in a circle)
+    let radius = size.x.min(size.y) / 2.0;
+
+    // Outer glow for emphasis
+    let glow_color = apply_opacity(
+        super::colors::control_portal_glow(confidence),
+        opacity * 0.5,
+    );
+    painter.circle_filled(center, radius + 4.0, glow_color);
+
+    // Draw hexagon
+    render_hexagon(painter, center, radius, fill, border);
+
+    // Label inside hexagon
+    let font_size = (size.y * 0.18).clamp(10.0, 14.0);
+    let text_color = apply_opacity(Color32::WHITE, opacity);
+
+    // Primary label: "Board Controller" or entity name
+    let label = if node.label.is_empty() {
+        "Board Controller"
+    } else {
+        &node.label
+    };
+
+    painter.text(
+        center - Vec2::new(0.0, font_size * 0.5),
+        egui::Align2::CENTER_CENTER,
+        truncate_name(label, 14),
+        FontId::proportional(font_size),
+        text_color,
+    );
+
+    // Confidence badge below label
+    let confidence_text = match confidence {
+        ControlConfidence::High => "High",
+        ControlConfidence::Medium => "Medium",
+        ControlConfidence::Low => "Low",
+    };
+    let badge_color = apply_opacity(Color32::from_rgba_unmultiplied(0, 0, 0, 140), opacity);
+    let badge_text_color = apply_opacity(Color32::WHITE, opacity);
+
+    let badge_pos = center + Vec2::new(0.0, font_size * 0.8);
+    let badge_font = FontId::proportional(font_size * 0.7);
+    let galley = painter.layout_no_wrap(
+        confidence_text.to_string(),
+        badge_font.clone(),
+        badge_text_color,
+    );
+    let badge_rect = egui::Rect::from_center_size(badge_pos, galley.size() + Vec2::new(8.0, 4.0));
+    painter.rect_filled(badge_rect, 3.0, badge_color);
+    painter.text(
+        badge_pos,
+        egui::Align2::CENTER_CENTER,
+        confidence_text,
+        badge_font,
+        badge_text_color,
+    );
+
+    // Rule indicator (small letter in corner)
+    if let Some(ref rule) = node.control_rule {
+        let rule_pos = center + Vec2::new(radius * 0.6, -radius * 0.6);
+        let rule_color = apply_opacity(Color32::from_rgb(200, 200, 200), opacity);
+        painter.text(
+            rule_pos,
+            egui::Align2::CENTER_CENTER,
+            format!("R{}", rule),
+            FontId::proportional(font_size * 0.6),
+            rule_color,
+        );
     }
 }
 

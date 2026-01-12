@@ -148,6 +148,16 @@ impl ToolHandlers {
             "dsl_complete" => self.dsl_complete(args),
             "dsl_signature" => self.dsl_signature(args),
             "session_context" => self.session_context(args),
+            // Session v2 tools - simplified CBU session management
+            "session_load_cbu" => self.session_load_cbu(args).await,
+            "session_load_jurisdiction" => self.session_load_jurisdiction(args).await,
+            "session_load_galaxy" => self.session_load_galaxy(args).await,
+            "session_unload_cbu" => self.session_unload_cbu(args).await,
+            "session_clear" => self.session_clear(args).await,
+            "session_undo" => self.session_undo(args).await,
+            "session_redo" => self.session_redo(args).await,
+            "session_info" => self.session_info(args).await,
+            "session_list" => self.session_list(args).await,
             "entity_search" => self.entity_search(args).await,
             // Resolution sub-session tools
             "resolution_start" => self.resolution_start(args).await,
@@ -1457,6 +1467,331 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         let state = session::session_context(action).map_err(|e| anyhow!("{}", e))?;
 
         serde_json::to_value(state).map_err(|e| anyhow!("Failed to serialize session state: {}", e))
+    }
+
+    // =========================================================================
+    // Session v2 Tools - Memory-first CBU session management
+    // =========================================================================
+
+    /// Load a single CBU into the session scope
+    async fn session_load_cbu(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+
+        let pool = self.require_pool()?;
+
+        // Get CBU by ID or name
+        let cbu_id: Uuid = if let Some(id_str) = args["cbu_id"].as_str() {
+            Uuid::parse_str(id_str).map_err(|_| anyhow!("Invalid cbu_id UUID"))?
+        } else if let Some(name) = args["cbu_name"].as_str() {
+            // Resolve by name
+            let row: Option<(Uuid,)> =
+                sqlx::query_as(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE $1 LIMIT 1"#)
+                    .bind(format!("%{}%", name))
+                    .fetch_optional(pool)
+                    .await?;
+            row.ok_or_else(|| anyhow!("CBU not found: {}", name))?.0
+        } else {
+            return Err(anyhow!("Either cbu_id or cbu_name required"));
+        };
+
+        // Fetch CBU details
+        let cbu: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
+            r#"SELECT cbu_id, name, jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await?;
+
+        let (id, name, jurisdiction) = cbu.ok_or_else(|| anyhow!("CBU not found"))?;
+
+        // Get or create session and load the CBU
+        let sessions = self.require_sessions()?;
+        let mut guard = sessions.write().await;
+
+        // Use default session for now (could be parameterized)
+        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+
+        session.load_cbu(id);
+        session.maybe_save(pool);
+
+        Ok(json!({
+            "loaded": true,
+            "cbu_id": id,
+            "name": name,
+            "jurisdiction": jurisdiction,
+            "scope_size": session.count()
+        }))
+    }
+
+    /// Load all CBUs in a jurisdiction
+    async fn session_load_jurisdiction(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+
+        let pool = self.require_pool()?;
+        let jurisdiction = args["jurisdiction"]
+            .as_str()
+            .ok_or_else(|| anyhow!("jurisdiction required"))?;
+
+        // Find all CBUs in jurisdiction
+        let rows: Vec<(Uuid, String)> =
+            sqlx::query_as(r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE jurisdiction = $1"#)
+                .bind(jurisdiction)
+                .fetch_all(pool)
+                .await?;
+
+        if rows.is_empty() {
+            return Err(anyhow!("No CBUs found in jurisdiction: {}", jurisdiction));
+        }
+
+        let cbu_ids: Vec<Uuid> = rows.iter().map(|(id, _)| *id).collect();
+        let cbu_names: Vec<String> = rows.iter().map(|(_, name)| name.clone()).collect();
+
+        // Get or create session
+        let sessions = self.require_sessions()?;
+        let mut guard = sessions.write().await;
+        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+
+        // Load all CBUs
+        for id in &cbu_ids {
+            session.load_cbu(*id);
+        }
+        session.maybe_save(pool);
+
+        Ok(json!({
+            "loaded": true,
+            "jurisdiction": jurisdiction,
+            "cbu_count": cbu_ids.len(),
+            "cbu_ids": cbu_ids,
+            "cbu_names": cbu_names
+        }))
+    }
+
+    /// Load all CBUs under a commercial client (galaxy)
+    async fn session_load_galaxy(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+
+        let pool = self.require_pool()?;
+
+        // Get apex entity by ID or name
+        let apex_id: Uuid = if let Some(id_str) = args["apex_entity_id"].as_str() {
+            Uuid::parse_str(id_str).map_err(|_| anyhow!("Invalid apex_entity_id UUID"))?
+        } else if let Some(name) = args["apex_name"].as_str() {
+            // Resolve by name
+            let row: Option<(Uuid,)> = sqlx::query_as(
+                r#"SELECT entity_id FROM "ob-poc".entities WHERE name ILIKE $1 LIMIT 1"#,
+            )
+            .bind(format!("%{}%", name))
+            .fetch_optional(pool)
+            .await?;
+            row.ok_or_else(|| anyhow!("Entity not found: {}", name))?.0
+        } else {
+            return Err(anyhow!("Either apex_entity_id or apex_name required"));
+        };
+
+        // Find all CBUs under this commercial client
+        let rows: Vec<(Uuid, String)> = sqlx::query_as(
+            r#"SELECT cbu_id, name FROM "ob-poc".cbus WHERE commercial_client_entity_id = $1"#,
+        )
+        .bind(apex_id)
+        .fetch_all(pool)
+        .await?;
+
+        if rows.is_empty() {
+            return Err(anyhow!("No CBUs found under commercial client"));
+        }
+
+        let cbu_ids: Vec<Uuid> = rows.iter().map(|(id, _)| *id).collect();
+        let cbu_names: Vec<String> = rows.iter().map(|(_, name)| name.clone()).collect();
+
+        // Get apex entity name for response
+        let apex_name: Option<(String,)> =
+            sqlx::query_as(r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#)
+                .bind(apex_id)
+                .fetch_optional(pool)
+                .await?;
+
+        // Get or create session
+        let sessions = self.require_sessions()?;
+        let mut guard = sessions.write().await;
+        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+
+        // Load all CBUs
+        for id in &cbu_ids {
+            session.load_cbu(*id);
+        }
+        session.maybe_save(pool);
+
+        Ok(json!({
+            "loaded": true,
+            "apex_entity_id": apex_id,
+            "apex_name": apex_name.map(|n| n.0),
+            "cbu_count": cbu_ids.len(),
+            "cbu_ids": cbu_ids,
+            "cbu_names": cbu_names
+        }))
+    }
+
+    /// Remove a CBU from the current session scope
+    async fn session_unload_cbu(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+
+        let pool = self.require_pool()?;
+        let cbu_id = args["cbu_id"]
+            .as_str()
+            .ok_or_else(|| anyhow!("cbu_id required"))?;
+        let cbu_id = Uuid::parse_str(cbu_id).map_err(|_| anyhow!("Invalid cbu_id UUID"))?;
+
+        let sessions = self.require_sessions()?;
+        let mut guard = sessions.write().await;
+        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+
+        session.unload_cbu(cbu_id);
+        session.maybe_save(pool);
+
+        Ok(json!({
+            "unloaded": true,
+            "cbu_id": cbu_id,
+            "scope_size": session.count()
+        }))
+    }
+
+    /// Clear session scope to empty (universe view)
+    async fn session_clear(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+        let _ = args; // unused but kept for consistent signature
+
+        let pool = self.require_pool()?;
+
+        let sessions = self.require_sessions()?;
+        let mut guard = sessions.write().await;
+        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+
+        session.clear();
+        session.maybe_save(pool);
+
+        Ok(json!({
+            "cleared": true,
+            "scope_size": 0
+        }))
+    }
+
+    /// Undo the last scope change
+    async fn session_undo(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+        let _ = args;
+
+        let pool = self.require_pool()?;
+
+        let sessions = self.require_sessions()?;
+        let mut guard = sessions.write().await;
+        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+
+        let success = session.undo();
+        if success {
+            session.maybe_save(pool);
+        }
+
+        Ok(json!({
+            "success": success,
+            "scope_size": session.count(),
+            "history_depth": session.history_depth(),
+            "future_depth": session.future_depth()
+        }))
+    }
+
+    /// Redo a previously undone scope change
+    async fn session_redo(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+        let _ = args;
+
+        let pool = self.require_pool()?;
+
+        let sessions = self.require_sessions()?;
+        let mut guard = sessions.write().await;
+        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+
+        let success = session.redo();
+        if success {
+            session.maybe_save(pool);
+        }
+
+        Ok(json!({
+            "success": success,
+            "scope_size": session.count(),
+            "history_depth": session.history_depth(),
+            "future_depth": session.future_depth()
+        }))
+    }
+
+    /// Get current session state and scope
+    async fn session_info(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+        let _ = args;
+
+        let pool = self.require_pool()?;
+
+        let sessions = self.require_sessions()?;
+        let guard = sessions.read().await;
+        let session = guard.get(&Uuid::nil());
+
+        if let Some(session) = session {
+            let cbu_ids = session.cbu_ids_vec();
+
+            // Fetch CBU names if we have any
+            let cbu_names: Vec<String> = if cbu_ids.is_empty() {
+                vec![]
+            } else {
+                let rows: Vec<(String,)> =
+                    sqlx::query_as(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = ANY($1)"#)
+                        .bind(&cbu_ids)
+                        .fetch_all(pool)
+                        .await
+                        .unwrap_or_default();
+                rows.into_iter().map(|(name,)| name).collect()
+            };
+
+            Ok(json!({
+                "id": session.id(),
+                "name": session.name(),
+                "cbu_count": cbu_ids.len(),
+                "cbu_ids": cbu_ids,
+                "cbu_names": cbu_names,
+                "history_depth": session.history_depth(),
+                "future_depth": session.future_depth(),
+                "dirty": session.is_dirty()
+            }))
+        } else {
+            Ok(json!({
+                "id": null,
+                "name": null,
+                "cbu_count": 0,
+                "cbu_ids": [],
+                "cbu_names": [],
+                "history_depth": 0,
+                "future_depth": 0,
+                "dirty": false
+            }))
+        }
+    }
+
+    /// List saved sessions
+    async fn session_list(&self, args: Value) -> Result<Value> {
+        use crate::session::CbuSession;
+
+        let pool = self.require_pool()?;
+        let limit = args["limit"].as_i64().unwrap_or(20) as i64;
+
+        let sessions = CbuSession::list_all(pool, limit as usize).await;
+
+        Ok(json!({
+            "sessions": sessions.iter().map(|s| json!({
+                "id": s.id,
+                "name": s.name,
+                "cbu_count": s.cbu_count,
+                "updated_at": s.updated_at.to_rfc3339(),
+                "expires_at": s.expires_at.to_rfc3339()
+            })).collect::<Vec<_>>()
+        }))
     }
 
     /// Search for entities with fuzzy matching, enrichment, and smart disambiguation

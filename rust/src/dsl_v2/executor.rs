@@ -25,6 +25,10 @@ use ob_poc_types::ViewportState;
 // This enables session.set-* operations to communicate scope changes back to the session layer
 use crate::graph::GraphScope;
 
+// Import CbuSession for pending_cbu_session field
+// This enables session.load-*/unload-*/undo/redo to communicate session state back
+use crate::session::CbuSession;
+
 #[cfg(feature = "database")]
 use super::ast::{AstNode, Literal, VerbCall};
 #[cfg(feature = "database")]
@@ -151,6 +155,15 @@ pub struct ExecutionContext {
     pub source_attribution: super::idempotency::SourceAttribution,
     /// Session ID for view state audit linkage
     pub session_id: Option<Uuid>,
+    /// Pending CBU session from session.* operations (Phase 6)
+    ///
+    /// Session operations (session.load-cbu, session.undo, etc.) modify the CBU
+    /// session but cannot directly access UnifiedSessionContext. Instead, they
+    /// store/modify the CbuSession here. After execution completes, the caller
+    /// should call `take_pending_cbu_session()` and propagate it to the session.
+    ///
+    /// **Memory is truth, DB is backup.** All mutations are sync, in-memory, <1µs.
+    pub pending_cbu_session: Option<CbuSession>,
 }
 
 impl Default for ExecutionContext {
@@ -172,6 +185,7 @@ impl Default for ExecutionContext {
             pending_scope_change: None,
             source_attribution: super::idempotency::SourceAttribution::default(),
             session_id: None,
+            pending_cbu_session: None,
         }
     }
 }
@@ -289,6 +303,8 @@ impl ExecutionContext {
             source_attribution: self.source_attribution.clone(),
             // Inherit session ID for view state linkage
             session_id: self.session_id,
+            // Don't inherit pending_cbu_session - each iteration starts fresh
+            pending_cbu_session: None,
         }
     }
 
@@ -464,6 +480,47 @@ impl ExecutionContext {
     /// Check if there's a pending scope change
     pub fn has_pending_scope_change(&self) -> bool {
         self.pending_scope_change.is_some()
+    }
+
+    // =========================================================================
+    // CBU SESSION METHODS - For session.* verb output to session layer (Phase 6)
+    // =========================================================================
+
+    /// Get or create the pending CBU session for mutation.
+    ///
+    /// Session operations (session.load-cbu, session.undo, etc.) call this to get
+    /// a mutable reference to the CbuSession. If no session exists yet, creates one.
+    ///
+    /// **Memory is truth.** All mutations are sync, in-memory, <1µs.
+    pub fn get_or_create_cbu_session_mut(&mut self) -> &mut CbuSession {
+        if self.pending_cbu_session.is_none() {
+            self.pending_cbu_session = Some(CbuSession::new());
+        }
+        self.pending_cbu_session.as_mut().unwrap()
+    }
+
+    /// Set the pending CBU session (e.g., when loading from DB at startup)
+    pub fn set_pending_cbu_session(&mut self, session: CbuSession) {
+        self.pending_cbu_session = Some(session);
+    }
+
+    /// Take the pending CBU session (consumes it)
+    ///
+    /// Called by the execution layer after DSL execution completes.
+    /// The caller should propagate this to UnifiedSessionContext or
+    /// trigger a background save via `session.maybe_save(&pool)`.
+    pub fn take_pending_cbu_session(&mut self) -> Option<CbuSession> {
+        self.pending_cbu_session.take()
+    }
+
+    /// Check if there's a pending CBU session
+    pub fn has_pending_cbu_session(&self) -> bool {
+        self.pending_cbu_session.is_some()
+    }
+
+    /// Get a reference to the pending CBU session (if any)
+    pub fn pending_cbu_session(&self) -> Option<&CbuSession> {
+        self.pending_cbu_session.as_ref()
     }
 
     // =========================================================================

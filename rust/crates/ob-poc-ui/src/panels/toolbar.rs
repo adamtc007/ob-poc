@@ -153,5 +153,6 @@ fn view_mode_name(mode: ViewMode) -> &'static str {
         ViewMode::ServiceDelivery => "Services",
         ViewMode::ProductsOnly => "Products",
         ViewMode::Trading => "Trading",
+        ViewMode::BoardControl => "Board Control",
     }
 }

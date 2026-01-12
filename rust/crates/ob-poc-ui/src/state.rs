@@ -430,6 +430,15 @@ pub enum WindowData {
         /// Total refs to resolve
         total_refs: usize,
     },
+    /// Disambiguation from agent chat - simpler than full resolution
+    Disambiguation {
+        /// The disambiguation request from agent
+        request: ob_poc_types::DisambiguationRequest,
+        /// Current item index being resolved
+        current_item_index: usize,
+        /// Search results for current item
+        search_results: Option<Vec<ob_poc_types::EntityMatch>>,
+    },
     /// Confirmation dialog data
     Confirmation {
         title: String,
@@ -529,6 +538,11 @@ impl WindowStack {
         });
     }
 
+    /// Find a window by type (immutable)
+    pub fn find_by_type(&self, window_type: WindowType) -> Option<&WindowEntry> {
+        self.windows.iter().find(|w| w.window_type == window_type)
+    }
+
     /// Find a window by type (mutable)
     pub fn find_by_type_mut(&mut self, window_type: WindowType) -> Option<&mut WindowEntry> {
         self.windows
@@ -539,6 +553,11 @@ impl WindowStack {
     /// Close all windows of a given type
     pub fn close_by_type(&mut self, window_type: WindowType) {
         self.windows.retain(|w| w.window_type != window_type);
+    }
+
+    /// Check if any modal is active
+    pub fn has_modal(&self) -> bool {
+        self.windows.iter().any(|w| w.modal)
     }
 }
 
@@ -689,6 +708,16 @@ pub struct AsyncState {
     pub pending_trading_matrix: Option<Result<TradingMatrix, String>>,
     pub pending_investor_register: Option<Result<InvestorRegisterView, String>>,
     pub pending_investor_list: Option<Result<InvestorListResponse, String>>,
+
+    // Disambiguation (from agent chat when entity is ambiguous)
+    /// Disambiguation request from chat response
+    pub pending_disambiguation: Option<ob_poc_types::DisambiguationRequest>,
+    /// Search results for disambiguation
+    pub pending_disambiguation_results: Option<Result<Vec<ob_poc_types::EntityMatch>, String>>,
+    /// Loading flag for disambiguation search
+    pub loading_disambiguation: bool,
+    /// Flag to trigger session refetch after entity bind
+    pub pending_session_refetch: bool,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -1017,6 +1046,73 @@ impl AppState {
                 Ok(msg) => self.messages.push(msg),
                 Err(e) => state.last_error = Some(e),
             }
+        }
+
+        // Process pending disambiguation request - opens modal
+        if let Some(disambig) = state.pending_disambiguation.take() {
+            web_sys::console::log_1(
+                &format!(
+                    "process_async_results: opening disambiguation modal for {} items",
+                    disambig.items.len()
+                )
+                .into(),
+            );
+
+            // Create window entry for disambiguation modal
+            let window = WindowEntry {
+                id: format!("disambig-{}", disambig.request_id),
+                window_type: WindowType::Resolution,
+                layer: 2, // Modal layer
+                modal: true,
+                data: Some(WindowData::Disambiguation {
+                    request: disambig.clone(),
+                    current_item_index: 0,
+                    search_results: None,
+                }),
+            };
+
+            self.window_stack.push(window);
+
+            // Initialize search buffer with first item's search text
+            if let Some(first_item) = disambig.items.first() {
+                if let ob_poc_types::DisambiguationItem::EntityMatch {
+                    ref search_text, ..
+                } = first_item
+                {
+                    self.resolution_ui.search_query = search_text.clone();
+                }
+            }
+        }
+
+        // Process disambiguation search results
+        if let Some(result) = state.pending_disambiguation_results.take() {
+            state.loading_disambiguation = false;
+            match result {
+                Ok(matches) => {
+                    // Update the disambiguation window with search results
+                    if let Some(window) = self.window_stack.find_by_type_mut(WindowType::Resolution)
+                    {
+                        if let Some(WindowData::Disambiguation {
+                            ref mut search_results,
+                            ..
+                        }) = window.data
+                        {
+                            *search_results = Some(matches);
+                        }
+                    }
+                }
+                Err(e) => state.last_error = Some(format!("Disambiguation search failed: {}", e)),
+            }
+        }
+
+        // Process session refetch flag (after entity bind)
+        if state.pending_session_refetch {
+            state.pending_session_refetch = false;
+            state.needs_session_refetch = true;
+            // Also trigger graph, matrix, and context refetch since CBU likely changed
+            state.needs_graph_refetch = true;
+            state.needs_trading_matrix_refetch = true;
+            state.needs_context_refetch = true;
         }
 
         // Process execution - triggers refetch of dependent data

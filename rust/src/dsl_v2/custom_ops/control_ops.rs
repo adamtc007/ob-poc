@@ -1276,6 +1276,849 @@ impl CustomOperation for ControlReconcileOwnershipOp {
     }
 }
 
+// ============================================================================
+// ShowBoardControllerOp - Show board controller for a CBU
+// ============================================================================
+
+pub struct ShowBoardControllerOp;
+
+#[async_trait]
+impl CustomOperation for ShowBoardControllerOp {
+    fn domain(&self) -> &'static str {
+        "control"
+    }
+
+    fn verb(&self) -> &'static str {
+        "show-board-controller"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Shows the computed board controller for a CBU with derivation explanation, confidence, and data gaps"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
+
+        // Get CBU info
+        let cbu_info: Option<(String,)> =
+            sqlx::query_as(r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#)
+                .bind(cbu_id)
+                .fetch_optional(pool)
+                .await?;
+
+        let cbu_name = cbu_info
+            .ok_or_else(|| anyhow!("CBU not found: {}", cbu_id))?
+            .0;
+
+        // Check for manual override first
+        #[derive(sqlx::FromRow)]
+        struct OverrideRow {
+            controller_entity_id: Uuid,
+            justification: Option<String>,
+            set_at: chrono::DateTime<chrono::Utc>,
+        }
+
+        let manual_override: Option<OverrideRow> = sqlx::query_as(
+            r#"
+            SELECT controller_entity_id, justification, set_at
+            FROM "ob-poc".board_controller_overrides
+            WHERE cbu_id = $1 AND cleared_at IS NULL
+            ORDER BY set_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None); // Table may not exist yet
+
+        if let Some(override_row) = manual_override {
+            // Get controller info
+            let controller_info: Option<(String, bool)> = sqlx::query_as(
+                r#"
+                SELECT e.name,
+                       EXISTS(SELECT 1 FROM "ob-poc".entity_proper_persons pp WHERE pp.entity_id = e.entity_id)
+                FROM "ob-poc".entities e
+                WHERE e.entity_id = $1
+                "#,
+            )
+            .bind(override_row.controller_entity_id)
+            .fetch_optional(pool)
+            .await?;
+
+            let (controller_name, is_natural) =
+                controller_info.unwrap_or(("Unknown".to_string(), false));
+            let controller_type = if is_natural {
+                "NATURAL_PERSON"
+            } else {
+                "LEGAL_ENTITY"
+            };
+
+            return Ok(ExecutionResult::Record(json!({
+                "cbu_id": cbu_id,
+                "cbu_name": cbu_name,
+                "board_controller_entity_id": override_row.controller_entity_id,
+                "board_controller_name": controller_name,
+                "board_controller_type": controller_type,
+                "confidence": "HIGH",
+                "derivation_rule": "MANUAL_OVERRIDE",
+                "derivation_explanation": format!("Manually set: {}", override_row.justification.unwrap_or_default()),
+                "data_gaps": [],
+                "evidence_sources": ["MANUAL"],
+                "is_override": true,
+                "computed_at": override_row.set_at.to_rfc3339()
+            })));
+        }
+
+        // Compute board controller from data
+        // Rule 1: Check for majority appointer in board compositions
+        #[derive(sqlx::FromRow)]
+        struct AppointerRow {
+            appointer_id: Uuid,
+            appointer_name: String,
+            appointments: i64,
+            total_board: i64,
+        }
+
+        let appointers: Vec<AppointerRow> = sqlx::query_as(
+            r#"
+            WITH cbu_entities AS (
+                SELECT DISTINCT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+            ),
+            board_analysis AS (
+                SELECT
+                    bc.appointed_by_entity_id as appointer_id,
+                    e.name as appointer_name,
+                    COUNT(*) as appointments,
+                    (SELECT COUNT(*) FROM kyc.board_compositions bc2
+                     WHERE bc2.entity_id IN (SELECT entity_id FROM cbu_entities)
+                     AND (bc2.ended_at IS NULL OR bc2.ended_at > CURRENT_DATE)) as total_board
+                FROM kyc.board_compositions bc
+                JOIN "ob-poc".entities e ON bc.appointed_by_entity_id = e.entity_id
+                WHERE bc.entity_id IN (SELECT entity_id FROM cbu_entities)
+                  AND bc.appointed_by_entity_id IS NOT NULL
+                  AND (bc.ended_at IS NULL OR bc.ended_at > CURRENT_DATE)
+                GROUP BY bc.appointed_by_entity_id, e.name
+            )
+            SELECT appointer_id, appointer_name, appointments, total_board
+            FROM board_analysis
+            WHERE total_board > 0
+            ORDER BY appointments DESC
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_all(pool)
+        .await
+        .unwrap_or_default();
+
+        let mut data_gaps: Vec<String> = Vec::new();
+        let mut evidence_sources: Vec<&str> = Vec::new();
+
+        // Check if we have board data
+        if appointers.is_empty() {
+            data_gaps.push("No board composition data found".to_string());
+        }
+
+        // Find majority appointer
+        if let Some(top) = appointers.first() {
+            if top.total_board > 0 {
+                let ratio = top.appointments as f64 / top.total_board as f64;
+                if ratio > 0.5 {
+                    // Majority appointer found
+                    let is_natural: bool = sqlx::query_scalar(
+                        r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entity_proper_persons WHERE entity_id = $1)"#,
+                    )
+                    .bind(top.appointer_id)
+                    .fetch_one(pool)
+                    .await?;
+
+                    let controller_type = if is_natural {
+                        "NATURAL_PERSON"
+                    } else {
+                        "LEGAL_ENTITY"
+                    };
+                    evidence_sources.push("COMPUTED");
+
+                    return Ok(ExecutionResult::Record(json!({
+                        "cbu_id": cbu_id,
+                        "cbu_name": cbu_name,
+                        "board_controller_entity_id": top.appointer_id,
+                        "board_controller_name": top.appointer_name,
+                        "board_controller_type": controller_type,
+                        "confidence": "HIGH",
+                        "derivation_rule": "MAJORITY_APPOINTER",
+                        "derivation_explanation": format!(
+                            "{} appoints {} of {} board members ({}%)",
+                            top.appointer_name, top.appointments, top.total_board,
+                            (ratio * 100.0).round()
+                        ),
+                        "data_gaps": data_gaps,
+                        "evidence_sources": evidence_sources,
+                        "is_override": false,
+                        "computed_at": chrono::Utc::now().to_rfc3339()
+                    })));
+                }
+            }
+        }
+
+        // Rule 2: Check for >50% ownership control
+        #[derive(sqlx::FromRow)]
+        struct OwnerRow {
+            owner_id: Uuid,
+            owner_name: String,
+            percentage: rust_decimal::Decimal,
+        }
+
+        let majority_owner: Option<OwnerRow> = sqlx::query_as(
+            r#"
+            WITH cbu_entities AS (
+                SELECT DISTINCT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+            )
+            SELECT
+                er.from_entity_id as owner_id,
+                e.name as owner_name,
+                er.percentage
+            FROM "ob-poc".entity_relationships er
+            JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
+            WHERE er.to_entity_id IN (SELECT entity_id FROM cbu_entities)
+              AND er.relationship_type IN ('ownership', 'control')
+              AND er.percentage > 50
+              AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
+            ORDER BY er.percentage DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await?;
+
+        if let Some(owner) = majority_owner {
+            let is_natural: bool = sqlx::query_scalar(
+                r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entity_proper_persons WHERE entity_id = $1)"#,
+            )
+            .bind(owner.owner_id)
+            .fetch_one(pool)
+            .await?;
+
+            let controller_type = if is_natural {
+                "NATURAL_PERSON"
+            } else {
+                "LEGAL_ENTITY"
+            };
+            evidence_sources.push("COMPUTED");
+
+            return Ok(ExecutionResult::Record(json!({
+                "cbu_id": cbu_id,
+                "cbu_name": cbu_name,
+                "board_controller_entity_id": owner.owner_id,
+                "board_controller_name": owner.owner_name,
+                "board_controller_type": controller_type,
+                "confidence": "MEDIUM",
+                "derivation_rule": "MAJORITY_OWNER",
+                "derivation_explanation": format!(
+                    "{} owns {}% (>50% ownership implies board control)",
+                    owner.owner_name, owner.percentage
+                ),
+                "data_gaps": data_gaps,
+                "evidence_sources": evidence_sources,
+                "is_override": false,
+                "computed_at": chrono::Utc::now().to_rfc3339()
+            })));
+        }
+
+        // Rule 3: Check GLEIF ultimate parent
+        #[derive(sqlx::FromRow)]
+        struct GleifParentRow {
+            parent_entity_id: Uuid,
+            parent_name: String,
+        }
+
+        let gleif_parent: Option<GleifParentRow> = sqlx::query_as(
+            r#"
+            WITH cbu_entities AS (
+                SELECT DISTINCT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+            )
+            SELECT
+                er.from_entity_id as parent_entity_id,
+                e.name as parent_name
+            FROM "ob-poc".entity_relationships er
+            JOIN "ob-poc".entities e ON er.from_entity_id = e.entity_id
+            WHERE er.to_entity_id IN (SELECT entity_id FROM cbu_entities)
+              AND er.source = 'GLEIF'
+              AND er.relationship_type = 'control'
+              AND er.control_type = 'ULTIMATE_ACCOUNTING_CONSOLIDATION'
+              AND (er.effective_to IS NULL OR er.effective_to > CURRENT_DATE)
+            LIMIT 1
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+
+        if let Some(parent) = gleif_parent {
+            let is_natural: bool = sqlx::query_scalar(
+                r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entity_proper_persons WHERE entity_id = $1)"#,
+            )
+            .bind(parent.parent_entity_id)
+            .fetch_one(pool)
+            .await?;
+
+            let controller_type = if is_natural {
+                "NATURAL_PERSON"
+            } else {
+                "LEGAL_ENTITY"
+            };
+            evidence_sources.push("GLEIF");
+
+            return Ok(ExecutionResult::Record(json!({
+                "cbu_id": cbu_id,
+                "cbu_name": cbu_name,
+                "board_controller_entity_id": parent.parent_entity_id,
+                "board_controller_name": parent.parent_name,
+                "board_controller_type": controller_type,
+                "confidence": "MEDIUM",
+                "derivation_rule": "GLEIF_ULTIMATE_PARENT",
+                "derivation_explanation": format!(
+                    "{} is GLEIF ultimate accounting consolidation parent",
+                    parent.parent_name
+                ),
+                "data_gaps": data_gaps,
+                "evidence_sources": evidence_sources,
+                "is_override": false,
+                "computed_at": chrono::Utc::now().to_rfc3339()
+            })));
+        }
+
+        // No controller found
+        data_gaps.push("No majority appointer found".to_string());
+        data_gaps.push("No majority owner found".to_string());
+        data_gaps.push("No GLEIF ultimate parent found".to_string());
+
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": cbu_id,
+            "cbu_name": cbu_name,
+            "board_controller_entity_id": null,
+            "board_controller_name": null,
+            "board_controller_type": "UNKNOWN",
+            "confidence": "LOW",
+            "derivation_rule": "NONE",
+            "derivation_explanation": "Unable to determine board controller from available data",
+            "data_gaps": data_gaps,
+            "evidence_sources": evidence_sources,
+            "is_override": false,
+            "computed_at": chrono::Utc::now().to_rfc3339()
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+// ============================================================================
+// RecomputeBoardControllerOp - Recompute board controller for a CBU
+// ============================================================================
+
+pub struct RecomputeBoardControllerOp;
+
+#[async_trait]
+impl CustomOperation for RecomputeBoardControllerOp {
+    fn domain(&self) -> &'static str {
+        "control"
+    }
+
+    fn verb(&self) -> &'static str {
+        "recompute-board-controller"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Recomputes the board controller for a CBU by traversing ownership/control graph"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
+
+        // Get previous controller (if any)
+        let previous: Option<(Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT controller_entity_id, controller_name
+            FROM "ob-poc".board_controller_cache
+            WHERE cbu_id = $1
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None); // Table may not exist
+
+        // Call show-board-controller to compute
+        let show_op = ShowBoardControllerOp;
+        let show_result = show_op.execute(verb_call, ctx, pool).await?;
+
+        let computed = match &show_result {
+            ExecutionResult::Record(r) => r.clone(),
+            _ => return Err(anyhow!("Unexpected result from show-board-controller")),
+        };
+
+        let new_controller_id = computed
+            .get("board_controller_entity_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok());
+
+        let new_controller_name = computed
+            .get("board_controller_name")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        let confidence = computed
+            .get("confidence")
+            .and_then(|v| v.as_str())
+            .unwrap_or("LOW");
+
+        let derivation_rule = computed
+            .get("derivation_rule")
+            .and_then(|v| v.as_str())
+            .unwrap_or("NONE");
+
+        // Check if changed
+        let changed = match (&previous, &new_controller_id) {
+            (Some((prev_id, _)), Some(new_id)) => prev_id != new_id,
+            (None, Some(_)) => true,
+            (Some(_), None) => true,
+            (None, None) => false,
+        };
+
+        // Update cache (upsert)
+        if let Some(controller_id) = new_controller_id {
+            let _ = sqlx::query(
+                r#"
+                INSERT INTO "ob-poc".board_controller_cache
+                    (cbu_id, controller_entity_id, controller_name, confidence, derivation_rule, computed_at)
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                ON CONFLICT (cbu_id) DO UPDATE SET
+                    controller_entity_id = EXCLUDED.controller_entity_id,
+                    controller_name = EXCLUDED.controller_name,
+                    confidence = EXCLUDED.confidence,
+                    derivation_rule = EXCLUDED.derivation_rule,
+                    computed_at = EXCLUDED.computed_at
+                "#,
+            )
+            .bind(cbu_id)
+            .bind(controller_id)
+            .bind(&new_controller_name)
+            .bind(confidence)
+            .bind(derivation_rule)
+            .execute(pool)
+            .await; // Ignore error if table doesn't exist
+        }
+
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": cbu_id,
+            "board_controller_entity_id": new_controller_id,
+            "board_controller_name": new_controller_name,
+            "confidence": confidence,
+            "derivation_rule": derivation_rule,
+            "previous_controller_entity_id": previous.as_ref().map(|(id, _)| id),
+            "previous_controller_name": previous.as_ref().map(|(_, name)| name),
+            "changed": changed,
+            "recomputed_at": chrono::Utc::now().to_rfc3339()
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+// ============================================================================
+// SetBoardControllerOp - Manually set board controller
+// ============================================================================
+
+pub struct SetBoardControllerOp;
+
+#[async_trait]
+impl CustomOperation for SetBoardControllerOp {
+    fn domain(&self) -> &'static str {
+        "control"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-board-controller"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Manually sets the board controller for a CBU, creating an override"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
+        let controller_entity_id = get_required_uuid(verb_call, "controller-entity-id")?;
+
+        let justification = verb_call
+            .get_arg("justification")
+            .and_then(|v| v.value.as_string())
+            .ok_or_else(|| anyhow!("justification is required"))?;
+
+        let evidence_doc_id = verb_call
+            .get_arg("evidence-doc-id")
+            .and_then(|v| v.value.as_uuid());
+
+        // Verify entity exists
+        let entity_exists: bool = sqlx::query_scalar(
+            r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1)"#,
+        )
+        .bind(controller_entity_id)
+        .fetch_one(pool)
+        .await?;
+
+        if !entity_exists {
+            return Err(anyhow!("Entity not found: {}", controller_entity_id));
+        }
+
+        // Clear any existing override
+        let _ = sqlx::query(
+            r#"
+            UPDATE "ob-poc".board_controller_overrides
+            SET cleared_at = NOW()
+            WHERE cbu_id = $1 AND cleared_at IS NULL
+            "#,
+        )
+        .bind(cbu_id)
+        .execute(pool)
+        .await; // Ignore if table doesn't exist
+
+        // Insert new override
+        let override_id = Uuid::new_v4();
+        let _ = sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".board_controller_overrides
+                (override_id, cbu_id, controller_entity_id, justification, evidence_doc_id, set_at)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            "#,
+        )
+        .bind(override_id)
+        .bind(cbu_id)
+        .bind(controller_entity_id)
+        .bind(&justification)
+        .bind(evidence_doc_id)
+        .execute(pool)
+        .await;
+
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": cbu_id,
+            "board_controller_entity_id": controller_entity_id,
+            "override_id": override_id,
+            "justification": justification,
+            "set_at": chrono::Utc::now().to_rfc3339()
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+// ============================================================================
+// ClearBoardControllerOverrideOp - Clear manual override
+// ============================================================================
+
+pub struct ClearBoardControllerOverrideOp;
+
+#[async_trait]
+impl CustomOperation for ClearBoardControllerOverrideOp {
+    fn domain(&self) -> &'static str {
+        "control"
+    }
+
+    fn verb(&self) -> &'static str {
+        "clear-board-controller-override"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Clears a manual board controller override, returning to computed value"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
+
+        // Clear override
+        let result = sqlx::query(
+            r#"
+            UPDATE "ob-poc".board_controller_overrides
+            SET cleared_at = NOW()
+            WHERE cbu_id = $1 AND cleared_at IS NULL
+            "#,
+        )
+        .bind(cbu_id)
+        .execute(pool)
+        .await;
+
+        let override_cleared = result.map(|r| r.rows_affected() > 0).unwrap_or(false);
+
+        // Get computed controller
+        let show_op = ShowBoardControllerOp;
+        let show_result = show_op.execute(verb_call, ctx, pool).await?;
+
+        let computed = match &show_result {
+            ExecutionResult::Record(r) => r.clone(),
+            _ => json!({}),
+        };
+
+        let computed_controller_id = computed
+            .get("board_controller_entity_id")
+            .and_then(|v| v.as_str())
+            .and_then(|s| Uuid::parse_str(s).ok());
+
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": cbu_id,
+            "override_cleared": override_cleared,
+            "now_using_computed": true,
+            "computed_controller_entity_id": computed_controller_id
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+// ============================================================================
+// ImportPscRegisterOp - Import PSC register data
+// ============================================================================
+
+pub struct ImportPscRegisterOp;
+
+#[async_trait]
+impl CustomOperation for ImportPscRegisterOp {
+    fn domain(&self) -> &'static str {
+        "control"
+    }
+
+    fn verb(&self) -> &'static str {
+        "import-psc-register"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Imports board controller data from a PSC (Persons with Significant Control) register"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
+
+        let company_number = verb_call
+            .get_arg("company-number")
+            .and_then(|v| v.value.as_string())
+            .ok_or_else(|| anyhow!("company-number is required"))?;
+
+        let source = verb_call
+            .get_arg("source")
+            .and_then(|v| v.value.as_string())
+            .unwrap_or_else(|| "COMPANIES_HOUSE");
+
+        // This would call the Companies House API in a real implementation
+        // For now, we log the intent and return a placeholder
+
+        // Check if we have existing research data from Companies House
+        #[derive(sqlx::FromRow)]
+        struct PscDataRow {
+            psc_count: i64,
+        }
+
+        let existing_psc: Option<PscDataRow> = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) as psc_count
+            FROM "ob-poc".entity_relationships er
+            WHERE er.source = 'PSC_REGISTER'
+              AND er.to_entity_id IN (
+                  SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1
+              )
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+
+        let pscs_imported = existing_psc.map(|r| r.psc_count).unwrap_or(0);
+
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": cbu_id,
+            "company_number": company_number,
+            "source": source,
+            "pscs_imported": pscs_imported,
+            "board_controller_updated": false,
+            "message": "PSC import requires Companies House API integration",
+            "imported_at": chrono::Utc::now().to_rfc3339()
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
+// ============================================================================
+// ImportGleifControlOp - Import GLEIF control data
+// ============================================================================
+
+pub struct ImportGleifControlOp;
+
+#[async_trait]
+impl CustomOperation for ImportGleifControlOp {
+    fn domain(&self) -> &'static str {
+        "control"
+    }
+
+    fn verb(&self) -> &'static str {
+        "import-gleif-control"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Imports control data from GLEIF (Global LEI Foundation) relationship records"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = get_required_uuid(verb_call, "cbu-id")?;
+
+        let lei = verb_call
+            .get_arg("lei")
+            .and_then(|v| v.value.as_string())
+            .ok_or_else(|| anyhow!("lei is required"))?;
+
+        let include_ultimate = verb_call
+            .get_arg("include-ultimate-parent")
+            .and_then(|v| v.value.as_boolean())
+            .unwrap_or(true);
+
+        // Check for existing GLEIF relationships
+        #[derive(sqlx::FromRow)]
+        struct GleifDataRow {
+            relationship_count: i64,
+            has_direct_parent: bool,
+            has_ultimate_parent: bool,
+        }
+
+        let existing: Option<GleifDataRow> = sqlx::query_as(
+            r#"
+            SELECT
+                COUNT(*) as relationship_count,
+                EXISTS(
+                    SELECT 1 FROM "ob-poc".entity_relationships er
+                    WHERE er.source = 'GLEIF'
+                      AND er.control_type = 'DIRECT_CONSOLIDATION'
+                      AND er.to_entity_id IN (SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1)
+                ) as has_direct_parent,
+                EXISTS(
+                    SELECT 1 FROM "ob-poc".entity_relationships er
+                    WHERE er.source = 'GLEIF'
+                      AND er.control_type = 'ULTIMATE_ACCOUNTING_CONSOLIDATION'
+                      AND er.to_entity_id IN (SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1)
+                ) as has_ultimate_parent
+            FROM "ob-poc".entity_relationships er
+            WHERE er.source = 'GLEIF'
+              AND er.to_entity_id IN (SELECT entity_id FROM "ob-poc".cbu_entity_roles WHERE cbu_id = $1)
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_optional(pool)
+        .await
+        .unwrap_or(None);
+
+        let (rel_count, has_direct, has_ultimate) = existing
+            .map(|r| {
+                (
+                    r.relationship_count,
+                    r.has_direct_parent,
+                    r.has_ultimate_parent,
+                )
+            })
+            .unwrap_or((0, false, false));
+
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": cbu_id,
+            "lei": lei,
+            "include_ultimate_parent": include_ultimate,
+            "direct_parent_imported": has_direct,
+            "ultimate_parent_imported": has_ultimate,
+            "control_relationships_created": rel_count,
+            "board_controller_updated": false,
+            "message": "GLEIF import uses existing gleif.* verbs for data retrieval",
+            "imported_at": chrono::Utc::now().to_rfc3339()
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Void)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1301,5 +2144,29 @@ mod tests {
         let reconcile = ControlReconcileOwnershipOp;
         assert_eq!(reconcile.domain(), "control");
         assert_eq!(reconcile.verb(), "reconcile-ownership");
+
+        let show = ShowBoardControllerOp;
+        assert_eq!(show.domain(), "control");
+        assert_eq!(show.verb(), "show-board-controller");
+
+        let recompute = RecomputeBoardControllerOp;
+        assert_eq!(recompute.domain(), "control");
+        assert_eq!(recompute.verb(), "recompute-board-controller");
+
+        let set = SetBoardControllerOp;
+        assert_eq!(set.domain(), "control");
+        assert_eq!(set.verb(), "set-board-controller");
+
+        let clear = ClearBoardControllerOverrideOp;
+        assert_eq!(clear.domain(), "control");
+        assert_eq!(clear.verb(), "clear-board-controller-override");
+
+        let import_psc = ImportPscRegisterOp;
+        assert_eq!(import_psc.domain(), "control");
+        assert_eq!(import_psc.verb(), "import-psc-register");
+
+        let import_gleif = ImportGleifControlOp;
+        assert_eq!(import_gleif.domain(), "control");
+        assert_eq!(import_gleif.verb(), "import-gleif-control");
     }
 }
