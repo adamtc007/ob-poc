@@ -2850,8 +2850,7 @@ impl App {
                         web_sys::console::log_1(
                             &format!("ServiceTaxonomy: Refresh for CBU {}", cbu_id).into(),
                         );
-                        // TODO: Fetch service taxonomy from API
-                        // self.state.fetch_service_taxonomy(cbu_id);
+                        self.state.fetch_service_taxonomy(cbu_id);
                     }
                 }
             }
@@ -3045,6 +3044,22 @@ impl App {
                                             {
                                                 self.state.panels.browser_tab =
                                                     BrowserTab::ServiceResources;
+                                                // Trigger fetch if we don't have data and have a CBU selected
+                                                if self.state.service_taxonomy.is_none() {
+                                                    if let Some(cbu_id_str) = self
+                                                        .state
+                                                        .session
+                                                        .as_ref()
+                                                        .and_then(|s| s.active_cbu_id())
+                                                    {
+                                                        if let Ok(cbu_id) =
+                                                            Uuid::parse_str(&cbu_id_str)
+                                                        {
+                                                            self.state
+                                                                .fetch_service_taxonomy(cbu_id);
+                                                        }
+                                                    }
+                                                }
                                             }
                                         });
 

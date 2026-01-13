@@ -381,6 +381,15 @@ pub async fn get_trading_matrix(cbu_id: Uuid) -> Result<TradingMatrix, String> {
     Ok(TradingMatrix::from_response(response))
 }
 
+/// Get the service taxonomy for a CBU (Product → Service → Resource hierarchy)
+pub async fn get_service_taxonomy(cbu_id: Uuid) -> Result<ob_poc_graph::ServiceTaxonomy, String> {
+    get(&format!(
+        "/api/service-resources/cbu/{}/service-taxonomy",
+        cbu_id
+    ))
+    .await
+}
+
 // =============================================================================
 // CBU API
 // =============================================================================

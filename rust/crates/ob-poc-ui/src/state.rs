@@ -1257,6 +1257,20 @@ impl AppState {
             }
         }
 
+        // Process service taxonomy
+        if let Some(result) = state.pending_service_taxonomy.take() {
+            state.loading_service_taxonomy = false;
+            match result {
+                Ok(taxonomy) => {
+                    // Expand first level by default for better UX
+                    self.service_taxonomy_state
+                        .expand_to_depth(&taxonomy.root, 1);
+                    self.service_taxonomy = Some(taxonomy);
+                }
+                Err(e) => state.last_error = Some(format!("Service taxonomy fetch failed: {}", e)),
+            }
+        }
+
         // Process investor register
         if let Some(result) = state.pending_investor_register.take() {
             state.loading_investor_register = false;
@@ -2229,6 +2243,32 @@ impl AppState {
             if let Ok(mut state) = async_state.lock() {
                 state.pending_trading_matrix = Some(result);
                 state.loading_trading_matrix = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
+    /// Fetch service taxonomy for a CBU (Product → Service → Resource hierarchy)
+    /// Called when Services tab is selected in the browser panel
+    pub fn fetch_service_taxonomy(&mut self, cbu_id: Uuid) {
+        use crate::api;
+        use wasm_bindgen_futures::spawn_local;
+
+        let async_state = std::sync::Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        {
+            let mut state = async_state.lock().unwrap();
+            state.loading_service_taxonomy = true;
+        }
+
+        spawn_local(async move {
+            let result = api::get_service_taxonomy(cbu_id).await;
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_service_taxonomy = Some(result);
+                state.loading_service_taxonomy = false;
             }
             if let Some(ctx) = ctx {
                 ctx.request_repaint();

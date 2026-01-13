@@ -54,6 +54,8 @@ pub fn service_resource_router(pool: PgPool) -> Router {
     let state = Arc::new(ServiceResourceState::new(pool));
 
     Router::new()
+        // Service Taxonomy (hierarchical view for UI)
+        .route("/cbu/:cbu_id/service-taxonomy", get(get_service_taxonomy))
         // Service Intents
         .route("/cbu/:cbu_id/service-intents", post(create_service_intent))
         .route("/cbu/:cbu_id/service-intents", get(list_service_intents))
@@ -565,6 +567,590 @@ async fn run_full_pipeline(
             }
         })),
     )
+}
+
+// =============================================================================
+// SERVICE TAXONOMY HANDLER
+// =============================================================================
+
+/// Response types for service taxonomy (mirrors ob-poc-graph types)
+mod taxonomy_types {
+    use serde::{Deserialize, Serialize};
+    use uuid::Uuid;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ServiceTaxonomyResponse {
+        pub root: ServiceTaxonomyNode,
+        pub cbu_id: Uuid,
+        pub cbu_name: String,
+        pub stats: ServiceTaxonomyStats,
+    }
+
+    #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+    pub struct ServiceTaxonomyStats {
+        pub product_count: usize,
+        pub service_count: usize,
+        pub intent_count: usize,
+        pub resource_count: usize,
+        pub attribute_progress: (usize, usize),
+        pub services_ready: usize,
+        pub services_partial: usize,
+        pub services_blocked: usize,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ServiceTaxonomyNode {
+        pub id: Vec<String>,
+        pub node_type: ServiceTaxonomyNodeType,
+        pub label: String,
+        pub sublabel: Option<String>,
+        pub status: String,
+        pub children: Vec<ServiceTaxonomyNode>,
+        pub leaf_count: usize,
+        pub blocking_reasons: Vec<String>,
+        pub attr_progress: Option<(usize, usize)>,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    #[serde(tag = "type", rename_all = "snake_case")]
+    pub enum ServiceTaxonomyNodeType {
+        Root {
+            cbu_id: Uuid,
+        },
+        Product {
+            product_id: Uuid,
+        },
+        Service {
+            service_id: Uuid,
+            product_id: Uuid,
+        },
+        ServiceIntent {
+            intent_id: Uuid,
+        },
+        Resource {
+            srdef_id: String,
+            resource_type: String,
+        },
+        AttributeCategory {
+            category: String,
+        },
+        Attribute {
+            attr_id: Uuid,
+            satisfied: bool,
+        },
+        AttributeValue {
+            source: String,
+        },
+    }
+
+    impl ServiceTaxonomyNode {
+        pub fn new(id: Vec<String>, node_type: ServiceTaxonomyNodeType, label: String) -> Self {
+            Self {
+                id,
+                node_type,
+                label,
+                sublabel: None,
+                status: "pending".to_string(),
+                children: Vec::new(),
+                leaf_count: 0,
+                blocking_reasons: Vec::new(),
+                attr_progress: None,
+            }
+        }
+
+        pub fn compute_leaf_counts(&mut self) -> usize {
+            if self.children.is_empty() {
+                self.leaf_count = 1;
+            } else {
+                self.leaf_count = self
+                    .children
+                    .iter_mut()
+                    .map(|c| c.compute_leaf_counts())
+                    .sum();
+            }
+            self.leaf_count
+        }
+    }
+}
+
+use taxonomy_types::*;
+
+/// Query result types for building taxonomy
+#[derive(Debug, sqlx::FromRow)]
+struct ProductRow {
+    product_id: Uuid,
+    name: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct ServiceRow {
+    service_id: Uuid,
+    product_id: Uuid,
+    name: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct IntentRow {
+    intent_id: Uuid,
+    product_id: Uuid,
+    service_id: Uuid,
+    status: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct DiscoveryRow {
+    srdef_id: String,
+    triggered_by_intents: JsonValue,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct AttrRequirementRow {
+    attr_id: Uuid,
+    requirement_strength: String,
+    required_by_srdefs: JsonValue,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct AttrValueRow {
+    attr_id: Uuid,
+    source: String,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct ReadinessRow {
+    product_id: Uuid,
+    service_id: Uuid,
+    status: String,
+    blocking_reasons: JsonValue,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct CbuNameRow {
+    name: String,
+}
+
+/// Build the hierarchical service taxonomy for a CBU
+async fn get_service_taxonomy(
+    State(state): State<Arc<ServiceResourceState>>,
+    Path(cbu_id): Path<Uuid>,
+) -> impl IntoResponse {
+    // Get CBU name
+    let cbu_name: String = match sqlx::query_as::<_, CbuNameRow>(
+        r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+    )
+    .bind(cbu_id)
+    .fetch_optional(&state.pool)
+    .await
+    {
+        Ok(Some(row)) => row.name,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": "CBU not found" })),
+            )
+        }
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        }
+    };
+
+    // Get active service intents for this CBU
+    let intents: Vec<IntentRow> = match sqlx::query_as(
+        r#"
+        SELECT intent_id, product_id, service_id, status
+        FROM "ob-poc".service_intents
+        WHERE cbu_id = $1 AND status = 'active'
+        ORDER BY product_id, service_id
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        }
+    };
+
+    // Collect unique product IDs from intents
+    let product_ids: Vec<Uuid> = intents
+        .iter()
+        .map(|i| i.product_id)
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    // Get product details
+    let products: Vec<ProductRow> = if product_ids.is_empty() {
+        Vec::new()
+    } else {
+        match sqlx::query_as(
+            r#"
+            SELECT product_id, name
+            FROM "ob-poc".products
+            WHERE product_id = ANY($1)
+            ORDER BY name
+            "#,
+        )
+        .bind(&product_ids)
+        .fetch_all(&state.pool)
+        .await
+        {
+            Ok(rows) => rows,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            }
+        }
+    };
+
+    // Collect unique service IDs from intents
+    let service_ids: Vec<Uuid> = intents
+        .iter()
+        .map(|i| i.service_id)
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
+
+    // Get service details with product mapping
+    let services: Vec<ServiceRow> = if service_ids.is_empty() {
+        Vec::new()
+    } else {
+        match sqlx::query_as(
+            r#"
+            SELECT s.service_id, ps.product_id, s.name
+            FROM "ob-poc".services s
+            JOIN "ob-poc".product_services ps ON s.service_id = ps.service_id
+            WHERE s.service_id = ANY($1) AND ps.product_id = ANY($2)
+            ORDER BY s.name
+            "#,
+        )
+        .bind(&service_ids)
+        .bind(&product_ids)
+        .fetch_all(&state.pool)
+        .await
+        {
+            Ok(rows) => rows,
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )
+            }
+        }
+    };
+
+    // Get discovered SRDEFs for this CBU
+    let discoveries: Vec<DiscoveryRow> = match sqlx::query_as(
+        r#"
+        SELECT srdef_id, triggered_by_intents
+        FROM "ob-poc".srdef_discovery_reasons
+        WHERE cbu_id = $1 AND superseded_at IS NULL
+        ORDER BY srdef_id
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        }
+    };
+
+    // Get attribute requirements
+    let attr_requirements: Vec<AttrRequirementRow> = match sqlx::query_as(
+        r#"
+        SELECT attr_id, requirement_strength, required_by_srdefs
+        FROM "ob-poc".cbu_unified_attr_requirements
+        WHERE cbu_id = $1
+        ORDER BY requirement_strength, attr_id
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        }
+    };
+
+    // Get attribute values (what's been satisfied)
+    let attr_values: Vec<AttrValueRow> = match sqlx::query_as(
+        r#"
+        SELECT attr_id, source
+        FROM "ob-poc".cbu_attr_values
+        WHERE cbu_id = $1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        }
+    };
+
+    // Get service readiness
+    let readiness: Vec<ReadinessRow> = match sqlx::query_as(
+        r#"
+        SELECT product_id, service_id, status, blocking_reasons
+        FROM "ob-poc".cbu_service_readiness
+        WHERE cbu_id = $1
+        "#,
+    )
+    .bind(cbu_id)
+    .fetch_all(&state.pool)
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": e.to_string() })),
+            )
+        }
+    };
+
+    // Build maps for efficient lookup
+    let satisfied_attrs: std::collections::HashSet<Uuid> =
+        attr_values.iter().map(|v| v.attr_id).collect();
+
+    let readiness_map: std::collections::HashMap<(Uuid, Uuid), &ReadinessRow> = readiness
+        .iter()
+        .map(|r| ((r.product_id, r.service_id), r))
+        .collect();
+
+    // Build the tree
+    let mut root = ServiceTaxonomyNode::new(
+        vec![],
+        ServiceTaxonomyNodeType::Root { cbu_id },
+        cbu_name.clone(),
+    );
+    root.status = "ready".to_string();
+
+    let mut stats = ServiceTaxonomyStats::default();
+
+    // For each product
+    for product in &products {
+        let product_key = product.product_id.to_string();
+        let mut product_node = ServiceTaxonomyNode::new(
+            vec![product_key.clone()],
+            ServiceTaxonomyNodeType::Product {
+                product_id: product.product_id,
+            },
+            product.name.clone(),
+        );
+        stats.product_count += 1;
+
+        // Find services for this product
+        let product_services: Vec<&ServiceRow> = services
+            .iter()
+            .filter(|s| s.product_id == product.product_id)
+            .collect();
+
+        for service in product_services {
+            let service_key = service.service_id.to_string();
+            let mut service_node = ServiceTaxonomyNode::new(
+                vec![product_key.clone(), service_key.clone()],
+                ServiceTaxonomyNodeType::Service {
+                    service_id: service.service_id,
+                    product_id: product.product_id,
+                },
+                service.name.clone(),
+            );
+            stats.service_count += 1;
+
+            // Get readiness status for this service
+            if let Some(r) = readiness_map.get(&(product.product_id, service.service_id)) {
+                service_node.status = r.status.clone();
+                if let Some(reasons) = r.blocking_reasons.as_array() {
+                    service_node.blocking_reasons = reasons
+                        .iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect();
+                }
+
+                match r.status.as_str() {
+                    "ready" => stats.services_ready += 1,
+                    "partial" => stats.services_partial += 1,
+                    "blocked" => stats.services_blocked += 1,
+                    _ => {}
+                }
+            }
+
+            // Find intents for this product/service
+            let service_intents: Vec<&IntentRow> = intents
+                .iter()
+                .filter(|i| {
+                    i.product_id == product.product_id && i.service_id == service.service_id
+                })
+                .collect();
+
+            for intent in service_intents {
+                let intent_key = intent.intent_id.to_string();
+                let mut intent_node = ServiceTaxonomyNode::new(
+                    vec![product_key.clone(), service_key.clone(), intent_key.clone()],
+                    ServiceTaxonomyNodeType::ServiceIntent {
+                        intent_id: intent.intent_id,
+                    },
+                    format!("Intent: {}", &intent.intent_id.to_string()[..8]),
+                );
+                intent_node.sublabel = Some(intent.status.clone());
+                intent_node.status = if intent.status == "active" {
+                    "ready".to_string()
+                } else {
+                    "pending".to_string()
+                };
+                stats.intent_count += 1;
+
+                // Find SRDEFs triggered by this intent
+                let intent_srdefs: Vec<&DiscoveryRow> = discoveries
+                    .iter()
+                    .filter(|d| {
+                        if let Some(arr) = d.triggered_by_intents.as_array() {
+                            arr.iter().any(|v| {
+                                v.as_str()
+                                    .map(|s| s == intent.intent_id.to_string())
+                                    .unwrap_or(false)
+                            })
+                        } else {
+                            false
+                        }
+                    })
+                    .collect();
+
+                for discovery in intent_srdefs {
+                    let srdef_key = discovery.srdef_id.clone();
+                    let resource_type = discovery
+                        .srdef_id
+                        .split(':')
+                        .nth(1)
+                        .unwrap_or("resource")
+                        .to_string();
+
+                    let mut resource_node = ServiceTaxonomyNode::new(
+                        vec![
+                            product_key.clone(),
+                            service_key.clone(),
+                            intent_key.clone(),
+                            srdef_key.clone(),
+                        ],
+                        ServiceTaxonomyNodeType::Resource {
+                            srdef_id: discovery.srdef_id.clone(),
+                            resource_type: resource_type.clone(),
+                        },
+                        discovery.srdef_id.clone(),
+                    );
+                    resource_node.sublabel = Some(resource_type);
+                    stats.resource_count += 1;
+
+                    // Find attributes required by this SRDEF
+                    let srdef_attrs: Vec<&AttrRequirementRow> = attr_requirements
+                        .iter()
+                        .filter(|a| {
+                            if let Some(arr) = a.required_by_srdefs.as_array() {
+                                arr.iter().any(|v| {
+                                    v.as_str().map(|s| s == discovery.srdef_id).unwrap_or(false)
+                                })
+                            } else {
+                                false
+                            }
+                        })
+                        .collect();
+
+                    let mut satisfied_count = 0;
+                    let total_count = srdef_attrs.len();
+
+                    for attr in srdef_attrs {
+                        let satisfied = satisfied_attrs.contains(&attr.attr_id);
+                        if satisfied {
+                            satisfied_count += 1;
+                        }
+
+                        let attr_node = ServiceTaxonomyNode::new(
+                            vec![
+                                product_key.clone(),
+                                service_key.clone(),
+                                intent_key.clone(),
+                                srdef_key.clone(),
+                                attr.attr_id.to_string(),
+                            ],
+                            ServiceTaxonomyNodeType::Attribute {
+                                attr_id: attr.attr_id,
+                                satisfied,
+                            },
+                            format!(
+                                "{} {}",
+                                if satisfied { "✓" } else { "○" },
+                                attr.attr_id.to_string()[..8].to_string()
+                            ),
+                        );
+
+                        resource_node.children.push(attr_node);
+                        stats.attribute_progress.1 += 1;
+                        if satisfied {
+                            stats.attribute_progress.0 += 1;
+                        }
+                    }
+
+                    resource_node.attr_progress = Some((satisfied_count, total_count));
+                    resource_node.status = if total_count == 0 {
+                        "ready".to_string()
+                    } else if satisfied_count == total_count {
+                        "ready".to_string()
+                    } else if satisfied_count > 0 {
+                        "partial".to_string()
+                    } else {
+                        "blocked".to_string()
+                    };
+
+                    intent_node.children.push(resource_node);
+                }
+
+                service_node.children.push(intent_node);
+            }
+
+            product_node.children.push(service_node);
+        }
+
+        root.children.push(product_node);
+    }
+
+    // Compute leaf counts
+    root.compute_leaf_counts();
+
+    let response = ServiceTaxonomyResponse {
+        root,
+        cbu_id,
+        cbu_name,
+        stats,
+    };
+
+    (StatusCode::OK, Json(json!(response)))
 }
 
 // =============================================================================
