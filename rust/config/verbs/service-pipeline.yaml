@@ -1,0 +1,393 @@
+# Service Resource Pipeline DSL Verbs
+#
+# These verbs orchestrate the Product → Service → Resource lifecycle:
+# 1. service-intent.create - Declare what CBU wants
+# 2. discovery.run - Determine required SRDEFs
+# 3. attributes.rollup - Merge attribute requirements
+# 4. attributes.populate - Fill attribute values
+# 5. provisioning.run - Create resources
+# 6. readiness.compute - Check "good to transact" status
+
+domains:
+  service-intent:
+    description: "Service intent management - declares what products/services a CBU wants"
+
+    verbs:
+      create:
+        description: "Create a service intent for a CBU"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service_intent
+        behavior: plugin
+        handler: ServiceIntentCreateOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to create intent for"
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: product-id
+            type: uuid
+            required: true
+            description: "Product being subscribed to"
+            lookup:
+              table: products
+              schema: ob-poc
+              search_key: name
+              primary_key: product_id
+          - name: service-id
+            type: uuid
+            required: true
+            description: "Service being configured"
+            lookup:
+              table: services
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+          - name: options
+            type: json
+            required: false
+            description: "Service configuration options"
+        returns:
+          type: uuid
+          name: intent_id
+          capture: true
+
+      list:
+        description: "List all service intents for a CBU"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: service_intent
+        behavior: plugin
+        handler: ServiceIntentListOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+          name: intents
+
+      supersede:
+        description: "Supersede an existing service intent with new options"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: service_intent
+        behavior: plugin
+        handler: ServiceIntentSupersedeOp
+        args:
+          - name: intent-id
+            type: uuid
+            required: true
+          - name: options
+            type: json
+            required: true
+        returns:
+          type: uuid
+          name: new_intent_id
+
+  discovery:
+    description: "Resource discovery operations"
+
+    verbs:
+      run:
+        description: "Run resource discovery - determines required SRDEFs from service intents"
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          noun: discovery
+        behavior: plugin
+        handler: DiscoveryRunOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          name: discovery_result
+
+      explain:
+        description: "Explain why specific SRDEFs were discovered"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: discovery
+        behavior: plugin
+        handler: DiscoveryExplainOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+          - name: srdef-id
+            type: string
+            required: false
+            description: "Specific SRDEF to explain (or all if omitted)"
+        returns:
+          type: record_set
+          name: explanations
+
+  attributes:
+    description: "Attribute requirement and value management"
+
+    verbs:
+      rollup:
+        description: "Roll up attribute requirements from discovered SRDEFs"
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          noun: attribute_requirements
+        behavior: plugin
+        handler: AttributeRollupOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          name: rollup_result
+
+      populate:
+        description: "Auto-populate attribute values from available sources"
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          noun: attribute_values
+        behavior: plugin
+        handler: AttributePopulateOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: sources
+            type: string_list
+            required: false
+            description: "Sources to try: entity, cbu, document, derived"
+        returns:
+          type: record
+          name: population_result
+
+      gaps:
+        description: "Show attribute gaps - required values that are missing"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: attribute_gaps
+        behavior: plugin
+        handler: AttributeGapsOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: srdef-id
+            type: string
+            required: false
+            description: "Filter to specific SRDEF"
+        returns:
+          type: record_set
+          name: gaps
+
+      set:
+        description: "Set an attribute value manually"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: attribute_value
+        behavior: plugin
+        handler: AttributeSetOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: attr-id
+            type: uuid
+            required: true
+          - name: value
+            type: string
+            required: true
+          - name: evidence
+            type: string_list
+            required: false
+            description: "Document references supporting this value"
+        returns:
+          type: affected
+          name: rows
+
+  provisioning:
+    description: "Resource provisioning operations"
+
+    verbs:
+      run:
+        description: "Run provisioning orchestrator - creates resources for ready SRDEFs"
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          noun: provisioning
+        behavior: plugin
+        handler: ProvisioningRunOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record
+          name: provisioning_result
+
+      status:
+        description: "Check provisioning request status"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: provisioning_status
+        behavior: plugin
+        handler: ProvisioningStatusOp
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+        returns:
+          type: record
+          name: request_status
+
+  readiness:
+    description: "Service readiness operations"
+
+    verbs:
+      compute:
+        description: "Compute service readiness - determines 'good to transact' status"
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          noun: readiness
+        behavior: plugin
+        handler: ReadinessComputeOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          name: readiness_result
+
+      explain:
+        description: "Explain blocking reasons for a service"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: cbu
+          noun: blocking_reasons
+        behavior: plugin
+        handler: ReadinessExplainOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: service-id
+            type: uuid
+            required: false
+            description: "Specific service (or all if omitted)"
+            lookup:
+              table: services
+              schema: ob-poc
+              search_key: name
+              primary_key: service_id
+        returns:
+          type: record_set
+          name: blocking_reasons
+
+  pipeline:
+    description: "Full pipeline orchestration"
+
+    verbs:
+      full:
+        description: "Run the entire pipeline: discovery -> rollup -> populate -> provision -> readiness"
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: cbu
+          noun: pipeline
+        behavior: plugin
+        handler: PipelineFullOp
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            lookup:
+              table: cbus
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+        returns:
+          type: record
+          name: pipeline_result

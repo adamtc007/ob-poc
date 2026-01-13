@@ -15,8 +15,9 @@
 use crate::panels::ContainerBrowseState;
 use crate::tokens::TokenRegistry;
 use ob_poc_graph::{
-    CbuGraphData, CbuGraphWidget, EntityTypeOntology, GalaxyView, TaxonomyState, TradingMatrix,
-    TradingMatrixNode, TradingMatrixState, ViewMode,
+    CbuGraphData, CbuGraphWidget, EntityTypeOntology, GalaxyView, ServiceTaxonomy,
+    ServiceTaxonomyState, TaxonomyState, TradingMatrix, TradingMatrixNode, TradingMatrixState,
+    ViewMode,
 };
 use ob_poc_types::investor_register::{
     BreakdownDimension, InvestorFilters, InvestorListResponse, InvestorRegisterView,
@@ -137,6 +138,10 @@ pub struct AppState {
     /// Set via fetch_trading_matrix(), never modified directly
     pub trading_matrix: Option<TradingMatrix>,
 
+    /// Service taxonomy data (Product → Service → Resource hierarchy)
+    /// Set via fetch_service_taxonomy(), never modified directly
+    pub service_taxonomy: Option<ServiceTaxonomy>,
+
     /// Universe graph data (galaxy navigation - clusters of CBUs)
     /// Set via fetch_universe(), never modified directly
     pub universe_graph: Option<UniverseGraph>,
@@ -202,6 +207,9 @@ pub struct AppState {
     /// Currently selected trading matrix node (for detail panel)
     pub selected_matrix_node: Option<TradingMatrixNode>,
 
+    /// Service taxonomy browser state (expand/collapse, selection, filters)
+    pub service_taxonomy_state: ServiceTaxonomyState,
+
     /// Galaxy view widget (universe navigation - force-directed cluster layout)
     /// Owns camera, force simulation - call tick() BEFORE render() per egui rules
     pub galaxy_view: GalaxyView,
@@ -257,6 +265,7 @@ impl Default for AppState {
             cbu_list: Vec::new(),
             session_context: None,
             trading_matrix: None,
+            service_taxonomy: None,
             universe_graph: None,
             investor_register: None,
             investor_list: None,
@@ -283,6 +292,7 @@ impl Default for AppState {
             type_filter: None,
             trading_matrix_state: TradingMatrixState::new(),
             selected_matrix_node: None,
+            service_taxonomy_state: ServiceTaxonomyState::new(),
             galaxy_view: GalaxyView::new(),
             navigation_scope: NavigationScope::default(),
             view_level: ViewLevel::default(),
@@ -328,6 +338,18 @@ pub struct TextBuffers {
 // PANEL STATE - UI layout configuration
 // =============================================================================
 
+/// Which browser is shown in the left panel
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum BrowserTab {
+    /// Entity type taxonomy browser
+    #[default]
+    Taxonomy,
+    /// Trading matrix configuration browser
+    TradingMatrix,
+    /// Service resources taxonomy browser
+    ServiceResources,
+}
+
 /// Panel visibility and layout state
 #[derive(Clone)]
 pub struct PanelState {
@@ -338,6 +360,8 @@ pub struct PanelState {
     pub show_entity_detail: bool,
     pub show_debug: bool, // F1 toggle for debug window
     pub layout: LayoutMode,
+    /// Which browser tab is active in the left panel
+    pub browser_tab: BrowserTab,
 }
 
 impl Default for PanelState {
@@ -350,6 +374,7 @@ impl Default for PanelState {
             show_entity_detail: false,
             show_debug: false,
             layout: LayoutMode::Simplified,
+            browser_tab: BrowserTab::default(),
         }
     }
 }
@@ -706,6 +731,7 @@ pub struct AsyncState {
     pub pending_cbu_search: Option<Result<crate::api::CbuSearchResponse, String>>,
     pub pending_session_context: Option<Result<SessionContext, String>>,
     pub pending_trading_matrix: Option<Result<TradingMatrix, String>>,
+    pub pending_service_taxonomy: Option<Result<ServiceTaxonomy, String>>,
     pub pending_investor_register: Option<Result<InvestorRegisterView, String>>,
     pub pending_investor_list: Option<Result<InvestorListResponse, String>>,
 
@@ -848,6 +874,7 @@ pub struct AsyncState {
     pub searching_resolution: bool,
     pub loading_session_context: bool,
     pub loading_trading_matrix: bool,
+    pub loading_service_taxonomy: bool,
     pub loading_investor_register: bool,
     pub loading_investor_list: bool,
     pub checking_version: bool, // Version poll in progress

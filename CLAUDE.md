@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-13
-> **Verb count:** 781 verbs across 102 YAML files
-> **Custom ops:** 48 plugin handlers
+> **Verb count:** 795 verbs across 103 YAML files
+> **Custom ops:** 49 plugin handlers
 > **Crates:** 13 fine-grained crates
 > **Migrations:** 23 schema migrations (latest: 023_sessions_persistence.sql)
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
@@ -13,6 +13,7 @@
 > **Viewport Scaling:** ✅ Complete - Force simulation + LOD thresholds scale to viewport size
 > **CBU View Mode:** ✅ Complete - Single TRADING view mode as default, simplified ViewMode struct
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
+> **Service Resource Pipeline:** ✅ Complete - Intent→Discovery→Attributes→Provisioning→Readiness + taxonomy viz
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -109,6 +110,8 @@ This file provides guidance to Claude Code when working with this repository.
 - "corporate action", "CA policy", "election policy", "dividend", "rights issue", "proceeds SSI" → `ai-thoughts/032-corporate-actions-integration.md`
 - "cbu session", "session persistence", "load cbu", "unload cbu", "session undo", "session redo" → See CBU Session v2 section below
 - "force simulation", "viewport scaling", "LOD", "detail level", "graph density" → See Viewport Scaling section below
+- "service resource", "service intent", "resource discovery", "provisioning", "readiness" → See Service Resource Pipeline section below
+- "service taxonomy", "product service", "attribute satisfaction", "srdef" → See Service Resource Pipeline section below
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -629,6 +632,11 @@ Never silently "guess and commit" on complex domain logic.
 | `dilution` | 10 | Options, warrants, convertibles, exercises |
 | `agent` | 12 | Agent mode, checkpoints, task orchestration |
 | `research.*` | 30+ | External source import, workflow, screening |
+| `service-intent` | 3 | Service intent creation, listing |
+| `resource-discovery` | 3 | Discover resources for services |
+| `resource-attributes` | 2 | Attribute satisfaction tracking |
+| `provisioning` | 3 | Request/track resource provisioning |
+| `readiness` | 3 | CBU service readiness queries |
 
 **Full verb reference:** See YAML files in `rust/config/verbs/`
 **Research/agent details:** See `docs/research-agent-annex.md`
@@ -969,6 +977,116 @@ pub struct ViewMode;  // Single CBU/Trading view
 
 ---
 
+## Service Resource Pipeline
+
+The service resource pipeline handles the flow from product/service intent through resource discovery, attribute satisfaction, and provisioning to readiness.
+
+### Pipeline Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Service Resource Pipeline                                │
+│                                                                              │
+│  ┌───────────┐    ┌───────────┐    ┌───────────┐    ┌───────────┐           │
+│  │  Intent   │ → │ Discovery │ → │ Attributes│ → │Provisioning│ → Ready   │
+│  │           │    │           │    │           │    │           │           │
+│  │ CBU wants │    │ Find SRDEF│    │ Check/    │    │ Request   │           │
+│  │ a service │    │ resources │    │ satisfy   │    │ resources │           │
+│  └───────────┘    └───────────┘    └───────────┘    └───────────┘           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### DSL Domains (14 verbs total)
+
+| Domain | Verbs | Description |
+|--------|-------|-------------|
+| `service-intent` | `create`, `list`, `get` | Express CBU intent for services |
+| `resource-discovery` | `discover`, `list-for-service`, `get-definition` | Find SRDEF resources |
+| `resource-attributes` | `check-satisfaction`, `record-satisfaction` | Track attribute completion |
+| `provisioning` | `request`, `status`, `list-pending` | Request/track provisioning |
+| `readiness` | `check`, `summary`, `blocking-resources` | Query CBU readiness |
+
+### MCP Tools (10 tools)
+
+| Tool | Description |
+|------|-------------|
+| `service_intent_create` | Create service intent for CBU |
+| `service_intent_list` | List intents for CBU |
+| `resource_discovery_discover` | Discover resources for service |
+| `resource_discovery_list_for_service` | List resources for service |
+| `resource_attributes_check` | Check attribute satisfaction |
+| `resource_attributes_record` | Record attribute as satisfied |
+| `provisioning_request` | Request resource provisioning |
+| `provisioning_status` | Check provisioning status |
+| `readiness_check` | Check CBU readiness for service |
+| `readiness_summary` | Get readiness summary |
+
+### REST API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/service-resource/intent` | Create service intent |
+| `GET` | `/api/service-resource/intent/:cbu_id` | List intents for CBU |
+| `POST` | `/api/service-resource/discover` | Discover resources |
+| `GET` | `/api/service-resource/resources/:service_id` | List resources for service |
+| `POST` | `/api/service-resource/attributes/check` | Check satisfaction |
+| `POST` | `/api/service-resource/attributes/record` | Record satisfaction |
+| `POST` | `/api/service-resource/provision` | Request provisioning |
+| `GET` | `/api/service-resource/provision/:request_id` | Get provisioning status |
+| `GET` | `/api/service-resource/readiness/:cbu_id` | Check readiness |
+| `GET` | `/api/service-resource/readiness/:cbu_id/summary` | Get summary |
+
+### Service Taxonomy Visualization
+
+The UI includes a hierarchical browser for the service resource structure:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Browser Tabs: [Entities] [Trading] [Services]                  │
+├─────────────────────────────────────────────────────────────────┤
+│  ▼ CBU: Acme Fund                                               │
+│    ▼ Product: Prime Brokerage                                   │
+│      ▼ Service: Securities Lending                              │
+│        ├─ Intent: intent-001 [ACTIVE]                          │
+│        ▼ Resource: SRDEF-CUSTODY-ACCOUNT                       │
+│          ▼ Attributes                                           │
+│            ├─ [✓] account_number: "12345"                      │
+│            └─ [✗] routing_code: (missing)                      │
+│      ▼ Service: Margin Financing                                │
+│        └─ ... (collapsed)                                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Node types:**
+- `Root` - CBU container
+- `Product` - Product category
+- `Service` - Service under product
+- `ServiceIntent` - Active intent
+- `Resource` - SRDEF resource definition
+- `AttributeCategory` - Attribute grouping
+- `Attribute` - Individual attribute (✓/✗ status)
+- `AttributeValue` - Source of satisfaction
+
+**Status indicators:**
+- `Ready` (green) - All attributes satisfied
+- `Partial` (yellow) - Some attributes missing
+- `Blocked` (red) - Critical attributes missing
+- `Pending` (gray) - Awaiting provisioning
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/config/verbs/service-pipeline.yaml` | DSL verb definitions (14 verbs) |
+| `rust/src/dsl_v2/custom_ops/service_pipeline_ops.rs` | Plugin handlers |
+| `rust/src/api/service_resource_routes.rs` | REST API routes |
+| `rust/src/mcp/handlers/service_resource.rs` | MCP tool handlers |
+| `rust/crates/ob-poc-graph/src/graph/service_taxonomy.rs` | Taxonomy tree widget |
+| `rust/crates/ob-poc-ui/src/panels/service_taxonomy.rs` | UI panel wrapper |
+
+---
+
 ## Key Files Reference
 
 | What | Where |
@@ -1096,6 +1214,7 @@ TextEdit::singleline(&mut String::new())
 | `trading_matrix.rs` | `TradingMatrixPanelAction` | ✅ | Node selection, navigation |
 | `investor_register.rs` | `InvestorRegisterAction` | ✅ | Aggregate expand, drill-down |
 | `toolbar.rs` | `ToolbarAction` | ✅ | CBU select, layout, view mode |
+| `service_taxonomy.rs` | `ServiceTaxonomyPanelAction` | ✅ | Service tree expand, drilling |
 
 ### Anti-Patterns to Avoid
 

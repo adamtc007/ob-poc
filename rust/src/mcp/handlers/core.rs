@@ -209,6 +209,17 @@ impl ToolHandlers {
             "feedback_repro" => self.feedback_repro(args).await,
             "feedback_todo" => self.feedback_todo(args).await,
             "feedback_audit" => self.feedback_audit(args).await,
+            // Service resource pipeline tools
+            "service_intent_create" => self.service_intent_create(args).await,
+            "service_intent_list" => self.service_intent_list(args).await,
+            "service_discovery_run" => self.service_discovery_run(args).await,
+            "service_attributes_gaps" => self.service_attributes_gaps(args).await,
+            "service_attributes_set" => self.service_attributes_set(args).await,
+            "service_readiness_get" => self.service_readiness_get(args).await,
+            "service_readiness_recompute" => self.service_readiness_recompute(args).await,
+            "service_pipeline_run" => self.service_pipeline_run(args).await,
+            "srdef_list" => self.srdef_list(args).await,
+            "srdef_get" => self.srdef_get(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -4303,6 +4314,473 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             })).collect::<Vec<_>>()
         }))
     }
+
+    // =========================================================================
+    // Service Resource Pipeline Tools
+    // =========================================================================
+
+    async fn service_intent_create(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::{NewServiceIntent, ServiceResourcePipelineService};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+            product_id: String,
+            service_id: String,
+            options: Option<Value>,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        // Resolve CBU ID (UUID or name)
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        // Resolve product ID
+        let product_id = self.resolve_product_id(&args.product_id).await?;
+
+        // Resolve service ID
+        let service_id = self.resolve_service_id(&args.service_id).await?;
+
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let input = NewServiceIntent {
+            cbu_id,
+            product_id,
+            service_id,
+            options: args.options,
+            created_by: None,
+        };
+
+        let intent_id = service.create_service_intent(&input).await?;
+
+        Ok(json!({
+            "success": true,
+            "intent_id": intent_id,
+            "cbu_id": cbu_id,
+            "product_id": product_id,
+            "service_id": service_id
+        }))
+    }
+
+    async fn service_intent_list(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::ServiceResourcePipelineService;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let intents = service.get_service_intents(cbu_id).await?;
+
+        Ok(json!({
+            "success": true,
+            "count": intents.len(),
+            "intents": intents.iter().map(|i| json!({
+                "intent_id": i.intent_id,
+                "cbu_id": i.cbu_id,
+                "product_id": i.product_id,
+                "service_id": i.service_id,
+                "options": i.options,
+                "status": i.status,
+                "created_at": i.created_at.to_rfc3339()
+            })).collect::<Vec<_>>()
+        }))
+    }
+
+    async fn service_discovery_run(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::{load_srdefs_from_config, run_discovery_pipeline};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        let registry = load_srdefs_from_config().unwrap_or_default();
+        let result = run_discovery_pipeline(pool, &registry, cbu_id).await?;
+
+        Ok(json!({
+            "success": true,
+            "cbu_id": result.cbu_id,
+            "srdefs_discovered": result.srdefs_discovered,
+            "attrs_rolled_up": result.attrs_rolled_up,
+            "attrs_populated": result.attrs_populated,
+            "attrs_missing": result.attrs_missing
+        }))
+    }
+
+    async fn service_attributes_gaps(&self, args: Value) -> Result<Value> {
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        // Query the gap view directly
+        let gaps: Vec<AttrGapRow> = sqlx::query_as(
+            r#"
+            SELECT attr_id, attr_code, attr_name, attr_category, has_value
+            FROM "ob-poc".v_cbu_attr_gaps
+            WHERE cbu_id = $1 AND NOT has_value
+            ORDER BY attr_category, attr_name
+            "#,
+        )
+        .bind(cbu_id)
+        .fetch_all(pool)
+        .await?;
+
+        Ok(json!({
+            "success": true,
+            "cbu_id": cbu_id,
+            "gap_count": gaps.len(),
+            "gaps": gaps.iter().map(|g| json!({
+                "attr_id": g.attr_id,
+                "attr_code": g.attr_code,
+                "attr_name": g.attr_name,
+                "attr_category": g.attr_category
+            })).collect::<Vec<_>>()
+        }))
+    }
+
+    async fn service_attributes_set(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::{
+            AttributeSource, ServiceResourcePipelineService, SetCbuAttrValue,
+        };
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+            attr_id: Uuid,
+            value: Value,
+            source: Option<String>,
+            evidence_refs: Option<Vec<String>>,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        let source = match args.source.as_deref() {
+            Some("derived") => AttributeSource::Derived,
+            Some("entity") => AttributeSource::Entity,
+            Some("cbu") => AttributeSource::Cbu,
+            Some("document") => AttributeSource::Document,
+            Some("external") => AttributeSource::External,
+            _ => AttributeSource::Manual,
+        };
+
+        // Convert evidence_refs strings to EvidenceRef structs
+        let evidence_refs = args.evidence_refs.map(|refs| {
+            refs.into_iter()
+                .map(|r| crate::service_resources::EvidenceRef {
+                    document_id: Uuid::parse_str(&r).ok(),
+                    url: None,
+                    description: Some(r),
+                })
+                .collect()
+        });
+
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let input = SetCbuAttrValue {
+            cbu_id,
+            attr_id: args.attr_id,
+            value: args.value.clone(),
+            source,
+            evidence_refs,
+            explain_refs: None,
+        };
+
+        service.set_cbu_attr_value(&input).await?;
+
+        Ok(json!({
+            "success": true,
+            "cbu_id": cbu_id,
+            "attr_id": args.attr_id,
+            "value": args.value
+        }))
+    }
+
+    async fn service_readiness_get(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::ServiceResourcePipelineService;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        let service = ServiceResourcePipelineService::new(pool.clone());
+        let readiness = service.get_service_readiness(cbu_id).await?;
+
+        let ready = readiness.iter().filter(|r| r.status == "ready").count();
+        let partial = readiness.iter().filter(|r| r.status == "partial").count();
+        let blocked = readiness.iter().filter(|r| r.status == "blocked").count();
+
+        Ok(json!({
+            "success": true,
+            "cbu_id": cbu_id,
+            "summary": {
+                "total": readiness.len(),
+                "ready": ready,
+                "partial": partial,
+                "blocked": blocked
+            },
+            "services": readiness.iter().map(|r| json!({
+                "service_id": r.service_id,
+                "service_name": r.service_name,
+                "status": r.status,
+                "blocking_reasons": r.blocking_reasons
+            })).collect::<Vec<_>>()
+        }))
+    }
+
+    async fn service_readiness_recompute(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::{load_srdefs_from_config, ReadinessEngine};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        let registry = load_srdefs_from_config().unwrap_or_default();
+        let engine = ReadinessEngine::new(pool, &registry);
+        let result = engine.compute_for_cbu(cbu_id).await?;
+
+        Ok(json!({
+            "success": true,
+            "cbu_id": cbu_id,
+            "recomputed": true,
+            "total_services": result.total_services,
+            "ready": result.ready,
+            "partial": result.partial,
+            "blocked": result.blocked
+        }))
+    }
+
+    async fn service_pipeline_run(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::{
+            load_srdefs_from_config, run_discovery_pipeline, run_provisioning_pipeline,
+        };
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            cbu_id: String,
+            dry_run: Option<bool>,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+        let _dry_run = args.dry_run.unwrap_or(false);
+
+        let cbu_id = self.resolve_cbu_id(&args.cbu_id).await?;
+
+        let registry = load_srdefs_from_config().unwrap_or_default();
+
+        // Run discovery + rollup + populate
+        let discovery = run_discovery_pipeline(pool, &registry, cbu_id).await?;
+
+        // Run provisioning + readiness
+        let provisioning = run_provisioning_pipeline(pool, &registry, cbu_id).await?;
+
+        Ok(json!({
+            "success": true,
+            "cbu_id": cbu_id,
+            "discovery": {
+                "srdefs_discovered": discovery.srdefs_discovered,
+                "attrs_rolled_up": discovery.attrs_rolled_up,
+                "attrs_populated": discovery.attrs_populated,
+                "attrs_missing": discovery.attrs_missing
+            },
+            "provisioning": {
+                "requests_created": provisioning.requests_created,
+                "already_active": provisioning.already_active,
+                "not_ready": provisioning.not_ready
+            },
+            "readiness": {
+                "services_ready": provisioning.services_ready,
+                "services_partial": provisioning.services_partial,
+                "services_blocked": provisioning.services_blocked
+            }
+        }))
+    }
+
+    async fn srdef_list(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::load_srdefs_from_config;
+
+        #[derive(serde::Deserialize, Default)]
+        struct Args {
+            domain: Option<String>,
+            resource_type: Option<String>,
+        }
+
+        let args: Args = serde_json::from_value(args).unwrap_or_default();
+
+        let registry = load_srdefs_from_config().unwrap_or_default();
+
+        let srdefs: Vec<_> = registry
+            .srdefs
+            .values()
+            .filter(|s| {
+                args.domain
+                    .as_ref()
+                    .map_or(true, |d| s.code.starts_with(&format!("{}:", d)))
+            })
+            .filter(|s| {
+                args.resource_type
+                    .as_ref()
+                    .map_or(true, |rt| s.resource_type.eq_ignore_ascii_case(rt))
+            })
+            .map(|s| {
+                json!({
+                    "srdef_id": s.srdef_id,
+                    "code": s.code,
+                    "name": s.name,
+                    "resource_type": s.resource_type,
+                    "owner": s.owner,
+                    "provisioning_strategy": s.provisioning_strategy,
+                    "triggered_by_services": s.triggered_by_services,
+                    "attribute_count": s.attributes.len(),
+                    "depends_on": s.depends_on
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "success": true,
+            "count": srdefs.len(),
+            "srdefs": srdefs
+        }))
+    }
+
+    async fn srdef_get(&self, args: Value) -> Result<Value> {
+        use crate::service_resources::load_srdefs_from_config;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            srdef_id: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+
+        let registry = load_srdefs_from_config().unwrap_or_default();
+
+        // Try direct lookup, then with decoded colons
+        let srdef_id = args.srdef_id.replace("%3A", ":").replace("%3a", ":");
+
+        match registry.get(&srdef_id) {
+            Some(srdef) => Ok(json!({
+                "success": true,
+                "srdef": {
+                    "srdef_id": srdef.srdef_id,
+                    "code": srdef.code,
+                    "name": srdef.name,
+                    "resource_type": srdef.resource_type,
+                    "purpose": srdef.purpose,
+                    "owner": srdef.owner,
+                    "provisioning_strategy": srdef.provisioning_strategy,
+                    "triggered_by_services": srdef.triggered_by_services,
+                    "attributes": srdef.attributes.iter().map(|a| json!({
+                        "attr_id": a.attr_id,
+                        "requirement": a.requirement,
+                        "source_policy": a.source_policy,
+                        "constraints": a.constraints,
+                        "description": a.description
+                    })).collect::<Vec<_>>(),
+                    "depends_on": srdef.depends_on,
+                    "per_market": srdef.per_market,
+                    "per_currency": srdef.per_currency,
+                    "per_counterparty": srdef.per_counterparty
+                }
+            })),
+            None => Err(anyhow!("SRDEF not found: {}", srdef_id)),
+        }
+    }
+
+    // Helper: resolve CBU ID from UUID string or name
+    async fn resolve_cbu_id(&self, value: &str) -> Result<Uuid> {
+        // Try as UUID first
+        if let Ok(uuid) = Uuid::parse_str(value) {
+            return Ok(uuid);
+        }
+
+        // Try as name lookup
+        let pool = self.require_pool()?;
+        let cbu_id: Option<Uuid> =
+            sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name ILIKE $1 LIMIT 1"#)
+                .bind(value)
+                .fetch_optional(pool)
+                .await?;
+
+        cbu_id.ok_or_else(|| anyhow!("CBU not found: {}", value))
+    }
+
+    // Helper: resolve product ID from UUID string or name
+    async fn resolve_product_id(&self, value: &str) -> Result<Uuid> {
+        if let Ok(uuid) = Uuid::parse_str(value) {
+            return Ok(uuid);
+        }
+
+        let pool = self.require_pool()?;
+        let product_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT product_id FROM "ob-poc".products WHERE name ILIKE $1 LIMIT 1"#,
+        )
+        .bind(value)
+        .fetch_optional(pool)
+        .await?;
+
+        product_id.ok_or_else(|| anyhow!("Product not found: {}", value))
+    }
+
+    // Helper: resolve service ID from UUID string or name
+    async fn resolve_service_id(&self, value: &str) -> Result<Uuid> {
+        if let Ok(uuid) = Uuid::parse_str(value) {
+            return Ok(uuid);
+        }
+
+        let pool = self.require_pool()?;
+        let service_id: Option<Uuid> = sqlx::query_scalar(
+            r#"SELECT service_id FROM "ob-poc".services WHERE name ILIKE $1 LIMIT 1"#,
+        )
+        .bind(value)
+        .fetch_optional(pool)
+        .await?;
+
+        service_id.ok_or_else(|| anyhow!("Service not found: {}", value))
+    }
+}
+
+// Helper struct for attribute gap query
+#[derive(sqlx::FromRow)]
+struct AttrGapRow {
+    attr_id: Uuid,
+    attr_code: String,
+    attr_name: String,
+    attr_category: String,
+    has_value: bool,
 }
 
 // Helper functions for parsing enum strings

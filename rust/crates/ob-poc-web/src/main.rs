@@ -28,7 +28,7 @@ use ob_poc::api::{
     create_client_router, create_dsl_viewer_router, create_entity_router, create_graph_router,
     create_resolution_router, create_session_graph_router, create_session_store,
     create_taxonomy_router, create_trading_matrix_router, create_universe_router,
-    create_verb_discovery_router,
+    create_verb_discovery_router, service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -361,7 +361,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Galaxy navigation - universe view and cluster detail
         .merge(create_universe_router(pool.clone()))
         // Control/ownership routes (board controller, control sphere)
-        .merge(control_routes(pool.clone()));
+        .merge(control_routes(pool.clone()))
+        // Service resource pipeline (intents, discovery, readiness)
+        .merge(service_resource_router(pool.clone()));
 
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());
@@ -429,6 +431,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/client/status    - Get CBU status");
     tracing::info!("  /api/client/outstanding - List outstanding requests");
     tracing::info!("  /api/client/chat      - Client chat endpoint");
+    tracing::info!("");
+    tracing::info!("Service Resource Pipeline:");
+    tracing::info!("  POST /api/cbu/:id/service-intents   - Create service intent");
+    tracing::info!("  POST /api/cbu/:id/resource-discover - Run resource discovery");
+    tracing::info!("  POST /api/cbu/:id/pipeline/full     - Run full pipeline");
+    tracing::info!("  GET  /api/cbu/:id/readiness         - Service readiness");
+    tracing::info!("  GET  /api/srdefs                    - SRDEF registry");
     tracing::info!("");
 
     let listener = match tokio::net::TcpListener::bind(addr).await {

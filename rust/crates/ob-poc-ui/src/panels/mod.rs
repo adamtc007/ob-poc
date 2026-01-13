@@ -16,6 +16,7 @@ mod investor_register;
 mod repl;
 mod resolution;
 mod results;
+mod service_taxonomy;
 mod session;
 mod taxonomy;
 mod toolbar;
@@ -37,6 +38,7 @@ pub use resolution::{
     resolution_modal, EntityMatchDisplay, ResolutionPanelAction, ResolutionPanelData,
 };
 pub use results::results_panel;
+pub use service_taxonomy::{service_taxonomy_panel, ServiceTaxonomyPanelAction};
 pub use session::session_panel;
 pub use taxonomy::{taxonomy_panel, TaxonomyPanelAction};
 pub use toolbar::{toolbar, ToolbarAction, ToolbarData};

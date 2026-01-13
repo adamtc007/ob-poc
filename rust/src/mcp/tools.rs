@@ -1688,5 +1688,229 @@ Each entry includes actor, timestamp, and details."#.into(),
                 "required": ["fingerprint"]
             }),
         },
+        // =====================================================================
+        // Service Resource Pipeline Tools
+        // Intent → Discovery → Attributes → Provisioning → Readiness
+        // =====================================================================
+        Tool {
+            name: "service_intent_create".into(),
+            description: r#"Create a service intent - declares that a CBU wants a product+service combination.
+
+A service intent captures what a CBU wants to do (e.g., "use Global Custody for Securities Services").
+This triggers the resource discovery pipeline to determine what resources are needed."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name to look up"
+                    },
+                    "product_id": {
+                        "type": "string",
+                        "description": "Product UUID or name (e.g., 'Global Custody')"
+                    },
+                    "service_id": {
+                        "type": "string",
+                        "description": "Service UUID or name (e.g., 'Securities Services')"
+                    },
+                    "options": {
+                        "type": "object",
+                        "description": "Service configuration options (markets, SSI mode, etc.)",
+                        "additionalProperties": true
+                    }
+                },
+                "required": ["cbu_id", "product_id", "service_id"]
+            }),
+        },
+        Tool {
+            name: "service_intent_list".into(),
+            description: "List all service intents for a CBU.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
+        Tool {
+            name: "service_discovery_run".into(),
+            description: r#"Run resource discovery for a CBU.
+
+Determines which SRDEFs (Service Resource Definitions) are required based on
+the CBU's service intents. Also performs attribute rollup and population.
+
+Returns:
+- srdefs_discovered: List of required SRDEFs
+- attrs_rolled_up: Count of unified attribute requirements
+- attrs_populated: Count of attributes auto-populated
+- attrs_missing: Count of attributes still needing values"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
+        Tool {
+            name: "service_attributes_gaps".into(),
+            description: r#"Get attribute gaps for a CBU.
+
+Shows which required attributes are missing values. These must be
+filled (manually or from documents) before resources can be provisioned.
+
+Returns list of missing attributes with:
+- attr_id, attr_code, attr_name
+- required_by_srdefs: Which SRDEFs need this attribute
+- source_policy: How the value should be obtained"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
+        Tool {
+            name: "service_attributes_set".into(),
+            description: "Set an attribute value for a CBU.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name"
+                    },
+                    "attr_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Attribute requirement ID"
+                    },
+                    "value": {
+                        "description": "Value to set (type depends on attribute)"
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": ["manual", "document", "derived", "entity", "cbu", "external"],
+                        "default": "manual",
+                        "description": "Source of the value"
+                    },
+                    "evidence_refs": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Document IDs supporting this value"
+                    }
+                },
+                "required": ["cbu_id", "attr_id", "value"]
+            }),
+        },
+        Tool {
+            name: "service_readiness_get".into(),
+            description: r#"Get service readiness status for a CBU.
+
+Shows which services are ready to transact, which are blocked, and why.
+
+Returns:
+- summary: { ready: N, blocked: M, partial: P }
+- services: List with status, blocking_reasons for each service"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
+        Tool {
+            name: "service_readiness_recompute".into(),
+            description: "Force recomputation of service readiness for a CBU.".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
+        Tool {
+            name: "service_pipeline_run".into(),
+            description: r#"Run the full service resource pipeline for a CBU.
+
+Executes: discovery → rollup → populate → provision → readiness
+
+Returns comprehensive result with all pipeline stages."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "cbu_id": {
+                        "type": "string",
+                        "description": "CBU UUID or name"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, don't actually provision - just show what would happen"
+                    }
+                },
+                "required": ["cbu_id"]
+            }),
+        },
+        Tool {
+            name: "srdef_list".into(),
+            description: r#"List all available Service Resource Definitions (SRDEFs).
+
+SRDEFs define what resources are needed, how to provision them,
+and what attributes are required."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "domain": {
+                        "type": "string",
+                        "description": "Filter by domain (e.g., 'custody', 'connectivity', 'iam')"
+                    },
+                    "resource_type": {
+                        "type": "string",
+                        "description": "Filter by resource type (e.g., 'account', 'connectivity', 'entitlement')"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "srdef_get".into(),
+            description: r#"Get details of a specific SRDEF.
+
+Returns:
+- srdef_id, code, name, resource_type
+- provisioning_strategy
+- triggered_by_services
+- attributes: List of required/optional attributes
+- depends_on: Other SRDEFs this depends on"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "srdef_id": {
+                        "type": "string",
+                        "description": "SRDEF ID (e.g., 'custody:securities', 'connectivity:swift')"
+                    }
+                },
+                "required": ["srdef_id"]
+            }),
+        },
     ]
 }

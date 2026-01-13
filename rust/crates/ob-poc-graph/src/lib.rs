@@ -11,6 +11,9 @@ pub use graph::{
     get_entities_for_type,
     // Trading Matrix (hierarchical custody config browser)
     render_node_detail_panel,
+    // Service Taxonomy (Product → Service → Resource browser)
+    render_service_detail_panel,
+    render_service_taxonomy,
     render_trading_matrix_browser,
     render_type_browser,
     // Astronomy view (universe/solar system transitions)
@@ -32,9 +35,21 @@ pub use graph::{
     GraphNodeData,
     // Navigation actions
     GraphWidgetAction,
+    IntentData,
     NavigateBackAction,
     NavigationEntry,
+    ProductData,
+    ResourceData,
     RiskSummary,
+    ServiceData,
+    ServiceStatus,
+    ServiceTaxonomy,
+    ServiceTaxonomyAction,
+    ServiceTaxonomyNode,
+    ServiceTaxonomyNodeId,
+    ServiceTaxonomyNodeType,
+    ServiceTaxonomyState,
+    ServiceTaxonomyStats,
     // Animation
     SpringConfig,
     SpringF32,

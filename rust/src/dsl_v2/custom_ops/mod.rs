@@ -52,6 +52,7 @@ mod resource_ops;
 
 mod screening_ops;
 mod semantic_ops;
+mod service_pipeline_ops;
 mod session_ops;
 mod source_loader_ops;
 mod team_ops;
@@ -243,6 +244,13 @@ pub use tollgate_ops::{
 };
 pub use trust_ops::{TrustAnalyzeControlOp, TrustClassifyOp, TrustIdentifyUbosOp};
 
+// Service pipeline operations (intent → discovery → provision → readiness)
+pub use service_pipeline_ops::{
+    AttributeGapsOp, AttributePopulateOp, AttributeRollupOp, AttributeSetOp, DiscoveryExplainOp,
+    DiscoveryRunOp, PipelineFullOp, ProvisioningRunOp, ProvisioningStatusOp, ReadinessComputeOp,
+    ReadinessExplainOp, ServiceIntentCreateOp, ServiceIntentListOp, ServiceIntentSupersedeOp,
+};
+
 // GLEIF operations (LEI data enrichment)
 pub use gleif_ops::{
     GleifEnrichOp, GleifGetChildrenOp, GleifGetManagedFundsOp, GleifGetManagerOp,
@@ -331,6 +339,22 @@ impl CustomOperationRegistry {
         registry.register(Arc::new(ResourceSuspendOp));
         registry.register(Arc::new(ResourceDecommissionOp));
         registry.register(Arc::new(ResourceValidateAttrsOp));
+
+        // Service pipeline operations (intent → discovery → provision → readiness)
+        registry.register(Arc::new(ServiceIntentCreateOp));
+        registry.register(Arc::new(ServiceIntentListOp));
+        registry.register(Arc::new(ServiceIntentSupersedeOp));
+        registry.register(Arc::new(DiscoveryRunOp));
+        registry.register(Arc::new(DiscoveryExplainOp));
+        registry.register(Arc::new(AttributeRollupOp));
+        registry.register(Arc::new(AttributePopulateOp));
+        registry.register(Arc::new(AttributeGapsOp));
+        registry.register(Arc::new(AttributeSetOp));
+        registry.register(Arc::new(ProvisioningRunOp));
+        registry.register(Arc::new(ProvisioningStatusOp));
+        registry.register(Arc::new(ReadinessComputeOp));
+        registry.register(Arc::new(ReadinessExplainOp));
+        registry.register(Arc::new(PipelineFullOp));
 
         // CBU operations
         registry.register(Arc::new(CbuAddProductOp));

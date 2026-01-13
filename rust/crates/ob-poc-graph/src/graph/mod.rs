@@ -48,6 +48,7 @@ pub mod lod;
 pub mod ontology;
 pub mod render;
 pub mod sdf;
+pub mod service_taxonomy;
 pub mod spatial;
 pub mod trading_matrix;
 pub mod types;
@@ -79,6 +80,11 @@ pub use ontology::{
     TaxonomyState, TypeBrowserAction, TypeNode,
 };
 pub use render::GraphRenderer;
+pub use service_taxonomy::{
+    render_service_detail_panel, render_service_taxonomy, IntentData, ProductData, ResourceData,
+    ServiceData, ServiceStatus, ServiceTaxonomy, ServiceTaxonomyAction, ServiceTaxonomyNode,
+    ServiceTaxonomyNodeId, ServiceTaxonomyNodeType, ServiceTaxonomyState, ServiceTaxonomyStats,
+};
 pub use trading_matrix::{
     get_node_type_color, get_node_type_icon, render_node_detail_panel,
     render_trading_matrix_browser, StatusColor, TradingMatrix, TradingMatrixAction,

@@ -10,12 +10,15 @@ use crate::command::AgentPromptConduit;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
-    results_panel, session_panel, taxonomy_panel, toolbar, trading_matrix_panel, CbuSearchAction,
-    CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction, DslEditorAction,
-    EntityMatchDisplay, InvestorRegisterAction, ResolutionPanelAction, ResolutionPanelData,
+    results_panel, service_taxonomy_panel, session_panel, taxonomy_panel, toolbar,
+    trading_matrix_panel, CbuSearchAction, CbuSearchData, ContainerBrowseAction,
+    ContainerBrowseData, ContextPanelAction, DslEditorAction, EntityMatchDisplay,
+    InvestorRegisterAction, ResolutionPanelAction, ResolutionPanelData, ServiceTaxonomyPanelAction,
     TaxonomyPanelAction, ToolbarAction, ToolbarData, TradingMatrixPanelAction,
 };
-use crate::state::{AppState, AsyncState, CbuSearchUi, LayoutMode, PanelState, TextBuffers};
+use crate::state::{
+    AppState, AsyncState, BrowserTab, CbuSearchUi, LayoutMode, PanelState, TextBuffers,
+};
 use ob_poc_graph::{CbuGraphWidget, TradingMatrixNodeIdExt, ViewMode};
 use ob_poc_types::galaxy::{NavigationAction, ViewLevel};
 use std::sync::{Arc, Mutex};
@@ -140,6 +143,7 @@ impl App {
             cbu_list: Vec::new(),
             session_context: None,
             trading_matrix: None,
+            service_taxonomy: None,
             universe_graph: None,
             investor_register: None,
             investor_list: None,
@@ -164,6 +168,7 @@ impl App {
             type_filter: None,
             trading_matrix_state: ob_poc_graph::TradingMatrixState::new(),
             selected_matrix_node: None,
+            service_taxonomy_state: ob_poc_graph::ServiceTaxonomyState::new(),
             // Galaxy navigation state
             galaxy_view: ob_poc_graph::GalaxyView::new(),
             navigation_scope: ob_poc_types::galaxy::NavigationScope::default(),
@@ -2788,6 +2793,71 @@ impl App {
         }
     }
 
+    /// Handle service taxonomy panel actions
+    fn handle_service_taxonomy_action(&mut self, action: ServiceTaxonomyPanelAction) {
+        match action {
+            ServiceTaxonomyPanelAction::None => {}
+            ServiceTaxonomyPanelAction::ToggleExpand { node_id } => {
+                self.state.service_taxonomy_state.toggle(&node_id);
+            }
+            ServiceTaxonomyPanelAction::SelectNode { node_id } => {
+                web_sys::console::log_1(
+                    &format!("ServiceTaxonomy: Select node {}", node_id.as_key()).into(),
+                );
+                self.state.service_taxonomy_state.select(Some(&node_id));
+            }
+            ServiceTaxonomyPanelAction::DrillIntoResource { srdef_id } => {
+                web_sys::console::log_1(
+                    &format!("ServiceTaxonomy: Drill into resource {}", srdef_id).into(),
+                );
+                // TODO: Navigate to resource detail view
+            }
+            ServiceTaxonomyPanelAction::ShowBlockingReason { node_id, reason } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "ServiceTaxonomy: Show blocking reason for {}: {}",
+                        node_id.as_key(),
+                        reason
+                    )
+                    .into(),
+                );
+                // TODO: Show blocking reason modal
+            }
+            ServiceTaxonomyPanelAction::ToggleBlockedFilter => {
+                self.state.service_taxonomy_state.show_blocked_only =
+                    !self.state.service_taxonomy_state.show_blocked_only;
+            }
+            ServiceTaxonomyPanelAction::ToggleAttributeDetail => {
+                self.state.service_taxonomy_state.show_attributes =
+                    !self.state.service_taxonomy_state.show_attributes;
+            }
+            ServiceTaxonomyPanelAction::ExpandAll => {
+                if let Some(ref taxonomy) = self.state.service_taxonomy {
+                    self.state
+                        .service_taxonomy_state
+                        .expand_to_depth(&taxonomy.root, 4);
+                }
+            }
+            ServiceTaxonomyPanelAction::CollapseAll => {
+                self.state.service_taxonomy_state.collapse_all();
+            }
+            ServiceTaxonomyPanelAction::Refresh => {
+                // Trigger refetch of service taxonomy
+                if let Some(cbu_id_str) =
+                    self.state.session.as_ref().and_then(|s| s.active_cbu_id())
+                {
+                    if let Ok(cbu_id) = Uuid::parse_str(&cbu_id_str) {
+                        web_sys::console::log_1(
+                            &format!("ServiceTaxonomy: Refresh for CBU {}", cbu_id).into(),
+                        );
+                        // TODO: Fetch service taxonomy from API
+                        // self.state.fetch_service_taxonomy(cbu_id);
+                    }
+                }
+            }
+        }
+    }
+
     /// Handle investor register panel actions
     fn handle_investor_register_action(&mut self, action: crate::panels::InvestorRegisterAction) {
         use crate::panels::InvestorRegisterAction;
@@ -2924,11 +2994,10 @@ impl App {
         let top_height = available.y * 0.5;
         let bottom_height = available.y * 0.5 - 4.0;
 
-        // Top: Graph (full width, 50% height) with taxonomy/trading matrix browser overlay
-        // Use Trading Matrix browser when in Trading view mode, Taxonomy browser otherwise
-        let is_trading_mode = matches!(self.state.view_mode, ViewMode);
+        // Top: Graph (full width, 50% height) with browser panel overlay
+        // Browser panel has tabs: Taxonomy, Trading Matrix, Service Resources
 
-        let (taxonomy_action, trading_matrix_action) = ui
+        let (taxonomy_action, trading_matrix_action, service_taxonomy_action) = ui
             .allocate_ui(egui::vec2(available.x, top_height), |ui| {
                 egui::Frame::default()
                     .inner_margin(0.0)
@@ -2936,28 +3005,90 @@ impl App {
                     .show(ui, |ui| {
                         // Horizontal split: browser (left) + graph (right)
                         ui.horizontal(|ui| {
-                            let browser_width = if is_trading_mode { 240.0 } else { 180.0 };
+                            let browser_width = 240.0;
 
-                            let (tax_action, matrix_action) = ui
+                            let (tax_action, matrix_action, svc_action) = ui
                                 .allocate_ui(
                                     egui::vec2(browser_width, ui.available_height()),
                                     |ui| {
-                                        if is_trading_mode {
-                                            // Trading Matrix browser for Trading view
-                                            let action = trading_matrix_panel(
-                                                ui,
-                                                &self.state,
-                                                ui.available_height(),
-                                            );
-                                            (TaxonomyPanelAction::None, action)
-                                        } else {
-                                            // Taxonomy browser for other views
-                                            let action = taxonomy_panel(
-                                                ui,
-                                                &self.state,
-                                                ui.available_height(),
-                                            );
-                                            (action, TradingMatrixPanelAction::None)
+                                        // Browser tab bar
+                                        ui.horizontal(|ui| {
+                                            if ui
+                                                .selectable_label(
+                                                    self.state.panels.browser_tab
+                                                        == BrowserTab::Taxonomy,
+                                                    "Entities",
+                                                )
+                                                .clicked()
+                                            {
+                                                self.state.panels.browser_tab =
+                                                    BrowserTab::Taxonomy;
+                                            }
+                                            if ui
+                                                .selectable_label(
+                                                    self.state.panels.browser_tab
+                                                        == BrowserTab::TradingMatrix,
+                                                    "Trading",
+                                                )
+                                                .clicked()
+                                            {
+                                                self.state.panels.browser_tab =
+                                                    BrowserTab::TradingMatrix;
+                                            }
+                                            if ui
+                                                .selectable_label(
+                                                    self.state.panels.browser_tab
+                                                        == BrowserTab::ServiceResources,
+                                                    "Services",
+                                                )
+                                                .clicked()
+                                            {
+                                                self.state.panels.browser_tab =
+                                                    BrowserTab::ServiceResources;
+                                            }
+                                        });
+
+                                        ui.separator();
+
+                                        // Render active browser panel
+                                        let remaining_height = ui.available_height();
+                                        match self.state.panels.browser_tab {
+                                            BrowserTab::Taxonomy => {
+                                                let action = taxonomy_panel(
+                                                    ui,
+                                                    &self.state,
+                                                    remaining_height,
+                                                );
+                                                (
+                                                    action,
+                                                    TradingMatrixPanelAction::None,
+                                                    ServiceTaxonomyPanelAction::None,
+                                                )
+                                            }
+                                            BrowserTab::TradingMatrix => {
+                                                let action = trading_matrix_panel(
+                                                    ui,
+                                                    &self.state,
+                                                    remaining_height,
+                                                );
+                                                (
+                                                    TaxonomyPanelAction::None,
+                                                    action,
+                                                    ServiceTaxonomyPanelAction::None,
+                                                )
+                                            }
+                                            BrowserTab::ServiceResources => {
+                                                let action = service_taxonomy_panel(
+                                                    ui,
+                                                    &self.state,
+                                                    remaining_height,
+                                                );
+                                                (
+                                                    TaxonomyPanelAction::None,
+                                                    TradingMatrixPanelAction::None,
+                                                    action,
+                                                )
+                                            }
                                         }
                                     },
                                 )
@@ -2973,7 +3104,7 @@ impl App {
                                 }
                             });
 
-                            (tax_action, matrix_action)
+                            (tax_action, matrix_action, svc_action)
                         })
                         .inner
                     })
@@ -2984,6 +3115,7 @@ impl App {
         // Handle actions AFTER rendering (Rule 2)
         self.handle_taxonomy_action(taxonomy_action);
         self.handle_trading_matrix_action(trading_matrix_action);
+        self.handle_service_taxonomy_action(service_taxonomy_action);
 
         ui.separator();
 
