@@ -1,0 +1,159 @@
+# SRDEF definitions for IAM (Identity & Access Management) domain
+#
+# These define user access and entitlement resources.
+
+domain: IAM
+description: Identity and access management
+
+srdefs:
+  # Platform user entitlement
+  - code: platform_access
+    name: Platform User Access
+    resource_type: Entitlement
+    purpose: Grant user access to platform applications
+    provisioning_strategy: create
+    owner: IAM
+
+    triggered_by_services:
+      - CUSTODY_SAFEKEEPING
+      - CUSTODY_SETTLEMENT
+      - REPORTING
+      - CORPORATE_ACTIONS
+
+    attributes:
+      - id: user_principal
+        requirement: required
+        source_policy: [entity, cbu, manual]
+        description: Primary user identity (email or SSO ID)
+
+      - id: role_assignments
+        requirement: required
+        source_policy: [cbu, manual]
+        constraints:
+          type: array
+          items: string
+        description: List of role names to assign
+
+      - id: mfa_required
+        requirement: optional
+        source_policy: [derived, manual]
+        constraints:
+          type: boolean
+        default: true
+        description: Whether MFA is required for this user
+
+      - id: session_timeout_minutes
+        requirement: optional
+        source_policy: [manual]
+        constraints:
+          type: integer
+          minimum: 5
+          maximum: 480
+        default: 60
+        description: Session timeout in minutes
+
+    depends_on: []
+
+    per_market: false
+    per_currency: false
+    per_counterparty: false
+
+  # Service account for automation
+  - code: service_account
+    name: Service Account
+    resource_type: Entitlement
+    purpose: Non-interactive service account for automation
+    provisioning_strategy: create
+    owner: IAM
+
+    triggered_by_services:
+      - API_ACCESS
+      - DATA_FEEDS
+      - AUTOMATION
+
+    attributes:
+      - id: service_account_name
+        requirement: required
+        source_policy: [derived, cbu, manual]
+        description: Service account identifier
+
+      - id: service_roles
+        requirement: required
+        source_policy: [cbu, manual]
+        constraints:
+          type: array
+          items: string
+        description: Roles assigned to service account
+
+      - id: credential_rotation_days
+        requirement: optional
+        source_policy: [manual]
+        constraints:
+          type: integer
+          minimum: 30
+          maximum: 365
+        default: 90
+        description: Credential rotation period in days
+
+      - id: audit_logging
+        requirement: required
+        source_policy: [derived]
+        constraints:
+          type: boolean
+        default: true
+        description: Whether to log all actions
+
+    depends_on:
+      - SRDEF::CONNECTIVITY::Connectivity::api_gateway
+
+    per_market: false
+    per_currency: false
+    per_counterparty: false
+
+  # Data access permissions
+  - code: data_permissions
+    name: Data Access Permissions
+    resource_type: Entitlement
+    purpose: Control access to specific data domains
+    provisioning_strategy: create
+    owner: IAM
+
+    triggered_by_services:
+      - REPORTING
+      - DATA_FEEDS
+      - ANALYTICS
+
+    attributes:
+      - id: data_domains
+        requirement: required
+        source_policy: [cbu, manual]
+        constraints:
+          type: array
+          items: string
+          enum_items: [positions, transactions, valuations, corporate_actions, documents, reference_data]
+        description: Data domains accessible
+
+      - id: access_level
+        requirement: required
+        source_policy: [cbu, manual]
+        constraints:
+          type: string
+          enum: [read, read_write, admin]
+        default: read
+        description: Level of access granted
+
+      - id: data_retention_days
+        requirement: optional
+        source_policy: [manual]
+        constraints:
+          type: integer
+          minimum: 1
+          maximum: 3650
+        description: How long data is retained/accessible
+
+    depends_on:
+      - SRDEF::IAM::Entitlement::platform_access
+
+    per_market: false
+    per_currency: false
+    per_counterparty: false

@@ -1,0 +1,151 @@
+# SRDEF definitions for Connectivity domain
+#
+# These define messaging and connectivity resources required
+# for communication with external parties.
+
+domain: CONNECTIVITY
+description: Messaging and connectivity services
+
+srdefs:
+  # SWIFT sender/receiver setup
+  - code: swift_messaging
+    name: SWIFT Messaging Channel
+    resource_type: Connectivity
+    purpose: Enable SWIFT messaging for settlements
+    provisioning_strategy: request
+    owner: SWIFT
+
+    triggered_by_services:
+      - CUSTODY_SETTLEMENT
+      - CORPORATE_ACTIONS
+      - PROXY_VOTING
+
+    attributes:
+      - id: sender_bic
+        requirement: required
+        source_policy: [derived, entity, manual]
+        constraints:
+          type: string
+          pattern: "^[A-Z]{8,11}$"
+        description: Our BIC code for sending messages
+
+      - id: receiver_bic
+        requirement: required
+        source_policy: [cbu, manual]
+        constraints:
+          type: string
+          pattern: "^[A-Z]{8,11}$"
+        description: Counterparty BIC for receiving messages
+
+      - id: message_types
+        requirement: required
+        source_policy: [derived, manual]
+        constraints:
+          type: array
+          items: string
+        default: [MT540, MT541, MT542, MT543, MT544, MT545, MT546, MT547, MT548]
+        description: Enabled SWIFT message types
+
+    depends_on: []
+
+    per_market: false
+    per_currency: false
+    per_counterparty: true
+
+  # FIX connectivity
+  - code: fix_connectivity
+    name: FIX Protocol Connection
+    resource_type: Connectivity
+    purpose: Enable FIX protocol for order routing
+    provisioning_strategy: request
+    owner: TRADING
+
+    triggered_by_services:
+      - ORDER_ROUTING
+      - EXECUTION_MANAGEMENT
+
+    attributes:
+      - id: fix_sender_comp_id
+        requirement: required
+        source_policy: [derived, manual]
+        description: Our FIX SenderCompID
+
+      - id: fix_target_comp_id
+        requirement: required
+        source_policy: [cbu, manual]
+        description: Target system's CompID
+
+      - id: fix_version
+        requirement: required
+        source_policy: [manual]
+        constraints:
+          type: string
+          enum: ["4.2", "4.4", "5.0", "5.0SP2"]
+        default: "4.4"
+        description: FIX protocol version
+
+      - id: heartbeat_interval
+        requirement: optional
+        source_policy: [manual]
+        constraints:
+          type: integer
+          minimum: 10
+          maximum: 120
+        default: 30
+        description: Heartbeat interval in seconds
+
+    depends_on: []
+
+    per_market: false
+    per_currency: false
+    per_counterparty: true
+
+  # API connectivity
+  - code: api_gateway
+    name: API Gateway Access
+    resource_type: Connectivity
+    purpose: REST/GraphQL API access for programmatic integration
+    provisioning_strategy: create
+    owner: API_GATEWAY
+
+    triggered_by_services:
+      - API_ACCESS
+      - DATA_FEEDS
+      - REPORTING
+
+    attributes:
+      - id: api_client_id
+        requirement: required
+        source_policy: [derived]
+        description: Generated API client identifier
+
+      - id: allowed_scopes
+        requirement: required
+        source_policy: [cbu, manual]
+        constraints:
+          type: array
+          items: string
+        description: OAuth scopes granted to this client
+
+      - id: rate_limit_tier
+        requirement: optional
+        source_policy: [derived, manual]
+        constraints:
+          type: string
+          enum: [basic, standard, premium]
+        default: standard
+        description: API rate limiting tier
+
+      - id: ip_whitelist
+        requirement: optional
+        source_policy: [cbu, manual]
+        constraints:
+          type: array
+          items: string
+        description: Allowed source IP addresses/CIDRs
+
+    depends_on: []
+
+    per_market: false
+    per_currency: false
+    per_counterparty: false

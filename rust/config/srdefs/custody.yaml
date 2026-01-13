@@ -1,0 +1,143 @@
+# SRDEF definitions for Custody domain
+#
+# These define the Service Resource Definitions (SRDEFs) required
+# for custody services. Each SRDEF specifies:
+# - What resource type is needed
+# - How to provision it (create/request/discover)
+# - What attributes are required
+# - Dependencies on other SRDEFs
+
+domain: CUSTODY
+description: Custody and safekeeping services
+
+srdefs:
+  # Securities custody account
+  - code: custody_securities
+    name: Securities Custody Account
+    resource_type: Account
+    purpose: Hold securities positions in custody
+    provisioning_strategy: request
+    owner: CUSTODY
+
+    # Which services trigger this SRDEF
+    triggered_by_services:
+      - CUSTODY_SAFEKEEPING
+      - CUSTODY_SETTLEMENT
+      - PRIME_BROKERAGE
+
+    # Attribute requirements
+    attributes:
+      - id: market_scope
+        requirement: required
+        source_policy: [cbu, entity, manual]
+        constraints:
+          type: array
+          items: string
+          min_items: 1
+        description: List of markets/exchanges for trading (MIC codes)
+
+      - id: settlement_currency
+        requirement: required
+        source_policy: [derived, cbu, manual]
+        constraints:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        description: Primary settlement currency (ISO 4217)
+
+      - id: account_structure
+        requirement: optional
+        source_policy: [cbu, manual]
+        constraints:
+          type: string
+          enum: [omnibus, segregated, hybrid]
+        default: segregated
+        description: Account segregation model
+
+      - id: tax_jurisdiction
+        requirement: required
+        source_policy: [entity, cbu, manual]
+        description: Tax domicile for withholding purposes
+
+    # Dependencies
+    depends_on: []
+
+    # Per-market instantiation
+    per_market: true
+    per_currency: false
+
+  # Cash custody account
+  - code: custody_cash
+    name: Cash Custody Account
+    resource_type: Account
+    purpose: Hold cash balances
+    provisioning_strategy: request
+    owner: CUSTODY
+
+    triggered_by_services:
+      - CUSTODY_SAFEKEEPING
+      - CUSTODY_SETTLEMENT
+      - CASH_MANAGEMENT
+
+    attributes:
+      - id: settlement_currency
+        requirement: required
+        source_policy: [derived, cbu, manual]
+        constraints:
+          type: string
+          pattern: "^[A-Z]{3}$"
+        description: Account currency (ISO 4217)
+
+      - id: interest_calculation
+        requirement: optional
+        source_policy: [cbu, manual]
+        constraints:
+          type: string
+          enum: [daily_accrual, month_end, none]
+        default: daily_accrual
+
+    depends_on:
+      - SRDEF::CUSTODY::Account::custody_securities
+
+    per_market: false
+    per_currency: true
+
+  # Settlement instructions
+  - code: settlement_ssi
+    name: Standing Settlement Instructions
+    resource_type: InstructionSet
+    purpose: Define default settlement instructions
+    provisioning_strategy: create
+    owner: CUSTODY
+
+    triggered_by_services:
+      - CUSTODY_SETTLEMENT
+
+    attributes:
+      - id: ssi_mode
+        requirement: required
+        source_policy: [cbu, manual]
+        constraints:
+          type: string
+          enum: [standing, per_trade]
+        description: Whether to use standing instructions or per-trade
+
+      - id: default_agent_bic
+        requirement: conditional
+        condition: ssi_mode == 'standing'
+        source_policy: [cbu, manual]
+        constraints:
+          type: string
+          pattern: "^[A-Z]{8,11}$"
+        description: BIC of default settlement agent
+
+      - id: default_account_number
+        requirement: conditional
+        condition: ssi_mode == 'standing'
+        source_policy: [cbu, manual]
+        description: Default settlement account number
+
+    depends_on:
+      - SRDEF::CUSTODY::Account::custody_securities
+
+    per_market: true
+    per_currency: false

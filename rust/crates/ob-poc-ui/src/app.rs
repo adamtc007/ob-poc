@@ -2319,13 +2319,21 @@ impl App {
                 entity_type,
                 display_name,
             } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "DisambiguationAction::Select: entity_type='{}', entity_id='{}', display_name='{}'",
+                        entity_type, entity_id, display_name
+                    )
+                    .into(),
+                );
+
                 // Close modal
                 self.state
                     .window_stack
                     .close_by_type(crate::state::WindowType::Resolution);
 
                 // If selecting a CBU, switch to System view and trigger graph fetch
-                if entity_type == "cbu" || entity_type == "entity" {
+                if entity_type == "cbu" {
                     // entity_id might be a UUID or a name - try UUID first, then lookup by name
                     if let Ok(uuid) = Uuid::parse_str(&entity_id) {
                         self.state.select_cbu(uuid, &display_name);
@@ -2334,7 +2342,7 @@ impl App {
                         self.lookup_and_select_cbu(&entity_id, &display_name);
                     }
                 } else {
-                    // Bind entity to session (non-CBU entity)
+                    // Bind entity to session (non-CBU entity like person, company, etc.)
                     if let Some(session_id) = self.state.session_id {
                         self.bind_entity_to_session(
                             session_id,

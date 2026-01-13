@@ -99,6 +99,10 @@ pub mod events;
 #[cfg(feature = "database")]
 pub mod feedback;
 
+// Service Resources Pipeline - CBU Service → Resource Discovery → Provisioning
+#[cfg(feature = "database")]
+pub mod service_resources;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

@@ -67,6 +67,9 @@ pub mod control_routes;
 pub mod cbu_session_routes;
 
 #[cfg(feature = "server")]
+pub mod service_resource_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -124,3 +127,6 @@ pub use cbu_session_routes::{
     create_cbu_session_router, create_cbu_session_router_with_pool, CbuSessionState,
     CbuSessionStore,
 };
+
+#[cfg(feature = "server")]
+pub use service_resource_routes::{service_resource_router, ServiceResourceState};
