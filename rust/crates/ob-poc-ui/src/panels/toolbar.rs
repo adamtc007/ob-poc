@@ -147,12 +147,6 @@ pub fn toolbar(ui: &mut Ui, data: &ToolbarData) -> ToolbarAction {
     action
 }
 
-fn view_mode_name(mode: ViewMode) -> &'static str {
-    match mode {
-        ViewMode::KycUbo => "KYC/UBO",
-        ViewMode::ServiceDelivery => "Services",
-        ViewMode::ProductsOnly => "Products",
-        ViewMode::Trading => "Trading",
-        ViewMode::BoardControl => "Board Control",
-    }
+fn view_mode_name(_mode: ViewMode) -> &'static str {
+    "CBU"
 }

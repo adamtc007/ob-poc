@@ -32,11 +32,57 @@ pub fn gateway_addr() -> String {
 ///
 /// Uses EntityGateway gRPC service for all lookups, ensuring consistent
 /// behavior with LSP autocomplete.
+#[derive(Clone)]
 pub struct GatewayRefResolver {
     client: EntityGatewayClient<Channel>,
 }
 
 impl GatewayRefResolver {
+    /// Get key strength for ordering (lower = stronger = try first)
+    ///
+    /// Policy lives HERE in resolver, not in config crate.
+    /// Config should be pure data, resolver owns resolution strategy.
+    ///
+    /// Strength tiers:
+    /// - Tier 1 (0-9): Exact identifiers - O(1) lookup
+    /// - Tier 2 (10-19): Composite with discriminators - narrowed search
+    /// - Tier 3 (20+): Fuzzy name search - broad, slower
+    pub fn key_strength(column: &str, has_discriminators: bool) -> u8 {
+        match column {
+            // Tier 1: Exact identifiers
+            "id" => 0,
+            "lei" => 1,
+            "registration_number" | "reg_number" => 2,
+            "bic" => 3,
+            "isin" => 4,
+            "code" => 5,
+            // Tier 2: Composite with discriminators
+            _ if has_discriminators => 10,
+            // Tier 3: Fuzzy name-based
+            "search_name" | "name" => 20,
+            "alias" => 25,
+            _ => 30,
+        }
+    }
+}
+
+impl GatewayRefResolver {
+    /// Create from an existing client (preferred - reuses connection)
+    ///
+    /// The `EntityGatewayClient<Channel>` is cheap to clone since tonic's
+    /// Channel uses Arc internally. This enables connection reuse across
+    /// multiple resolve calls.
+    pub fn new(client: EntityGatewayClient<Channel>) -> Self {
+        Self { client }
+    }
+
+    /// Get a clone of the underlying client for sharing
+    ///
+    /// This is cheap because tonic Channel is Arc-based.
+    pub fn client(&self) -> EntityGatewayClient<Channel> {
+        self.client.clone()
+    }
+
     /// Connect to the EntityGateway service
     pub async fn connect(addr: &str) -> Result<Self, String> {
         let client = EntityGatewayClient::connect(addr.to_string())
@@ -76,6 +122,8 @@ impl GatewayRefResolver {
             mode: SearchMode::Exact as i32,
             limit: Some(5), // Get suggestions if not found
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let response = self
@@ -95,6 +143,8 @@ impl GatewayRefResolver {
                 mode: SearchMode::Fuzzy as i32,
                 limit: Some(10),
                 discriminators: std::collections::HashMap::new(),
+                tenant_id: None,
+                cbu_id: None,
             };
 
             let fuzzy_response = self
@@ -184,6 +234,8 @@ impl GatewayRefResolver {
             mode: SearchMode::Exact as i32,
             limit: None, // Return all matches
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let response = self
@@ -236,6 +288,121 @@ impl GatewayRefResolver {
         Ok(results)
     }
 
+    /// Resolve a reference with discriminators for disambiguation
+    ///
+    /// This is the full-featured resolution method that uses the complete
+    /// search schema from verb YAML. Discriminators are extracted from
+    /// sibling arguments by the semantic validator.
+    ///
+    /// Example: For a person lookup with search_key "(search_name (date_of_birth :selectivity 0.95))",
+    /// if the verb call has `:dob "1985-03-15"`, that value is passed as a discriminator
+    /// to boost matching candidates with that DOB.
+    pub async fn resolve_with_discriminators(
+        &mut self,
+        ref_type: RefType,
+        value: &str,
+        discriminators: std::collections::HashMap<String, String>,
+    ) -> Result<ResolveResult, String> {
+        let nickname = ref_type_to_nickname(ref_type);
+
+        // For UUID-based lookups, we search by ID directly if value looks like a UUID
+        let (search_value, search_key) =
+            if is_uuid_lookup(ref_type) && Uuid::parse_str(value).is_ok() {
+                (value.to_string(), Some("id".to_string()))
+            } else {
+                (value.to_string(), None)
+            };
+
+        let request = SearchRequest {
+            nickname: nickname.to_string(),
+            values: vec![search_value.clone()],
+            search_key: search_key.clone(),
+            mode: SearchMode::Exact as i32,
+            limit: Some(5),
+            discriminators: discriminators.clone(),
+            tenant_id: None,
+            cbu_id: None,
+        };
+
+        let response = self
+            .client
+            .search(request)
+            .await
+            .map_err(|e| format!("EntityGateway search failed: {}", e))?;
+
+        let matches: Vec<_> = response.into_inner().matches;
+
+        if matches.is_empty() {
+            // No exact matches - try fuzzy search with discriminators for suggestions
+            let fuzzy_request = SearchRequest {
+                nickname: nickname.to_string(),
+                values: vec![search_value.clone()],
+                search_key: search_key.clone(),
+                mode: SearchMode::Fuzzy as i32,
+                limit: Some(10),
+                discriminators,
+                tenant_id: None,
+                cbu_id: None,
+            };
+
+            let fuzzy_response = self
+                .client
+                .search(fuzzy_request)
+                .await
+                .map_err(|e| format!("EntityGateway fuzzy search failed: {}", e))?;
+
+            let fuzzy_matches = fuzzy_response.into_inner().matches;
+
+            if fuzzy_matches.is_empty() {
+                return Ok(ResolveResult::NotFound {
+                    suggestions: vec![],
+                });
+            }
+
+            let suggestions: Vec<SuggestedMatch> = fuzzy_matches
+                .into_iter()
+                .map(|m| SuggestedMatch {
+                    value: m.token,
+                    display: m.display,
+                    score: m.score,
+                })
+                .collect();
+
+            return Ok(ResolveResult::NotFound { suggestions });
+        }
+
+        // Check for exact match (case-insensitive)
+        let value_upper = value.to_uppercase();
+        for m in &matches {
+            if m.token.to_uppercase() == value_upper || m.display.to_uppercase() == value_upper {
+                if let Ok(uuid) = Uuid::parse_str(&m.token) {
+                    return Ok(ResolveResult::Found {
+                        id: uuid,
+                        display: m.display.clone(),
+                    });
+                } else {
+                    return Ok(ResolveResult::FoundByCode {
+                        code: m.token.clone(),
+                        uuid: None,
+                        display: m.display.clone(),
+                    });
+                }
+            }
+        }
+
+        // No exact match - return suggestions
+        let suggestions: Vec<SuggestedMatch> = matches
+            .into_iter()
+            .map(|m| SuggestedMatch {
+                value: m.token,
+                display: m.display,
+                score: m.score,
+            })
+            .collect();
+
+        Ok(ResolveResult::NotFound { suggestions })
+    }
+
     /// Search with fuzzy matching (for autocomplete-like scenarios)
     pub async fn search_fuzzy(
         &mut self,
@@ -252,6 +419,8 @@ impl GatewayRefResolver {
             mode: SearchMode::Fuzzy as i32,
             limit: Some(limit as i32),
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let response = self

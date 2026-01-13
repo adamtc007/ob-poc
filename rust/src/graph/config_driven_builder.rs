@@ -1486,16 +1486,34 @@ impl ConfigDrivenGraphBuilder {
     }
 
     /// Map entity_type string to node_type code
+    ///
+    /// Maps entity types from the entities table to node_type_code values
+    /// in the node_types table for visibility filtering.
     fn map_entity_type_to_node_type(&self, entity_type: &str) -> String {
         match entity_type.to_uppercase().as_str() {
-            "PROPER_PERSON" | "NATURAL_PERSON" => "entity".to_string(),
-            "LIMITED_COMPANY" | "COMPANY" => "entity".to_string(),
-            "FUND" | "SICAV" | "ICAV" | "OEIC" | "VCC" | "UNIT_TRUST" | "FCP" => {
-                "entity".to_string()
+            // Natural persons
+            "PROPER_PERSON" | "NATURAL_PERSON" | "PERSON" => "ENTITY_PERSON".to_string(),
+            // Companies
+            "LIMITED_COMPANY" | "COMPANY" | "CORPORATION" | "LLC" | "GMBH" | "SA" | "AG"
+            | "PLC" | "LTD" | "INC" => "ENTITY_COMPANY".to_string(),
+            // Funds
+            "FUND" | "SICAV" | "ICAV" | "OEIC" | "VCC" | "UNIT_TRUST" | "FCP" | "UCITS" | "AIF"
+            | "RAIF" => "ENTITY_FUND".to_string(),
+            // Partnerships
+            "PARTNERSHIP"
+            | "LIMITED_PARTNERSHIP"
+            | "LP"
+            | "LLP"
+            | "GP"
+            | "SCSP"
+            | "SCS"
+            | "SCSSP" => "ENTITY_PARTNERSHIP".to_string(),
+            // Trusts
+            "TRUST" | "DISCRETIONARY_TRUST" | "FIXED_TRUST" | "UNIT_TRUST_STRUCTURE" => {
+                "ENTITY_TRUST".to_string()
             }
-            "PARTNERSHIP" | "LIMITED_PARTNERSHIP" => "entity".to_string(),
-            "TRUST" | "DISCRETIONARY_TRUST" => "entity".to_string(),
-            _ => "entity".to_string(),
+            // Default to company for unknown types
+            _ => "ENTITY_COMPANY".to_string(),
         }
     }
 

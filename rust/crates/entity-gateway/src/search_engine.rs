@@ -129,6 +129,8 @@ impl SearchEngine {
             mode: MatchMode::Fuzzy,
             limit: limit * 3, // Get more candidates for discriminator filtering
             discriminators: query.discriminators.clone(),
+            tenant_id: None, // TODO: Pass tenant/CBU scope through SearchQuery
+            cbu_id: None,
         };
 
         let primary_matches = index.search(&primary_query).await;
@@ -248,6 +250,8 @@ impl SearchEngine {
             mode: MatchMode::Fuzzy,
             limit: limit * 5,
             discriminators: query.discriminators.clone(),
+            tenant_id: None, // TODO: Pass tenant/CBU scope through SearchQuery
+            cbu_id: None,
         };
 
         let primary_matches = index.search(&primary_query).await;

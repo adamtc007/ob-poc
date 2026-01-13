@@ -32,6 +32,177 @@ use uuid::Uuid;
 // Re-export resolution types for convenience
 pub use resolution::*;
 
+// ============================================================================
+// RESOLVED KEY - UUID vs Code distinction
+// ============================================================================
+
+/// Resolved key - either a database UUID or a code string
+///
+/// This enum prevents the anti-pattern of generating fake UUIDs for reference
+/// data like role codes (`DIRECTOR`), jurisdiction codes (`US`), or product
+/// codes (`FUND_ACCOUNTING`). These should remain as their natural string keys.
+///
+/// ## Examples
+///
+/// ```ignore
+/// // Entity with UUID primary key
+/// ResolvedKey::Uuid(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap())
+///
+/// // Role code (string primary key)
+/// ResolvedKey::Code("DIRECTOR".to_string())
+///
+/// // Jurisdiction code
+/// ResolvedKey::Code("LU".to_string())
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "key_type", content = "value", rename_all = "snake_case")]
+pub enum ResolvedKey {
+    /// UUID primary key (entities, persons, funds, CBUs)
+    Uuid(Uuid),
+    /// Code string (roles, jurisdictions, products, attributes, currencies)
+    Code(String),
+}
+
+impl ResolvedKey {
+    /// Check if this is a UUID key
+    pub fn is_uuid(&self) -> bool {
+        matches!(self, ResolvedKey::Uuid(_))
+    }
+
+    /// Check if this is a code key
+    pub fn is_code(&self) -> bool {
+        matches!(self, ResolvedKey::Code(_))
+    }
+
+    /// Get the UUID if this is a UUID key
+    pub fn as_uuid(&self) -> Option<Uuid> {
+        match self {
+            ResolvedKey::Uuid(u) => Some(*u),
+            ResolvedKey::Code(_) => None,
+        }
+    }
+
+    /// Get the code if this is a code key
+    pub fn as_code(&self) -> Option<&str> {
+        match self {
+            ResolvedKey::Uuid(_) => None,
+            ResolvedKey::Code(c) => Some(c),
+        }
+    }
+
+    /// Parse from string - tries UUID first, falls back to Code
+    ///
+    /// This is useful when receiving data from external sources where
+    /// the key type isn't explicitly tagged.
+    pub fn parse(s: &str) -> Self {
+        match Uuid::parse_str(s) {
+            Ok(u) => ResolvedKey::Uuid(u),
+            Err(_) => ResolvedKey::Code(s.to_string()),
+        }
+    }
+
+    /// Convert to string representation
+    ///
+    /// For UUIDs, returns the hyphenated string form.
+    /// For codes, returns the code as-is.
+    pub fn to_key_string(&self) -> String {
+        match self {
+            ResolvedKey::Uuid(u) => u.to_string(),
+            ResolvedKey::Code(c) => c.clone(),
+        }
+    }
+}
+
+impl std::fmt::Display for ResolvedKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResolvedKey::Uuid(u) => write!(f, "{}", u),
+            ResolvedKey::Code(c) => write!(f, "{}", c),
+        }
+    }
+}
+
+impl From<Uuid> for ResolvedKey {
+    fn from(u: Uuid) -> Self {
+        ResolvedKey::Uuid(u)
+    }
+}
+
+impl From<String> for ResolvedKey {
+    fn from(s: String) -> Self {
+        ResolvedKey::parse(&s)
+    }
+}
+
+impl From<&str> for ResolvedKey {
+    fn from(s: &str) -> Self {
+        ResolvedKey::parse(s)
+    }
+}
+
+// ============================================================================
+// REF LOCATION - Location-based reference identification
+// ============================================================================
+
+/// Unique identifier for an unresolved reference location in the AST
+///
+/// This enables location-based resolution rather than text-based matching.
+/// When two "John Smith" references appear in the same DSL (one as director,
+/// one as UBO), they can be resolved to different people because they're
+/// identified by their AST location, not their text content.
+///
+/// ## Example
+///
+/// ```ignore
+/// // Statement 0: (cbu.assign-role :entity-id "John Smith" :role "DIRECTOR")
+/// // Statement 1: (ownership.add-ubo :person "John Smith" :percentage 25)
+///
+/// // These create two distinct RefLocations:
+/// RefLocation { stmt_index: 0, arg_name: "entity-id".to_string(), span: None }
+/// RefLocation { stmt_index: 1, arg_name: "person".to_string(), span: None }
+/// ```
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RefLocation {
+    /// Statement index in the AST (0-based)
+    pub stmt_index: usize,
+    /// Argument name within the statement (e.g., "entity-id", "cbu-id")
+    pub arg_name: String,
+    /// Optional byte span for sub-argument precision (start, end)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub span: Option<(usize, usize)>,
+}
+
+impl RefLocation {
+    /// Create a new RefLocation
+    pub fn new(stmt_index: usize, arg_name: impl Into<String>) -> Self {
+        Self {
+            stmt_index,
+            arg_name: arg_name.into(),
+            span: None,
+        }
+    }
+
+    /// Create a new RefLocation with span
+    pub fn with_span(stmt_index: usize, arg_name: impl Into<String>, span: (usize, usize)) -> Self {
+        Self {
+            stmt_index,
+            arg_name: arg_name.into(),
+            span: Some(span),
+        }
+    }
+
+    /// Generate a unique ref_id string for this location
+    pub fn ref_id(&self) -> String {
+        format!("{}:{}", self.stmt_index, self.arg_name)
+    }
+}
+
+impl std::fmt::Display for RefLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "stmt[{}].{}", self.stmt_index, self.arg_name)
+    }
+}
+
 // Re-export investor register types for convenience
 pub use investor_register::{
     AggregateBreakdown, AggregateInvestorsNode, BreakdownDimension, ControlHolderNode, ControlTier,
@@ -1980,5 +2151,176 @@ mod tests {
             !json.contains(r#""commands":null"#),
             "commands should not be null"
         );
+    }
+
+    // =========================================================================
+    // ResolvedKey Tests
+    // =========================================================================
+
+    #[test]
+    fn resolved_key_uuid_creation() {
+        let uuid = Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+        let key = ResolvedKey::Uuid(uuid);
+
+        assert!(key.is_uuid());
+        assert!(!key.is_code());
+        assert_eq!(key.as_uuid(), Some(uuid));
+        assert_eq!(key.as_code(), None);
+        assert_eq!(key.to_key_string(), "550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    #[test]
+    fn resolved_key_code_creation() {
+        let key = ResolvedKey::Code("DIRECTOR".to_string());
+
+        assert!(!key.is_uuid());
+        assert!(key.is_code());
+        assert_eq!(key.as_uuid(), None);
+        assert_eq!(key.as_code(), Some("DIRECTOR"));
+        assert_eq!(key.to_key_string(), "DIRECTOR");
+    }
+
+    #[test]
+    fn resolved_key_parse_uuid() {
+        let key = ResolvedKey::parse("550e8400-e29b-41d4-a716-446655440000");
+
+        assert!(key.is_uuid());
+        assert_eq!(
+            key.as_uuid(),
+            Some(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap())
+        );
+    }
+
+    #[test]
+    fn resolved_key_parse_code() {
+        let key = ResolvedKey::parse("DIRECTOR");
+
+        assert!(key.is_code());
+        assert_eq!(key.as_code(), Some("DIRECTOR"));
+    }
+
+    #[test]
+    fn resolved_key_parse_jurisdiction_code() {
+        // Jurisdiction codes like "LU", "US" should NOT be parsed as UUIDs
+        let key = ResolvedKey::parse("LU");
+
+        assert!(key.is_code());
+        assert_eq!(key.as_code(), Some("LU"));
+    }
+
+    #[test]
+    fn resolved_key_serializes_with_tag() {
+        let uuid_key =
+            ResolvedKey::Uuid(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap());
+        let json = serde_json::to_string(&uuid_key).unwrap();
+        assert!(json.contains(r#""key_type":"uuid""#));
+        assert!(json.contains(r#""value":"550e8400-e29b-41d4-a716-446655440000""#));
+
+        let code_key = ResolvedKey::Code("DIRECTOR".to_string());
+        let json = serde_json::to_string(&code_key).unwrap();
+        assert!(json.contains(r#""key_type":"code""#));
+        assert!(json.contains(r#""value":"DIRECTOR""#));
+    }
+
+    #[test]
+    fn resolved_key_roundtrip() {
+        let original = ResolvedKey::Code("FUND_ACCOUNTING".to_string());
+        let json = serde_json::to_string(&original).unwrap();
+        let parsed: ResolvedKey = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn resolved_key_from_uuid() {
+        let uuid = Uuid::new_v4();
+        let key: ResolvedKey = uuid.into();
+        assert!(key.is_uuid());
+        assert_eq!(key.as_uuid(), Some(uuid));
+    }
+
+    #[test]
+    fn resolved_key_from_string() {
+        let key: ResolvedKey = "DIRECTOR".to_string().into();
+        assert!(key.is_code());
+
+        let uuid_str = "550e8400-e29b-41d4-a716-446655440000".to_string();
+        let key: ResolvedKey = uuid_str.into();
+        assert!(key.is_uuid());
+    }
+
+    #[test]
+    fn resolved_key_display() {
+        let uuid_key =
+            ResolvedKey::Uuid(Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap());
+        assert_eq!(
+            format!("{}", uuid_key),
+            "550e8400-e29b-41d4-a716-446655440000"
+        );
+
+        let code_key = ResolvedKey::Code("DIRECTOR".to_string());
+        assert_eq!(format!("{}", code_key), "DIRECTOR");
+    }
+
+    // =========================================================================
+    // RefLocation Tests
+    // =========================================================================
+
+    #[test]
+    fn ref_location_creation() {
+        let loc = RefLocation::new(0, "entity-id");
+        assert_eq!(loc.stmt_index, 0);
+        assert_eq!(loc.arg_name, "entity-id");
+        assert_eq!(loc.span, None);
+    }
+
+    #[test]
+    fn ref_location_with_span() {
+        let loc = RefLocation::with_span(2, "cbu-id", (10, 25));
+        assert_eq!(loc.stmt_index, 2);
+        assert_eq!(loc.arg_name, "cbu-id");
+        assert_eq!(loc.span, Some((10, 25)));
+    }
+
+    #[test]
+    fn ref_location_ref_id() {
+        let loc = RefLocation::new(3, "person");
+        assert_eq!(loc.ref_id(), "3:person");
+    }
+
+    #[test]
+    fn ref_location_display() {
+        let loc = RefLocation::new(1, "entity-id");
+        assert_eq!(format!("{}", loc), "stmt[1].entity-id");
+    }
+
+    #[test]
+    fn ref_location_equality() {
+        let loc1 = RefLocation::new(0, "entity-id");
+        let loc2 = RefLocation::new(0, "entity-id");
+        let loc3 = RefLocation::new(1, "entity-id");
+        let loc4 = RefLocation::new(0, "cbu-id");
+
+        assert_eq!(loc1, loc2);
+        assert_ne!(loc1, loc3); // Different stmt_index
+        assert_ne!(loc1, loc4); // Different arg_name
+    }
+
+    #[test]
+    fn ref_location_serializes() {
+        let loc = RefLocation::new(2, "entity-id");
+        let json = serde_json::to_string(&loc).unwrap();
+        assert!(json.contains(r#""stmt_index":2"#));
+        assert!(json.contains(r#""arg_name":"entity-id""#));
+        // span should be omitted when None
+        assert!(!json.contains("span"));
+    }
+
+    #[test]
+    fn ref_location_roundtrip() {
+        let original = RefLocation::with_span(5, "owner-id", (100, 150));
+        let json = serde_json::to_string(&original).unwrap();
+        let parsed: RefLocation = serde_json::from_str(&json).unwrap();
+        assert_eq!(original, parsed);
     }
 }

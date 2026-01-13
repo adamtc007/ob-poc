@@ -144,7 +144,7 @@ impl App {
             investor_register: None,
             investor_list: None,
             buffers: TextBuffers::default(),
-            view_mode: ViewMode::KycUbo,
+            view_mode: ViewMode,
             panels: PanelState::default(),
             selected_entity_id: None,
             resolution_ui: crate::state::ResolutionPanelUi::default(),
@@ -900,6 +900,15 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Store ctx for async callbacks that need to request repaint
         self.state.ctx = Some(ctx.clone());
+
+        // Debug: log view_level at start of each frame
+        web_sys::console::log_1(
+            &format!(
+                "update START: view_level={:?}, layout={:?}",
+                self.state.view_level, self.state.panels.layout
+            )
+            .into(),
+        );
 
         // =================================================================
         // STEP 1: Process any pending async results
@@ -1661,7 +1670,7 @@ impl eframe::App for App {
                         async_state.pending_cbu_id = Some(cbu_id);
                         async_state.needs_graph_refetch = true;
                     }
-                    self.state.view_mode = ob_poc_graph::ViewMode::KycUbo;
+                    self.state.view_mode = ob_poc_graph::ViewMode;
                     #[cfg(target_arch = "wasm32")]
                     web_sys::console::log_1(
                         &format!(
@@ -2047,6 +2056,15 @@ impl eframe::App for App {
 
             // Main content area - just the graph viewport
             egui::CentralPanel::default().show(ctx, |ui| {
+                // Debug: log view_level on each frame (temporary)
+                web_sys::console::log_1(
+                    &format!(
+                        "render: view_level={:?}, session_id={:?}",
+                        self.state.view_level, self.state.session_id
+                    )
+                    .into(),
+                );
+
                 if self.state.view_level == ViewLevel::Universe {
                     self.render_galaxy_view(ui);
                 } else {
@@ -2144,6 +2162,9 @@ impl App {
                 self.state.search_cbus(&query);
             }
             CbuSearchAction::Select { id, name } => {
+                web_sys::console::log_1(
+                    &format!("CbuSearchAction::Select id={} name={}", id, name).into(),
+                );
                 // Close modal
                 self.state.cbu_search_ui.open = false;
                 self.state.cbu_search_ui.results = None;
@@ -2298,27 +2319,30 @@ impl App {
                 entity_type,
                 display_name,
             } => {
-                web_sys::console::log_1(
-                    &format!(
-                        "Disambiguation: Select entity_id={} type={} name={}",
-                        entity_id, entity_type, display_name
-                    )
-                    .into(),
-                );
-
                 // Close modal
                 self.state
                     .window_stack
                     .close_by_type(crate::state::WindowType::Resolution);
 
-                // Bind entity to session
-                if let Some(session_id) = self.state.session_id {
-                    self.bind_entity_to_session(
-                        session_id,
-                        &entity_id,
-                        &entity_type,
-                        &display_name,
-                    );
+                // If selecting a CBU, switch to System view and trigger graph fetch
+                if entity_type == "cbu" || entity_type == "entity" {
+                    // entity_id might be a UUID or a name - try UUID first, then lookup by name
+                    if let Ok(uuid) = Uuid::parse_str(&entity_id) {
+                        self.state.select_cbu(uuid, &display_name);
+                    } else {
+                        // Not a UUID - use entity_id as name to lookup CBU
+                        self.lookup_and_select_cbu(&entity_id, &display_name);
+                    }
+                } else {
+                    // Bind entity to session (non-CBU entity)
+                    if let Some(session_id) = self.state.session_id {
+                        self.bind_entity_to_session(
+                            session_id,
+                            &entity_id,
+                            &entity_type,
+                            &display_name,
+                        );
+                    }
                 }
 
                 // Clear search
@@ -2326,23 +2350,14 @@ impl App {
             }
 
             DisambiguationAction::Search { query, entity_type } => {
-                web_sys::console::log_1(
-                    &format!(
-                        "Disambiguation: Search query={} type={}",
-                        query, entity_type
-                    )
-                    .into(),
-                );
                 self.search_disambiguation_matches(&query, &entity_type);
             }
 
             DisambiguationAction::Skip => {
-                web_sys::console::log_1(&"Disambiguation: Skip".into());
                 self.advance_disambiguation_item();
             }
 
             DisambiguationAction::Cancel | DisambiguationAction::Close => {
-                web_sys::console::log_1(&"Disambiguation: Cancel/Close".into());
                 self.state
                     .window_stack
                     .close_by_type(crate::state::WindowType::Resolution);
@@ -2435,6 +2450,49 @@ impl App {
             }
 
             let _ = session_id; // Silence unused warning
+        });
+    }
+
+    /// Look up CBU by name and select it (used when disambiguation returns name instead of UUID)
+    fn lookup_and_select_cbu(&mut self, search_name: &str, display_name: &str) {
+        let async_state = Arc::clone(&self.state.async_state);
+        let ctx = self.state.ctx.clone();
+        let search_name = search_name.to_string();
+        let display_name = display_name.to_string();
+
+        {
+            let mut state = self.state.async_state.lock().unwrap();
+            state.loading_cbu_lookup = true;
+        }
+
+        spawn_local(async move {
+            // Search for CBU by name, limit to 1 result
+            let result = crate::api::search_entities(&search_name, "cbu", 1).await;
+
+            let lookup_result = match result {
+                Ok(matches) if !matches.is_empty() => {
+                    // Try to parse the entity_id as UUID
+                    let m = &matches[0];
+                    match Uuid::parse_str(&m.entity_id) {
+                        Ok(uuid) => Ok((uuid, display_name)),
+                        Err(e) => Err(format!(
+                            "CBU entity_id '{}' is not a valid UUID: {}",
+                            m.entity_id, e
+                        )),
+                    }
+                }
+                Ok(_) => Err(format!("No CBU found matching '{}'", search_name)),
+                Err(e) => Err(format!("CBU lookup failed: {}", e)),
+            };
+
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_cbu_lookup = false;
+                state.pending_cbu_lookup = Some(lookup_result);
+            }
+
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
         });
     }
 
@@ -2860,7 +2918,7 @@ impl App {
 
         // Top: Graph (full width, 50% height) with taxonomy/trading matrix browser overlay
         // Use Trading Matrix browser when in Trading view mode, Taxonomy browser otherwise
-        let is_trading_mode = matches!(self.state.view_mode, ViewMode::Trading);
+        let is_trading_mode = matches!(self.state.view_mode, ViewMode);
 
         let (taxonomy_action, trading_matrix_action) = ui
             .allocate_ui(egui::vec2(available.x, top_height), |ui| {
@@ -3419,6 +3477,9 @@ impl AppState {
         self.session_id = Some(cbu_id);
         let _ = api::set_local_storage("session_id", &cbu_id.to_string());
 
+        // Switch from Universe/Cluster view to System (single CBU focus)
+        self.view_level = ViewLevel::System;
+
         // Set flags - actual fetch happens in update() after all state changes
         if let Ok(mut state) = self.async_state.lock() {
             state.pending_cbu_id = Some(cbu_id);
@@ -3470,20 +3531,14 @@ impl AppState {
         if let Ok(mut state) = self.async_state.lock() {
             state.needs_graph_refetch = true;
             // Also trigger trading matrix refetch when switching to Trading mode
-            if matches!(mode, ViewMode::Trading) {
+            if matches!(mode, ViewMode) {
                 state.needs_trading_matrix_refetch = true;
             }
         }
 
         // Sync view mode to server session (fire-and-forget)
         if let Some(session_id) = self.session_id {
-            let view_mode_str = match mode {
-                ViewMode::KycUbo => "KYC_UBO",
-                ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
-                ViewMode::ProductsOnly => "PRODUCTS_ONLY",
-                ViewMode::Trading => "TRADING",
-                ViewMode::BoardControl => "BOARD_CONTROL",
-            };
+            let view_mode_str = "TRADING"; // Single CBU view mode
             let view_level_str = format!("{:?}", self.view_level);
             spawn_local(async move {
                 if let Err(e) =
@@ -3528,13 +3583,7 @@ impl AppState {
 
         // Sync view level to server session (fire-and-forget)
         if let Some(session_id) = self.session_id {
-            let view_mode_str = match self.view_mode {
-                ViewMode::KycUbo => "KYC_UBO",
-                ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
-                ViewMode::ProductsOnly => "PRODUCTS_ONLY",
-                ViewMode::Trading => "TRADING",
-                ViewMode::BoardControl => "BOARD_CONTROL",
-            };
+            let view_mode_str = "TRADING"; // Single CBU view mode
             let view_level_str = format!("{:?}", level);
             spawn_local(async move {
                 if let Err(e) =

@@ -233,7 +233,7 @@ impl LayoutEngine {
     pub fn new(category: CbuCategory) -> Self {
         Self {
             template: get_template(category),
-            view_mode: super::ViewMode::KycUbo,
+            view_mode: super::ViewMode,
         }
     }
 
@@ -338,7 +338,7 @@ impl LayoutEngine {
 
         // For TRADING view, set container_parent_id on trading entity nodes
         // This shows the CBU as an outer container with entities inside
-        if self.view_mode == super::ViewMode::Trading {
+        if self.view_mode == super::ViewMode {
             // Find the CBU node ID
             let cbu_id = graph
                 .nodes
@@ -469,7 +469,7 @@ impl LayoutEngine {
         self.force_refine(&mut graph, 10);
 
         // 3. Apply view-mode specific layout adjustments
-        if self.view_mode == super::ViewMode::KycUbo {
+        if self.view_mode == super::ViewMode {
             // UBO view: invert hierarchy so UBOs (persons) are at top, CBU at bottom
             self.apply_ubo_layout(&mut graph);
         }

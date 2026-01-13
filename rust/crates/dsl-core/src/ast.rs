@@ -168,6 +168,56 @@ pub struct Argument {
 }
 
 // =============================================================================
+// RESOLUTION EXPLAIN - OPTIONAL TELEMETRY
+// =============================================================================
+
+/// How resolution happened - which tier matched and why
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ResolutionTier {
+    /// Tier 1: Exact identifier match (id, lei, bic, isin)
+    ExactIdentifier,
+    /// Tier 2: Composite match with discriminators (name + dob + nationality)
+    CompositeWithDiscriminators,
+    /// Tier 3: Fuzzy name match
+    FuzzyName,
+    /// Special: User manually selected from disambiguation
+    UserSelected,
+}
+
+/// Optional telemetry explaining how an EntityRef was resolved.
+///
+/// This is captured during resolution and attached to the EntityRef for
+/// debugging, audit, and observability purposes. It does NOT affect
+/// execution - the resolver can populate this when TRACE logging is enabled.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ResolutionExplain {
+    /// ref_id this explain corresponds to
+    pub ref_id: String,
+    /// Entity type being resolved
+    pub entity_type: String,
+    /// Search key expression used (e.g., "name" or "(composite name dob nationality)")
+    pub search_key_expr: String,
+    /// Input value that was searched
+    pub input_value: String,
+    /// Number of candidates returned by search
+    pub candidate_count: usize,
+    /// Score of the winning match (0.0-1.0)
+    pub winner_score: f32,
+    /// Resolved key (UUID)
+    pub resolved_key: String,
+    /// Display name for the resolved entity
+    pub resolved_display: String,
+    /// Which resolution tier matched
+    pub resolution_tier: ResolutionTier,
+    /// Discriminators that were applied (e.g., ["nationality:DE", "dob:1980"])
+    pub discriminators_applied: Vec<String>,
+    /// Tantivy index generation (for cache debugging)
+    pub index_generation: Option<u64>,
+    /// When resolution happened
+    pub resolved_at: chrono::DateTime<chrono::Utc>,
+}
+
+// =============================================================================
 // AST NODE - THE CORE ENUM
 // =============================================================================
 
@@ -208,6 +258,17 @@ pub enum AstNode {
 
         /// Source span for error reporting
         span: Span,
+
+        /// Stable location identifier for commit targeting: "{stmt_index}:{span.start}-{span.end}"
+        /// Uses span-based format (NOT arg_name) for stability under arg renames.
+        /// Set during enrichment, used during resolution commit.
+        ref_id: Option<String>,
+
+        /// Optional telemetry explaining how resolution happened.
+        /// Only populated when TRACE logging is enabled or explicitly requested.
+        /// Does NOT affect execution - purely for debugging and audit.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        explain: Option<Box<ResolutionExplain>>,
     },
 
     /// List of nodes: [a, b, c]
@@ -315,6 +376,8 @@ impl AstNode {
             value: value.into(),
             resolved_key: None,
             span,
+            ref_id: None,
+            explain: None,
         }
     }
 
@@ -332,6 +395,8 @@ impl AstNode {
             value: value.into(),
             resolved_key: Some(resolved_key.into()),
             span,
+            ref_id: None,
+            explain: None,
         }
     }
 
@@ -483,24 +548,53 @@ impl AstNode {
     // RESOLUTION
     // =========================================================================
 
-    /// Resolve an entity ref with a primary key
-    /// Returns a new node with resolved_key set
+    /// Resolve an entity ref with a primary key (UUID validated)
+    ///
+    /// Returns a new node with resolved_key set.
+    /// The key MUST be a valid UUID - this prevents conflating codes with entity keys.
+    ///
+    /// # Panics
+    /// Panics if `key` is not a valid UUID. Use `try_with_resolved_key` for fallible version.
     pub fn with_resolved_key(&self, key: String) -> Self {
+        self.try_with_resolved_key(key)
+            .expect("resolved_key must be a valid UUID")
+    }
+
+    /// Resolve an entity ref with a primary key (UUID validated, fallible)
+    ///
+    /// Returns Ok(new_node) if key is a valid UUID, Err if not.
+    /// This enforces that only UUIDs can be resolved keys - codes like
+    /// "DIRECTOR" or "LU" should remain as string literals.
+    pub fn try_with_resolved_key(&self, key: String) -> Result<Self, String> {
+        // Validate UUID format
+        uuid::Uuid::parse_str(&key).map_err(|_| {
+            format!(
+                "resolved_key '{}' is not a valid UUID. \
+                 Only entity primary keys (UUIDs) can be resolved keys. \
+                 Codes like roles and jurisdictions should use string literals.",
+                key
+            )
+        })?;
+
         match self {
             AstNode::EntityRef {
                 entity_type,
                 search_column,
                 value,
                 span,
+                ref_id,
+                explain,
                 ..
-            } => AstNode::EntityRef {
+            } => Ok(AstNode::EntityRef {
                 entity_type: entity_type.clone(),
                 search_column: search_column.clone(),
                 value: value.clone(),
                 resolved_key: Some(key),
                 span: *span,
-            },
-            _ => self.clone(),
+                ref_id: ref_id.clone(),
+                explain: explain.clone(),
+            }),
+            _ => Ok(self.clone()),
         }
     }
 }

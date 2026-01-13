@@ -281,17 +281,8 @@ impl NavigationVerb {
             }
             NavigationVerb::ResetLayout => "(nav.reset-layout)".to_string(),
 
-            // View Mode
-            NavigationVerb::SetViewMode { mode } => {
-                let mode_str = match mode {
-                    ViewMode::KycUbo => "kyc-ubo",
-                    ViewMode::ServiceDelivery => "service-delivery",
-                    ViewMode::ProductsOnly => "products-only",
-                    ViewMode::Trading => "trading",
-                    ViewMode::BoardControl => "board-control",
-                };
-                format!("(nav.set-view-mode :mode {})", mode_str)
-            }
+            // View Mode - single CBU/Trading view
+            NavigationVerb::SetViewMode { mode: _ } => "(nav.set-view-mode :mode cbu)".to_string(),
 
             // Type Filtering
             NavigationVerb::FilterByType { type_codes } => {
@@ -1293,27 +1284,19 @@ fn match_verb_from_transcript(transcript: &str, ctx: &InvestigationContext) -> N
     }
 
     // =========================================================================
-    // View Mode
+    // View Mode (single CBU/Trading view - all triggers map to same mode)
     // =========================================================================
-    if matches_any(&text, &["kyc view", "kyc ubo", "ownership view", "ubo"]) {
-        return NavigationVerb::SetViewMode {
-            mode: ViewMode::KycUbo,
-        };
-    }
-    if matches_any(&text, &["service view", "services", "service delivery"]) {
-        return NavigationVerb::SetViewMode {
-            mode: ViewMode::ServiceDelivery,
-        };
-    }
-    if matches_any(&text, &["products view", "products only", "products"]) {
-        return NavigationVerb::SetViewMode {
-            mode: ViewMode::ProductsOnly,
-        };
-    }
-    if matches_any(&text, &["trading view", "trading", "trading matrix"]) {
-        return NavigationVerb::SetViewMode {
-            mode: ViewMode::Trading,
-        };
+    if matches_any(
+        &text,
+        &[
+            "cbu view",
+            "graph view",
+            "entity view",
+            "trading view",
+            "show graph",
+        ],
+    ) {
+        return NavigationVerb::SetViewMode { mode: ViewMode };
     }
 
     // =========================================================================
@@ -1414,18 +1397,8 @@ fn map_egui_action_to_verb(action: &EguiAction, ctx: &InvestigationContext) -> N
             },
             "Escape" => NavigationVerb::Stop,
             "r" if modifiers.ctrl || modifiers.command => NavigationVerb::ResetLayout,
-            "1" => NavigationVerb::SetViewMode {
-                mode: ViewMode::KycUbo,
-            },
-            "2" => NavigationVerb::SetViewMode {
-                mode: ViewMode::ServiceDelivery,
-            },
-            "3" => NavigationVerb::SetViewMode {
-                mode: ViewMode::ProductsOnly,
-            },
-            "4" => NavigationVerb::SetViewMode {
-                mode: ViewMode::Trading,
-            },
+            // "g" for graph/CBU view (single view mode now)
+            "g" => NavigationVerb::SetViewMode { mode: ViewMode },
             _ => NavigationVerb::None,
         },
         _ => NavigationVerb::None,

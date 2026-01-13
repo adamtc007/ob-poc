@@ -40,9 +40,8 @@ tokens:
       base_size: 48.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{name}\n{jurisdiction} | {status}"
+      on_hover: !tooltip
+        template: "{name}\n{jurisdiction} | {status}"
       on_click: select
       on_double_click: open_detail
       context_actions:
@@ -103,9 +102,8 @@ tokens:
       base_size: 40.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{share_class_code} ({currency})\n{investor_count} investors | {total_aum}"
+      on_hover: !tooltip
+        template: "{share_class_code} ({currency})\n{investor_count} investors | {total_aum}"
       on_click: select
       on_double_click: open_container
       context_actions:
@@ -136,14 +134,12 @@ tokens:
           fields:
             - key: investor_count
               label: "Investors"
-              format:
-                number:
-                  decimals: 0
+              format: !number
+                decimals: 0
             - key: total_aum
               label: "Total AUM"
-              format:
-                currency:
-                  symbol: "$"
+              format: !currency
+                symbol: "$"
 
   # ===========================================================================
   # INVESTOR HOLDING - Container item
@@ -168,9 +164,8 @@ tokens:
       base_size: 32.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{investor_name}\n{jurisdiction} | {investor_type}\n{holding_value} ({percentage}%)"
+      on_hover: !tooltip
+        template: "{investor_name}\n{jurisdiction} | {investor_type}\n{holding_value} ({percentage}%)"
       on_click: select
       on_double_click: open_detail
       context_actions:
@@ -190,24 +185,20 @@ tokens:
           fields:
             - key: holding_value
               label: "Value"
-              format:
-                currency:
-                  symbol: "$"
+              format: !currency
+                symbol: "$"
             - key: units
               label: "Units"
-              format:
-                number:
-                  decimals: 2
+              format: !number
+                decimals: 2
             - key: percentage
               label: "% of Class"
-              format:
-                percent:
-                  decimals: 2
+              format: !percent
+                decimals: 2
             - key: acquisition_date
               label: "Acquired"
-              format:
-                date:
-                  format: "%Y-%m-%d"
+              format: !date
+                format: "%Y-%m-%d"
         - title: "Investor"
           collapsed: true
           fields:
@@ -248,9 +239,8 @@ tokens:
       base_size: 36.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{name}\n{entity_type} | {jurisdiction}"
+      on_hover: !tooltip
+        template: "{name}\n{entity_type} | {jurisdiction}"
       on_click: select
       on_double_click: open_detail
       context_actions:
@@ -304,9 +294,8 @@ tokens:
       base_size: 40.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{product_name}\n{service_count} services"
+      on_hover: !tooltip
+        template: "{product_name}\n{service_count} services"
       on_click: select
       on_double_click: open_container
       context_actions:
@@ -340,9 +329,8 @@ tokens:
       base_size: 36.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{service_name}\n{resource_count} resources"
+      on_hover: !tooltip
+        template: "{service_name}\n{resource_count} resources"
       on_click: select
       on_double_click: open_container
       context_actions:
@@ -375,9 +363,8 @@ tokens:
       base_size: 28.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{resource_name}\n{resource_type_code} | {status}"
+      on_hover: !tooltip
+        template: "{resource_name}\n{resource_type_code} | {status}"
       on_click: select
       on_double_click: open_detail
       context_actions:
@@ -427,9 +414,8 @@ tokens:
       base_size: 28.0
 
     interactions:
-      on_hover:
-        tooltip:
-          template: "{document_type}\n{status} | {expiry_date}"
+      on_hover: !tooltip
+        template: "{document_type}\n{status} | {expiry_date}"
       on_click: select
       on_double_click: open_detail
       context_actions:
@@ -455,6 +441,5 @@ tokens:
               format: status_badge
             - key: expiry_date
               label: "Expires"
-              format:
-                date:
-                  format: "%Y-%m-%d"
+              format: !date
+                format: "%Y-%m-%d"

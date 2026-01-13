@@ -31,8 +31,9 @@ use ob_poc::api::{
     create_verb_discovery_router,
 };
 
-// Import resolution store from services
-use ob_poc::services::create_resolution_store;
+// Import gateway resolver for resolution routes
+use entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient;
+use ob_poc::dsl_v2::{gateway_resolver::gateway_addr, GatewayRefResolver};
 
 // Import verb sync and config loader for startup sync
 use ob_poc::dsl_v2::ConfigLoader;
@@ -310,8 +311,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create single shared session store for agent routers
     let sessions = create_session_store();
 
-    // Create resolution store for entity reference resolution
-    let resolution_store = create_resolution_store();
+    // Create gateway resolver for entity reference resolution
+    let gateway_channel = tonic::transport::Channel::from_shared(gateway_addr())
+        .expect("valid gateway address")
+        .connect_lazy();
+    let gateway_client = EntityGatewayClient::new(gateway_channel);
+    let gateway_resolver = GatewayRefResolver::new(gateway_client);
 
     // Create shared state for CBU/graph endpoints
     let state = AppState::new(pool.clone());
@@ -340,7 +345,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_attribute_router(pool.clone()))
         .merge(create_entity_router())
         .merge(create_dsl_viewer_router(pool.clone()))
-        .merge(create_resolution_router(sessions.clone(), resolution_store))
+        .merge(create_resolution_router(sessions.clone(), gateway_resolver))
         // Client portal router (separate auth, scoped access)
         .merge(create_client_router(pool.clone(), sessions.clone()))
         // Verb discovery router (RAG-style verb suggestions)

@@ -2674,6 +2674,9 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         if !lower_msg.starts_with("show ")
             && !lower_msg.starts_with("load ")
             && !lower_msg.starts_with("select ")
+            && !lower_msg.starts_with("view ")
+            && !lower_msg.starts_with("pick ")
+            && !lower_msg.starts_with("group ")
         {
             return Ok(None);
         }

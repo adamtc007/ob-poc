@@ -165,6 +165,10 @@ impl RefreshPipeline {
                     display,
                     search_values,
                     discriminator_values,
+                    // TODO: Load tenant_id and cbu_ids from database when available
+                    // For now, these are not populated - tenant isolation happens at query time
+                    tenant_id: None,
+                    cbu_ids: vec![],
                 })
             })
             .collect();

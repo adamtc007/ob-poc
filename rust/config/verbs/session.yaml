@@ -201,5 +201,5 @@ domains:
             required: false
             description: Filter by jurisdiction
         returns:
-          type: list
-          item_fields: [cbu_id, name, jurisdiction, apex_entity]
+          type: record_set
+          fields: [cbu_id, name, jurisdiction, apex_entity]

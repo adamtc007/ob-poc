@@ -263,7 +263,7 @@ impl Default for AppState {
 
             // UI-only state
             buffers: TextBuffers::default(),
-            view_mode: ViewMode::KycUbo,
+            view_mode: ViewMode,
             panels: PanelState::default(),
             selected_entity_id: None,
             resolution_ui: ResolutionPanelUi::default(),
@@ -355,7 +355,7 @@ impl Default for PanelState {
 }
 
 /// Layout mode for panel arrangement
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum LayoutMode {
     #[default]
     Simplified, // New default: 90% viewport + 10% bottom (Chat left, Session right)
@@ -718,6 +718,10 @@ pub struct AsyncState {
     pub loading_disambiguation: bool,
     /// Flag to trigger session refetch after entity bind
     pub pending_session_refetch: bool,
+    /// Pending CBU lookup result (from name search) - tuple of (uuid, display_name)
+    pub pending_cbu_lookup: Option<Result<(Uuid, String), String>>,
+    /// Loading flag for CBU lookup
+    pub loading_cbu_lookup: bool,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -1102,6 +1106,22 @@ impl AppState {
                     }
                 }
                 Err(e) => state.last_error = Some(format!("Disambiguation search failed: {}", e)),
+            }
+        }
+
+        // Process CBU lookup result (from disambiguation name search)
+        if let Some(result) = state.pending_cbu_lookup.take() {
+            state.loading_cbu_lookup = false;
+            match result {
+                Ok((uuid, display_name)) => {
+                    // Need to drop the lock before calling select_cbu since it acquires the lock
+                    drop(state);
+                    self.select_cbu(uuid, &display_name);
+                    return; // Early return since we dropped the lock
+                }
+                Err(e) => {
+                    state.last_error = Some(e);
+                }
             }
         }
 

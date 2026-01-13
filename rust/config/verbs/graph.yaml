@@ -42,13 +42,12 @@ domains:
           - name: view-mode
             type: string
             required: false
-            default: "KYC_UBO"
+            default: "TRADING"
             valid_values:
+              - TRADING
               - KYC_UBO
               - UBO_ONLY
-              - SERVICE_DELIVERY
               - CUSTODY
-              - PRODUCTS_ONLY
             description: "View mode determining which layers and edges to include"
           - name: max-depth
             type: integer

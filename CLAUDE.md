@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-12
+> **Last reviewed:** 2026-01-13
 > **Verb count:** 781 verbs across 102 YAML files
 > **Custom ops:** 48 plugin handlers
 > **Crates:** 13 fine-grained crates
@@ -11,6 +11,7 @@
 > **Verb Tiering:** ✅ Complete - All verbs tagged with tier metadata
 > **Verb Governance:** ✅ Complete - Mandatory metadata, single authoring surface, STANDARD lint enforcement
 > **Viewport Scaling:** ✅ Complete - Force simulation + LOD thresholds scale to viewport size
+> **CBU View Mode:** ✅ Complete - Single TRADING view mode as default, simplified ViewMode struct
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 
 This file provides guidance to Claude Code when working with this repository.
@@ -918,6 +919,53 @@ impl LodConfig {
 | `rust/crates/ob-poc-graph/src/graph/force_sim.rs` | Force simulation + viewport scaling |
 | `rust/crates/ob-poc-graph/src/graph/lod.rs` | LOD config + density thresholds |
 | `rust/crates/ob-poc-graph/src/graph/galaxy.rs` | Resize detection + wiring |
+
+---
+
+## CBU View Mode (Simplified)
+
+The CBU graph view has been simplified from 5 view modes to a single TRADING view mode.
+
+### Before (Removed)
+- `KYC_UBO` - KYC/UBO ownership view (was default)
+- `SERVICE_DELIVERY` - Product/service delivery chain
+- `PRODUCTS_ONLY` - Products without service expansion
+- `BOARD_CONTROL` - Board/control relationships
+
+### After (Current)
+- `TRADING` - Trading network view showing:
+  - CBU container node
+  - Trading Profile
+  - Instrument Matrix
+  - Instrument classes (equities, bonds, derivatives, etc.)
+  - Markets (exchanges)
+  - Counterparty entities
+
+### API Default Change
+
+All graph API endpoints now default to `TRADING` view mode:
+```
+GET /api/cbu/{cbu_id}/graph              → TRADING (was KYC_UBO)
+GET /api/cbu/{cbu_id}/graph?view_mode=TRADING  → Explicit
+```
+
+### ViewMode Struct
+
+`ViewMode` is now a unit struct (not an enum):
+```rust
+// rust/crates/ob-poc-graph/src/graph/mod.rs
+pub struct ViewMode;  // Single CBU/Trading view
+```
+
+### Key Files Changed
+
+| File | Change |
+|------|--------|
+| `ob-poc-graph/src/graph/mod.rs` | ViewMode enum → unit struct |
+| `ob-poc-ui/src/command.rs` | Consolidated voice triggers, keyboard "g" for graph |
+| `api/graph_routes.rs` | Default changed from KYC_UBO to TRADING |
+| `config/verbs/graph.yaml` | Default view-mode: TRADING |
+| `config/verbs/view.yaml` | `view.cbu` mode: trading/ubo only |
 
 ---
 

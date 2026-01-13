@@ -108,6 +108,8 @@ impl ToolHandlers {
             },
             limit: Some(limit),
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let response = client

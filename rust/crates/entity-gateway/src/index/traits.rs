@@ -43,6 +43,12 @@ pub struct SearchQuery {
     pub limit: usize,
     /// Discriminator values for composite search (e.g., nationality, date_of_birth)
     pub discriminators: HashMap<String, String>,
+    /// Optional tenant ID for multi-tenant isolation
+    /// When set, only returns entities belonging to this tenant
+    pub tenant_id: Option<String>,
+    /// Optional CBU ID for entity universe scoping
+    /// When set, only returns entities within this CBU's entity graph
+    pub cbu_id: Option<String>,
 }
 
 /// The main search index trait
@@ -77,6 +83,11 @@ pub struct IndexRecord {
     pub search_values: HashMap<String, String>,
     /// Discriminator values for composite search scoring (e.g., nationality, date_of_birth)
     pub discriminator_values: HashMap<String, String>,
+    /// Optional tenant ID for multi-tenant isolation
+    pub tenant_id: Option<String>,
+    /// CBU IDs this entity belongs to (for universe scoping)
+    /// An entity can be in multiple CBU graphs (e.g., shared service providers)
+    pub cbu_ids: Vec<String>,
 }
 
 /// Errors that can occur during index operations

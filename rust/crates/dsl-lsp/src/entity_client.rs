@@ -52,6 +52,8 @@ impl EntityLookupClient {
             mode: SearchMode::Fuzzy as i32,
             limit: Some(limit as i32),
             discriminators: std::collections::HashMap::new(), // No discriminators for LSP completion
+            tenant_id: None,                                  // LSP completion is global context
+            cbu_id: None,
         };
 
         let response = self.client.search(request).await?;

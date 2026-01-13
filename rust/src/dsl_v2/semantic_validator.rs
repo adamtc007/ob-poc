@@ -396,6 +396,8 @@ fn resolve_node_impl(
             value,
             resolved_key,
             span,
+            ref_id,
+            explain,
         } => {
             // Check if we have a resolution for this argument
             let resolved_pk = resolved_keys
@@ -409,6 +411,8 @@ fn resolve_node_impl(
                 value: value.clone(),
                 resolved_key: resolved_pk,
                 span: *span,
+                ref_id: ref_id.clone(),
+                explain: explain.clone(),
             }
         }
         AstNode::List { items, span } => {
@@ -559,6 +563,7 @@ impl SemanticValidator {
                     symbols,
                     diagnostics,
                     ref_cache,
+                    verb_call,
                 )
                 .await;
 
@@ -747,6 +752,9 @@ impl SemanticValidator {
     }
 
     /// Validate an argument value - check refs against DB
+    ///
+    /// Now accepts the full VerbCall to enable discriminator extraction from
+    /// sibling arguments for composite search keys (Fix 3.2).
     #[allow(clippy::too_many_arguments)]
     async fn validate_argument_value(
         &mut self,
@@ -758,6 +766,7 @@ impl SemanticValidator {
         symbols: &mut HashMap<String, SymbolInfo>,
         diagnostics: &mut DiagnosticBuilder,
         ref_cache: &RefCache,
+        verb_call: &VerbCall,
     ) -> Option<crate::dsl_v2::validation::ResolvedArg> {
         use crate::dsl_v2::validation::ResolvedArg;
 
@@ -770,14 +779,42 @@ impl SemanticValidator {
                     // Check if this arg needs DB validation
                     let key_with_colon = format!(":{}", key);
                     if let Some(ref_type) = arg_to_ref_type(verb, &key_with_colon) {
-                        // Check cache first (from batch resolution - 6x speedup)
-                        let cache_key = (ref_type, s.clone());
-                        let resolve_result = if let Some(cached) = ref_cache.get(&cache_key) {
-                            Ok(cached.clone())
+                        // Extract discriminators from sibling args if lookup config has composite search key
+                        // Split verb into domain.verb for registry lookup
+                        let discriminators = if let Some((domain, verb_name)) = verb.split_once('.')
+                        {
+                            if let Some(lookup) =
+                                runtime_registry().get_arg_lookup(domain, verb_name, key)
+                            {
+                                extract_discriminators_from_siblings(verb_call, lookup)
+                            } else {
+                                HashMap::new()
+                            }
                         } else {
-                            // Fall back to individual resolve
-                            self.resolver.resolve(ref_type, s).await
+                            HashMap::new()
                         };
+
+                        // Use discriminators if available, otherwise fall back to cache/simple resolve
+                        let resolve_result = if !discriminators.is_empty() {
+                            // Use resolve_with_discriminators for better disambiguation
+                            if let Some(gateway) = self.resolver.as_gateway_resolver() {
+                                gateway
+                                    .resolve_with_discriminators(ref_type, s, discriminators)
+                                    .await
+                            } else {
+                                self.resolver.resolve(ref_type, s).await
+                            }
+                        } else {
+                            // Check cache first (from batch resolution - 6x speedup)
+                            let cache_key = (ref_type, s.clone());
+                            if let Some(cached) = ref_cache.get(&cache_key) {
+                                Ok(cached.clone())
+                            } else {
+                                // Fall back to individual resolve
+                                self.resolver.resolve(ref_type, s).await
+                            }
+                        };
+
                         match resolve_result {
                             Ok(ResolveResult::Found { id, display }) => Some(ResolvedArg::Ref {
                                 ref_type,
@@ -1005,6 +1042,7 @@ impl SemanticValidator {
                         symbols,
                         diagnostics,
                         ref_cache,
+                        verb_call,
                     ))
                     .await
                     {
@@ -1027,6 +1065,7 @@ impl SemanticValidator {
                         symbols,
                         diagnostics,
                         ref_cache,
+                        verb_call,
                     ))
                     .await
                     {
@@ -1155,7 +1194,7 @@ fn get_fuzzy_checks(full_verb: &str) -> Vec<FuzzyCheckInfo> {
 }
 
 /// Map entity_type string from YAML to RefType
-fn entity_type_to_ref_type(entity_type: &str) -> RefType {
+pub fn entity_type_to_ref_type(entity_type: &str) -> RefType {
     match entity_type {
         "cbu" => RefType::Cbu,
         "entity" => RefType::Entity,
@@ -1177,6 +1216,50 @@ fn extract_string_value(node: &AstNode) -> Option<String> {
         AstNode::EntityRef { value, .. } => Some(value.clone()),
         _ => None,
     }
+}
+
+/// Extract discriminator values from sibling arguments in a verb call
+///
+/// Given a verb call and a lookup config with composite search key,
+/// extracts values for each discriminator from sibling arguments.
+///
+/// Example: For a person lookup with discriminators [dob, nationality]
+/// and verb call `(entity.link :person "John Smith" :dob "1985-03-15" :nationality "GB")`
+/// returns: {"date_of_birth": "1985-03-15", "nationality": "GB"}
+fn extract_discriminators_from_siblings(
+    verb_call: &VerbCall,
+    lookup: &super::config::types::LookupConfig,
+) -> HashMap<String, String> {
+    use super::config::types::SearchKeyConfig;
+
+    let mut discriminators = HashMap::new();
+
+    // Only composite search keys have discriminators
+    let composite = match &lookup.search_key {
+        SearchKeyConfig::Composite(c) => c,
+        SearchKeyConfig::Simple(_) => return discriminators,
+    };
+
+    for disc in &composite.discriminators {
+        // Get the argument name that provides this discriminator
+        let arg_name = disc.arg_name();
+
+        // Look for a sibling argument with this name
+        if let Some(sibling_value) = verb_call.get_value(arg_name) {
+            if let Some(value_str) = extract_string_value(sibling_value) {
+                // Map from field name (e.g., "date_of_birth") to the value
+                discriminators.insert(disc.field.clone(), value_str);
+            }
+        }
+    }
+
+    tracing::debug!(
+        verb = %format!("{}.{}", verb_call.domain, verb_call.verb),
+        discriminators = ?discriminators,
+        "Extracted discriminators from sibling args"
+    );
+
+    discriminators
 }
 
 // =============================================================================

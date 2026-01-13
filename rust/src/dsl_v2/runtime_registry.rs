@@ -588,6 +588,19 @@ impl RuntimeVerbRegistry {
             .as_deref()
     }
 
+    /// Get the full lookup config for an argument
+    ///
+    /// This provides access to the SearchKeyConfig including discriminators,
+    /// which is needed for disambiguation during resolution.
+    pub fn get_arg_lookup(&self, domain: &str, verb: &str, arg: &str) -> Option<&LookupConfig> {
+        self.get(domain, verb)?
+            .args
+            .iter()
+            .find(|a| a.name == arg)?
+            .lookup
+            .as_ref()
+    }
+
     /// Get all verbs that can execute given available binding types
     /// Returns verbs where all required consumes are satisfied
     pub fn verbs_satisfiable_by<'a>(

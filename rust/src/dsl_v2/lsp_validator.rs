@@ -663,6 +663,8 @@ fn resolve_node(
             value,
             resolved_key,
             span,
+            ref_id,
+            explain,
         } => {
             let resolved_pk = resolved_keys
                 .get(&(stmt_idx, arg_key.to_string()))
@@ -675,6 +677,8 @@ fn resolve_node(
                 value: value.clone(),
                 resolved_key: resolved_pk,
                 span: *span,
+                ref_id: ref_id.clone(),
+                explain: explain.clone(),
             }
         }
         AstNode::List { items, span } => AstNode::List {

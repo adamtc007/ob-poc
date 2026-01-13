@@ -78,6 +78,8 @@ impl EntityResolver for DatabaseEntityResolver {
             mode: SearchMode::Fuzzy as i32,
             limit: Some(1),
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let mut client = self.client.lock().await;
@@ -133,6 +135,8 @@ impl EntityResolver for DatabaseEntityResolver {
             mode: SearchMode::Fuzzy as i32,
             limit: Some(1),
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let mut client = self.client.lock().await;

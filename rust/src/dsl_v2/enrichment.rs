@@ -84,19 +84,20 @@ impl<'a> Enricher<'a> {
             statements: program
                 .statements
                 .into_iter()
-                .map(|s| self.enrich_statement(s))
+                .enumerate()
+                .map(|(stmt_index, s)| self.enrich_statement(s, stmt_index))
                 .collect(),
         }
     }
 
-    fn enrich_statement(&mut self, stmt: Statement) -> Statement {
+    fn enrich_statement(&mut self, stmt: Statement, stmt_index: usize) -> Statement {
         match stmt {
-            Statement::VerbCall(vc) => Statement::VerbCall(self.enrich_verb_call(vc)),
+            Statement::VerbCall(vc) => Statement::VerbCall(self.enrich_verb_call(vc, stmt_index)),
             Statement::Comment(c) => Statement::Comment(c),
         }
     }
 
-    fn enrich_verb_call(&mut self, vc: VerbCall) -> VerbCall {
+    fn enrich_verb_call(&mut self, vc: VerbCall, stmt_index: usize) -> VerbCall {
         let full_name = vc.full_name();
 
         // Look up verb definition
@@ -105,7 +106,7 @@ impl<'a> Enricher<'a> {
         let enriched_args = vc
             .arguments
             .into_iter()
-            .map(|arg| self.enrich_argument(arg, verb_def.map(|v| &v.args)))
+            .map(|arg| self.enrich_argument(arg, verb_def.map(|v| &v.args), stmt_index))
             .collect();
 
         VerbCall {
@@ -117,14 +118,19 @@ impl<'a> Enricher<'a> {
         }
     }
 
-    fn enrich_argument(&mut self, arg: Argument, verb_args: Option<&Vec<RuntimeArg>>) -> Argument {
+    fn enrich_argument(
+        &mut self,
+        arg: Argument,
+        verb_args: Option<&Vec<RuntimeArg>>,
+        stmt_index: usize,
+    ) -> Argument {
         // Find the arg definition for this key
         let arg_def = verb_args.and_then(|args| args.iter().find(|a| a.name == arg.key));
 
         // Get lookup config if present
         let lookup_config = arg_def.and_then(|a| a.lookup.as_ref());
 
-        let enriched_value = self.enrich_node(arg.value, lookup_config, arg.span);
+        let enriched_value = self.enrich_node(arg.value, lookup_config, arg.span, stmt_index);
 
         Argument {
             key: arg.key,
@@ -138,6 +144,7 @@ impl<'a> Enricher<'a> {
         node: AstNode,
         lookup_config: Option<&LookupConfig>,
         arg_span: Span,
+        stmt_index: usize,
     ) -> AstNode {
         match node {
             // String literal - potentially convert to EntityRef
@@ -149,12 +156,21 @@ impl<'a> Enricher<'a> {
                         .clone()
                         .unwrap_or_else(|| config.table.clone());
 
+                    // Generate span-based ref_id for stable commit targeting
+                    // Format: "{stmt_index}:{span.start}-{span.end}"
+                    let ref_id = Some(format!(
+                        "{}:{}-{}",
+                        stmt_index, arg_span.start, arg_span.end
+                    ));
+
                     AstNode::EntityRef {
                         entity_type,
                         search_column: config.search_key.primary_column().to_string(),
                         value: s,
                         resolved_key: None,
                         span: arg_span, // Preserve span for LSP diagnostics
+                        ref_id,
+                        explain: None, // Populated during resolution if TRACE enabled
                     }
                 } else {
                     // Keep as string literal
@@ -170,6 +186,12 @@ impl<'a> Enricher<'a> {
                         .clone()
                         .unwrap_or_else(|| config.table.clone());
 
+                    // Generate span-based ref_id for stable commit targeting
+                    let ref_id = Some(format!(
+                        "{}:{}-{}",
+                        stmt_index, arg_span.start, arg_span.end
+                    ));
+
                     // UUID is already the resolved key
                     AstNode::EntityRef {
                         entity_type,
@@ -177,6 +199,8 @@ impl<'a> Enricher<'a> {
                         value: uuid.to_string(), // Use UUID as display value
                         resolved_key: Some(uuid.to_string()),
                         span: arg_span, // Preserve span for LSP diagnostics
+                        ref_id,
+                        explain: None, // Already resolved, no explain needed
                     }
                 } else {
                     AstNode::Literal(Literal::Uuid(uuid))
@@ -196,7 +220,7 @@ impl<'a> Enricher<'a> {
             AstNode::List { items, span } => AstNode::List {
                 items: items
                     .into_iter()
-                    .map(|item| self.enrich_node(item, lookup_config, span))
+                    .map(|item| self.enrich_node(item, lookup_config, span, stmt_index))
                     .collect(),
                 span,
             },
@@ -205,13 +229,15 @@ impl<'a> Enricher<'a> {
             AstNode::Map { entries, span } => AstNode::Map {
                 entries: entries
                     .into_iter()
-                    .map(|(k, v)| (k, self.enrich_node(v, None, span)))
+                    .map(|(k, v)| (k, self.enrich_node(v, None, span, stmt_index)))
                     .collect(),
                 span,
             },
 
             // Nested verb calls - recursive enrichment
-            AstNode::Nested(vc) => AstNode::Nested(Box::new(self.enrich_verb_call(*vc))),
+            AstNode::Nested(vc) => {
+                AstNode::Nested(Box::new(self.enrich_verb_call(*vc, stmt_index)))
+            }
         }
     }
 }

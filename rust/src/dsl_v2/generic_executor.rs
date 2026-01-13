@@ -2344,6 +2344,8 @@ impl GenericCrudExecutor {
                 mode: SearchMode::Exact as i32,
                 limit: Some(5),
                 discriminators: std::collections::HashMap::new(),
+                tenant_id: None,
+                cbu_id: None,
             };
 
             match client.search(request).await {
@@ -2438,6 +2440,8 @@ impl GenericCrudExecutor {
                 mode: SearchMode::Fuzzy as i32,
                 limit: Some(5),
                 discriminators: std::collections::HashMap::new(),
+                tenant_id: None,
+                cbu_id: None,
             };
 
             if let Ok(response) = client.search(request).await {

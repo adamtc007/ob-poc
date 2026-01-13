@@ -93,6 +93,244 @@ pub struct EntityMatchInfo {
     pub score_pct: u8,
 }
 
+// ============================================================================
+// ResolutionSubSession Implementation
+// ============================================================================
+
+impl ResolutionSubSession {
+    /// Create a new empty resolution sub-session
+    pub fn new() -> Self {
+        Self {
+            unresolved_refs: Vec::new(),
+            parent_dsl_index: 0,
+            current_ref_index: 0,
+            resolutions: HashMap::new(),
+        }
+    }
+
+    /// Extract unresolved refs from AST statements
+    ///
+    /// Walks the AST and collects all EntityRef nodes that have `resolved_key: None`.
+    /// Each ref gets a unique ref_id based on its span location.
+    pub fn from_statements(statements: &[Statement]) -> Self {
+        let mut unresolved_refs = Vec::new();
+
+        for (stmt_idx, stmt) in statements.iter().enumerate() {
+            if let Statement::VerbCall(vc) = stmt {
+                // Build context line for display
+                let context_line = vc.to_dsl_string();
+
+                for arg in &vc.arguments {
+                    Self::collect_unresolved_refs(
+                        &arg.value,
+                        stmt_idx,
+                        &context_line,
+                        &mut unresolved_refs,
+                    );
+                }
+            }
+        }
+
+        Self {
+            unresolved_refs,
+            parent_dsl_index: 0,
+            current_ref_index: 0,
+            resolutions: HashMap::new(),
+        }
+    }
+
+    /// Recursively collect unresolved EntityRefs from an AstNode
+    fn collect_unresolved_refs(
+        node: &crate::dsl_v2::ast::AstNode,
+        stmt_idx: usize,
+        context_line: &str,
+        out: &mut Vec<UnresolvedRefInfo>,
+    ) {
+        use crate::dsl_v2::ast::AstNode;
+
+        match node {
+            AstNode::EntityRef {
+                entity_type,
+                value,
+                resolved_key,
+                span,
+                ref_id,
+                ..
+            } => {
+                if resolved_key.is_none() {
+                    // Use ref_id if available, otherwise generate from span
+                    let ref_id_str = ref_id
+                        .clone()
+                        .unwrap_or_else(|| format!("{}:{}-{}", stmt_idx, span.start, span.end));
+
+                    out.push(UnresolvedRefInfo {
+                        ref_id: ref_id_str,
+                        entity_type: entity_type.clone(),
+                        search_value: value.clone(),
+                        context_line: context_line.to_string(),
+                        initial_matches: Vec::new(), // Populated by pre_fetch_matches
+                    });
+                }
+            }
+            AstNode::List { items, .. } => {
+                for item in items {
+                    Self::collect_unresolved_refs(item, stmt_idx, context_line, out);
+                }
+            }
+            AstNode::Map { entries, .. } => {
+                for (_, v) in entries {
+                    Self::collect_unresolved_refs(v, stmt_idx, context_line, out);
+                }
+            }
+            AstNode::Nested(vc) => {
+                for arg in &vc.arguments {
+                    Self::collect_unresolved_refs(&arg.value, stmt_idx, context_line, out);
+                }
+            }
+            // Literals and SymbolRefs don't contain EntityRefs
+            _ => {}
+        }
+    }
+
+    /// Select a resolution for a ref_id
+    ///
+    /// Stores the mapping from ref_id to resolved_key.
+    /// Validation against gateway should be done by caller before calling this.
+    pub fn select(&mut self, ref_id: &str, resolved_key: &str) -> Result<(), String> {
+        // Verify ref_id exists
+        if !self.unresolved_refs.iter().any(|r| r.ref_id == ref_id) {
+            return Err(format!("Unknown ref_id: {}", ref_id));
+        }
+
+        self.resolutions
+            .insert(ref_id.to_string(), resolved_key.to_string());
+        Ok(())
+    }
+
+    /// Clear a resolution for a ref_id (undo selection)
+    pub fn clear(&mut self, ref_id: &str) {
+        self.resolutions.remove(ref_id);
+    }
+
+    /// Check if all refs have been resolved
+    pub fn is_complete(&self) -> bool {
+        self.unresolved_refs
+            .iter()
+            .all(|r| self.resolutions.contains_key(&r.ref_id))
+    }
+
+    /// Get number of resolved vs total refs
+    pub fn progress(&self) -> (usize, usize) {
+        let resolved = self
+            .unresolved_refs
+            .iter()
+            .filter(|r| self.resolutions.contains_key(&r.ref_id))
+            .count();
+        (resolved, self.unresolved_refs.len())
+    }
+
+    /// Get the current unresolved ref being worked on
+    pub fn current_ref(&self) -> Option<&UnresolvedRefInfo> {
+        self.unresolved_refs.get(self.current_ref_index)
+    }
+
+    /// Move to next unresolved ref
+    pub fn next_ref(&mut self) -> bool {
+        if self.current_ref_index + 1 < self.unresolved_refs.len() {
+            self.current_ref_index += 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Move to previous ref
+    pub fn prev_ref(&mut self) -> bool {
+        if self.current_ref_index > 0 {
+            self.current_ref_index -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Apply all resolutions to AST statements
+    ///
+    /// Walks the AST and sets `resolved_key` on EntityRef nodes
+    /// where we have a resolution stored.
+    pub fn apply_to_statements(&self, statements: &mut [Statement]) -> Result<usize, String> {
+        let mut applied = 0;
+
+        for stmt in statements.iter_mut() {
+            if let Statement::VerbCall(vc) = stmt {
+                for arg in &mut vc.arguments {
+                    applied += self.apply_to_node(&mut arg.value)?;
+                }
+            }
+        }
+
+        Ok(applied)
+    }
+
+    /// Recursively apply resolutions to an AstNode
+    fn apply_to_node(&self, node: &mut crate::dsl_v2::ast::AstNode) -> Result<usize, String> {
+        use crate::dsl_v2::ast::AstNode;
+
+        match node {
+            AstNode::EntityRef {
+                ref_id,
+                resolved_key,
+                span,
+                ..
+            } => {
+                // Get the ref_id for this node
+                let node_ref_id = ref_id
+                    .clone()
+                    .unwrap_or_else(|| format!("unknown:{}-{}", span.start, span.end));
+
+                // Check if we have a resolution
+                if let Some(key) = self.resolutions.get(&node_ref_id) {
+                    // Validate it's a UUID before setting
+                    uuid::Uuid::parse_str(key)
+                        .map_err(|_| format!("Resolution '{}' is not a valid UUID", key))?;
+                    *resolved_key = Some(key.clone());
+                    Ok(1)
+                } else {
+                    Ok(0)
+                }
+            }
+            AstNode::List { items, .. } => {
+                let mut count = 0;
+                for item in items {
+                    count += self.apply_to_node(item)?;
+                }
+                Ok(count)
+            }
+            AstNode::Map { entries, .. } => {
+                let mut count = 0;
+                for (_, v) in entries {
+                    count += self.apply_to_node(v)?;
+                }
+                Ok(count)
+            }
+            AstNode::Nested(vc) => {
+                let mut count = 0;
+                for arg in &mut vc.arguments {
+                    count += self.apply_to_node(&mut arg.value)?;
+                }
+                Ok(count)
+            }
+            _ => Ok(0),
+        }
+    }
+}
+
+impl Default for ResolutionSubSession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Research sub-session state - GLEIF/UBO discovery
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ResearchSubSession {

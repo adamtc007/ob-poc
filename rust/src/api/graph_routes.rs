@@ -35,7 +35,7 @@ use ob_poc_types::galaxy::{NodeType, Route, RouteResponse, RouteWaypoint, ViewLe
 /// Query parameters for graph endpoint
 #[derive(Debug, Deserialize)]
 pub struct GraphQuery {
-    /// View mode: KYC_UBO (default), SERVICE_DELIVERY, or CUSTODY
+    /// View mode: TRADING (default), KYC_UBO, SERVICE_DELIVERY, or CUSTODY
     pub view_mode: Option<String>,
     /// Layout orientation: VERTICAL (default, top-to-bottom) or HORIZONTAL (left-to-right)
     pub orientation: Option<String>,
@@ -43,7 +43,7 @@ pub struct GraphQuery {
     pub as_of: Option<String>,
 }
 
-/// GET /api/cbu/{cbu_id}/graph?view_mode=KYC_UBO&orientation=VERTICAL
+/// GET /api/cbu/{cbu_id}/graph?view_mode=TRADING&orientation=VERTICAL
 ///
 /// Returns graph data with server-computed layout positions.
 ///
@@ -57,7 +57,7 @@ pub async fn get_cbu_graph(
     Path(cbu_id): Path<Uuid>,
     Query(params): Query<GraphQuery>,
 ) -> Result<Json<CbuGraph>, (StatusCode, String)> {
-    let view_mode = params.view_mode.as_deref().unwrap_or("KYC_UBO");
+    let view_mode = params.view_mode.as_deref().unwrap_or("TRADING");
     let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
     let horizontal = orientation.eq_ignore_ascii_case("HORIZONTAL");
 
@@ -161,7 +161,7 @@ pub struct LayoutSaveRequest {
 fn normalize_view_mode(view_mode: Option<String>) -> String {
     view_mode
         .map(|v| v.to_uppercase())
-        .unwrap_or_else(|| "KYC_UBO".to_string())
+        .unwrap_or_else(|| "TRADING".to_string())
 }
 
 /// GET /api/cbu/{cbu_id}/layout - fetch saved layout overrides
@@ -249,7 +249,7 @@ pub async fn save_cbu_layout(
 /// Query parameters for unified graph endpoints
 #[derive(Debug, Deserialize)]
 pub struct UnifiedGraphQuery {
-    /// View mode: KYC_UBO (default), UBO_ONLY, BOOK
+    /// View mode: TRADING (default), KYC_UBO, UBO_ONLY, BOOK
     pub view_mode: Option<String>,
     /// Layout orientation: VERTICAL (default) or HORIZONTAL
     pub orientation: Option<String>,
@@ -285,7 +285,7 @@ pub async fn get_unified_cbu_graph(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Apply layout
-    let view_mode = params.view_mode.as_deref().unwrap_or("KYC_UBO");
+    let view_mode = params.view_mode.as_deref().unwrap_or("TRADING");
     let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
     graph.layout(view_mode, orientation);
 
@@ -351,7 +351,7 @@ pub async fn get_jurisdiction_graph(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     // Apply layout
-    let view_mode = params.view_mode.as_deref().unwrap_or("KYC_UBO");
+    let view_mode = params.view_mode.as_deref().unwrap_or("TRADING");
     let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
     graph.layout(view_mode, orientation);
 
@@ -919,7 +919,7 @@ async fn get_session_graph(
         .view_mode
         .as_deref()
         .or(session_view_mode.as_deref())
-        .unwrap_or("KYC_UBO");
+        .unwrap_or("TRADING");
     let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
     let horizontal = orientation.eq_ignore_ascii_case("HORIZONTAL");
 

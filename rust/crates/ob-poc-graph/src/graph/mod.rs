@@ -104,66 +104,29 @@ pub use ob_poc_types::PanDirection;
 // Import ViewportState for apply_viewport_state method
 use ob_poc_types::viewport::{CbuViewType, EnhanceArg, ViewportFocusState, ViewportState};
 
-/// View mode for the graph visualization
+/// View mode for the graph visualization - CBU Trading view only
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ViewMode {
-    /// KYC/UBO view - shows core entities, KYC status, and ownership chains
-    #[default]
-    KycUbo,
-    /// Service Delivery view - shows products, services, resources
-    ServiceDelivery,
-    /// Products only view - simplified product overview
-    ProductsOnly,
-    /// Trading view - CBU as container with trading entities (Asset Owner, IM, ManCo, etc.)
-    Trading,
-    /// Board Control view - ownership tree from anchor entity, flows upward to UBOs
-    BoardControl,
-}
+pub struct ViewMode;
 
 impl ViewMode {
     /// Get the API string representation
     pub fn as_str(&self) -> &'static str {
-        match self {
-            ViewMode::KycUbo => "KYC_UBO",
-            ViewMode::ServiceDelivery => "SERVICE_DELIVERY",
-            ViewMode::ProductsOnly => "PRODUCTS_ONLY",
-            ViewMode::Trading => "TRADING",
-            ViewMode::BoardControl => "BOARD_CONTROL",
-        }
+        "TRADING"
     }
 
     /// Get display name for UI
     pub fn display_name(&self) -> &'static str {
-        match self {
-            ViewMode::KycUbo => "KYC / UBO",
-            ViewMode::ServiceDelivery => "Services",
-            ViewMode::ProductsOnly => "Products",
-            ViewMode::Trading => "Trading",
-            ViewMode::BoardControl => "Board Control",
-        }
+        "CBU"
     }
 
-    /// Get all available view modes (in display order)
-    /// Note: BoardControl is not in this list as it's navigated to via portal click
+    /// Get all available view modes (just one now)
     pub fn all() -> &'static [ViewMode] {
-        &[
-            ViewMode::KycUbo,
-            ViewMode::Trading,
-            ViewMode::ProductsOnly,
-            ViewMode::ServiceDelivery,
-        ]
+        &[ViewMode]
     }
 
-    /// Parse from API string representation
-    pub fn from_str(s: &str) -> Option<ViewMode> {
-        match s.to_uppercase().as_str() {
-            "KYC_UBO" | "KYCUBO" | "KYC" | "UBO" => Some(ViewMode::KycUbo),
-            "SERVICE_DELIVERY" | "SERVICEDELIVERY" | "SERVICES" => Some(ViewMode::ServiceDelivery),
-            "PRODUCTS_ONLY" | "PRODUCTSONLY" | "PRODUCTS" => Some(ViewMode::ProductsOnly),
-            "TRADING" | "CUSTODY" => Some(ViewMode::Trading),
-            "BOARD_CONTROL" | "BOARDCONTROL" | "CONTROL" => Some(ViewMode::BoardControl),
-            _ => None,
-        }
+    /// Parse from API string representation - always returns ViewMode (CBU/Trading)
+    pub fn from_str(_s: &str) -> Option<ViewMode> {
+        Some(ViewMode)
     }
 }
 
@@ -269,7 +232,7 @@ impl CbuGraphWidget {
             raw_data: None,
             layout_graph: None,
             renderer: GraphRenderer::new(),
-            view_mode: ViewMode::KycUbo,
+            view_mode: ViewMode,
             needs_initial_fit: true,
             viewport_fit: ViewportFit::new(),
             last_viewport_size: None,
@@ -721,10 +684,10 @@ impl CbuGraphWidget {
                     let action = NavigateBackAction {
                         target_cbu_id: source_cbu.0,
                         target_cbu_name: None, // Will be resolved by caller
-                        from_view: ViewMode::BoardControl,
+                        from_view: ViewMode,
                     };
                     // Reset to KycUbo view mode
-                    self.view_mode = ViewMode::KycUbo;
+                    self.view_mode = ViewMode;
                     return Some(action);
                 }
                 ViewportFocusState::InstrumentMatrix { cbu, .. }
@@ -733,10 +696,10 @@ impl CbuGraphWidget {
                     let action = NavigateBackAction {
                         target_cbu_id: cbu.0,
                         target_cbu_name: None,
-                        from_view: ViewMode::Trading,
+                        from_view: ViewMode,
                     };
                     // Reset to KycUbo view mode and clear matrix focus
-                    self.view_mode = ViewMode::KycUbo;
+                    self.view_mode = ViewMode;
                     self.matrix_focus_path = None;
                     return Some(action);
                 }
@@ -815,7 +778,7 @@ impl CbuGraphWidget {
         };
 
         self.viewport_state = Some(state);
-        self.view_mode = ViewMode::Trading;
+        self.view_mode = ViewMode;
 
         // Store the matrix focus path for graph highlighting
         self.matrix_focus_path = if node_path.is_empty() {
@@ -1164,7 +1127,7 @@ impl CbuGraphWidget {
         }
 
         // Render evidence panel when in BoardControl mode
-        if self.view_mode == ViewMode::BoardControl {
+        if self.view_mode == ViewMode {
             // Sample evidence items for demo - in production these would come from server
             let evidence = vec![
                 board_control::EvidenceItem {
@@ -1459,19 +1422,19 @@ impl CbuGraphWidget {
             }
             ViewportFocusState::BoardControl { enhance_level, .. } => {
                 // Board control view - switch view mode and set enhance level
-                self.view_mode = ViewMode::BoardControl;
+                self.view_mode = ViewMode;
                 self.set_enhance_level(*enhance_level);
             }
         }
 
         // 2. Apply view type → view mode mapping
         let view_mode = match state.view_type {
-            CbuViewType::Structure | CbuViewType::Ownership => ViewMode::KycUbo,
-            CbuViewType::Accounts => ViewMode::ServiceDelivery,
-            CbuViewType::Compliance => ViewMode::KycUbo,
-            CbuViewType::Geographic => ViewMode::KycUbo,
-            CbuViewType::Temporal => ViewMode::KycUbo,
-            CbuViewType::Instruments => ViewMode::Trading,
+            CbuViewType::Structure | CbuViewType::Ownership => ViewMode,
+            CbuViewType::Accounts => ViewMode,
+            CbuViewType::Compliance => ViewMode,
+            CbuViewType::Geographic => ViewMode,
+            CbuViewType::Temporal => ViewMode,
+            CbuViewType::Instruments => ViewMode,
         };
         if self.view_mode != view_mode {
             self.view_mode = view_mode;

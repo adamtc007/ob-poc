@@ -85,13 +85,15 @@ impl EntityGateway for EntityGatewayService {
             SearchMode::Exact => MatchMode::Exact,
         };
 
-        // Build query with discriminators from request
+        // Build query with discriminators and tenant scope from request
         let query = SearchQuery {
             values: req.values,
             search_key,
             mode,
             limit: req.limit.unwrap_or(10) as usize,
             discriminators: req.discriminators,
+            tenant_id: req.tenant_id,
+            cbu_id: req.cbu_id,
         };
 
         // Execute search
@@ -156,6 +158,8 @@ mod tests {
             mode: SearchMode::Fuzzy as i32,
             limit: None,
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         });
 
         let result = service.search(request).await;
@@ -183,6 +187,8 @@ mod tests {
                     "test".to_string(),
                 )]),
                 discriminator_values: std::collections::HashMap::new(),
+                tenant_id: None,
+                cbu_ids: vec![],
             }])
             .await
             .unwrap();
@@ -197,6 +203,8 @@ mod tests {
             mode: SearchMode::Fuzzy as i32,
             limit: None,
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         });
 
         let result = service.search(request).await;

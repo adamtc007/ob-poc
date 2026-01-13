@@ -29,6 +29,13 @@ message SearchRequest {
   // Optional: discriminator values for composite search (e.g., nationality, date_of_birth)
   // Keys are discriminator names, values are the discriminator values
   map<string, string> discriminators = 6;
+
+  // Optional: tenant isolation - only return entities belonging to this tenant
+  optional string tenant_id = 7;
+
+  // Optional: CBU scope - only return entities within this CBU's entity universe
+  // Used during resolution to prevent cross-CBU entity leakage
+  optional string cbu_id = 8;
 }
 
 enum SearchMode {

@@ -46,21 +46,8 @@ fn default_limit() -> u32 {
     10
 }
 
-/// A single match from entity search
-#[derive(Debug, Clone, Serialize)]
-pub struct EntityMatch {
-    /// Primary key (UUID or code) to store in resolved_key
-    pub value: String,
-
-    /// Human-readable label for UI display
-    pub display: String,
-
-    /// Additional context (entity type, jurisdiction)
-    pub detail: Option<String>,
-
-    /// Relevance score 0.0-1.0
-    pub score: f32,
-}
+// Use the shared EntityMatch type from ob-poc-types for client compatibility
+use ob_poc_types::EntityMatch;
 
 /// Response from entity search
 #[derive(Debug, Clone, Serialize)]
@@ -138,6 +125,8 @@ async fn search_entities(
         mode: SearchMode::Fuzzy as i32,
         limit: Some(query.limit.min(50) as i32 + 1), // +1 to detect truncation
         discriminators,
+        tenant_id: None,
+        cbu_id: None,
     };
 
     let response = client.search(request).await.map_err(|e| {
@@ -168,14 +157,16 @@ async fn search_entities(
             }
         })
         .map(|m| {
-            // Build detail from entity type and any jurisdiction info
-            let detail = build_detail(&query.entity_type, &m.display);
+            // Parse jurisdiction from display if present (format: "Name (JUR)")
+            let jurisdiction = extract_jurisdiction(&m.display);
 
             EntityMatch {
-                value: m.token,
-                display: m.display,
-                detail,
-                score: m.score,
+                entity_id: m.token,
+                name: m.display,
+                entity_type: query.entity_type.clone(),
+                jurisdiction,
+                context: None,
+                score: Some(m.score as f64),
             }
         })
         .collect();
@@ -208,18 +199,22 @@ fn normalize_entity_type(entity_type: &str) -> String {
 }
 
 /// Build detail string from entity type and display
-fn build_detail(entity_type: &str, display: &str) -> Option<String> {
-    // Try to extract jurisdiction from display if it's in format "Name | JURISDICTION"
-    let parts: Vec<&str> = display.split(" | ").collect();
-    if parts.len() > 1 {
-        Some(format!(
-            "{} | {}",
-            capitalize_entity_type(entity_type),
-            parts[1]
-        ))
-    } else {
-        Some(capitalize_entity_type(entity_type))
+/// Extract jurisdiction from display string if present
+/// Handles formats like "Name | JURISDICTION" or "Name (JUR)"
+fn extract_jurisdiction(display: &str) -> Option<String> {
+    // Try "Name | JURISDICTION" format
+    if let Some(idx) = display.find(" | ") {
+        return Some(display[idx + 3..].trim().to_string());
     }
+    // Try "Name (JUR)" format
+    if let Some(start) = display.rfind('(') {
+        if let Some(end) = display.rfind(')') {
+            if end > start {
+                return Some(display[start + 1..end].trim().to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Capitalize entity type for display
@@ -310,14 +305,5 @@ mod tests {
         assert_eq!(capitalize_entity_type("person"), "Proper Person");
         assert_eq!(capitalize_entity_type("company"), "Limited Company");
         assert_eq!(capitalize_entity_type("role"), "Role");
-    }
-
-    #[test]
-    fn test_build_detail() {
-        assert_eq!(
-            build_detail("person", "John Smith | LU"),
-            Some("Proper Person | LU".to_string())
-        );
-        assert_eq!(build_detail("cbu", "Apex Fund"), Some("CBU".to_string()));
     }
 }

@@ -3455,6 +3455,8 @@ async fn auto_resolve_entity_refs(
             mode: SearchMode::Exact as i32, // Exact mode for precise matching
             limit: Some(1),
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         if let Ok(response) = client.search(search_request).await {
@@ -3501,6 +3503,7 @@ async fn auto_resolve_entity_refs(
                                 search_column,
                                 value,
                                 span,
+                                ref_id,
                                 ..
                             } = arg.value
                             {
@@ -3512,6 +3515,8 @@ async fn auto_resolve_entity_refs(
                                         value,
                                         resolved_key: Some(resolved_key.clone()),
                                         span,
+                                        ref_id,
+                                        explain: None, // Resolution explain not captured in batch commit
                                     },
                                     span: arg.span,
                                 };
@@ -3803,6 +3808,8 @@ async fn resolve_entity_ref(
                             value,
                             resolved_key,
                             span,
+                            ref_id,
+                            explain,
                         } => {
                             if resolved_key.is_some() {
                                 Err((
@@ -3817,6 +3824,8 @@ async fn resolve_entity_ref(
                                     value: value.clone(),
                                     resolved_key: Some(req.resolved_key.clone()),
                                     span: *span,
+                                    ref_id: ref_id.clone(),
+                                    explain: explain.clone(),
                                 };
                                 Ok(())
                             }
@@ -4644,6 +4653,8 @@ async fn execute_tool(_pool: &PgPool, tool_name: &str, input: &serde_json::Value
             mode: SearchMode::Fuzzy as i32,
             limit: Some(limit),
             discriminators: std::collections::HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let response = client
@@ -5110,6 +5121,8 @@ async fn complete_entity(
         mode: SearchMode::Fuzzy as i32,
         limit: Some(req.limit),
         discriminators: std::collections::HashMap::new(),
+        tenant_id: None,
+        cbu_id: None,
     };
 
     let response = match client.search(search_request).await {

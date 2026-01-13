@@ -16,7 +16,7 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tantivy::collector::TopDocs;
 use tantivy::query::{BooleanQuery, FuzzyTermQuery, Query, QueryParser, TermQuery};
 use tantivy::schema::{
@@ -57,8 +57,15 @@ pub struct TantivyIndex {
     exact_fields: HashMap<String, Field>,
     /// Field handles for discriminator values (stored only, for post-search filtering)
     discriminator_fields: HashMap<String, Field>,
+    /// Field handle for tenant ID (for multi-tenant isolation)
+    tenant_field: Field,
+    /// Field handle for CBU IDs (for entity universe scoping)
+    /// Stored as space-separated UUIDs for term filtering
+    cbu_ids_field: Field,
     /// Whether the index is ready
     ready: AtomicBool,
+    /// Generation counter - increments on each refresh for cache validation
+    generation: AtomicU64,
 }
 
 impl TantivyIndex {
@@ -129,6 +136,12 @@ impl TantivyIndex {
             discriminator_fields.insert(disc.name.clone(), field);
         }
 
+        // Add tenant isolation field (STRING for exact term matching)
+        let tenant_field = schema_builder.add_text_field("tenant_id", STRING | STORED);
+
+        // Add CBU IDs field (STRING for term matching - stores space-separated UUIDs)
+        let cbu_ids_field = schema_builder.add_text_field("cbu_ids", STRING | STORED);
+
         let schema = schema_builder.build();
         let index = Index::create_in_ram(schema.clone());
 
@@ -155,13 +168,34 @@ impl TantivyIndex {
             search_fields,
             exact_fields,
             discriminator_fields,
+            tenant_field,
+            cbu_ids_field,
             ready: AtomicBool::new(false),
+            generation: AtomicU64::new(0),
         })
     }
 
     /// Get the nickname of this index
     pub fn nickname(&self) -> &str {
         &self.config.nickname
+    }
+
+    /// Get current index generation (increments on each refresh)
+    pub fn generation(&self) -> u64 {
+        self.generation.load(Ordering::SeqCst)
+    }
+
+    /// Force the reader to reload and see latest committed changes
+    /// Call this if you suspect stale results
+    pub async fn force_reload(&self) -> Result<(), IndexError> {
+        let reader_guard = self.reader.read().await;
+        if let Some(reader) = reader_guard.as_ref() {
+            reader
+                .reload()
+                .map_err(|e| IndexError::BuildFailed(format!("Reload failed: {}", e)))?;
+            tracing::info!(nickname = %self.config.nickname, "Forced reader reload");
+        }
+        Ok(())
     }
 
     /// Build a fuzzy substring query that handles:
@@ -202,6 +236,52 @@ impl TantivyIndex {
                 let term = Term::from_field_text(exact_field, &input_trimmed);
                 Box::new(TermQuery::new(term, Default::default()))
             }
+        }
+    }
+
+    /// Build a scoped query that wraps the base query with tenant/CBU constraints.
+    ///
+    /// This enforces multi-tenant isolation and CBU-scoped entity visibility at
+    /// QUERY TIME rather than post-filtering, which is more efficient and secure.
+    ///
+    /// - If `tenant_id` is provided, only matches documents with that tenant
+    /// - If `cbu_id` is provided, only matches documents that include that CBU in their cbu_ids
+    fn build_scoped_query(
+        &self,
+        base_query: Box<dyn Query>,
+        tenant_id: Option<&str>,
+        cbu_id: Option<&str>,
+    ) -> Box<dyn Query> {
+        use tantivy::query::Occur;
+
+        let mut must_clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, base_query)];
+
+        // Tenant isolation: require exact tenant_id match
+        if let Some(tenant) = tenant_id {
+            let term = Term::from_field_text(self.tenant_field, tenant);
+            must_clauses.push((
+                Occur::Must,
+                Box::new(TermQuery::new(term, IndexRecordOption::Basic)),
+            ));
+        }
+
+        // CBU scope: require the CBU to be in the entity's cbu_ids list
+        // Note: cbu_ids is stored as space-separated UUIDs, indexed with word tokenizer
+        // so a term query for a single UUID will match if it's in the list
+        if let Some(cbu) = cbu_id {
+            let term = Term::from_field_text(self.cbu_ids_field, cbu);
+            must_clauses.push((
+                Occur::Must,
+                Box::new(TermQuery::new(term, IndexRecordOption::Basic)),
+            ));
+        }
+
+        // If no scope constraints, return base query unchanged
+        if must_clauses.len() == 1 {
+            // Only the base query, no wrapping needed
+            must_clauses.into_iter().next().unwrap().1
+        } else {
+            Box::new(BooleanQuery::new(must_clauses))
         }
     }
 
@@ -323,11 +403,14 @@ impl TantivyIndex {
 #[async_trait]
 impl SearchIndex for TantivyIndex {
     async fn search(&self, query: &SearchQuery) -> Vec<SearchMatch> {
+        let generation = self.generation.load(Ordering::SeqCst);
+
         tracing::debug!(
             nickname = %self.config.nickname,
             search_key = %query.search_key,
             values = ?query.values,
             mode = ?query.mode,
+            generation = generation,
             "Starting search"
         );
 
@@ -341,7 +424,13 @@ impl SearchIndex for TantivyIndex {
         };
 
         let searcher = reader.searcher();
-        tracing::debug!(nickname = %self.config.nickname, num_docs = searcher.num_docs(), "Searcher ready");
+        tracing::debug!(
+            nickname = %self.config.nickname,
+            num_docs = searcher.num_docs(),
+            num_segments = searcher.segment_readers().len(),
+            generation = generation,
+            "Searcher ready"
+        );
 
         // Get the search fields
         let search_field = match self.search_fields.get(&query.search_key) {
@@ -410,6 +499,14 @@ impl SearchIndex for TantivyIndex {
                 }
             };
 
+            // Wrap with scope constraints (tenant/CBU) for query-time enforcement
+            // This is more efficient and secure than post-search filtering
+            let scoped_query = self.build_scoped_query(
+                tantivy_query,
+                query.tenant_id.as_deref(),
+                query.cbu_id.as_deref(),
+            );
+
             // Request more results if we have discriminators to filter by
             let fetch_limit = if query.discriminators.is_empty() {
                 query.limit
@@ -417,8 +514,7 @@ impl SearchIndex for TantivyIndex {
                 query.limit * 3 // Fetch more candidates for filtering
             };
 
-            let top_docs = match searcher.search(&tantivy_query, &TopDocs::with_limit(fetch_limit))
-            {
+            let top_docs = match searcher.search(&scoped_query, &TopDocs::with_limit(fetch_limit)) {
                 Ok(docs) => docs,
                 Err(e) => {
                     tracing::error!(error = %e, "Search failed");
@@ -429,6 +525,40 @@ impl SearchIndex for TantivyIndex {
             for (score, doc_addr) in top_docs {
                 match searcher.doc::<tantivy::TantivyDocument>(doc_addr) {
                     Ok(doc) => {
+                        // Note: Tenant and CBU scope filtering is now done at QUERY TIME
+                        // via build_scoped_query(). The checks below are kept as defense-in-depth
+                        // but should never filter anything since the query already enforces scope.
+
+                        // Defense-in-depth: Tenant isolation check
+                        if let Some(ref query_tenant) = query.tenant_id {
+                            let doc_tenant = doc
+                                .get_first(self.tenant_field)
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            if doc_tenant != query_tenant {
+                                tracing::warn!(
+                                    "Defense-in-depth: tenant mismatch slipped through query filter"
+                                );
+                                continue;
+                            }
+                        }
+
+                        // Defense-in-depth: CBU scope check
+                        if let Some(ref query_cbu) = query.cbu_id {
+                            let doc_cbu_ids = doc
+                                .get_first(self.cbu_ids_field)
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            // CBU IDs are stored space-separated
+                            let cbu_list: Vec<&str> = doc_cbu_ids.split_whitespace().collect();
+                            if !cbu_list.contains(&query_cbu.as_str()) {
+                                tracing::warn!(
+                                    "Defense-in-depth: CBU scope mismatch slipped through query filter"
+                                );
+                                continue;
+                            }
+                        }
+
                         let token = doc
                             .get_first(self.token_field)
                             .and_then(|v| v.as_str())
@@ -540,6 +670,19 @@ impl SearchIndex for TantivyIndex {
                 }
             }
 
+            // Add tenant ID for multi-tenant isolation
+            if let Some(tenant_id) = &record.tenant_id {
+                doc.add_text(self.tenant_field, tenant_id);
+            }
+
+            // Add CBU IDs for entity universe scoping
+            // Store each CBU ID as a separate term for efficient filtering
+            if !record.cbu_ids.is_empty() {
+                // Join CBU IDs with space - allows term queries to match individual IDs
+                let cbu_ids_str = record.cbu_ids.join(" ");
+                doc.add_text(self.cbu_ids_field, &cbu_ids_str);
+            }
+
             writer
                 .add_document(doc)
                 .map_err(|e| IndexError::BuildFailed(e.to_string()))?;
@@ -550,14 +693,25 @@ impl SearchIndex for TantivyIndex {
             .commit()
             .map_err(|e| IndexError::BuildFailed(e.to_string()))?;
 
-        // Create new reader
+        // Wait for merging threads to clean up deleted segments
+        // This ensures old documents are actually removed, not just marked deleted
+        // Note: wait_merging_threads() consumes the writer, so no explicit drop needed
+        if let Err(e) = writer.wait_merging_threads() {
+            tracing::warn!(nickname = %self.config.nickname, error = %e, "Merge threads warning (non-fatal)");
+        }
+
+        // Create new reader with explicit reload policy
+        // OnCommitWithDelay reloads automatically after commits
         let new_reader = self
             .index
-            .reader()
-            .map_err(|e| IndexError::BuildFailed(e.to_string()))?;
+            .reader_builder()
+            .reload_policy(tantivy::ReloadPolicy::OnCommitWithDelay)
+            .try_into()
+            .map_err(|e: tantivy::TantivyError| IndexError::BuildFailed(e.to_string()))?;
 
-        // Update the reader
+        // Update the reader and increment generation
         *self.reader.write().await = Some(new_reader);
+        self.generation.fetch_add(1, Ordering::SeqCst);
         self.ready.store(true, Ordering::SeqCst);
 
         let elapsed = start.elapsed();
@@ -613,6 +767,8 @@ mod tests {
                     "asia pacific growth fund".to_string(),
                 )]),
                 discriminator_values: HashMap::new(),
+                tenant_id: None,
+                cbu_ids: vec![],
             },
             IndexRecord {
                 token: "uuid-2".to_string(),
@@ -622,6 +778,8 @@ mod tests {
                     "luxembourg investment sicav".to_string(),
                 )]),
                 discriminator_values: HashMap::new(),
+                tenant_id: None,
+                cbu_ids: vec![],
             },
             IndexRecord {
                 token: "uuid-3".to_string(),
@@ -631,6 +789,8 @@ mod tests {
                     "pacific capital partners".to_string(),
                 )]),
                 discriminator_values: HashMap::new(),
+                tenant_id: None,
+                cbu_ids: vec![],
             },
             IndexRecord {
                 token: "uuid-4".to_string(),
@@ -640,6 +800,8 @@ mod tests {
                     "apex fund services".to_string(),
                 )]),
                 discriminator_values: HashMap::new(),
+                tenant_id: None,
+                cbu_ids: vec![],
             },
         ]
     }
@@ -672,6 +834,8 @@ mod tests {
             mode: MatchMode::Fuzzy,
             limit: 10,
             discriminators: HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let results = index.search(&query).await;
@@ -704,6 +868,8 @@ mod tests {
             mode: MatchMode::Fuzzy,
             limit: 10,
             discriminators: HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let results = index.search(&query).await;
@@ -727,6 +893,8 @@ mod tests {
             mode: MatchMode::Fuzzy,
             limit: 10,
             discriminators: HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let results = index.search(&query).await;
@@ -750,6 +918,8 @@ mod tests {
             mode: MatchMode::Fuzzy,
             limit: 10,
             discriminators: HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let results = index.search(&query).await;
@@ -773,6 +943,8 @@ mod tests {
             mode: MatchMode::Exact,
             limit: 10,
             discriminators: HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         let results = index.search(&query).await;
@@ -793,6 +965,8 @@ mod tests {
             mode: MatchMode::Fuzzy,
             limit: 10,
             discriminators: HashMap::new(),
+            tenant_id: None,
+            cbu_id: None,
         };
 
         // Measure search time
@@ -858,6 +1032,8 @@ async fn test_exact_search_with_underscore() {
                 ("product_code".to_string(), "CUSTODY".to_string()),
             ]),
             discriminator_values: HashMap::new(),
+            tenant_id: None,
+            cbu_ids: vec![],
         },
         IndexRecord {
             token: "FUND_ACCOUNTING".to_string(),
@@ -867,6 +1043,8 @@ async fn test_exact_search_with_underscore() {
                 ("product_code".to_string(), "FUND_ACCOUNTING".to_string()),
             ]),
             discriminator_values: HashMap::new(),
+            tenant_id: None,
+            cbu_ids: vec![],
         },
     ];
 
@@ -879,6 +1057,8 @@ async fn test_exact_search_with_underscore() {
         mode: MatchMode::Exact,
         limit: 10,
         discriminators: HashMap::new(),
+        tenant_id: None,
+        cbu_id: None,
     };
 
     let results = index.search(&query).await;

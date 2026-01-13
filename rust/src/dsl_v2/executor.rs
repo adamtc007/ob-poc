@@ -54,6 +54,104 @@ use sqlx::PgPool;
 // Event infrastructure for observability
 use crate::events::SharedEmitter;
 
+// ============================================================================
+// Pre-Flight Resolution Check
+// ============================================================================
+
+/// Unresolved reference info for error reporting
+#[cfg(feature = "database")]
+#[derive(Debug, Clone)]
+pub struct UnresolvedRef {
+    /// Stable location identifier from AST: "{stmt_index}:{span.start}-{span.end}"
+    pub ref_id: Option<String>,
+    /// The unresolved value (e.g., "Allianz Global Investors")
+    pub value: String,
+    /// Entity type being resolved (e.g., "entity", "cbu")
+    pub entity_type: String,
+}
+
+/// Validate all EntityRefs in an execution plan have been resolved.
+///
+/// This is the PRE-FLIGHT check that runs before any verb execution.
+/// If any EntityRef has `resolved_key: None`, execution cannot proceed.
+///
+/// Returns Ok(()) if all refs are resolved, or Err with details about unresolved refs.
+#[cfg(feature = "database")]
+fn validate_all_resolved(plan: &super::execution_plan::ExecutionPlan) -> Result<(), anyhow::Error> {
+    let mut unresolved: Vec<UnresolvedRef> = Vec::new();
+
+    for step in &plan.steps {
+        collect_unresolved_from_verb_call(&step.verb_call, &mut unresolved);
+    }
+
+    if !unresolved.is_empty() {
+        let details: Vec<String> = unresolved
+            .iter()
+            .map(|u| {
+                format!(
+                    "  - {} '{}' (ref_id: {})",
+                    u.entity_type,
+                    u.value,
+                    u.ref_id.as_deref().unwrap_or("unknown")
+                )
+            })
+            .collect();
+
+        return Err(anyhow!(
+            "Cannot execute: {} unresolved entity reference(s):\n{}",
+            unresolved.len(),
+            details.join("\n")
+        ));
+    }
+
+    Ok(())
+}
+
+/// Recursively collect unresolved EntityRefs from a VerbCall
+#[cfg(feature = "database")]
+fn collect_unresolved_from_verb_call(vc: &VerbCall, unresolved: &mut Vec<UnresolvedRef>) {
+    for arg in &vc.arguments {
+        collect_unresolved_from_node(&arg.value, unresolved);
+    }
+}
+
+/// Recursively collect unresolved EntityRefs from an AstNode
+#[cfg(feature = "database")]
+fn collect_unresolved_from_node(node: &AstNode, unresolved: &mut Vec<UnresolvedRef>) {
+    match node {
+        AstNode::EntityRef {
+            resolved_key,
+            ref_id,
+            value,
+            entity_type,
+            ..
+        } => {
+            if resolved_key.is_none() {
+                unresolved.push(UnresolvedRef {
+                    ref_id: ref_id.clone(),
+                    value: value.clone(),
+                    entity_type: entity_type.clone(),
+                });
+            }
+        }
+        AstNode::List { items, .. } => {
+            for item in items {
+                collect_unresolved_from_node(item, unresolved);
+            }
+        }
+        AstNode::Map { entries, .. } => {
+            for (_, v) in entries {
+                collect_unresolved_from_node(v, unresolved);
+            }
+        }
+        AstNode::Nested(vc) => {
+            collect_unresolved_from_verb_call(vc, unresolved);
+        }
+        // Literals and SymbolRefs don't contain EntityRefs
+        AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+    }
+}
+
 /// Return type specification for verb execution
 #[derive(Debug, Clone)]
 pub enum ReturnType {
@@ -1092,6 +1190,9 @@ impl DslExecutor {
         plan: &super::execution_plan::ExecutionPlan,
         ctx: &mut ExecutionContext,
     ) -> Result<Vec<ExecutionResult>> {
+        // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
+        validate_all_resolved(plan)?;
+
         tracing::debug!("execute_plan: starting with {} steps", plan.steps.len());
         let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
 
