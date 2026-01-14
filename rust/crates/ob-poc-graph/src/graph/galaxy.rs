@@ -454,7 +454,7 @@ impl GalaxyView {
                 let short_label = api_cluster
                     .id
                     .split(':')
-                    .last()
+                    .next_back()
                     .unwrap_or(&api_cluster.id)
                     .to_string();
 
@@ -1327,7 +1327,7 @@ impl GalaxyView {
         let mut best_id: Option<String> = None;
         let mut best_score = f32::MAX;
 
-        for (id, _cluster) in &self.clusters {
+        for id in self.clusters.keys() {
             // Skip current selection
             if Some(id) == self.keyboard_selected.as_ref() {
                 continue;
@@ -1461,7 +1461,7 @@ impl GalaxyView {
     ) -> GalaxyAction {
         // Phase 7: Handle viewport resize - scale simulation bounds
         let current_size = screen_rect.size();
-        let size_changed = self.last_viewport_size.map_or(true, |prev| {
+        let size_changed = self.last_viewport_size.is_none_or(|prev| {
             (prev.x - current_size.x).abs() > 10.0 || (prev.y - current_size.y).abs() > 10.0
         });
         if size_changed {

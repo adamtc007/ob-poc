@@ -2,11 +2,11 @@
 //!
 //! Provides a hierarchical drill-down view of CBU service configuration:
 //! - Products (Global Custody, Securities Lending, etc.)
-//!   └── Services (Settlement, Safekeeping, Corporate Actions, etc.)
-//!       └── Service Intents (active subscriptions with options)
-//!           └── Discovered SRDEFs (required resources)
-//!               └── Attribute Requirements (data needed)
-//!                   └── Attribute Values (satisfied/missing)
+//!   - Services (Settlement, Safekeeping, Corporate Actions, etc.)
+//!     - Service Intents (active subscriptions with options)
+//!       - Discovered SRDEFs (required resources)
+//!         - Attribute Requirements (data needed)
+//!           - Attribute Values (satisfied/missing)
 //!
 //! # Design Principles (EGUI-RULES Compliant)
 //! - Data fetched from server, not mutated locally
@@ -617,15 +617,15 @@ fn render_service_node(
     }
 
     // Skip attribute nodes if not showing attributes
-    if !state.show_attributes {
-        if matches!(
+    if !state.show_attributes
+        && matches!(
             node.node_type,
             ServiceTaxonomyNodeType::Attribute { .. }
                 | ServiceTaxonomyNodeType::AttributeValue { .. }
                 | ServiceTaxonomyNodeType::AttributeCategory { .. }
-        ) {
-            return action;
-        }
+        )
+    {
+        return action;
     }
 
     let is_expanded = state.is_expanded(&node.id);

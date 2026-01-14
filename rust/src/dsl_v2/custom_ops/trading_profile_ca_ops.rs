@@ -19,8 +19,6 @@ use ob_poc_types::trading_matrix::{
 };
 
 #[cfg(feature = "database")]
-use rust_decimal::Decimal;
-#[cfg(feature = "database")]
 use sqlx::PgPool;
 
 // =============================================================================
@@ -358,8 +356,7 @@ impl CustomOperation for TradingProfileCaSetElectionOp {
             .arguments
             .iter()
             .find(|a| a.key == "auto-instruct-threshold")
-            .and_then(|a| a.value.as_decimal())
-            .map(Decimal::from);
+            .and_then(|a| a.value.as_decimal());
 
         let (doc, mut ca) = load_ca_section(pool, profile_id).await?;
 

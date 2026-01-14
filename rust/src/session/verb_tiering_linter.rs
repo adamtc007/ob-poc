@@ -335,15 +335,14 @@ fn check_minimal_rules(
     if matches!(
         metadata.status,
         dsl_core::config::types::VerbStatus::Deprecated
-    ) {
-        if metadata.replaced_by.is_none() {
-            diagnostics.add_warning_with_path(
-                codes::M006_DEPRECATED_NO_REPLACEMENT,
-                &format!("{} is deprecated but missing replaced_by", full_name),
-                Some("metadata.replaced_by"),
-                Some("Add replaced_by: 'domain.verb-name' pointing to the canonical replacement"),
-            );
-        }
+    ) && metadata.replaced_by.is_none()
+    {
+        diagnostics.add_warning_with_path(
+            codes::M006_DEPRECATED_NO_REPLACEMENT,
+            &format!("{} is deprecated but missing replaced_by", full_name),
+            Some("metadata.replaced_by"),
+            Some("Add replaced_by: 'domain.verb-name' pointing to the canonical replacement"),
+        );
     }
 }
 
@@ -418,33 +417,29 @@ fn check_basic_rules(
     }
 
     // B005: list-* verbs should be tier: diagnostics
-    if verb_name.starts_with("list-") {
-        if !matches!(metadata.tier, Some(VerbTier::Diagnostics)) {
-            diagnostics.add_warning_with_path(
-                codes::B005_LIST_NOT_DIAGNOSTICS,
-                &format!(
-                    "{} uses 'list-' prefix but tier is not diagnostics",
-                    full_name
-                ),
-                Some("metadata.tier"),
-                Some("List verbs are read-only, use tier: diagnostics"),
-            );
-        }
+    if verb_name.starts_with("list-") && !matches!(metadata.tier, Some(VerbTier::Diagnostics)) {
+        diagnostics.add_warning_with_path(
+            codes::B005_LIST_NOT_DIAGNOSTICS,
+            &format!(
+                "{} uses 'list-' prefix but tier is not diagnostics",
+                full_name
+            ),
+            Some("metadata.tier"),
+            Some("List verbs are read-only, use tier: diagnostics"),
+        );
     }
 
     // B006: get-* verbs should be tier: diagnostics
-    if verb_name.starts_with("get-") {
-        if !matches!(metadata.tier, Some(VerbTier::Diagnostics)) {
-            diagnostics.add_warning_with_path(
-                codes::B006_GET_NOT_DIAGNOSTICS,
-                &format!(
-                    "{} uses 'get-' prefix but tier is not diagnostics",
-                    full_name
-                ),
-                Some("metadata.tier"),
-                Some("Get verbs are read-only, use tier: diagnostics"),
-            );
-        }
+    if verb_name.starts_with("get-") && !matches!(metadata.tier, Some(VerbTier::Diagnostics)) {
+        diagnostics.add_warning_with_path(
+            codes::B006_GET_NOT_DIAGNOSTICS,
+            &format!(
+                "{} uses 'get-' prefix but tier is not diagnostics",
+                full_name
+            ),
+            Some("metadata.tier"),
+            Some("Get verbs are read-only, use tier: diagnostics"),
+        );
     }
 }
 
@@ -627,7 +622,7 @@ fn check_cross_verb_standard_rules(
                         intent_verbs_by_noun
                             .entry(noun.clone())
                             .or_default()
-                            .push((full_name, metadata.source_of_truth.clone()));
+                            .push((full_name, metadata.source_of_truth));
                     }
                 }
             }

@@ -319,7 +319,7 @@ fn extract_segment(label: &str) -> String {
 
     // Use first word if it's a reasonable segment name
     let first = words[0];
-    if first.len() >= 3 && first.chars().next().map_or(false, |c| c.is_uppercase()) {
+    if first.len() >= 3 && first.chars().next().is_some_and(|c| c.is_uppercase()) {
         first.to_string()
     } else {
         "Other".to_string()

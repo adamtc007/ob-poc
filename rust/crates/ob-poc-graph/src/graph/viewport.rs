@@ -1046,7 +1046,7 @@ fn render_confidence_zone_legend(ui: &mut Ui, filters: &ViewportFilters, rect: R
     let row_height = 14.0;
 
     for (zone, label, range) in zones {
-        let is_filtered = filters.confidence_zone.map_or(false, |z| z == zone);
+        let is_filtered = filters.confidence_zone == Some(zone);
 
         // Color dot
         let color = viewport_colors::zone_color(zone);

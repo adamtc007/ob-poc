@@ -1828,7 +1828,7 @@ impl CustomOperation for SetBoardControllerOp {
         .bind(override_id)
         .bind(cbu_id)
         .bind(controller_entity_id)
-        .bind(&justification)
+        .bind(justification)
         .bind(evidence_doc_id)
         .execute(pool)
         .await;
@@ -1964,7 +1964,7 @@ impl CustomOperation for ImportPscRegisterOp {
         let source = verb_call
             .get_arg("source")
             .and_then(|v| v.value.as_string())
-            .unwrap_or_else(|| "COMPANIES_HOUSE");
+            .unwrap_or("COMPANIES_HOUSE");
 
         // This would call the Companies House API in a real implementation
         // For now, we log the intent and return a placeholder

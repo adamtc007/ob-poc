@@ -608,6 +608,7 @@ mod tests {
             verification_status: None,
             is_container: false,
             contains_type: None,
+            container_parent_id: None,
             child_count: None,
             browse_nickname: None,
             parent_key: None,

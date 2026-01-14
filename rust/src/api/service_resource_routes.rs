@@ -706,6 +706,7 @@ struct DiscoveryRow {
 #[derive(Debug, sqlx::FromRow)]
 struct AttrRequirementRow {
     attr_id: Uuid,
+    #[allow(dead_code)]
     requirement_strength: String,
     required_by_srdefs: JsonValue,
 }
@@ -713,6 +714,7 @@ struct AttrRequirementRow {
 #[derive(Debug, sqlx::FromRow)]
 struct AttrValueRow {
     attr_id: Uuid,
+    #[allow(dead_code)]
     source: String,
 }
 
@@ -1106,7 +1108,7 @@ async fn get_service_taxonomy(
                             format!(
                                 "{} {}",
                                 if satisfied { "✓" } else { "○" },
-                                attr.attr_id.to_string()[..8].to_string()
+                                &attr.attr_id.to_string()[..8]
                             ),
                         );
 
@@ -1118,9 +1120,7 @@ async fn get_service_taxonomy(
                     }
 
                     resource_node.attr_progress = Some((satisfied_count, total_count));
-                    resource_node.status = if total_count == 0 {
-                        "ready".to_string()
-                    } else if satisfied_count == total_count {
+                    resource_node.status = if total_count == 0 || satisfied_count == total_count {
                         "ready".to_string()
                     } else if satisfied_count > 0 {
                         "partial".to_string()

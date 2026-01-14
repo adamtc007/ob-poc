@@ -2,13 +2,13 @@
 //!
 //! Provides a hierarchical drill-down view of CBU trading configuration:
 //! - Instrument Classes (EQUITY, GOVT_BOND, OTC_IRS, etc.)
-//!   └── Markets/Counterparties (XNYS, XLON, Goldman Sachs)
-//!       └── Universe Entries (currencies, settlement types)
-//!           └── Resources:
-//!               ├── SSIs (with booking rules)
-//!               ├── Settlement Chains (with hops)
-//!               ├── Tax Configuration (treaty rates, reclaim)
-//!               └── ISDA/CSA (for OTC)
+//!   - Markets/Counterparties (XNYS, XLON, Goldman Sachs)
+//!     - Universe Entries (currencies, settlement types)
+//!       - Resources:
+//!         - SSIs (with booking rules)
+//!         - Settlement Chains (with hops)
+//!         - Tax Configuration (treaty rates, reclaim)
+//!         - ISDA/CSA (for OTC)
 //!
 //! # Design Principles (EGUI-RULES Compliant)
 //! - Data fetched from server, not mutated locally
@@ -564,14 +564,13 @@ pub fn render_trading_matrix_browser(
                         action = TradingMatrixAction::ExpandAll;
                     }
                     // Clear selection
-                    if state.selected().is_some() {
-                        if ui
+                    if state.selected().is_some()
+                        && ui
                             .small_button("×")
                             .on_hover_text("Clear selection")
                             .clicked()
-                        {
-                            action = TradingMatrixAction::ClearSelection;
-                        }
+                    {
+                        action = TradingMatrixAction::ClearSelection;
                     }
                 });
             });

@@ -131,7 +131,7 @@ impl ViewMode {
     }
 
     /// Parse from API string representation - always returns ViewMode (CBU/Trading)
-    pub fn from_str(_s: &str) -> Option<ViewMode> {
+    pub fn parse(_s: &str) -> Option<ViewMode> {
         Some(ViewMode)
     }
 }
@@ -1051,7 +1051,7 @@ impl CbuGraphWidget {
 
         // Auto-fit: initial fit, resize detection, content change
         let current_size = screen_rect.size();
-        let size_changed = self.last_viewport_size.map_or(true, |prev| {
+        let size_changed = self.last_viewport_size.is_none_or(|prev| {
             (prev.x - current_size.x).abs() > 10.0 || (prev.y - current_size.y).abs() > 10.0
         });
 
@@ -1225,7 +1225,7 @@ impl CbuGraphWidget {
             // Actions that require server round-trip or don't apply to local widget state
             ViewportAction::None
             | ViewportAction::FocusCbu { .. }
-            | ViewportAction::FocusMatrix { .. }
+            | ViewportAction::FocusMatrix
             | ViewportAction::FocusInstrumentType { .. }
             | ViewportAction::ChangeViewType { .. }
             | ViewportAction::SetSearchText { .. }

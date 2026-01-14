@@ -217,27 +217,6 @@ fn extract_jurisdiction(display: &str) -> Option<String> {
     None
 }
 
-/// Capitalize entity type for display
-fn capitalize_entity_type(entity_type: &str) -> String {
-    match entity_type.to_lowercase().as_str() {
-        "cbu" => "CBU".to_string(),
-        "person" | "proper_person" => "Proper Person".to_string(),
-        "company" | "limited_company" | "legal_entity" => "Limited Company".to_string(),
-        "product" => "Product".to_string(),
-        "service" => "Service".to_string(),
-        "role" => "Role".to_string(),
-        "jurisdiction" => "Jurisdiction".to_string(),
-        "currency" => "Currency".to_string(),
-        "fund" => "Fund".to_string(),
-        "entity" => "Entity".to_string(),
-        other => other
-            .chars()
-            .next()
-            .map(|c| c.to_uppercase().collect::<String>() + &other[1..])
-            .unwrap_or_else(|| other.to_string()),
-    }
-}
-
 // ============================================================================
 // Legacy endpoint for backward compatibility
 // ============================================================================

@@ -85,21 +85,16 @@ pub struct Srdef {
 }
 
 /// How to obtain a resource
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ProvisioningStrategy {
     /// We create it directly
+    #[default]
     Create,
     /// We request it from an owner system
     Request,
     /// We discover/bind to an existing resource
     Discover,
-}
-
-impl Default for ProvisioningStrategy {
-    fn default() -> Self {
-        Self::Create
-    }
 }
 
 impl std::fmt::Display for ProvisioningStrategy {
@@ -164,18 +159,13 @@ pub struct CbuUnifiedAttrRequirement {
 }
 
 /// Requirement strength
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RequirementStrength {
+    #[default]
     Required,
     Optional,
     Conditional,
-}
-
-impl Default for RequirementStrength {
-    fn default() -> Self {
-        Self::Required
-    }
 }
 
 impl std::fmt::Display for RequirementStrength {
@@ -294,18 +284,13 @@ pub struct NewProvisioningRequest {
 }
 
 /// Who requested the provisioning
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RequestedBy {
     Agent,
     User,
+    #[default]
     System,
-}
-
-impl Default for RequestedBy {
-    fn default() -> Self {
-        Self::System
-    }
 }
 
 impl std::fmt::Display for RequestedBy {
@@ -452,18 +437,13 @@ pub struct CbuServiceReadiness {
 }
 
 /// Readiness status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ReadinessStatus {
     Ready,
+    #[default]
     Blocked,
     Partial,
-}
-
-impl Default for ReadinessStatus {
-    fn default() -> Self {
-        Self::Blocked
-    }
 }
 
 impl std::fmt::Display for ReadinessStatus {

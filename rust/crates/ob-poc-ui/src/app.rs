@@ -6,7 +6,6 @@
 //! 3. Handling widget responses (no callbacks, return values only)
 
 use crate::api;
-use crate::command::AgentPromptConduit;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
@@ -252,7 +251,7 @@ impl App {
             let source = CommandSource::Voice {
                 transcript: cmd.transcript.clone(),
                 confidence: cmd.confidence,
-                provider: crate::command::VoiceProvider::from_str(&cmd.provider),
+                provider: crate::command::VoiceProvider::parse(&cmd.provider),
             };
 
             let result = dispatch_command(source.clone(), &context);
@@ -2533,14 +2532,12 @@ impl App {
                 } else {
                     // Clear results and update search buffer for next item
                     *search_results = None;
-                    if let Some(item) = request.items.get(*current_item_index) {
-                        if let ob_poc_types::DisambiguationItem::EntityMatch {
-                            ref search_text,
-                            ..
-                        } = item
-                        {
-                            self.state.resolution_ui.search_query = search_text.clone();
-                        }
+                    if let Some(ob_poc_types::DisambiguationItem::EntityMatch {
+                        ref search_text,
+                        ..
+                    }) = request.items.get(*current_item_index)
+                    {
+                        self.state.resolution_ui.search_query = search_text.clone();
                     }
                 }
             }

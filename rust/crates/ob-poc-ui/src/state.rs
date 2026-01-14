@@ -1105,13 +1105,11 @@ impl AppState {
             self.window_stack.push(window);
 
             // Initialize search buffer with first item's search text
-            if let Some(first_item) = disambig.items.first() {
-                if let ob_poc_types::DisambiguationItem::EntityMatch {
-                    ref search_text, ..
-                } = first_item
-                {
-                    self.resolution_ui.search_query = search_text.clone();
-                }
+            if let Some(ob_poc_types::DisambiguationItem::EntityMatch {
+                ref search_text, ..
+            }) = disambig.items.first()
+            {
+                self.resolution_ui.search_query = search_text.clone();
             }
         }
 
@@ -2457,7 +2455,7 @@ impl AppState {
 
 /// Parse view mode from string (used by agent commands)
 pub fn parse_view_mode(s: &str) -> Option<ViewMode> {
-    ViewMode::from_str(s)
+    ViewMode::parse(s)
 }
 
 // =============================================================================

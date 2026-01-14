@@ -560,7 +560,7 @@ impl GraphRenderer {
                 // depth: use hierarchy_depth from node (clamped to u8)
                 // has_red_flag: use needs_attention from node
                 // has_gap: for now, treat incomplete KYC as a gap
-                let depth = (node.hierarchy_depth as u8).min(255);
+                let depth = node.hierarchy_depth as u8;
                 let has_red_flag = node.needs_attention;
                 let has_gap = node.kyc_completion.map(|c| c < 100).unwrap_or(false);
 

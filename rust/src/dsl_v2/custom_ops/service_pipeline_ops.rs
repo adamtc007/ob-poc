@@ -998,7 +998,7 @@ impl CustomOperation for ReadinessExplainOp {
 
         let blocking: Vec<_> = readiness
             .into_iter()
-            .filter(|r| service_filter.map_or(true, |sid| r.service_id == sid))
+            .filter(|r| service_filter.is_none_or(|sid| r.service_id == sid))
             .filter(|r| r.status != "ready")
             .map(|r| {
                 json!({
