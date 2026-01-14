@@ -12,7 +12,7 @@
 > **Verb Governance:** ✅ Complete - Mandatory metadata, single authoring surface, STANDARD lint enforcement
 > **Viewport Scaling:** ✅ Complete - Force simulation + LOD thresholds scale to viewport size
 > **CBU View Mode:** ✅ Complete - Single TRADING view mode as default, simplified ViewMode struct
-> **CBU Container Rendering:** ✅ Complete - Entities inside CBU box, trading nodes outside
+> **CBU Container Rendering:** ✅ Complete - Container layout with status badge, external taxonomy positioning, attachment edges, taxonomy navigation
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 > **Service Resource Pipeline:** ✅ Complete - Intent→Discovery→Attributes→Provisioning→Readiness + taxonomy viz
 
@@ -113,7 +113,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "force simulation", "viewport scaling", "LOD", "detail level", "graph density" → See Viewport Scaling section below
 - "service resource", "service intent", "resource discovery", "provisioning", "readiness" → See Service Resource Pipeline section below
 - "service taxonomy", "product service", "attribute satisfaction", "srdef" → See Service Resource Pipeline section below
-- "container", "container_parent_id", "is_container", "entities inside CBU", "trading nodes outside" → See CBU Container Rendering section below
+- "container", "container_parent_id", "is_container", "entities inside CBU", "trading nodes outside", "status badge", "attachment edge", "taxonomy navigation", "external taxonomy" → See CBU Container Rendering section below
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -1145,15 +1145,89 @@ The CBU graph uses container rendering to visually group entities inside a CBU b
 | `container_parent_id` | Entity nodes | CBU UUID | Groups entities in CBU box |
 | `container_parent_id` | Trading nodes | `null` | Renders outside the box |
 
+### Container Header with Status Badge
+
+The container header displays the CBU name and a status badge:
+
+```rust
+// Status badge colors (render.rs)
+match status.to_lowercase().as_str() {
+    "active" | "approved" => Color32::from_rgb(34, 197, 94),   // green-500
+    "pending"             => Color32::from_rgb(250, 204, 21),  // yellow-400
+    "blocked" | "rejected"=> Color32::from_rgb(239, 68, 68),   // red-500
+    "draft"               => Color32::from_rgb(148, 163, 184), // slate-400
+    _                     => Color32::from_rgb(148, 163, 184), // slate-400
+}
+```
+
+### External Taxonomy Positioning
+
+External taxonomies are positioned relative to the CBU container:
+
+```
+         ┌─────────────────────────────┐
+         │      Instrument Matrix      │  ← ABOVE container
+         │   InstrumentClass  Market   │
+         └─────────────────────────────┘
+                      │
+              attachment edge
+                      │
+    ┌─────────────────────────────────────┐
+    │           CBU Container             │
+    │   [entities with roles/edges]       │
+    └─────────────────────────────────────┘
+                      │
+              attachment edge
+                      │
+         ┌─────────────────────────────┐
+         │       Product Matrix        │  ← BELOW container
+         │    Products   Services      │
+         └─────────────────────────────┘
+```
+
+**Layout function:** `position_external_taxonomies()` in `layout.rs`
+
+### Attachment Edges
+
+Attachment edges connect the CBU container to external taxonomies with connector circles at endpoints:
+
+```rust
+// render.rs - render_attachment_edges()
+// Draws line from container bounds to taxonomy nodes
+// With filled circles at both endpoints
+```
+
+### Taxonomy Navigation (Double-Click)
+
+Double-clicking on taxonomy nodes triggers navigation:
+
+| Node Type | Action | Enum Value |
+|-----------|--------|------------|
+| TradingProfile, InstrumentMatrix, InstrumentClass, Market | Navigate to Trading Matrix view | `TaxonomyNavigationAction::TradingMatrix` |
+| Product, Service, Resource | Navigate to Service Taxonomy view | `TaxonomyNavigationAction::ServiceTaxonomy` |
+
+**Usage in UI:**
+```rust
+// In app.rs or graph panel
+if let Some(action) = graph_widget.take_taxonomy_navigation_action() {
+    match action {
+        TaxonomyNavigationAction::TradingMatrix => { /* switch to trading matrix panel */ }
+        TaxonomyNavigationAction::ServiceTaxonomy => { /* switch to service taxonomy panel */ }
+    }
+}
+```
+
 ### Key Files
 
 | File | Purpose |
 |------|---------|
 | `rust/src/graph/config_driven_builder.rs` | Sets container fields server-side |
 | `rust/src/graph/types.rs` | `LegacyGraphNode` struct with container fields |
-| `rust/crates/ob-poc-graph/src/graph/layout.rs` | Uses `container_parent_id` for grouping |
-| `rust/crates/ob-poc-graph/src/graph/render.rs` | `render_containers()` draws box |
-| `rust/crates/ob-poc-graph/src/graph/types.rs` | `GraphNodeData` / `LayoutNode` structs |
+| `rust/crates/ob-poc-graph/src/graph/layout.rs` | `position_external_taxonomies()` + container grouping |
+| `rust/crates/ob-poc-graph/src/graph/render.rs` | `render_containers()`, `render_attachment_edges()`, status badge |
+| `rust/crates/ob-poc-graph/src/graph/input.rs` | Double-click handling, `TaxonomyNavigationAction` |
+| `rust/crates/ob-poc-graph/src/graph/mod.rs` | `TaxonomyNavigationAction` enum, `take_taxonomy_navigation_action()` |
+| `rust/crates/ob-poc-graph/src/graph/types.rs` | `GraphNodeData` / `LayoutNode` with `status` field |
 | `rust/crates/ob-poc-types/src/lib.rs` | Shared `GraphNode` type |
 
 ---
