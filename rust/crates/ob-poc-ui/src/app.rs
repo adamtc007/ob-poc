@@ -6,6 +6,7 @@
 //! 3. Handling widget responses (no callbacks, return values only)
 
 use crate::api;
+use crate::command::AgentPromptConduit;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
