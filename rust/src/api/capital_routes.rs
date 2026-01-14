@@ -48,9 +48,60 @@ pub struct ReconciliationQuery {
     pub limit: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct EconomicExposureQuery {
+    /// ISO date (YYYY-MM-DD), defaults to today
+    pub as_of: Option<String>,
+    /// Maximum traversal depth (default 6)
+    pub max_depth: Option<i32>,
+    /// Stop when cumulative ownership drops below this (default 0.01%)
+    pub min_pct: Option<f64>,
+    /// Limit result set size (default 200)
+    pub max_rows: Option<i32>,
+    /// Stop at holders without BO data available
+    #[serde(default = "default_true")]
+    pub stop_on_no_bo_data: bool,
+    /// Stop at holders with NONE lookthrough policy
+    #[serde(default = "default_true")]
+    pub stop_on_policy_none: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 // =============================================================================
 // RESPONSE TYPES
 // =============================================================================
+
+#[derive(Debug, Serialize)]
+pub struct EconomicExposureResponse {
+    pub root_entity_id: Uuid,
+    pub root_name: String,
+    pub as_of_date: String,
+    pub exposures: Vec<ExposureNode>,
+    pub parameters: ExposureParameters,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExposureNode {
+    pub leaf_entity_id: Uuid,
+    pub leaf_name: String,
+    pub cumulative_pct: f64,
+    pub depth: i32,
+    pub path_entities: Vec<Uuid>,
+    pub path_names: Vec<String>,
+    pub stopped_reason: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ExposureParameters {
+    pub max_depth: i32,
+    pub min_pct: f64,
+    pub max_rows: i32,
+    pub stop_on_no_bo_data: bool,
+    pub stop_on_policy_none: bool,
+}
 
 #[derive(Debug, Serialize)]
 pub struct CapTableResponse {
@@ -744,6 +795,99 @@ async fn get_ownership_graph(
         as_of_date: as_of.to_string(),
         nodes,
         edges,
+    }))
+}
+
+/// GET /api/capital/:entity_id/economic-exposure
+///
+/// Returns bounded look-through economic exposure from an entity.
+/// Uses recursive computation with configurable depth, min percentage,
+/// and role-profile-aware stop conditions.
+async fn get_economic_exposure(
+    State(pool): State<PgPool>,
+    Path(entity_id): Path<Uuid>,
+    Query(query): Query<EconomicExposureQuery>,
+) -> Result<Json<EconomicExposureResponse>, (StatusCode, String)> {
+    let as_of = parse_as_of_date(query.as_of.as_deref())?;
+    let max_depth = query.max_depth.unwrap_or(6);
+    let min_pct = query.min_pct.unwrap_or(0.0001);
+    let max_rows = query.max_rows.unwrap_or(200);
+
+    // Get root entity name
+    let root_entity = sqlx::query!(
+        r#"SELECT entity_id, name FROM "ob-poc".entities WHERE entity_id = $1"#,
+        entity_id
+    )
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .ok_or_else(|| {
+        (
+            StatusCode::NOT_FOUND,
+            format!("Entity not found: {}", entity_id),
+        )
+    })?;
+
+    // Call the economic exposure SQL function
+    let rows = sqlx::query(
+        r#"
+        SELECT
+            root_entity_id,
+            leaf_entity_id,
+            leaf_name,
+            cumulative_pct,
+            depth,
+            path_entities,
+            path_names,
+            stopped_reason
+        FROM kyc.fn_compute_economic_exposure($1, $2, $3, $4, $5, $6, $7)
+        "#,
+    )
+    .bind(entity_id)
+    .bind(as_of)
+    .bind(max_depth)
+    .bind(Decimal::try_from(min_pct).unwrap_or_default())
+    .bind(max_rows)
+    .bind(query.stop_on_no_bo_data)
+    .bind(query.stop_on_policy_none)
+    .fetch_all(&pool)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let exposures: Vec<ExposureNode> = rows
+        .iter()
+        .map(|row| {
+            let cumulative_pct_bd: sqlx::types::BigDecimal =
+                row.try_get("cumulative_pct").unwrap_or_default();
+            let cumulative_pct_decimal = bigdecimal_to_decimal(cumulative_pct_bd);
+
+            ExposureNode {
+                leaf_entity_id: row.try_get("leaf_entity_id").unwrap_or(Uuid::nil()),
+                leaf_name: row.try_get("leaf_name").unwrap_or_default(),
+                cumulative_pct: cumulative_pct_decimal
+                    .to_string()
+                    .parse::<f64>()
+                    .unwrap_or(0.0),
+                depth: row.try_get("depth").unwrap_or(0),
+                path_entities: row.try_get("path_entities").unwrap_or_default(),
+                path_names: row.try_get("path_names").unwrap_or_default(),
+                stopped_reason: row.try_get("stopped_reason").unwrap_or_default(),
+            }
+        })
+        .collect();
+
+    Ok(Json(EconomicExposureResponse {
+        root_entity_id: entity_id,
+        root_name: root_entity.name,
+        as_of_date: as_of.to_string(),
+        exposures,
+        parameters: ExposureParameters {
+            max_depth,
+            min_pct,
+            max_rows,
+            stop_on_no_bo_data: query.stop_on_no_bo_data,
+            stop_on_policy_none: query.stop_on_policy_none,
+        },
     }))
 }
 
@@ -1658,5 +1802,10 @@ pub fn create_capital_router(pool: PgPool) -> Router {
         )
         // Graph data (for viewport)
         .route("/api/capital/:issuer_id/graph", get(get_ownership_graph))
+        // Economic exposure look-through
+        .route(
+            "/api/capital/:entity_id/economic-exposure",
+            get(get_economic_exposure),
+        )
         .with_state(pool)
 }

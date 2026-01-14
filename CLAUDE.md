@@ -1,10 +1,11 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-14
-> **Verb count:** 795 verbs across 103 YAML files
-> **Custom ops:** 49 plugin handlers
+> **Verb count:** 800+ verbs across 103 YAML files
+> **Custom ops:** 51 plugin handlers
 > **Crates:** 13 fine-grained crates
-> **Migrations:** 23 schema migrations (latest: 023_sessions_persistence.sql)
+> **Migrations:** 31 schema migrations (latest: 031_economic_lookthrough.sql)
+> **Investor Register:** ✅ Complete - Role profiles, fund vehicles, economic look-through
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
 > **CBU Session v2:** ✅ Complete - In-memory sessions, 9 MCP tools, REST API, undo/redo, persistence
@@ -85,8 +86,13 @@ This file provides guidance to Claude Code when working with this repository.
 - "egui", "viewport", "immediate mode", "graph widget" → `docs/strategy-patterns.md` §3
 - "entity model", "CBU", "UBO", "holdings" → `docs/strategy-patterns.md` §1
 - "agent", "MCP", "research macro" → `docs/research-agent-annex.md`, `ai-thoughts/020-*`
-- "investor register", "cap table", "shareholder", "control holder" → `ai-thoughts/018-*`
-- "institutional holder", "UBO chain", "look-through" → `ai-thoughts/018-*`, `ai-thoughts/019-*`
+- "investor register", "cap table", "shareholder", "control holder" → `ai-thoughts/018-*`, See Investor Register section
+- "institutional holder", "UBO chain", "look-through" → `ai-thoughts/018-*`, `ai-thoughts/019-*`, See Investor Register section
+- "nominee", "custodian", "fund of funds", "FoF", "master-feeder" → See Investor Register section
+- "investor role", "holder classification", "UBO eligibility" → See Investor Register section
+- "economic exposure", "diluted ownership", "indirect ownership" → See Investor Register section
+- "fund vehicle", "SICAV", "RAIF", "SCSp", "FCP", "umbrella", "compartment" → See Investor Register section
+- "look-through policy", "end investor", "beneficial owner" → See Investor Register section
 - "GROUP", "ownership graph", "coverage", "gaps" → `ai-thoughts/019-*`
 - "research", "GLEIF", "Companies House", "external source" → `docs/research-agent-annex.md`, `ai-thoughts/021-*`
 - "checkpoint", "confidence", "disambiguation" → `docs/research-agent-annex.md`
@@ -696,6 +702,208 @@ Configured per issuer in `kyc.issuer_control_config`:
 | `control_threshold_pct` | 50% | ⚡ + control edge |
 
 **Any holder with board/veto rights appears as individual node regardless of percentage.**
+
+---
+
+## Investor Register & Economic Look-Through Pipeline
+
+> **Status:** ✅ Complete
+> **Migrations:** 029-031 (role profiles, fund vehicles, economic look-through)
+> **Verbs:** 35+ across 4 domains (investor-role, fund-vehicle, fund-compartment, economic-exposure)
+> **Tests:** 7 integration tests in `rust/tests/investor_register_tests.rs`
+
+### The Problem: Control vs Economic Ownership
+
+Financial KYC/AML requires tracking two fundamentally different ownership concepts:
+
+| Concept | Question | Scale | Use Case |
+|---------|----------|-------|----------|
+| **Control/Voting** | "Who controls decisions?" | 5-50 holders | Board composition, blocking rights, regulatory filings (13D/13G, TR-1) |
+| **Economic** | "Who receives distributions?" | 100,000+ holders | AML exposure analysis, tax reporting, investor communications |
+
+**The mismatch problem:**
+- Control holders are few, named, and need individual graph nodes
+- Economic holders are many, often anonymous, and need aggregation
+- Traditional systems either show 50,000 nodes (unusable) or collapse everything (loses control insight)
+- Institutional holders (pension funds, FoFs) aren't "proper persons" - they have their own UBO chains
+
+**Domain jargon this solves:**
+- *Nominee holding* - Custodian holds on behalf of beneficial owners, not UBO-eligible
+- *Omnibus account* - Single account aggregating multiple underlying investors
+- *Fund-of-funds (FoF)* - Intermediary fund that invests in other funds, requires look-through
+- *Master-feeder structure* - Pooling vehicle where feeders invest in master, master holds assets
+- *Intra-group treasury* - Group company moving cash between subsidiaries, not "real" external investor
+- *Look-through* - Tracing through intermediaries to find ultimate beneficial owners
+- *TA holding* - Transfer Agent record, administrative not beneficial
+- *End investor* - Terminal holder who actually receives economic benefit
+
+### Architecture: Temporal Role Profiles + Bounded Look-Through
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Investor Register Architecture                            │
+│                                                                              │
+│  ┌───────────────────┐     ┌───────────────────┐     ┌──────────────────┐   │
+│  │  Role Profiles    │     │  Fund Vehicles    │     │ Economic Edges   │   │
+│  │  (kyc.investor_   │     │  (kyc.fund_       │     │ (v_economic_     │   │
+│  │   role_profiles)  │     │   vehicles)       │     │  edges_direct)   │   │
+│  │                   │     │                   │     │                  │   │
+│  │  • Issuer-scoped  │     │  • SCSP, SICAV,   │     │  • pct_of_to     │   │
+│  │  • Temporal       │     │    FCP, LP, etc   │     │  • usage_type    │   │
+│  │  • UBO eligibility│     │  • Umbrella/      │     │  • Filtered by   │   │
+│  │  • Look-through   │     │    compartments   │     │    role profile  │   │
+│  │    policy         │     │  • Manager link   │     │                  │   │
+│  └───────────────────┘     └───────────────────┘     └──────────────────┘   │
+│           │                         │                         │              │
+│           └─────────────────────────┼─────────────────────────┘              │
+│                                     ▼                                        │
+│                    ┌────────────────────────────────┐                        │
+│                    │  fn_compute_economic_exposure  │                        │
+│                    │  (Bounded recursive CTE)       │                        │
+│                    │                                │                        │
+│                    │  Stop conditions:              │                        │
+│                    │  1. CYCLE_DETECTED             │                        │
+│                    │  2. MAX_DEPTH (default 6)      │                        │
+│                    │  3. BELOW_MIN_PCT (0.01%)      │                        │
+│                    │  4. END_INVESTOR role          │                        │
+│                    │  5. POLICY_NONE                │                        │
+│                    │  6. NO_BO_DATA available       │                        │
+│                    └────────────────────────────────┘                        │
+│                                     │                                        │
+│                                     ▼                                        │
+│                    ┌────────────────────────────────┐                        │
+│                    │     Dual-Mode Visualization    │                        │
+│                    │                                │                        │
+│                    │  Control: Individual nodes     │                        │
+│                    │  Economic: Aggregated table    │                        │
+│                    └────────────────────────────────┘                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Role Types and Look-Through Policies
+
+**Role Types (`investor_role_profiles.role_type`):**
+
+| Role | UBO Eligible | Look-Through | Description |
+|------|--------------|--------------|-------------|
+| `END_INVESTOR` | ✅ Yes | None | Terminal beneficial owner, proper person |
+| `NOMINEE` | ❌ No | None | Custodial/nominee holding, not real owner |
+| `OMNIBUS` | ❌ No | On-demand | Aggregated account, multiple underlying |
+| `INTERMEDIARY_FOF` | ❌ No | On-demand | Fund-of-funds, invests in other funds |
+| `MASTER_POOL` | ❌ No | Auto-if-data | Master fund in master-feeder |
+| `INTRA_GROUP_POOL` | ❌ No | Auto-if-data | Group treasury/intercompany |
+| `TREASURY` | ❌ No | None | Corporate treasury function |
+| `CUSTODIAN` | ❌ No | None | Custodian bank holding |
+| `OTHER` | Configurable | Configurable | Custom classification |
+
+**Look-Through Policies (`lookthrough_policy`):**
+
+| Policy | Behavior | Use Case |
+|--------|----------|----------|
+| `NONE` | Stop here, don't traverse | End investors, nominees |
+| `ON_DEMAND` | Only traverse when explicitly requested | FoFs where BO data may exist |
+| `AUTO_IF_DATA` | Traverse if `beneficial_owner_data_available=true` | Master pools with known feeders |
+| `ALWAYS` | Always traverse regardless of data availability | Regulatory requirement |
+
+### Temporal Versioning
+
+Role profiles support point-in-time queries for mid-year reclassifications:
+
+```sql
+-- Same holder, different roles over time
+INSERT INTO kyc.investor_role_profiles 
+  (issuer_entity_id, holder_entity_id, role_type, effective_from)
+VALUES
+  ('fund-a', 'blackrock', 'END_INVESTOR', '2024-01-01'),  -- Started as end investor
+  ('fund-a', 'blackrock', 'INTERMEDIARY_FOF', '2024-07-01'); -- Reclassified mid-year
+
+-- Query as of March 2024 → END_INVESTOR
+-- Query as of September 2024 → INTERMEDIARY_FOF
+```
+
+### Fund Vehicle Taxonomy
+
+Luxembourg and international fund structures:
+
+| Vehicle Type | Jurisdiction | Structure | Compartments |
+|--------------|--------------|-----------|--------------|
+| `SCSP` | Luxembourg | Société en Commandite Spéciale | No |
+| `SICAV_RAIF` | Luxembourg | Reserved AIF (RAIF) | Yes |
+| `SICAV_SIF` | Luxembourg | Specialized Investment Fund | Yes |
+| `SICAV_UCITS` | Luxembourg | UCITS umbrella | Yes |
+| `FCP` | Luxembourg | Fonds Commun de Placement | No |
+| `LP` | Multiple | Limited Partnership | No |
+| `LLC` | US | Limited Liability Company | No |
+| `TRUST` | Multiple | Trust structure | No |
+| `OEIC` | UK | Open-Ended Investment Company | Yes |
+| `ETF` | Multiple | Exchange-Traded Fund | No |
+| `REIT` | Multiple | Real Estate Investment Trust | No |
+
+### Key DSL Verbs
+
+**Investor Role Management:**
+```
+investor-role.set issuer="Allianz Fund I" holder="BlackRock" 
+  role-type=INTERMEDIARY_FOF lookthrough-policy=ON_DEMAND
+
+investor-role.mark-as-nominee issuer="Fund A" holder="State Street"
+
+investor-role.read-as-of issuer="Fund A" holder="Investor X" as-of-date=2024-06-15
+```
+
+**Fund Vehicle Management:**
+```
+fund-vehicle.upsert fund-entity-id="Allianz SICAV" vehicle-type=SICAV_RAIF 
+  is-umbrella=true domicile-country=LU
+
+fund-compartment.upsert umbrella-fund-entity-id="Allianz SICAV" 
+  compartment-code="EQUITY" compartment-name="Global Equity Fund"
+
+share-class.link-to-compartment share-class-id=$class compartment-id=$compartment
+```
+
+**Economic Exposure Analysis:**
+```
+economic-exposure.compute root-entity-id="Fund A" max-depth=6 min-pct=0.01
+
+economic-exposure.summary issuer-entity-id="Fund A" threshold-pct=5.0
+
+issuer-control-config.upsert issuer-entity-id="Fund A" 
+  disclosure-threshold-pct=5.0 control-threshold-pct=50.0
+```
+
+### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/capital/:entity_id/economic-exposure` | Compute look-through exposure |
+| `GET` | `/api/capital/:entity_id/investor-register` | Get investor register with role profiles |
+| `POST` | `/api/capital/:entity_id/role-profile` | Set holder role profile |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/029_investor_role_profiles.sql` | Role profiles table + upsert function |
+| `migrations/030_fund_vehicles.sql` | Fund vehicles + compartments + views |
+| `migrations/031_economic_lookthrough.sql` | Look-through functions + control config |
+| `rust/config/verbs/registry/investor-role.yaml` | Role profile DSL verbs |
+| `rust/config/verbs/registry/fund-vehicle.yaml` | Fund vehicle DSL verbs |
+| `rust/config/verbs/registry/economic-exposure.yaml` | Look-through DSL verbs |
+| `rust/src/api/capital_routes.rs` | REST API endpoints |
+| `rust/tests/investor_register_tests.rs` | Integration tests |
+
+### Integration with UBO Computation
+
+The UBO sync trigger (`trg_sync_ubo_on_holding_change`) respects role profiles:
+
+```sql
+-- Holdings with usage_type='TA' → no UBO edge (transfer agent record)
+-- Holdings where holder has is_ubo_eligible=false → no UBO edge
+-- Holdings where holder role_type='NOMINEE' → no UBO edge
+```
+
+This prevents nominees, custodians, and administrative holdings from polluting the UBO graph while preserving them in the economic exposure view.
 
 ---
 

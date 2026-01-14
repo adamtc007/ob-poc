@@ -1,34 +1,96 @@
 domains:
   investor-role:
     description: |
-      Investor role profile management for UBO eligibility and look-through policy.
-      Controls how holders are treated for UBO determination and economic exposure computation.
+      Investor role profile management for beneficial ownership eligibility and economic look-through policy.
 
-      Issuer-scoped: same holder can have different roles for different issuers.
-      Temporal: supports point-in-time queries for mid-year reclassifications.
+      PURPOSE: Controls how shareholders/unitholders are classified for UBO (Ultimate Beneficial Owner)
+      determination and economic exposure computation. Critical for distinguishing between "real" investors
+      who receive economic benefit vs intermediaries/nominees who hold on behalf of others.
 
-      Role types:
-      - END_INVESTOR: Ultimate beneficial owner candidate
-      - NOMINEE: Holding on behalf of others
-      - OMNIBUS: Omnibus account (multiple underlying)
-      - INTERMEDIARY_FOF: Fund-of-funds intermediary
-      - MASTER_POOL: Master pooling vehicle
-      - INTRA_GROUP_POOL: Intra-group pooling (same corporate group)
+      KEY CONCEPTS:
+      - Issuer-scoped: The same holder entity (e.g., BlackRock) can have different roles for different
+        issuers/funds. BlackRock might be an END_INVESTOR in Fund A but an INTERMEDIARY_FOF in Fund B.
+      - Temporal versioning: Supports point-in-time queries. If an investor is reclassified mid-year
+        (e.g., from END_INVESTOR to FoF after restructuring), historical queries return the correct role.
+      - UBO eligibility: Determines whether holdings create UBO edges in the ownership graph.
+      - Look-through policy: Controls whether economic exposure computation traverses through this holder.
+
+      DOMAIN JARGON:
+      - Nominee holding: Custodian/nominee holds shares on behalf of beneficial owners (e.g., State Street
+        holding for pension fund clients). Not UBO-eligible - the underlying clients are the real owners.
+      - Omnibus account: Single account aggregating multiple underlying investors. Common in fund admin.
+      - Fund-of-funds (FoF): Intermediary fund that invests in target funds. Requires look-through to
+        find ultimate LPs/investors.
+      - Master-feeder: Pooling structure where feeder funds invest in master. Master holds assets,
+        feeders are economic pass-through.
+      - Intra-group treasury: Corporate group moving cash between subsidiaries. Not "real" external investor.
+      - TA holding: Transfer Agent administrative record. Not beneficial ownership.
+      - End investor: Terminal holder who actually receives economic benefit. The "proper person" in KYC terms.
+
+      ROLE TYPES:
+      - END_INVESTOR: Ultimate beneficial owner candidate, proper person (individual or terminal entity)
+      - NOMINEE: Holding on behalf of others (custodian, nominee company, etc.)
+      - OMNIBUS: Omnibus account aggregating multiple underlying investors
+      - INTERMEDIARY_FOF: Fund-of-funds intermediary investing in other funds
+      - MASTER_POOL: Master pooling vehicle in master-feeder structure
+      - INTRA_GROUP_POOL: Intra-group pooling (same corporate group, treasury operations)
       - TREASURY: Group treasury function
-      - CUSTODIAN: Custodial holding
-      - OTHER: Other role type
+      - CUSTODIAN: Custodial holding (bank custody, safekeeping)
+      - OTHER: Other role type requiring manual classification
+
+    invocation_hints:
+      - "investor role"
+      - "holder classification"
+      - "shareholder type"
+      - "UBO eligibility"
+      - "look-through"
+      - "nominee"
+      - "beneficial owner"
+      - "end investor"
+      - "fund of funds"
 
     verbs:
       # ============================================
       # Core operations
       # ============================================
       set:
-        description: Set or update holder role profile (creates new temporal version)
+        description: |
+          Set or update the investor role profile for a holder-issuer relationship.
+          Creates a new temporal version if effective_from differs from existing record.
+
+          Use this to classify how a shareholder/unitholder should be treated for UBO
+          determination and economic look-through. The classification affects:
+          1. Whether holdings create UBO edges (is_ubo_eligible)
+          2. Whether economic exposure computation traverses through this holder (lookthrough_policy)
+          3. How the holder appears in investor register visualization
+
+          EXAMPLES:
+          - Classify BlackRock as a fund-of-funds for Fund A
+          - Mark State Street as a nominee/custodian
+          - Set a pension fund as an end investor (terminal UBO)
+          - Configure look-through policy for institutional holders
+
+          TEMPORAL BEHAVIOR: If a profile already exists for this issuer-holder pair,
+          and you provide a different effective_from date, the old record gets closed
+          (effective_to set) and a new version is created. This preserves history.
         metadata:
           tier: intent
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "set investor role"
+          - "classify holder"
+          - "set holder type"
+          - "configure investor classification"
+          - "set shareholder role"
+          - "classify shareholder"
+          - "set unitholder type"
+          - "configure look-through policy"
+          - "set UBO eligibility"
+          - "mark as nominee"
+          - "mark as FoF"
+          - "mark as end investor"
         behavior: plugin
         plugin_handler: investor_role_set
         args:
@@ -42,7 +104,7 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-            description: "Issuer entity (fund/vehicle)"
+            description: "Issuer entity - the fund, vehicle, or company whose shares/units are held. This is the entity from whose perspective we're classifying the holder."
           - name: holder
             type: uuid
             required: true
@@ -53,12 +115,22 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-            description: "Holder entity (investor)"
+            description: "Holder entity - the investor, shareholder, unitholder, or intermediary being classified. This is the entity whose role we're defining."
           - name: role-type
             type: string
             required: true
             maps_to: role_type
-            description: "Holder role classification"
+            description: |
+              Holder role classification determining UBO treatment:
+              - END_INVESTOR: Terminal beneficial owner (proper person)
+              - NOMINEE: Custodian/nominee holding for others
+              - OMNIBUS: Aggregated account with multiple underlying
+              - INTERMEDIARY_FOF: Fund-of-funds requiring look-through
+              - MASTER_POOL: Master fund in master-feeder structure
+              - INTRA_GROUP_POOL: Intra-group treasury/pooling
+              - TREASURY: Corporate treasury function
+              - CUSTODIAN: Bank custody/safekeeping
+              - OTHER: Manual classification
             validation:
               enum:
                 - END_INVESTOR
@@ -75,7 +147,12 @@ domains:
             required: false
             maps_to: lookthrough_policy
             default: NONE
-            description: "Look-through policy for economic exposure"
+            description: |
+              Look-through policy for economic exposure computation:
+              - NONE: Stop here, don't traverse through this holder
+              - ON_DEMAND: Only traverse when explicitly requested
+              - AUTO_IF_DATA: Traverse if beneficial_owner_data_available=true
+              - ALWAYS: Always traverse regardless of data availability
             validation:
               enum:
                 - NONE
@@ -87,7 +164,12 @@ domains:
             required: false
             maps_to: holder_affiliation
             default: UNKNOWN
-            description: "Holder relationship to issuer group"
+            description: |
+              Holder relationship to issuer's corporate group:
+              - INTRA_GROUP: Same corporate group (subsidiary, treasury)
+              - EXTERNAL: Third-party investor
+              - MIXED: Partially related (JV, associate)
+              - UNKNOWN: Affiliation not determined
             validation:
               enum:
                 - INTRA_GROUP
@@ -99,13 +181,13 @@ domains:
             required: false
             maps_to: beneficial_owner_data_available
             default: false
-            description: "Whether beneficial owner data is available for look-through"
+            description: "Whether beneficial owner data is available for this holder. If true and lookthrough_policy is AUTO_IF_DATA, economic exposure will traverse through."
           - name: is-ubo-eligible
             type: boolean
             required: false
             maps_to: is_ubo_eligible
             default: true
-            description: "If false, never create UBO edges for this holder"
+            description: "If false, holdings from this holder will NEVER create UBO edges regardless of ownership percentage. Use for nominees, custodians, TA records."
           - name: share-class
             type: uuid
             required: false
@@ -116,7 +198,7 @@ domains:
               schema: kyc
               search_key: name
               primary_key: id
-            description: "Optional share class scope (NULL = applies to all)"
+            description: "Optional share class scope. If set, this role profile only applies to holdings in this specific share class. NULL means applies to all share classes."
           - name: group-container
             type: uuid
             required: false
@@ -127,40 +209,52 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-            description: "Optional group container entity for intra-group holders"
+            description: "Optional group container entity for intra-group holders. Links to parent group for treasury/intercompany classifications."
           - name: group-label
             type: string
             required: false
             maps_to: group_label
-            description: "Optional label for group affiliation"
+            description: "Optional label for group affiliation (e.g., 'Allianz Group Treasury', 'BlackRock Funds')"
           - name: effective-from
             type: date
             required: false
             maps_to: effective_from
-            description: "Effective date (defaults to today)"
+            description: "Effective date for this classification. Defaults to today. Use for backdated classifications or future-dated changes."
           - name: source
             type: string
             required: false
             maps_to: source
             default: MANUAL
-            description: "Data source"
+            description: "Data source for this classification (MANUAL, GLEIF, COMPANIES_HOUSE, SEC_EDGAR, etc.)"
           - name: notes
             type: string
             required: false
             maps_to: notes
-            description: "Free-text notes"
+            description: "Free-text notes explaining the classification rationale"
         returns:
           type: uuid
           name: id
           capture: true
 
       read:
-        description: Read current role profile for holder-issuer relationship
+        description: |
+          Read the current (active) role profile for a holder-issuer relationship.
+          Returns the profile where effective_to IS NULL (current version).
+
+          Use this to check how a holder is currently classified for a specific issuer.
+          For historical/point-in-time queries, use read-as-of instead.
         metadata:
           tier: diagnostics
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "get investor role"
+          - "check holder classification"
+          - "what type of investor"
+          - "how is holder classified"
+          - "get shareholder role"
+          - "check UBO eligibility"
         behavior: crud
         crud:
           operation: select
@@ -192,12 +286,28 @@ domains:
           type: record
 
       read-as-of:
-        description: Read role profile as of a specific date (point-in-time query)
+        description: |
+          Read the role profile as of a specific historical date (point-in-time query).
+
+          Use this when you need to know how a holder was classified at a specific point
+          in time, e.g., for historical UBO reports, audit trails, or regulatory filings
+          that require as-of-date accuracy.
+
+          EXAMPLE: If BlackRock was reclassified from END_INVESTOR to INTERMEDIARY_FOF
+          on July 1, 2024:
+          - read-as-of with date=2024-03-15 returns END_INVESTOR
+          - read-as-of with date=2024-09-15 returns INTERMEDIARY_FOF
         metadata:
           tier: diagnostics
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "historical investor role"
+          - "investor role as of date"
+          - "holder classification at date"
+          - "point in time role"
+          - "what was holder type on date"
         behavior: plugin
         plugin_handler: investor_role_read_as_of
         args:
@@ -224,17 +334,32 @@ domains:
           - name: as-of-date
             type: date
             required: true
-            description: "Point-in-time date for query"
+            description: "Point-in-time date for the query. Returns the role profile that was effective on this date."
         returns:
           type: record
 
       list-by-issuer:
-        description: List all current role profiles for an issuer
+        description: |
+          List all current role profiles for an issuer (fund/vehicle).
+
+          Use this to see how all shareholders/unitholders of a fund are classified.
+          Helpful for reviewing investor register classifications, identifying
+          nominees vs end investors, or auditing UBO eligibility settings.
+
+          Can filter by role_type or is_ubo_eligible to find specific classifications.
         metadata:
           tier: diagnostics
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "list investor roles for fund"
+          - "show holder classifications"
+          - "all shareholders roles"
+          - "investor register classifications"
+          - "who are the nominees"
+          - "list end investors"
+          - "show FoF intermediaries"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -256,7 +381,7 @@ domains:
             type: string
             required: false
             maps_to: role_type
-            description: "Filter by role type"
+            description: "Filter by role type (END_INVESTOR, NOMINEE, etc.)"
           - name: is-ubo-eligible
             type: boolean
             required: false
@@ -266,12 +391,23 @@ domains:
           type: record_set
 
       list-by-holder:
-        description: List all current role profiles for a holder across issuers
+        description: |
+          List all current role profiles for a holder across all issuers.
+
+          Use this to see how a specific investor (e.g., BlackRock) is classified
+          across different funds. The same holder may have different roles for
+          different issuers - this shows the complete picture.
         metadata:
           tier: diagnostics
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "list roles for investor"
+          - "how is holder classified everywhere"
+          - "all funds where investor"
+          - "BlackRock classifications"
+          - "investor role across funds"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -293,12 +429,25 @@ domains:
           type: record_set
 
       history:
-        description: Get all historical versions of a role profile
+        description: |
+          Get all historical versions of a role profile for a holder-issuer relationship.
+
+          Shows the complete audit trail of classification changes over time.
+          Ordered by effective_from descending (most recent first).
+
+          Use for regulatory audit trails, investigating classification changes,
+          or understanding how holder treatment evolved over time.
         metadata:
           tier: diagnostics
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "role profile history"
+          - "classification changes"
+          - "audit trail for investor"
+          - "how has classification changed"
+          - "historical role versions"
         behavior: crud
         crud:
           operation: list_by_fk
@@ -333,12 +482,32 @@ domains:
       # Convenience verbs for common patterns
       # ============================================
       mark-as-nominee:
-        description: Mark holder as nominee (not UBO eligible, no look-through)
+        description: |
+          Mark a holder as a nominee (custodian, nominee company, etc.).
+
+          EFFECT: Sets role_type=NOMINEE, is_ubo_eligible=false, lookthrough_policy=NONE
+
+          Use when:
+          - Holder is a custodian bank holding on behalf of clients (State Street, BNY Mellon)
+          - Holder is a nominee company (e.g., "XYZ Nominees Ltd")
+          - Holder is a depositary/trustee holding assets for beneficial owners
+          - You want to exclude this holder from UBO graph entirely
+
+          This is the most common classification for custodial holdings. The beneficial
+          owners behind the nominee should be identified separately.
         metadata:
           tier: intent
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "mark as nominee"
+          - "classify as nominee"
+          - "set as custodian"
+          - "this is a nominee holding"
+          - "exclude from UBO"
+          - "custodial holding"
+          - "nominee company"
         behavior: plugin
         plugin_handler: investor_role_set
         args:
@@ -376,12 +545,31 @@ domains:
           capture: true
 
       mark-as-fof:
-        description: Mark holder as fund-of-funds intermediary
+        description: |
+          Mark a holder as a fund-of-funds intermediary.
+
+          EFFECT: Sets role_type=INTERMEDIARY_FOF, is_ubo_eligible=false, lookthrough_policy=ON_DEMAND
+
+          Use when:
+          - Holder is itself a fund that invests in other funds
+          - You need to look through to find the ultimate LPs/investors
+          - Examples: feeder funds, fund-of-funds, multi-manager platforms
+
+          FoFs are not end investors - they're intermediaries. Economic exposure
+          computation can traverse through them to find underlying investors
+          when look-through is requested and BO data is available.
         metadata:
           tier: intent
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "mark as fund of funds"
+          - "mark as FoF"
+          - "classify as feeder fund"
+          - "this is a FoF"
+          - "intermediary fund"
+          - "set look-through"
         behavior: plugin
         plugin_handler: investor_role_set
         args:
@@ -424,12 +612,29 @@ domains:
           capture: true
 
       mark-as-master-pool:
-        description: Mark holder as master pooling vehicle
+        description: |
+          Mark a holder as a master pooling vehicle (master fund in master-feeder structure).
+
+          EFFECT: Sets role_type=MASTER_POOL, is_ubo_eligible=false, lookthrough_policy=AUTO_IF_DATA
+
+          Use when:
+          - Holder is the master fund in a master-feeder structure
+          - Feeder funds invest in the master, master holds the actual assets
+          - Economic look-through should auto-traverse if feeder data is available
+
+          Master-feeder structures are common for institutional funds. The master
+          is not an end investor - it's a pooling mechanism.
         metadata:
           tier: intent
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "mark as master fund"
+          - "mark as master pool"
+          - "master-feeder structure"
+          - "this is a master vehicle"
+          - "pooling vehicle"
         behavior: plugin
         plugin_handler: investor_role_set
         args:
@@ -478,12 +683,32 @@ domains:
           capture: true
 
       mark-as-end-investor:
-        description: Mark holder as end investor (UBO eligible)
+        description: |
+          Mark a holder as an end investor (terminal beneficial owner).
+
+          EFFECT: Sets role_type=END_INVESTOR, is_ubo_eligible=true, lookthrough_policy=NONE
+
+          Use when:
+          - Holder is the ultimate beneficial owner receiving economic benefit
+          - Holder is a "proper person" in KYC terms (individual or terminal entity)
+          - No further look-through is needed
+          - Examples: pension funds investing directly, HNW individuals, sovereign wealth funds
+
+          End investors ARE UBO-eligible and WILL create UBO edges when their
+          holdings exceed disclosure thresholds.
         metadata:
           tier: intent
           source_of_truth: register
           scope: cbu
           noun: investor_role_profile
+        invocation_phrases:
+          - "mark as end investor"
+          - "terminal investor"
+          - "beneficial owner"
+          - "proper person"
+          - "real investor"
+          - "this is the actual owner"
+          - "no look-through needed"
         behavior: plugin
         plugin_handler: investor_role_set
         args:

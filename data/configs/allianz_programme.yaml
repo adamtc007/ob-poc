@@ -1,0 +1,61 @@
+# Allianz Global Investors Fund Programme Configuration
+#
+# This config file maps CSV columns to database fields for bulk import
+# of Allianz fund structures.
+#
+# Usage:
+#   cargo xtask load-fund-programme -c data/configs/allianz_programme.yaml -i data/funds.csv
+
+programme_name: "Allianz Global Investors"
+
+defaults:
+  holder_affiliation: INTRA_GROUP
+  bo_data_available: false
+  domicile_country: LU
+  role_type: INTERMEDIARY_FOF
+  lookthrough_policy: AUTO_IF_DATA
+
+column_mapping:
+  # Required fields
+  entity_name: "Fund Name"
+
+  # LEI-based identification
+  lei: "LEI"
+  umbrella_lei: "Umbrella LEI"
+  manager_lei: "Manager LEI"
+
+  # Vehicle structure
+  vehicle_type: "Vehicle Type"
+  is_umbrella: "Is Umbrella"
+  domicile_country: "Domicile"
+
+  # Compartment (for SICAV umbrella sub-funds)
+  compartment_code: "Compartment Code"
+  compartment_name: "Compartment Name"
+
+  # Optional investor classification
+  investor_type: "Investor Type"
+  holder_affiliation: "Affiliation"
+  bo_data_available: "BO Data Available"
+
+# Map CSV vehicle type values to database enum values
+vehicle_type_mapping:
+  "SCSp": SCSP
+  "SICAV-RAIF": SICAV_RAIF
+  "SICAV-SIF": SICAV_SIF
+  "SIF": SIF
+  "SICAV-UCITS": SICAV_UCITS
+  "FCP": FCP
+  "Limited Partnership": LP
+  "LLC": LLC
+  "Trust": TRUST
+  "OEIC": OEIC
+  "ETF": ETF
+
+# Map CSV investor type values to database enum values
+investor_type_mapping:
+  "Institutional": INSTITUTIONAL
+  "Professional": PROFESSIONAL
+  "Retail": RETAIL
+  "Nominee": NOMINEE
+  "Intra-Group": INTRA_GROUP

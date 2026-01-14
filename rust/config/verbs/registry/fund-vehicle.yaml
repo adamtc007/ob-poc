@@ -1,0 +1,778 @@
+domains:
+  fund-vehicle:
+    description: |
+      Fund vehicle taxonomy management for Luxembourg and international fund structures.
+
+      PURPOSE: Model the legal structure of investment funds without creating fake legal entities.
+      A fund's vehicle type determines its regulatory treatment, compartmentalization ability,
+      and how investors interact with it (shares, units, LP interests, etc.).
+
+      KEY CONCEPTS:
+      - Vehicle type: Legal/regulatory classification (SICAV, FCP, LP, etc.)
+      - Umbrella fund: Single legal entity containing multiple compartments/sub-funds
+      - Compartment: Legally segregated sleeve within an umbrella (separate NAV, investors)
+      - Sub-fund: Fund that is part of a larger umbrella structure
+      - ManCo: Management Company (AIFM or UCITS ManCo) managing the fund
+
+      LUXEMBOURG STRUCTURES (most common in EU institutional funds):
+      - SCSp (Société en Commandite Spéciale): Luxembourg special limited partnership.
+        Tax transparent, flexible governance, common for PE/VC. Not AIFMD compliant alone.
+      - SICAV-RAIF (Reserved AIF): Lighter regulation than SIF, quick launch, no CSSF approval.
+        Can be umbrella with compartments. Very popular since 2016.
+      - SICAV-SIF (Specialized Investment Fund): Regulated by CSSF, for qualified investors.
+        Can be umbrella. Pre-RAIF workhorse structure.
+      - SICAV-UCITS: Retail-friendly, passport across EU, strict investment rules.
+        Always umbrella capable. Most liquid fund type.
+      - FCP (Fonds Commun de Placement): Contractual fund (not corporate), managed by ManCo.
+        No legal personality - ManCo acts on behalf. Lower costs.
+
+      OTHER JURISDICTIONS:
+      - LP (Limited Partnership): US/Cayman/UK. GP/LP structure, tax transparent.
+      - LLC (Limited Liability Company): US. Corporate with pass-through tax option.
+      - TRUST: UK/Ireland/Cayman. Trust structure with trustee.
+      - OEIC (Open-Ended Investment Company): UK equivalent of SICAV.
+      - ETF (Exchange-Traded Fund): Listed, intraday trading.
+      - REIT (Real Estate Investment Trust): Tax-efficient real estate vehicle.
+      - BDC (Business Development Company): US closed-end for middle market.
+
+    invocation_hints:
+      - "fund vehicle"
+      - "fund type"
+      - "SICAV"
+      - "SCSp"
+      - "RAIF"
+      - "umbrella fund"
+      - "compartment"
+      - "sub-fund"
+      - "Luxembourg fund"
+
+    verbs:
+      # ============================================
+      # Fund Vehicle CRUD
+      # ============================================
+      upsert:
+        description: |
+          Create or update fund vehicle metadata for an entity.
+
+          Links an entity (the fund) to its vehicle type classification,
+          umbrella relationship, management company, and jurisdiction.
+
+          USE CASES:
+          - "Register Allianz SICAV as a SICAV-RAIF umbrella in Luxembourg"
+          - "Set Fund A as a sub-fund under the main SICAV"
+          - "Link fund to its management company"
+          - "Change vehicle type after restructuring"
+
+          NOTE: The entity must already exist. This verb adds fund-specific
+          metadata to an existing legal entity, not create a new entity.
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: fund_vehicle
+        invocation_phrases:
+          - "create fund vehicle"
+          - "set fund type"
+          - "register fund structure"
+          - "configure fund vehicle"
+          - "set as SICAV"
+          - "set as SCSp"
+          - "make umbrella fund"
+          - "link to umbrella"
+          - "set management company"
+          - "register Luxembourg fund"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: fund_vehicles
+          schema: kyc
+          returning: fund_entity_id
+          conflict_keys:
+            - fund_entity_id
+        args:
+          - name: fund-entity-id
+            type: uuid
+            required: true
+            maps_to: fund_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Entity representing the fund. Must already exist in entities table."
+          - name: vehicle-type
+            type: string
+            required: true
+            maps_to: vehicle_type
+            description: |
+              Fund structure/vehicle type:
+              - SCSP: Luxembourg Société en Commandite Spéciale (special LP)
+              - SICAV_RAIF: Luxembourg Reserved AIF (quick launch, qualified investors)
+              - SICAV_SIF: Luxembourg Specialized Investment Fund (CSSF regulated)
+              - SIF: Generic SIF (non-SICAV)
+              - SICAV_UCITS: Luxembourg UCITS (retail, EU passport)
+              - FCP: Luxembourg Fonds Commun de Placement (contractual)
+              - LLC: US Limited Liability Company
+              - LP: Limited Partnership (US/Cayman/UK)
+              - TRUST: Trust structure
+              - OEIC: UK Open-Ended Investment Company
+              - ETF: Exchange-Traded Fund
+              - REIT: Real Estate Investment Trust
+              - BDC: US Business Development Company
+              - OTHER: Other/custom structure
+            validation:
+              enum:
+                - SCSP
+                - SICAV_RAIF
+                - SICAV_SIF
+                - SIF
+                - SICAV_UCITS
+                - FCP
+                - LLC
+                - LP
+                - TRUST
+                - OEIC
+                - ETF
+                - REIT
+                - BDC
+                - OTHER
+          - name: umbrella-entity-id
+            type: uuid
+            required: false
+            maps_to: umbrella_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Parent umbrella fund entity, if this fund is a sub-fund. NULL for standalone funds or umbrellas themselves."
+          - name: is-umbrella
+            type: boolean
+            required: false
+            maps_to: is_umbrella
+            default: false
+            description: "True if this fund can contain compartments/sub-funds. Typical for SICAV structures."
+          - name: domicile-country
+            type: string
+            required: false
+            maps_to: domicile_country
+            description: "ISO 3166-1 alpha-2 country code (LU, IE, DE, US, KY, etc.). Determines regulatory regime."
+          - name: manager-entity-id
+            type: uuid
+            required: false
+            maps_to: manager_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Fund manager / ManCo / AIFM entity responsible for managing the fund."
+          - name: meta
+            type: json
+            required: false
+            maps_to: meta
+            description: "Additional metadata as JSON (e.g., CSSF reference, fund launch date, AuM)."
+          - name: created-by
+            type: string
+            required: false
+            maps_to: created_by
+        returns:
+          type: uuid
+          name: fund_entity_id
+          capture: true
+
+      read:
+        description: |
+          Read fund vehicle metadata by entity ID.
+
+          Returns vehicle type, umbrella relationship, manager, domicile,
+          and any custom metadata.
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: fund_vehicle
+        invocation_phrases:
+          - "get fund vehicle"
+          - "read fund type"
+          - "what type of fund"
+          - "fund structure info"
+          - "check fund vehicle"
+        behavior: crud
+        crud:
+          operation: select
+          table: fund_vehicles
+          schema: kyc
+        args:
+          - name: fund-entity-id
+            type: uuid
+            required: true
+            maps_to: fund_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+
+      delete:
+        description: |
+          Delete fund vehicle metadata from an entity.
+
+          WARNING: This removes the vehicle type classification, not the entity itself.
+          Use with caution - may break compartment relationships.
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: fund_vehicle
+          dangerous: true
+        invocation_phrases:
+          - "delete fund vehicle"
+          - "remove fund type"
+          - "unclassify fund"
+        behavior: crud
+        crud:
+          operation: delete
+          table: fund_vehicles
+          schema: kyc
+          key: fund_entity_id
+        args:
+          - name: fund-entity-id
+            type: uuid
+            required: true
+            maps_to: fund_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: affected
+
+      list-by-umbrella:
+        description: |
+          List all sub-funds under an umbrella fund.
+
+          Returns all funds that have this umbrella as their parent.
+          Useful for viewing the complete structure of a SICAV or similar umbrella.
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: fund_vehicle
+        invocation_phrases:
+          - "list sub-funds"
+          - "funds under umbrella"
+          - "compartments in SICAV"
+          - "umbrella structure"
+          - "show sub-funds"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_vehicles
+          schema: kyc
+          fk_col: umbrella_entity_id
+        args:
+          - name: umbrella-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      list-by-manager:
+        description: |
+          List all funds managed by an entity (ManCo/AIFM).
+
+          Returns all funds where manager_entity_id matches.
+          Useful for management company oversight and AuM aggregation.
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: fund_vehicle
+        invocation_phrases:
+          - "funds by manager"
+          - "funds managed by"
+          - "ManCo funds"
+          - "AIFM portfolio"
+          - "list managed funds"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_vehicles
+          schema: kyc
+          fk_col: manager_entity_id
+        args:
+          - name: manager-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      list-by-type:
+        description: |
+          List all funds of a specific vehicle type.
+
+          Returns all funds matching the vehicle_type.
+          Useful for regulatory reporting by structure type.
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: global
+          noun: fund_vehicle
+        invocation_phrases:
+          - "list all SICAVs"
+          - "find SCSp funds"
+          - "all RAIFs"
+          - "funds by type"
+          - "list ETFs"
+          - "show all LPs"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_vehicles
+          schema: kyc
+          fk_col: vehicle_type
+        args:
+          - name: vehicle-type
+            type: string
+            required: true
+            validation:
+              enum:
+                - SCSP
+                - SICAV_RAIF
+                - SICAV_SIF
+                - SIF
+                - SICAV_UCITS
+                - FCP
+                - LLC
+                - LP
+                - TRUST
+                - OEIC
+                - ETF
+                - REIT
+                - BDC
+                - OTHER
+        returns:
+          type: record_set
+
+  fund-compartment:
+    description: |
+      Compartment/sleeve management under umbrella funds.
+
+      PURPOSE: Model compartments (sub-funds/sleeves) within umbrella structures without
+      creating fake legal entities. Compartments are legally segregated pools within
+      a single umbrella but may or may not have separate legal identity.
+
+      KEY CONCEPTS:
+      - Compartment: Segregated pool of assets/liabilities within umbrella
+      - Ring-fencing: Legal separation of compartment assets from umbrella/other compartments
+      - Compartment code: Short identifier (e.g., "EQUITY", "A", "US_GROWTH")
+      - Separate NAV: Each compartment has its own Net Asset Value calculation
+
+      TYPICAL USE:
+      - SICAV with 5 compartments: "Global Equity", "US Bonds", "Emerging Markets", etc.
+      - Each compartment can have multiple share classes with different fee structures
+      - Investors buy shares in specific compartments, not the umbrella
+
+      NOTE: Some compartments have their own LEI and act like separate entities;
+      others are purely internal accounting segregation. Use compartment_entity_id
+      to link to a separate entity when applicable.
+
+    invocation_hints:
+      - "compartment"
+      - "sub-fund"
+      - "sleeve"
+      - "umbrella compartment"
+      - "fund compartment"
+
+    verbs:
+      # ============================================
+      # Fund Compartment CRUD
+      # ============================================
+      upsert:
+        description: |
+          Create or update a compartment under an umbrella fund.
+
+          Compartments represent segregated pools within an umbrella structure.
+          Each compartment can have its own investors, NAV, and share classes.
+
+          USE CASES:
+          - "Create Global Equity compartment under Allianz SICAV"
+          - "Add new sleeve to existing umbrella"
+          - "Link compartment to its dedicated entity (if separate LEI)"
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: fund_compartment
+        invocation_phrases:
+          - "create compartment"
+          - "add sub-fund"
+          - "new sleeve"
+          - "create fund compartment"
+          - "add compartment to umbrella"
+        behavior: crud
+        crud:
+          operation: upsert
+          table: fund_compartments
+          schema: kyc
+          returning: id
+          conflict_keys:
+            - umbrella_fund_entity_id
+            - compartment_code
+        args:
+          - name: umbrella-fund-entity-id
+            type: uuid
+            required: true
+            maps_to: umbrella_fund_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Parent umbrella fund that contains this compartment."
+          - name: compartment-code
+            type: string
+            required: true
+            maps_to: compartment_code
+            description: "Short identifier for the compartment (e.g., 'EQUITY', 'A', 'US_GROWTH'). Unique within umbrella."
+          - name: compartment-name
+            type: string
+            required: false
+            maps_to: compartment_name
+            description: "Human-readable name (e.g., 'Global Equity Fund', 'US Growth Strategy')."
+          - name: compartment-entity-id
+            type: uuid
+            required: false
+            maps_to: compartment_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Link to separate entity if compartment has its own legal identity/LEI. NULL if purely internal."
+          - name: meta
+            type: json
+            required: false
+            maps_to: meta
+            description: "Additional metadata (e.g., launch date, base currency, investment strategy)."
+        returns:
+          type: uuid
+          name: id
+          capture: true
+
+      read:
+        description: |
+          Read compartment details by ID.
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: fund_compartment
+        invocation_phrases:
+          - "get compartment"
+          - "read sub-fund"
+          - "compartment details"
+        behavior: crud
+        crud:
+          operation: select
+          table: fund_compartments
+          schema: kyc
+        args:
+          - name: id
+            type: uuid
+            required: true
+            maps_to: id
+        returns:
+          type: record
+
+      delete:
+        description: |
+          Delete a compartment.
+
+          WARNING: May break share class linkages. Ensure no share classes
+          are linked to this compartment before deleting.
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: fund_compartment
+          dangerous: true
+        invocation_phrases:
+          - "delete compartment"
+          - "remove sub-fund"
+          - "delete sleeve"
+        behavior: crud
+        crud:
+          operation: delete
+          table: fund_compartments
+          schema: kyc
+          key: id
+        args:
+          - name: id
+            type: uuid
+            required: true
+            maps_to: id
+        returns:
+          type: affected
+
+      list-by-umbrella:
+        description: |
+          List all compartments under an umbrella fund.
+
+          Returns all sleeves/sub-funds within the umbrella structure.
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: fund_compartment
+        invocation_phrases:
+          - "list compartments"
+          - "show sub-funds"
+          - "compartments in umbrella"
+          - "all sleeves"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: fund_compartments
+          schema: kyc
+          fk_col: umbrella_fund_entity_id
+        args:
+          - name: umbrella-fund-entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+  share-class:
+    description: |
+      Extended share class operations for instrument type and compartment linking.
+
+      PURPOSE: Add fund-specific attributes to share classes, particularly:
+      - Instrument type classification (shares, units, LP interests, etc.)
+      - Compartment linkage for umbrella funds
+
+      NOTE: Core share class CRUD (create, update, delete) is in capital.yaml.
+      These verbs extend share classes with fund-specific fields.
+
+      INSTRUMENT TYPES:
+      - UNITS: Standard fund units (FCP, unit trusts)
+      - SHARES: Corporate shares (SICAV, OEIC)
+      - LP_INTEREST: Limited partnership interest
+      - PARTNERSHIP_INTEREST: General partnership interest
+      - NOMINEE_POSITION: Nominee holding (internal tracking)
+      - TRACKING_SHARES: Performance tracking shares
+      - CARRIED_INTEREST: Carry/promote entitlement
+
+    invocation_hints:
+      - "share class"
+      - "instrument type"
+      - "link to compartment"
+
+    verbs:
+      # ============================================
+      # Instrument type operations
+      # ============================================
+      set-instrument-type:
+        description: |
+          Set the instrument type classification for a share class.
+
+          Determines what kind of instrument investors hold when they
+          invest in this share class (shares, units, LP interests, etc.).
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+        invocation_phrases:
+          - "set instrument type"
+          - "classify share class"
+          - "set as LP interest"
+          - "set as units"
+          - "set as shares"
+        behavior: crud
+        crud:
+          operation: update
+          table: share_classes
+          schema: kyc
+          key: id
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: instrument-type
+            type: string
+            required: true
+            maps_to: instrument_type
+            description: |
+              Instrument classification:
+              - UNITS: Standard fund units
+              - SHARES: Corporate shares
+              - LP_INTEREST: Limited partnership interest
+              - PARTNERSHIP_INTEREST: General partnership
+              - NOMINEE_POSITION: Nominee holding
+              - TRACKING_SHARES: Performance tracking
+              - CARRIED_INTEREST: Carry/promote
+            validation:
+              enum:
+                - UNITS
+                - SHARES
+                - LP_INTEREST
+                - PARTNERSHIP_INTEREST
+                - NOMINEE_POSITION
+                - TRACKING_SHARES
+                - CARRIED_INTEREST
+        returns:
+          type: affected
+
+      link-to-compartment:
+        description: |
+          Link a share class to a fund compartment.
+
+          Associates the share class with a specific compartment/sleeve
+          within an umbrella fund. Investors in this share class own
+          exposure to the linked compartment.
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+        invocation_phrases:
+          - "link share class to compartment"
+          - "assign to compartment"
+          - "connect to sub-fund"
+          - "link to sleeve"
+        behavior: crud
+        crud:
+          operation: update
+          table: share_classes
+          schema: kyc
+          key: id
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+          - name: compartment-id
+            type: uuid
+            required: true
+            maps_to: compartment_id
+            lookup:
+              table: fund_compartments
+              entity_type: fund_compartment
+              schema: kyc
+              search_key: compartment_code
+              primary_key: id
+        returns:
+          type: affected
+
+      unlink-from-compartment:
+        description: |
+          Remove share class from compartment (set compartment_id to NULL).
+
+          Use when restructuring fund or moving share class to different compartment.
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+        invocation_phrases:
+          - "unlink from compartment"
+          - "remove from compartment"
+          - "detach from sleeve"
+        behavior: crud
+        crud:
+          operation: update
+          table: share_classes
+          schema: kyc
+          key: id
+          set_values:
+            compartment_id: null
+        args:
+          - name: share-class-id
+            type: uuid
+            required: true
+            maps_to: id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+        returns:
+          type: affected
+
+      list-by-compartment:
+        description: |
+          List all share classes in a compartment.
+
+          Returns all share classes linked to the specified compartment.
+          Useful for viewing fee structures and investor breakdowns by sleeve.
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: share_class
+        invocation_phrases:
+          - "share classes in compartment"
+          - "list classes by compartment"
+          - "compartment share classes"
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: share_classes
+          schema: kyc
+          fk_col: compartment_id
+        args:
+          - name: compartment-id
+            type: uuid
+            required: true
+            lookup:
+              table: fund_compartments
+              entity_type: fund_compartment
+              schema: kyc
+              search_key: compartment_code
+              primary_key: id
+        returns:
+          type: record_set

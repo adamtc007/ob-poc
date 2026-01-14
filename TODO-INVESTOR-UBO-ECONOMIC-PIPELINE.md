@@ -5,7 +5,7 @@ This TODO is based on the contents of `ob-poc-ownership-ubo.tar.gz` (investor/ow
 ## Objective
 Refactor/extend the current investor + holdings + UBO sync model so that:
 
-1) **UBO** remains a *control* question (board/GP/appointment/voting) and avoids mis-identifying pooled/intermediary funds as “UBOs”.
+1) **UBO** remains a *control* question (board/GP/appointment/voting) and avoids mis-identifying pooled/intermediary funds as "UBOs".
 2) **Economic exposure** remains a *holdings / NAV* question and supports *look-through* **without** materializing cartesian implied edges.
 3) The DSL verb YAML **matches the DB schema** (so agent-generated DSL executes correctly).
 
@@ -19,30 +19,30 @@ Deliverables should be implementable by Claude Code (Opus) in staged PRs.
 Allianz-style private markets structures (and similar insurers/asset managers) commonly use multi-tier fund structures:
 
 - **Feeder / Fund-of-Funds (FoF)** vehicles for different investor channels (internal group capital, external institutional, ELTIF-like wrappers).
-- A **master pooling vehicle** (“asset bank”) such as a Luxembourg **SCSp** or **SICAV-RAIF**, which manages calls/distributions and holds portfolio assets via holdcos/SPVs.
+- A **master pooling vehicle** ("asset bank") such as a Luxembourg **SCSp** or **SICAV-RAIF**, which manages calls/distributions and holds portfolio assets via holdcos/SPVs.
 - Optional **umbrella + compartment** patterns where compartments represent sleeves/strategies even when not separate legal entities.
 
 This creates two distinct but overlapping questions:
 
-1) **UBO / control** (regulatory/KYC): “Who ultimately controls the vehicle?”  
-   Practically this is often **GP/ManCo/board appointment rights**, not “who holds units”.
+1) **UBO / control** (regulatory/KYC): "Who ultimately controls the vehicle?"  
+   Practically this is often **GP/ManCo/board appointment rights**, not "who holds units".
 
-2) **Economic exposure** (investment/operations): “Who has the economic interest / NAV exposure?”  
+2) **Economic exposure** (investment/operations): "Who has the economic interest / NAV exposure?"  
    This is often **multi-level** (end-investor → FoF → master pool → holdco → project SPV).
 
 ### Why naïve models fail
-A naïve “holdings ≥ 25% ⇒ UBO edge” approach breaks in pooled environments because:
+A naïve "holdings ≥ 25% ⇒ UBO edge" approach breaks in pooled environments because:
 - Intermediary funds, nominees, omnibus holders, and master pools can exceed thresholds but are **not** ultimate beneficial owners.
 - Control is often held via **GP/ManCo/board rights** independent of economic holdings.
 
-A naïve “materialize look-through edges” approach breaks at scale because it creates **cartesian explosions**:
+A naïve "materialize look-through edges" approach breaks at scale because it creates **cartesian explosions**:
 - If 1,000 investors hold a FoF and the FoF holds 200 SPVs, materializing implied edges creates 200,000 edges (and gets worse with more tiers).
 
 ### The design principle
 Maintain **two overlay graphs** with explicit metadata and bounded look-through:
 
 - **Control graph (UBO):** driven by control edges, special rights, board controller computation.
-- **Economic graph:** store only direct holdings edges; compute look-through on-demand into bounded “exposure slices”.
+- **Economic graph:** store only direct holdings edges; compute look-through on-demand into bounded "exposure slices".
 
 Role metadata (issuer-scoped) is the critical control knob that:
 - prevents pooled/intermediary holders from being misclassified as UBO,
@@ -91,10 +91,10 @@ Examples:
 
 Impact: agent-generated DSL will fail or silently write wrong columns.
 
-### 2.2 Trigger generates misleading “UBO ownership” edges for pooled vehicles
-FoF/master pool/nominee holders can hit ≥25% but they are not “ultimate beneficial owners” in the governance/control sense. UBO should be driven by control edges / board controller computation.
+### 2.2 Trigger generates misleading "UBO ownership" edges for pooled vehicles
+FoF/master pool/nominee holders can hit ≥25% but they are not "ultimate beneficial owners" in the governance/control sense. UBO should be driven by control edges / board controller computation.
 
-### 2.3 Missing “holder role” + “look-through policy”
+### 2.3 Missing "holder role" + "look-through policy"
 `investor_type` is not enough to decide:
 - whether a holder is UBO-eligible
 - whether look-through is allowed/available
@@ -113,11 +113,15 @@ To fully load Allianz Group (including FoF / umbrella / master pooling vehicles)
 - **Investor base affiliation** (INTRA_GROUP vs EXTERNAL vs MIXED) and **look-through availability** (do we have BO data?).
 
 Without these, the system either:
-- misclassifies FoF/master pools as “UBO”, or
-- cannot represent “hybrid” pools that have both intra-group and third-party investors, or
-- forces everything into a single generic “holding” shape that loses meaning.
+- misclassifies FoF/master pools as "UBO", or
+- cannot represent "hybrid" pools that have both intra-group and third-party investors, or
+- forces everything into a single generic "holding" shape that loses meaning.
 
+### 2.6 Missing temporal versioning on role profiles (NEW)
+Role profiles need point-in-time query support. If a nominee holder gets reclassified to `END_INVESTOR` mid-year, regulatory reports need historical accuracy. Without `effective_from/effective_to`, you lose the ability to answer "what was the role profile on date X?".
 
+### 2.7 Graph cycle risk in look-through traversal (NEW)
+Recursive CTEs in Postgres don't protect against cycles by default. Garbage-in data (e.g., A→B→C→A circular ownership) will cause infinite loops. The look-through function needs explicit cycle detection.
 
 ---
 
@@ -128,11 +132,14 @@ Without these, the system either:
 - Economic: `kyc.holdings` / `kyc.ownership_snapshots(basis='ECONOMIC')` + `ob-poc.fund_investments`
 
 ### 3.2 Add explicit holder role metadata table
-A small table answering: “for this issuer, who is this holder and how do we treat it?”
+A small table answering: "for this issuer, who is this holder and how do we treat it?"
 
-### 3.3 Compute look-through exposure views (don’t store implied edges)
+**With temporal versioning:** Include `effective_from` / `effective_to` columns for point-in-time queries.
+
+### 3.3 Compute look-through exposure views (don't store implied edges)
 - Store only direct edges (holdings / fund_investments)
 - Derive look-through results into a *query response* (and optionally cache a limited, bounded table)
+- **Include cycle detection** via visited-set tracking in the recursive function
 
 ### 3.4 Add fund vehicle taxonomy + investor affiliation flags (supports Allianz umbrella/FoF)
 Add explicit, schema-backed metadata so the same mechanics can represent:
@@ -143,7 +150,7 @@ Add explicit, schema-backed metadata so the same mechanics can represent:
 
 Key principles:
 - **Direct holdings edges only** (holder → issuer/share-class), enriched with *instrument type* and *rights profile*.
-- Treat umbrella/compartments as first-class “fund structure” records even if they are not separate legal entities (you can still attach them to `entities` via synthetic UUIDs if needed).
+- Treat umbrella/compartments as first-class "fund structure" records even if they are not separate legal entities (you can still attach them to `entities` via synthetic UUIDs if needed).
 
 
 
@@ -166,7 +173,8 @@ Align to `kyc.holdings`:
 
 - `usage-type` enum must be `'TA' | 'UBO'` (or whatever you actually store; standardize).
 - Standardize holding state on `holding_status` only; treat legacy `status` as deprecated.
-- Align `holding_status` enum to what you want: `PENDING, ACTIVE, SUSPENDED, CLOSED` (and update SQL views/triggers accordingly).
+- Align `holding_status` enum to what you want: `PENDING, ACTIVE, SUSPENDED, CLOSED, TRANSFERRED` (and update SQL views/triggers accordingly).
+  - **Note:** Include `TRANSFERRED` for movement tracking scenarios.
 - Ensure upserts use the right conflict keys (share_class_id + investor_entity_id is fine for economic holdings; share_class_id + investor_id for TA investor holdings).
 
 ### A3) Add a regression harness
@@ -180,7 +188,7 @@ and executes end-to-end against a migrated DB.
 
 ---
 
-## Phase B — Add holder role profiles (stop treating pooled funds as “UBO”)
+## Phase B — Add holder role profiles (stop treating pooled funds as "UBO")
 
 ### B1) New migration: `migrations/0XX_investor_role_profiles.sql`
 Create:
@@ -204,6 +212,10 @@ CREATE TABLE IF NOT EXISTS kyc.investor_role_profiles (
   group_label TEXT NULL,
 
   is_ubo_eligible BOOLEAN NOT NULL DEFAULT true,
+
+  -- TEMPORAL VERSIONING (point-in-time queries for regulatory reporting)
+  effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
+  effective_to DATE NULL,  -- NULL = currently active
 
   source VARCHAR(50) DEFAULT 'MANUAL',
   source_reference TEXT NULL,
@@ -234,21 +246,46 @@ CREATE TABLE IF NOT EXISTS kyc.investor_role_profiles (
     'MIXED',
     'UNKNOWN'
   )),
+  -- Ensure effective_to >= effective_from when both present
+  CONSTRAINT chk_effective_range CHECK (effective_to IS NULL OR effective_to >= effective_from),
 
-  CONSTRAINT uq_role_profile UNIQUE (
-    issuer_entity_id, holder_entity_id, COALESCE(share_class_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  -- Unique per issuer+holder+share_class+effective_from (allows versioned history)
+  CONSTRAINT uq_role_profile_temporal UNIQUE (
+    issuer_entity_id, holder_entity_id, 
+    COALESCE(share_class_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    effective_from
   )
 );
 
 CREATE INDEX IF NOT EXISTS idx_role_profiles_issuer ON kyc.investor_role_profiles(issuer_entity_id);
 CREATE INDEX IF NOT EXISTS idx_role_profiles_holder ON kyc.investor_role_profiles(holder_entity_id);
 CREATE INDEX IF NOT EXISTS idx_role_profiles_group  ON kyc.investor_role_profiles(group_container_entity_id);
+CREATE INDEX IF NOT EXISTS idx_role_profiles_effective ON kyc.investor_role_profiles(effective_from, effective_to);
+
+-- Helper function for point-in-time role profile lookup
+CREATE OR REPLACE FUNCTION kyc.fn_get_role_profile_at(
+  p_issuer_entity_id UUID,
+  p_holder_entity_id UUID,
+  p_share_class_id UUID,
+  p_as_of DATE DEFAULT CURRENT_DATE
+) RETURNS kyc.investor_role_profiles AS $$
+  SELECT * FROM kyc.investor_role_profiles
+  WHERE issuer_entity_id = p_issuer_entity_id
+    AND holder_entity_id = p_holder_entity_id
+    AND COALESCE(share_class_id, '00000000-0000-0000-0000-000000000000'::uuid) = 
+        COALESCE(p_share_class_id, '00000000-0000-0000-0000-000000000000'::uuid)
+    AND p_as_of >= effective_from
+    AND (effective_to IS NULL OR p_as_of <= effective_to)
+  ORDER BY effective_from DESC
+  LIMIT 1;
+$$ LANGUAGE SQL STABLE;
 ```
 
 ### B2) DSL verbs for role profiles
 Add a new domain YAML, e.g. `rust/config/verbs/registry/investor-role.yaml`:
-- `investor-role.set` (upsert by issuer + holder + optional share_class)
-- `investor-role.read/list` (by issuer, by holder)
+- `investor-role.set` (upsert by issuer + holder + optional share_class + effective_from)
+- `investor-role.supersede` (close current profile and create new version)
+- `investor-role.read/list` (by issuer, by holder, with optional `as-of` date)
 
 Use EntityRef lookups for issuer/holder and share class.
 
@@ -257,11 +294,11 @@ Patch `kyc.sync_holding_to_ubo_relationship()` in `migrations/011_investor_regis
 
 Rules:
 - Only run when `NEW.usage_type = 'UBO'`
-- If a role profile exists and `is_ubo_eligible = false`, do nothing
+- If a role profile exists (for current date) and `is_ubo_eligible = false`, do nothing
 - (Optional) default-deny for pooled vehicles if `role_type in (INTERMEDIARY_FOF, MASTER_POOL, INTRA_GROUP_POOL)` unless explicitly overridden.
 
 ### B4) Add fund vehicle + umbrella/compartment metadata (Allianz group load)
-Create minimal schema to represent fund structures and the “units/shares” instruments used between FoF → master pool → holdco layers.
+Create minimal schema to represent fund structures and the "units/shares" instruments used between FoF → master pool → holdco layers.
 
 **New tables (migration recommended):**
 - `kyc.fund_vehicles` — one row per fund/legal vehicle (often LEI-backed)
@@ -305,7 +342,18 @@ CREATE TABLE IF NOT EXISTS kyc.fund_compartments (
   - share classes with different rights (economic vs voting)
 
 Recommended enum (store on share class or holding):
-- `instrument_type IN ('UNITS','SHARES','LP_INTEREST','PARTNERSHIP_INTEREST','NOMINEE_POSITION')`
+```sql
+-- Extended instrument type taxonomy
+instrument_type IN (
+  'UNITS',
+  'SHARES',
+  'LP_INTEREST',
+  'PARTNERSHIP_INTEREST',
+  'NOMINEE_POSITION',
+  'TRACKING_SHARES',      -- synthetic exposure for internal allocation models
+  'CARRIED_INTEREST'      -- GP economics
+)
+```
 
 **DSL verbs to add:**
 - `fund-vehicle.upsert` (entity-ref + vehicle_type + optional umbrella link)
@@ -314,7 +362,7 @@ Recommended enum (store on share class or holding):
 
 Acceptance:
 - You can load Allianz vehicles (FoF/master/umbrella) with correct types.
-- You can represent “hybrid” investor base via `holder_affiliation` and `beneficial_owner_data_available`.
+- You can represent "hybrid" investor base via `holder_affiliation` and `beneficial_owner_data_available`.
 
 
 
@@ -389,10 +437,10 @@ Purpose: Ensure holdings can represent FoF/master pool instruments cleanly (unit
 
 **YAML extension**
 - add `instrument-type` enum:
-  - UNITS|SHARES|LP_INTEREST|PARTNERSHIP_INTEREST|NOMINEE_POSITION
+  - UNITS|SHARES|LP_INTEREST|PARTNERSHIP_INTEREST|NOMINEE_POSITION|TRACKING_SHARES|CARRIED_INTEREST
 - add optional `compartment-code` or `compartment-id`
 
-### 4) `investor-role.set` / `investor-role.list`
+### 4) `investor-role.set` / `investor-role.supersede` / `investor-role.list`
 Purpose: Issuer-scoped holder profile describing what the holder *is* (end investor, FoF, nominee, intra-group pool) and what policies apply.
 
 **S-expression example**
@@ -406,7 +454,20 @@ Purpose: Issuer-scoped holder profile describing what the holder *is* (end inves
   (beneficial-owner-data-available false)
   (lookthrough-policy ON_DEMAND)
   (is-ubo-eligible false)
+  (effective-from "2025-01-01")  ; temporal versioning
   (notes "FoF feeder into master pool; do not treat as UBO; allow look-through only when BO data present.")
+)
+```
+
+**S-expression example (supersede existing profile)**
+```lisp
+;; Close existing profile and create new version with different role
+(investor-role.supersede
+  (issuer (entity-ref legal-entity (k lei "529900KRX8A6KQV2XK98")))
+  (holder (entity-ref legal-entity (k name "Allianz European Infrastructure Fund")))
+  (effective-from "2026-01-01")  ; new profile starts here; old one closed at 2025-12-31
+  (role-type END_INVESTOR)       ; reclassified
+  (is-ubo-eligible true)
 )
 ```
 
@@ -421,6 +482,7 @@ Purpose: Issuer-scoped holder profile describing what the holder *is* (end inves
   - `holder-affiliation` enum (INTRA_GROUP|EXTERNAL|MIXED|UNKNOWN)
   - `beneficial-owner-data-available` (bool)
   - `is-ubo-eligible` (bool)
+  - `effective-from` (date, default: today)
   - `group-container` (EntityRef optional)
   - `notes` (string optional)
 
@@ -442,6 +504,7 @@ Expected behavior:
 - traverses direct edges only
 - multiplies percentages along the path
 - stops at pooled/intermediary nodes when lookthrough_policy=NONE or BO data unavailable
+- **includes cycle detection** (visited-set tracking)
 - returns (root, leaf, cumulative_pct, depth, path)
 
 
@@ -450,14 +513,14 @@ Expected behavior:
 
 ## Phase C — Economic look-through without exploding edges
 
-### C1) Define a canonical “economic edge” view (direct only)
+### C1) Define a canonical "economic edge" view (direct only)
 Create a VIEW (or SQL function) that yields direct, composable edges:
 
 `kyc.v_economic_edges_direct` with columns:
 - `from_entity_id` (holder)
 - `to_entity_id` (issuer/investee)
 - `pct_of_to` (numeric) — percentage ownership/exposure of *investee*
-- `instrument_type` (UNITS | SHARES | LP_INTEREST | PARTNERSHIP_INTEREST | NOMINEE_POSITION)
+- `instrument_type` (UNITS | SHARES | LP_INTEREST | PARTNERSHIP_INTEREST | NOMINEE_POSITION | TRACKING_SHARES | CARRIED_INTEREST)
 - `share_class_id` (nullable) — ties to TA share-class when applicable
 - `vehicle_type` (nullable) — SCSP/SICAV_RAIF/etc from `kyc.fund_vehicles` if available
 - `basis` (ECONOMIC | UNITS | NAV)
@@ -474,6 +537,7 @@ Populate via:
 This function exists specifically to avoid cartesian joins/edge explosions. We never store derived edges like
 `end_investor -> every underlying SPV`. We compute exposure slices when requested (UI drilldown / report), with
 hard limits (depth, min_pct, max_rows) and stop conditions based on holder role profiles.
+
 Create SQL function:
 
 `kyc.fn_compute_economic_exposure(root_entity_id, as_of_date, max_depth, min_pct, max_rows)`
@@ -481,20 +545,123 @@ Create SQL function:
 Behavior:
 - recursively traverse `v_economic_edges_direct`
 - multiply percentages along the path
-- stop recursion when:
-  - depth limit hit
-  - pct falls below min_pct
-  - holder role profile says `lookthrough_policy = NONE` (treat as leaf)
+- **CYCLE DETECTION:** track visited entities in path array; skip if already visited
+- stop recursion when (evaluated in this order):
+  1. **Cycle detected** (entity already in path) — treat as leaf, log warning
+  2. **Depth limit hit** (depth >= max_depth)
+  3. **Percentage below threshold** (cumulative_pct < min_pct)
+  4. **Role profile stop** (lookthrough_policy = NONE for this holder at as_of_date)
+  5. **No BO data** (beneficial_owner_data_available = false, unless explicitly overridden)
 - output rows:
-  - `root_entity_id`, `leaf_entity_id`, `cumulative_pct`, `depth`, `path_entities[]`, `path_edges[]`
+  - `root_entity_id`, `leaf_entity_id`, `cumulative_pct`, `depth`, `path_entities[]`, `path_edges[]`, `stop_reason`
+
+**Stop condition precedence is explicit** — the order above matters for debugging edge cases.
 
 Important: **do not materialize implied edges** (no investor→every-SPV edge table). This function is the engine.
 
-### C3) Optional cache table (bounded)
-If you need speed:
+**SQL skeleton with cycle detection:**
+```sql
+CREATE OR REPLACE FUNCTION kyc.fn_compute_economic_exposure(
+  p_root_entity_id UUID,
+  p_as_of_date DATE DEFAULT CURRENT_DATE,
+  p_max_depth INT DEFAULT 6,
+  p_min_pct NUMERIC DEFAULT 0.0001,
+  p_max_rows INT DEFAULT 200
+) RETURNS TABLE (
+  root_entity_id UUID,
+  leaf_entity_id UUID,
+  cumulative_pct NUMERIC,
+  depth INT,
+  path_entities UUID[],
+  path_edges UUID[],
+  stop_reason TEXT
+) AS $$
+WITH RECURSIVE exposure_tree AS (
+  -- Base case: start from root
+  SELECT 
+    p_root_entity_id AS root_entity_id,
+    e.to_entity_id AS current_entity_id,
+    e.pct_of_to AS cumulative_pct,
+    1 AS depth,
+    ARRAY[p_root_entity_id, e.to_entity_id] AS path_entities,
+    ARRAY[e.edge_id] AS path_edges,
+    CASE
+      WHEN rp.lookthrough_policy = 'NONE' THEN 'LOOKTHROUGH_NONE'
+      WHEN rp.beneficial_owner_data_available = false THEN 'NO_BO_DATA'
+      ELSE NULL
+    END AS stop_reason
+  FROM kyc.v_economic_edges_direct e
+  LEFT JOIN kyc.fn_get_role_profile_at(p_root_entity_id, e.to_entity_id, NULL, p_as_of_date) rp ON true
+  WHERE e.from_entity_id = p_root_entity_id
+    AND e.as_of_date <= p_as_of_date
+  
+  UNION ALL
+  
+  -- Recursive case
+  SELECT 
+    t.root_entity_id,
+    e.to_entity_id,
+    t.cumulative_pct * e.pct_of_to,
+    t.depth + 1,
+    t.path_entities || e.to_entity_id,
+    t.path_edges || e.edge_id,
+    CASE
+      -- Cycle detection: entity already in path
+      WHEN e.to_entity_id = ANY(t.path_entities) THEN 'CYCLE_DETECTED'
+      WHEN t.depth + 1 >= p_max_depth THEN 'MAX_DEPTH'
+      WHEN t.cumulative_pct * e.pct_of_to < p_min_pct THEN 'BELOW_MIN_PCT'
+      WHEN rp.lookthrough_policy = 'NONE' THEN 'LOOKTHROUGH_NONE'
+      WHEN rp.beneficial_owner_data_available = false THEN 'NO_BO_DATA'
+      ELSE NULL
+    END AS stop_reason
+  FROM exposure_tree t
+  JOIN kyc.v_economic_edges_direct e ON e.from_entity_id = t.current_entity_id
+  LEFT JOIN kyc.fn_get_role_profile_at(t.root_entity_id, e.to_entity_id, NULL, p_as_of_date) rp ON true
+  WHERE t.stop_reason IS NULL  -- Only continue if no stop condition hit
+    AND e.to_entity_id <> ALL(t.path_entities)  -- Cycle guard
+    AND t.depth < p_max_depth
+    AND e.as_of_date <= p_as_of_date
+)
+SELECT 
+  root_entity_id,
+  current_entity_id AS leaf_entity_id,
+  cumulative_pct,
+  depth,
+  path_entities,
+  path_edges,
+  COALESCE(stop_reason, 'LEAF_NODE') AS stop_reason
+FROM exposure_tree
+WHERE stop_reason IS NOT NULL OR NOT EXISTS (
+  SELECT 1 FROM kyc.v_economic_edges_direct e2 
+  WHERE e2.from_entity_id = exposure_tree.current_entity_id
+)
+ORDER BY cumulative_pct DESC
+LIMIT p_max_rows;
+$$ LANGUAGE SQL STABLE;
+```
+
+### C3) Cache strategy (choose one)
+
+**Option A: No cache (recommended for initial implementation)**
+- Rely on bounded query limits (max_depth, min_pct, max_rows) to keep response times acceptable
+- Simpler; no invalidation complexity
+- Profile actual query times before adding cache
+
+**Option B: Event-driven invalidation (if cache needed)**
 - `kyc.economic_exposure_cache` keyed by `(root_entity_id, as_of_date, params_hash)`
-- store top-N results + explain payload
-- TTL-based invalidation (recompute on demand)
+- **Invalidation triggers:**
+  - Holdings insert/update/delete → invalidate affected root entities
+  - Role profile changes → invalidate affected issuer-holder pairs
+  - Fund investments changes → invalidate affected entities
+- Use Postgres `LISTEN/NOTIFY` to signal cache invalidation events
+- TTL as fallback (e.g., 1 hour) for any missed events
+
+**Option C: Version-based invalidation (simpler but coarser)**
+- Add a `cache_version` counter that increments on any relevant table change
+- Cache entries include version; invalidate all when version changes
+- Coarse but eliminates risk of stale data
+
+**Recommendation:** Start with Option A. Add caching only if query times exceed acceptable thresholds (e.g., >500ms for typical queries).
 
 ### C4) Rust API + DSL integration
 Add a custom op:
@@ -517,7 +684,7 @@ You already have DTO structs in `rust/src/graph/investor_register.rs`. Wire them
 Create `rust/src/services/investor_register_service.rs` that:
 - reads thresholds (issuer_control_config or defaults)
 - loads holders from `kyc.ownership_snapshots` (basis controlled by query)
-- applies role profiles:
+- applies role profiles (using `as_of` date for temporal accuracy):
   - holders with role_type in (INTERMEDIARY_FOF, MASTER_POOL, INTRA_GROUP_POOL, NOMINEE) can be collapsed by default
 - returns:
   - `control_holders` (above threshold or has special rights)
@@ -525,19 +692,22 @@ Create `rust/src/services/investor_register_service.rs` that:
 
 ### D2) Add API endpoints
 - `GET /issuer/{entity_id}/investor-register` → returns `InvestorRegisterView`
+- `GET /issuer/{entity_id}/investor-register?as_of=2025-06-30` → point-in-time view
 - `GET /issuer/{entity_id}/investor-list` → paginated list (drilldown)
 
 ---
 
 
-## Phase D.5 — Bulk load Allianz group + fund programme (LEI-first ingest)
+## Phase D.5 — Bulk load fund programme (generalized LEI-first ingest)
+
+> **Note:** Generalized from "Allianz-specific" to support any fund programme with similar structures (BlackRock iShares, Vanguard, etc.)
 
 ### D5.1 xtask loader
-Add an xtask command to ingest an Allianz group programme dataset (LEI list + vehicle type + optional umbrella/compartment):
+Add an xtask command to ingest a fund programme dataset (LEI list + vehicle type + optional umbrella/compartment):
 
-- `cargo xtask load-allianz-group --input ./data/allianz_funds.csv`
+- `cargo xtask load-fund-programme --input ./data/fund_programme.csv --config ./data/fund_programme_config.yaml`
 
-Input columns (suggested):
+**Input CSV columns (suggested):**
 - `lei`
 - `entity_name`
 - `vehicle_type` (SCSP/SICAV_RAIF/...)
@@ -546,14 +716,37 @@ Input columns (suggested):
 - `holder_affiliation_default` (INTRA_GROUP|EXTERNAL|MIXED|UNKNOWN)
 - `bo_data_available_default` (true/false)
 
-Loader behavior:
+**Config YAML (for column mapping and defaults):**
+```yaml
+# fund_programme_config.yaml
+programme_name: "Allianz Group Funds"
+column_mappings:
+  lei: "lei"
+  entity_name: "entity_name"
+  vehicle_type: "vehicle_type"
+  umbrella_lei: "umbrella_lei"
+  compartment_code: "compartment_code"
+  holder_affiliation: "holder_affiliation_default"
+  bo_data_available: "bo_data_available_default"
+defaults:
+  holder_affiliation: "UNKNOWN"
+  bo_data_available: false
+  default_role_type: "INTERMEDIARY_FOF"
+vehicle_type_mappings:
+  # Allow client-specific nomenclature
+  "SCS": "SCSP"
+  "RAIF": "SICAV_RAIF"
+```
+
+**Loader behavior:**
 - Upsert `entities` (by LEI)
 - Upsert `kyc.fund_vehicles`
 - Upsert `kyc.fund_compartments` when present
 - Seed `kyc.investor_role_profiles` defaults for issuer vehicles when provided
 
-Acceptance:
-- You can load a full Allianz programme (FoF/master/umbrella) without manual hand-entry.
+**Acceptance:**
+- You can load any fund programme (FoF/master/umbrella) without manual hand-entry.
+- Config-driven mapping allows different asset managers without code changes.
 - Subsequent DSL operations (holdings, role profiles, exposure compute) work against the loaded dataset.
 
 
@@ -563,11 +756,13 @@ Acceptance:
 - When a holding is inserted with `usage_type='TA'`, trigger must not write UBO edges.
 - When role profile exists with `is_ubo_eligible=false`, trigger must not write UBO edges even if ≥25%.
 - When `usage_type='UBO'` and eligible and ≥25%, edge is written/updated.
+- **Temporal test:** Role profile change from `is_ubo_eligible=true` to `false` (via supersede) should not affect historical data; point-in-time queries return correct results.
 
 ### E2) Look-through boundedness
 - Ensure `fn_compute_economic_exposure` respects `max_depth`, `min_pct`, and `lookthrough_policy=NONE`.
 - Ensure it never returns more than `max_rows`.
 - Ensure look-through traversal treats `beneficial_owner_data_available=false` as a stop condition unless user explicitly overrides.
+- **Cycle detection test:** Create A→B→C→A circular ownership; verify function terminates with `CYCLE_DETECTED` stop_reason and does not infinite loop.
 
 ### E3) End-to-end DSL regression
 - A single DSL fixture runs:
@@ -575,11 +770,38 @@ Acceptance:
   - set role profile for pooled holder
   - verify UBO sync behavior
   - compute exposure view
+- Include test for `investor-role.supersede` temporal versioning.
+
+### E4) Performance baseline (NEW)
+- Measure `fn_compute_economic_exposure` query time for representative datasets:
+  - Small: 10 entities, 3 levels deep
+  - Medium: 100 entities, 5 levels deep
+  - Large: 1,000 entities, 6 levels deep (Allianz-scale)
+- Establish acceptable thresholds (e.g., <100ms small, <500ms medium, <2s large)
+- Use this baseline to decide if caching (Phase C3) is needed.
 
 ---
 
 ## Implementation notes (keep it pragmatic)
-- Keep role profiles **issuer-scoped** (issuer_entity_id) so that “same holder” can be treated differently across issuers.
-- Don’t fight the immediate-mode UI: expose exposure results as a table (paged) and only expand look-through when user requests it.
+- Keep role profiles **issuer-scoped** (issuer_entity_id) so that "same holder" can be treated differently across issuers.
+- **Temporal versioning** enables regulatory point-in-time queries without losing history.
+- Don't fight the immediate-mode UI: expose exposure results as a table (paged) and only expand look-through when user requests it.
 - Prefer schema-driven enums; keep value casing consistent across SQL + YAML + Rust.
+- **Stop condition order matters:** Document and test the precedence explicitly.
+- **Cycle detection is non-negotiable:** Even if "shouldn't happen," garbage-in data will eventually trigger it.
 
+---
+
+## Changelog
+
+### 2026-01-14 — Review additions
+- **2.6/2.7:** Added issues for temporal versioning and cycle detection
+- **B1:** Added `effective_from/effective_to` columns and point-in-time lookup function
+- **B2:** Added `investor-role.supersede` verb for temporal transitions
+- **B4:** Extended `instrument_type` enum with `TRACKING_SHARES` and `CARRIED_INTEREST`
+- **A2:** Added `TRANSFERRED` to `holding_status` enum
+- **C2:** Added explicit stop condition precedence and SQL skeleton with cycle detection
+- **C3:** Replaced vague "TTL-based invalidation" with concrete cache strategy options
+- **D5:** Generalized from Allianz-specific to config-driven `load-fund-programme`
+- **E2:** Added cycle detection test requirement
+- **E4:** Added performance baseline phase

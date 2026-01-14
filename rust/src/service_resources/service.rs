@@ -187,6 +187,7 @@ impl ServiceResourcePipelineService {
     // =========================================================================
 
     /// Upsert a unified attribute requirement
+    #[allow(clippy::too_many_arguments)]
     pub async fn upsert_unified_attr_requirement(
         &self,
         cbu_id: Uuid,
@@ -514,6 +515,7 @@ impl ServiceResourcePipelineService {
     // =========================================================================
 
     /// Upsert service readiness
+    #[allow(clippy::too_many_arguments)]
     pub async fn upsert_service_readiness(
         &self,
         cbu_id: Uuid,

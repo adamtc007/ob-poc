@@ -31,6 +31,7 @@ mod control_ops;
 mod custody;
 mod dilution_ops;
 mod document_ops;
+mod economic_exposure_ops;
 mod entity_ops;
 pub mod entity_query;
 mod gleif_ops;
@@ -688,6 +689,9 @@ impl CustomOperationRegistry {
 
         // Investor role profile operations (UBO eligibility, look-through policy)
         investor_role_ops::register_investor_role_ops(&mut registry);
+
+        // Economic exposure look-through operations (bounded recursive computation)
+        economic_exposure_ops::register_economic_exposure_ops(&mut registry);
 
         // Session v2 operations (Phase 6 - 9 verbs, memory-first)
         session_ops::register_session_ops_v2(&mut registry);

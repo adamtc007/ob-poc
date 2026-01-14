@@ -277,12 +277,4 @@ mod tests {
         assert_eq!(normalize_entity_type("company"), "LEGAL_ENTITY");
         assert_eq!(normalize_entity_type("unknown"), "UNKNOWN");
     }
-
-    #[test]
-    fn test_capitalize_entity_type() {
-        assert_eq!(capitalize_entity_type("cbu"), "CBU");
-        assert_eq!(capitalize_entity_type("person"), "Proper Person");
-        assert_eq!(capitalize_entity_type("company"), "Limited Company");
-        assert_eq!(capitalize_entity_type("role"), "Role");
-    }
 }

@@ -689,24 +689,31 @@ mod tests {
 
     #[test]
     fn test_confidence_levels() {
+        // High: data_coverage > 0.8 AND total() > 0.7
+        // total = (0.70*s_appoint + 0.25*s_vote + 0.05*s_affiliation) * data_coverage
+        // For high: total = (0.70*1.0 + 0.25*0.8 + 0.05*0.5) * 0.9 = 0.925 * 0.9 = 0.8325
         let high = ControlScore {
-            s_appoint: 0.8,
-            s_vote: 0.6,
-            s_affiliation: 0.3,
+            s_appoint: 1.0,
+            s_vote: 0.8,
+            s_affiliation: 0.5,
             s_override: 0.0,
             data_coverage: 0.9,
         };
         assert_eq!(high.confidence(), ControlConfidence::High);
 
+        // Medium: data_coverage > 0.5 AND total() > 0.5
+        // total = (0.70*0.7 + 0.25*0.6 + 0.05*0.3) * 0.7 = 0.655 * 0.7 = 0.4585
+        // Adjust to get above 0.5: (0.70*0.8 + 0.25*0.6 + 0.05*0.3) * 0.8 = 0.725 * 0.8 = 0.58
         let medium = ControlScore {
-            s_appoint: 0.5,
-            s_vote: 0.3,
-            s_affiliation: 0.2,
+            s_appoint: 0.8,
+            s_vote: 0.6,
+            s_affiliation: 0.3,
             s_override: 0.0,
-            data_coverage: 0.6,
+            data_coverage: 0.8,
         };
         assert_eq!(medium.confidence(), ControlConfidence::Medium);
 
+        // Low: either data_coverage <= 0.5 or total() <= 0.5
         let low = ControlScore {
             s_appoint: 0.2,
             s_vote: 0.1,

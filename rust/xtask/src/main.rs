@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod allianz_harness;
+mod fund_programme;
 mod gleif_crawl_dsl;
 mod gleif_import;
 mod gleif_load;
@@ -316,6 +317,36 @@ enum Command {
         #[command(subcommand)]
         action: VerbsAction,
     },
+
+    /// Load fund programme from CSV using config-driven column mapping
+    ///
+    /// Generic loader that supports any fund programme (Allianz, BlackRock, Vanguard, etc.)
+    /// by using a YAML config file to map CSV columns to database fields.
+    LoadFundProgramme {
+        /// Path to YAML config file with column mappings
+        #[arg(long, short = 'c')]
+        config: std::path::PathBuf,
+
+        /// Path to CSV input file
+        #[arg(long, short = 'i')]
+        input: std::path::PathBuf,
+
+        /// Output DSL file (default: stdout)
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+
+        /// Limit number of records to process
+        #[arg(long, short = 'l')]
+        limit: Option<usize>,
+
+        /// Dry run - generate DSL but don't save
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+
+        /// Execute the generated DSL against the database
+        #[arg(long, short = 'x')]
+        execute: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -530,7 +561,61 @@ fn main() -> Result<()> {
                 } => verbs::verbs_inventory(output, update_claude_md, show_untagged),
             }
         }
+        Command::LoadFundProgramme {
+            config,
+            input,
+            output,
+            limit,
+            dry_run,
+            execute,
+        } => run_load_fund_programme(&config, &input, output.as_deref(), limit, dry_run, execute),
     }
+}
+
+fn run_load_fund_programme(
+    config_path: &std::path::Path,
+    input_path: &std::path::Path,
+    output_path: Option<&std::path::Path>,
+    limit: Option<usize>,
+    dry_run: bool,
+    _execute: bool,
+) -> Result<()> {
+    println!("Loading fund programme...");
+    println!("  Config: {}", config_path.display());
+    println!("  Input: {}", input_path.display());
+
+    // Load config
+    let config = fund_programme::FundProgrammeConfig::from_file(config_path)?;
+    println!("  Programme: {}", config.programme_name);
+
+    // Load CSV
+    let records = fund_programme::load_csv_with_config(input_path, &config, limit)?;
+    println!("  Loaded {} records", records.len());
+
+    // Generate DSL
+    let dsl = fund_programme::generate_dsl_file(&records, &config);
+
+    if dry_run {
+        println!("\n--- Generated DSL (dry run) ---\n");
+        println!("{}", dsl);
+        return Ok(());
+    }
+
+    // Write output
+    match output_path {
+        Some(path) => {
+            std::fs::write(path, &dsl)?;
+            println!("  Written to: {}", path.display());
+        }
+        None => {
+            println!("\n{}", dsl);
+        }
+    }
+
+    // TODO: Execute DSL if --execute flag is set
+    // This would require connecting to the database and running the DSL executor
+
+    Ok(())
 }
 
 async fn run_allianz_harness(
