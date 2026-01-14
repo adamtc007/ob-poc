@@ -98,11 +98,11 @@ domains:
             type: string
             required: true
             maps_to: usage_type
-            description: "Purpose of holding: ta_kyc (TA KYC-as-a-Service) or ubo_tracking (UBO intra-group)"
+            description: "Purpose of holding: TA (Transfer Agency - client investors) or UBO (intra-group ownership tracking)"
             validation:
               enum:
-                - ta_kyc
-                - ubo_tracking
+                - TA
+                - UBO
           - name: provider
             type: string
             required: false
@@ -130,15 +130,15 @@ domains:
             type: string
             required: false
             maps_to: holding_status
-            default: pending
+            default: ACTIVE
+            description: "Holding lifecycle status (uppercase per schema)"
             validation:
               enum:
-                - pending
-                - active
-                - suspended
-                - redeemed
-                - transferred_out
-                - closed
+                - PENDING
+                - ACTIVE
+                - SUSPENDED
+                - TRANSFERRED
+                - CLOSED
         returns:
           type: uuid
           name: holding_id
@@ -195,10 +195,11 @@ domains:
             type: string
             required: false
             maps_to: usage_type
+            description: "Purpose: TA (Transfer Agency) or UBO (intra-group ownership)"
             validation:
               enum:
-                - ta_kyc
-                - ubo_tracking
+                - TA
+                - UBO
           - name: provider
             type: string
             required: false
@@ -223,14 +224,14 @@ domains:
             type: string
             required: false
             maps_to: holding_status
+            description: "Holding lifecycle status (uppercase per schema)"
             validation:
               enum:
-                - pending
-                - active
-                - suspended
-                - redeemed
-                - transferred_out
-                - closed
+                - PENDING
+                - ACTIVE
+                - SUSPENDED
+                - TRANSFERRED
+                - CLOSED
         returns:
           type: uuid
           name: holding_id
@@ -299,14 +300,14 @@ domains:
             type: string
             required: true
             maps_to: holding_status
+            description: "Holding lifecycle status (uppercase per schema)"
             validation:
               enum:
-                - pending
-                - active
-                - suspended
-                - redeemed
-                - transferred_out
-                - closed
+                - PENDING
+                - ACTIVE
+                - SUSPENDED
+                - TRANSFERRED
+                - CLOSED
         returns:
           type: affected
 

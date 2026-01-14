@@ -32,34 +32,39 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-          - name: cbu-id
+          - name: owning-cbu-id
             type: uuid
-            required: true
-            maps_to: cbu_id
+            required: false
+            maps_to: owning_cbu_id
             lookup:
               table: cbus
               entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
-          - name: investor-name
-            type: string
-            required: true
-            maps_to: investor_name
+            description: "CBU that owns this investor record (optional - investor can exist without CBU context)"
           - name: investor-type
             type: string
             required: true
             maps_to: investor_type
+            description: "Investor classification per schema: RETAIL, PROFESSIONAL, INSTITUTIONAL, NOMINEE, INTRA_GROUP"
             validation:
               enum:
-                - natural_person
-                - legal_entity
-                - nominee
-                - omnibus
-          - name: tax-residence
+                - RETAIL
+                - PROFESSIONAL
+                - INSTITUTIONAL
+                - NOMINEE
+                - INTRA_GROUP
+          - name: investor-category
             type: string
             required: false
-            maps_to: tax_residence
+            maps_to: investor_category
+            description: "Optional sub-categorization"
+          - name: tax-jurisdiction
+            type: string
+            required: false
+            maps_to: tax_jurisdiction
+            description: "Tax jurisdiction (ISO country code, max 10 chars)"
           - name: provider
             type: string
             required: false
@@ -75,7 +80,7 @@ domains:
           capture: true
 
       ensure:
-        description: Create or update investor by entity_id + cbu_id (idempotent)
+        description: Create or update investor by entity_id + owning_cbu_id (idempotent)
         metadata:
           tier: intent
           source_of_truth: register
@@ -89,7 +94,7 @@ domains:
           returning: investor_id
           conflict_keys:
             - entity_id
-            - cbu_id
+            - owning_cbu_id
         args:
           - name: entity-id
             type: uuid
@@ -101,34 +106,39 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-          - name: cbu-id
+          - name: owning-cbu-id
             type: uuid
-            required: true
-            maps_to: cbu_id
+            required: false
+            maps_to: owning_cbu_id
             lookup:
               table: cbus
               entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
-          - name: investor-name
-            type: string
-            required: true
-            maps_to: investor_name
+            description: "CBU that owns this investor record"
           - name: investor-type
             type: string
             required: true
             maps_to: investor_type
+            description: "Investor classification: RETAIL, PROFESSIONAL, INSTITUTIONAL, NOMINEE, INTRA_GROUP"
             validation:
               enum:
-                - natural_person
-                - legal_entity
-                - nominee
-                - omnibus
-          - name: tax-residence
+                - RETAIL
+                - PROFESSIONAL
+                - INSTITUTIONAL
+                - NOMINEE
+                - INTRA_GROUP
+          - name: investor-category
             type: string
             required: false
-            maps_to: tax_residence
+            maps_to: investor_category
+            description: "Optional sub-categorization"
+          - name: tax-jurisdiction
+            type: string
+            required: false
+            maps_to: tax_jurisdiction
+            description: "Tax jurisdiction (ISO country code, max 10 chars)"
           - name: provider
             type: string
             required: false
@@ -180,9 +190,9 @@ domains:
           operation: list_by_fk
           table: investors
           schema: kyc
-          fk_col: cbu_id
+          fk_col: owning_cbu_id
         args:
-          - name: cbu-id
+          - name: owning-cbu-id
             type: uuid
             required: true
             lookup:
@@ -674,14 +684,14 @@ domains:
       count-by-state:
         description: Count investors by lifecycle state for a CBU
         metadata:
-          tier: intent
+          tier: diagnostics
           source_of_truth: register
           scope: cbu
           noun: investor
         behavior: plugin
         plugin_handler: investor_count_by_state
         args:
-          - name: cbu-id
+          - name: owning-cbu-id
             type: uuid
             required: true
             lookup:
