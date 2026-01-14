@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-13
+> **Last reviewed:** 2026-01-14
 > **Verb count:** 795 verbs across 103 YAML files
 > **Custom ops:** 49 plugin handlers
 > **Crates:** 13 fine-grained crates
@@ -12,6 +12,7 @@
 > **Verb Governance:** ✅ Complete - Mandatory metadata, single authoring surface, STANDARD lint enforcement
 > **Viewport Scaling:** ✅ Complete - Force simulation + LOD thresholds scale to viewport size
 > **CBU View Mode:** ✅ Complete - Single TRADING view mode as default, simplified ViewMode struct
+> **CBU Container Rendering:** ✅ Complete - Entities inside CBU box, trading nodes outside
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 > **Service Resource Pipeline:** ✅ Complete - Intent→Discovery→Attributes→Provisioning→Readiness + taxonomy viz
 
@@ -112,6 +113,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "force simulation", "viewport scaling", "LOD", "detail level", "graph density" → See Viewport Scaling section below
 - "service resource", "service intent", "resource discovery", "provisioning", "readiness" → See Service Resource Pipeline section below
 - "service taxonomy", "product service", "attribute satisfaction", "srdef" → See Service Resource Pipeline section below
+- "container", "container_parent_id", "is_container", "entities inside CBU", "trading nodes outside" → See CBU Container Rendering section below
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -1084,6 +1086,75 @@ The UI includes a hierarchical browser for the service resource structure:
 | `rust/src/mcp/handlers/service_resource.rs` | MCP tool handlers |
 | `rust/crates/ob-poc-graph/src/graph/service_taxonomy.rs` | Taxonomy tree widget |
 | `rust/crates/ob-poc-ui/src/panels/service_taxonomy.rs` | UI panel wrapper |
+
+---
+
+## CBU Container Rendering
+
+The CBU graph uses container rendering to visually group entities inside a CBU box, while trading infrastructure nodes appear outside.
+
+### Container Field Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Server (ConfigDrivenGraphBuilder)                                          │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ CBU Node:     is_container: true, contains_type: "entity"           │   │
+│  │ Entity Nodes: container_parent_id: <cbu_id>                         │   │
+│  │ Trading Nodes: container_parent_id: null (outside container)        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼ API Response                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │ UI (LayoutGraph)                                                     │   │
+│  │ Uses container_parent_id to group nodes visually                     │   │
+│  │ render_containers() draws box around grouped nodes                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Visual Result
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│  ┌─────────────────────────────────────────┐                               │
+│  │         CBU: Acme Fund                  │    ┌──────────────────────┐   │
+│  │  ┌─────────────┐  ┌─────────────┐       │    │  Trading Profile     │   │
+│  │  │ Management  │  │ Investment  │       │    └──────────────────────┘   │
+│  │  │ Company     │  │ Manager     │       │              │               │
+│  │  └─────────────┘  └─────────────┘       │              ▼               │
+│  │  ┌─────────────┐  ┌─────────────┐       │    ┌──────────────────────┐   │
+│  │  │ Asset       │  │ Custodian   │       │    │  Instrument Matrix   │   │
+│  │  │ Owner       │  │             │       │    └──────────────────────┘   │
+│  │  └─────────────┘  └─────────────┘       │              │               │
+│  └─────────────────────────────────────────┘              ▼               │
+│       INSIDE CBU CONTAINER                     ┌───────────────────────┐   │
+│                                                │  Equities │ Bonds     │   │
+│                                                └───────────────────────┘   │
+│                                                   OUTSIDE CONTAINER        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Container Fields
+
+| Field | Set On | Value | Purpose |
+|-------|--------|-------|---------|
+| `is_container` | CBU node | `true` | Marks CBU as a container |
+| `contains_type` | CBU node | `"entity"` | Type of items inside |
+| `container_parent_id` | Entity nodes | CBU UUID | Groups entities in CBU box |
+| `container_parent_id` | Trading nodes | `null` | Renders outside the box |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/graph/config_driven_builder.rs` | Sets container fields server-side |
+| `rust/src/graph/types.rs` | `LegacyGraphNode` struct with container fields |
+| `rust/crates/ob-poc-graph/src/graph/layout.rs` | Uses `container_parent_id` for grouping |
+| `rust/crates/ob-poc-graph/src/graph/render.rs` | `render_containers()` draws box |
+| `rust/crates/ob-poc-graph/src/graph/types.rs` | `GraphNodeData` / `LayoutNode` structs |
+| `rust/crates/ob-poc-types/src/lib.rs` | Shared `GraphNode` type |
 
 ---
 

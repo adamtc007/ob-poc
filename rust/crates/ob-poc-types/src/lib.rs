@@ -1113,6 +1113,11 @@ pub struct GraphNode {
     /// Parent key for scoped queries (e.g., cbu_id)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_key: Option<String>,
+
+    /// ID of the container node this node belongs to (for visual grouping)
+    /// Entities inside a CBU have container_parent_id set to the CBU ID
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container_parent_id: Option<String>,
 }
 
 /// Verification status summary for entity relationships

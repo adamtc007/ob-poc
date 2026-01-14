@@ -333,6 +333,9 @@ impl ConfigDrivenGraphBuilder {
             // Apply rendering hints from config
             width: hints.as_ref().and_then(|h| h.default_width),
             height: hints.as_ref().and_then(|h| h.default_height),
+            // CBU is a container for entities
+            is_container: true,
+            contains_type: Some("entity".to_string()),
             data: serde_json::json!({
                 "jurisdiction": cbu_record.jurisdiction,
                 "client_type": cbu_record.client_type,
@@ -393,6 +396,8 @@ impl ConfigDrivenGraphBuilder {
                     person_state: ent.person_state.clone(),
                     width: hints.as_ref().and_then(|h| h.default_width),
                     height: hints.as_ref().and_then(|h| h.default_height),
+                    // Entity belongs inside the CBU container
+                    container_parent_id: Some(self.cbu_id.to_string()),
                     data: serde_json::json!({
                         "entity_id": ent.entity_id,
                         "entity_category": ent.entity_category,

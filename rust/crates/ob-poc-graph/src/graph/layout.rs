@@ -321,8 +321,8 @@ impl LayoutEngine {
                 child_count: node.child_count,
                 browse_nickname: node.browse_nickname.clone(),
                 parent_key: node.parent_key.clone(),
-                // Container parent (set below for SERVICE_DELIVERY view)
-                container_parent_id: None,
+                // Container parent - use server-provided value
+                container_parent_id: node.container_parent_id.clone(),
                 // Control portal fields
                 control_confidence: hints.control_confidence,
                 control_explanation: hints.control_explanation,
@@ -336,8 +336,8 @@ impl LayoutEngine {
             graph.nodes.insert(node.id.clone(), layout_node);
         }
 
-        // For TRADING view, set container_parent_id on trading entity nodes
-        // This shows the CBU as an outer container with entities inside
+        // For TRADING view, set container_parent_id on entity nodes if not already set by server
+        // (fallback for backward compatibility with older server responses)
         if self.view_mode == super::ViewMode {
             // Find the CBU node ID
             let cbu_id = graph
@@ -347,9 +347,10 @@ impl LayoutEngine {
                 .map(|n| n.id.clone());
 
             if let Some(ref cbu_id) = cbu_id {
-                // Set container_parent_id on all entity nodes (not products/services/resources)
+                // Set container_parent_id on entity nodes only if not already set by server
                 for node in graph.nodes.values_mut() {
-                    if !node.is_cbu_root
+                    if node.container_parent_id.is_none()
+                        && !node.is_cbu_root
                         && node.entity_type != EntityType::Product
                         && node.entity_type != EntityType::Service
                         && node.entity_type != EntityType::Resource

@@ -373,6 +373,11 @@ pub struct GraphNodeData {
     #[serde(default)]
     pub parent_key: Option<String>,
 
+    /// ID of the container node this node belongs to (for visual grouping)
+    /// Entities inside a CBU have container_parent_id set to the CBU ID
+    #[serde(default)]
+    pub container_parent_id: Option<String>,
+
     // =========================================================================
     // CONTROL PORTAL FIELDS - for ControlPortal node type
     // =========================================================================
@@ -940,6 +945,7 @@ impl From<ob_poc_types::GraphNode> for GraphNodeData {
             child_count: node.child_count,
             browse_nickname: node.browse_nickname,
             parent_key: node.parent_key,
+            container_parent_id: node.container_parent_id,
             // Control portal fields - not in shared types yet, default to None
             control_confidence: None,
             control_explanation: None,

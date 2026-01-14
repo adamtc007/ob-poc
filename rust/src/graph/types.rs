@@ -1962,6 +1962,10 @@ pub struct LegacyGraphNode {
     pub is_container: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contains_type: Option<String>,
+    /// ID of the container node this node belongs to (for visual grouping)
+    /// Used in TRADING view to show entities inside the CBU container
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub container_parent_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub child_count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
