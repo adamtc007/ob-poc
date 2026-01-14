@@ -419,16 +419,33 @@ pub struct CbuSearchResponse {
 }
 
 /// Individual CBU match from fuzzy search
+/// Field names match server's EntityMatch response
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct CbuSearchMatch {
-    /// CBU UUID
+    /// CBU UUID (from server's entity_id field)
+    #[serde(rename = "entity_id")]
     pub value: String,
-    /// Display name
+    /// Display name (from server's name field)
+    #[serde(rename = "name")]
     pub display: String,
-    /// Additional context (e.g., jurisdiction)
+    /// Additional context - jurisdiction (from server's jurisdiction field)
+    #[serde(rename = "jurisdiction")]
     pub detail: Option<String>,
-    /// Relevance score 0.0-1.0
+    /// Relevance score (from server's score field, converted from Option<f64>)
+    #[serde(default, deserialize_with = "deserialize_score")]
     pub score: f32,
+}
+
+/// Deserialize score from Option<f64> to f32, normalized to 0.0-1.0 range
+/// Tantivy scores can be > 1.0, so we normalize by dividing by 10 and clamping
+fn deserialize_score<'de, D>(deserializer: D) -> Result<f32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let opt: Option<f64> = Option::deserialize(deserializer)?;
+    let raw_score = opt.unwrap_or(0.0) as f32;
+    // Normalize: divide by 10 and clamp to 0.0-1.0
+    Ok((raw_score / 10.0).clamp(0.0, 1.0))
 }
 
 // =============================================================================
