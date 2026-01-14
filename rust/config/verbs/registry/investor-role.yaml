@@ -1,0 +1,532 @@
+domains:
+  investor-role:
+    description: |
+      Investor role profile management for UBO eligibility and look-through policy.
+      Controls how holders are treated for UBO determination and economic exposure computation.
+
+      Issuer-scoped: same holder can have different roles for different issuers.
+      Temporal: supports point-in-time queries for mid-year reclassifications.
+
+      Role types:
+      - END_INVESTOR: Ultimate beneficial owner candidate
+      - NOMINEE: Holding on behalf of others
+      - OMNIBUS: Omnibus account (multiple underlying)
+      - INTERMEDIARY_FOF: Fund-of-funds intermediary
+      - MASTER_POOL: Master pooling vehicle
+      - INTRA_GROUP_POOL: Intra-group pooling (same corporate group)
+      - TREASURY: Group treasury function
+      - CUSTODIAN: Custodial holding
+      - OTHER: Other role type
+
+    verbs:
+      # ============================================
+      # Core operations
+      # ============================================
+      set:
+        description: Set or update holder role profile (creates new temporal version)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: plugin
+        plugin_handler: investor_role_set
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Issuer entity (fund/vehicle)"
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Holder entity (investor)"
+          - name: role-type
+            type: string
+            required: true
+            maps_to: role_type
+            description: "Holder role classification"
+            validation:
+              enum:
+                - END_INVESTOR
+                - NOMINEE
+                - OMNIBUS
+                - INTERMEDIARY_FOF
+                - MASTER_POOL
+                - INTRA_GROUP_POOL
+                - TREASURY
+                - CUSTODIAN
+                - OTHER
+          - name: lookthrough-policy
+            type: string
+            required: false
+            maps_to: lookthrough_policy
+            default: NONE
+            description: "Look-through policy for economic exposure"
+            validation:
+              enum:
+                - NONE
+                - ON_DEMAND
+                - AUTO_IF_DATA
+                - ALWAYS
+          - name: holder-affiliation
+            type: string
+            required: false
+            maps_to: holder_affiliation
+            default: UNKNOWN
+            description: "Holder relationship to issuer group"
+            validation:
+              enum:
+                - INTRA_GROUP
+                - EXTERNAL
+                - MIXED
+                - UNKNOWN
+          - name: bo-data-available
+            type: boolean
+            required: false
+            maps_to: beneficial_owner_data_available
+            default: false
+            description: "Whether beneficial owner data is available for look-through"
+          - name: is-ubo-eligible
+            type: boolean
+            required: false
+            maps_to: is_ubo_eligible
+            default: true
+            description: "If false, never create UBO edges for this holder"
+          - name: share-class
+            type: uuid
+            required: false
+            maps_to: share_class_id
+            lookup:
+              table: share_classes
+              entity_type: share_class
+              schema: kyc
+              search_key: name
+              primary_key: id
+            description: "Optional share class scope (NULL = applies to all)"
+          - name: group-container
+            type: uuid
+            required: false
+            maps_to: group_container_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+            description: "Optional group container entity for intra-group holders"
+          - name: group-label
+            type: string
+            required: false
+            maps_to: group_label
+            description: "Optional label for group affiliation"
+          - name: effective-from
+            type: date
+            required: false
+            maps_to: effective_from
+            description: "Effective date (defaults to today)"
+          - name: source
+            type: string
+            required: false
+            maps_to: source
+            default: MANUAL
+            description: "Data source"
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+            description: "Free-text notes"
+        returns:
+          type: uuid
+          name: id
+          capture: true
+
+      read:
+        description: Read current role profile for holder-issuer relationship
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: crud
+        crud:
+          operation: select
+          table: investor_role_profiles
+          schema: kyc
+          where_clause: "effective_to IS NULL"
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+
+      read-as-of:
+        description: Read role profile as of a specific date (point-in-time query)
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: plugin
+        plugin_handler: investor_role_read_as_of
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: as-of-date
+            type: date
+            required: true
+            description: "Point-in-time date for query"
+        returns:
+          type: record
+
+      list-by-issuer:
+        description: List all current role profiles for an issuer
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: investor_role_profiles
+          schema: kyc
+          fk_col: issuer_entity_id
+          where_clause: "effective_to IS NULL"
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: role-type
+            type: string
+            required: false
+            maps_to: role_type
+            description: "Filter by role type"
+          - name: is-ubo-eligible
+            type: boolean
+            required: false
+            maps_to: is_ubo_eligible
+            description: "Filter by UBO eligibility"
+        returns:
+          type: record_set
+
+      list-by-holder:
+        description: List all current role profiles for a holder across issuers
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: investor_role_profiles
+          schema: kyc
+          fk_col: holder_entity_id
+          where_clause: "effective_to IS NULL"
+        args:
+          - name: holder
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      history:
+        description: Get all historical versions of a role profile
+        metadata:
+          tier: diagnostics
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: crud
+        crud:
+          operation: list_by_fk
+          table: investor_role_profiles
+          schema: kyc
+          fk_col: issuer_entity_id
+          order_by: effective_from DESC
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      # ============================================
+      # Convenience verbs for common patterns
+      # ============================================
+      mark-as-nominee:
+        description: Mark holder as nominee (not UBO eligible, no look-through)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: plugin
+        plugin_handler: investor_role_set
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        defaults:
+          role_type: NOMINEE
+          is_ubo_eligible: false
+          lookthrough_policy: NONE
+        returns:
+          type: uuid
+          name: id
+          capture: true
+
+      mark-as-fof:
+        description: Mark holder as fund-of-funds intermediary
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: plugin
+        plugin_handler: investor_role_set
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: bo-data-available
+            type: boolean
+            required: false
+            maps_to: beneficial_owner_data_available
+            default: false
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        defaults:
+          role_type: INTERMEDIARY_FOF
+          is_ubo_eligible: false
+          lookthrough_policy: ON_DEMAND
+        returns:
+          type: uuid
+          name: id
+          capture: true
+
+      mark-as-master-pool:
+        description: Mark holder as master pooling vehicle
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: plugin
+        plugin_handler: investor_role_set
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder-affiliation
+            type: string
+            required: false
+            maps_to: holder_affiliation
+            default: INTRA_GROUP
+            validation:
+              enum:
+                - INTRA_GROUP
+                - EXTERNAL
+                - MIXED
+                - UNKNOWN
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        defaults:
+          role_type: MASTER_POOL
+          is_ubo_eligible: false
+          lookthrough_policy: AUTO_IF_DATA
+        returns:
+          type: uuid
+          name: id
+          capture: true
+
+      mark-as-end-investor:
+        description: Mark holder as end investor (UBO eligible)
+        metadata:
+          tier: intent
+          source_of_truth: register
+          scope: cbu
+          noun: investor_role_profile
+        behavior: plugin
+        plugin_handler: investor_role_set
+        args:
+          - name: issuer
+            type: uuid
+            required: true
+            maps_to: issuer_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder
+            type: uuid
+            required: true
+            maps_to: holder_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: holder-affiliation
+            type: string
+            required: false
+            maps_to: holder_affiliation
+            default: EXTERNAL
+            validation:
+              enum:
+                - INTRA_GROUP
+                - EXTERNAL
+                - MIXED
+                - UNKNOWN
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        defaults:
+          role_type: END_INVESTOR
+          is_ubo_eligible: true
+          lookthrough_policy: NONE
+        returns:
+          type: uuid
+          name: id
+          capture: true

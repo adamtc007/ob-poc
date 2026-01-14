@@ -36,6 +36,7 @@ pub mod entity_query;
 mod gleif_ops;
 pub mod helpers;
 mod investor_ops;
+mod investor_role_ops;
 mod kyc_case_ops;
 mod lifecycle_ops;
 mod matrix_overlay_ops;
@@ -684,6 +685,9 @@ impl CustomOperationRegistry {
 
         // Investor lifecycle operations (TA KYC-as-a-Service)
         investor_ops::register_investor_ops(&mut registry);
+
+        // Investor role profile operations (UBO eligibility, look-through policy)
+        investor_role_ops::register_investor_role_ops(&mut registry);
 
         // Session v2 operations (Phase 6 - 9 verbs, memory-first)
         session_ops::register_session_ops_v2(&mut registry);
