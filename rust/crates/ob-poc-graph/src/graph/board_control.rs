@@ -173,6 +173,7 @@ pub fn compute_ownership_tree_layout(data: &ControlSphereData) -> LayoutGraph {
                     label: node.name.clone(),
                     sublabel: node.jurisdiction.clone(),
                     jurisdiction: node.jurisdiction.clone(),
+                    status: None,
                     base_position: position,
                     offset: Vec2::ZERO,
                     position,

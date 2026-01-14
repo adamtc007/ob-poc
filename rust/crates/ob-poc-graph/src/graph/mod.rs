@@ -151,6 +151,17 @@ pub struct GraphWidgetAction {
     pub select_entity: Option<String>,
     /// Navigate back from current view (BoardControl → CBU, Matrix → CBU)
     pub navigate_back: Option<NavigateBackAction>,
+    /// Navigate into an external taxonomy (InstrumentMatrix, Products, etc.)
+    pub navigate_taxonomy: Option<TaxonomyNavigationAction>,
+}
+
+/// Taxonomy navigation action - triggered by clicking on external taxonomy nodes
+#[derive(Debug, Clone)]
+pub enum TaxonomyNavigationAction {
+    /// Navigate to Trading Matrix view (Instrument Matrix / Markets)
+    TradingMatrix,
+    /// Navigate to Service Taxonomy view (Products / Services)
+    ServiceTaxonomy,
 }
 
 /// Navigation back action with context
@@ -499,6 +510,12 @@ impl CbuGraphWidget {
     /// Returns ContainerInfo if a container node was double-clicked
     pub fn take_container_action(&mut self) -> Option<ContainerInfo> {
         self.input_state.take_pending_container_open()
+    }
+
+    /// Take pending taxonomy navigation action (consumes it)
+    /// Returns TaxonomyNavigationAction if a taxonomy node was double-clicked
+    pub fn take_taxonomy_navigation_action(&mut self) -> Option<TaxonomyNavigationAction> {
+        self.input_state.take_pending_taxonomy_navigation()
     }
 
     /// Fit camera to show all nodes

@@ -441,6 +441,8 @@ pub struct LayoutNode {
     pub label: String,
     pub sublabel: Option<String>,
     pub jurisdiction: Option<String>,
+    /// Status: "active", "pending", "blocked", etc.
+    pub status: Option<String>,
 
     /// Base position from template layout
     pub base_position: Pos2,

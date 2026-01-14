@@ -46,6 +46,8 @@ pub struct InputState {
     pub pending_container_open: Option<super::ContainerInfo>,
     /// Pending enhance action (set by keyboard, consumed by CbuGraphWidget)
     pub pending_enhance_action: Option<EnhanceAction>,
+    /// Pending taxonomy navigation action (set on double-click of taxonomy node)
+    pub pending_taxonomy_navigation: Option<super::TaxonomyNavigationAction>,
 }
 
 impl InputState {
@@ -80,6 +82,11 @@ impl InputState {
     /// Take pending enhance action (consumes it)
     pub fn take_pending_enhance_action(&mut self) -> Option<EnhanceAction> {
         self.pending_enhance_action.take()
+    }
+
+    /// Take pending taxonomy navigation action (consumes it)
+    pub fn take_pending_taxonomy_navigation(&mut self) -> Option<super::TaxonomyNavigationAction> {
+        self.pending_taxonomy_navigation.take()
     }
 }
 
@@ -144,27 +151,52 @@ impl InputHandler {
             }
         }
 
-        // Handle double-click to open container, fit focused node, or toggle investor group
+        // Handle double-click to open container, navigate taxonomy, fit focused node, or toggle investor group
         if response.double_clicked() {
             if let Some(pos) = pointer_pos {
                 // First check if double-clicked on a node
                 if let Some(node_id) = Self::hit_test_node(pos, graph, camera, screen_rect) {
                     if let Some(node) = graph.get_node(&node_id) {
-                        // Check if this is a container node
-                        if node.is_container {
-                            // Set pending container open action
-                            state.pending_container_open = Some(super::ContainerInfo {
-                                container_id: node.id.clone(),
-                                container_type: node.contains_type.clone().unwrap_or_default(),
-                                label: node.label.clone(),
-                                parent_key: node.parent_key.clone(),
-                                browse_nickname: node.browse_nickname.clone(),
-                            });
-                            needs_repaint = true;
-                        } else {
-                            // Non-container node: pan to it
-                            camera.pan_to(node.position);
-                            needs_repaint = true;
+                        use super::types::EntityType;
+
+                        // Check if this is a taxonomy node (external to CBU container)
+                        match node.entity_type {
+                            EntityType::TradingProfile
+                            | EntityType::InstrumentMatrix
+                            | EntityType::InstrumentClass
+                            | EntityType::Market => {
+                                // Navigate to Trading Matrix view
+                                state.pending_taxonomy_navigation =
+                                    Some(super::TaxonomyNavigationAction::TradingMatrix);
+                                needs_repaint = true;
+                            }
+                            EntityType::Product | EntityType::Service | EntityType::Resource => {
+                                // Navigate to Service Taxonomy view
+                                state.pending_taxonomy_navigation =
+                                    Some(super::TaxonomyNavigationAction::ServiceTaxonomy);
+                                needs_repaint = true;
+                            }
+                            _ => {
+                                // Check if this is a container node
+                                if node.is_container {
+                                    // Set pending container open action
+                                    state.pending_container_open = Some(super::ContainerInfo {
+                                        container_id: node.id.clone(),
+                                        container_type: node
+                                            .contains_type
+                                            .clone()
+                                            .unwrap_or_default(),
+                                        label: node.label.clone(),
+                                        parent_key: node.parent_key.clone(),
+                                        browse_nickname: node.browse_nickname.clone(),
+                                    });
+                                    needs_repaint = true;
+                                } else {
+                                    // Non-container node: pan to it
+                                    camera.pan_to(node.position);
+                                    needs_repaint = true;
+                                }
+                            }
                         }
                     }
                 } else if let Some(_group_idx) =

@@ -292,6 +292,7 @@ impl LayoutEngine {
                 label: node.label.clone(),
                 sublabel: node.sublabel.clone(),
                 jurisdiction: node.jurisdiction.clone(),
+                status: Some(node.status.clone()),
                 base_position: position,
                 offset: Vec2::ZERO,
                 position,
@@ -380,8 +381,195 @@ impl LayoutEngine {
             graph.edges.push(layout_edge);
         }
 
+        // Position external taxonomies relative to CBU container
+        self.position_external_taxonomies(&mut graph);
+
         graph.recompute_bounds();
         graph
+    }
+
+    /// Position external taxonomy nodes (TradingProfile, InstrumentMatrix, etc.) relative to CBU container
+    ///
+    /// Layout:
+    /// - InstrumentMatrix and trading nodes: positioned ABOVE the CBU container
+    /// - Product/Service taxonomy: positioned BELOW the CBU container
+    fn position_external_taxonomies(&self, graph: &mut LayoutGraph) {
+        // Constants for external taxonomy positioning
+        const GAP_ABOVE: f32 = 100.0; // Gap between CBU container and Instrument Matrix
+        const GAP_BELOW: f32 = 100.0; // Gap between CBU container and Product Matrix
+        const TRADING_TIER_SPACING: f32 = 80.0; // Vertical spacing between trading tiers
+
+        // Find CBU container and compute its bounds from contained entities
+        let cbu_node = graph.nodes.values().find(|n| n.is_cbu_root);
+        let Some(cbu_node) = cbu_node else {
+            return; // No CBU node, nothing to position relative to
+        };
+        let cbu_id = cbu_node.id.clone();
+
+        // Compute container bounds from entities inside the CBU
+        let contained_nodes: Vec<_> = graph
+            .nodes
+            .values()
+            .filter(|n| n.container_parent_id.as_deref() == Some(&cbu_id))
+            .collect();
+
+        if contained_nodes.is_empty() {
+            return; // No entities in container, use default positions
+        }
+
+        // Calculate bounding box of contained nodes
+        let mut min_x = f32::MAX;
+        let mut max_x = f32::MIN;
+        let mut min_y = f32::MAX;
+        let mut max_y = f32::MIN;
+
+        for node in &contained_nodes {
+            let half_w = node.size.x / 2.0;
+            let half_h = node.size.y / 2.0;
+            min_x = min_x.min(node.position.x - half_w);
+            max_x = max_x.max(node.position.x + half_w);
+            min_y = min_y.min(node.position.y - half_h);
+            max_y = max_y.max(node.position.y + half_h);
+        }
+
+        // Add padding for container
+        let container_padding = 40.0;
+        min_x -= container_padding;
+        max_x += container_padding;
+        min_y -= container_padding;
+        max_y += container_padding;
+
+        let container_center_x = (min_x + max_x) / 2.0;
+        let container_top = min_y;
+        let container_bottom = max_y;
+
+        // Collect external taxonomy nodes by type
+        let mut trading_profile: Option<String> = None;
+        let mut instrument_matrix: Option<String> = None;
+        let mut instrument_classes: Vec<String> = Vec::new();
+        let mut markets: Vec<String> = Vec::new();
+        let mut products: Vec<String> = Vec::new();
+        let mut services: Vec<String> = Vec::new();
+
+        for (id, node) in &graph.nodes {
+            // Skip nodes inside the CBU container
+            if node.container_parent_id.is_some() || node.is_cbu_root {
+                continue;
+            }
+
+            match node.entity_type {
+                EntityType::TradingProfile => trading_profile = Some(id.clone()),
+                EntityType::InstrumentMatrix => instrument_matrix = Some(id.clone()),
+                EntityType::InstrumentClass => instrument_classes.push(id.clone()),
+                EntityType::Market => markets.push(id.clone()),
+                EntityType::Product => products.push(id.clone()),
+                EntityType::Service => services.push(id.clone()),
+                _ => {}
+            }
+        }
+
+        // Position trading layer ABOVE the container
+        // Tier layout (from bottom to top):
+        // 1. TradingProfile (closest to CBU)
+        // 2. InstrumentMatrix
+        // 3. InstrumentClasses (spread horizontally)
+        // 4. Markets (spread horizontally)
+
+        let mut current_y = container_top - GAP_ABOVE;
+
+        // Position TradingProfile
+        if let Some(ref profile_id) = trading_profile {
+            if let Some(node) = graph.nodes.get_mut(profile_id) {
+                node.position = Pos2::new(container_center_x, current_y);
+                node.base_position = node.position;
+                current_y -= node.size.y + TRADING_TIER_SPACING;
+            }
+        }
+
+        // Position InstrumentMatrix
+        if let Some(ref matrix_id) = instrument_matrix {
+            if let Some(node) = graph.nodes.get_mut(matrix_id) {
+                node.position = Pos2::new(container_center_x, current_y);
+                node.base_position = node.position;
+                current_y -= node.size.y + TRADING_TIER_SPACING;
+            }
+        }
+
+        // Position InstrumentClasses (spread horizontally)
+        if !instrument_classes.is_empty() {
+            let count = instrument_classes.len();
+            let spacing = 180.0;
+            let total_width = (count - 1) as f32 * spacing;
+            let start_x = container_center_x - total_width / 2.0;
+
+            for (i, class_id) in instrument_classes.iter().enumerate() {
+                if let Some(node) = graph.nodes.get_mut(class_id) {
+                    let x = start_x + i as f32 * spacing;
+                    node.position = Pos2::new(x, current_y);
+                    node.base_position = node.position;
+                }
+            }
+            if let Some(first_node) = instrument_classes
+                .first()
+                .and_then(|id| graph.nodes.get(id))
+            {
+                current_y -= first_node.size.y + TRADING_TIER_SPACING;
+            }
+        }
+
+        // Position Markets (spread horizontally)
+        if !markets.is_empty() {
+            let count = markets.len();
+            let spacing = 160.0;
+            let total_width = (count - 1) as f32 * spacing;
+            let start_x = container_center_x - total_width / 2.0;
+
+            for (i, market_id) in markets.iter().enumerate() {
+                if let Some(node) = graph.nodes.get_mut(market_id) {
+                    let x = start_x + i as f32 * spacing;
+                    node.position = Pos2::new(x, current_y);
+                    node.base_position = node.position;
+                }
+            }
+        }
+
+        // Position Product/Service taxonomy BELOW the container
+        let mut current_y = container_bottom + GAP_BELOW;
+
+        // Position Products (spread horizontally)
+        if !products.is_empty() {
+            let count = products.len();
+            let spacing = 180.0;
+            let total_width = (count - 1) as f32 * spacing;
+            let start_x = container_center_x - total_width / 2.0;
+
+            for (i, product_id) in products.iter().enumerate() {
+                if let Some(node) = graph.nodes.get_mut(product_id) {
+                    let x = start_x + i as f32 * spacing;
+                    node.position = Pos2::new(x, current_y);
+                    node.base_position = node.position;
+                }
+            }
+            if let Some(first_node) = products.first().and_then(|id| graph.nodes.get(id)) {
+                current_y += first_node.size.y + TRADING_TIER_SPACING;
+            }
+        }
+
+        // Position Services (spread horizontally, below products)
+        if !services.is_empty() {
+            let count = services.len();
+            let spacing = 160.0;
+            let total_width = (count - 1) as f32 * spacing;
+            let start_x = container_center_x - total_width / 2.0;
+
+            for (i, service_id) in services.iter().enumerate() {
+                if let Some(node) = graph.nodes.get_mut(service_id) {
+                    let x = start_x + i as f32 * spacing;
+                    node.position = Pos2::new(x, current_y);
+                    node.base_position = node.position;
+                }
+            }
+        }
     }
 
     /// Template-based layout (fallback when server doesn't provide positions)
@@ -514,6 +702,7 @@ impl LayoutEngine {
                 label: node.label.clone(),
                 sublabel: node.sublabel.clone(),
                 jurisdiction: node.jurisdiction.clone(),
+                status: Some(node.status.clone()),
                 position,
                 base_size: node_size,
                 size_override: None,
@@ -585,6 +774,7 @@ impl LayoutEngine {
                 label: node.label.clone(),
                 sublabel: node.sublabel.clone(),
                 jurisdiction: node.jurisdiction.clone(),
+                status: Some(node.status.clone()),
                 position,
                 base_size: node_size,
                 size_override: None,
@@ -688,6 +878,7 @@ impl LayoutEngine {
                     label: product.label.clone(),
                     sublabel: product.sublabel.clone(),
                     jurisdiction: None,
+                    status: None,
                     position,
                     base_size: node_size,
                     size_override: None,
@@ -749,6 +940,7 @@ impl LayoutEngine {
                             label: service.label.clone(),
                             sublabel: service.sublabel.clone(),
                             jurisdiction: None,
+                            status: None,
                             base_position: svc_position,
                             offset: Vec2::ZERO,
                             position: svc_position,
@@ -812,6 +1004,7 @@ impl LayoutEngine {
                                     label: resource.label.clone(),
                                     sublabel: resource.sublabel.clone(),
                                     jurisdiction: None,
+                                    status: None,
                                     base_position: res_position,
                                     offset: Vec2::ZERO,
                                     position: res_position,
@@ -892,6 +1085,7 @@ impl LayoutEngine {
                     label: service.label.clone(),
                     sublabel: service.sublabel.clone(),
                     jurisdiction: None,
+                    status: None,
                     position,
                     base_size: node_size,
                     size_override: None,
@@ -966,6 +1160,7 @@ impl LayoutEngine {
                     label: resource.label.clone(),
                     sublabel: resource.sublabel.clone(),
                     jurisdiction: None,
+                    status: None,
                     position,
                     base_size: node_size,
                     size_override: None,

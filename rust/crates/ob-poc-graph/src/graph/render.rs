@@ -155,6 +155,9 @@ impl GraphRenderer {
             );
         }
 
+        // Render attachment edges (CBU container to external taxonomies)
+        self.render_attachment_edges(painter, graph, camera, screen_rect);
+
         // Render nodes (skip nodes that are rendered as containers)
         let container_ids: std::collections::HashSet<&str> = graph
             .nodes
@@ -229,11 +232,12 @@ impl GraphRenderer {
 
         // Render each container
         for (container_id, child_nodes) in containers {
-            // Get the container node (CBU) for label
+            // Get the container node (CBU) for label and status
             let container_node = graph.get_node(&container_id);
             let container_label = container_node
                 .map(|n| n.label.as_str())
                 .unwrap_or("Container");
+            let container_status = container_node.and_then(|n| n.status.as_deref());
 
             // Calculate bounding box of all child nodes
             if let Some(bounds) = self.compute_container_bounds(&child_nodes, camera, screen_rect) {
@@ -241,11 +245,156 @@ impl GraphRenderer {
                     painter,
                     bounds,
                     container_label,
+                    container_status,
                     camera,
                     screen_rect,
                 );
             }
         }
+    }
+
+    /// Render attachment edges from CBU container to external taxonomy nodes
+    ///
+    /// These edges visually connect the container boundary to external nodes
+    /// (TradingProfile, InstrumentMatrix above; Products below)
+    fn render_attachment_edges(
+        &self,
+        painter: &egui::Painter,
+        graph: &LayoutGraph,
+        camera: &Camera2D,
+        screen_rect: Rect,
+    ) {
+        use super::types::EntityType;
+
+        // Find CBU container and its bounds
+        let cbu_node = graph.nodes.values().find(|n| n.is_cbu_root);
+        let Some(cbu_node) = cbu_node else {
+            return;
+        };
+        let cbu_id = &cbu_node.id;
+
+        // Get contained nodes to compute container bounds
+        let contained_nodes: Vec<_> = graph
+            .nodes
+            .values()
+            .filter(|n| n.container_parent_id.as_deref() == Some(cbu_id))
+            .collect();
+
+        let Some(container_bounds) =
+            self.compute_container_bounds(&contained_nodes, camera, screen_rect)
+        else {
+            return;
+        };
+
+        // Find external taxonomy nodes to connect to
+        let mut trading_profile: Option<&super::types::LayoutNode> = None;
+        let mut instrument_matrix: Option<&super::types::LayoutNode> = None;
+        let mut first_product: Option<&super::types::LayoutNode> = None;
+
+        for node in graph.nodes.values() {
+            // Skip nodes inside the container
+            if node.container_parent_id.is_some() || node.is_cbu_root {
+                continue;
+            }
+
+            match node.entity_type {
+                EntityType::TradingProfile => trading_profile = Some(node),
+                EntityType::InstrumentMatrix => instrument_matrix = Some(node),
+                EntityType::Product => {
+                    if first_product.is_none() {
+                        first_product = Some(node);
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        // Style for attachment edges
+        let edge_color = Color32::from_rgb(100, 116, 139); // slate-500
+        let edge_width = 1.5 * camera.zoom();
+        let connector_radius = 4.0 * camera.zoom();
+
+        // Draw attachment edge to TradingProfile (above container)
+        if let Some(profile) = trading_profile {
+            let profile_screen_pos = camera.world_to_screen(profile.position, screen_rect);
+            let profile_size = profile.size * camera.zoom();
+
+            // From container top center to profile bottom
+            let start = Pos2::new(container_bounds.center().x, container_bounds.min.y);
+            let end = Pos2::new(
+                profile_screen_pos.x,
+                profile_screen_pos.y + profile_size.y / 2.0,
+            );
+
+            self.render_attachment_edge_line(
+                painter,
+                start,
+                end,
+                edge_color,
+                edge_width,
+                connector_radius,
+            );
+        }
+        // If no trading profile, connect directly to instrument matrix
+        else if let Some(matrix) = instrument_matrix {
+            let matrix_screen_pos = camera.world_to_screen(matrix.position, screen_rect);
+            let matrix_size = matrix.size * camera.zoom();
+
+            let start = Pos2::new(container_bounds.center().x, container_bounds.min.y);
+            let end = Pos2::new(
+                matrix_screen_pos.x,
+                matrix_screen_pos.y + matrix_size.y / 2.0,
+            );
+
+            self.render_attachment_edge_line(
+                painter,
+                start,
+                end,
+                edge_color,
+                edge_width,
+                connector_radius,
+            );
+        }
+
+        // Draw attachment edge to first Product (below container)
+        if let Some(product) = first_product {
+            let product_screen_pos = camera.world_to_screen(product.position, screen_rect);
+            let product_size = product.size * camera.zoom();
+
+            // From container bottom center to product top
+            let start = Pos2::new(container_bounds.center().x, container_bounds.max.y);
+            let end = Pos2::new(
+                product_screen_pos.x,
+                product_screen_pos.y - product_size.y / 2.0,
+            );
+
+            self.render_attachment_edge_line(
+                painter,
+                start,
+                end,
+                edge_color,
+                edge_width,
+                connector_radius,
+            );
+        }
+    }
+
+    /// Render a single attachment edge with connector circles at endpoints
+    fn render_attachment_edge_line(
+        &self,
+        painter: &egui::Painter,
+        start: Pos2,
+        end: Pos2,
+        color: Color32,
+        width: f32,
+        connector_radius: f32,
+    ) {
+        // Draw the line
+        painter.line_segment([start, end], Stroke::new(width, color));
+
+        // Draw connector circles at endpoints
+        painter.circle_filled(start, connector_radius, color);
+        painter.circle_filled(end, connector_radius, color);
     }
 
     /// Compute the bounding box for a container's child nodes (in screen coordinates)
@@ -289,12 +438,13 @@ impl GraphRenderer {
         ))
     }
 
-    /// Render a container background with label
+    /// Render a container background with label and status badge
     fn render_container_background(
         &self,
         painter: &egui::Painter,
         bounds: Rect,
         label: &str,
+        status: Option<&str>,
         camera: &Camera2D,
         _screen_rect: Rect,
     ) {
@@ -329,6 +479,40 @@ impl GraphRenderer {
             FontId::proportional(font_size),
             label_color,
         );
+
+        // Status badge on the right side of header
+        if let Some(status_str) = status {
+            let status_lower = status_str.to_lowercase();
+            let (status_color, status_text) = match status_lower.as_str() {
+                "active" => (Color32::from_rgb(34, 197, 94), "Active"), // green-500
+                "pending" => (Color32::from_rgb(250, 204, 21), "Pending"), // yellow-400
+                "blocked" => (Color32::from_rgb(239, 68, 68), "Blocked"), // red-500
+                "draft" => (Color32::from_rgb(148, 163, 184), "Draft"), // slate-400
+                "approved" => (Color32::from_rgb(34, 197, 94), "Approved"), // green-500
+                "rejected" => (Color32::from_rgb(239, 68, 68), "Rejected"), // red-500
+                _ => (Color32::from_rgb(148, 163, 184), status_str),    // slate-400 for unknown
+            };
+
+            // Draw status indicator circle
+            let badge_x = bounds.right() - 20.0 * camera.zoom();
+            let badge_y = bounds.top() + header_height / 2.0;
+            let badge_radius = 5.0 * camera.zoom();
+
+            painter.circle_filled(Pos2::new(badge_x, badge_y), badge_radius, status_color);
+
+            // Draw status text next to the circle (if zoomed in enough)
+            if camera.zoom() > 0.6 {
+                let text_pos = Pos2::new(badge_x - 8.0 * camera.zoom(), badge_y);
+                let text_size = 10.0 * camera.zoom();
+                painter.text(
+                    text_pos,
+                    egui::Align2::RIGHT_CENTER,
+                    status_text,
+                    FontId::proportional(text_size),
+                    status_color,
+                );
+            }
+        }
 
         // Optional: render a subtle header divider line
         let divider_y = bounds.top() + header_height;
