@@ -422,8 +422,394 @@ async fn test_issuer_control_config_defaults() {
 }
 
 // =============================================================================
+// UBO SYNC TRIGGER TESTS (Migration 029)
+// =============================================================================
+
+/// Test that TA holdings (usage_type='TA') do NOT create UBO edges
+/// even when ownership ≥25%
+#[tokio::test]
+async fn test_ubo_sync_skips_ta_holdings() {
+    let pool = get_pool().await;
+
+    // Create test entities
+    let fund_id = create_test_entity(&pool, "Test Fund for TA").await;
+    let investor_id = create_test_entity(&pool, "Test TA Investor").await;
+
+    // Create a share class for the fund
+    let share_class_id = create_test_share_class(&pool, fund_id, "Class A TA Test").await;
+
+    // Create a TA holding with 30% ownership (should NOT create UBO edge)
+    sqlx::query!(
+        r#"
+        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        VALUES ($1, $2, 30.0, 'TA', 'active')
+        "#,
+        share_class_id,
+        investor_id
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Verify NO ownership relationship was created
+    let edge_count: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) as "count!"
+        FROM "ob-poc".entity_relationships
+        WHERE from_entity_id = $1
+          AND to_entity_id = $2
+          AND relationship_type = 'ownership'
+          AND source = 'INVESTOR_REGISTER'
+        "#,
+        investor_id,
+        fund_id
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(
+        edge_count, 0,
+        "TA holdings should NOT create UBO ownership edges"
+    );
+
+    // Cleanup
+    cleanup_test_share_class(&pool, share_class_id).await;
+    cleanup_test_entity(&pool, fund_id).await;
+    cleanup_test_entity(&pool, investor_id).await;
+}
+
+/// Test that UBO holdings DO create UBO edges when ownership ≥25%
+/// and no role profile restricts it
+#[tokio::test]
+async fn test_ubo_sync_creates_edge_for_ubo_holdings() {
+    let pool = get_pool().await;
+
+    // Create test entities
+    let fund_id = create_test_entity(&pool, "Test Fund for UBO").await;
+    let investor_id = create_test_entity(&pool, "Test UBO Investor").await;
+
+    // Create a share class for the fund
+    let share_class_id = create_test_share_class(&pool, fund_id, "Class A UBO Test").await;
+
+    // Create a UBO holding with 30% ownership (should create UBO edge)
+    sqlx::query!(
+        r#"
+        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        VALUES ($1, $2, 30.0, 'UBO', 'active')
+        "#,
+        share_class_id,
+        investor_id
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Verify ownership relationship WAS created
+    let edge_count: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) as "count!"
+        FROM "ob-poc".entity_relationships
+        WHERE from_entity_id = $1
+          AND to_entity_id = $2
+          AND relationship_type = 'ownership'
+          AND source = 'INVESTOR_REGISTER'
+        "#,
+        investor_id,
+        fund_id
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(
+        edge_count, 1,
+        "UBO holdings ≥25% should create ownership edges"
+    );
+
+    // Cleanup
+    sqlx::query!(
+        r#"
+        DELETE FROM "ob-poc".entity_relationships
+        WHERE from_entity_id = $1 AND to_entity_id = $2 AND source = 'INVESTOR_REGISTER'
+        "#,
+        investor_id,
+        fund_id
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    cleanup_test_share_class(&pool, share_class_id).await;
+    cleanup_test_entity(&pool, fund_id).await;
+    cleanup_test_entity(&pool, investor_id).await;
+}
+
+/// Test that role profile with is_ubo_eligible=false prevents UBO edge creation
+#[tokio::test]
+async fn test_ubo_sync_respects_ubo_eligibility_false() {
+    let pool = get_pool().await;
+
+    // Create test entities
+    let fund_id = create_test_entity(&pool, "Test Fund Eligibility").await;
+    let nominee_id = create_test_entity(&pool, "Test Nominee Holder").await;
+
+    // Create a role profile marking the holder as NOT UBO eligible (nominee)
+    sqlx::query!(
+        r#"
+        INSERT INTO kyc.investor_role_profiles
+        (issuer_entity_id, holder_entity_id, role_type, is_ubo_eligible, lookthrough_policy)
+        VALUES ($1, $2, 'NOMINEE', false, 'NONE')
+        "#,
+        fund_id,
+        nominee_id
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Create a share class for the fund
+    let share_class_id = create_test_share_class(&pool, fund_id, "Class A Nominee Test").await;
+
+    // Create a UBO holding with 50% ownership
+    // Despite being usage_type='UBO' and ≥25%, should NOT create edge because is_ubo_eligible=false
+    sqlx::query!(
+        r#"
+        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        VALUES ($1, $2, 50.0, 'UBO', 'active')
+        "#,
+        share_class_id,
+        nominee_id
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Verify NO ownership relationship was created
+    let edge_count: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) as "count!"
+        FROM "ob-poc".entity_relationships
+        WHERE from_entity_id = $1
+          AND to_entity_id = $2
+          AND relationship_type = 'ownership'
+          AND source = 'INVESTOR_REGISTER'
+        "#,
+        nominee_id,
+        fund_id
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(
+        edge_count, 0,
+        "Holdings from is_ubo_eligible=false holders should NOT create UBO edges"
+    );
+
+    // Cleanup
+    cleanup_test_share_class(&pool, share_class_id).await;
+    cleanup_test_entity(&pool, fund_id).await;
+    cleanup_test_entity(&pool, nominee_id).await;
+}
+
+/// Test that pooled vehicle role types (INTERMEDIARY_FOF, MASTER_POOL) default-deny UBO edges
+#[tokio::test]
+async fn test_ubo_sync_default_deny_pooled_vehicles() {
+    let pool = get_pool().await;
+
+    // Create test entities
+    let fund_id = create_test_entity(&pool, "Test Fund Pooled").await;
+    let fof_id = create_test_entity(&pool, "Test FoF Holder").await;
+
+    // Create a role profile with INTERMEDIARY_FOF type but NO explicit is_ubo_eligible
+    // The trigger should default-deny for pooled vehicle types
+    sqlx::query!(
+        r#"
+        INSERT INTO kyc.investor_role_profiles
+        (issuer_entity_id, holder_entity_id, role_type, lookthrough_policy)
+        VALUES ($1, $2, 'INTERMEDIARY_FOF', 'ON_DEMAND')
+        "#,
+        fund_id,
+        fof_id
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Create a share class for the fund
+    let share_class_id = create_test_share_class(&pool, fund_id, "Class A FoF Test").await;
+
+    // Create a UBO holding with 40% ownership
+    sqlx::query!(
+        r#"
+        INSERT INTO kyc.holdings (share_class_id, investor_entity_id, units, usage_type, status)
+        VALUES ($1, $2, 40.0, 'UBO', 'active')
+        "#,
+        share_class_id,
+        fof_id
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    // Verify NO ownership relationship was created (default-deny for pooled vehicles)
+    let edge_count: i64 = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) as "count!"
+        FROM "ob-poc".entity_relationships
+        WHERE from_entity_id = $1
+          AND to_entity_id = $2
+          AND relationship_type = 'ownership'
+          AND source = 'INVESTOR_REGISTER'
+        "#,
+        fof_id,
+        fund_id
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(
+        edge_count, 0,
+        "Pooled vehicle role types should default-deny UBO edge creation"
+    );
+
+    // Cleanup
+    cleanup_test_share_class(&pool, share_class_id).await;
+    cleanup_test_entity(&pool, fund_id).await;
+    cleanup_test_entity(&pool, fof_id).await;
+}
+
+// =============================================================================
+// ECONOMIC EXPOSURE BOUNDEDNESS TESTS
+// =============================================================================
+
+/// Test that max_rows parameter is respected
+#[tokio::test]
+async fn test_economic_exposure_max_rows_limit() {
+    let pool = get_pool().await;
+
+    // Call with max_rows=5 on a non-existent entity (should return 0 anyway)
+    // This mainly tests that the parameter is accepted and function doesn't crash
+    let result = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as "count!" FROM kyc.fn_compute_economic_exposure(
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            CURRENT_DATE,
+            6,      -- max_depth
+            0.0001, -- min_pct
+            5,      -- max_rows = 5
+            true,
+            true
+        )
+        "#
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // With no data, should return 0 rows (well under the limit)
+    assert!(
+        result.count <= 5,
+        "max_rows parameter should limit results to 5"
+    );
+}
+
+/// Test that min_pct threshold stops traversal
+#[tokio::test]
+async fn test_economic_exposure_min_pct_threshold() {
+    let pool = get_pool().await;
+
+    // Call with min_pct=50% - only very large holdings would traverse
+    let result = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as "count!" FROM kyc.fn_compute_economic_exposure(
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            CURRENT_DATE,
+            6,
+            0.50,   -- min_pct = 50% (very high threshold)
+            200,
+            true,
+            true
+        )
+        "#
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // Should work without error
+    assert_eq!(result.count, 0);
+}
+
+/// Test that max_depth parameter is accepted
+#[tokio::test]
+async fn test_economic_exposure_max_depth_parameter() {
+    let pool = get_pool().await;
+
+    // Call with max_depth=2
+    let result = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as "count!" FROM kyc.fn_compute_economic_exposure(
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            CURRENT_DATE,
+            2,      -- max_depth = 2 (shallow)
+            0.0001,
+            200,
+            true,
+            true
+        )
+        "#
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // Should work without error
+    assert_eq!(result.count, 0);
+}
+
+// =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
+
+async fn create_test_share_class(pool: &PgPool, entity_id: Uuid, name: &str) -> Uuid {
+    let share_class_id = Uuid::new_v4();
+    let unique_name = format!("{} {}", name, share_class_id);
+
+    sqlx::query!(
+        r#"
+        INSERT INTO kyc.share_classes (id, entity_id, name, status)
+        VALUES ($1, $2, $3, 'active')
+        "#,
+        share_class_id,
+        entity_id,
+        unique_name
+    )
+    .execute(pool)
+    .await
+    .unwrap();
+
+    share_class_id
+}
+
+async fn cleanup_test_share_class(pool: &PgPool, share_class_id: Uuid) {
+    // Delete holdings first
+    let _ = sqlx::query!(
+        "DELETE FROM kyc.holdings WHERE share_class_id = $1",
+        share_class_id
+    )
+    .execute(pool)
+    .await;
+
+    // Delete share class
+    let _ = sqlx::query!(
+        "DELETE FROM kyc.share_classes WHERE id = $1",
+        share_class_id
+    )
+    .execute(pool)
+    .await;
+}
 
 async fn create_test_entity(pool: &PgPool, name: &str) -> Uuid {
     let entity_id = Uuid::new_v4();

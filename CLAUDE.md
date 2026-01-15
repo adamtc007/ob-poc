@@ -708,9 +708,9 @@ Configured per issuer in `kyc.issuer_control_config`:
 ## Investor Register & Economic Look-Through Pipeline
 
 > **Status:** ✅ Complete
-> **Migrations:** 029-031 (role profiles, fund vehicles, economic look-through)
+> **Migrations:** 028-031 (role profiles, fund vehicles, economic look-through, UBO sync trigger)
 > **Verbs:** 35+ across 4 domains (investor-role, fund-vehicle, fund-compartment, economic-exposure)
-> **Tests:** 7 integration tests in `rust/tests/investor_register_tests.rs`
+> **Tests:** 14 integration tests in `rust/tests/investor_register_tests.rs`
 
 ### The Problem: Control vs Economic Ownership
 
