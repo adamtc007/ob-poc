@@ -1,6 +1,15 @@
 domains:
   trading-profile:
     description: "Trading profile document management - single source of truth for CBU trading configuration"
+    invocation_hints:
+      - trading profile
+      - trading setup
+      - trading configuration
+      - ISDA
+      - CSA
+      - counterparty
+      - instruments
+      - markets
     verbs:
       import:
         description: Import a trading profile document from YAML/JSON file or inline content
@@ -336,6 +345,14 @@ domains:
         description: Add instrument class to trading profile universe
         behavior: plugin
         handler: add_instrument_class_to_profile
+        invocation_phrases:
+          - add instruments
+          - add instrument class
+          - enable trading
+          - add to universe
+          - add equities
+          - add bonds
+          - add derivatives
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -396,6 +413,13 @@ domains:
         description: Add market to trading profile universe under an instrument class
         behavior: plugin
         handler: add_market_to_profile
+        invocation_phrases:
+          - add market
+          - add exchange
+          - add NYSE
+          - add LSE
+          - enable market
+          - trade on
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -653,6 +677,13 @@ domains:
         description: Add ISDA master agreement to trading profile
         behavior: plugin
         handler: add_isda_config_to_profile
+        invocation_phrases:
+          - add ISDA
+          - establish ISDA
+          - create ISDA
+          - set up ISDA
+          - add counterparty
+          - add counterparty for derivatives
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -724,6 +755,12 @@ domains:
         description: Add CSA (Credit Support Annex) to ISDA agreement
         behavior: plugin
         handler: add_csa_config_to_profile
+        invocation_phrases:
+          - add CSA
+          - add credit support annex
+          - add VM CSA
+          - add IM CSA
+          - add collateral agreement
         metadata:
           tier: intent
           source_of_truth: matrix

@@ -313,7 +313,9 @@ pub enum IntentAst {
     CounterpartyList { cbu: Option<EntityRef> },
 
     /// Show ISDA details.
-    IsdaShow { counterparty: EntityRef },
+    /// - If counterparty is Some, show ISDA for that counterparty.
+    /// - If counterparty is None, list all ISDAs.
+    IsdaShow { counterparty: Option<EntityRef> },
 
     // ========== Fallback ==========
     /// Unrecognized intent (requires clarification).

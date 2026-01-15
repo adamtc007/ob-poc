@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-14
+> **Last reviewed:** 2026-01-15
 > **Verb count:** 800+ verbs across 103 YAML files
 > **Custom ops:** 51 plugin handlers
 > **Crates:** 13 fine-grained crates
@@ -16,6 +16,7 @@
 > **CBU Container Rendering:** ✅ Complete - Container layout with status badge, external taxonomy positioning, attachment edges, taxonomy navigation
 > **Entity Resolution:** ⚠️ In Progress - UX design + implementation plan done, UI wiring pending
 > **Service Resource Pipeline:** ✅ Complete - Intent→Discovery→Attributes→Provisioning→Readiness + taxonomy viz
+> **Lexicon Intent Parser:** ✅ Complete - AST lowering with type inference, Plan/Render separation, 100% harness pass rate
 
 This file provides guidance to Claude Code when working with this repository.
 
@@ -120,6 +121,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "service resource", "service intent", "resource discovery", "provisioning", "readiness" → See Service Resource Pipeline section below
 - "service taxonomy", "product service", "attribute satisfaction", "srdef" → See Service Resource Pipeline section below
 - "container", "container_parent_id", "is_container", "entities inside CBU", "trading nodes outside", "status badge", "attachment edge", "taxonomy navigation", "external taxonomy" → See CBU Container Rendering section below
+- "intent parser", "NLU", "natural language", "lexicon", "tokenizer", "AST lowering", "type inference", "Plan/Render", "SemanticAction", "lexicon harness" → See Lexicon Intent Parser section below
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -616,6 +618,182 @@ If uncertain about DSL semantics, CBU/UBO/KYC domain rules, research workflow pa
 4. Wait for guidance
 
 Never silently "guess and commit" on complex domain logic.
+
+---
+
+## Lexicon Intent Parser (Agent NLU)
+
+> **Status:** ✅ Complete - 100% test pass rate on lexicon harness
+> **Key Capability:** Natural language → DSL generation with entity type inference
+
+The lexicon intent parser is a **compiler-style pipeline** that transforms natural language into executable DSL. This is foundational for the agent to correctly select DSL verbs from user intent.
+
+### Architecture: Rust Compiler-Inspired
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Lexicon Intent Parser Pipeline                            │
+│                                                                              │
+│  ┌───────────┐    ┌───────────┐    ┌───────────┐    ┌───────────┐           │
+│  │ Tokenize  │ → │   Lower   │ → │   Parse   │ → │   Plan    │ → DSL      │
+│  │           │    │           │    │           │    │ + Render  │           │
+│  │ Raw text  │    │ Type      │    │ Nom       │    │ Slot-     │           │
+│  │ to tokens │    │ inference │    │ combinator│    │ based     │           │
+│  │           │    │ + fusion  │    │ grammar   │    │ rendering │           │
+│  └───────────┘    └───────────┘    └───────────┘    └───────────┘           │
+│                                                                              │
+│  Key insight: LLM does DISCOVERY, DSL does EXECUTION                        │
+│  This pipeline is the bridge - deterministic intent → verb mapping          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Phase 1: Tokenization (`tokenizer.rs`)
+
+Converts raw text into typed tokens using lexicon dictionary:
+
+```rust
+// Input: "create counterparty Barclays under NY law"
+// Output: [
+//   Token { text: "create", token_type: Verb(Create) },
+//   Token { text: "counterparty", token_type: Entity(Counterparty) },
+//   Token { text: "Barclays", token_type: Entity(Generic) },
+//   Token { text: "under", token_type: Prep(Under) },
+//   Token { text: "NY law", token_type: Law },
+// ]
+```
+
+### Phase 2: AST Lowering (`lowering.rs`)
+
+**Rust compiler-inspired type inference pass.** Like HIR lowering in rustc, this normalizes surface syntax variations into canonical form with inferred types.
+
+**Type Inference Rules:**
+
+| Pattern | Inference | Rationale |
+|---------|-----------|-----------|
+| `counterparty <name>` | name : Counterparty | Type indicator precedes name |
+| `<name> as counterparty` | name : Counterparty | Post-position type indicator |
+| `<name> under <law>` | name : Counterparty | OTC context (law = ISDA domain) |
+| `<name> for IRS/CDS` | name : Counterparty | OTC instruments imply counterparty |
+| `assign <name> as <role>` | name : Person | Role assignment implies person |
+
+**Multi-Word Entity Fusion:**
+```rust
+// Input: "Deutsche Bank AG" (3 tokens)
+// Output: Single token "Deutsche Bank AG" with type Entity(Generic)
+```
+
+**Source Tracking:**
+```rust
+pub enum TokenSource {
+    Lexicon,   // From tokenizer
+    Lowering,  // Created by lowering pass (fused/inferred)
+}
+```
+
+### Phase 3: Intent Parsing (`intent_parser.rs`)
+
+Nom-based combinator parser that recognizes grammatical patterns:
+
+```rust
+// Grammar patterns recognized:
+// - verb entity law? instruments?    ("create counterparty Barclays under NY law")
+// - entity verb prep?                ("Barclays as counterparty")
+// - verb role entity prep entity     ("assign director Smith to Acme")
+// - terse patterns                   ("counterparty add: HSBC")
+```
+
+**Off-Topic Detection:**
+```rust
+// "what is the weather today" → IntentAst::Unknown
+// Early detection prevents false-positive verb matches
+```
+
+### Phase 4: Plan + Render (`intent_plan.rs`, `dsl_render.rs`)
+
+**S-expression friendly rendering** with slot-based intermediate representation:
+
+```rust
+// Plan (intermediate)
+Plan {
+    action: SemanticAction::CreateCounterparty,
+    slots: {
+        "counterparty": Entity { name: "Barclays", type: Counterparty },
+        "governing_law": String("NY_LAW"),
+        "instruments": List([String("IRS")]),
+    }
+}
+
+// Rendered DSL
+(entity.ensure-limited-company :name "Barclays" :as @counterparty)
+(trading-profile.add-instrument-class :profile-id @cbu :class-code "IRS")
+(isda.create :cbu-id @cbu :counterparty @counterparty :governing-law "NY_LAW" :as @isda)
+```
+
+**Why Plan/Render separation:**
+- **Verb extensibility**: Add new verbs by adding SemanticAction + render function
+- **Context injection**: RenderContext supplies active CBU, symbols
+- **Testability**: Plans are pure data, easy to assert
+- **Less fragile**: Grammar changes don't require DSL template rewrites
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/ob-agentic/src/lexicon/tokenizer.rs` | Raw text → Token stream |
+| `rust/crates/ob-agentic/src/lexicon/tokens.rs` | Token types, EntityClass, VerbClass |
+| `rust/crates/ob-agentic/src/lexicon/lowering.rs` | **NEW** - AST lowering with type inference |
+| `rust/crates/ob-agentic/src/lexicon/intent_parser.rs` | Nom combinator grammar |
+| `rust/crates/ob-agentic/src/lexicon/intent_ast.rs` | IntentAst enum (parsed intents) |
+| `rust/crates/ob-agentic/src/lexicon/intent_plan.rs` | **NEW** - Plan intermediate representation |
+| `rust/crates/ob-agentic/src/lexicon/dsl_render.rs` | **NEW** - Plan → DSL s-expression rendering |
+| `rust/crates/ob-agentic/src/lexicon/pipeline.rs` | Orchestrates full pipeline |
+
+### Test Harness
+
+```bash
+cargo x lexicon-harness    # Run all intent tests (100% pass rate)
+```
+
+Test cases in `rust/crates/ob-agentic/src/lexicon/harness/test_cases.yaml`:
+
+| Category | Examples |
+|----------|----------|
+| Happy path | "create counterparty Goldman Sachs for IRS under NY law" |
+| Terse | "counterparty add: HSBC" |
+| Verbose | "I would like to establish an ISDA agreement with Citi" |
+| Edge cases | "Deutsche Bank AG", "what is the weather today" |
+| Role assign | "assign Smith as director to Acme Fund" |
+
+### Adding New Intent Types
+
+1. **Add SemanticAction** in `intent_plan.rs`:
+```rust
+pub enum SemanticAction {
+    // ... existing
+    MyNewAction,
+}
+```
+
+2. **Add render function** in `dsl_render.rs`:
+```rust
+fn render_my_new_action(plan: &Plan, ctx: &RenderContext) -> RenderedDsl {
+    // Extract slots, render DSL
+}
+```
+
+3. **Add grammar pattern** in `intent_parser.rs` (if new syntax needed)
+
+4. **Add test case** in `test_cases.yaml`
+
+### Trigger Phrases (for Claude)
+
+When you see these in a task, you're working in lexicon territory:
+- "intent parser", "intent parsing", "NLU", "natural language"
+- "tokenizer", "tokens", "lexicon"
+- "AST lowering", "type inference", "entity inference"
+- "Plan/Render", "SemanticAction", "slot-based"
+- "lexicon harness", "test cases", "pass rate"
+- "nom combinator", "grammar", "parse pattern"
 
 ---
 

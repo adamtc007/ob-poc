@@ -5,6 +5,13 @@
 domains:
   cbu.role:
     description: "CBU entity role management with validation"
+    invocation_hints:
+      - role
+      - director
+      - UBO
+      - shareholder
+      - signatory
+      - trustee
 
     verbs:
       # ═══════════════════════════════════════════════════════════════════════
@@ -15,6 +22,14 @@ domains:
         description: |
           Assign a role to an entity within a CBU.
           Validates entity type compatibility and role conflicts before assignment.
+        invocation_phrases:
+          - assign role
+          - add as director
+          - add as UBO
+          - add as shareholder
+          - add as signatory
+          - make director
+          - appoint director
         metadata:
           tier: intent
           source_of_truth: operational

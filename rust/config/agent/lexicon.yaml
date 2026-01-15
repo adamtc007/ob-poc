@@ -243,7 +243,9 @@ roles:
   - manco
   - custodian
   - administrator
-  - counterparty
+  # Note: "counterparty" is NOT a role - it's an entity type indicator
+  # See entities.counterparty section. "add X as counterparty" creates a counterparty,
+  # not a role assignment like "add X as director"
   - principal
   - agent
 

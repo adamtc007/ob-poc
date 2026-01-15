@@ -1,6 +1,13 @@
 domains:
   entity:
     description: Entity management operations
+    invocation_hints:
+      - entity
+      - company
+      - person
+      - counterparty
+      - director
+      - UBO
     dynamic_verbs:
       - pattern: create-{type_code}
         source:
@@ -30,6 +37,11 @@ domains:
       create-limited-company:
         description: Create a limited company entity
         behavior: crud
+        invocation_phrases:
+          - create company
+          - add company
+          - create limited company
+          - register company
         metadata:
           tier: intent
           source_of_truth: entity
@@ -76,6 +88,11 @@ domains:
       create-proper-person:
         description: Create a natural person entity
         behavior: crud
+        invocation_phrases:
+          - create person
+          - add person
+          - add individual
+          - create individual
         metadata:
           tier: intent
           source_of_truth: entity

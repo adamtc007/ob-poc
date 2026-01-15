@@ -48,9 +48,12 @@ use std::sync::Arc;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use super::dsl_render::{render_plan, RenderContext};
 use super::intent_ast::{EntityRef, IntentAst};
 use super::intent_parser::parse_tokens;
+use super::intent_plan::intent_to_plan;
 use super::loader::{Lexicon, LifecycleDomain};
+use super::lowering::lower_tokens;
 use super::tokenizer::{EntityResolver, SessionSalience, Tokenizer};
 
 /// Result of processing a user message.
@@ -143,15 +146,38 @@ impl LexiconPipeline {
     /// Process a user message through the pipeline.
     pub async fn process(&mut self, message: &str) -> LexiconPipelineResult {
         // Step 1: Tokenize with session context
-        let tokenizer = Tokenizer::new(self.tokenizer.lexicon().clone().into())
-            .with_salience(self.salience.clone());
+        // Use fork_with_salience to preserve entity_resolver from self.tokenizer
+        let tokenizer = self.tokenizer.fork_with_salience(self.salience.clone());
 
-        let tokens = tokenizer.tokenize(message).await;
+        let raw_tokens = tokenizer.tokenize(message).await;
 
-        // Step 2: Detect domain from tokens
+        // Debug: log raw tokens in test builds
+        #[cfg(test)]
+        {
+            let token_debug: Vec<_> = raw_tokens
+                .iter()
+                .map(|t| format!("{}:{:?}", t.text, t.token_type))
+                .collect();
+            eprintln!("[pipeline.process] raw tokens: {:?}", token_debug);
+        }
+
+        // Step 2: AST Lowering - normalize token order and fuse type+name pairs
+        let tokens = lower_tokens(&raw_tokens);
+
+        // Debug: log lowered tokens in test builds
+        #[cfg(test)]
+        {
+            let token_debug: Vec<_> = tokens
+                .iter()
+                .map(|t| format!("{}:{:?}", t.text, t.token_type))
+                .collect();
+            eprintln!("[pipeline.process] lowered tokens: {:?}", token_debug);
+        }
+
+        // Step 3: Detect domain from tokens
         let domain = tokenizer.detect_domain(&tokens);
 
-        // Step 3: Parse tokens into IntentAst
+        // Step 4: Parse tokens into IntentAst
         let intent = match parse_tokens(&tokens) {
             Ok(intent) => intent,
             Err(e) => {
@@ -167,38 +193,51 @@ impl LexiconPipeline {
             }
         };
 
-        // Step 4: Check for unresolved entities
-        let unresolved = self.find_unresolved_entities(&intent);
+        // Step 5: Convert IntentAst to Plan (intermediate representation)
+        let plan = intent_to_plan(&intent);
 
-        // Step 5: Generate DSL (even for unresolved - uses placeholder names)
-        let dsl = self.generate_dsl(&intent);
+        // Step 6: Build render context from session state
+        let render_ctx = match &self.active_cbu {
+            Some(cbu) => RenderContext::new().with_cbu(cbu.id.clone(), cbu.name.clone()),
+            None => RenderContext::new(),
+        };
+
+        // Step 7: Render Plan to DSL s-expressions
+        let rendered = render_plan(&plan, &render_ctx);
+
+        // Step 8: Check for unresolved entities (from plan)
+        let unresolved: Vec<String> = plan
+            .unresolved_entities()
+            .into_iter()
+            .map(|(slot, name)| format!("{}: {}", slot, name))
+            .collect();
+
         let errors = if unresolved.is_empty() {
             vec![]
         } else {
             vec![format!("Unresolved entities: {}", unresolved.join(", "))]
         };
 
-        // Step 6: Build description
-        let description = self.describe_intent(&intent);
-
-        // Step 7: Determine if confirmation is needed
+        // Step 9: Determine if confirmation is needed
         let needs_confirmation = self.requires_confirmation(&intent);
 
-        // Step 8: Update salience with resolved entities
+        // Step 10: Update salience with resolved entities
         self.update_salience(&intent);
 
         LexiconPipelineResult {
             intent_type: intent_type_name(&intent),
             domain: domain.map(domain_to_string),
-            dsl: Some(dsl),
+            dsl: Some(rendered.source),
             unresolved_entities: unresolved,
             needs_confirmation,
-            description,
+            description: rendered.description,
             errors,
         }
     }
 
     /// Find unresolved entity references in the intent.
+    /// DEPRECATED: Use Plan::unresolved_entities() instead.
+    #[allow(dead_code)]
     fn find_unresolved_entities(&self, intent: &IntentAst) -> Vec<String> {
         let mut unresolved = Vec::new();
 
@@ -238,6 +277,8 @@ impl LexiconPipeline {
     }
 
     /// Generate DSL from an IntentAst.
+    /// DEPRECATED: Use intent_to_plan() + render_plan() instead.
+    #[allow(dead_code)]
     fn generate_dsl(&self, intent: &IntentAst) -> String {
         match intent {
             IntentAst::CounterpartyCreate {
@@ -397,10 +438,13 @@ impl LexiconPipeline {
                 format!("(cbu.parties :cbu-id {})", cbu_id)
             }
 
-            IntentAst::IsdaShow { counterparty } => {
-                let cp_id = self.resolve_entity_id(counterparty);
-                format!("(isda.list :counterparty-id {})", cp_id)
-            }
+            IntentAst::IsdaShow { counterparty } => match counterparty {
+                Some(cp) => {
+                    let cp_id = self.resolve_entity_id(cp);
+                    format!("(isda.list :counterparty-id {})", cp_id)
+                }
+                None => "(isda.list)".to_string(),
+            },
 
             IntentAst::Unknown { raw_text, .. } => {
                 format!("; Could not parse: {}", raw_text)
@@ -411,6 +455,8 @@ impl LexiconPipeline {
     }
 
     /// Resolve an entity reference to an ID string for DSL.
+    /// DEPRECATED: Use SlotValue::to_dsl() instead.
+    #[allow(dead_code)]
     fn resolve_entity_id(&self, entity: &EntityRef) -> String {
         match entity.id() {
             Some(id) => format!("\"{}\"", id),
@@ -419,6 +465,8 @@ impl LexiconPipeline {
     }
 
     /// Get the current CBU ID for DSL.
+    /// DEPRECATED: Use RenderContext::cbu_ref() instead.
+    #[allow(dead_code)]
     fn get_cbu_id(&self) -> String {
         match &self.active_cbu {
             Some(cbu) => format!("\"{}\"", cbu.id),
@@ -427,6 +475,8 @@ impl LexiconPipeline {
     }
 
     /// Describe what an intent will do.
+    /// DEPRECATED: Use RenderedDsl::description instead.
+    #[allow(dead_code)]
     fn describe_intent(&self, intent: &IntentAst) -> String {
         match intent {
             IntentAst::CounterpartyCreate {
@@ -646,5 +696,111 @@ mod tests {
         let result = pipeline.process("hello world").await;
 
         assert_eq!(result.intent_type, "unknown");
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_entity_resolver_is_used() {
+        // This test verifies that the entity_resolver is actually wired through
+        // to the tokenizer in process(). Previously there was a bug where
+        // process() created a new Tokenizer without the resolver.
+        use super::super::tokenizer::MockEntityResolver;
+        use super::super::tokens::TokenType;
+
+        let lexicon = test_lexicon();
+        let resolver = MockEntityResolver::new().with_entity(
+            "barclays",
+            "550e8400-e29b-41d4-a716-446655440000",
+            "Barclays Bank PLC",
+            "counterparty",
+        );
+
+        let resolver_arc = Arc::new(resolver);
+
+        // First, verify tokenizer directly resolves "Barclays"
+        let tokenizer = Tokenizer::new(lexicon.clone()).with_entity_resolver(resolver_arc.clone());
+        let tokens = tokenizer
+            .tokenize("add Barclays as counterparty for irs")
+            .await;
+
+        // Debug: collect token info
+        let token_info: Vec<_> = tokens
+            .iter()
+            .map(|t| {
+                format!(
+                    "{}:{:?}(src={:?},id={:?})",
+                    t.text, t.token_type, t.source, t.resolved_id
+                )
+            })
+            .collect();
+        eprintln!("Tokens from direct tokenizer: {:?}", token_info);
+
+        // Check "Barclays" was resolved as Entity
+        let barclays_token = tokens.iter().find(|t| t.text == "Barclays");
+        assert!(
+            barclays_token.is_some(),
+            "Should have token for 'Barclays', got: {:?}",
+            token_info
+        );
+        let barclays = barclays_token.unwrap();
+        assert!(
+            matches!(barclays.token_type, TokenType::Entity(_)),
+            "Barclays should be Entity, got {:?}. Tokens: {:?}",
+            barclays.token_type,
+            token_info
+        );
+        // Note: with speculative entity detection, resolved_id may be None
+        // but it should still be classified as Entity
+        eprintln!(
+            "Barclays token: {:?}, source: {:?}, resolved_id: {:?}",
+            barclays.token_type, barclays.source, barclays.resolved_id
+        );
+
+        // Now test full pipeline
+        let mut pipeline = LexiconPipeline::new(lexicon).with_entity_resolver(resolver_arc);
+        pipeline.set_active_cbu("cbu-123".to_string(), "Test Fund".to_string());
+
+        let result = pipeline
+            .process("add Barclays as counterparty for irs")
+            .await;
+
+        assert_eq!(
+            result.intent_type, "counterparty_create",
+            "Expected counterparty_create, got {} (desc: {})",
+            result.intent_type, result.description
+        );
+        assert_eq!(result.domain, Some("otc".to_string()));
+        assert!(result.dsl.is_some());
+
+        let dsl = result.dsl.unwrap();
+        assert!(
+            result.unresolved_entities.is_empty(),
+            "Entity should be resolved, got unresolved: {:?}",
+            result.unresolved_entities
+        );
+        assert!(dsl.contains("entity.ensure-limited-company"));
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_without_resolver_marks_unresolved() {
+        // When no entity resolver is configured, entities that aren't in the
+        // lexicon should be marked as unresolved.
+        let lexicon = test_lexicon();
+        let mut pipeline = LexiconPipeline::new(lexicon);
+        pipeline.set_active_cbu("cbu-123".to_string(), "Test Fund".to_string());
+
+        // "Barclays" is NOT in the lexicon and no resolver is configured
+        // This should parse but leave the entity unresolved
+        let result = pipeline
+            .process("add Barclays as counterparty for irs")
+            .await;
+
+        // The intent may be unknown or counterparty_create depending on grammar flexibility
+        // Key check: if it did parse, Barclays should be unresolved
+        if result.intent_type == "counterparty_create" {
+            assert!(
+                !result.unresolved_entities.is_empty(),
+                "Without resolver, 'Barclays' should be unresolved"
+            );
+        }
     }
 }

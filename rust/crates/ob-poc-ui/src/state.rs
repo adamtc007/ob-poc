@@ -241,6 +241,9 @@ pub struct AppState {
     /// Investor register UI state (aggregate breakdown view, drill-down)
     pub investor_register_ui: InvestorRegisterUi,
 
+    /// Pending navigation verb from typed command (needs App context to execute)
+    pub pending_navigation_verb: Option<crate::command::NavigationVerb>,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -302,6 +305,7 @@ impl Default for AppState {
             navigation_log: Vec::new(),
             current_scope: None,
             investor_register_ui: InvestorRegisterUi::default(),
+            pending_navigation_verb: None,
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),
@@ -923,9 +927,14 @@ impl AppState {
                         }
                     }
 
-                    // If DSL is present and no resolution active, trigger resolution check
+                    // If DSL is present with unresolved refs, trigger resolution check
                     // This enables automatic entity lookup popup when DSL has unresolved refs
-                    if has_dsl && self.resolution.is_none() && !state.loading_resolution {
+                    // Only trigger if can_execute is false (meaning there ARE unresolved refs)
+                    if has_dsl
+                        && !session.can_execute
+                        && self.resolution.is_none()
+                        && !state.loading_resolution
+                    {
                         state.needs_resolution_check = true;
                     }
 

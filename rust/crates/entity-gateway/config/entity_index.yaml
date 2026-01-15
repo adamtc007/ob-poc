@@ -132,7 +132,7 @@ entities:
   entity:
     nickname: "ENTITY"
     source_table: '"ob-poc".entity_search_view'
-    return_key: "display_name" # Return name for DSL source (resolved to UUID at execution)
+    return_key: "id" # Return UUID for UI binding
     display_template: "{display_name} ({entity_type})"
     index_mode: trigram # Entity names need fuzzy search
     search_keys:

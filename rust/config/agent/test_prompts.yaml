@@ -1,0 +1,239 @@
+# Test prompts for lexicon stress testing
+# Load with: TestHarness::load_test_cases("config/agent/test_prompts.yaml")
+
+# =============================================================================
+# COUNTERPARTY CREATION
+# =============================================================================
+
+- id: cp_simple_01
+  prompt: "add Goldman as counterparty"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, simple, happy_path]
+  description: Minimal counterparty creation
+
+- id: cp_simple_02
+  prompt: "add Barclays as counterparty"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, simple]
+
+- id: cp_simple_03
+  prompt: "create counterparty Citi"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, simple, alt_syntax]
+
+- id: cp_with_instrument_01
+  prompt: "add Goldman as counterparty for IRS"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, with_instrument]
+
+- id: cp_with_instrument_02
+  prompt: "add Barclays as counterparty for CDS"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, with_instrument]
+
+- id: cp_with_law_01
+  prompt: "add Goldman as counterparty under NY law"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, with_law]
+  description: With governing law (short form)
+
+- id: cp_with_law_02
+  prompt: "add Barclays as counterparty under English law"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, with_law]
+
+- id: cp_full_01
+  prompt: "add Goldman as counterparty for IRS under NY law"
+  expected_intent: counterparty_create
+  tags: [counterparty, create, full_form]
+  description: Full counterparty with instrument and law
+
+# =============================================================================
+# ISDA ESTABLISHMENT
+# =============================================================================
+
+- id: isda_simple_01
+  prompt: "establish ISDA with Goldman under NY law"
+  expected_intent: isda_establish
+  tags: [isda, create, happy_path]
+  description: Basic ISDA establishment
+
+- id: isda_simple_02
+  prompt: "create ISDA with Barclays under English law"
+  expected_intent: isda_establish
+  tags: [isda, create]
+
+- id: isda_with_instrument_01
+  prompt: "establish ISDA with Goldman under NY law for IRS"
+  expected_intent: isda_establish
+  tags: [isda, create, with_instrument]
+
+- id: isda_with_instrument_02
+  prompt: "establish ISDA with Citi under NY law for IRS and CDS"
+  expected_intent: isda_establish
+  tags: [isda, create, with_instrument, multi_instrument]
+
+# =============================================================================
+# CSA ADDITION
+# =============================================================================
+
+- id: csa_vm_01
+  prompt: "add VM CSA to Goldman"
+  expected_intent: csa_add
+  tags: [csa, create, vm]
+
+- id: csa_im_01
+  prompt: "add IM CSA to Barclays"
+  expected_intent: csa_add
+  tags: [csa, create, im]
+
+- id: csa_with_currency_01
+  prompt: "add VM CSA to Goldman in USD"
+  expected_intent: csa_add
+  tags: [csa, create, with_currency]
+
+# =============================================================================
+# UNIVERSE / TRADING SETUP
+# =============================================================================
+
+- id: universe_instruments_01
+  prompt: "add equities to universe"
+  expected_intent: universe_add
+  tags: [universe, instruments]
+
+- id: universe_instruments_02
+  prompt: "add equities and bonds to universe"
+  expected_intent: universe_add
+  tags: [universe, instruments, multi]
+
+- id: universe_markets_01
+  prompt: "add NYSE to universe"
+  expected_intent: universe_add
+  tags: [universe, markets]
+
+- id: universe_markets_02
+  prompt: "enable trading on NYSE and LSE"
+  expected_intent: universe_add
+  tags: [universe, markets, multi, alt_syntax]
+
+- id: universe_mixed_01
+  prompt: "add equities on NYSE to universe"
+  expected_intent: universe_add
+  tags: [universe, mixed]
+
+# =============================================================================
+# ROLE ASSIGNMENT
+# =============================================================================
+
+- id: role_director_01
+  prompt: "assign John as director"
+  expected_intent: role_assign
+  tags: [role, assign]
+
+- id: role_ubo_01
+  prompt: "assign Mary as UBO"
+  expected_intent: role_assign
+  tags: [role, assign, ubo]
+
+- id: role_signatory_01
+  prompt: "add Jane as signatory"
+  expected_intent: role_assign
+  tags: [role, assign]
+
+# =============================================================================
+# QUERIES
+# =============================================================================
+
+- id: query_counterparties_01
+  prompt: "list counterparties"
+  expected_intent: counterparty_list
+  tags: [query, list]
+
+- id: query_counterparties_02
+  prompt: "show all counterparties"
+  expected_intent: counterparty_list
+  tags: [query, list]
+
+- id: query_isda_01
+  prompt: "show ISDA for Goldman"
+  expected_intent: isda_show
+  tags: [query, isda]
+
+# =============================================================================
+# EDGE CASES - CONVERSATIONAL STYLE
+# =============================================================================
+
+- id: conv_01
+  prompt: "I need to add a counterparty called Goldman"
+  expected_intent: counterparty_create
+  tags: [edge_case, conversational]
+
+- id: conv_02
+  prompt: "can you add Barclays as a counterparty"
+  expected_intent: counterparty_create
+  tags: [edge_case, conversational, polite]
+
+- id: conv_03
+  prompt: "please set up ISDA with Citi under NY law"
+  expected_intent: isda_establish
+  tags: [edge_case, conversational, polite]
+
+# =============================================================================
+# EDGE CASES - TERSE STYLE
+# =============================================================================
+
+- id: terse_01
+  prompt: "counterparty: Goldman"
+  expected_intent: counterparty_create
+  tags: [edge_case, terse]
+
+- id: terse_02
+  prompt: "ISDA Goldman NY"
+  expected_intent: isda_establish
+  tags: [edge_case, terse]
+
+# =============================================================================
+# NEGATIVE CASES - SHOULD PARSE AS UNKNOWN
+# =============================================================================
+
+- id: neg_01
+  prompt: "hello"
+  expected_intent: unknown
+  tags: [negative, irrelevant]
+
+- id: neg_02
+  prompt: "what time is it"
+  expected_intent: unknown
+  tags: [negative, off_topic]
+
+- id: neg_03
+  prompt: "send an email to john"
+  expected_intent: unknown
+  tags: [negative, wrong_domain]
+
+- id: neg_04
+  prompt: "delete all data"
+  expected_intent: unknown
+  tags: [negative, dangerous]
+
+# =============================================================================
+# AMBIGUOUS CASES - MAY NEED CLARIFICATION
+# =============================================================================
+
+- id: ambig_01
+  prompt: "Goldman"
+  expected_intent: unknown
+  tags: [ambiguous, entity_only]
+  description: Just an entity name, no verb
+
+- id: ambig_02
+  prompt: "add Goldman"
+  expected_intent: counterparty_create
+  tags: [ambiguous, no_role]
+  description: Inferred as counterparty in OTC domain context
+
+- id: ambig_03
+  prompt: "counterparty for IRS"
+  expected_intent: unknown
+  tags: [ambiguous, no_entity]
+  description: Which counterparty?

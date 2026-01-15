@@ -42,19 +42,26 @@
 
 #[cfg(feature = "gateway")]
 mod db_resolver;
+mod dsl_render;
 mod intent_ast;
 mod intent_parser;
+mod intent_plan;
 mod loader;
+mod lowering;
 mod pipeline;
+pub mod test_harness;
 mod tokenizer;
 mod tokens;
+pub mod verb_phrases;
 
 #[cfg(feature = "gateway")]
 pub use db_resolver::{CompositeEntityResolver, DatabaseEntityResolver};
+pub use dsl_render::{render_plan, RenderContext, RenderedDsl};
 pub use intent_ast::{
     CsaType, CurrencyCode, EntityRef, GoverningLaw, InstrumentCode, IntentAst, MarketCode, RoleCode,
 };
 pub use intent_parser::parse_tokens;
+pub use intent_plan::{intent_to_plan, Plan, SemanticAction, SlotValue};
 pub use loader::{
     EntitiesConfig, InstrumentsConfig, Lexicon, LexiconConfig, LexiconEntry, LifecycleDomain,
     PrepositionsConfig, VerbsConfig,
@@ -66,3 +73,4 @@ pub use tokenizer::{
 pub use tokens::{
     EntityClass, ModifierType, NumberType, PrepType, Token, TokenSource, TokenType, VerbClass,
 };
+pub use verb_phrases::{VerbEntry, VerbMatch, VerbPhraseIndex, VerbPhraseStats};

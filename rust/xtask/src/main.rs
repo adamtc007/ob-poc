@@ -318,6 +318,29 @@ enum Command {
         action: VerbsAction,
     },
 
+    /// Lexicon test harness - stress test tokenizer and intent parser
+    LexiconHarness {
+        /// Load test cases from YAML file
+        #[arg(long, short = 'p')]
+        prompts: Option<std::path::PathBuf>,
+
+        /// Run built-in standard test cases
+        #[arg(long)]
+        standard: bool,
+
+        /// Only run tests with this tag
+        #[arg(long, short = 'f')]
+        filter: Option<String>,
+
+        /// Output results as JSON
+        #[arg(long)]
+        json: bool,
+
+        /// Interactive mode - enter prompts to test
+        #[arg(long, short = 'i')]
+        interactive: bool,
+    },
+
     /// Load fund programme from CSV using config-driven column mapping
     ///
     /// Generic loader that supports any fund programme (Allianz, BlackRock, Vanguard, etc.)
@@ -569,7 +592,67 @@ fn main() -> Result<()> {
             dry_run,
             execute,
         } => run_load_fund_programme(&config, &input, output.as_deref(), limit, dry_run, execute),
+        Command::LexiconHarness {
+            prompts,
+            standard,
+            filter,
+            json,
+            interactive,
+        } => run_lexicon_harness(&sh, prompts, standard, filter, json, interactive),
     }
+}
+
+fn run_lexicon_harness(
+    sh: &Shell,
+    prompts: Option<std::path::PathBuf>,
+    standard: bool,
+    filter: Option<String>,
+    json: bool,
+    interactive: bool,
+) -> Result<()> {
+    // Build the lexicon_harness binary
+    cmd!(
+        sh,
+        "cargo build -p ob-agentic --features cli --bin lexicon_harness"
+    )
+    .run()
+    .context("Failed to build lexicon_harness")?;
+
+    // Use std::process::Command for proper argument handling
+    let mut cmd = std::process::Command::new("./target/debug/lexicon_harness");
+
+    if let Some(ref path) = prompts {
+        cmd.args(["--prompts", &path.to_string_lossy()]);
+    }
+
+    if standard {
+        cmd.arg("--standard");
+    }
+
+    if let Some(ref tag) = filter {
+        cmd.args(["--filter", tag]);
+    }
+
+    if json {
+        cmd.arg("--json");
+    }
+
+    if interactive {
+        cmd.arg("--interactive");
+    }
+
+    // Default to standard if nothing specified
+    if prompts.is_none() && !standard && !interactive {
+        cmd.arg("--standard");
+    }
+
+    let status = cmd.status().context("Failed to run lexicon_harness")?;
+    if !status.success() {
+        // Non-zero exit is expected when tests fail - propagate exit code
+        std::process::exit(status.code().unwrap_or(1));
+    }
+
+    Ok(())
 }
 
 fn run_load_fund_programme(

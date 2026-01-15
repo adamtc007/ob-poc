@@ -1,10 +1,22 @@
 domains:
   cbu:
     description: Client Business Unit operations
+    invocation_hints:
+      - CBU
+      - client
+      - fund
+      - account
+      - portfolio
     verbs:
       create:
         description: Create a new Client Business Unit (idempotent by name)
         behavior: crud
+        invocation_phrases:
+          - create CBU
+          - create client
+          - create fund
+          - onboard client
+          - set up CBU
         metadata:
           tier: intent
           source_of_truth: operational

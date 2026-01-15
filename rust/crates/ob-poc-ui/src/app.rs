@@ -179,6 +179,7 @@ impl App {
             navigation_log: Vec::new(),
             current_scope: None,
             investor_register_ui: crate::state::InvestorRegisterUi::default(),
+            pending_navigation_verb: None,
         };
 
         // Try to restore session from localStorage
@@ -210,9 +211,6 @@ impl App {
     /// - AgentPrompt → sent via AgentPromptConduit
     #[cfg(target_arch = "wasm32")]
     fn process_voice_commands(&mut self) {
-        use crate::command::{
-            dispatch_command, CommandResult, CommandSource, InvestigationContext,
-        };
         use crate::voice_bridge::take_pending_voice_commands;
 
         // Take all pending voice commands from the queue
@@ -235,42 +233,18 @@ impl App {
                 continue;
             }
 
-            // Build investigation context from current app state
-            let context = InvestigationContext {
-                focused_entity_id: self.state.graph_widget.selected_entity_id(),
-                current_cbu_id: self.state.session.as_ref().and_then(|s| s.active_cbu_id()),
-                current_view_mode: self.state.graph_widget.view_mode(),
-                current_zoom: 1.0,
-                selected_entities: self
-                    .state
-                    .graph_widget
-                    .selected_entity_id()
-                    .map(|id| vec![id])
-                    .unwrap_or_default(),
-            };
-
-            let source = CommandSource::Voice {
-                transcript: cmd.transcript.clone(),
-                confidence: cmd.confidence,
-                provider: crate::command::VoiceProvider::parse(&cmd.provider),
-            };
-
-            let result = dispatch_command(source.clone(), &context);
-
+            // Voice command = typed command. Same path.
+            // Put transcript in chat input and send (goes through dispatch_command in send_chat_message)
             web_sys::console::log_1(
                 &format!(
-                    "Voice command: '{}' -> {:?} (confidence: {:.2})",
-                    cmd.transcript, result, cmd.confidence
+                    "Voice command: '{}' (confidence: {:.2}) -> routing to chat",
+                    cmd.transcript, cmd.confidence
                 )
                 .into(),
             );
 
-            // Route based on command result
-            match result {
-                CommandResult::Navigation(verb) => self.execute_navigation_verb(verb, Some(source)),
-                CommandResult::Agent(prompt) => self.send_to_agent(prompt),
-                CommandResult::None => {}
-            }
+            self.state.buffers.chat_input = cmd.transcript;
+            self.state.send_chat_message();
         }
     }
 
@@ -540,8 +514,16 @@ impl App {
                 // Select a specific CBU (solar system level)
                 if let Some(ref id) = cbu_id {
                     if let Ok(uuid) = Uuid::parse_str(id) {
+                        // Valid UUID - select directly
                         self.state.select_cbu(uuid, id);
                         self.state.view_level = ob_poc_types::galaxy::ViewLevel::System;
+                    } else {
+                        // Not a UUID - open CBU search with the name pre-filled
+                        self.state.cbu_search_ui.query = id.clone();
+                        self.state.cbu_search_ui.open = true;
+                        self.state.cbu_search_ui.just_opened = true;
+                        // Trigger initial search
+                        self.trigger_cbu_search(id.clone());
                     }
                 }
             }
@@ -921,11 +903,15 @@ impl eframe::App for App {
         self.state.process_async_results();
 
         // =================================================================
-        // STEP 1.5: Process voice commands (WASM only)
-        // Voice commands flow through unified dispatcher
+        // STEP 1.25: Process pending navigation verbs from typed commands
+        // STEP 1.5: Process voice commands
+        // Both WASM only since execute_navigation_verb is wasm32 gated
         // =================================================================
         #[cfg(target_arch = "wasm32")]
         {
+            if let Some(verb) = self.state.pending_navigation_verb.take() {
+                self.execute_navigation_verb(verb, None);
+            }
             self.process_voice_commands();
         }
 
@@ -2176,7 +2162,22 @@ impl App {
 
                 // Select the CBU
                 if let Ok(uuid) = Uuid::parse_str(&id) {
+                    web_sys::console::log_1(
+                        &format!(
+                            "CbuSearchAction::Select - parsed UUID: {}, calling select_cbu",
+                            uuid
+                        )
+                        .into(),
+                    );
                     self.state.select_cbu(uuid, &name);
+                } else {
+                    web_sys::console::error_1(
+                        &format!(
+                            "CbuSearchAction::Select - FAILED to parse UUID from id: {}",
+                            id
+                        )
+                        .into(),
+                    );
                 }
             }
             CbuSearchAction::Close => {
@@ -2184,6 +2185,11 @@ impl App {
                 self.state.cbu_search_ui.results = None;
             }
         }
+    }
+
+    /// Trigger CBU search with a query string (from voice command)
+    fn trigger_cbu_search(&mut self, query: String) {
+        self.state.search_cbus(&query);
     }
 
     /// Handle resolution panel actions
@@ -3620,10 +3626,12 @@ impl AppState {
 
     /// Select a CBU - sets state, graph refetch happens centrally in update()
     pub fn select_cbu(&mut self, cbu_id: Uuid, display_name: &str) {
-        tracing::info!(
-            "select_cbu called: cbu_id={}, old_session_id={:?}",
-            cbu_id,
-            self.session_id
+        web_sys::console::log_1(
+            &format!(
+                "select_cbu: cbu_id={}, display_name={}, old_session_id={:?}",
+                cbu_id, display_name, self.session_id
+            )
+            .into(),
         );
 
         // Use CBU ID as session ID (session key = entity key)
@@ -3638,6 +3646,15 @@ impl AppState {
             state.pending_cbu_id = Some(cbu_id);
             state.needs_graph_refetch = true;
             state.needs_context_refetch = true;
+            web_sys::console::log_1(
+                &format!(
+                    "select_cbu: set pending_cbu_id={}, needs_graph_refetch=true",
+                    cbu_id
+                )
+                .into(),
+            );
+        } else {
+            web_sys::console::error_1(&"select_cbu: FAILED to lock async_state".into());
         }
 
         // Request repaint to trigger the refetch in next frame
@@ -3656,6 +3673,11 @@ impl AppState {
 
             // Then: bind CBU to session
             let _result = api::bind_entity(cbu_id, cbu_id, "cbu", &display_name).await;
+
+            // Set session scope to this CBU (this sets scope_type to "cbu")
+            if let Err(e) = api::load_cbu_into_scope(cbu_id, cbu_id).await {
+                web_sys::console::warn_1(&format!("Failed to set CBU scope: {}", e).into());
+            }
 
             // Fetch session state again to get updated context
             let session_result = api::get_session(cbu_id).await;
@@ -3760,6 +3782,7 @@ impl AppState {
 
         web_sys::console::log_1(&format!("send_chat_message: {}", message).into());
 
+        // ALL messages go to the server agent - one conversation, one handler
         // Add user message to local history immediately for responsiveness
         self.add_user_message(message.clone());
 

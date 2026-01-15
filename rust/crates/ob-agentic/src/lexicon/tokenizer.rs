@@ -12,7 +12,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use super::loader::{Lexicon, LifecycleDomain};
-use super::tokens::{EntityClass, Token, TokenSource, TokenType};
+use super::tokens::{EntityClass, Token, TokenSource, TokenType, VerbClass};
 
 /// Result of entity resolution.
 #[derive(Debug, Clone)]
@@ -171,6 +171,19 @@ impl Tokenizer {
         self
     }
 
+    /// Fork this tokenizer with new salience, preserving entity resolver.
+    ///
+    /// Use this when you need a tokenizer for a new request but want to
+    /// preserve the entity resolver configuration from an existing tokenizer.
+    pub fn fork_with_salience(&self, salience: SessionSalience) -> Self {
+        Self {
+            lexicon: Arc::clone(&self.lexicon),
+            entity_resolver: self.entity_resolver.clone(),
+            salience,
+            min_entity_confidence: self.min_entity_confidence,
+        }
+    }
+
     /// Tokenize input text into a stream of classified tokens.
     pub async fn tokenize(&self, input: &str) -> Vec<Token> {
         let mut tokens = Vec::new();
@@ -188,8 +201,18 @@ impl Tokenizer {
                 break;
             }
 
-            // Try longest match first (multi-word phrases)
+            // Try longest match first (multi-word phrases from lexicon)
             if let Some((token, consumed)) = self.try_phrase_match(remaining, offset).await {
+                tokens.push(token);
+                remaining = &remaining[consumed..];
+                offset += consumed;
+                continue;
+            }
+
+            // Try multi-word entity resolution (e.g., "Goldman Sachs", "Morgan Stanley")
+            if let Some((token, consumed)) =
+                self.try_multi_word_entity(remaining, offset, &tokens).await
+            {
                 tokens.push(token);
                 remaining = &remaining[consumed..];
                 offset += consumed;
@@ -233,8 +256,12 @@ impl Tokenizer {
             else if let Some(token) = self.try_pronoun_resolution(word, offset) {
                 tokens.push(token);
             }
-            // Try entity resolution
+            // Try entity resolution via EntityGateway
             else if let Some(token) = self.try_entity_resolution(word, offset).await {
+                tokens.push(token);
+            }
+            // Try speculative entity detection (capitalized words in entity position)
+            else if let Some(token) = self.try_speculative_entity(word, offset, &tokens) {
                 tokens.push(token);
             }
             // Unknown token
@@ -278,6 +305,140 @@ impl Tokenizer {
                         confidence: 1.0,
                     },
                     phrase_len,
+                ));
+            }
+        }
+
+        None
+    }
+
+    /// Try to resolve consecutive capitalized words as a multi-word entity name.
+    ///
+    /// This handles company names like "Goldman Sachs", "Morgan Stanley", "Deutsche Bank".
+    /// It looks ahead at consecutive capitalized words and tries entity resolution on
+    /// progressively shorter phrases until one matches.
+    async fn try_multi_word_entity(
+        &self,
+        input: &str,
+        offset: usize,
+        prior_tokens: &[Token],
+    ) -> Option<(Token, usize)> {
+        // Check if we're in a position where an entity name is expected
+        let in_entity_position = match prior_tokens.last() {
+            Some(token) => matches!(
+                token.token_type,
+                TokenType::Verb(VerbClass::Create)
+                    | TokenType::Verb(VerbClass::Link)
+                    | TokenType::Verb(VerbClass::Update)
+                    | TokenType::Verb(VerbClass::Query)
+                    | TokenType::Prep(_)
+                    | TokenType::Article
+                    | TokenType::Conj
+                    | TokenType::Entity(_) // After another entity (e.g., "Goldman Sachs")
+            ),
+            None => true,
+        };
+
+        if !in_entity_position {
+            return None;
+        }
+
+        // Extract consecutive capitalized words
+        let words: Vec<&str> = input.split_whitespace().collect();
+        let mut capitalized_words = Vec::new();
+
+        for word in words.iter().take(5) {
+            // Stop if word doesn't start with uppercase
+            let first_char = word.chars().next()?;
+            if !first_char.is_uppercase() {
+                break;
+            }
+            // Stop if this word is in the lexicon (probably not part of entity name)
+            if self.lexicon.lookup_word(word).is_some() {
+                break;
+            }
+            capitalized_words.push(*word);
+        }
+
+        // Need at least 2 words for multi-word entity
+        if capitalized_words.len() < 2 {
+            return None;
+        }
+
+        // Try progressively shorter phrases (longest match first)
+        for len in (2..=capitalized_words.len()).rev() {
+            let phrase = capitalized_words[..len].join(" ");
+
+            // Calculate actual byte length including spaces
+            let phrase_byte_len = input
+                .find(&phrase)
+                .map(|_| phrase.len())
+                .unwrap_or_else(|| {
+                    // Calculate from words with actual spacing
+                    let mut total = 0;
+                    for (i, word) in capitalized_words[..len].iter().enumerate() {
+                        if i > 0 {
+                            // Find whitespace between words
+                            let after_prev: usize = capitalized_words[..i]
+                                .iter()
+                                .map(|w| w.len())
+                                .sum::<usize>()
+                                + i;
+                            let ws = input[after_prev..]
+                                .chars()
+                                .take_while(|c| c.is_whitespace())
+                                .count();
+                            total += ws;
+                        }
+                        total += word.len();
+                    }
+                    total
+                });
+
+            // Try entity resolution on the phrase
+            if let Some(resolver) = &self.entity_resolver {
+                if let Some(resolved) = resolver.resolve(&phrase, None).await {
+                    if resolved.confidence >= self.min_entity_confidence {
+                        let entity_class = match resolved.entity_type.as_str() {
+                            "cbu" => EntityClass::Cbu,
+                            "proper_person" => EntityClass::Person,
+                            "limited_company" | "legal_entity" => EntityClass::LegalEntity,
+                            "counterparty" => EntityClass::Counterparty,
+                            "isda" => EntityClass::Isda,
+                            "csa" => EntityClass::Csa,
+                            _ => EntityClass::Generic,
+                        };
+
+                        return Some((
+                            Token {
+                                text: phrase.clone(),
+                                normalized: phrase.to_lowercase(),
+                                token_type: TokenType::Entity(entity_class),
+                                span: (offset, offset + phrase_byte_len),
+                                source: TokenSource::EntityGateway,
+                                resolved_id: Some(resolved.id),
+                                confidence: resolved.confidence,
+                            },
+                            phrase_byte_len,
+                        ));
+                    }
+                }
+            }
+
+            // Even without entity resolver, if we see consecutive capitalized words
+            // in entity position, treat them as a speculative entity
+            if len >= 2 {
+                return Some((
+                    Token {
+                        text: phrase.clone(),
+                        normalized: phrase.to_lowercase(),
+                        token_type: TokenType::Entity(EntityClass::Generic),
+                        span: (offset, offset + phrase_byte_len),
+                        source: TokenSource::Inferred,
+                        resolved_id: None,
+                        confidence: 0.6,
+                    },
+                    phrase_byte_len,
                 ));
             }
         }
@@ -378,6 +539,93 @@ impl Tokenizer {
             source: TokenSource::EntityGateway,
             resolved_id: Some(resolved.id),
             confidence: resolved.confidence,
+        })
+    }
+
+    /// Try to speculatively classify a word as an entity based on heuristics.
+    ///
+    /// This is the "LLM-like" behavior: when we see a capitalized word in a
+    /// position where an entity is expected, we guess it's probably an entity
+    /// name even if we can't resolve it to a UUID.
+    ///
+    /// Heuristics used:
+    /// 1. Word is capitalized (not just first letter of sentence)
+    /// 2. Word follows an action verb (Create, Link) or preposition
+    /// 3. Word is not a common English word (would be in lexicon)
+    ///
+    /// Returns a Token with:
+    /// - `token_type: Entity(Generic)` - speculative entity
+    /// - `source: Inferred` - indicates this was guessed, not resolved
+    /// - `confidence: 0.6` - lower confidence, needs verification
+    /// - `resolved_id: None` - not yet resolved to UUID
+    fn try_speculative_entity(
+        &self,
+        word: &str,
+        offset: usize,
+        prior_tokens: &[Token],
+    ) -> Option<Token> {
+        // Heuristic 1: Must be capitalized
+        let first_char = word.chars().next()?;
+        if !first_char.is_uppercase() {
+            return None;
+        }
+
+        // Heuristic 2: Check if it looks like a proper noun
+        // - All caps is probably an acronym (skip for now, might be instrument code)
+        // - Mixed case with capital first letter is likely a name
+        let is_all_caps = word.chars().all(|c| c.is_uppercase() || !c.is_alphabetic());
+        if is_all_caps && word.len() <= 4 {
+            // Short all-caps might be an instrument code (IRS, CDS) - skip
+            return None;
+        }
+
+        // Heuristic 3: Context-based - check what precedes this word
+        let last_token = prior_tokens.last();
+        let in_entity_position = match last_token {
+            Some(token) => {
+                matches!(
+                    token.token_type,
+                    // After action verbs: "add Barclays", "create Goldman"
+                    TokenType::Verb(VerbClass::Create)
+                        | TokenType::Verb(VerbClass::Link)
+                        | TokenType::Verb(VerbClass::Update)
+                        | TokenType::Verb(VerbClass::Delete)
+                        | TokenType::Verb(VerbClass::Query)
+                        // After prepositions: "for Barclays", "with Goldman"
+                        | TokenType::Prep(_)
+                        // After articles: "the Barclays", "a Goldman"
+                        | TokenType::Article
+                        // After conjunctions: "Barclays and Goldman"
+                        | TokenType::Conj
+                )
+            }
+            // At start of input, capitalized word is likely entity
+            None => true,
+        };
+
+        // Heuristic 4: Not at very start after nothing (could be sentence-initial cap)
+        // But if it follows a verb or prep, it's probably an entity
+        let is_sentence_start = prior_tokens.is_empty();
+
+        // Accept if in entity position OR if capitalized and not sentence start
+        if !in_entity_position && is_sentence_start {
+            // Sentence-initial capital alone isn't enough evidence
+            // But we'll still accept it since it might be an entity-first query
+            // like "Barclays counterparty" - give it lower confidence
+        }
+
+        // Build the speculative entity token
+        Some(Token {
+            text: word.to_string(),
+            normalized: word.to_lowercase(),
+            token_type: TokenType::Entity(EntityClass::Generic),
+            span: (offset, offset + word.len()),
+            source: TokenSource::Inferred,
+            resolved_id: None,
+            // Lower confidence for speculative entities
+            // - 0.7 if in clear entity position
+            // - 0.5 if just capitalized at sentence start
+            confidence: if in_entity_position { 0.7 } else { 0.5 },
         })
     }
 

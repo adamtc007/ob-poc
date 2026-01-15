@@ -484,6 +484,44 @@ pub async fn set_stage_focus(
 }
 
 // =============================================================================
+// CBU Session Scope API
+// =============================================================================
+
+/// Request to load a CBU into session scope
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct LoadCbuRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cbu_id: Option<Uuid>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cbu_name: Option<String>,
+}
+
+/// Response from loading a CBU into scope
+#[derive(Clone, Debug, serde::Deserialize)]
+#[allow(dead_code)]
+pub struct LoadCbuResponse {
+    pub loaded: bool,
+    pub count: usize,
+    pub scope_size: usize,
+}
+
+/// Load a CBU into the session scope (sets scope_type to "cbu")
+/// This calls POST /api/cbu-session/:id/load-cbu
+pub async fn load_cbu_into_scope(
+    session_id: Uuid,
+    cbu_id: Uuid,
+) -> Result<LoadCbuResponse, String> {
+    post(
+        &format!("/api/cbu-session/{}/load-cbu", session_id),
+        &LoadCbuRequest {
+            cbu_id: Some(cbu_id),
+            cbu_name: None,
+        },
+    )
+    .await
+}
+
+// =============================================================================
 // Resolution API
 // =============================================================================
 

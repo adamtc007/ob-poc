@@ -949,7 +949,32 @@ fn match_verb_from_transcript(transcript: &str, ctx: &InvestigationContext) -> N
         };
     }
 
-    if let Some(cbu) = extract_after_any(&text, &["system", "focus cbu", "client unit", "cbu"]) {
+    // "cbu" is the token - extract everything else as the search term
+    if text.contains("cbu") {
+        // Remove known keywords, keep the rest as search term
+        let search_term = text
+            .replace("show", "")
+            .replace("open", "")
+            .replace("display", "")
+            .replace("view", "")
+            .replace("cbu", "")
+            .replace("client unit", "")
+            .replace("system", "")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        return NavigationVerb::ScaleSystem {
+            cbu_id: if search_term.is_empty() {
+                ctx.current_cbu_id.clone()
+            } else {
+                Some(search_term)
+            },
+        };
+    }
+
+    // Fallback for "system X" without "cbu" keyword
+    if let Some(cbu) = extract_after_any(&text, &["system", "focus cbu", "client unit"]) {
         return NavigationVerb::ScaleSystem {
             cbu_id: if cbu.is_empty() {
                 ctx.current_cbu_id.clone()
@@ -1420,6 +1445,27 @@ fn extract_after_any(text: &str, triggers: &[&str]) -> Option<String> {
         if let Some(pos) = text.find(trigger) {
             let after = text[pos + trigger.len()..].trim().to_string();
             return Some(after);
+        }
+    }
+    None
+}
+
+/// Extract text between a prefix and suffix pattern
+/// e.g., extract_between("show allianz cbu", &["show", "open"], "cbu") -> Some("allianz")
+fn extract_between(text: &str, prefixes: &[&str], suffix: &str) -> Option<String> {
+    // Check if suffix exists first
+    let suffix_pos = text.find(suffix)?;
+
+    // Find any prefix before the suffix
+    for prefix in prefixes {
+        if let Some(prefix_pos) = text.find(prefix) {
+            if prefix_pos < suffix_pos {
+                let start = prefix_pos + prefix.len();
+                let between = text[start..suffix_pos].trim().to_string();
+                if !between.is_empty() {
+                    return Some(between);
+                }
+            }
         }
     }
     None

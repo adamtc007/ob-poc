@@ -382,6 +382,9 @@ pub enum TokenSource {
     /// Inferred from structure/position.
     Inferred,
 
+    /// Produced by AST lowering pass (type association, normalization).
+    Lowering,
+
     /// No match found.
     Unmatched,
 }

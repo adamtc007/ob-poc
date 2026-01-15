@@ -785,35 +785,10 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         tracing::info!("CBU ID: {:?}", request.cbu_id);
         tracing::info!("Session ID: {}", session.id);
 
-        // Check for "show CBU" command first
-        if let Some(cmd_response) = self.handle_show_command(&request.message).await? {
-            tracing::info!("Handled as show command");
-            return Ok(cmd_response);
-        }
-
-        // Check for graph filter/view commands (show only shells, filter by type, etc.)
-        if let Some(cmd_response) = self.handle_filter_command(&request.message) {
-            tracing::info!("Handled as filter command");
-            return Ok(cmd_response);
-        }
-
-        // Check for Esper-style UI navigation commands (enhance, zoom, pan, stop, etc.)
-        if let Some(cmd_response) = self.handle_esper_command(&request.message) {
-            tracing::info!("Handled as Esper navigation command");
-            return Ok(cmd_response);
-        }
-
-        // Check for DSL management commands (delete, undo, clear, execute)
-        if let Some(cmd_response) = self.handle_dsl_command(session, &request.message).await? {
-            tracing::info!("Handled as DSL command");
-            return Ok(cmd_response);
-        }
-
-        // Check for taxonomy navigation commands (drill into, zoom out, show taxonomy)
-        if let Some(cmd_response) = self.handle_taxonomy_command(session, &request.message) {
-            tracing::info!("Handled as taxonomy command");
-            return Ok(cmd_response);
-        }
+        // NOTE: Previously had bypass handlers (handle_show_command, handle_filter_command, etc.)
+        // These have been removed to ensure ALL user prompts go through the full pipeline:
+        // User prompt → LLM generates DSL → Parse → AST → Unresolved refs → Resolution popup → Execute
+        // This ensures entity resolution works consistently for all commands.
 
         // If this is a disambiguation response, handle it
         if let Some(disambig_response) = &request.disambiguation_response {
@@ -2681,9 +2656,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return Ok(None);
         }
 
+        // Extract search term, removing command keywords like "cbu", "client", etc.
+        let keywords_to_strip = ["cbu", "client", "fund", "entity", "unit"];
         let search_term = message
             .split_whitespace()
-            .skip(1)
+            .skip(1) // Skip the command word (show, load, select, view, pick, group)
+            .filter(|word| !keywords_to_strip.contains(&word.to_lowercase().as_str()))
             .collect::<Vec<_>>()
             .join(" ");
 

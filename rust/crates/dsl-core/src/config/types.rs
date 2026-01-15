@@ -45,6 +45,11 @@ pub struct DomainConfig {
     pub verbs: HashMap<String, VerbConfig>,
     #[serde(default)]
     pub dynamic_verbs: Vec<DynamicVerbConfig>,
+    /// Domain-level invocation hints for agent intent matching.
+    /// These are general phrases that suggest this domain.
+    /// Example: ["counterparty", "ISDA", "CSA"] for OTC domain
+    #[serde(default)]
+    pub invocation_hints: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -73,6 +78,11 @@ pub struct VerbConfig {
     /// Verb metadata for tiering, source of truth, and organizational tags
     #[serde(default)]
     pub metadata: Option<VerbMetadata>,
+    /// Natural language phrases that should trigger this verb.
+    /// Used by the agent for intent-to-verb matching.
+    /// Example: ["add counterparty", "create counterparty", "onboard counterparty"]
+    #[serde(default)]
+    pub invocation_phrases: Vec<String>,
 }
 
 // =============================================================================
