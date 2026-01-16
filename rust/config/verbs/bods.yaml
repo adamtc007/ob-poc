@@ -4,6 +4,12 @@ domains:
     verbs:
       discover-ubos:
         description: Discover Ultimate Beneficial Owners for an entity using GLEIF + BODS data
+        invocation_phrases:
+          - "discover UBOs"
+          - "find UBOs"
+          - "find beneficial owners"
+          - "who are the UBOs"
+          - "trace ownership"
         metadata:
           tier: composite
           source_of_truth: external
@@ -31,6 +37,10 @@ domains:
 
       import:
         description: Bulk import BODS statements from data dump
+        invocation_phrases:
+          - "import BODS data"
+          - "import ownership data"
+          - "load BODS statements"
         metadata:
           tier: intent
           source_of_truth: external

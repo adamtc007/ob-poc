@@ -57,6 +57,7 @@ impl TransitionValidator {
             ViewportFocusState::InstrumentMatrix { .. } => Ok(()),
             ViewportFocusState::InstrumentType { .. } => Ok(()),
             ViewportFocusState::ConfigNode { .. } => Ok(()),
+            ViewportFocusState::BoardControl { .. } => Ok(()),
         }
     }
 
@@ -73,6 +74,7 @@ impl TransitionValidator {
             ViewportFocusState::InstrumentMatrix { .. } => Ok(()),
             ViewportFocusState::InstrumentType { .. } => Ok(()),
             ViewportFocusState::ConfigNode { .. } => Ok(()),
+            ViewportFocusState::BoardControl { .. } => Ok(()),
         }
     }
 
@@ -86,6 +88,7 @@ impl TransitionValidator {
             ViewportFocusState::InstrumentMatrix { cbu, .. } => Ok(cbu.clone()),
             ViewportFocusState::InstrumentType { cbu, .. } => Ok(cbu.clone()),
             ViewportFocusState::ConfigNode { cbu, .. } => Ok(cbu.clone()),
+            ViewportFocusState::BoardControl { source_cbu, .. } => Ok(source_cbu.clone()),
         }
     }
 
@@ -106,6 +109,7 @@ impl TransitionValidator {
                 Ok((cbu.clone(), matrix.clone()))
             }
             ViewportFocusState::ConfigNode { cbu, matrix, .. } => Ok((cbu.clone(), matrix.clone())),
+            ViewportFocusState::BoardControl { .. } => Err(TransitionError::NoMatrixContext),
         }
     }
 
@@ -134,6 +138,7 @@ impl TransitionValidator {
                 instrument_type,
                 ..
             } => Ok((cbu.clone(), matrix.clone(), instrument_type.clone())),
+            ViewportFocusState::BoardControl { .. } => Err(TransitionError::NoMatrixContext),
         }
     }
 
@@ -178,6 +183,7 @@ pub fn max_enhance_for_state(state: &ViewportFocusState) -> u8 {
         ViewportFocusState::InstrumentMatrix { .. } => 2,
         ViewportFocusState::InstrumentType { .. } => 3,
         ViewportFocusState::ConfigNode { .. } => 2,
+        ViewportFocusState::BoardControl { .. } => 2,
     }
 }
 
@@ -191,6 +197,7 @@ pub fn current_enhance_level(state: &ViewportFocusState) -> u8 {
         ViewportFocusState::InstrumentMatrix { matrix_enhance, .. } => *matrix_enhance,
         ViewportFocusState::InstrumentType { type_enhance, .. } => *type_enhance,
         ViewportFocusState::ConfigNode { node_enhance, .. } => *node_enhance,
+        ViewportFocusState::BoardControl { enhance_level, .. } => *enhance_level,
     }
 }
 
@@ -204,6 +211,7 @@ pub fn extract_cbu(state: &ViewportFocusState) -> Option<&CbuRef> {
         ViewportFocusState::InstrumentMatrix { cbu, .. } => Some(cbu),
         ViewportFocusState::InstrumentType { cbu, .. } => Some(cbu),
         ViewportFocusState::ConfigNode { cbu, .. } => Some(cbu),
+        ViewportFocusState::BoardControl { source_cbu, .. } => Some(source_cbu),
     }
 }
 
@@ -293,6 +301,17 @@ pub fn describe_focus(state: &ViewportFocusState) -> String {
                 ConfigNodeRef::Restrictions { id } => format!("Restrictions {}", id),
             };
             format!("Config {} for CBU {} (L{})", node_desc, cbu.0, node_enhance)
+        }
+        ViewportFocusState::BoardControl {
+            source_cbu,
+            anchor_entity_name,
+            enhance_level,
+            ..
+        } => {
+            format!(
+                "Board Control: {} from CBU {} (L{})",
+                anchor_entity_name, source_cbu.0, enhance_level
+            )
         }
     }
 }

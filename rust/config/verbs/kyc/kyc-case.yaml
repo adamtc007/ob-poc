@@ -4,6 +4,11 @@ domains:
     verbs:
       create:
         description: Create a new KYC case for a CBU
+        invocation_phrases:
+          - "create kyc case"
+          - "open case"
+          - "start onboarding"
+          - "create case for"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -111,6 +116,10 @@ domains:
           type: affected
       escalate:
         description: Escalate case to higher authority
+        invocation_phrases:
+          - "escalate case"
+          - "escalate kyc case"
+          - "raise to senior"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -147,6 +156,10 @@ domains:
           type: affected
       assign:
         description: Assign case to analyst and/or reviewer
+        invocation_phrases:
+          - "assign case"
+          - "assign to analyst"
+          - "assign case to"
         metadata:
           tier: intent
           source_of_truth: workflow

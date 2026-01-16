@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
+use crate::api::cbu_session_routes::CbuSessionStore;
 use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
@@ -35,6 +36,8 @@ pub struct ToolHandlers {
     gateway_client: Arc<Mutex<Option<EntityGatewayClient<Channel>>>>,
     /// UI session store - shared with web server for template batch operations
     sessions: Option<SessionStore>,
+    /// CBU session store for load/unload operations
+    cbu_sessions: Option<CbuSessionStore>,
 }
 
 impl ToolHandlers {
@@ -46,6 +49,7 @@ impl ToolHandlers {
             pool,
             gateway_client: Arc::new(Mutex::new(None)),
             sessions: None,
+            cbu_sessions: None,
         }
     }
 
@@ -57,6 +61,23 @@ impl ToolHandlers {
             pool,
             gateway_client: Arc::new(Mutex::new(None)),
             sessions: Some(sessions),
+            cbu_sessions: None,
+        }
+    }
+
+    /// Create handlers with both session stores (full integrated mode)
+    pub fn with_all_sessions(
+        pool: PgPool,
+        sessions: SessionStore,
+        cbu_sessions: CbuSessionStore,
+    ) -> Self {
+        Self {
+            generation_log: GenerationLogRepository::new(pool.clone()),
+            repo: VisualizationRepository::new(pool.clone()),
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+            sessions: Some(sessions),
+            cbu_sessions: Some(cbu_sessions),
         }
     }
 
@@ -64,6 +85,13 @@ impl ToolHandlers {
     fn require_sessions(&self) -> Result<&SessionStore> {
         self.sessions.as_ref().ok_or_else(|| {
             anyhow!("Session store not configured. Batch operations require integrated mode.")
+        })
+    }
+
+    /// Get the CBU session store, or error if not configured
+    fn require_cbu_sessions(&self) -> Result<&CbuSessionStore> {
+        self.cbu_sessions.as_ref().ok_or_else(|| {
+            anyhow!("CBU session store not configured. CBU operations require integrated mode.")
         })
     }
 
@@ -209,6 +237,12 @@ impl ToolHandlers {
             "feedback_repro" => self.feedback_repro(args).await,
             "feedback_todo" => self.feedback_todo(args).await,
             "feedback_audit" => self.feedback_audit(args).await,
+            // Agent learning tools (Loop 2 - continuous improvement)
+            "intent_analyze" => self.intent_analyze(args).await,
+            "intent_list" => self.intent_list(args).await,
+            "intent_approve" => self.intent_approve(args).await,
+            "intent_reject" => self.intent_reject(args).await,
+            "intent_reload" => self.intent_reload(args).await,
             // Service resource pipeline tools
             "service_intent_create" => self.service_intent_create(args).await,
             "service_intent_list" => self.service_intent_list(args).await,
@@ -627,7 +661,7 @@ impl ToolHandlers {
                         // Update scope if a session.* operation changed it
                         if let Some(ref sc) = scope_change {
                             session.context.scope =
-                                crate::session::SessionScope::from_graph_scope(sc.clone());
+                                Some(crate::session::SessionScope::from_graph_scope(sc.clone()));
                         }
 
                         // Touch updated_at to trigger watch notification
@@ -1518,7 +1552,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         let (id, name, jurisdiction) = cbu.ok_or_else(|| anyhow!("CBU not found"))?;
 
         // Get or create session and load the CBU
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
 
         // Use default session for now (could be parameterized)
@@ -1560,7 +1594,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         let cbu_names: Vec<String> = rows.iter().map(|(_, name)| name.clone()).collect();
 
         // Get or create session
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
         let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
 
@@ -1624,7 +1658,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                 .await?;
 
         // Get or create session
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
         let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
 
@@ -1654,7 +1688,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             .ok_or_else(|| anyhow!("cbu_id required"))?;
         let cbu_id = Uuid::parse_str(cbu_id).map_err(|_| anyhow!("Invalid cbu_id UUID"))?;
 
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
         let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
 
@@ -1675,7 +1709,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
         let pool = self.require_pool()?;
 
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
         let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
 
@@ -1695,7 +1729,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
         let pool = self.require_pool()?;
 
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
         let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
 
@@ -1719,7 +1753,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
         let pool = self.require_pool()?;
 
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
         let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
 
@@ -1738,12 +1772,11 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
     /// Get current session state and scope
     async fn session_info(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
         let _ = args;
 
         let pool = self.require_pool()?;
 
-        let sessions = self.require_sessions()?;
+        let sessions = self.require_cbu_sessions()?;
         let guard = sessions.read().await;
         let session = guard.get(&Uuid::nil());
 
@@ -1792,7 +1825,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         use crate::session::CbuSession;
 
         let pool = self.require_pool()?;
-        let limit = args["limit"].as_i64().unwrap_or(20) as i64;
+        let limit = args["limit"].as_i64().unwrap_or(20);
 
         let sessions = CbuSession::list_all(pool, limit as usize).await;
 
@@ -1967,7 +2000,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                     ref_id: r["ref_id"].as_str().unwrap_or("").to_string(),
                     search_value: r["search_value"].as_str().unwrap_or("").to_string(),
                     entity_type: r["entity_type"].as_str().unwrap_or("entity").to_string(),
-                    dsl_line: r["dsl_line"].as_u64().map(|n| n as usize),
+                    context_line: r["context_line"].as_str().unwrap_or("").to_string(),
                     initial_matches,
                 }
             })
@@ -2068,7 +2101,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         let raw_matches = self.gateway_search(nickname, Some(base_query), 10).await?;
 
         // Apply discriminator filtering (basic implementation)
-        let mut filtered_matches = raw_matches;
+        let filtered_matches = raw_matches;
 
         if let Some(disc) = discriminators {
             // TODO: Implement proper discriminator filtering via EntityEnricher
@@ -2119,45 +2152,78 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         }
         .ok_or_else(|| anyhow!("Sub-session {} not found", subsession_id))?;
 
-        let SubSessionType::Resolution(resolution) = &mut session.sub_session_type else {
-            return Err(anyhow!(
-                "Session {} is not a resolution sub-session",
-                subsession_id
-            ));
-        };
+        // Extract values and update resolution in a scope that ends before we move session
+        let (
+            ref_id,
+            selected_value,
+            is_complete,
+            resolutions_count,
+            remaining_count,
+            next_ref_json,
+        ) = {
+            let SubSessionType::Resolution(resolution) = &mut session.sub_session_type else {
+                return Err(anyhow!(
+                    "Session {} is not a resolution sub-session",
+                    subsession_id
+                ));
+            };
 
-        let current_ref = resolution
-            .unresolved_refs
-            .get(resolution.current_ref_index)
-            .ok_or_else(|| anyhow!("No current reference to resolve"))?;
+            let current_ref = resolution
+                .unresolved_refs
+                .get(resolution.current_ref_index)
+                .ok_or_else(|| anyhow!("No current reference to resolve"))?;
 
-        // Determine the selected value
-        let selected_value = if let Some(idx) = selection {
-            let match_info = current_ref
-                .initial_matches
-                .get(idx as usize)
-                .ok_or_else(|| anyhow!("Selection index {} out of range", idx))?;
-            match_info.value.clone()
-        } else if let Some(eid) = entity_id {
-            eid.to_string()
-        } else {
-            return Err(anyhow!("No selection provided"));
-        };
+            // Determine the selected value
+            let selected_value = if let Some(idx) = selection {
+                let match_info = current_ref
+                    .initial_matches
+                    .get(idx as usize)
+                    .ok_or_else(|| anyhow!("Selection index {} out of range", idx))?;
+                match_info.value.clone()
+            } else if let Some(eid) = entity_id {
+                eid.to_string()
+            } else {
+                return Err(anyhow!("No selection provided"));
+            };
 
-        // Record resolution
-        let ref_id = current_ref.ref_id.clone();
-        resolution
-            .resolutions
-            .insert(ref_id.clone(), selected_value.clone());
+            // Record resolution
+            let ref_id = current_ref.ref_id.clone();
+            resolution
+                .resolutions
+                .insert(ref_id.clone(), selected_value.clone());
 
-        // Move to next
-        resolution.current_ref_index += 1;
+            // Move to next
+            resolution.current_ref_index += 1;
 
-        let is_complete = resolution.current_ref_index >= resolution.unresolved_refs.len();
-        let next_ref = if !is_complete {
-            resolution.unresolved_refs.get(resolution.current_ref_index)
-        } else {
-            None
+            let is_complete = resolution.current_ref_index >= resolution.unresolved_refs.len();
+            let next_ref_json = if !is_complete {
+                resolution
+                    .unresolved_refs
+                    .get(resolution.current_ref_index)
+                    .map(|r| {
+                        json!({
+                            "ref_id": r.ref_id,
+                            "search_value": r.search_value,
+                            "entity_type": r.entity_type,
+                            "context_line": r.context_line,
+                            "initial_matches": r.initial_matches
+                        })
+                    })
+            } else {
+                None
+            };
+
+            let resolutions_count = resolution.current_ref_index;
+            let remaining_count = resolution.unresolved_refs.len() - resolution.current_ref_index;
+
+            (
+                ref_id,
+                selected_value,
+                is_complete,
+                resolutions_count,
+                remaining_count,
+                next_ref_json,
+            )
         };
 
         // Store updated session
@@ -2172,19 +2238,9 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                 "value": selected_value
             },
             "is_complete": is_complete,
-            "resolutions_count": resolution.current_ref_index,
-            "remaining_count": resolution.unresolved_refs.len() - resolution.current_ref_index,
-            "next_ref": next_ref.map(|r| json!({
-                "ref_id": r.ref_id,
-                "search_value": r.search_value,
-                "entity_type": r.entity_type,
-                "matches": r.initial_matches.iter().map(|m| json!({
-                    "value": m.value,
-                    "display": m.display,
-                    "score_pct": m.score_pct,
-                    "detail": m.detail
-                })).collect::<Vec<_>>()
-            }))
+            "resolutions_count": resolutions_count,
+            "remaining_count": remaining_count,
+            "next_ref": next_ref_json
         }))
     }
 
@@ -3960,7 +4016,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         // Get trading profile status
         let profile = sqlx::query!(
             r#"
-            SELECT profile_id, status, version, created_at, updated_at
+            SELECT profile_id, status, version, created_at, activated_at
             FROM "ob-poc".cbu_trading_profiles
             WHERE cbu_id = $1 AND status = 'ACTIVE'
             ORDER BY version DESC
@@ -4028,10 +4084,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             cbu_id
         )
         .fetch_all(&self.pool)
-        .await?
-        .into_iter()
-        .filter_map(|s| s)
-        .collect();
+        .await?;
 
         // Get markets in universe
         let markets: Vec<String> = sqlx::query_scalar!(
@@ -4045,10 +4098,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             cbu_id
         )
         .fetch_all(&self.pool)
-        .await?
-        .into_iter()
-        .filter_map(|s| s)
-        .collect();
+        .await?;
 
         // Build summary
         let has_profile = profile.is_some();
@@ -4057,7 +4107,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                 "profile_id": p.profile_id.to_string(),
                 "status": p.status,
                 "version": p.version,
-                "updated_at": p.updated_at.map(|t| t.to_rfc3339())
+                "activated_at": p.activated_at.map(|t| t.to_rfc3339())
             })
         });
 
@@ -4092,7 +4142,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
     // =========================================================================
 
     async fn feedback_analyze(&self, args: Value) -> Result<Value> {
-        use crate::feedback::{AnalysisReport, FeedbackInspector};
+        use crate::feedback::FeedbackInspector;
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -4122,7 +4172,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
     }
 
     async fn feedback_list(&self, args: Value) -> Result<Value> {
-        use crate::feedback::{ErrorType, FeedbackInspector, IssueFilter, IssueStatus};
+        use crate::feedback::{FeedbackInspector, IssueFilter};
 
         #[derive(serde::Deserialize)]
         struct Args {
@@ -4240,7 +4290,8 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
         let pool = self.require_pool()?;
         let inspector = FeedbackInspector::new(pool.clone(), None);
-        let repro_gen = ReproGenerator::new();
+        let tests_dir = std::path::PathBuf::from("tests/generated");
+        let repro_gen = ReproGenerator::new(tests_dir);
 
         let result = repro_gen
             .generate_and_verify(&inspector, &args.fingerprint)
@@ -4249,9 +4300,8 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         Ok(json!({
             "fingerprint": args.fingerprint,
             "repro_type": format!("{:?}", result.repro_type),
-            "path": result.path.to_string_lossy(),
+            "path": result.repro_path.to_string_lossy(),
             "verified": result.verified,
-            "passes": result.passes,
             "output": result.output
         }))
     }
@@ -4269,7 +4319,8 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
         let pool = self.require_pool()?;
         let inspector = FeedbackInspector::new(pool.clone(), None);
-        let todo_gen = TodoGenerator::new();
+        let todos_dir = std::path::PathBuf::from("todos/generated");
+        let todo_gen = TodoGenerator::new(todos_dir);
 
         let result = todo_gen
             .generate_todo(&inspector, &args.fingerprint, args.todo_number)
@@ -4312,6 +4363,153 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                 "new_status": a.new_status.map(|s| format!("{:?}", s)),
                 "created_at": a.created_at.to_rfc3339()
             })).collect::<Vec<_>>()
+        }))
+    }
+
+    // =========================================================================
+    // Agent Learning Tools (Loop 2 - Continuous Improvement)
+    // =========================================================================
+
+    async fn intent_analyze(&self, args: Value) -> Result<Value> {
+        use crate::agent::AgentLearningInspector;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            since_hours: Option<i64>,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let since = args
+            .since_hours
+            .map(|h| chrono::Utc::now() - chrono::Duration::hours(h));
+
+        let inspector = AgentLearningInspector::new(pool.clone());
+        let stats = inspector.analyze(since).await?;
+
+        Ok(json!({
+            "events_processed": stats.events_processed,
+            "candidates_created": stats.candidates_created,
+            "candidates_updated": stats.candidates_updated,
+            "auto_applied": stats.auto_applied,
+            "queued_for_review": stats.queued_for_review
+        }))
+    }
+
+    async fn intent_list(&self, args: Value) -> Result<Value> {
+        use crate::agent::{AgentLearningInspector, LearningStatus, LearningType};
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            status: Option<String>,
+            learning_type: Option<String>,
+            limit: Option<i64>,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let status = args.status.and_then(|s| match s.as_str() {
+            "pending" => Some(LearningStatus::Pending),
+            "approved" => Some(LearningStatus::Approved),
+            "rejected" => Some(LearningStatus::Rejected),
+            "applied" => Some(LearningStatus::Applied),
+            _ => None,
+        });
+
+        let learning_type = args.learning_type.and_then(|t| match t.as_str() {
+            "entity_alias" => Some(LearningType::EntityAlias),
+            "lexicon_token" => Some(LearningType::LexiconToken),
+            "invocation_phrase" => Some(LearningType::InvocationPhrase),
+            "prompt_change" => Some(LearningType::PromptChange),
+            _ => None,
+        });
+
+        let inspector = AgentLearningInspector::new(pool.clone());
+        let candidates = inspector
+            .list_candidates(status, learning_type, args.limit.unwrap_or(20))
+            .await?;
+
+        Ok(json!({
+            "count": candidates.len(),
+            "candidates": candidates.iter().map(|c| json!({
+                "fingerprint": c.fingerprint,
+                "learning_type": c.learning_type.as_str(),
+                "input_pattern": c.input_pattern,
+                "suggested_output": c.suggested_output,
+                "occurrence_count": c.occurrence_count,
+                "risk_level": c.risk_level.as_str(),
+                "status": c.status.as_str(),
+                "first_seen": c.first_seen.to_rfc3339(),
+                "last_seen": c.last_seen.to_rfc3339()
+            })).collect::<Vec<_>>()
+        }))
+    }
+
+    async fn intent_approve(&self, args: Value) -> Result<Value> {
+        use crate::agent::AgentLearningInspector;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            fingerprint: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let inspector = AgentLearningInspector::new(pool.clone());
+        let applied = inspector
+            .approve_candidate(&args.fingerprint, "mcp_user")
+            .await?;
+
+        Ok(json!({
+            "success": true,
+            "learning_type": applied.learning_type.as_str(),
+            "input_pattern": applied.input_pattern,
+            "output": applied.output,
+            "applied_at": applied.applied_at.to_rfc3339()
+        }))
+    }
+
+    async fn intent_reject(&self, args: Value) -> Result<Value> {
+        use crate::agent::AgentLearningInspector;
+
+        #[derive(serde::Deserialize)]
+        struct Args {
+            fingerprint: String,
+        }
+
+        let args: Args = serde_json::from_value(args)?;
+        let pool = self.require_pool()?;
+
+        let inspector = AgentLearningInspector::new(pool.clone());
+        inspector
+            .reject_candidate(&args.fingerprint, "mcp_user")
+            .await?;
+
+        Ok(json!({
+            "success": true,
+            "fingerprint": args.fingerprint,
+            "status": "rejected"
+        }))
+    }
+
+    async fn intent_reload(&self, _args: Value) -> Result<Value> {
+        use crate::agent::LearningWarmup;
+
+        let pool = self.require_pool()?;
+
+        let warmup = LearningWarmup::new(pool.clone());
+        let (_, stats) = warmup.warmup().await?;
+
+        Ok(json!({
+            "success": true,
+            "entity_aliases_loaded": stats.entity_aliases_loaded,
+            "lexicon_tokens_loaded": stats.lexicon_tokens_loaded,
+            "invocation_phrases_loaded": stats.invocation_phrases_loaded,
+            "learnings_auto_applied": stats.learnings_auto_applied,
+            "duration_ms": stats.duration_ms
         }))
     }
 
@@ -4388,7 +4586,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
                 "service_id": i.service_id,
                 "options": i.options,
                 "status": i.status,
-                "created_at": i.created_at.to_rfc3339()
+                "created_at": i.created_at.map(|t| t.to_rfc3339())
             })).collect::<Vec<_>>()
         }))
     }
@@ -4488,9 +4686,10 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
         let evidence_refs = args.evidence_refs.map(|refs| {
             refs.into_iter()
                 .map(|r| crate::service_resources::EvidenceRef {
-                    document_id: Uuid::parse_str(&r).ok(),
-                    url: None,
-                    description: Some(r),
+                    ref_type: "document".to_string(),
+                    id: Uuid::parse_str(&r).ok().map(|u| u.to_string()),
+                    path: None,
+                    details: Some(serde_json::json!({ "description": r })),
                 })
                 .collect()
         });
@@ -4546,7 +4745,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             },
             "services": readiness.iter().map(|r| json!({
                 "service_id": r.service_id,
-                "service_name": r.service_name,
+                "product_id": r.product_id,
                 "status": r.status,
                 "blocking_reasons": r.blocking_reasons
             })).collect::<Vec<_>>()
@@ -4775,6 +4974,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
 
 // Helper struct for attribute gap query
 #[derive(sqlx::FromRow)]
+#[allow(dead_code)]
 struct AttrGapRow {
     attr_id: Uuid,
     attr_code: String,

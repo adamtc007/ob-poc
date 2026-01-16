@@ -15,6 +15,10 @@ domains:
         description: Import a trading profile document from YAML/JSON file or inline content
         behavior: plugin
         handler: import_trading_profile
+        invocation_phrases:
+          - "import trading profile"
+          - "load trading profile"
+          - "import profile for"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -68,6 +72,10 @@ domains:
       read:
         description: Read a trading profile by ID
         behavior: crud
+        invocation_phrases:
+          - "show trading profile"
+          - "get trading profile"
+          - "read trading profile"
         metadata:
           tier: diagnostics
           source_of_truth: matrix
@@ -90,6 +98,10 @@ domains:
         description: Get the active trading profile for a CBU
         behavior: plugin
         handler: get_active_trading_profile
+        invocation_phrases:
+          - "get active profile"
+          - "show active trading profile"
+          - "current trading profile"
         metadata:
           tier: diagnostics
           source_of_truth: matrix
@@ -163,6 +175,12 @@ domains:
         description: Materialize trading profile to operational tables (universe, SSIs, booking rules)
         behavior: plugin
         handler: materialize_trading_profile
+        invocation_phrases:
+          - "materialize trading profile"
+          - "materialize profile"
+          - "sync trading profile"
+          - "deploy profile"
+          - "apply trading profile"
         metadata:
           tier: composite
           source_of_truth: matrix
@@ -1081,6 +1099,10 @@ domains:
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
         behavior: plugin
         handler: submit_trading_profile
+        invocation_phrases:
+          - "submit trading profile"
+          - "submit profile for review"
+          - "send for approval"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -1107,6 +1129,10 @@ domains:
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
         behavior: plugin
         handler: approve_trading_profile
+        invocation_phrases:
+          - "approve trading profile"
+          - "approve profile"
+          - "activate trading profile"
         metadata:
           tier: intent
           source_of_truth: matrix

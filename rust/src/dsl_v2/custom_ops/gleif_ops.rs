@@ -16,6 +16,7 @@ use crate::gleif::client::extract_lei_from_url;
 
 #[cfg(feature = "database")]
 use {
+    crate::dsl_v2::DslExecutor,
     crate::gleif::{
         ChainLink, DiscoveredEntity, FundListResult, GleifClient, GleifEnrichmentService,
         LeiRecord, OwnershipChain, SuccessorResult, UboStatus,
@@ -77,44 +78,35 @@ impl CustomOperation for GleifEnrichOp {
                 match existing {
                     Some(id) => (l, id),
                     None => {
-                        // Create new entity from GLEIF
-                        let _service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+                        // Create new entity from GLEIF using DSL (ensures deduplication by name)
                         let client = GleifClient::new()?;
 
                         // Fetch LEI record first to get entity name
                         let record = client.get_lei_record(&l).await?;
                         let name = &record.attributes.entity.legal_name.name;
-                        let jurisdiction = &record.attributes.entity.jurisdiction;
+                        let jurisdiction = record
+                            .attributes
+                            .entity
+                            .jurisdiction
+                            .as_deref()
+                            .unwrap_or("XX");
 
-                        // Create base entity
-                        let entity_type_id: Uuid = sqlx::query_scalar(
-                            r#"SELECT entity_type_id FROM "ob-poc".entity_types WHERE type_code = 'limited_company'"#,
-                        )
-                        .fetch_one(pool)
-                        .await?;
+                        // Use DSL to create entity (idempotent by name - prevents duplicates)
+                        let dsl = format!(
+                            r#"(entity.ensure-limited-company :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+                            escape_dsl_string(name),
+                            jurisdiction,
+                            l
+                        );
 
-                        let entity_id = Uuid::new_v4();
-                        sqlx::query(
-                            r#"INSERT INTO "ob-poc".entities (entity_id, entity_type_id, name) VALUES ($1, $2, $3)"#,
-                        )
-                        .bind(entity_id)
-                        .bind(entity_type_id)
-                        .bind(name)
-                        .execute(pool)
-                        .await?;
+                        let executor = DslExecutor::new(pool.clone());
+                        let mut dsl_ctx = ExecutionContext::new();
+                        executor.execute_dsl(&dsl, &mut dsl_ctx).await?;
 
-                        // Create limited company record
-                        sqlx::query(
-                            r#"INSERT INTO "ob-poc".entity_limited_companies
-                               (entity_id, company_name, jurisdiction, lei)
-                               VALUES ($1, $2, $3, $4)"#,
-                        )
-                        .bind(entity_id)
-                        .bind(name)
-                        .bind(jurisdiction)
-                        .bind(&l)
-                        .execute(pool)
-                        .await?;
+                        // Get the created/existing entity ID from context
+                        let entity_id = dsl_ctx
+                            .resolve("entity")
+                            .ok_or_else(|| anyhow::anyhow!("DSL did not bind @entity"))?;
 
                         (l, entity_id)
                     }
@@ -838,7 +830,7 @@ async fn get_or_create_entity_by_lei(
 
 #[cfg(feature = "database")]
 async fn get_or_create_entity_from_record(pool: &PgPool, record: &LeiRecord) -> Result<Uuid> {
-    let lei = &record.lei();
+    let lei = record.lei();
     let name = &record.attributes.entity.legal_name.name;
     let jurisdiction = record
         .attributes
@@ -847,11 +839,10 @@ async fn get_or_create_entity_from_record(pool: &PgPool, record: &LeiRecord) -> 
         .as_deref()
         .unwrap_or("XX");
     let category = record.attributes.entity.category.as_deref();
-    let status = record.attributes.entity.status.as_deref();
 
     let is_fund = category == Some("FUND");
 
-    // Check if entity exists by LEI in appropriate table
+    // Check if entity exists by LEI first (fast path - no DSL needed)
     if is_fund {
         let existing: Option<Uuid> =
             sqlx::query_scalar(r#"SELECT entity_id FROM "ob-poc".entity_funds WHERE lei = $1"#)
@@ -875,137 +866,83 @@ async fn get_or_create_entity_from_record(pool: &PgPool, record: &LeiRecord) -> 
         }
     }
 
-    // Get entity type based on category
-    // For funds, use fund_standalone as the default type (can be refined later based on fund structure)
-    let type_code = if is_fund {
-        "fund_standalone"
+    // Create entity using DSL (idempotent by name - prevents duplicates)
+    let executor = DslExecutor::new(pool.clone());
+    let mut ctx = ExecutionContext::new();
+
+    let dsl = if is_fund {
+        // Use fund.ensure-standalone for fund entities
+        format!(
+            r#"(fund.ensure-standalone :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+            escape_dsl_string(name),
+            jurisdiction,
+            lei
+        )
     } else {
-        "limited_company"
+        // Use entity.ensure-limited-company for non-fund entities
+        format!(
+            r#"(entity.ensure-limited-company :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+            escape_dsl_string(name),
+            jurisdiction,
+            lei
+        )
     };
-    let entity_type_id: Uuid = sqlx::query_scalar(
-        r#"SELECT entity_type_id FROM "ob-poc".entity_types WHERE type_code = $1"#,
-    )
-    .bind(type_code)
-    .fetch_one(pool)
-    .await?;
 
-    // Create base entity
-    let entity_id = Uuid::new_v4();
-    sqlx::query(
-        r#"INSERT INTO "ob-poc".entities (entity_id, entity_type_id, name) VALUES ($1, $2, $3)"#,
-    )
-    .bind(entity_id)
-    .bind(entity_type_id)
-    .bind(name)
-    .execute(pool)
-    .await?;
+    executor.execute_dsl(&dsl, &mut ctx).await?;
 
-    if is_fund {
-        // Create fund entity record with GLEIF data
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".entity_funds
-               (entity_id, lei, jurisdiction, gleif_category, gleif_status, gleif_last_update)
-               VALUES ($1, $2, $3, $4, $5, NOW())"#,
-        )
-        .bind(entity_id)
-        .bind(lei)
-        .bind(jurisdiction)
-        .bind(category)
-        .bind(status)
-        .execute(pool)
-        .await?;
-    } else {
-        // Create limited company record with GLEIF data
-        sqlx::query(
-            r#"INSERT INTO "ob-poc".entity_limited_companies
-               (entity_id, company_name, jurisdiction, lei, gleif_category, gleif_status)
-               VALUES ($1, $2, $3, $4, $5, $6)"#,
-        )
-        .bind(entity_id)
-        .bind(name)
-        .bind(jurisdiction)
-        .bind(lei)
-        .bind(category)
-        .bind(status)
-        .execute(pool)
-        .await?;
-    }
+    // Get the created/existing entity ID from context
+    let entity_id = ctx
+        .resolve("entity")
+        .ok_or_else(|| anyhow::anyhow!("DSL did not bind @entity for {}", name))?;
 
     Ok(entity_id)
 }
 
 #[cfg(feature = "database")]
 async fn create_fund_cbu(pool: &PgPool, name: &str, jurisdiction: &str) -> Result<Uuid> {
-    // Check if CBU exists
-    let existing: Option<Uuid> =
-        sqlx::query_scalar(r#"SELECT cbu_id FROM "ob-poc".cbus WHERE name = $1"#)
-            .bind(name)
-            .fetch_optional(pool)
-            .await?;
+    // Use DSL to create CBU (idempotent by name - prevents duplicates)
+    let executor = DslExecutor::new(pool.clone());
+    let mut ctx = ExecutionContext::new();
 
-    if let Some(id) = existing {
-        return Ok(id);
-    }
+    let dsl = format!(
+        r#"(cbu.ensure :name "{}" :jurisdiction "{}" :client-type "FUND" :as @cbu)"#,
+        escape_dsl_string(name),
+        jurisdiction
+    );
 
-    // Create CBU
-    let cbu_id = Uuid::new_v4();
-    sqlx::query(
-        r#"INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, client_type)
-           VALUES ($1, $2, $3, 'FUND')"#,
-    )
-    .bind(cbu_id)
-    .bind(name)
-    .bind(jurisdiction)
-    .execute(pool)
-    .await?;
+    executor.execute_dsl(&dsl, &mut ctx).await?;
+
+    let cbu_id = ctx
+        .resolve("cbu")
+        .ok_or_else(|| anyhow::anyhow!("DSL did not bind @cbu for {}", name))?;
 
     Ok(cbu_id)
 }
 
 #[cfg(feature = "database")]
 async fn assign_role(pool: &PgPool, cbu_id: Uuid, entity_id: Uuid, role_name: &str) -> Result<()> {
-    // Get role ID
-    let role_id: Option<Uuid> =
-        sqlx::query_scalar(r#"SELECT role_id FROM "ob-poc".roles WHERE name = $1"#)
-            .bind(role_name)
-            .fetch_optional(pool)
-            .await?;
+    // Use DSL to assign role (idempotent - prevents duplicates)
+    let executor = DslExecutor::new(pool.clone());
+    let mut ctx = ExecutionContext::new();
 
-    let role_id = match role_id {
-        Some(id) => id,
-        None => {
-            tracing::warn!("Role not found: {}", role_name);
-            return Ok(());
+    let dsl = format!(
+        r#"(cbu.assign-role :cbu-id "{}" :entity-id "{}" :role "{}")"#,
+        cbu_id, entity_id, role_name
+    );
+
+    // Execute and ignore "already assigned" errors
+    match executor.execute_dsl(&dsl, &mut ctx).await {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let err_str = e.to_string();
+            // Ignore duplicate assignment errors
+            if err_str.contains("already assigned") || err_str.contains("duplicate") {
+                Ok(())
+            } else {
+                Err(e)
+            }
         }
-    };
-
-    // Check if role already assigned
-    let existing: Option<Uuid> = sqlx::query_scalar(
-        r#"SELECT cbu_entity_role_id FROM "ob-poc".cbu_entity_roles
-           WHERE cbu_id = $1 AND entity_id = $2 AND role_id = $3"#,
-    )
-    .bind(cbu_id)
-    .bind(entity_id)
-    .bind(role_id)
-    .fetch_optional(pool)
-    .await?;
-
-    if existing.is_some() {
-        return Ok(());
     }
-
-    // Assign role
-    sqlx::query(
-        r#"INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
-           VALUES ($1, $2, $3)"#,
-    )
-    .bind(cbu_id)
-    .bind(entity_id)
-    .bind(role_id)
-    .execute(pool)
-    .await?;
-
-    Ok(())
 }
 
 /// Get direct children from GLEIF
@@ -1728,4 +1665,10 @@ async fn log_research_action(
     .await?;
 
     Ok(action_id)
+}
+
+/// Escape a string for use in DSL - handles quotes and special characters
+#[cfg(feature = "database")]
+fn escape_dsl_string(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }

@@ -796,3 +796,45 @@ pub async fn get_investor_list(
     );
     get(&url).await
 }
+
+// =============================================================================
+// Agent Learning API
+// =============================================================================
+
+/// Request to report a user correction
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct ReportCorrectionRequest {
+    pub session_id: Uuid,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_message: Option<String>,
+    pub generated_dsl: String,
+    pub corrected_dsl: String,
+}
+
+/// Response from reporting a correction
+#[derive(Clone, Debug, serde::Deserialize)]
+#[allow(dead_code)]
+pub struct ReportCorrectionResponse {
+    pub recorded: bool,
+    pub event_id: Option<i64>,
+}
+
+/// Report a user correction for learning (fire-and-forget)
+/// Called when user edits agent-generated DSL before executing
+pub async fn report_correction(
+    session_id: Uuid,
+    original_message: Option<String>,
+    generated_dsl: String,
+    corrected_dsl: String,
+) -> Result<ReportCorrectionResponse, String> {
+    post(
+        "/api/agent/correction",
+        &ReportCorrectionRequest {
+            session_id,
+            original_message,
+            generated_dsl,
+            corrected_dsl,
+        },
+    )
+    .await
+}

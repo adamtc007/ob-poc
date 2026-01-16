@@ -95,6 +95,10 @@ pub mod research;
 // Event infrastructure - always-on, zero-overhead event capture from DSL pipeline
 pub mod events;
 
+// Agent learning infrastructure - continuous improvement from user interactions
+#[cfg(feature = "database")]
+pub mod agent;
+
 // Feedback Inspector - on-demand failure analysis, repro generation, audit trail
 #[cfg(feature = "database")]
 pub mod feedback;

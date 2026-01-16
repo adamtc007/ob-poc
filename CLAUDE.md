@@ -1,12 +1,14 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-15
+> **Last reviewed:** 2026-01-16
 > **Verb count:** 800+ verbs across 103 YAML files
 > **Custom ops:** 51 plugin handlers
-> **Crates:** 13 fine-grained crates
-> **Migrations:** 31 schema migrations (latest: 031_economic_lookthrough.sql)
+> **Crates:** 14 fine-grained crates
+> **DSL LSP:** ✅ Complete - Syntax highlighting, completions, go-to-definition, hover docs
+> **Migrations:** 32 schema migrations (latest: 032_agent_learning.sql)
 > **Investor Register:** ✅ Complete - Role profiles, fund vehicles, economic look-through
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
+> **Agent Learning Loop:** ✅ Complete - Continuous improvement from user corrections, startup warmup, 5 MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
 > **CBU Session v2:** ✅ Complete - In-memory sessions, 9 MCP tools, REST API, undo/redo, persistence
 > **Verb Tiering:** ✅ Complete - All verbs tagged with tier metadata
@@ -122,6 +124,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "service taxonomy", "product service", "attribute satisfaction", "srdef" → See Service Resource Pipeline section below
 - "container", "container_parent_id", "is_container", "entities inside CBU", "trading nodes outside", "status badge", "attachment edge", "taxonomy navigation", "external taxonomy" → See CBU Container Rendering section below
 - "intent parser", "NLU", "natural language", "lexicon", "tokenizer", "AST lowering", "type inference", "Plan/Render", "SemanticAction", "lexicon harness" → See Lexicon Intent Parser section below
+- "LSP", "language server", "completions", "hover", "go-to-definition", "diagnostics", "dsl-lsp" → See DSL Language Server (LSP) section below
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -202,6 +205,7 @@ ob-poc/
 │   │   └── agent/              # Agent mode verbs
 │   ├── crates/
 │   │   ├── dsl-core/           # Parser, AST, compiler (NO DB dependency)
+│   │   ├── dsl-lsp/            # Language Server Protocol for DSL editing
 │   │   ├── ob-agentic/         # LLM agent for DSL generation
 │   │   ├── ob-poc-web/         # Axum server + API
 │   │   ├── ob-poc-ui/          # egui/WASM UI
@@ -231,10 +235,91 @@ ob-poc/
 | Crate | DB Required | Purpose |
 |-------|-------------|---------|
 | `dsl-core` | No | Pure parser, AST, compiler - works offline |
+| `dsl-lsp` | No | Language Server Protocol for DSL editing |
 | `ob-agentic` | No | LLM intent extraction |
 | `ob-poc-ui` | No | Pure egui/WASM UI - fetches data via HTTP |
 | `ob-poc-web` | Yes | Axum server handles all DB operations |
 | `entity-gateway` | Yes | gRPC entity resolution with Tantivy indexes |
+
+---
+
+## DSL Language Server (LSP)
+
+The `dsl-lsp` crate provides IDE support for editing DSL files via the Language Server Protocol.
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Syntax Highlighting** | Semantic tokens for verbs, arguments, symbols, strings |
+| **Diagnostics** | Real-time syntax error detection with line/column positions |
+| **Completions** | Smart completions for verbs, arguments, entity lookups |
+| **Go-to-Definition** | Jump to @symbol definitions within the document |
+| **Hover Documentation** | Verb descriptions and argument docs on hover |
+| **Signature Help** | Argument hints while typing verb calls |
+| **Code Actions** | Quick fixes for common issues |
+| **Document Symbols** | Outline view of @symbol captures |
+
+### Building and Running
+
+```bash
+# Build release binary
+cargo build -p dsl-lsp --release
+
+# Binary location
+./target/release/dsl-lsp
+
+# Environment variables
+DSL_CONFIG_DIR=/path/to/rust/config    # Verb YAML location
+ENTITY_GATEWAY_URL=http://[::1]:50051  # For entity lookups (optional)
+```
+
+### Editor Integration
+
+**VS Code** (recommended):
+1. Install a generic LSP client extension (e.g., "Language Server Protocol Client")
+2. Configure to run `dsl-lsp` binary for `.dsl` files
+3. Set `DSL_CONFIG_DIR` environment variable
+
+**Neovim** (nvim-lspconfig):
+```lua
+local lspconfig = require('lspconfig')
+local configs = require('lspconfig.configs')
+
+configs.dsl_lsp = {
+  default_config = {
+    cmd = { '/path/to/dsl-lsp' },
+    filetypes = { 'dsl' },
+    root_dir = lspconfig.util.find_git_ancestor,
+  },
+}
+
+lspconfig.dsl_lsp.setup({
+  cmd_env = {
+    DSL_CONFIG_DIR = '/path/to/rust/config',
+  },
+})
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/dsl-lsp/src/main.rs` | Entry point, stdio transport |
+| `rust/crates/dsl-lsp/src/server.rs` | LSP server implementation |
+| `rust/crates/dsl-lsp/src/handlers/completion.rs` | Smart completions with picklists |
+| `rust/crates/dsl-lsp/src/handlers/diagnostics.rs` | Syntax error detection |
+| `rust/crates/dsl-lsp/src/handlers/hover.rs` | Hover documentation |
+| `rust/crates/dsl-lsp/src/handlers/goto_definition.rs` | Symbol navigation |
+| `rust/crates/dsl-lsp/src/analysis/` | Document analysis and caching |
+
+### Logging
+
+LSP uses stdout for protocol communication, so logs go to `/tmp/dsl-lsp.log`:
+
+```bash
+tail -f /tmp/dsl-lsp.log
+```
 
 ---
 
@@ -794,6 +879,135 @@ When you see these in a task, you're working in lexicon territory:
 - "Plan/Render", "SemanticAction", "slot-based"
 - "lexicon harness", "test cases", "pass rate"
 - "nom combinator", "grammar", "parse pattern"
+
+---
+
+## Agent Learning Loop (Continuous Improvement)
+
+> **Status:** ✅ Complete
+> **Migration:** `032_agent_learning.sql`
+> **Key Capability:** Self-improving system that learns from user corrections
+
+The agent learning loop is the **second feedback loop** that enables continuous improvement:
+
+### Two Feedback Loops
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LOOP 1: DSL Execution Feedback (exists)                                    │
+│  ────────────────────────────────────────                                   │
+│  DSL → Executor → DB → DslEvent → FeedbackInspector                        │
+│  "Did the DSL execute correctly?" → Fix verbs/handlers                      │
+│                                                                              │
+│  LOOP 2: Agent→DSL Alignment Feedback (NEW)                                 │
+│  ──────────────────────────────────────────                                 │
+│  User Intent → LLM → Verb Selection → DSL → AgentEvent → LearningInspector │
+│  "Did we understand the user?" → Learn from corrections                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### What Gets Learned
+
+| Learning Type | Risk | Auto-Apply? | Example |
+|--------------|------|-------------|---------|
+| `entity_alias` | Low | ✅ After 3x | "Barclays" → "Barclays PLC" |
+| `lexicon_token` | Low | ✅ After 3x | "counterparty" → EntityType |
+| `invocation_phrase` | Medium | ⚠️ Review queue | "set up ISDA" → isda.create |
+| `prompt_change` | High | ❌ Manual only | System prompt adjustments |
+
+### Learning Triggers
+
+| Trigger | When | Overhead |
+|---------|------|----------|
+| **Startup warmup** | Server load | +100-200ms once |
+| **Immediate** | User corrects DSL | ~1μs (fire-and-forget) |
+| **Threshold (3x)** | Same pattern 3+ times | Background, async |
+| **On-demand** | MCP tools | Manual trigger |
+
+### MCP Tools (5 tools)
+
+| Tool | Description |
+|------|-------------|
+| `intent_analyze` | Scan recent events, create learning candidates |
+| `intent_list` | List candidates with status/type filtering |
+| `intent_approve` | Manually approve and apply a learning |
+| `intent_reject` | Reject a candidate (won't auto-apply) |
+| `intent_reload` | Reload learned data without server restart |
+
+### Architecture
+
+```rust
+// Fire-and-forget event capture (< 1μs overhead)
+if let Some(emitter) = &self.agent_emitter {
+    emitter.emit(AgentEvent::user_correction(session_id, original, corrected, type));
+}
+
+// Startup warmup (100-200ms, blocks before serving)
+let warmup = LearningWarmup::new(pool);
+let (learned_data, stats) = warmup.warmup().await?;
+
+// Threshold-based auto-apply (background)
+let inspector = AgentLearningInspector::new(pool);
+inspector.apply_threshold_learnings().await?;
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/032_agent_learning.sql` | Schema: events, aliases, tokens, phrases, candidates |
+| `rust/src/agent/learning/types.rs` | `AgentEvent`, `AgentEventPayload`, `CorrectionType` |
+| `rust/src/agent/learning/emitter.rs` | Fire-and-forget channel emitter |
+| `rust/src/agent/learning/inspector.rs` | Analysis, threshold triggers, candidate management |
+| `rust/src/agent/learning/warmup.rs` | Startup learning load, in-memory `LearnedData` |
+| `rust/src/agent/learning/drain.rs` | Background DB persistence task |
+| `rust/src/mcp/handlers/core.rs` | MCP tool handlers (`intent_*`) |
+| `rust/src/api/agent_routes.rs` | `POST /api/agent/correction` endpoint |
+| `rust/crates/ob-poc-ui/src/api.rs` | `report_correction()` client API |
+| `rust/crates/ob-poc-ui/src/state.rs` | `TextBuffers.last_agent_dsl` tracking |
+| `rust/crates/ob-poc-ui/src/app.rs` | `execute_dsl()` correction detection |
+
+### UI Correction Capture
+
+When user edits agent-generated DSL before executing, it's captured as a learning signal:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│  1. Agent generates DSL → stored in buffers.last_agent_dsl              │
+│  2. User edits in DSL editor → buffers.dsl_dirty = true                 │
+│  3. User clicks Execute → compare editor vs last_agent_dsl              │
+│  4. If different → POST /api/agent/correction (fire-and-forget)         │
+│  5. Server stores in agent.events with was_corrected = true             │
+│  6. Inspector can analyze patterns via MCP tools                        │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Correction types detected:**
+- `VerbChange` - User changed the verb (e.g., `entity.create` → `entity.ensure-limited-company`)
+- `Addition` - User added content to generated DSL
+- `Removal` - User removed content from generated DSL
+- `FullRewrite` - Significant changes (< 30% similarity)
+
+### Database Schema (agent.*)
+
+| Table | Purpose |
+|-------|---------|
+| `agent.events` | Raw agent interaction events |
+| `agent.entity_aliases` | Learned entity name mappings |
+| `agent.lexicon_tokens` | Learned vocabulary tokens |
+| `agent.invocation_phrases` | Learned phrase→verb mappings |
+| `agent.learning_candidates` | Pending learnings (threshold tracking) |
+| `agent.learning_audit` | Audit trail of applied learnings |
+
+### Trigger Phrases (for Claude)
+
+When you see these in a task, you're working on agent learning:
+- "learning loop", "continuous improvement", "self-learning"
+- "entity alias", "learned alias"
+- "user correction", "DSL correction"
+- "intent_analyze", "intent_approve", "learning candidate"
+- "warmup", "startup learning"
+- "AgentEvent", "AgentEventPayload"
 
 ---
 

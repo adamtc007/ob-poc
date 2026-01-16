@@ -379,6 +379,7 @@ impl CbuGraphWidget {
     }
 
     /// Compute layout from raw data (no filtering - server provides filtered data)
+    /// Preserves user-dragged positions (offsets) from previous layout
     fn recompute_layout(&mut self) {
         let Some(ref raw) = self.raw_data else {
             self.layout_graph = None;
@@ -395,6 +396,19 @@ impl CbuGraphWidget {
             .into(),
         );
 
+        // Preserve user-dragged offsets from existing layout
+        let saved_offsets: std::collections::HashMap<String, egui::Vec2> = self
+            .layout_graph
+            .as_ref()
+            .map(|g| {
+                g.nodes
+                    .iter()
+                    .filter(|(_, node)| node.offset != egui::Vec2::ZERO)
+                    .map(|(id, node)| (id.clone(), node.offset))
+                    .collect()
+            })
+            .unwrap_or_default();
+
         // Server already filtered by view_mode - client just computes layout
         let category = raw
             .cbu_category
@@ -403,7 +417,18 @@ impl CbuGraphWidget {
             .unwrap_or_default();
 
         let engine = LayoutEngine::with_view_mode(category, self.view_mode);
-        self.layout_graph = Some(engine.compute_layout(raw));
+        let mut new_layout = engine.compute_layout(raw);
+
+        // Restore user-dragged offsets to matching nodes
+        for (id, offset) in saved_offsets {
+            if let Some(node) = new_layout.nodes.get_mut(&id) {
+                node.offset = offset;
+                // Update position to include the offset
+                node.position = node.base_position + offset;
+            }
+        }
+
+        self.layout_graph = Some(new_layout);
     }
 
     /// Get current view mode

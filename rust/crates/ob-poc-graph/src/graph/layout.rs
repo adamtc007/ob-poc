@@ -337,30 +337,10 @@ impl LayoutEngine {
             graph.nodes.insert(node.id.clone(), layout_node);
         }
 
-        // For TRADING view, set container_parent_id on entity nodes if not already set by server
-        // (fallback for backward compatibility with older server responses)
-        if self.view_mode == super::ViewMode {
-            // Find the CBU node ID
-            let cbu_id = graph
-                .nodes
-                .values()
-                .find(|n| n.is_cbu_root)
-                .map(|n| n.id.clone());
-
-            if let Some(ref cbu_id) = cbu_id {
-                // Set container_parent_id on entity nodes only if not already set by server
-                for node in graph.nodes.values_mut() {
-                    if node.container_parent_id.is_none()
-                        && !node.is_cbu_root
-                        && node.entity_type != EntityType::Product
-                        && node.entity_type != EntityType::Service
-                        && node.entity_type != EntityType::Resource
-                    {
-                        node.container_parent_id = Some(cbu_id.clone());
-                    }
-                }
-            }
-        }
+        // NOTE: container_parent_id is set by the server (ConfigDrivenGraphBuilder).
+        // The UI should NOT override or "fix" server-provided values.
+        // Entity nodes have container_parent_id = CBU ID (inside container)
+        // Trading nodes have container_parent_id = null (outside container)
 
         // Create edges
         for edge in &data.edges {
@@ -391,8 +371,9 @@ impl LayoutEngine {
     /// Position external taxonomy nodes (TradingProfile, InstrumentMatrix, etc.) relative to CBU container
     ///
     /// Layout:
-    /// - InstrumentMatrix and trading nodes: positioned ABOVE the CBU container
-    /// - Product/Service taxonomy: positioned BELOW the CBU container
+    /// - CBU container at TOP
+    /// - InstrumentMatrix and trading nodes: positioned BELOW the CBU container
+    /// - Product/Service taxonomy: positioned further BELOW
     fn position_external_taxonomies(&self, graph: &mut LayoutGraph) {
         // Constants for external taxonomy positioning
         const GAP_ABOVE: f32 = 100.0; // Gap between CBU container and Instrument Matrix
@@ -440,7 +421,7 @@ impl LayoutEngine {
         max_y += container_padding;
 
         let container_center_x = (min_x + max_x) / 2.0;
-        let container_top = min_y;
+        let _container_top = min_y;
         let container_bottom = max_y;
 
         // Collect external taxonomy nodes by type
@@ -448,6 +429,7 @@ impl LayoutEngine {
         let mut instrument_matrix: Option<String> = None;
         let mut instrument_classes: Vec<String> = Vec::new();
         let mut markets: Vec<String> = Vec::new();
+        let mut counterparties: Vec<String> = Vec::new();
         let mut products: Vec<String> = Vec::new();
         let mut services: Vec<String> = Vec::new();
 
@@ -464,25 +446,36 @@ impl LayoutEngine {
                 EntityType::Market => markets.push(id.clone()),
                 EntityType::Product => products.push(id.clone()),
                 EntityType::Service => services.push(id.clone()),
+                // Counterparties are OTC trading partners
+                EntityType::Counterparty => counterparties.push(id.clone()),
+                // Other entity types outside container (ProperPerson, LimitedCompany, etc.)
+                // are also likely counterparties in trading context
+                EntityType::ProperPerson
+                | EntityType::LimitedCompany
+                | EntityType::Partnership
+                | EntityType::Trust
+                | EntityType::Fund => {
+                    counterparties.push(id.clone());
+                }
                 _ => {}
             }
         }
 
-        // Position trading layer ABOVE the container
-        // Tier layout (from bottom to top):
+        // Position trading layer BELOW the container
+        // Tier layout (from top to bottom):
         // 1. TradingProfile (closest to CBU)
         // 2. InstrumentMatrix
         // 3. InstrumentClasses (spread horizontally)
         // 4. Markets (spread horizontally)
 
-        let mut current_y = container_top - GAP_ABOVE;
+        let mut current_y = container_bottom + GAP_ABOVE;
 
         // Position TradingProfile
         if let Some(ref profile_id) = trading_profile {
             if let Some(node) = graph.nodes.get_mut(profile_id) {
                 node.position = Pos2::new(container_center_x, current_y);
                 node.base_position = node.position;
-                current_y -= node.size.y + TRADING_TIER_SPACING;
+                current_y += node.size.y + TRADING_TIER_SPACING;
             }
         }
 
@@ -491,7 +484,7 @@ impl LayoutEngine {
             if let Some(node) = graph.nodes.get_mut(matrix_id) {
                 node.position = Pos2::new(container_center_x, current_y);
                 node.base_position = node.position;
-                current_y -= node.size.y + TRADING_TIER_SPACING;
+                current_y += node.size.y + TRADING_TIER_SPACING;
             }
         }
 
@@ -513,7 +506,7 @@ impl LayoutEngine {
                 .first()
                 .and_then(|id| graph.nodes.get(id))
             {
-                current_y -= first_node.size.y + TRADING_TIER_SPACING;
+                current_y += first_node.size.y + TRADING_TIER_SPACING;
             }
         }
 
@@ -531,10 +524,33 @@ impl LayoutEngine {
                     node.base_position = node.position;
                 }
             }
+            if let Some(first_node) = markets.first().and_then(|id| graph.nodes.get(id)) {
+                current_y += first_node.size.y + TRADING_TIER_SPACING;
+            }
         }
 
-        // Position Product/Service taxonomy BELOW the container
-        let mut current_y = container_bottom + GAP_BELOW;
+        // Position Counterparties (spread horizontally) - OTC trading partners
+        if !counterparties.is_empty() {
+            let count = counterparties.len();
+            let spacing = 180.0;
+            let total_width = (count - 1) as f32 * spacing;
+            let start_x = container_center_x - total_width / 2.0;
+
+            for (i, cp_id) in counterparties.iter().enumerate() {
+                if let Some(node) = graph.nodes.get_mut(cp_id) {
+                    let x = start_x + i as f32 * spacing;
+                    node.position = Pos2::new(x, current_y);
+                    node.base_position = node.position;
+                }
+            }
+            if let Some(first_node) = counterparties.first().and_then(|id| graph.nodes.get(id)) {
+                current_y += first_node.size.y + TRADING_TIER_SPACING;
+            }
+        }
+
+        // Position Product/Service taxonomy BELOW the trading tier
+        // (current_y continues from where trading tier ended)
+        current_y += GAP_BELOW;
 
         // Position Products (spread horizontally)
         if !products.is_empty() {

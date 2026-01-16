@@ -23,6 +23,12 @@ domains:
         description: Add a single CBU to the session
         behavior: plugin
         handler: SessionLoadCbuOp
+        invocation_phrases:
+          - "load cbu"
+          - "open cbu"
+          - "load fund"
+          - "switch to"
+          - "show cbu"
         metadata:
           tier: intent
           source_of_truth: session
@@ -48,6 +54,10 @@ domains:
         description: Load all CBUs in a jurisdiction
         behavior: plugin
         handler: SessionLoadJurisdictionOp
+        invocation_phrases:
+          - "load jurisdiction"
+          - "show all in"
+          - "load all CBUs in"
         metadata:
           tier: intent
           source_of_truth: session
@@ -66,6 +76,11 @@ domains:
         description: Load all CBUs under an apex entity (e.g., Allianz SE)
         behavior: plugin
         handler: SessionLoadGalaxyOp
+        invocation_phrases:
+          - "load galaxy"
+          - "load all funds under"
+          - "show all CBUs for"
+          - "load group"
         metadata:
           tier: intent
           source_of_truth: session

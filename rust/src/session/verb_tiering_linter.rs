@@ -717,6 +717,7 @@ mod tests {
             consumes: vec![],
             lifecycle: None,
             metadata: None,
+            invocation_phrases: vec![],
         }
     }
 
@@ -758,6 +759,7 @@ mod tests {
             consumes: vec![],
             lifecycle: None,
             metadata: None,
+            invocation_phrases: vec![],
         }
     }
 
@@ -774,6 +776,7 @@ mod tests {
             consumes: vec![],
             lifecycle: None,
             metadata: None,
+            invocation_phrases: vec![],
         }
     }
 

@@ -25,10 +25,11 @@ use crate::state::AppState;
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
     control_routes, create_agent_router_with_sessions, create_attribute_router,
-    create_client_router, create_dsl_viewer_router, create_entity_router, create_graph_router,
-    create_resolution_router, create_session_graph_router, create_session_store,
-    create_taxonomy_router, create_trading_matrix_router, create_universe_router,
-    create_verb_discovery_router, service_resource_router,
+    create_cbu_session_router_with_pool, create_client_router, create_dsl_viewer_router,
+    create_entity_router, create_graph_router, create_resolution_router,
+    create_session_graph_router, create_session_store, create_taxonomy_router,
+    create_trading_matrix_router, create_universe_router, create_verb_discovery_router,
+    service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -363,7 +364,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Control/ownership routes (board controller, control sphere)
         .merge(control_routes(pool.clone()))
         // Service resource pipeline (intents, discovery, readiness)
-        .merge(service_resource_router(pool.clone()));
+        .merge(service_resource_router(pool.clone()))
+        // CBU session management (load/unload CBUs, undo/redo)
+        .nest(
+            "/api/cbu-session",
+            create_cbu_session_router_with_pool(pool.clone()),
+        );
 
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());

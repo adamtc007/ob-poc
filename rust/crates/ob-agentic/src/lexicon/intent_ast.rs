@@ -317,6 +317,134 @@ pub enum IntentAst {
     /// - If counterparty is None, list all ISDAs.
     IsdaShow { counterparty: Option<EntityRef> },
 
+    // ========== Trading Profile Domain ==========
+    /// Materialize a trading profile (apply draft to operational tables).
+    TradingProfileMaterialize { cbu: EntityRef },
+
+    /// Add an instrument class to trading profile.
+    TradingProfileAddInstrument {
+        cbu: EntityRef,
+        instrument: InstrumentCode,
+    },
+
+    /// Add a market to trading profile.
+    TradingProfileAddMarket { cbu: EntityRef, market: MarketCode },
+
+    /// Submit trading profile for approval.
+    TradingProfileSubmit { cbu: EntityRef },
+
+    /// Approve a submitted trading profile.
+    TradingProfileApprove { cbu: EntityRef },
+
+    /// Validate trading profile is ready for go-live.
+    TradingProfileValidate { cbu: EntityRef },
+
+    // ========== Session/Navigation Domain ==========
+    /// Load a CBU into the session.
+    SessionLoadCbu { cbu: EntityRef },
+
+    /// Load all CBUs in a jurisdiction.
+    SessionLoadJurisdiction { jurisdiction: String },
+
+    /// Load all CBUs under an apex entity (galaxy).
+    SessionLoadGalaxy { apex: EntityRef },
+
+    /// Clear the session (unload all CBUs).
+    SessionClear,
+
+    /// Undo last session action.
+    SessionUndo,
+
+    /// Redo undone session action.
+    SessionRedo,
+
+    // ========== View/Visualization Domain (ESPER) ==========
+    /// Drill into an entity (zoom in).
+    ViewDrill { entity: EntityRef },
+
+    /// Surface up from drill (zoom out).
+    ViewSurface,
+
+    /// Trace relationships (money, control, risk, documents).
+    ViewTrace {
+        entity: EntityRef,
+        trace_type: String,
+    },
+
+    /// X-ray view (show hidden layers).
+    ViewXray { layer: String },
+
+    /// Illuminate/highlight an aspect.
+    ViewIlluminate { aspect: String },
+
+    // ========== KYC/Compliance Domain ==========
+    /// Create a KYC case for a CBU.
+    KycCaseCreate {
+        cbu: EntityRef,
+        case_type: Option<String>,
+    },
+
+    /// Escalate a KYC case.
+    KycCaseEscalate {
+        cbu: EntityRef,
+        reason: Option<String>,
+    },
+
+    /// Assign a KYC case to a user.
+    KycCaseAssign { cbu: EntityRef, assignee: EntityRef },
+
+    /// Close a KYC case.
+    KycCaseClose { cbu: EntityRef },
+
+    /// Set risk rating for a CBU.
+    KycSetRiskRating { cbu: EntityRef, rating: String },
+
+    // ========== Ownership/UBO Domain ==========
+    /// Compute ownership/UBO for an entity.
+    OwnershipCompute { entity: EntityRef },
+
+    /// Who controls this entity?
+    OwnershipWhoControls { entity: EntityRef },
+
+    /// Trace the ownership chain.
+    OwnershipTraceChain {
+        entity: EntityRef,
+        depth: Option<i32>,
+    },
+
+    /// Analyze ownership gaps.
+    OwnershipAnalyzeGaps { entity: EntityRef },
+
+    // ========== GLEIF/Research Domain ==========
+    /// Import GLEIF/LEI data for an entity.
+    GleifImport { entity: EntityRef },
+
+    /// Import GLEIF ownership tree.
+    GleifImportTree { lei: String },
+
+    /// Search GLEIF by name.
+    GleifSearch { query: String },
+
+    /// Lookup LEI details.
+    GleifLookup { lei: String },
+
+    // ========== BODS/Beneficial Ownership Domain ==========
+    /// Discover UBOs for an entity.
+    BodsDiscoverUbos { entity: EntityRef },
+
+    /// Import BODS statement.
+    BodsImport { entity: EntityRef },
+
+    // ========== Investor Register/Cap Table Domain ==========
+    /// Show investor register / cap table.
+    InvestorRegisterShow { entity: EntityRef },
+
+    /// List holders of an entity.
+    InvestorRegisterListHolders {
+        entity: EntityRef,
+        threshold_pct: Option<f64>,
+    },
+
     // ========== Fallback ==========
     /// Unrecognized intent (requires clarification).
     Unknown {
@@ -329,6 +457,7 @@ impl IntentAst {
     /// Get the primary verb class for this intent.
     pub fn verb_class(&self) -> VerbClass {
         match self {
+            // Create operations
             IntentAst::CounterpartyCreate { .. }
             | IntentAst::IsdaEstablish { .. }
             | IntentAst::CsaAdd { .. }
@@ -337,18 +466,66 @@ impl IntentAst {
             | IntentAst::BookingRuleAdd { .. }
             | IntentAst::EntityCreate { .. }
             | IntentAst::ProductAdd { .. }
-            | IntentAst::ServiceProvision { .. } => VerbClass::Create,
+            | IntentAst::ServiceProvision { .. }
+            | IntentAst::KycCaseCreate { .. } => VerbClass::Create,
 
-            IntentAst::IsdaAddCoverage { .. } => VerbClass::Update,
+            // Update operations
+            IntentAst::IsdaAddCoverage { .. }
+            | IntentAst::TradingProfileAddInstrument { .. }
+            | IntentAst::TradingProfileAddMarket { .. }
+            | IntentAst::KycSetRiskRating { .. } => VerbClass::Update,
 
-            IntentAst::RoleAssign { .. } => VerbClass::Link,
+            // Link operations
+            IntentAst::RoleAssign { .. } | IntentAst::KycCaseAssign { .. } => VerbClass::Link,
 
+            // Unlink operations
             IntentAst::RoleRemove { .. } => VerbClass::Unlink,
 
+            // Query operations
             IntentAst::EntityList { .. }
             | IntentAst::EntityShow { .. }
             | IntentAst::CounterpartyList { .. }
-            | IntentAst::IsdaShow { .. } => VerbClass::Query,
+            | IntentAst::IsdaShow { .. }
+            | IntentAst::InvestorRegisterShow { .. }
+            | IntentAst::InvestorRegisterListHolders { .. }
+            | IntentAst::GleifLookup { .. }
+            | IntentAst::GleifSearch { .. } => VerbClass::Query,
+
+            // Trading profile operations
+            IntentAst::TradingProfileMaterialize { .. }
+            | IntentAst::TradingProfileSubmit { .. }
+            | IntentAst::TradingProfileApprove { .. }
+            | IntentAst::TradingProfileValidate { .. } => VerbClass::TradingProfile,
+
+            // Session operations
+            IntentAst::SessionLoadCbu { .. }
+            | IntentAst::SessionLoadJurisdiction { .. }
+            | IntentAst::SessionLoadGalaxy { .. }
+            | IntentAst::SessionClear
+            | IntentAst::SessionUndo
+            | IntentAst::SessionRedo => VerbClass::Session,
+
+            // View/ESPER operations
+            IntentAst::ViewDrill { .. }
+            | IntentAst::ViewSurface
+            | IntentAst::ViewTrace { .. }
+            | IntentAst::ViewXray { .. }
+            | IntentAst::ViewIlluminate { .. } => VerbClass::View,
+
+            // KYC operations (non-create)
+            IntentAst::KycCaseEscalate { .. } | IntentAst::KycCaseClose { .. } => VerbClass::Kyc,
+
+            // Ownership operations
+            IntentAst::OwnershipCompute { .. }
+            | IntentAst::OwnershipWhoControls { .. }
+            | IntentAst::OwnershipTraceChain { .. }
+            | IntentAst::OwnershipAnalyzeGaps { .. } => VerbClass::Ownership,
+
+            // Research operations
+            IntentAst::GleifImport { .. }
+            | IntentAst::GleifImportTree { .. }
+            | IntentAst::BodsDiscoverUbos { .. }
+            | IntentAst::BodsImport { .. } => VerbClass::Research,
 
             IntentAst::Unknown { verb_class, .. } => verb_class.unwrap_or(VerbClass::Query),
         }
@@ -380,22 +557,80 @@ impl IntentAst {
     /// Get the DSL domain for this intent.
     pub fn dsl_domain(&self) -> &'static str {
         match self {
+            // OTC/ISDA domain
             IntentAst::CounterpartyCreate { .. } => "entity",
             IntentAst::IsdaEstablish { .. } => "isda",
             IntentAst::CsaAdd { .. } => "isda",
             IntentAst::IsdaAddCoverage { .. } => "isda",
+            IntentAst::IsdaShow { .. } => "isda",
+
+            // Exchange-traded domain
             IntentAst::UniverseAdd { .. } => "cbu-custody",
             IntentAst::SsiCreate { .. } => "cbu-custody",
             IntentAst::BookingRuleAdd { .. } => "cbu-custody",
+
+            // Entity/role domain
             IntentAst::RoleAssign { .. } => "cbu",
             IntentAst::RoleRemove { .. } => "cbu",
             IntentAst::EntityCreate { .. } => "entity",
-            IntentAst::ProductAdd { .. } => "cbu",
-            IntentAst::ServiceProvision { .. } => "service-resource",
             IntentAst::EntityList { .. } => "entity",
             IntentAst::EntityShow { .. } => "entity",
             IntentAst::CounterpartyList { .. } => "entity",
-            IntentAst::IsdaShow { .. } => "isda",
+
+            // Product/service domain
+            IntentAst::ProductAdd { .. } => "cbu",
+            IntentAst::ServiceProvision { .. } => "service-resource",
+
+            // Trading profile domain
+            IntentAst::TradingProfileMaterialize { .. } => "trading-profile",
+            IntentAst::TradingProfileAddInstrument { .. } => "trading-profile",
+            IntentAst::TradingProfileAddMarket { .. } => "trading-profile",
+            IntentAst::TradingProfileSubmit { .. } => "trading-profile",
+            IntentAst::TradingProfileApprove { .. } => "trading-profile",
+            IntentAst::TradingProfileValidate { .. } => "trading-profile",
+
+            // Session domain
+            IntentAst::SessionLoadCbu { .. } => "session",
+            IntentAst::SessionLoadJurisdiction { .. } => "session",
+            IntentAst::SessionLoadGalaxy { .. } => "session",
+            IntentAst::SessionClear => "session",
+            IntentAst::SessionUndo => "session",
+            IntentAst::SessionRedo => "session",
+
+            // View domain
+            IntentAst::ViewDrill { .. } => "view",
+            IntentAst::ViewSurface => "view",
+            IntentAst::ViewTrace { .. } => "view",
+            IntentAst::ViewXray { .. } => "view",
+            IntentAst::ViewIlluminate { .. } => "view",
+
+            // KYC domain
+            IntentAst::KycCaseCreate { .. } => "kyc-case",
+            IntentAst::KycCaseEscalate { .. } => "kyc-case",
+            IntentAst::KycCaseAssign { .. } => "kyc-case",
+            IntentAst::KycCaseClose { .. } => "kyc-case",
+            IntentAst::KycSetRiskRating { .. } => "kyc-case",
+
+            // Ownership domain
+            IntentAst::OwnershipCompute { .. } => "ownership",
+            IntentAst::OwnershipWhoControls { .. } => "ownership",
+            IntentAst::OwnershipTraceChain { .. } => "ownership",
+            IntentAst::OwnershipAnalyzeGaps { .. } => "ownership",
+
+            // GLEIF domain
+            IntentAst::GleifImport { .. } => "gleif",
+            IntentAst::GleifImportTree { .. } => "gleif",
+            IntentAst::GleifSearch { .. } => "gleif",
+            IntentAst::GleifLookup { .. } => "gleif",
+
+            // BODS domain
+            IntentAst::BodsDiscoverUbos { .. } => "bods",
+            IntentAst::BodsImport { .. } => "bods",
+
+            // Investor register domain
+            IntentAst::InvestorRegisterShow { .. } => "capital",
+            IntentAst::InvestorRegisterListHolders { .. } => "capital",
+
             IntentAst::Unknown { .. } => "unknown",
         }
     }

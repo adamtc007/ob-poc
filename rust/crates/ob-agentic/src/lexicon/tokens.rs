@@ -198,6 +198,24 @@ pub enum VerbClass {
 
     /// Scope/navigate - changes what data is in view
     Scope,
+
+    /// Trading profile operations (materialize, submit, approve, etc.)
+    TradingProfile,
+
+    /// Research/external data operations (import, enrich, refresh)
+    Research,
+
+    /// Session management (load, unload, undo, redo)
+    Session,
+
+    /// View/visualization operations (drill, surface, xray, etc.)
+    View,
+
+    /// KYC/compliance workflow (screen, escalate, assign)
+    Kyc,
+
+    /// Ownership/UBO computation (compute, trace, analyze)
+    Ownership,
 }
 
 impl VerbClass {
@@ -213,6 +231,12 @@ impl VerbClass {
             VerbClass::Provision => "provision",
             VerbClass::Trade => "execute",
             VerbClass::Scope => "session",
+            VerbClass::TradingProfile => "trading-profile",
+            VerbClass::Research => "research",
+            VerbClass::Session => "session",
+            VerbClass::View => "view",
+            VerbClass::Kyc => "kyc-case",
+            VerbClass::Ownership => "ownership",
         }
     }
 }
@@ -249,6 +273,24 @@ pub enum EntityClass {
 
     /// Scope type (galaxy, book, jurisdiction, neighborhood)
     ScopeType,
+
+    /// Trading profile
+    TradingProfile,
+
+    /// KYC case
+    KycCase,
+
+    /// Document
+    Document,
+
+    /// Share class (capital structure)
+    ShareClass,
+
+    /// Investor register / cap table
+    InvestorRegister,
+
+    /// LEI / GLEIF record
+    Lei,
 }
 
 impl EntityClass {
@@ -265,6 +307,12 @@ impl EntityClass {
             EntityClass::Service => "service",
             EntityClass::Generic => "entity",
             EntityClass::ScopeType => "scope_type",
+            EntityClass::TradingProfile => "trading_profile",
+            EntityClass::KycCase => "kyc_case",
+            EntityClass::Document => "document",
+            EntityClass::ShareClass => "share_class",
+            EntityClass::InvestorRegister => "investor_register",
+            EntityClass::Lei => "lei",
         }
     }
 }

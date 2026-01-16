@@ -46,6 +46,53 @@ pub struct CbuSessionState {
     pub sessions: CbuSessionStore,
 }
 
+/// Get session from memory or load from DB if not present (read-only)
+async fn get_or_load_session(session_id: Uuid, state: &CbuSessionState) -> Option<CbuSession> {
+    // Check memory first
+    {
+        let sessions = state.sessions.read().await;
+        if let Some(session) = sessions.get(&session_id) {
+            return Some(session.clone());
+        }
+    }
+
+    // Try to load from DB
+    let session = CbuSession::load_or_new(Some(session_id), &state.pool).await;
+
+    // If loaded successfully (has the right ID), cache it
+    if session.id() == session_id {
+        let mut sessions = state.sessions.write().await;
+        sessions.insert(session_id, session.clone());
+        Some(session)
+    } else {
+        // load_or_new returned a new session with different ID (not found in DB)
+        None
+    }
+}
+
+/// Ensure session exists in memory (load from DB if needed), then return write lock
+/// Creates new session if not found anywhere
+async fn ensure_session_in_store(session_id: Uuid, state: &CbuSessionState) {
+    // Check if already in memory
+    {
+        let sessions = state.sessions.read().await;
+        if sessions.contains_key(&session_id) {
+            return;
+        }
+    }
+
+    // Try to load from DB, or create new
+    let session = CbuSession::load_or_new(Some(session_id), &state.pool).await;
+
+    // Insert into store (even if new - will have session_id set)
+    let mut sessions = state.sessions.write().await;
+    sessions.entry(session_id).or_insert_with(|| {
+        let mut s = session;
+        s.id = session_id; // Ensure ID matches
+        s
+    });
+}
+
 // =============================================================================
 // REQUEST/RESPONSE TYPES
 // =============================================================================
@@ -142,13 +189,14 @@ async fn get_session(
     Path(session_id): Path<Uuid>,
     State(state): State<CbuSessionState>,
 ) -> Result<Json<SessionResponse>, (StatusCode, String)> {
-    let sessions = state.sessions.read().await;
-    let session = sessions.get(&session_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            format!("Session {} not found", session_id),
-        )
-    })?;
+    let session = get_or_load_session(session_id, &state)
+        .await
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Session {} not found", session_id),
+            )
+        })?;
 
     Ok(Json(SessionResponse {
         id: session.id(),
@@ -196,13 +244,12 @@ async fn load_cbu(
         ));
     };
 
+    // Ensure session exists (load from DB if needed)
+    ensure_session_in_store(session_id, &state).await;
+
     // Update session
     let mut sessions = state.sessions.write().await;
-    let session = sessions.entry(session_id).or_insert_with(|| {
-        let mut s = CbuSession::new();
-        s.id = session_id;
-        s
-    });
+    let session = sessions.get_mut(&session_id).expect("session just ensured");
 
     let was_new = session.load_cbu(cbu_id);
     session.maybe_save(&state.pool);
@@ -237,13 +284,12 @@ async fn load_jurisdiction(
 
     let cbu_ids: Vec<Uuid> = rows.into_iter().map(|(id,)| id).collect();
 
+    // Ensure session exists (load from DB if needed)
+    ensure_session_in_store(session_id, &state).await;
+
     // Update session
     let mut sessions = state.sessions.write().await;
-    let session = sessions.entry(session_id).or_insert_with(|| {
-        let mut s = CbuSession::new();
-        s.id = session_id;
-        s
-    });
+    let session = sessions.get_mut(&session_id).expect("session just ensured");
 
     let count = session.load_many(cbu_ids);
     session.maybe_save(&state.pool);
@@ -300,13 +346,12 @@ async fn load_galaxy(
 
     let cbu_ids: Vec<Uuid> = rows.into_iter().map(|(id,)| id).collect();
 
+    // Ensure session exists (load from DB if needed)
+    ensure_session_in_store(session_id, &state).await;
+
     // Update session
     let mut sessions = state.sessions.write().await;
-    let session = sessions.entry(session_id).or_insert_with(|| {
-        let mut s = CbuSession::new();
-        s.id = session_id;
-        s
-    });
+    let session = sessions.get_mut(&session_id).expect("session just ensured");
 
     let count = session.load_many(cbu_ids);
     session.maybe_save(&state.pool);
@@ -324,13 +369,11 @@ async fn unload_cbu(
     State(state): State<CbuSessionState>,
     Json(req): Json<UnloadCbuRequest>,
 ) -> Result<Json<LoadResult>, (StatusCode, String)> {
+    // Ensure session exists (load from DB if needed)
+    ensure_session_in_store(session_id, &state).await;
+
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            format!("Session {} not found", session_id),
-        )
-    })?;
+    let session = sessions.get_mut(&session_id).expect("session just ensured");
 
     let was_present = session.unload_cbu(req.cbu_id);
     session.maybe_save(&state.pool);
@@ -347,13 +390,11 @@ async fn clear_session(
     Path(session_id): Path<Uuid>,
     State(state): State<CbuSessionState>,
 ) -> Result<Json<LoadResult>, (StatusCode, String)> {
+    // Ensure session exists (load from DB if needed)
+    ensure_session_in_store(session_id, &state).await;
+
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            format!("Session {} not found", session_id),
-        )
-    })?;
+    let session = sessions.get_mut(&session_id).expect("session just ensured");
 
     let count = session.clear();
     session.maybe_save(&state.pool);
@@ -370,13 +411,11 @@ async fn undo(
     Path(session_id): Path<Uuid>,
     State(state): State<CbuSessionState>,
 ) -> Result<Json<HistoryResult>, (StatusCode, String)> {
+    // Ensure session exists (load from DB if needed)
+    ensure_session_in_store(session_id, &state).await;
+
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            format!("Session {} not found", session_id),
-        )
-    })?;
+    let session = sessions.get_mut(&session_id).expect("session just ensured");
 
     let success = session.undo();
     if success {
@@ -396,13 +435,11 @@ async fn redo(
     Path(session_id): Path<Uuid>,
     State(state): State<CbuSessionState>,
 ) -> Result<Json<HistoryResult>, (StatusCode, String)> {
+    // Ensure session exists (load from DB if needed)
+    ensure_session_in_store(session_id, &state).await;
+
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            format!("Session {} not found", session_id),
-        )
-    })?;
+    let session = sessions.get_mut(&session_id).expect("session just ensured");
 
     let success = session.redo();
     if success {

@@ -3,6 +3,7 @@
 //! Handles persistence of GLEIF Level 1 and Level 2 data to our schema.
 
 use super::types::*;
+use crate::dsl_v2::{DslExecutor, ExecutionContext};
 use anyhow::{Context, Result};
 use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::PgPool;
@@ -538,40 +539,40 @@ impl GleifRepository {
     }
 
     /// Create a new entity from GLEIF data
+    ///
+    /// Uses DSL entity.ensure-limited-company for idempotent upsert (dedup by name)
     pub async fn create_entity_from_gleif(&self, record: &LeiRecord) -> Result<Uuid> {
         let entity = &record.attributes.entity;
+        let name = &entity.legal_name.name;
+        let jurisdiction = entity.jurisdiction.as_deref().unwrap_or("XX");
+        let lei = record.lei();
 
-        // First create the base entity
-        let entity_id: Uuid = sqlx::query_scalar(
-            r#"
-            INSERT INTO "ob-poc".entities (entity_type_id, name)
-            SELECT entity_type_id, $1
-            FROM "ob-poc".entity_types
-            WHERE type_code = 'limited_company'
-            RETURNING entity_id
-        "#,
-        )
-        .bind(&entity.legal_name.name)
-        .fetch_one(self.pool.as_ref())
-        .await?;
+        // Use DSL for idempotent entity creation (prevents duplicates)
+        let dsl = format!(
+            r#"(entity.ensure-limited-company :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
+            escape_dsl_string(name),
+            jurisdiction,
+            lei
+        );
 
-        // Then create the limited company extension
-        sqlx::query(
-            r#"
-            INSERT INTO "ob-poc".entity_limited_companies
-                (entity_id, company_name, jurisdiction, lei)
-            VALUES ($1, $2, $3, $4)
-        "#,
-        )
-        .bind(entity_id)
-        .bind(&entity.legal_name.name)
-        .bind(&entity.jurisdiction)
-        .bind(record.lei())
-        .execute(self.pool.as_ref())
-        .await?;
+        let executor = DslExecutor::new((*self.pool).clone());
+        let mut dsl_ctx = ExecutionContext::new();
+        executor
+            .execute_dsl(&dsl, &mut dsl_ctx)
+            .await
+            .context("Failed to create entity from GLEIF via DSL")?;
+
+        let entity_id = dsl_ctx
+            .resolve("entity")
+            .ok_or_else(|| anyhow::anyhow!("DSL did not bind @entity for GLEIF entity creation"))?;
 
         Ok(entity_id)
     }
+}
+
+/// Escape special characters in DSL string arguments
+fn escape_dsl_string(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 /// Map GLEIF event types to our database constraint values

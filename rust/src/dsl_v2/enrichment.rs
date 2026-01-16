@@ -345,6 +345,7 @@ mod tests {
                 ],
                 returns: None,
                 metadata: None,
+                invocation_phrases: vec![],
             },
         );
 
@@ -439,6 +440,7 @@ mod tests {
                 ],
                 returns: None,
                 metadata: None,
+                invocation_phrases: vec![],
             },
         );
 
@@ -448,6 +450,7 @@ mod tests {
                 description: "CBU operations".to_string(),
                 verbs: cbu_verbs,
                 dynamic_verbs: vec![],
+                invocation_hints: vec![],
             },
         );
 

@@ -26,11 +26,21 @@ pub struct VoiceCommandQueue {
     commands: VecDeque<VoiceCommand>,
 }
 
+impl VoiceCommandQueue {
+    /// Create an empty queue (const for thread_local initialization)
+    pub const fn new() -> Self {
+        Self {
+            commands: VecDeque::new(),
+        }
+    }
+}
+
 /// A voice command received from JavaScript
 #[derive(Debug, Clone)]
 pub struct VoiceCommand {
     pub transcript: String,
     pub confidence: f32,
+    #[allow(dead_code)]
     pub provider: String,
 }
 
@@ -52,8 +62,8 @@ impl VoiceCommandQueue {
 
 // Global voice command queue (thread-local for WASM)
 thread_local! {
-    static VOICE_QUEUE: RefCell<VoiceCommandQueue> = RefCell::new(VoiceCommandQueue::default());
-    static LISTENER_INSTALLED: RefCell<bool> = RefCell::new(false);
+    static VOICE_QUEUE: RefCell<VoiceCommandQueue> = const { RefCell::new(VoiceCommandQueue::new()) };
+    static LISTENER_INSTALLED: RefCell<bool> = const { RefCell::new(false) };
 }
 
 /// Install the voice command event listener

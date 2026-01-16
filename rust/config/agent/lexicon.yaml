@@ -158,6 +158,86 @@ verbs:
     - golive
     - go-live
 
+  # Research/external data operations
+  research:
+    - import
+    - enrich
+    - refresh
+    - lookup
+    - resolve
+    - discover
+    - trace
+    - sync
+
+  # Session/navigation verbs
+  session:
+    - load
+    - unload
+    - clear
+    - undo
+    - redo
+    - set scope
+    - set cbu
+    - set galaxy
+    - set book
+    - set jurisdiction
+
+  # View/visualization verbs (ESPER)
+  view:
+    - drill
+    - drill into
+    - drill down
+    - surface
+    - zoom in
+    - zoom out
+    - trace
+    - xray
+    - x-ray
+    - peel
+    - illuminate
+    - highlight
+    - shadow
+    - red flag
+    - black holes
+
+  # KYC/compliance workflow
+  kyc:
+    - screen
+    - screening
+    - escalate
+    - assign
+    - close case
+    - reopen
+    - set risk
+    - risk rating
+
+  # Ownership/UBO operations
+  ownership:
+    - compute ownership
+    - compute ubo
+    - who controls
+    - trace chain
+    - analyze gaps
+    - reconcile
+    - control positions
+
+  # GLEIF/LEI operations
+  gleif:
+    - import lei
+    - import gleif
+    - import tree
+    - lei lookup
+    - lei search
+    - get parent
+    - get children
+    - trace ownership
+
+  # BODS/beneficial ownership
+  bods:
+    - discover ubos
+    - import bods
+    - sync from gleif
+
 entities:
   # Scope types
   scope_type:
@@ -225,6 +305,53 @@ entities:
     - credit support annex
     - collateral agreement
     - margin agreement
+
+  # Trading profile indicators
+  trading_profile:
+    - trading profile
+    - profile
+    - trading setup
+    - trading config
+    - trading configuration
+
+  # KYC case indicators
+  kyc_case:
+    - kyc case
+    - case
+    - onboarding case
+    - compliance case
+    - review case
+
+  # Document indicators
+  document:
+    - document
+    - doc
+    - file
+    - attachment
+    - certificate
+    - agreement
+
+  # Share class / capital indicators
+  share_class:
+    - share class
+    - class of shares
+    - equity class
+    - series
+    - tranche
+
+  # Investor register indicators
+  investor_register:
+    - investor register
+    - cap table
+    - capitalization table
+    - shareholder register
+    - holder list
+
+  # LEI/GLEIF indicators
+  lei:
+    - lei
+    - legal entity identifier
+    - gleif record
 
 roles:
   - director

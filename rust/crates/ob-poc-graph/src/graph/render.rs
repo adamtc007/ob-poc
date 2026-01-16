@@ -21,7 +21,7 @@ use std::collections::HashMap;
 
 const CORNER_RADIUS: f32 = 8.0;
 const CONTAINER_PADDING: f32 = 40.0;
-const CONTAINER_HEADER_HEIGHT: f32 = 30.0;
+const CONTAINER_HEADER_HEIGHT: f32 = 36.0; // Taller header for larger CBU title font
 
 // =============================================================================
 // GRAPH RENDERER
@@ -314,16 +314,16 @@ impl GraphRenderer {
         let edge_width = 1.5 * camera.zoom();
         let connector_radius = 4.0 * camera.zoom();
 
-        // Draw attachment edge to TradingProfile (above container)
+        // Draw attachment edge to TradingProfile (below container)
         if let Some(profile) = trading_profile {
             let profile_screen_pos = camera.world_to_screen(profile.position, screen_rect);
             let profile_size = profile.size * camera.zoom();
 
-            // From container top center to profile bottom
-            let start = Pos2::new(container_bounds.center().x, container_bounds.min.y);
+            // From container bottom center to profile top
+            let start = Pos2::new(container_bounds.center().x, container_bounds.max.y);
             let end = Pos2::new(
                 profile_screen_pos.x,
-                profile_screen_pos.y + profile_size.y / 2.0,
+                profile_screen_pos.y - profile_size.y / 2.0,
             );
 
             self.render_attachment_edge_line(
@@ -340,10 +340,10 @@ impl GraphRenderer {
             let matrix_screen_pos = camera.world_to_screen(matrix.position, screen_rect);
             let matrix_size = matrix.size * camera.zoom();
 
-            let start = Pos2::new(container_bounds.center().x, container_bounds.min.y);
+            let start = Pos2::new(container_bounds.center().x, container_bounds.max.y);
             let end = Pos2::new(
                 matrix_screen_pos.x,
-                matrix_screen_pos.y + matrix_size.y / 2.0,
+                matrix_screen_pos.y - matrix_size.y / 2.0,
             );
 
             self.render_attachment_edge_line(
@@ -469,8 +469,8 @@ impl GraphRenderer {
             bounds.top() + header_height / 2.0,
         );
 
-        let font_size = 14.0 * camera.zoom();
-        let label_color = Color32::from_rgb(180, 190, 210);
+        let font_size = 20.0 * camera.zoom(); // Larger font for CBU container title
+        let label_color = Color32::from_rgb(220, 230, 245); // Brighter for better visibility
 
         painter.text(
             label_pos,

@@ -130,6 +130,7 @@ impl ViewportContext {
             ViewportFocusState::InstrumentMatrix { .. } => CbuViewType::Instruments,
             ViewportFocusState::InstrumentType { .. } => CbuViewType::Instruments,
             ViewportFocusState::ConfigNode { .. } => CbuViewType::Instruments,
+            ViewportFocusState::BoardControl { .. } => CbuViewType::Structure,
         }
     }
 

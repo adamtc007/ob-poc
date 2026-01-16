@@ -336,6 +336,13 @@ pub struct TextBuffers {
     /// DSL editor dirty flag
     /// Used ONLY for "unsaved changes" warning, NOT for sync logic
     pub dsl_dirty: bool,
+
+    /// Last agent-generated DSL (for correction detection)
+    /// Set when agent generates DSL, compared on execute to detect user edits
+    pub last_agent_dsl: Option<String>,
+
+    /// Last user message that triggered DSL generation (for correction context)
+    pub last_agent_message: Option<String>,
 }
 
 // =============================================================================
@@ -755,6 +762,8 @@ pub struct AsyncState {
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
+    pub pending_search_cbu_query: Option<String>, // Open CBU search with query pre-filled
+    pub needs_cbu_search_trigger: Option<String>, // Trigger CBU search with query (set in process_async_results)
 
     // Graph filter commands (from agent chat)
     pub pending_filter_by_type: Option<Vec<String>>, // Type codes to filter
@@ -887,6 +896,9 @@ pub struct AsyncState {
     // Chat focus tracking - set when chat completes to refocus input
     pub chat_just_finished: bool,
 
+    // Initial focus - set to true on first frame to focus chat input
+    pub needs_initial_focus: bool,
+
     // Error display
     pub last_error: Option<String>,
 }
@@ -924,6 +936,8 @@ impl AppState {
                     if !self.buffers.dsl_dirty {
                         if let Some(ref dsl) = session.combined_dsl {
                             self.buffers.dsl_editor = dsl.clone();
+                            // Track agent-generated DSL for correction detection
+                            self.buffers.last_agent_dsl = Some(dsl.clone());
                         }
                     }
 
@@ -1227,6 +1241,21 @@ impl AppState {
             }
         }
 
+        // Process pending CBU search popup request (from SearchCbu agent command)
+        // This handles typos in "show cbu <name>" - opens search popup so user can correct spelling
+        if let Some(query) = state.pending_search_cbu_query.take() {
+            #[cfg(target_arch = "wasm32")]
+            web_sys::console::log_1(
+                &format!("Opening CBU search popup with query: {}", query).into(),
+            );
+            self.cbu_search_ui.results = None;
+            self.cbu_search_ui.query = query.clone();
+            self.cbu_search_ui.open = true;
+            self.cbu_search_ui.just_opened = true;
+            // Set flag to trigger search in update loop (where search_cbus is accessible)
+            state.needs_cbu_search_trigger = Some(query);
+        }
+
         // Process session context
         if let Some(result) = state.pending_session_context.take() {
             state.loading_session_context = false;
@@ -1373,6 +1402,16 @@ impl AppState {
                 );
             }
             pending
+        } else {
+            None
+        }
+    }
+
+    /// Check if CBU search trigger is needed and return the query
+    /// This is used when agent SearchCbu command opens the popup
+    pub fn take_pending_cbu_search_trigger(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.needs_cbu_search_trigger.take()
         } else {
             None
         }

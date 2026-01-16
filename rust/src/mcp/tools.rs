@@ -1689,6 +1689,112 @@ Each entry includes actor, timestamp, and details."#.into(),
             }),
         },
         // =====================================================================
+        // Agent Learning Tools
+        // Continuous improvement from user interactions (Loop 2)
+        // =====================================================================
+        Tool {
+            name: "intent_analyze".into(),
+            description: r#"Analyze agent events to identify learning opportunities.
+
+Scans recent agent interactions for:
+- User corrections (edited DSL)
+- Entity resolution failures
+- Intent mismatches
+
+Returns learning candidates with occurrence counts and risk levels.
+Low-risk learnings (entity aliases) can be auto-applied after threshold."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "since_hours": {
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Analyze events from last N hours"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "intent_list".into(),
+            description: r#"List learning candidates with filtering.
+
+Returns candidates with:
+- fingerprint: Unique identifier
+- learning_type: entity_alias, lexicon_token, invocation_phrase, prompt_change
+- input_pattern: What the user said
+- suggested_output: What we should learn
+- occurrence_count: How many times seen
+- risk_level: low, medium, high
+- status: pending, approved, rejected, applied"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "approved", "rejected", "applied"],
+                        "description": "Filter by status"
+                    },
+                    "learning_type": {
+                        "type": "string",
+                        "enum": ["entity_alias", "lexicon_token", "invocation_phrase", "prompt_change"],
+                        "description": "Filter by learning type"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Max results to return"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "intent_approve".into(),
+            description: r#"Approve and apply a learning candidate.
+
+Manually approves a pending learning and applies it:
+- entity_alias: Adds to alias lookup table
+- lexicon_token: Adds to tokenizer vocabulary
+- invocation_phrase: Adds phrase→verb mapping
+- prompt_change: Logs for manual implementation
+
+Returns the applied learning details."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "Learning candidate fingerprint"
+                    }
+                },
+                "required": ["fingerprint"]
+            }),
+        },
+        Tool {
+            name: "intent_reject".into(),
+            description: "Reject a learning candidate (won't be auto-applied).".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "fingerprint": {
+                        "type": "string",
+                        "description": "Learning candidate fingerprint"
+                    }
+                },
+                "required": ["fingerprint"]
+            }),
+        },
+        Tool {
+            name: "intent_reload".into(),
+            description: r#"Reload learned data into memory.
+
+Call after manual approvals to immediately use new learnings
+without server restart. Returns counts of loaded items."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        // =====================================================================
         // Service Resource Pipeline Tools
         // Intent → Discovery → Attributes → Provisioning → Readiness
         // =====================================================================

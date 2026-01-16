@@ -258,6 +258,9 @@ fn set_enhance_level(manager: &mut FocusManager, level: u8) {
         ViewportFocusState::ConfigNode { node_enhance, .. } => {
             *node_enhance = clamped;
         }
+        ViewportFocusState::BoardControl { enhance_level, .. } => {
+            *enhance_level = clamped;
+        }
     }
 }
 

@@ -17,7 +17,6 @@ mod repl;
 mod resolution;
 mod results;
 mod service_taxonomy;
-mod session;
 mod taxonomy;
 mod toolbar;
 mod trading_matrix;
@@ -39,7 +38,6 @@ pub use resolution::{
 };
 pub use results::results_panel;
 pub use service_taxonomy::{service_taxonomy_panel, ServiceTaxonomyPanelAction};
-pub use session::session_panel;
 pub use taxonomy::{taxonomy_panel, TaxonomyPanelAction};
 pub use toolbar::{toolbar, ToolbarAction, ToolbarData};
 pub use trading_matrix::{trading_matrix_panel, TradingMatrixPanelAction};

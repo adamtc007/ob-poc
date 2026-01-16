@@ -6,15 +6,14 @@
 //! 3. Handling widget responses (no callbacks, return values only)
 
 use crate::api;
-use crate::command::AgentPromptConduit;
 use crate::panels::{
     ast_panel, cbu_search_modal, chat_panel, container_browse_panel, context_panel,
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
-    results_panel, service_taxonomy_panel, session_panel, taxonomy_panel, toolbar,
-    trading_matrix_panel, CbuSearchAction, CbuSearchData, ContainerBrowseAction,
-    ContainerBrowseData, ContextPanelAction, DslEditorAction, EntityMatchDisplay,
-    InvestorRegisterAction, ResolutionPanelAction, ResolutionPanelData, ServiceTaxonomyPanelAction,
-    TaxonomyPanelAction, ToolbarAction, ToolbarData, TradingMatrixPanelAction,
+    results_panel, service_taxonomy_panel, taxonomy_panel, toolbar, trading_matrix_panel,
+    CbuSearchAction, CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction,
+    DslEditorAction, EntityMatchDisplay, InvestorRegisterAction, ResolutionPanelAction,
+    ResolutionPanelData, ServiceTaxonomyPanelAction, TaxonomyPanelAction, ToolbarAction,
+    ToolbarData, TradingMatrixPanelAction,
 };
 use crate::state::{
     AppState, AsyncState, BrowserTab, CbuSearchUi, LayoutMode, PanelState, TextBuffers,
@@ -43,24 +42,21 @@ fn parse_selection_command(transcript: &str) -> Option<usize> {
     let lower = transcript.to_lowercase();
 
     // Check for "select N" pattern
-    if lower.starts_with("select ") {
-        let rest = &lower[7..];
+    if let Some(rest) = lower.strip_prefix("select ") {
         if let Some(n) = parse_number_word(rest) {
             return Some(n.saturating_sub(1)); // Convert to 0-indexed
         }
     }
 
     // Check for "option N" pattern
-    if lower.starts_with("option ") {
-        let rest = &lower[7..];
+    if let Some(rest) = lower.strip_prefix("option ") {
         if let Some(n) = parse_number_word(rest) {
             return Some(n.saturating_sub(1));
         }
     }
 
     // Check for "number N" pattern
-    if lower.starts_with("number ") {
-        let rest = &lower[7..];
+    if let Some(rest) = lower.strip_prefix("number ") {
         if let Some(n) = parse_number_word(rest) {
             return Some(n.saturating_sub(1));
         }
@@ -160,7 +156,10 @@ impl App {
                 crate::tokens::TokenRegistry::new()
             }),
             graph_widget: CbuGraphWidget::new(),
-            async_state: Arc::new(Mutex::new(AsyncState::default())),
+            async_state: Arc::new(Mutex::new(AsyncState {
+                needs_initial_focus: true, // Focus chat input on startup
+                ..Default::default()
+            })),
             ctx: Some(cc.egui_ctx.clone()),
             entity_ontology: ob_poc_graph::EntityTypeOntology::new(),
             taxonomy_state: ob_poc_graph::TaxonomyState::new(),
@@ -206,9 +205,7 @@ impl App {
     // =========================================================================
 
     /// Process pending voice commands from the JavaScript voice bridge.
-    /// Commands flow through the unified dispatcher and then either:
-    /// - NavigationVerb → executed locally
-    /// - AgentPrompt → sent via AgentPromptConduit
+    /// All voice commands go to the server agent for intent parsing.
     #[cfg(target_arch = "wasm32")]
     fn process_voice_commands(&mut self) {
         use crate::voice_bridge::take_pending_voice_commands;
@@ -233,16 +230,15 @@ impl App {
                 continue;
             }
 
-            // Voice command = typed command. Same path.
-            // Put transcript in chat input and send (goes through dispatch_command in send_chat_message)
             web_sys::console::log_1(
                 &format!(
-                    "Voice command: '{}' (confidence: {:.2}) -> routing to chat",
+                    "Voice command: '{}' (confidence: {:.2}) -> sending to agent",
                     cmd.transcript, cmd.confidence
                 )
                 .into(),
             );
 
+            // All voice commands go to agent for intent parsing
             self.state.buffers.chat_input = cmd.transcript;
             self.state.send_chat_message();
         }
@@ -523,7 +519,7 @@ impl App {
                         self.state.cbu_search_ui.open = true;
                         self.state.cbu_search_ui.just_opened = true;
                         // Trigger initial search
-                        self.trigger_cbu_search(id.clone());
+                        self.state.search_cbus(id);
                     }
                 }
             }
@@ -997,6 +993,15 @@ impl eframe::App for App {
             }
         }
 
+        // Check for pending CBU search popup trigger (from SearchCbu agent command)
+        // This handles typos in "show cbu <name>" - opens search popup so user can correct spelling
+        if let Some(query) = self.state.take_pending_cbu_search_trigger() {
+            web_sys::console::log_1(
+                &format!("update: triggering CBU search with query '{}'", query).into(),
+            );
+            self.state.search_cbus(&query);
+        }
+
         // =================================================================
         // Process graph filter commands from agent chat
         // =================================================================
@@ -1304,9 +1309,20 @@ impl eframe::App for App {
 
         if let Some(cbu_id) = self.state.take_pending_scale_system() {
             web_sys::console::log_1(&format!("update: scale system cbu_id={:?}", cbu_id).into());
-            // TODO: Focus on specific CBU system
             if let Some(id) = cbu_id {
-                self.state.graph_widget.focus_entity(&id);
+                if let Ok(uuid) = Uuid::parse_str(&id) {
+                    // Valid UUID - select CBU directly
+                    self.state.select_cbu(uuid, &id);
+                    self.state.view_level = ob_poc_types::galaxy::ViewLevel::System;
+                } else {
+                    // Not a UUID - open CBU search with name pre-filled
+                    // Clear previous results to force new search
+                    self.state.cbu_search_ui.results = None;
+                    self.state.cbu_search_ui.query = id.clone();
+                    self.state.cbu_search_ui.open = true;
+                    self.state.cbu_search_ui.just_opened = true;
+                    self.state.search_cbus(&id);
+                }
             }
         }
 
@@ -1950,7 +1966,11 @@ impl eframe::App for App {
                     .window_stack
                     .find_by_type(crate::state::WindowType::Resolution);
 
-                let data = DisambiguationModalData { window, searching };
+                let data = DisambiguationModalData {
+                    window,
+                    searching,
+                    last_search_change: None, // TODO: track in state for debounced auto-search
+                };
 
                 disambiguation_modal(ctx, &mut self.state.resolution_ui.search_query, &data)
             } else {
@@ -2033,16 +2053,6 @@ impl eframe::App for App {
                 .resizable(true)
                 .show(ctx, |ui| {
                     chat_panel(ui, &mut self.state);
-                });
-
-            // Session panel (bottom) for simplified layout
-            egui::TopBottomPanel::bottom("session_bottom_panel")
-                .default_height(120.0)
-                .min_height(80.0)
-                .max_height(300.0)
-                .resizable(true)
-                .show(ctx, |ui| {
-                    session_panel(ui, &mut self.state);
                 });
 
             // Main content area - just the graph viewport
@@ -2185,11 +2195,6 @@ impl App {
                 self.state.cbu_search_ui.results = None;
             }
         }
-    }
-
-    /// Trigger CBU search with a query string (from voice command)
-    fn trigger_cbu_search(&mut self, query: String) {
-        self.state.search_cbus(&query);
     }
 
     /// Handle resolution panel actions
@@ -2380,6 +2385,42 @@ impl App {
                 self.state
                     .window_stack
                     .close_by_type(crate::state::WindowType::Resolution);
+                self.state.resolution_ui.search_query.clear();
+            }
+
+            DisambiguationAction::CreateNew { name, entity_type } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "DisambiguationAction::CreateNew: name='{}', entity_type='{}'",
+                        name, entity_type
+                    )
+                    .into(),
+                );
+
+                // Close modal
+                self.state
+                    .window_stack
+                    .close_by_type(crate::state::WindowType::Resolution);
+
+                // Pre-fill the DSL editor with a create command
+                let dsl_command = match entity_type.as_str() {
+                    "cbu" => format!(r#"(cbu.create :name "{}")"#, name),
+                    "person" => format!(r#"(entity.create-natural-person :given-name "{}")"#, name),
+                    "company" | "counterparty" => {
+                        format!(r#"(entity.ensure-limited-company :name "{}")"#, name)
+                    }
+                    "fund" => format!(r#"(entity.ensure-fund :name "{}")"#, name),
+                    _ => format!(
+                        r#"(entity.create :name "{}" :entity-type "{}")"#,
+                        name, entity_type
+                    ),
+                };
+
+                // Set the DSL editor content
+                self.state.buffers.dsl_editor = dsl_command;
+                self.state.buffers.dsl_dirty = true;
+
+                // Clear search
                 self.state.resolution_ui.search_query.clear();
             }
         }
@@ -2958,33 +2999,14 @@ impl App {
 
         ui.separator();
 
-        // Bottom row: Chat (left) + Session/REPL (right)
-        ui.horizontal(|ui| {
-            ui.set_height(bottom_height);
-
-            // Chat panel (left, 50% width)
-            ui.vertical(|ui| {
-                ui.set_width(available.x * 0.5 - 4.0);
-                egui::Frame::default()
-                    .inner_margin(4.0)
-                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-                    .show(ui, |ui| {
-                        chat_panel(ui, &mut self.state);
-                    });
-            });
-
-            ui.separator();
-
-            // Session/REPL panel (right, 50% width) - human-readable session state
-            ui.vertical(|ui| {
-                ui.set_width(available.x * 0.5 - 4.0);
-                egui::Frame::default()
-                    .inner_margin(4.0)
-                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-                    .show(ui, |ui| {
-                        session_panel(ui, &mut self.state);
-                    });
-            });
+        // Bottom row: Chat (full width)
+        ui.allocate_ui(egui::vec2(available.x, bottom_height), |ui| {
+            egui::Frame::default()
+                .inner_margin(4.0)
+                .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                .show(ui, |ui| {
+                    chat_panel(ui, &mut self.state);
+                });
         });
     }
 
@@ -3772,7 +3794,8 @@ impl AppState {
         }
     }
 
-    /// Send chat message
+    /// Send chat message to server agent
+    /// All input (voice and typed) goes through the agent for intent parsing
     pub fn send_chat_message(&mut self) {
         let message = std::mem::take(&mut self.buffers.chat_input);
         if message.trim().is_empty() {
@@ -3782,7 +3805,9 @@ impl AppState {
 
         web_sys::console::log_1(&format!("send_chat_message: {}", message).into());
 
-        // ALL messages go to the server agent - one conversation, one handler
+        // Track the message for correction detection (learning loop)
+        self.buffers.last_agent_message = Some(message.clone());
+
         // Add user message to local history immediately for responsiveness
         self.add_user_message(message.clone());
 
@@ -3876,6 +3901,14 @@ impl AppState {
                                         );
                                         // Navigate to CBU using ScaleSystem mechanism
                                         state.pending_scale_system = Some(Some(cbu_id.clone()));
+                                    }
+                                    ob_poc_types::AgentCommand::SearchCbu { query } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: SearchCbu query={}", query).into(),
+                                        );
+                                        // Store query for UI to open search popup
+                                        // (handled in process_async_results via pending flag)
+                                        state.pending_search_cbu_query = Some(query.clone());
                                     }
                                     ob_poc_types::AgentCommand::HighlightEntity { entity_id } => {
                                         web_sys::console::log_1(
@@ -4397,6 +4430,34 @@ impl AppState {
         let async_state = Arc::clone(&self.async_state);
         let ctx = self.ctx.clone();
 
+        // Check if user corrected agent-generated DSL (for learning loop)
+        let correction_info = if self.buffers.dsl_dirty {
+            if let Some(ref agent_dsl) = self.buffers.last_agent_dsl {
+                // Normalize for comparison (trim whitespace)
+                let agent_normalized = agent_dsl.trim();
+                let user_normalized = dsl.trim();
+                if agent_normalized != user_normalized {
+                    Some((
+                        session_id,
+                        self.buffers.last_agent_message.clone(),
+                        agent_dsl.clone(),
+                        dsl.clone(),
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Clear tracking after execution
+        self.buffers.last_agent_dsl = None;
+        self.buffers.last_agent_message = None;
+        self.buffers.dsl_dirty = false;
+
         {
             let mut state = async_state.lock().unwrap();
             state.executing = true;
@@ -4404,6 +4465,20 @@ impl AppState {
         }
 
         spawn_local(async move {
+            // Report correction if detected (fire-and-forget, don't block execution)
+            if let Some((sid, original_msg, generated, corrected)) = correction_info {
+                web_sys::console::log_1(
+                    &format!(
+                        "execute_dsl: detected user correction ({} -> {} chars)",
+                        generated.len(),
+                        corrected.len()
+                    )
+                    .into(),
+                );
+                // Fire-and-forget - we don't wait for this
+                let _ = api::report_correction(sid, original_msg, generated, corrected).await;
+            }
+
             let result = api::execute_dsl(session_id, &dsl).await;
             if let Ok(mut state) = async_state.lock() {
                 state.pending_execution = Some(result);

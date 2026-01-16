@@ -155,12 +155,24 @@ pub enum LookupResolution {
 }
 
 /// Parameters that should be resolved as codes (not raw strings) via EntityGateway.
+/// These are reference data lookups where user input needs fuzzy matching to canonical codes.
+/// UUID-based entity lookups (CBU, Entity, Document) are handled separately.
 const CODE_PARAMS: &[(&str, RefType)] = &[
+    // Core reference codes
     ("product", RefType::Product),
+    ("service", RefType::Service),
     ("role", RefType::Role),
     ("jurisdiction", RefType::Jurisdiction),
     ("currency", RefType::Currency),
     ("client-type", RefType::ClientType),
+    ("entity-type", RefType::EntityType),
+    // Document and attribute references
+    ("document-type", RefType::DocumentType),
+    ("doc-type", RefType::DocumentType),
+    ("attribute-id", RefType::AttributeId),
+    ("attribute", RefType::AttributeId),
+    // Screening and compliance
+    ("screening-type", RefType::ScreeningType),
 ];
 
 /// Unified result of resolving ALL references (entities + codes) in intents.
@@ -329,6 +341,7 @@ pub struct AgentService {
     client_scope: Option<ClientScope>,
 }
 
+#[allow(dead_code)]
 impl AgentService {
     /// Create a new agent service without database support
     pub fn new() -> Self {
@@ -785,10 +798,11 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         tracing::info!("CBU ID: {:?}", request.cbu_id);
         tracing::info!("Session ID: {}", session.id);
 
-        // NOTE: Previously had bypass handlers (handle_show_command, handle_filter_command, etc.)
-        // These have been removed to ensure ALL user prompts go through the full pipeline:
-        // User prompt → LLM generates DSL → Parse → AST → Unresolved refs → Resolution popup → Execute
-        // This ensures entity resolution works consistently for all commands.
+        // Handle "show/load/select CBU" commands directly (bypass LLM)
+        // These are navigation commands that don't need DSL generation
+        if let Ok(Some(response)) = self.handle_show_command(&request.message).await {
+            return Ok(response);
+        }
 
         // If this is a disambiguation response, handle it
         if let Some(disambig_response) = &request.disambiguation_response {
@@ -2783,7 +2797,10 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 }
             }
             ResolveResult::NotFound { .. } => Ok(Some(AgentChatResponse {
-                message: format!("No CBU found matching '{}'", search_term),
+                message: format!(
+                    "No exact match for '{}'. Opening search to find similar CBUs...",
+                    search_term
+                ),
                 intents: vec![],
                 validation_results: vec![],
                 session_state: SessionState::New,
@@ -2791,7 +2808,10 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 dsl_source: None,
                 ast: None,
                 disambiguation: None,
-                commands: None,
+                // Return SearchCbu command to open popup with query pre-filled
+                commands: Some(vec![AgentCommand::SearchCbu {
+                    query: search_term.clone(),
+                }]),
             })),
         }
     }

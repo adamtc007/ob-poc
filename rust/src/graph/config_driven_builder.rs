@@ -1336,8 +1336,8 @@ impl ConfigDrivenGraphBuilder {
         // 7. Load Investment Managers and link to CBU
         let ims = repo.get_cbu_investment_managers(self.cbu_id).await?;
         for im in ims {
-            // IM is an entity - may already exist in graph from core layer
-            let im_entity_node_id = format!("entity-{}", im.entity_id);
+            // IM is an entity - use raw UUID to match entity nodes from load_entities
+            let im_entity_node_id = im.entity_id.to_string();
 
             // Edge: CBU → IM Entity with trading mandate
             if self.is_edge_type_visible("CBU_IM_MANDATE") {

@@ -1450,27 +1450,6 @@ fn extract_after_any(text: &str, triggers: &[&str]) -> Option<String> {
     None
 }
 
-/// Extract text between a prefix and suffix pattern
-/// e.g., extract_between("show allianz cbu", &["show", "open"], "cbu") -> Some("allianz")
-fn extract_between(text: &str, prefixes: &[&str], suffix: &str) -> Option<String> {
-    // Check if suffix exists first
-    let suffix_pos = text.find(suffix)?;
-
-    // Find any prefix before the suffix
-    for prefix in prefixes {
-        if let Some(prefix_pos) = text.find(prefix) {
-            if prefix_pos < suffix_pos {
-                let start = prefix_pos + prefix.len();
-                let between = text[start..suffix_pos].trim().to_string();
-                if !between.is_empty() {
-                    return Some(between);
-                }
-            }
-        }
-    }
-    None
-}
-
 /// Extract a number from the text
 fn extract_number(text: &str) -> Option<f32> {
     // Find first sequence of digits

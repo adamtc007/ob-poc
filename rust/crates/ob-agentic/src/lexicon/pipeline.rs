@@ -608,6 +608,52 @@ fn intent_type_name(intent: &IntentAst) -> String {
         IntentAst::EntityShow { .. } => "entity_show".to_string(),
         IntentAst::CounterpartyList { .. } => "counterparty_list".to_string(),
         IntentAst::IsdaShow { .. } => "isda_show".to_string(),
+        // Trading profile domain
+        IntentAst::TradingProfileMaterialize { .. } => "trading_profile_materialize".to_string(),
+        IntentAst::TradingProfileAddInstrument { .. } => {
+            "trading_profile_add_instrument".to_string()
+        }
+        IntentAst::TradingProfileAddMarket { .. } => "trading_profile_add_market".to_string(),
+        IntentAst::TradingProfileSubmit { .. } => "trading_profile_submit".to_string(),
+        IntentAst::TradingProfileApprove { .. } => "trading_profile_approve".to_string(),
+        IntentAst::TradingProfileValidate { .. } => "trading_profile_validate".to_string(),
+        // Session domain
+        IntentAst::SessionLoadCbu { .. } => "session_load_cbu".to_string(),
+        IntentAst::SessionLoadJurisdiction { .. } => "session_load_jurisdiction".to_string(),
+        IntentAst::SessionLoadGalaxy { .. } => "session_load_galaxy".to_string(),
+        IntentAst::SessionClear => "session_clear".to_string(),
+        IntentAst::SessionUndo => "session_undo".to_string(),
+        IntentAst::SessionRedo => "session_redo".to_string(),
+        // View domain
+        IntentAst::ViewDrill { .. } => "view_drill".to_string(),
+        IntentAst::ViewSurface => "view_surface".to_string(),
+        IntentAst::ViewTrace { .. } => "view_trace".to_string(),
+        IntentAst::ViewXray { .. } => "view_xray".to_string(),
+        IntentAst::ViewIlluminate { .. } => "view_illuminate".to_string(),
+        // KYC domain
+        IntentAst::KycCaseCreate { .. } => "kyc_case_create".to_string(),
+        IntentAst::KycCaseEscalate { .. } => "kyc_case_escalate".to_string(),
+        IntentAst::KycCaseAssign { .. } => "kyc_case_assign".to_string(),
+        IntentAst::KycCaseClose { .. } => "kyc_case_close".to_string(),
+        IntentAst::KycSetRiskRating { .. } => "kyc_set_risk_rating".to_string(),
+        // Ownership domain
+        IntentAst::OwnershipCompute { .. } => "ownership_compute".to_string(),
+        IntentAst::OwnershipWhoControls { .. } => "ownership_who_controls".to_string(),
+        IntentAst::OwnershipTraceChain { .. } => "ownership_trace_chain".to_string(),
+        IntentAst::OwnershipAnalyzeGaps { .. } => "ownership_analyze_gaps".to_string(),
+        // GLEIF domain
+        IntentAst::GleifImport { .. } => "gleif_import".to_string(),
+        IntentAst::GleifImportTree { .. } => "gleif_import_tree".to_string(),
+        IntentAst::GleifSearch { .. } => "gleif_search".to_string(),
+        IntentAst::GleifLookup { .. } => "gleif_lookup".to_string(),
+        // BODS domain
+        IntentAst::BodsDiscoverUbos { .. } => "bods_discover_ubos".to_string(),
+        IntentAst::BodsImport { .. } => "bods_import".to_string(),
+        // Investor register domain
+        IntentAst::InvestorRegisterShow { .. } => "investor_register_show".to_string(),
+        IntentAst::InvestorRegisterListHolders { .. } => {
+            "investor_register_list_holders".to_string()
+        }
         IntentAst::Unknown { .. } => "unknown".to_string(),
     }
 }

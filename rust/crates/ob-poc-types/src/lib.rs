@@ -630,6 +630,8 @@ pub enum AgentCommand {
     // =========================================================================
     /// Show a specific CBU in the graph ("show me X fund", "load allianz")
     ShowCbu { cbu_id: String },
+    /// Open CBU search popup with query pre-filled (for typos/no results)
+    SearchCbu { query: String },
     /// Highlight an entity in the graph
     HighlightEntity { entity_id: String },
     /// Navigate to a line in the DSL panel

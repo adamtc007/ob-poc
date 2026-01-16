@@ -244,6 +244,11 @@ domains:
       ensure-limited-company:
         description: Create or update a limited company entity (idempotent by name)
         behavior: crud
+        invocation_phrases:
+          - "ensure company"
+          - "add or update company"
+          - "upsert company"
+          - "ensure counterparty"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -283,6 +288,11 @@ domains:
             type: string
             required: false
             maps_to: jurisdiction
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: Legal Entity Identifier (LEI) from GLEIF
         returns:
           type: uuid
           name: entity_id
@@ -291,6 +301,10 @@ domains:
       ensure-proper-person:
         description: Create or update a natural person entity (idempotent by name)
         behavior: crud
+        invocation_phrases:
+          - "ensure person"
+          - "add or update person"
+          - "upsert person"
         metadata:
           tier: intent
           source_of_truth: entity
