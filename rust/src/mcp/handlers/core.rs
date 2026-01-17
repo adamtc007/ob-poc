@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
+use crate::agent::learning::warmup::SharedLearnedData;
 use crate::api::cbu_session_routes::CbuSessionStore;
 use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::{
@@ -24,6 +25,7 @@ use crate::database::VisualizationRepository;
 use crate::dsl_v2::{
     compile, gateway_resolver, parse_program, registry, DslExecutor, ExecutionContext,
 };
+use crate::mcp::verb_search::HybridVerbSearcher;
 
 use crate::mcp::protocol::ToolCallResult;
 
@@ -38,6 +40,10 @@ pub struct ToolHandlers {
     sessions: Option<SessionStore>,
     /// CBU session store for load/unload operations
     cbu_sessions: Option<CbuSessionStore>,
+    /// Hybrid verb searcher (lazy-initialized)
+    verb_searcher: Arc<Mutex<Option<HybridVerbSearcher>>>,
+    /// Learned data from agent learning system (shared reference)
+    learned_data: Option<SharedLearnedData>,
 }
 
 impl ToolHandlers {
@@ -50,6 +56,8 @@ impl ToolHandlers {
             gateway_client: Arc::new(Mutex::new(None)),
             sessions: None,
             cbu_sessions: None,
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: None,
         }
     }
 
@@ -62,6 +70,8 @@ impl ToolHandlers {
             gateway_client: Arc::new(Mutex::new(None)),
             sessions: Some(sessions),
             cbu_sessions: None,
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: None,
         }
     }
 
@@ -78,6 +88,41 @@ impl ToolHandlers {
             gateway_client: Arc::new(Mutex::new(None)),
             sessions: Some(sessions),
             cbu_sessions: Some(cbu_sessions),
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: None,
+        }
+    }
+
+    /// Create handlers with learned data for semantic intent pipeline (standalone MCP mode)
+    pub fn with_learned_data(pool: PgPool, learned_data: SharedLearnedData) -> Self {
+        Self {
+            generation_log: GenerationLogRepository::new(pool.clone()),
+            repo: VisualizationRepository::new(pool.clone()),
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+            sessions: None,
+            cbu_sessions: None,
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: Some(learned_data),
+        }
+    }
+
+    /// Create handlers with all session stores and learned data (full integrated mode)
+    pub fn with_all_sessions_and_learned_data(
+        pool: PgPool,
+        sessions: SessionStore,
+        cbu_sessions: CbuSessionStore,
+        learned_data: SharedLearnedData,
+    ) -> Self {
+        Self {
+            generation_log: GenerationLogRepository::new(pool.clone()),
+            repo: VisualizationRepository::new(pool.clone()),
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+            sessions: Some(sessions),
+            cbu_sessions: Some(cbu_sessions),
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: Some(learned_data),
         }
     }
 
@@ -114,6 +159,39 @@ impl ToolHandlers {
 
         *guard = Some(client.clone());
         Ok(client)
+    }
+
+    /// Get or create HybridVerbSearcher for verb discovery
+    ///
+    /// Lazy-initializes on first use. Includes:
+    /// - Phrase index from YAML invocation_phrases
+    /// - Semantic matcher (if database available)
+    /// - Learned data (if provided at construction)
+    async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher> {
+        let mut guard = self.verb_searcher.lock().await;
+        if let Some(searcher) = guard.as_ref() {
+            return Ok(searcher.clone());
+        }
+
+        // Determine verbs directory
+        let verbs_dir = std::env::var("DSL_CONFIG_DIR")
+            .map(|d| format!("{}/verbs", d))
+            .unwrap_or_else(|_| "config/verbs".to_string());
+
+        // Create searcher based on available resources
+        let searcher = if let Some(learned) = &self.learned_data {
+            // Full mode with learned data
+            HybridVerbSearcher::full(&verbs_dir, self.pool.clone(), Some(learned.clone()))
+                .await
+                .map_err(|e| anyhow!("Failed to create verb searcher: {}", e))?
+        } else {
+            // Phrase-only mode (no learned data yet)
+            HybridVerbSearcher::phrase_only(&verbs_dir)
+                .map_err(|e| anyhow!("Failed to create verb searcher: {}", e))?
+        };
+
+        *guard = Some(searcher.clone());
+        Ok(searcher)
     }
 
     /// Search via EntityGateway
@@ -168,6 +246,8 @@ impl ToolHandlers {
             "dsl_execute_submission" => self.dsl_execute_submission(args).await,
             "dsl_bind" => self.dsl_bind(args).await,
             "dsl_plan" => self.dsl_plan(args).await,
+            "verb_search" => self.verb_search(args).await,
+            "intent_feedback" => self.intent_feedback(args).await,
             "dsl_generate" => self.dsl_generate(args).await,
             "cbu_get" => self.cbu_get(args).await,
             "cbu_list" => self.cbu_list(args).await,
@@ -1000,99 +1080,284 @@ impl ToolHandlers {
         }))
     }
 
-    /// Generate DSL from natural language using intent extraction
+    /// Search for verbs matching natural language intent
+    ///
+    /// Uses hybrid search: learned phrases → YAML phrases → semantic embeddings
+    async fn verb_search(&self, args: Value) -> Result<Value> {
+        let query = args["query"]
+            .as_str()
+            .ok_or_else(|| anyhow!("query required"))?;
+        let domain = args["domain"].as_str();
+        let limit = args["limit"].as_i64().unwrap_or(5) as usize;
+
+        // Get or create verb searcher
+        let searcher = self.get_verb_searcher().await?;
+
+        // Perform hybrid search
+        let results = searcher.search(query, domain, limit).await?;
+
+        Ok(json!({
+            "query": query,
+            "domain_filter": domain,
+            "results": results.iter().map(|r| json!({
+                "verb": r.verb,
+                "score": r.score,
+                "source": r.source,
+                "matched_phrase": r.matched_phrase,
+                "description": r.description
+            })).collect::<Vec<_>>(),
+            "count": results.len()
+        }))
+    }
+
+    /// Generate DSL from natural language using structured intent extraction
+    ///
+    /// Pipeline:
+    /// 1. verb_search finds matching verbs (learned → phrase → semantic)
+    /// 2. LLM extracts argument values as JSON (NEVER writes DSL syntax)
+    /// 3. DSL assembled deterministically from structured intent
+    /// 4. Validated before return
     async fn dsl_generate(&self, args: Value) -> Result<Value> {
-        use crate::agentic::create_llm_client;
+        use crate::mcp::intent_pipeline::IntentPipeline;
 
         let instruction = args["instruction"]
             .as_str()
             .ok_or_else(|| anyhow!("instruction required"))?;
-        let _domain = args["domain"].as_str();
+        let domain = args["domain"].as_str();
         let execute = args["execute"].as_bool().unwrap_or(false);
 
-        // Create LLM client (uses AGENT_BACKEND env var to select provider)
-        let llm_client = create_llm_client()?;
+        // Get verb searcher and create intent pipeline
+        let searcher = self.get_verb_searcher().await?;
+        let pipeline = IntentPipeline::new(searcher);
 
-        // Build vocabulary prompt for context
-        let reg = registry();
-        let vocab: Vec<_> = reg
-            .all_verbs()
-            .take(50) // Limit for context
-            .map(|v| format!("{}: {}", v.full_name(), v.description))
-            .collect();
+        // Process through structured pipeline
+        let result = pipeline.process(instruction, domain).await?;
 
-        let system_prompt = format!(
-            r#"You are a DSL generator for a KYC/AML onboarding system.
-Generate valid DSL S-expressions from natural language instructions.
-
-DSL SYNTAX:
-- Format: (domain.verb :key "value" :key2 value2)
-- Strings must be quoted: "text"
-- Numbers are unquoted: 42
-- References start with @: @symbol_name
-- Use :as @name to capture results
-
-COMMON VERBS:
-{}
-
-Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, respond with: ERROR: <reason>"#,
-            vocab.join("\n")
-        );
-
-        // Call LLM API (Anthropic or OpenAI based on AGENT_BACKEND)
-        let dsl = llm_client
-            .chat(&system_prompt, instruction)
-            .await
-            .map_err(|e| anyhow!("LLM API error: {}", e))?
-            .trim()
-            .to_string();
-
-        if dsl.starts_with("ERROR:") {
-            return Ok(json!({
-                "success": false,
-                "error": dsl
-            }));
-        }
-
-        // Validate the generated DSL
-        let validation = match parse_program(&dsl) {
-            Ok(ast) => match compile(&ast) {
-                Ok(plan) => json!({
-                    "valid": true,
-                    "step_count": plan.steps.len()
-                }),
-                Err(e) => json!({
-                    "valid": false,
-                    "error": format!("Compile error: {:?}", e)
-                }),
+        // Build response
+        let response = json!({
+            "success": result.valid,
+            "intent": {
+                "verb": result.intent.verb,
+                "arguments": result.intent.arguments.iter().map(|a| json!({
+                    "name": a.name,
+                    "value": a.value,
+                    "resolved": a.resolved
+                })).collect::<Vec<_>>(),
+                "confidence": result.intent.confidence,
+                "notes": result.intent.notes
             },
-            Err(e) => json!({
-                "valid": false,
-                "error": format!("Parse error: {:?}", e)
-            }),
-        };
+            "verb_candidates": result.verb_candidates.iter().map(|v| json!({
+                "verb": v.verb,
+                "score": v.score,
+                "source": v.source,
+                "matched_phrase": v.matched_phrase
+            })).collect::<Vec<_>>(),
+            "dsl": result.dsl,
+            "valid": result.valid,
+            "validation_error": result.validation_error,
+            "unresolved_refs": result.unresolved_refs.iter().map(|r| json!({
+                "param_name": r.param_name,
+                "search_value": r.search_value,
+                "entity_type": r.entity_type
+            })).collect::<Vec<_>>()
+        });
 
         // Execute if requested and valid
-        if execute && validation["valid"].as_bool().unwrap_or(false) {
+        if execute && result.valid {
             let exec_result = self
                 .dsl_execute(json!({
-                    "source": dsl,
+                    "source": result.dsl,
                     "intent": instruction
                 }))
                 .await?;
 
             return Ok(json!({
                 "success": true,
-                "dsl": dsl,
-                "validation": validation,
+                "intent": response["intent"],
+                "verb_candidates": response["verb_candidates"],
+                "dsl": result.dsl,
+                "valid": result.valid,
                 "execution": exec_result
             }));
         }
 
+        Ok(response)
+    }
+
+    /// Record user correction for learning loop
+    ///
+    /// Uses existing agent.* schema for learning candidates.
+    /// Low-risk corrections (entity aliases) apply immediately.
+    /// Medium-risk corrections (phrase mappings) apply after threshold.
+    async fn intent_feedback(&self, args: Value) -> Result<Value> {
+        let feedback_type = args["feedback_type"]
+            .as_str()
+            .ok_or_else(|| anyhow!("feedback_type required"))?;
+        let original_input = args["original_input"]
+            .as_str()
+            .ok_or_else(|| anyhow!("original_input required"))?;
+        let _system_choice = args["system_choice"].as_str();
+        let correct_choice = args["correct_choice"]
+            .as_str()
+            .ok_or_else(|| anyhow!("correct_choice required"))?;
+        let _user_explanation = args["user_explanation"].as_str();
+
+        // Map feedback_type to learning parameters
+        let (learning_type, risk_level, auto_applicable) = match feedback_type {
+            "verb_correction" => ("invocation_phrase", "medium", false),
+            "entity_correction" => ("entity_alias", "low", true),
+            "phrase_mapping" => ("invocation_phrase", "medium", false),
+            _ => return Err(anyhow!("Unknown feedback_type: {}", feedback_type)),
+        };
+
+        let pool = self.require_pool()?;
+
+        // Create fingerprint for deduplication
+        let fingerprint = format!(
+            "{}:{}:{}",
+            learning_type,
+            original_input.to_lowercase().trim(),
+            correct_choice.trim()
+        );
+
+        // Insert or increment learning candidate
+        let row = sqlx::query_as::<_, (i64, i32, bool)>(
+            r#"
+            INSERT INTO agent.learning_candidates (
+                fingerprint, learning_type, input_pattern, suggested_output,
+                risk_level, auto_applicable
+            )
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (fingerprint) DO UPDATE SET
+                occurrence_count = agent.learning_candidates.occurrence_count + 1,
+                last_seen = NOW(),
+                updated_at = NOW()
+            RETURNING id, occurrence_count, (xmax = 0)
+            "#,
+        )
+        .bind(&fingerprint)
+        .bind(learning_type)
+        .bind(original_input)
+        .bind(correct_choice)
+        .bind(risk_level)
+        .bind(auto_applicable)
+        .fetch_one(pool)
+        .await
+        .map_err(|e| anyhow!("Failed to record learning: {}", e))?;
+
+        let (candidate_id, occurrence_count, was_created) = row;
+
+        // For low-risk corrections (entity aliases), apply immediately
+        let auto_applied = if risk_level == "low" {
+            sqlx::query(
+                r#"
+                INSERT INTO agent.entity_aliases (alias, canonical_name, source)
+                VALUES ($1, $2, 'explicit_feedback')
+                ON CONFLICT (alias) DO UPDATE SET
+                    canonical_name = $2,
+                    updated_at = NOW()
+                "#,
+            )
+            .bind(original_input.to_lowercase().trim())
+            .bind(correct_choice)
+            .execute(pool)
+            .await
+            .is_ok()
+        } else {
+            false
+        };
+
+        // Hot-reload into memory if learned_data available and applied
+        if auto_applied {
+            if let Some(learned) = &self.learned_data {
+                let mut guard = learned.write().await;
+                guard.entity_aliases.insert(
+                    original_input.to_lowercase(),
+                    (correct_choice.to_string(), None),
+                );
+            }
+        }
+
+        // For medium-risk (phrase mappings), check if we hit threshold (3 occurrences)
+        let threshold_applied = if risk_level == "medium" && occurrence_count >= 3 {
+            let applied = sqlx::query(
+                r#"
+                INSERT INTO agent.invocation_phrases (phrase, verb, source)
+                VALUES ($1, $2, 'threshold_auto')
+                ON CONFLICT (phrase, verb) DO UPDATE SET
+                    occurrence_count = agent.invocation_phrases.occurrence_count + 1,
+                    updated_at = NOW()
+                "#,
+            )
+            .bind(original_input.to_lowercase().trim())
+            .bind(correct_choice)
+            .execute(pool)
+            .await
+            .is_ok();
+
+            if applied {
+                // Mark candidate as applied
+                let _ = sqlx::query(
+                    "UPDATE agent.learning_candidates SET status = 'applied', applied_at = NOW() WHERE id = $1"
+                )
+                .bind(candidate_id)
+                .execute(pool)
+                .await;
+
+                // Hot-reload into memory
+                if let Some(learned) = &self.learned_data {
+                    let mut guard = learned.write().await;
+                    guard
+                        .invocation_phrases
+                        .insert(original_input.to_lowercase(), correct_choice.to_string());
+                }
+            }
+            applied
+        } else {
+            false
+        };
+
+        // Build user-friendly message
+        let message = if auto_applied || threshold_applied {
+            format!(
+                "Learned: '{}' maps to '{}'. Applied immediately.",
+                original_input, correct_choice
+            )
+        } else {
+            let remaining = 3 - occurrence_count;
+            format!(
+                "Recorded: '{}' → '{}'. Will apply after {} more confirmation(s).",
+                original_input,
+                correct_choice,
+                remaining.max(0)
+            )
+        };
+
+        tracing::info!(
+            feedback_type = feedback_type,
+            input = original_input,
+            correction = correct_choice,
+            auto_applied = auto_applied,
+            threshold_applied = threshold_applied,
+            occurrence_count = occurrence_count,
+            "Intent feedback recorded"
+        );
+
         Ok(json!({
-            "success": validation["valid"].as_bool().unwrap_or(false),
-            "dsl": dsl,
-            "validation": validation
+            "recorded": true,
+            "candidate_id": candidate_id,
+            "occurrence_count": occurrence_count,
+            "was_new": was_created,
+            "learning_type": learning_type,
+            "risk_level": risk_level,
+            "auto_applied": auto_applied,
+            "threshold_applied": threshold_applied,
+            "message": message,
+            "what_was_learned": {
+                "input": original_input,
+                "maps_to": correct_choice,
+                "type": feedback_type
+            }
         }))
     }
 
@@ -1297,9 +1562,11 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             "entity" => "ENTITY",
             "person" => "PERSON",
             "legal_entity" | "company" => "LEGAL_ENTITY",
+            "fund" => "FUND",
             "document" => "DOCUMENT",
             "product" => "PRODUCT",
             "service" => "SERVICE",
+            "kyc_case" => "KYC_CASE",
             "role" => "ROLE",
             "jurisdiction" => "JURISDICTION",
             "currency" => "CURRENCY",
@@ -1310,7 +1577,7 @@ Respond with ONLY the DSL, no explanation. If you cannot generate valid DSL, res
             "market" => "MARKET",
             _ => {
                 return Err(anyhow!(
-                    "Unknown lookup_type: {}. Valid types: cbu, entity, person, legal_entity, document, product, service, role, jurisdiction, currency, document_type, entity_type, attribute, instrument_class, market",
+                    "Unknown lookup_type: {}. Valid types: cbu, entity, person, legal_entity, fund, document, product, service, kyc_case, role, jurisdiction, currency, attribute, instrument_class, market",
                     lookup_type
                 ));
             }

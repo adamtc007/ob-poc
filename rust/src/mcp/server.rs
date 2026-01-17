@@ -10,6 +10,7 @@ use sqlx::PgPool;
 use super::handlers::ToolHandlers;
 use super::protocol::*;
 use super::tools::get_tools;
+use crate::agent::learning::warmup::SharedLearnedData;
 
 /// MCP Server
 pub struct McpServer {
@@ -21,6 +22,13 @@ impl McpServer {
     pub fn new(pool: PgPool) -> Self {
         Self {
             handlers: ToolHandlers::new(pool),
+        }
+    }
+
+    /// Create a new MCP server with database pool and learned data
+    pub fn with_learned_data(pool: PgPool, learned_data: SharedLearnedData) -> Self {
+        Self {
+            handlers: ToolHandlers::with_learned_data(pool, learned_data),
         }
     }
 

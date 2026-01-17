@@ -146,8 +146,25 @@ pub fn get_tools() -> Vec<Tool> {
                 "properties": {
                     "lookup_type": {
                         "type": "string",
-                        "enum": ["cbu", "entity", "document", "product", "service", "kyc_case", "attribute"],
-                        "description": "Type of record to look up. Use 'attribute' for attribute IDs (e.g., attr.identity.first_name)"
+                        "enum": [
+                            "cbu",
+                            "entity",
+                            "person",
+                            "legal_entity",
+                            "company",
+                            "fund",
+                            "document",
+                            "product",
+                            "service",
+                            "kyc_case",
+                            "attribute",
+                            "role",
+                            "jurisdiction",
+                            "currency",
+                            "instrument_class",
+                            "market"
+                        ],
+                        "description": "Type of record to look up. Use 'entity' for general entity search, 'person'/'company'/'fund' for specific entity types, 'attribute' for attribute IDs (e.g., attr.identity.first_name)"
                     },
                     "search": {
                         "type": "string",
@@ -203,19 +220,144 @@ pub fn get_tools() -> Vec<Tool> {
                 "required": ["verb"]
             }),
         },
+        // =====================================================================
+        // Verb Search - Hybrid discovery with learning loop integration
+        // Priority: learned phrases → YAML phrases → semantic embeddings
+        // =====================================================================
+        Tool {
+            name: "verb_search".into(),
+            description: r#"Search for DSL verbs matching natural language intent.
+
+Uses a hybrid search strategy in priority order:
+1. LEARNED phrases (from user corrections) - exact match, highest confidence
+2. YAML invocation_phrases - exact and substring matches
+3. Semantic embeddings (pgvector) - fallback for novel phrases
+
+Returns ranked candidates with source attribution:
+- learned: User taught us this phrase→verb mapping
+- phrase_exact: Exact match from YAML invocation_phrases
+- phrase_substring: Partial match from YAML
+- semantic: Embedding similarity (fallback)
+
+Use this BEFORE dsl_generate to understand available verbs.
+The learning system improves over time - Day 1 ~70% hit rate, Day 30 ~90%+."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Natural language description of what you want to do"
+                    },
+                    "domain": {
+                        "type": "string",
+                        "description": "Optional domain filter (e.g., 'cbu', 'entity', 'trading-profile')"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "Max results to return"
+                    }
+                },
+                "required": ["query"]
+            }),
+        },
+        // =====================================================================
+        // Intent Feedback - Explicit correction capture for learning loop
+        // =====================================================================
+        Tool {
+            name: "intent_feedback".into(),
+            description: r#"Record user correction to improve future intent matching.
+
+Call this when the user indicates the system chose the wrong verb, entity,
+or interpretation. Creates an explicit learning signal.
+
+Feedback types:
+- verb_correction: Wrong verb was selected
+- entity_correction: Wrong entity was resolved
+- phrase_mapping: User provides explicit phrase→verb mapping
+
+Examples:
+- User says "no, I meant ISDA not CSA" → verb_correction
+- User says "wrong John Smith" → entity_correction
+- User says "when I say 'onboard' I mean cbu.create" → phrase_mapping
+
+The system will:
+1. Record the correction immediately
+2. Apply to future requests (low-risk: immediate, medium-risk: after threshold)
+3. Return confirmation of what was learned"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "feedback_type": {
+                        "type": "string",
+                        "enum": ["verb_correction", "entity_correction", "phrase_mapping"],
+                        "description": "Type of correction"
+                    },
+                    "original_input": {
+                        "type": "string",
+                        "description": "What the user originally said/asked"
+                    },
+                    "system_choice": {
+                        "type": "string",
+                        "description": "What the system selected (verb name, entity UUID)"
+                    },
+                    "correct_choice": {
+                        "type": "string",
+                        "description": "What the user actually wanted"
+                    },
+                    "user_explanation": {
+                        "type": "string",
+                        "description": "User's explanation of the correction (optional but valuable)"
+                    },
+                    "context": {
+                        "type": "object",
+                        "description": "Additional context",
+                        "properties": {
+                            "session_id": { "type": "string", "format": "uuid" },
+                            "cbu_id": { "type": "string", "format": "uuid" },
+                            "domain": { "type": "string" }
+                        }
+                    }
+                },
+                "required": ["feedback_type", "original_input", "correct_choice"]
+            }),
+        },
+        // =====================================================================
+        // DSL Generate - Structured intent extraction + deterministic assembly
+        // LLM extracts arguments ONLY, never writes DSL syntax
+        // =====================================================================
         Tool {
             name: "dsl_generate".into(),
-            description: "Generate DSL from natural language. Extracts structured intent and assembles valid DSL code.".into(),
+            description: r#"Generate DSL from natural language using structured intent extraction.
+
+PIPELINE:
+1. verb_search finds matching verbs (learned → phrase → semantic)
+2. LLM extracts argument values as JSON (NEVER writes DSL syntax)
+3. DSL assembled deterministically from structured intent
+4. Validated before return
+
+The LLM only fills slots - it cannot invent DSL structure.
+This ensures consistent, learnable, reproducible generation.
+
+Returns:
+- intent: Structured extraction (verb, arguments, confidence)
+- verb_candidates: Ranked verb matches from search
+- dsl: Assembled DSL code
+- valid: Whether DSL passes validation
+- unresolved_refs: Entity names needing resolution via dsl_lookup
+
+Use verb_search first to understand available verbs, then dsl_generate
+to create executable DSL."#.into(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "instruction": {
                         "type": "string",
-                        "description": "Natural language description of what to create/do (e.g., 'Create a fund in Luxembourg called Apex Capital')"
+                        "description": "Natural language description of what to do"
                     },
                     "domain": {
                         "type": "string",
-                        "description": "Optional domain hint to focus generation (e.g., 'cbu', 'entity', 'kyc')"
+                        "description": "Optional domain hint to focus generation"
                     },
                     "execute": {
                         "type": "boolean",

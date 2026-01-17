@@ -43,12 +43,14 @@
 
 pub mod enrichment;
 pub mod handlers;
+pub mod intent_pipeline;
 pub mod protocol;
 pub mod resolution;
 pub mod server;
 pub mod session;
 pub mod tools;
 pub mod types;
+pub mod verb_search;
 
 pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
 pub use resolution::{

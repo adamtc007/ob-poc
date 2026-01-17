@@ -11,6 +11,7 @@
 use anyhow::Result;
 use sqlx::postgres::PgPoolOptions;
 
+use ob_poc::agent::learning::warmup::LearningWarmup;
 use ob_poc::mcp::McpServer;
 
 #[tokio::main]
@@ -26,5 +27,17 @@ async fn main() -> Result<()> {
 
     eprintln!("[dsl_mcp] Connected to database");
 
-    McpServer::new(pool).run().await
+    // Run learning warmup at startup
+    eprintln!("[dsl_mcp] Running learning warmup...");
+    let warmup = LearningWarmup::new(pool.clone());
+    let (learned_data, stats) = warmup.warmup().await?;
+    eprintln!(
+        "[dsl_mcp] Warmup complete: {} aliases, {} tokens, {} phrases ({}ms)",
+        stats.entity_aliases_loaded,
+        stats.lexicon_tokens_loaded,
+        stats.invocation_phrases_loaded,
+        stats.duration_ms
+    );
+
+    McpServer::with_learned_data(pool, learned_data).run().await
 }

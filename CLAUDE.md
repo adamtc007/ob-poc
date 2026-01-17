@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-16
+> **Last reviewed:** 2026-01-17
 > **Verb count:** 800+ verbs across 103 YAML files
 > **Custom ops:** 51 plugin handlers
 > **Crates:** 14 fine-grained crates
@@ -9,6 +9,7 @@
 > **Investor Register:** ✅ Complete - Role profiles, fund vehicles, economic look-through
 > **Feedback System:** ✅ Complete - Event capture + inspector + MCP tools
 > **Agent Learning Loop:** ✅ Complete - Continuous improvement from user corrections, startup warmup, 5 MCP tools
+> **Semantic Intent Pipeline:** ✅ Complete - Hybrid verb search, structured extraction, learning flywheel, 3 MCP tools
 > **Session/View:** ✅ Implemented - Scopes, filters, ESPER verbs, history
 > **CBU Session v2:** ✅ Complete - In-memory sessions, 9 MCP tools, REST API, undo/redo, persistence
 > **Verb Tiering:** ✅ Complete - All verbs tagged with tier metadata
@@ -125,6 +126,7 @@ This file provides guidance to Claude Code when working with this repository.
 - "container", "container_parent_id", "is_container", "entities inside CBU", "trading nodes outside", "status badge", "attachment edge", "taxonomy navigation", "external taxonomy" → See CBU Container Rendering section below
 - "intent parser", "NLU", "natural language", "lexicon", "tokenizer", "AST lowering", "type inference", "Plan/Render", "SemanticAction", "lexicon harness" → See Lexicon Intent Parser section below
 - "LSP", "language server", "completions", "hover", "go-to-definition", "diagnostics", "dsl-lsp" → See DSL Language Server (LSP) section below
+- "verb search", "hybrid search", "dsl_generate", "intent_feedback", "HybridVerbSearcher", "IntentPipeline", "structured extraction" → See Semantic Intent Pipeline section below
 
 **Working documents (TODOs, plans):**
 - `ai-thoughts/015-consolidate-dsl-execution-path.md` - Unify DSL execution to single session-aware path
@@ -1008,6 +1010,112 @@ When you see these in a task, you're working on agent learning:
 - "intent_analyze", "intent_approve", "learning candidate"
 - "warmup", "startup learning"
 - "AgentEvent", "AgentEventPayload"
+
+---
+
+## Semantic Intent Pipeline (DSL Generation)
+
+> **Status:** ✅ Complete
+> **Key Capability:** Structured intent extraction with hybrid verb search and learning flywheel
+
+The semantic intent pipeline replaces raw LLM DSL generation with a structured approach where LLM extracts arguments and the system assembles DSL deterministically.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Semantic Intent Pipeline                                  │
+│                                                                              │
+│  User Instruction                                                            │
+│       │                                                                      │
+│       ▼                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  1. Hybrid Verb Search (verb_search tool)                           │    │
+│  │     Priority: Learned phrases → YAML phrases → (future: semantic)   │    │
+│  │     Returns: Top matching verbs with scores and sources             │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│       │                                                                      │
+│       ▼                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  2. LLM Argument Extraction (structured, not free-form DSL)         │    │
+│  │     Input: User instruction + verb schema (args with types)         │    │
+│  │     Output: JSON with argument values only                          │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│       │                                                                      │
+│       ▼                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  3. Deterministic DSL Assembly                                       │    │
+│  │     Verb + extracted args → s-expression DSL                        │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│       │                                                                      │
+│       ▼                                                                      │
+│  Generated DSL (validated, consistent format)                               │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### MCP Tools (3 tools)
+
+| Tool | Description |
+|------|-------------|
+| `verb_search` | Hybrid search: learned phrases (highest priority) → YAML invocation_phrases → (future: semantic embeddings) |
+| `dsl_generate` | Structured pipeline: verb search → argument extraction → deterministic assembly |
+| `intent_feedback` | Explicit correction capture for learning candidates |
+
+### Learning Flywheel
+
+```
+Day 1: ~70-80% hit rate (YAML phrases only)
+    ↓
+User corrections captured via intent_feedback
+    ↓
+Learning candidates created (threshold: 3 occurrences)
+    ↓
+Auto-apply or manual approval
+    ↓
+Day 30: 90%+ hit rate (learned phrases dominate)
+```
+
+### Verb Search Priority
+
+1. **Learned phrases** (highest) - From `agent.invocation_phrases` table, populated by learning loop
+2. **YAML phrases** - From `invocation_phrases` in verb YAML definitions
+3. **Semantic embeddings** (future) - Vector similarity for novel phrasings
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher` - multi-source verb discovery |
+| `rust/src/mcp/intent_pipeline.rs` | `IntentPipeline` - structured extraction + DSL assembly |
+| `rust/src/mcp/tools.rs` | MCP tool definitions (`verb_search`, `dsl_generate`, `intent_feedback`) |
+| `rust/src/mcp/handlers/core.rs` | Tool handlers with learning data integration |
+| `rust/src/mcp/server.rs` | `McpServer::with_learned_data()` constructor |
+| `rust/src/bin/dsl_mcp.rs` | Server startup with `LearningWarmup` |
+
+### Startup Flow
+
+```rust
+// dsl_mcp.rs startup sequence
+1. Connect to database
+2. LearningWarmup.warmup()
+   - Apply pending threshold learnings (3+ occurrences)
+   - Load entity_aliases into HashMap
+   - Load lexicon_tokens into HashMap
+   - Load invocation_phrases into HashMap
+3. McpServer::with_learned_data(pool, learned_data)
+4. Server ready - verb_search uses learned data
+```
+
+### Trigger Phrases (for Claude)
+
+When you see these in a task, you're working on the semantic intent pipeline:
+- "verb search", "hybrid search", "phrase matching"
+- "dsl_generate", "intent pipeline", "structured extraction"
+- "intent_feedback", "correction capture"
+- "HybridVerbSearcher", "IntentPipeline"
+- "learned phrases", "YAML phrases"
+- "argument extraction", "DSL assembly"
 
 ---
 
