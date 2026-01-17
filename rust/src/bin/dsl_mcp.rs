@@ -7,10 +7,17 @@
 //! ```bash
 //! DATABASE_URL=postgresql://localhost/ob-poc ./target/debug/dsl_mcp
 //! ```
+//!
+//! ## Environment Variables
+//!
+//! - `DATABASE_URL` (required): PostgreSQL connection string
+//! - `OPENAI_API_KEY` (optional): Enables semantic search via pgvector embeddings
 
 use anyhow::Result;
 use sqlx::postgres::PgPoolOptions;
+use std::sync::Arc;
 
+use ob_poc::agent::learning::embedder::{CachedEmbedder, OpenAIEmbedder};
 use ob_poc::agent::learning::warmup::LearningWarmup;
 use ob_poc::mcp::McpServer;
 
@@ -39,5 +46,15 @@ async fn main() -> Result<()> {
         stats.duration_ms
     );
 
-    McpServer::with_learned_data(pool, learned_data).run().await
+    // Check for OpenAI API key to enable semantic search
+    let server = if let Ok(api_key) = std::env::var("OPENAI_API_KEY") {
+        eprintln!("[dsl_mcp] OPENAI_API_KEY found, enabling semantic search");
+        let embedder = Arc::new(CachedEmbedder::new(Arc::new(OpenAIEmbedder::new(api_key))));
+        McpServer::with_learned_data_and_embedder(pool, learned_data, embedder)
+    } else {
+        eprintln!("[dsl_mcp] No OPENAI_API_KEY, semantic search disabled");
+        McpServer::with_learned_data(pool, learned_data)
+    };
+
+    server.run().await
 }

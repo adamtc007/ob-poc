@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
+use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 use crate::api::cbu_session_routes::CbuSessionStore;
 use crate::api::session::SessionStore;
@@ -44,6 +45,8 @@ pub struct ToolHandlers {
     verb_searcher: Arc<Mutex<Option<HybridVerbSearcher>>>,
     /// Learned data from agent learning system (shared reference)
     learned_data: Option<SharedLearnedData>,
+    /// Embedder for semantic operations (optional)
+    embedder: Option<SharedEmbedder>,
 }
 
 impl ToolHandlers {
@@ -58,6 +61,7 @@ impl ToolHandlers {
             cbu_sessions: None,
             verb_searcher: Arc::new(Mutex::new(None)),
             learned_data: None,
+            embedder: None,
         }
     }
 
@@ -72,6 +76,7 @@ impl ToolHandlers {
             cbu_sessions: None,
             verb_searcher: Arc::new(Mutex::new(None)),
             learned_data: None,
+            embedder: None,
         }
     }
 
@@ -90,6 +95,7 @@ impl ToolHandlers {
             cbu_sessions: Some(cbu_sessions),
             verb_searcher: Arc::new(Mutex::new(None)),
             learned_data: None,
+            embedder: None,
         }
     }
 
@@ -104,6 +110,26 @@ impl ToolHandlers {
             cbu_sessions: None,
             verb_searcher: Arc::new(Mutex::new(None)),
             learned_data: Some(learned_data),
+            embedder: None,
+        }
+    }
+
+    /// Create handlers with learned data and embedder (full semantic pipeline)
+    pub fn with_learned_data_and_embedder(
+        pool: PgPool,
+        learned_data: SharedLearnedData,
+        embedder: SharedEmbedder,
+    ) -> Self {
+        Self {
+            generation_log: GenerationLogRepository::new(pool.clone()),
+            repo: VisualizationRepository::new(pool.clone()),
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+            sessions: None,
+            cbu_sessions: None,
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: Some(learned_data),
+            embedder: Some(embedder),
         }
     }
 
@@ -123,6 +149,7 @@ impl ToolHandlers {
             cbu_sessions: Some(cbu_sessions),
             verb_searcher: Arc::new(Mutex::new(None)),
             learned_data: Some(learned_data),
+            embedder: None,
         }
     }
 
@@ -249,6 +276,13 @@ impl ToolHandlers {
             "verb_search" => self.verb_search(args).await,
             "intent_feedback" => self.intent_feedback(args).await,
             "dsl_generate" => self.dsl_generate(args).await,
+            // Learning management tools
+            "intent_block" => self.intent_block(args).await,
+            "learning_import" => self.learning_import(args).await,
+            "learning_list" => self.learning_list(args).await,
+            "learning_approve" => self.learning_approve(args).await,
+            "learning_reject" => self.learning_reject(args).await,
+            "learning_stats" => self.learning_stats(args).await,
             "cbu_get" => self.cbu_get(args).await,
             "cbu_list" => self.cbu_list(args).await,
             "entity_get" => self.entity_get(args).await,
@@ -1093,8 +1127,8 @@ impl ToolHandlers {
         // Get or create verb searcher
         let searcher = self.get_verb_searcher().await?;
 
-        // Perform hybrid search
-        let results = searcher.search(query, domain, limit).await?;
+        // Perform hybrid search (no user_id in this context)
+        let results = searcher.search(query, None, domain, limit).await?;
 
         Ok(json!({
             "query": query,
@@ -1358,6 +1392,526 @@ impl ToolHandlers {
                 "maps_to": correct_choice,
                 "type": feedback_type
             }
+        }))
+    }
+
+    // =========================================================================
+    // Learning Management Tools
+    // =========================================================================
+
+    /// Block a verb from being selected for a phrase pattern
+    async fn intent_block(&self, args: Value) -> Result<Value> {
+        let phrase = args["phrase"]
+            .as_str()
+            .ok_or_else(|| anyhow!("phrase required"))?;
+        let blocked_verb = args["blocked_verb"]
+            .as_str()
+            .ok_or_else(|| anyhow!("blocked_verb required"))?;
+        let reason = args["reason"].as_str();
+        let scope = args["scope"].as_str().unwrap_or("global");
+        let user_id: Option<Uuid> = if scope == "user_specific" {
+            args["user_id"].as_str().and_then(|s| s.parse().ok())
+        } else {
+            None
+        };
+        let expires = args["expires"]
+            .as_str()
+            .and_then(|s| parse_duration(s).ok());
+
+        let pool = self.require_pool()?;
+
+        // Generate embedding if embedder available
+        let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
+            embedder.embed(phrase).await.ok()
+        } else {
+            None
+        };
+
+        let id = sqlx::query_scalar::<_, Uuid>(
+            r#"
+            INSERT INTO agent.phrase_blocklist
+                (phrase, blocked_verb, embedding, reason, user_id, expires_at)
+            VALUES ($1, $2, $3::vector, $4, $5, $6)
+            ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid))
+            DO UPDATE SET
+                reason = COALESCE($4, agent.phrase_blocklist.reason),
+                expires_at = $6,
+                embedding = COALESCE($3::vector, agent.phrase_blocklist.embedding)
+            RETURNING id
+            "#,
+        )
+        .bind(phrase)
+        .bind(blocked_verb)
+        .bind(embedding.as_ref())
+        .bind(reason)
+        .bind(user_id)
+        .bind(expires.map(|d| chrono::Utc::now() + d))
+        .fetch_one(pool)
+        .await?;
+
+        Ok(json!({
+            "blocked": true,
+            "block_id": id.to_string(),
+            "phrase": phrase,
+            "blocked_verb": blocked_verb,
+            "scope": scope,
+            "has_embedding": embedding.is_some(),
+            "message": format!(
+                "Blocked '{}' for phrase pattern '{}'. {}",
+                blocked_verb, phrase,
+                if embedding.is_some() { "Semantic matching enabled." } else { "Exact match only (no embedder)." }
+            )
+        }))
+    }
+
+    /// Bulk import phrase→verb mappings
+    async fn learning_import(&self, args: Value) -> Result<Value> {
+        let source = args["source"]
+            .as_str()
+            .ok_or_else(|| anyhow!("source required"))?;
+        let format = args["format"].as_str().unwrap_or("yaml");
+        let scope = args["scope"].as_str().unwrap_or("global");
+        let user_id: Option<Uuid> = if scope == "user_specific" {
+            args["user_id"].as_str().and_then(|s| s.parse().ok())
+        } else {
+            None
+        };
+        let dry_run = args["dry_run"].as_bool().unwrap_or(false);
+
+        // Get content
+        let content = match source {
+            "file" => {
+                let path = args["path"]
+                    .as_str()
+                    .ok_or_else(|| anyhow!("path required for file source"))?;
+                std::fs::read_to_string(path)?
+            }
+            "inline" => args["content"]
+                .as_str()
+                .ok_or_else(|| anyhow!("content required for inline source"))?
+                .to_string(),
+            _ => return Err(anyhow!("Invalid source: {}", source)),
+        };
+
+        // Parse content
+        let import_data: ImportData = match format {
+            "yaml" => serde_yaml::from_str(&content)?,
+            "json" => serde_json::from_str(&content)?,
+            "csv" => parse_csv_import(&content)?,
+            _ => return Err(anyhow!("Unknown format: {}", format)),
+        };
+
+        // Validate
+        let mut validation_errors = Vec::new();
+        for (i, phrase) in import_data.phrases.iter().enumerate() {
+            if phrase.phrase.is_empty() {
+                validation_errors.push(format!("Row {}: empty phrase", i + 1));
+            }
+            if phrase.verb.is_empty() {
+                validation_errors.push(format!("Row {}: empty verb", i + 1));
+            }
+        }
+
+        if !validation_errors.is_empty() {
+            return Ok(json!({
+                "success": false,
+                "validation_errors": validation_errors,
+                "message": "Import failed validation"
+            }));
+        }
+
+        if dry_run {
+            return Ok(json!({
+                "success": true,
+                "dry_run": true,
+                "would_import": import_data.phrases.len(),
+                "message": "Validation passed, ready to import"
+            }));
+        }
+
+        let pool = self.require_pool()?;
+        let mut imported = 0;
+        let mut errors = Vec::new();
+
+        // Batch embed if embedder available
+        let embeddings: Vec<Option<Vec<f32>>> = if let Some(embedder) = &self.embedder {
+            let texts: Vec<&str> = import_data
+                .phrases
+                .iter()
+                .map(|p| p.phrase.as_str())
+                .collect();
+            match embedder.embed_batch(&texts).await {
+                Ok(embs) => embs.into_iter().map(Some).collect(),
+                Err(_) => vec![None; import_data.phrases.len()],
+            }
+        } else {
+            vec![None; import_data.phrases.len()]
+        };
+
+        for (phrase_data, embedding) in import_data.phrases.iter().zip(embeddings) {
+            let result = if user_id.is_some() {
+                sqlx::query(
+                    r#"
+                    INSERT INTO agent.user_learned_phrases
+                        (user_id, phrase, verb, embedding, source)
+                    VALUES ($1, $2, $3, $4::vector, 'bulk_import')
+                    ON CONFLICT (user_id, phrase) DO UPDATE
+                    SET verb = $3, embedding = COALESCE($4::vector, agent.user_learned_phrases.embedding), updated_at = now()
+                    "#,
+                )
+                .bind(user_id)
+                .bind(&phrase_data.phrase)
+                .bind(&phrase_data.verb)
+                .bind(embedding.as_ref())
+                .execute(pool)
+                .await
+            } else {
+                sqlx::query(
+                    r#"
+                    INSERT INTO agent.invocation_phrases
+                        (phrase, verb, embedding, source)
+                    VALUES ($1, $2, $3::vector, 'bulk_import')
+                    ON CONFLICT (phrase) DO UPDATE
+                    SET verb = $2, embedding = COALESCE($3::vector, agent.invocation_phrases.embedding), updated_at = now()
+                    "#,
+                )
+                .bind(&phrase_data.phrase)
+                .bind(&phrase_data.verb)
+                .bind(embedding.as_ref())
+                .execute(pool)
+                .await
+            };
+
+            match result {
+                Ok(_) => imported += 1,
+                Err(e) => errors.push(format!("{}: {}", phrase_data.phrase, e)),
+            }
+        }
+
+        Ok(json!({
+            "success": true,
+            "imported": imported,
+            "errors": errors,
+            "scope": scope,
+            "message": format!("Imported {} phrase mappings", imported)
+        }))
+    }
+
+    /// List pending learning candidates
+    async fn learning_list(&self, args: Value) -> Result<Value> {
+        let pool = self.require_pool()?;
+        let status = args["status"].as_str().unwrap_or("pending");
+        let learning_type = args["learning_type"].as_str().unwrap_or("all");
+        let min_occurrences = args["min_occurrences"].as_i64().unwrap_or(1) as i32;
+        let limit = args["limit"].as_i64().unwrap_or(20) as i32;
+
+        let rows = sqlx::query_as::<
+            _,
+            (
+                i64,
+                String,
+                String,
+                String,
+                Option<String>,
+                i32,
+                String,
+                String,
+                Option<String>,
+                chrono::DateTime<chrono::Utc>,
+            ),
+        >(
+            r#"
+            SELECT id, learning_type, input_pattern, suggested_output, previous_output,
+                   occurrence_count, risk_level, status, user_explanation, created_at
+            FROM agent.learning_candidates
+            WHERE ($1 = 'all' OR status = $1)
+              AND ($2 = 'all' OR learning_type = $2)
+              AND occurrence_count >= $3
+            ORDER BY
+                CASE status WHEN 'pending' THEN 0 ELSE 1 END,
+                occurrence_count DESC,
+                created_at DESC
+            LIMIT $4
+            "#,
+        )
+        .bind(status)
+        .bind(learning_type)
+        .bind(min_occurrences)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?;
+
+        let items: Vec<Value> = rows
+            .iter()
+            .map(|r| {
+                json!({
+                    "id": r.0,
+                    "type": r.1,
+                    "input": r.2,
+                    "suggested": r.3,
+                    "previous": r.4,
+                    "occurrences": r.5,
+                    "risk": r.6,
+                    "status": r.7,
+                    "explanation": r.8,
+                    "created": r.9.to_rfc3339(),
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "candidates": items,
+            "count": items.len(),
+            "filters": {
+                "status": status,
+                "learning_type": learning_type,
+                "min_occurrences": min_occurrences
+            }
+        }))
+    }
+
+    /// Approve a learning candidate
+    async fn learning_approve(&self, args: Value) -> Result<Value> {
+        let pool = self.require_pool()?;
+
+        let candidate_id: i64 = args["candidate_id"]
+            .as_str()
+            .or_else(|| args["candidate_id"].as_i64().map(|_| ""))
+            .and_then(|s| {
+                if s.is_empty() {
+                    args["candidate_id"].as_i64()
+                } else {
+                    s.parse().ok()
+                }
+            })
+            .ok_or_else(|| anyhow!("candidate_id required"))?;
+        let apply_immediately = args["apply_immediately"].as_bool().unwrap_or(true);
+
+        // Get candidate
+        let candidate = sqlx::query_as::<_, (i64, String, String, String)>(
+            "SELECT id, learning_type, input_pattern, suggested_output FROM agent.learning_candidates WHERE id = $1",
+        )
+        .bind(candidate_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Candidate not found"))?;
+
+        // Update status
+        sqlx::query("UPDATE agent.learning_candidates SET status = 'approved', updated_at = now() WHERE id = $1")
+            .bind(candidate_id)
+            .execute(pool)
+            .await?;
+
+        let mut applied = false;
+        if apply_immediately {
+            // Generate embedding if available
+            let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
+                embedder.embed(&candidate.2).await.ok()
+            } else {
+                None
+            };
+
+            let result = match candidate.1.as_str() {
+                "invocation_phrase" => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO agent.invocation_phrases (phrase, verb, embedding, source)
+                        VALUES ($1, $2, $3::vector, 'approved_candidate')
+                        ON CONFLICT (phrase) DO UPDATE
+                        SET verb = $2, embedding = COALESCE($3::vector, agent.invocation_phrases.embedding), updated_at = now()
+                        "#,
+                    )
+                    .bind(&candidate.2)
+                    .bind(&candidate.3)
+                    .bind(embedding.as_ref())
+                    .execute(pool)
+                    .await
+                }
+                "entity_alias" => {
+                    sqlx::query(
+                        r#"
+                        INSERT INTO agent.entity_aliases (alias, canonical_name, embedding, source)
+                        VALUES ($1, $2, $3::vector, 'approved_candidate')
+                        ON CONFLICT (alias) DO UPDATE
+                        SET canonical_name = $2, embedding = COALESCE($3::vector, agent.entity_aliases.embedding), updated_at = now()
+                        "#,
+                    )
+                    .bind(&candidate.2)
+                    .bind(&candidate.3)
+                    .bind(embedding.as_ref())
+                    .execute(pool)
+                    .await
+                }
+                _ => Ok(Default::default()),
+            };
+
+            if result.is_ok() {
+                sqlx::query("UPDATE agent.learning_candidates SET status = 'applied', applied_at = now() WHERE id = $1")
+                    .bind(candidate_id)
+                    .execute(pool)
+                    .await?;
+                applied = true;
+            }
+        }
+
+        Ok(json!({
+            "approved": true,
+            "applied": applied,
+            "candidate_id": candidate_id,
+            "mapping": format!("'{}' → {}", candidate.2, candidate.3)
+        }))
+    }
+
+    /// Reject a learning candidate
+    async fn learning_reject(&self, args: Value) -> Result<Value> {
+        let pool = self.require_pool()?;
+
+        let candidate_id: i64 = args["candidate_id"]
+            .as_str()
+            .or_else(|| args["candidate_id"].as_i64().map(|_| ""))
+            .and_then(|s| {
+                if s.is_empty() {
+                    args["candidate_id"].as_i64()
+                } else {
+                    s.parse().ok()
+                }
+            })
+            .ok_or_else(|| anyhow!("candidate_id required"))?;
+        let reason = args["reason"].as_str();
+        let add_to_blocklist = args["add_to_blocklist"].as_bool().unwrap_or(false);
+
+        // Get candidate
+        let candidate = sqlx::query_as::<_, (i64, String, String, String)>(
+            "SELECT id, learning_type, input_pattern, suggested_output FROM agent.learning_candidates WHERE id = $1",
+        )
+        .bind(candidate_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Candidate not found"))?;
+
+        // Update status
+        sqlx::query(
+            "UPDATE agent.learning_candidates SET status = 'rejected', user_explanation = COALESCE($2, user_explanation), updated_at = now() WHERE id = $1",
+        )
+        .bind(candidate_id)
+        .bind(reason)
+        .execute(pool)
+        .await?;
+
+        // Optionally add to blocklist
+        let blocked = if add_to_blocklist && candidate.1.contains("phrase") {
+            let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
+                embedder.embed(&candidate.2).await.ok()
+            } else {
+                None
+            };
+
+            sqlx::query(
+                r#"
+                INSERT INTO agent.phrase_blocklist (phrase, blocked_verb, embedding, reason, source)
+                VALUES ($1, $2, $3::vector, $4, 'rejected_candidate')
+                ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) DO NOTHING
+                "#,
+            )
+            .bind(&candidate.2)
+            .bind(&candidate.3)
+            .bind(embedding.as_ref())
+            .bind(reason.unwrap_or("Rejected learning candidate"))
+            .execute(pool)
+            .await
+            .is_ok()
+        } else {
+            false
+        };
+
+        Ok(json!({
+            "rejected": true,
+            "candidate_id": candidate_id,
+            "added_to_blocklist": blocked,
+            "reason": reason
+        }))
+    }
+
+    /// Get learning statistics
+    async fn learning_stats(&self, args: Value) -> Result<Value> {
+        let pool = self.require_pool()?;
+        let time_range = args["time_range"].as_str().unwrap_or("week");
+        let include_top = args["include_top_corrections"].as_bool().unwrap_or(true);
+
+        let interval = match time_range {
+            "day" => "1 day",
+            "week" => "7 days",
+            "month" => "30 days",
+            _ => "1000 years", // "all"
+        };
+
+        // Get counts
+        let phrase_count =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent.invocation_phrases")
+                .fetch_one(pool)
+                .await
+                .unwrap_or(0);
+
+        let alias_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent.entity_aliases")
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
+
+        let blocklist_count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM agent.phrase_blocklist WHERE expires_at IS NULL OR expires_at > now()")
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
+
+        let pending_count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM agent.learning_candidates WHERE status = 'pending'",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+
+        // Get recent activity
+        let recent_applied = sqlx::query_scalar::<_, i64>(
+            &format!("SELECT COUNT(*) FROM agent.learning_candidates WHERE status = 'applied' AND applied_at > now() - interval '{}'", interval)
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+
+        // Top corrections (if requested)
+        let top_corrections: Vec<Value> = if include_top {
+            let rows = sqlx::query_as::<_, (String, String, i32)>(&format!(
+                r#"
+                    SELECT input_pattern, suggested_output, occurrence_count
+                    FROM agent.learning_candidates
+                    WHERE created_at > now() - interval '{}'
+                    ORDER BY occurrence_count DESC
+                    LIMIT 10
+                    "#,
+                interval
+            ))
+            .fetch_all(pool)
+            .await
+            .unwrap_or_default();
+
+            rows.iter()
+                .map(|r| json!({"input": r.0, "output": r.1, "count": r.2}))
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        Ok(json!({
+            "totals": {
+                "learned_phrases": phrase_count,
+                "learned_aliases": alias_count,
+                "blocklist_entries": blocklist_count,
+                "pending_candidates": pending_count
+            },
+            "period": {
+                "range": time_range,
+                "applied": recent_applied
+            },
+            "top_corrections": top_corrections
         }))
     }
 
@@ -5113,12 +5667,12 @@ impl ToolHandlers {
             .filter(|s| {
                 args.domain
                     .as_ref()
-                    .map_or(true, |d| s.code.starts_with(&format!("{}:", d)))
+                    .is_none_or(|d| s.code.starts_with(&format!("{}:", d)))
             })
             .filter(|s| {
                 args.resource_type
                     .as_ref()
-                    .map_or(true, |rt| s.resource_type.eq_ignore_ascii_case(rt))
+                    .is_none_or(|rt| s.resource_type.eq_ignore_ascii_case(rt))
             })
             .map(|s| {
                 json!({
@@ -5279,5 +5833,57 @@ fn parse_error_type(s: &str) -> Option<crate::feedback::ErrorType> {
         "DSL_PARSE_ERROR" => Some(ErrorType::DslParseError),
         "VALIDATION_FAILED" => Some(ErrorType::ValidationFailed),
         _ => None,
+    }
+}
+
+// =========================================================================
+// Learning System Helper Types
+// =========================================================================
+
+/// Import data format for bulk learning import
+#[derive(Debug, serde::Deserialize)]
+struct ImportData {
+    phrases: Vec<PhraseMapping>,
+}
+
+/// Single phrase→verb mapping for import
+#[derive(Debug, serde::Deserialize)]
+struct PhraseMapping {
+    phrase: String,
+    verb: String,
+}
+
+/// Parse CSV import format (phrase,verb per line)
+fn parse_csv_import(content: &str) -> anyhow::Result<ImportData> {
+    let mut phrases = Vec::new();
+    for line in content.lines().skip(1) {
+        // Skip header
+        let parts: Vec<&str> = line.split(',').collect();
+        if parts.len() >= 2 {
+            phrases.push(PhraseMapping {
+                phrase: parts[0].trim().to_string(),
+                verb: parts[1].trim().to_string(),
+            });
+        }
+    }
+    Ok(ImportData { phrases })
+}
+
+/// Parse duration string like "30d", "1w", "24h"
+fn parse_duration(s: &str) -> anyhow::Result<chrono::Duration> {
+    let len = s.len();
+    if len < 2 {
+        return Err(anyhow::anyhow!("Invalid duration format"));
+    }
+
+    let (num_str, unit) = s.split_at(len - 1);
+    let num: i64 = num_str.parse()?;
+
+    match unit {
+        "d" => Ok(chrono::Duration::days(num)),
+        "w" => Ok(chrono::Duration::weeks(num)),
+        "h" => Ok(chrono::Duration::hours(num)),
+        "m" => Ok(chrono::Duration::minutes(num)),
+        _ => Err(anyhow::anyhow!("Unknown duration unit: {}", unit)),
     }
 }

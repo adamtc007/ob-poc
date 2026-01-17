@@ -112,10 +112,10 @@ impl IntentPipeline {
         instruction: &str,
         domain_hint: Option<&str>,
     ) -> Result<PipelineResult> {
-        // Step 1: Find verb candidates
+        // Step 1: Find verb candidates (no user_id in this context)
         let candidates = self
             .verb_searcher
-            .search(instruction, domain_hint, 5)
+            .search(instruction, None, domain_hint, 5)
             .await?;
 
         if candidates.is_empty() {

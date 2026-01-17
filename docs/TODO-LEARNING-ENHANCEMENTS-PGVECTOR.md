@@ -51,6 +51,265 @@ This TODO extends the learning system with advanced capabilities and integrates 
 
 ---
 
+## Phase 0: Verb Lifecycle Management
+
+### Problem
+
+When new verbs are added to YAML:
+- VerbPhraseIndex requires MCP restart to pick them up
+- No validation that `invocation_phrases` are present
+- No automatic pgvector embedding sync
+- No visibility into verb coverage
+
+### 0.1 Hot Reload Tool
+
+**File**: `rust/src/mcp/tools.rs`
+
+```rust
+Tool {
+    name: "verbs_reload".into(),
+    description: r#"Reload verb definitions from YAML without restart.
+
+Use after adding or modifying verb YAML files.
+Reloads:
+- VerbPhraseIndex (invocation_phrases)
+- Does NOT reload RuntimeRegistry (requires restart for new verbs)"#.into(),
+    input_schema: json!({
+        "type": "object",
+        "properties": {
+            "verbs_dir": {
+                "type": "string",
+                "description": "Optional override for verbs directory"
+            }
+        }
+    }),
+},
+```
+
+**Handler**: Rebuild VerbPhraseIndex and swap via Arc:
+
+```rust
+async fn verbs_reload(&self, args: Value) -> Result<Value> {
+    let verbs_dir = args["verbs_dir"]
+        .as_str()
+        .unwrap_or("config/verbs");
+    
+    let new_index = VerbPhraseIndex::load_from_verbs_dir(verbs_dir)?;
+    let stats = new_index.stats();
+    
+    // Swap in handler state (requires Arc<RwLock<VerbPhraseIndex>>)
+    // ... implementation depends on how searcher is held
+    
+    Ok(json!({
+        "reloaded": true,
+        "verbs": stats.total_verbs,
+        "phrases": stats.total_phrases,
+        "domain_hints": stats.total_domain_hints
+    }))
+}
+```
+
+### 0.2 Verb Coverage Report Tool
+
+**File**: `rust/src/mcp/tools.rs`
+
+```rust
+Tool {
+    name: "verbs_coverage".into(),
+    description: "Report verb discovery coverage - which verbs have invocation_phrases".into(),
+    input_schema: json!({
+        "type": "object",
+        "properties": {
+            "domain": {
+                "type": "string",
+                "description": "Filter by domain"
+            },
+            "show_missing": {
+                "type": "boolean",
+                "default": true,
+                "description": "Show verbs without invocation_phrases"
+            }
+        }
+    }),
+},
+```
+
+**Handler**:
+
+```rust
+async fn verbs_coverage(&self, args: Value) -> Result<Value> {
+    let domain_filter = args["domain"].as_str();
+    let show_missing = args["show_missing"].as_bool().unwrap_or(true);
+    
+    let reg = registry();
+    let phrase_index = self.get_verb_searcher().await?.phrase_index();
+    
+    let mut covered = Vec::new();
+    let mut missing = Vec::new();
+    
+    for (domain, verbs) in reg.domains() {
+        if let Some(filter) = domain_filter {
+            if domain != filter { continue; }
+        }
+        
+        for verb in verbs {
+            let fq = format!("{}.{}", domain, verb.name);
+            if phrase_index.get_verb(&fq).is_some() {
+                covered.push(fq);
+            } else {
+                missing.push(fq);
+            }
+        }
+    }
+    
+    let total = covered.len() + missing.len();
+    let coverage_pct = if total > 0 {
+        (covered.len() as f32 / total as f32) * 100.0
+    } else {
+        0.0
+    };
+    
+    Ok(json!({
+        "coverage_percent": coverage_pct,
+        "covered_count": covered.len(),
+        "missing_count": missing.len(),
+        "covered": covered,
+        "missing": if show_missing { Some(missing) } else { None }
+    }))
+}
+```
+
+### 0.3 Embedding Sync Tool (for pgvector)
+
+**File**: `rust/src/mcp/tools.rs`
+
+```rust
+Tool {
+    name: "verbs_embed_sync".into(),
+    description: r#"Sync verb invocation_phrases to pgvector embeddings.
+
+Generates embeddings for all invocation_phrases and stores in
+semantic_verb_patterns table. Run after adding new verbs."#.into(),
+    input_schema: json!({
+        "type": "object",
+        "properties": {
+            "domain": {
+                "type": "string",
+                "description": "Sync only this domain"
+            },
+            "force": {
+                "type": "boolean",
+                "default": false,
+                "description": "Re-embed even if already present"
+            }
+        }
+    }),
+},
+```
+
+**Handler** (requires Embedder from Phase 2):
+
+```rust
+async fn verbs_embed_sync(&self, args: Value) -> Result<Value> {
+    let domain_filter = args["domain"].as_str();
+    let force = args["force"].as_bool().unwrap_or(false);
+    
+    let pool = self.require_pool()?;
+    let embedder = self.require_embedder()?;
+    let phrase_index = self.get_verb_searcher().await?.phrase_index();
+    
+    let mut synced = 0;
+    let mut skipped = 0;
+    let mut errors = Vec::new();
+    
+    for verb_entry in phrase_index.all_verbs() {
+        if let Some(filter) = domain_filter {
+            if verb_entry.domain != filter { continue; }
+        }
+        
+        for phrase in &verb_entry.phrases {
+            // Check if already embedded
+            if !force {
+                let exists = sqlx::query_scalar::<_, bool>(r#"
+                    SELECT EXISTS (
+                        SELECT 1 FROM "ob-poc".semantic_verb_patterns
+                        WHERE verb_name = $1 AND pattern_phrase = $2
+                    )
+                "#)
+                .bind(&verb_entry.fq_name)
+                .bind(phrase)
+                .fetch_one(pool)
+                .await?;
+                
+                if exists {
+                    skipped += 1;
+                    continue;
+                }
+            }
+            
+            // Generate embedding
+            match embedder.embed(phrase).await {
+                Ok(embedding) => {
+                    sqlx::query(r#"
+                        INSERT INTO "ob-poc".semantic_verb_patterns
+                            (verb_name, pattern_phrase, embedding)
+                        VALUES ($1, $2, $3)
+                        ON CONFLICT (verb_name, pattern_phrase) DO UPDATE
+                        SET embedding = $3
+                    "#)
+                    .bind(&verb_entry.fq_name)
+                    .bind(phrase)
+                    .bind(&embedding)
+                    .execute(pool)
+                    .await?;
+                    
+                    synced += 1;
+                }
+                Err(e) => {
+                    errors.push(format!("{}: {}", phrase, e));
+                }
+            }
+        }
+    }
+    
+    Ok(json!({
+        "synced": synced,
+        "skipped": skipped,
+        "errors": errors,
+        "message": format!("Synced {} patterns, skipped {} existing", synced, skipped)
+    }))
+}
+```
+
+### 0.4 Schema for semantic_verb_patterns
+
+**File**: `migrations/YYYYMMDD_semantic_verb_patterns.sql`
+
+```sql
+-- Semantic verb pattern embeddings for cold-start discovery
+CREATE TABLE IF NOT EXISTS "ob-poc".semantic_verb_patterns (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    verb_name TEXT NOT NULL,           -- domain.verb
+    pattern_phrase TEXT NOT NULL,      -- invocation phrase
+    embedding vector(1536),            -- ada-002 embedding
+    embedding_model TEXT DEFAULT 'text-embedding-ada-002',
+    source TEXT DEFAULT 'yaml_sync',   -- yaml_sync, manual, learned_promoted
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    
+    UNIQUE(verb_name, pattern_phrase)
+);
+
+CREATE INDEX idx_semantic_verb_patterns_verb 
+ON "ob-poc".semantic_verb_patterns(verb_name);
+
+CREATE INDEX idx_semantic_verb_patterns_embedding
+ON "ob-poc".semantic_verb_patterns
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+```
+
+---
+
 ## Phase 1: pgvector Schema Extensions
 
 ### 1.1 Add Embedding Columns

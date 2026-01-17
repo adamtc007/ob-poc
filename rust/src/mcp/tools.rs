@@ -2160,5 +2160,218 @@ Returns:
                 "required": ["srdef_id"]
             }),
         },
+        // =====================================================================
+        // Learning Management Tools - Admin/dashboard for learning system
+        // =====================================================================
+        Tool {
+            name: "intent_block".into(),
+            description: r#"Block a verb from being selected for a phrase pattern.
+
+Use when a user explicitly says "never pick X for Y" or indicates
+persistent frustration with a wrong verb being selected.
+
+The blocklist uses semantic matching — blocking "delete everything"
+will also block "remove all data" and similar phrases.
+
+Options:
+- global: Block for all users (default)
+- user_specific: Block only for current user
+- expires: Optional expiry duration (e.g., "30d" for 30 days)"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "phrase": {
+                        "type": "string",
+                        "description": "The phrase pattern to block"
+                    },
+                    "blocked_verb": {
+                        "type": "string",
+                        "description": "The verb to block for this phrase"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why this is being blocked"
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["global", "user_specific"],
+                        "default": "global"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID if scope is user_specific"
+                    },
+                    "expires": {
+                        "type": "string",
+                        "description": "Optional expiry duration (e.g., '30d', '1w', '24h')"
+                    }
+                },
+                "required": ["phrase", "blocked_verb"]
+            }),
+        },
+        Tool {
+            name: "learning_import".into(),
+            description: r#"Bulk import phrase→verb mappings from YAML/JSON.
+
+Used for:
+- Bootstrapping new deployments with client terminology
+- Loading glossaries and SOPs
+- Migrating from other systems
+
+Format (YAML):
+```yaml
+phrases:
+  - phrase: "spin up a fund"
+    verb: cbu.create
+  - phrase: "add a sig"
+    verb: entity.assign-role
+```
+
+Embeddings are generated automatically for semantic matching."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "source": {
+                        "type": "string",
+                        "enum": ["file", "inline"],
+                        "description": "Import from file path or inline content"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "File path (if source=file)"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "YAML/JSON content (if source=inline)"
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": ["yaml", "json", "csv"],
+                        "default": "yaml"
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["global", "user_specific"],
+                        "default": "global"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "User ID if scope is user_specific"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Validate without importing"
+                    }
+                },
+                "required": ["source"]
+            }),
+        },
+        Tool {
+            name: "learning_list".into(),
+            description: r#"List pending learning candidates for review.
+
+Returns candidates that need approval before being applied to the learning system.
+Filter by status, type, or minimum occurrence count."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "approved", "rejected", "applied", "all"],
+                        "default": "pending"
+                    },
+                    "learning_type": {
+                        "type": "string",
+                        "enum": ["invocation_phrase", "entity_alias", "all"],
+                        "default": "all"
+                    },
+                    "min_occurrences": {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Filter by minimum occurrence count"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 20
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "learning_approve".into(),
+            description: r#"Approve a learning candidate for application.
+
+Marks the candidate as approved and optionally applies it immediately
+to the active learned data (with embedding generation)."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "candidate_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Learning candidate ID"
+                    },
+                    "apply_immediately": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Apply to active learned data immediately"
+                    }
+                },
+                "required": ["candidate_id"]
+            }),
+        },
+        Tool {
+            name: "learning_reject".into(),
+            description: r#"Reject a learning candidate.
+
+Marks the candidate as rejected with an optional reason.
+Optionally adds the phrase to the blocklist to prevent re-learning."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "candidate_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Rejection reason"
+                    },
+                    "add_to_blocklist": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Also add to blocklist to prevent re-learning"
+                    }
+                },
+                "required": ["candidate_id"]
+            }),
+        },
+        Tool {
+            name: "learning_stats".into(),
+            description: r#"Get learning system statistics and health metrics.
+
+Returns:
+- Total learned items (phrases, aliases)
+- Pending candidates by type
+- Top corrections in time period
+- Hit rate metrics"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "time_range": {
+                        "type": "string",
+                        "enum": ["day", "week", "month", "all"],
+                        "default": "week"
+                    },
+                    "include_top_corrections": {
+                        "type": "boolean",
+                        "default": true
+                    }
+                }
+            }),
+        },
     ]
 }

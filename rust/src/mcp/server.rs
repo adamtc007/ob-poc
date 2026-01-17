@@ -10,6 +10,7 @@ use sqlx::PgPool;
 use super::handlers::ToolHandlers;
 use super::protocol::*;
 use super::tools::get_tools;
+use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 
 /// MCP Server
@@ -29,6 +30,17 @@ impl McpServer {
     pub fn with_learned_data(pool: PgPool, learned_data: SharedLearnedData) -> Self {
         Self {
             handlers: ToolHandlers::with_learned_data(pool, learned_data),
+        }
+    }
+
+    /// Create a new MCP server with database pool, learned data, and embedder (full semantic)
+    pub fn with_learned_data_and_embedder(
+        pool: PgPool,
+        learned_data: SharedLearnedData,
+        embedder: SharedEmbedder,
+    ) -> Self {
+        Self {
+            handlers: ToolHandlers::with_learned_data_and_embedder(pool, learned_data, embedder),
         }
     }
 

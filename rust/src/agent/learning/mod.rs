@@ -32,13 +32,19 @@
 //! Both loops use fire-and-forget emission (< 1μs overhead) with background
 //! database persistence.
 
+pub mod decay;
 pub mod drain;
+pub mod embedder;
 pub mod emitter;
 pub mod inspector;
 pub mod types;
 pub mod warmup;
 
+pub use decay::ConfidenceDecay;
 pub use drain::{spawn_agent_drain_task, DrainConfig};
+pub use embedder::{
+    CachedEmbedder, Embedder, Embedding, NullEmbedder, OpenAIEmbedder, SharedEmbedder,
+};
 pub use emitter::{AgentEventEmitter, AgentEventReceiver, SharedAgentEmitter};
 pub use inspector::{AgentLearningInspector, LearningCandidate, LearningStatus, LearningType};
 pub use types::{
