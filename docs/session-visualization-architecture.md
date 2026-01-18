@@ -1,20 +1,38 @@
 # Session & Visualization Architecture
 
 > **Status:** ✅ Complete
-> **Last Updated:** 2026-01-11
-> **Related:** CLAUDE.md Session State Management section
+> **Last Updated:** 2026-01-18
+> **Related:** CLAUDE.md
 
 ---
 
 ## Overview
 
-Session = Intent Scope = Visual State = Operation Target. They are THE SAME THING.
+**Session = Set<CBU>.** Everything resolves to sets of CBUs.
 
 ```
-User Intent → Session State Change → { Agent Context, DSL State, Visual } all update
+Session State = HashSet<Uuid> of loaded CBUs
+Clusters/galaxies = DERIVED from group edges (not stored)
+Focus/camera/viewport = CLIENT SIDE (not DSL verbs)
 ```
 
-One source of truth. Three expressions:
+### Core Principle
+
+CBU is the atomic trading unit. Views are sets of CBUs. Group structure cross-links
+CBUs via ownership/control edges. The session always resolves to CBUs, with one
+exception: KYC-specific UBO taxonomy for entity-level drill-down.
+
+```
+Universe (all CBUs in session)
+  └── Book (commercial client's CBUs)
+       └── CBU (single trading unit)
+            ├── TRADING view (default) - instruments, counterparties
+            └── UBO view (KYC mode) - ownership/control taxonomy
+                 └── Entity drill-down (within UBO context only)
+```
+
+### Three Expressions of Session State
+
 - **Agent context**: "You're looking at 12 LU equity CBUs with CUSTODY pending"
 - **DSL REPL**: `@_selection = [12 UUIDs]`
 - **Visualization**: 12 highlighted nodes in the taxonomy view
@@ -260,33 +278,46 @@ pub struct GraphNode {
 
 ### ✅ Astro Navigation (Scale Levels)
 
+> **Key insight:** Astro levels are **UI zoom/layout hops using CBU and group structures**.
+> They are NOT session scope changes. Session always resolves to Set<CBU>.
+> Scale levels control how we visualize the CBU set and group relationships.
+
+| Level | What You See | Data Source |
+|-------|--------------|-------------|
+| Universe | All CBUs as dots | Session's full CBU set |
+| Cluster/Galaxy | CBUs grouped by apex/jurisdiction | Group edges between CBUs |
+| System | Single CBU expanded (solar system) | CBU's internal entities |
+| Planet | Entity within CBU | Entity attributes/relationships |
+| Surface/Core | Deep detail | Max zoom on entity |
+
 **NavigationVerb (command.rs):**
 ```rust
-ScaleUniverse           // All CBUs as dots
-ScaleBook { client }    // All CBUs for commercial client
-ScaleGalaxy { segment } // Cluster/segment view
-ScaleSystem { cbu_id }  // Single CBU (solar system)
-ScalePlanet { entity }  // Single entity focus
-ScaleSurface            // High zoom detail
-ScaleCore               // Deepest zoom
+ScaleUniverse           // Zoom out: all CBUs in session as dots
+ScaleBook { client }    // Group: CBUs under apex entity
+ScaleGalaxy { segment } // Group: CBUs by segment/jurisdiction
+ScaleSystem { cbu_id }  // Zoom in: single CBU expanded
+ScalePlanet { entity }  // Zoom in: entity within CBU (UBO context)
+ScaleSurface            // Max zoom: entity detail
+ScaleCore               // Max zoom: deepest detail
 ```
 
 **ViewLevel (galaxy.rs):**
 ```rust
 pub enum ViewLevel {
-    Universe,
-    Cluster,
-    System,
-    Planet,
-    Surface,
-    Core,
+    Universe,   // CBU dots
+    Cluster,    // Grouped CBUs
+    System,     // Single CBU
+    Planet,     // Entity focus
+    Surface,    // Detail
+    Core,       // Max detail
 }
 ```
 
 **Wiring (app.rs):**
-- Each scale verb updates `navigation_scope` and `view_level`
-- Triggers appropriate API fetches (`fetch_universe_graph`, `fetch_client_book`)
-- Integrates with galaxy view focus stack
+- Each scale verb updates `view_level` (zoom state)
+- Session scope (Set<CBU>) remains unchanged
+- Layout engine renders appropriate visualization for zoom level
+- Group edges derived from CBU ownership/control relationships
 
 ---
 

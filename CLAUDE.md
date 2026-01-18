@@ -1,66 +1,125 @@
-# Claude Integration Guide for ob-poc
+# CLAUDE.md
 
-This document explains how the DSL system works with Claude, particularly around verb discovery, intent resolution, and the learning loop.
+> **Last reviewed:** 2026-01-18
+> **Crates:** 14 Rust crates
+> **Verbs:** 800+ across 103 YAML files
+> **Migrations:** 34 schema migrations
+> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2)
 
----
-
-## 📋 Key Architecture Decisions
-
-> **📄 Full Documentation:**
-> - [`/docs/ARCH-DECISION-CANDLE-EMBEDDINGS.md`](docs/ARCH-DECISION-CANDLE-EMBEDDINGS.md) — Enterprise architecture review (for ARB)
-> - [`/docs/VECTOR-DATABASE-PORTABILITY.md`](docs/VECTOR-DATABASE-PORTABILITY.md) — PostgreSQL vs Oracle analysis
-
-### Local ML Inference for Semantic Search
-
-This system uses **local ML inference** rather than external APIs:
-
-| Component | Choice | Rationale |
-|-----------|--------|----------|
-| **Framework** | [HuggingFace Candle](https://github.com/huggingface/candle) | Pure Rust, no Python, $4.5B company backing |
-| **Model** | [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | 142M downloads/month, Apache 2.0 |
-| **Storage** | pgvector (PostgreSQL) | IVFFlat indexes, cosine similarity |
-
-**Why this matters:**
-- ✅ **No external API calls** — data never leaves BNY infrastructure
-- ✅ **10-20x faster** — 5-15ms vs 100-300ms (OpenAI API)
-- ✅ **$0 marginal cost** — no per-embedding charges
-- ✅ **Air-gap capable** — works in isolated networks
-- ✅ **No Python runtime** — static Rust binary
-
-**Enterprise validation:** HuggingFace backed by Google, Amazon, Nvidia, Intel, IBM, Salesforce ($4.5B valuation, $396M funding).
-
-### Database Portability
-
-**PostgreSQL coupling is LOW.** Oracle 23ai AI Vector Search uses the **same `<=>` operator** for cosine distance. Migration effort: ~2-3 days. See [VECTOR-DATABASE-PORTABILITY.md](docs/VECTOR-DATABASE-PORTABILITY.md).
-
-| Feature | pgvector | Oracle 23ai | Compatible? |
-|---------|----------|-------------|-------------|
-| Cosine operator | `<=>` | `<=>` | ✅ **Identical** |
-| Vector type | `vector(384)` | `VECTOR(384)` | ✅ Minor syntax |
-| Index DDL | `ivfflat` | `NEIGHBOR PARTITIONS` | ⚠️ Different |
+This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
 ---
 
-## ⚠️ Active Migration: Candle Embeddings
+## Quick Start
 
-**Status**: Migration planned — see [`/docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md`](docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md)
+```bash
+cd rust/
 
-The system is migrating from OpenAI embeddings to local Candle embeddings:
+# Pre-commit (fast)
+cargo x pre-commit          # Format + clippy + unit tests
 
-| | Before | After |
-|---|--------|-------|
-| **Embedder** | OpenAI API | Candle (local) |
-| **Model** | text-embedding-3-small | all-MiniLM-L6-v2 |
-| **Dimensions** | 1536 | 384 |
-| **Latency** | 100-300ms | 5-15ms |
-| **Cost** | $0.00002/embed | $0 |
-| **API Key** | Required | Not needed |
+# Full check
+cargo x check --db          # Include database integration tests
 
-**Impact**: After migration, `verb_search` semantic matching will be ~10x faster with no external dependencies.
+# Deploy (UI development)
+cargo x deploy              # Full: WASM + server + start
+cargo x deploy --skip-wasm  # Skip WASM rebuild
+
+# Run server directly
+DATABASE_URL="postgresql:///data_designer" cargo run -p ob-poc-web
+```
 
 ---
 
-## Quick Reference
+## Core Architecture: CBU-Centric Model
+
+**CBU (Client Business Unit) is the atomic unit.** Everything resolves to sets of CBUs.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SESSION = Set<CBU>                                   │
+│                                                                              │
+│   Universe (all CBUs)                                                        │
+│     └── Book (commercial client's CBUs: Allianz, BlackRock)                 │
+│          └── CBU (single trading unit)                                       │
+│               ├── TRADING view (default) - instruments, counterparties      │
+│               └── UBO view (KYC mode) - ownership/control taxonomy          │
+│                    └── Entity drill-down (within UBO context only)          │
+│                                                                              │
+│   Group structure cross-links CBUs via ownership/control edges              │
+│   Clusters/galaxies are DERIVED from these edges, not stored                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### ViewMode (Simplified)
+
+`ViewMode` is a unit struct - always TRADING (CBU view). The old multi-mode enum (`KYC_UBO`, `SERVICE_DELIVERY`, `PRODUCTS_ONLY`, `BOARD_CONTROL`) was removed.
+
+```rust
+// Current implementation (graph/mod.rs)
+pub struct ViewMode;  // Always "TRADING"
+```
+
+For KYC/UBO work, use `view.cbu :mode ubo` which switches to ownership taxonomy within the CBU.
+
+### GraphScope (How Sessions Resolve)
+
+```rust
+pub enum GraphScope {
+    Empty,                                    // Initial state
+    SingleCbu { cbu_id, cbu_name },          // Single CBU focus
+    Book { apex_entity_id, apex_name },      // All CBUs under apex
+    Jurisdiction { code },                    // All CBUs in jurisdiction
+    EntityNeighborhood { entity_id, hops },  // N hops from entity (UBO context)
+    Custom { description },                   // Custom filter
+}
+```
+
+### Astro Scale Levels (Zoom/Layout)
+
+These are **UI zoom levels using CBU and group structures**, not session scope changes:
+
+| Level | What You See | Zoom Action |
+|-------|--------------|-------------|
+| Universe | All CBUs as dots | Zoom out to see everything |
+| Cluster/Galaxy | Segment view (by apex/jurisdiction) | Group CBUs by ownership |
+| System | Single CBU expanded | Focus on one CBU |
+| Planet | Entity within CBU | Drill into CBU's entities |
+| Surface/Core | Deep detail | Max zoom on entity attributes |
+
+---
+
+## Domain Annexes
+
+| When working on... | Read this annex | Contains |
+|--------------------|-----------------|----------|
+| **Agent/MCP pipeline** | `docs/agent-architecture.md` | Intent extraction, MCP tools, learning loop |
+| **Session & navigation** | `docs/session-visualization-architecture.md` | Scopes, filters, ESPER verbs, history |
+| **Data model (CBU/Entity/UBO)** | `docs/strategy-patterns.md` §1 | Why CBU is a lens, UBO discovery, holdings |
+| **Verb authoring** | `docs/verb-definition-spec.md` | YAML structure, valid values, common errors |
+| **egui/UI patterns** | `docs/strategy-patterns.md` §3 | Immediate mode, action enums, lock patterns |
+| **Entity model & schema** | `docs/entity-model-ascii.md` | Full ERD, table relationships |
+| **DSL pipeline** | `docs/dsl-verb-flow.md` | Parser, compiler, executor, plugins |
+| **Research workflows** | `docs/research-agent-annex.md` | GLEIF, agent mode, invocation phrases |
+
+### AI-Thoughts (Design Decisions)
+
+| Topic | Document | Status |
+|-------|----------|--------|
+| Group/UBO ownership | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` | ✅ Done |
+| Research workflows | `ai-thoughts/020-research-workflows-external-sources.md` | ✅ Done |
+| Source loaders | `ai-thoughts/021-pluggable-research-source-loaders.md` | ✅ Done |
+| Event infrastructure | `ai-thoughts/023a-event-infrastructure.md` | ✅ Done |
+| Feedback inspector | `ai-thoughts/023b-feedback-inspector.md` | ✅ Done |
+| Entity disambiguation | `ai-thoughts/025-entity-disambiguation-ux.md` | ✅ Done |
+| Trading matrix pivot | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ Done |
+| Verb governance | `ai-thoughts/028-verb-lexicon-governance.md` | ✅ Done |
+
+---
+
+## DSL Pipeline (Single Path)
+
+**ALL DSL generation goes through this pipeline. No bypass paths.**
 
 ```
 User says: "spin up a fund for Acme"
@@ -68,10 +127,14 @@ User says: "spin up a fund for Acme"
             verb_search tool
                     ↓
     ┌───────────────┴───────────────┐
-    │     Search Priority Order      │
-    │  1. Learned phrases (exact)    │  ← User taught us this
-    │  2. YAML invocation_phrases    │  ← Author defined these  
-    │  3. Semantic similarity        │  ← Candle embeddings + pgvector
+    │     Search Priority (7-tier)   │
+    │  1. User learned (exact)       │
+    │  2. Global learned (exact)     │
+    │  3. User semantic (pgvector)   │
+    │  4. Global semantic (pgvector) │
+    │  5. Blocklist check            │
+    │  6. YAML invocation_phrases    │
+    │  7. Cold start semantic        │
     └───────────────┬───────────────┘
                     ↓
             Top match: cbu.create
@@ -83,478 +146,213 @@ User says: "spin up a fund for Acme"
     Deterministic DSL assembly
                     ↓
             (cbu.create :name "Acme")
+                    ↓
+            dsl_execute tool
 ```
 
-### The Golden Rule
+### Embeddings: Candle Local (Complete)
 
-**ALL DSL generation MUST go through this pipeline.** No side doors, no bypass paths.
+| Component | Value |
+|-----------|-------|
+| Framework | HuggingFace Candle (pure Rust) |
+| Model | all-MiniLM-L6-v2 |
+| Dimensions | 384 |
+| Latency | 5-15ms |
+| Storage | pgvector (IVFFlat) |
+| API Key | Not required |
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    UNIFIED DSL PIPELINE                      │
-│                                                              │
-│   verb_search ──► dsl_generate ──► dsl_execute              │
-│       │               │                                      │
-│       ▼               ▼                                      │
-│   Candle embed    LLM extracts JSON only                    │
-│   (384-dim)       Deterministic assembly                    │
-│                                                              │
-│   ❌ No direct DSL construction by LLM                      │
-│   ❌ No IntentExtractor (legacy - removed)                  │
-│   ❌ No FeedbackLoop.generate_valid_dsl() (legacy)          │
-└─────────────────────────────────────────────────────────────┘
-```
+**No external API calls.** Embeddings are computed locally.
 
 ---
 
-## Verb Discovery System
+## Session Verbs
 
-### How Verbs Become Discoverable
+Session manages which CBUs are loaded. Focus/camera is client-side.
 
-A verb is only discoverable if it has **invocation_phrases** in its YAML definition:
+| Verb | Purpose |
+|------|---------|
+| `session.load-cbu` | Add single CBU to session |
+| `session.load-jurisdiction` | Load all CBUs in jurisdiction |
+| `session.load-galaxy` | Load all CBUs under apex entity |
+| `session.unload-cbu` | Remove CBU from session |
+| `session.clear` | Clear all CBUs |
+| `session.undo` / `session.redo` | History navigation |
+| `session.info` / `session.list` | Query session state |
+
+### View Verbs (ESPER Navigation)
+
+| Verb | Description |
+|------|-------------|
+| `view.universe` | All CBUs with optional filters |
+| `view.book` | CBUs for commercial client |
+| `view.cbu` | Focus single CBU (mode: trading/ubo) |
+| `view.drill` | Drill into entity (within UBO taxonomy) |
+| `view.surface` | Surface up from drill |
+| `view.trace` | Follow threads (money/control/risk) |
+| `view.xray` | Show hidden layers |
+| `view.refine` | Add/remove filters |
+
+---
+
+## Adding Verbs
+
+> ⚠️ **Before writing verb YAML, read `docs/verb-definition-spec.md`**
+> Serde structs are strict. Invalid YAML silently fails to load.
+
+### Quick Example (CRUD)
 
 ```yaml
-# config/verbs/cbu.yaml
+# rust/config/verbs/my_domain.yaml
 domains:
-  cbu:
+  my_domain:
     verbs:
       create:
-        description: "Create a new Client Business Unit"
-        invocation_phrases:           # ← REQUIRED for discovery
-          - "create cbu"
-          - "new client business unit"
-          - "spin up a fund"
-          - "onboard client"
-          - "set up cbu"
+        description: "Create a record"
+        behavior: crud
+        crud:
+          operation: insert
+          table: my_table
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+        invocation_phrases:        # Required for discovery
+          - "create my thing"
+          - "add new record"
         args:
           - name: name
-            type: String
+            type: string
             required: true
+            maps_to: name
 ```
 
-**Without `invocation_phrases`**: The verb exists in the registry but `verb_search` cannot find it. The LLM may hallucinate or fail.
-
-### Search Priority (7-Tier System)
-
-| Priority | Source | Confidence | Latency |
-|----------|--------|------------|---------|
-| 1 | **User learned exact** | 1.0 | <1ms |
-| 2 | **Global learned exact** | 1.0 | <1ms |
-| 3 | **User learned semantic** | 0.7-0.95 | 10-20ms |
-| 4 | **Global learned semantic** | 0.6-0.9 | 10-20ms |
-| 5 | **Blocklist check** | — | 5-10ms |
-| 6 | **YAML exact/substring** | 0.7-1.0 | <1ms |
-| 7 | **Cold start semantic** | 0.5-0.8 | 10-20ms |
-
-**Fast path**: Tiers 1, 2, 6 are in-memory — sub-millisecond.
-**Semantic path**: Tiers 3, 4, 5, 7 use Candle embeddings + pgvector — 10-20ms total.
-
-### The Learning Loop
-
-When `verb_search` returns the wrong verb, use `intent_feedback`:
-
-```
-User: "add a signatory to the fund"
-Claude: verb_search → entity.create (WRONG)
-User: "no, I meant entity.assign-role"
-
-Claude calls intent_feedback:
-  feedback_type: "verb_correction"
-  original_input: "add a signatory to the fund"
-  system_choice: "entity.create"
-  correct_choice: "entity.assign-role"
-
-System records this. Next time:
-  "add a signatory" → entity.assign-role (score 1.0, source: learned)
-```
-
----
-
-## Adding New Verbs
-
-### Step 1: Define the Verb YAML
-
-```yaml
-# config/verbs/trading-profile.yaml
-domains:
-  trading-profile:
-    invocation_hints:              # Domain-level hints
-      - "trading"
-      - "custody"
-      - "settlement"
-    verbs:
-      add-custody-account:
-        description: "Add a custody account to a trading profile"
-        invocation_phrases:        # ← CRITICAL: Add these!
-          - "add custody account"
-          - "set up custody"
-          - "link custody"
-          - "add custodian"
-          - "connect custody account"
-        args:
-          - name: trading_profile_id
-            type: Uuid
-            required: true
-          - name: custodian
-            type: String
-            required: true
-          - name: account_number
-            type: String
-            required: true
-```
-
-### Step 2: Restart MCP Server
-
-Currently, verb discovery requires a restart:
+### Verify
 
 ```bash
-# Restart dsl_mcp to pick up new verbs
-pkill -f dsl_mcp
-DATABASE_URL=postgresql://localhost/ob-poc ./target/debug/dsl_mcp
-```
-
-**Future**: `verbs_reload` tool will enable hot reload without restart.
-
-### Step 3: Verify Discovery
-
-```
-Claude: verb_search query="add custody account"
-
-Expected response:
-{
-  "results": [{
-    "verb": "trading-profile.add-custody-account",
-    "score": 1.0,
-    "source": "phrase_exact",
-    "matched_phrase": "add custody account"
-  }]
-}
-```
-
-### Step 4: Sync Embeddings
-
-After adding verbs with `invocation_phrases`:
-
-```
-Claude: verbs_embed_sync domain="trading-profile"
-
-This generates Candle embeddings (384-dim) for semantic matching.
+cargo x verbs check   # YAML matches DB
+cargo x verbs lint    # Tiering rules
 ```
 
 ---
 
-## Common Pitfalls
-
-### 1. Verb Not Found
-
-**Symptom**: `verb_search` returns empty results or wrong verbs.
-
-**Causes**:
-- Missing `invocation_phrases` in YAML
-- MCP server not restarted after YAML changes
-- Phrase doesn't match any defined patterns
-
-**Fix**:
-```yaml
-# Add invocation_phrases to the verb
-invocation_phrases:
-  - "exact phrase users say"
-  - "alternative phrasing"
-  - "common abbreviation"
-```
-
-### 2. Wrong Verb Keeps Winning
-
-**Symptom**: Same wrong verb selected repeatedly despite corrections.
-
-**Cause**: High-scoring YAML phrase match overriding learned data.
-
-**Fix**: Use `intent_feedback` repeatedly. After threshold (3+ occurrences), learned phrase takes priority.
-
-**Alternative**: `intent_block` tool explicitly blocks a verb for a phrase pattern.
-
-### 3. LLM Writes Bad DSL
-
-**Symptom**: `dsl_generate` produces invalid syntax.
-
-**Cause**: NOT a discovery problem — the structured pipeline should prevent this.
-
-**Debug**:
-1. Check `verb_search` returned correct verb
-2. Check verb signature in registry matches expectations
-3. LLM should only extract JSON arguments, never DSL syntax
-
-### 4. Entity Not Resolved
-
-**Symptom**: DSL contains entity name instead of UUID.
-
-**Expected behavior**: `dsl_generate` returns `unresolved_refs` array.
-
-**Fix**: Use `dsl_lookup` to resolve entity names to UUIDs before execution:
+## Key Directories
 
 ```
-Claude: dsl_lookup lookup_type="entity" search="Acme Corp"
-→ Returns: { entity_id: "uuid-here", name: "Acme Corporation" }
-
-Then update DSL with resolved UUID.
+ob-poc/
+├── rust/
+│   ├── config/verbs/           # 103 YAML verb definitions
+│   ├── crates/
+│   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
+│   │   ├── dsl-lsp/            # Language Server for DSL
+│   │   ├── ob-agentic/         # LLM agent
+│   │   ├── ob-poc-ui/          # egui/WASM UI
+│   │   └── ob-poc-graph/       # Graph visualization
+│   └── src/
+│       ├── dsl_v2/             # DSL execution
+│       │   ├── custom_ops/     # Plugin handlers
+│       │   └── generic_executor.rs
+│       ├── session/            # Session state
+│       ├── graph/              # Graph builders
+│       └── api/                # REST routes
+├── migrations/                 # SQLx migrations
+├── docs/                       # Architecture docs
+└── ai-thoughts/                # ADRs and design docs
 ```
 
-### 5. Semantic Search Not Working
+---
 
-**Symptom**: Only exact phrase matches work, similar phrases don't match.
+## Environment Variables
 
-**Causes**:
-- Embedder not loaded (check startup logs)
-- Embeddings not generated for phrases
-- Embedding dimension mismatch (must be 384)
-
-**Debug**:
 ```bash
-# Check embedder loaded
-grep "Candle" /var/log/dsl_mcp.log
+# Required
+DATABASE_URL="postgresql:///data_designer"
 
-# Check embeddings exist
-psql -c "SELECT COUNT(*) FROM agent.invocation_phrases WHERE embedding IS NOT NULL"
+# LLM (for agent chat, not embeddings)
+AGENT_BACKEND=anthropic
+ANTHROPIC_API_KEY="sk-ant-..."
+
+# Optional
+DSL_CONFIG_DIR="/path/to/config"
+BRAVE_SEARCH_API_KEY="..."       # Research macros
 ```
 
 ---
 
-## Tool Usage Patterns
+## Database Practices
 
-### Pattern 1: Simple Command
+### SQLx Compile-Time Verification
 
-```
-User: "create a cbu called Apex Fund"
-
-1. verb_search query="create a cbu"
-   → cbu.create (score 1.0)
-
-2. dsl_generate instruction="create a cbu called Apex Fund"
-   → (cbu.create :name "Apex Fund")
-   → valid: true, unresolved_refs: []
-
-3. dsl_execute source="(cbu.create :name \"Apex Fund\")"
+```bash
+# After schema changes
+psql -d data_designer -f your_migration.sql
+cd rust && cargo sqlx prepare --workspace
+cargo build  # Catches type mismatches
 ```
 
-### Pattern 2: With Entity Resolution
+### Type Mapping
 
-```
-User: "add John Smith as signatory to Apex Fund"
-
-1. verb_search query="add signatory"
-   → entity.assign-role (score 0.85)
-
-2. dsl_generate instruction="add John Smith as signatory to Apex Fund"
-   → (entity.assign-role :entity "John Smith" :role "signatory" :cbu "Apex Fund")
-   → unresolved_refs: [
-       { param: "entity", search: "John Smith", type: "person" },
-       { param: "cbu", search: "Apex Fund", type: "cbu" }
-     ]
-
-3. dsl_lookup lookup_type="person" search="John Smith"
-   → { entity_id: "uuid-1", name: "John Smith" }
-
-4. dsl_lookup lookup_type="cbu" search="Apex Fund"
-   → { cbu_id: "uuid-2", name: "Apex Fund" }
-
-5. dsl_execute source="(entity.assign-role :entity \"uuid-1\" :role \"signatory\" :cbu \"uuid-2\")"
-```
-
-### Pattern 3: Correction Flow
-
-```
-User: "set up an ISDA"
-Claude: verb_search → isda.create ✓
-Claude: dsl_generate → (isda.create ...)
-User: "no, I wanted a CSA not ISDA"
-
-Claude: intent_feedback
-  feedback_type: "verb_correction"
-  original_input: "set up an ISDA"
-  correct_choice: "csa.create"
-
-Claude: verb_search query="set up a CSA"
-   → csa.create (now learned)
-```
+| PostgreSQL | Rust |
+|------------|------|
+| UUID | `Uuid` |
+| TIMESTAMPTZ | `DateTime<Utc>` |
+| INTEGER | `i32` |
+| BIGINT | `i64` |
+| NUMERIC | `BigDecimal` |
+| NULLABLE | `Option<T>` |
 
 ---
 
-## MCP Tools Reference
+## Error Handling
 
-### Core DSL Tools
-
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| `verb_search` | Find verbs matching natural language | **Always first** — before `dsl_generate` |
-| `dsl_generate` | Convert instruction to DSL | After confirming verb with `verb_search` |
-| `dsl_lookup` | Resolve entity names to UUIDs | When `dsl_generate` returns `unresolved_refs` |
-| `dsl_execute` | Run DSL against database | After DSL is complete and valid |
-| `dsl_validate` | Check DSL syntax without executing | For debugging or preview |
-| `verbs_list` | List all available verbs | For exploration/debugging |
-| `schema_info` | Get entity types, roles, etc. | When unsure of valid enum values |
-
-### Learning Management Tools
-
-| Tool | Purpose | When to Use |
-|------|---------|-------------|
-| `intent_feedback` | Record user corrections | When user says "no, I meant X" |
-| `intent_block` | Block a verb for a phrase pattern | When a verb keeps winning incorrectly |
-| `learning_list` | List learned phrases/aliases | Audit what the system has learned |
-| `learning_approve` | Manually approve a learning candidate | Promote pending learning to active |
-| `learning_reject` | Reject a learning candidate | Prevent bad learning from activating |
-| `learning_import` | Bulk import phrase→verb mappings | Bootstrap from CSV/JSON |
-| `learning_stats` | Get learning system statistics | Monitor learning health |
-
-### Verb Lifecycle Tools (Future)
-
-| Tool | Purpose | Status |
-|------|---------|--------|
-| `verbs_reload` | Hot reload VerbPhraseIndex | Planned |
-| `verbs_coverage` | Report verbs missing invocation_phrases | Planned |
-| `verbs_embed_sync` | Generate embeddings for phrases | Planned |
+**Never use `.unwrap()` in production paths.** Use:
+- `?` operator
+- `.ok_or_else(|| anyhow!(...))`
+- `let Some(x) = ... else { continue }`
+- `match` / `if let`
 
 ---
 
-## Architecture Notes
+## Trigger Phrases
 
-### Why Structured Intent Extraction?
+When you see these in a task, read the corresponding annex first:
 
-The old approach had LLM write DSL directly:
-```
-User input → LLM → "(cbu.create :name \"Apex\")"  ← LLM invented syntax
-```
-
-Problems:
-- Inconsistent syntax
-- Hallucinated verbs
-- Can't learn from corrections (string is opaque)
-
-The new approach separates concerns:
-```
-User input → verb_search → verb signature → LLM extracts JSON args → deterministic assembly
-```
-
-Benefits:
-- LLM never sees DSL syntax
-- Verb must exist in registry
-- Arguments validated against signature
-- Corrections create learnable mappings
-
-### Embedding System
-
-**Model**: `all-MiniLM-L6-v2` (via Candle, local inference)
-**Dimensions**: 384
-**Index**: IVFFlat with cosine distance
-**Latency**: 5-15ms per embedding
-
-The embedder is loaded once at startup and cached. First startup downloads the model (~22MB) from HuggingFace to `~/.cache/huggingface/`.
-
-### Database Schema (Learning)
-
-```sql
-agent.invocation_phrases    -- Learned phrase→verb mappings
-  - phrase TEXT
-  - verb TEXT  
-  - embedding vector(384)   -- Candle embedding
-  - embedding_model TEXT    -- 'all-MiniLM-L6-v2'
-
-agent.entity_aliases        -- Learned entity name→canonical
-  - alias TEXT
-  - canonical_name TEXT
-  - embedding vector(384)
-
-agent.user_learned_phrases  -- User-specific learned phrases
-  - user_id UUID
-  - phrase TEXT
-  - verb TEXT
-  - confidence REAL
-  - embedding vector(384)
-
-agent.phrase_blocklist      -- Blocked verb+phrase combinations
-  - phrase TEXT
-  - blocked_verb TEXT
-  - embedding vector(384)
-
-agent.learning_candidates   -- Pending learnings awaiting threshold
-agent.events               -- Full interaction log for analysis
-```
-
-### Hot Path vs Learning Path
-
-```
-HOT PATH (sync, <50ms total):
-  verb_search 
-    → in-memory LearnedData (exact match)
-    → VerbPhraseIndex (YAML phrases)
-    → Candle embed + pgvector (semantic)
-    → return results
-
-LEARNING PATH (async, background):
-  intent_feedback 
-    → INSERT agent.learning_candidates
-    → (threshold reached) → promote to agent.invocation_phrases
-    → (next warmup) → load into LearnedData
-```
+| Phrase | Read |
+|--------|------|
+| "add verb", "create verb", "verb YAML" | `docs/verb-definition-spec.md` |
+| "egui", "viewport", "immediate mode" | `docs/strategy-patterns.md` §3 |
+| "entity model", "CBU", "UBO", "holdings" | `docs/strategy-patterns.md` §1 |
+| "agent", "MCP", "verb_search" | `docs/agent-architecture.md` |
+| "session", "scope", "navigation" | `docs/session-visualization-architecture.md` |
+| "ESPER", "drill", "trace", "xray" | `docs/session-visualization-architecture.md` |
+| "investor register", "look-through" | `ai-thoughts/018-investor-register-visualization.md` |
+| "GROUP", "ownership graph" | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` |
 
 ---
 
-## Startup Sequence
+## Deprecated / Removed
 
-```
-dsl_mcp startup:
-  1. Connect to database
-  2. Load Candle embedder (all-MiniLM-L6-v2)     ← ~1-3s first time
-  3. LearningWarmup loads from DB:
-     - agent.invocation_phrases → LearnedData
-     - agent.entity_aliases → LearnedData
-  4. VerbPhraseIndex.load_from_verbs_dir()      ← Scans YAML files
-  5. McpServer starts with learned_data + embedder
-  6. Ready for requests
-```
-
-**No API keys required.** Semantic search works out of the box.
+| Removed | Replaced By |
+|---------|-------------|
+| `ViewMode` enum (5 modes) | Unit struct (always TRADING) |
+| `OpenAIEmbedder` | `CandleEmbedder` (local) |
+| `IntentExtractor` | MCP `verb_search` + `dsl_generate` |
+| `AgentOrchestrator` | MCP pipeline |
+| `verb_rag_metadata.rs` | YAML `invocation_phrases` + pgvector |
+| `FeedbackLoop.generate_valid_dsl()` | MCP `dsl_generate` |
 
 ---
 
-## Debugging Checklist
+## Domain Quick Reference
 
-### Verb discovery not working:
-
-- [ ] Does the verb YAML have `invocation_phrases`?
-- [ ] Was MCP server restarted after YAML changes?
-- [ ] Does `verb_search` return results for similar queries?
-- [ ] Is there a learned phrase overriding? (Check `agent.invocation_phrases`)
-- [ ] Is the verb marked `internal: true`? (Internal verbs are excluded)
-
-### DSL generation fails:
-
-- [ ] Did `verb_search` return the correct verb?
-- [ ] Does the verb exist in RuntimeRegistry?
-- [ ] Are required arguments being extracted?
-- [ ] Does `dsl_validate` pass on the output?
-
-### Execution fails:
-
-- [ ] Are all entity references resolved to UUIDs?
-- [ ] Do referenced entities exist in database?
-- [ ] Does user have permission for this operation?
-- [ ] Check `dsl_plan` output for execution strategy
-
-### Semantic search not working:
-
-- [ ] Check startup logs for "Candle embedder loaded"
-- [ ] Verify embeddings exist: `SELECT COUNT(*) FROM agent.invocation_phrases WHERE embedding IS NOT NULL`
-- [ ] Check embedding dimension is 384
-- [ ] Try `verbs_embed_sync` to regenerate embeddings
-
----
-
-## Related Documentation
-
-| Document | Purpose |
-|----------|---------|
-| `/docs/VERB-AUTHORING-GUIDE.md` | How to write verb YAML files |
-| `/docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | Migration plan (Candle + cleanup) |
-| `/docs/TODO-LEARNING-ENHANCEMENTS-PGVECTOR.md` | Future learning system enhancements |
-| `/docs/PERFORMANCE-ANALYSIS-VERB-SEARCH.md` | Performance analysis and optimizations |
-| `/docs/CANDLE-EMBEDDER-GUIDE.md` | Deep dive on Candle embeddings |
+| Domain | Verbs | Purpose |
+|--------|-------|---------|
+| `cbu` | 25 | Client Business Unit lifecycle |
+| `entity` | 30 | Natural/legal person management |
+| `session` | 16 | Scope, navigation, history |
+| `view` | 15 | ESPER navigation, filters |
+| `trading-profile` | 30 | Trading matrix, CA policy |
+| `kyc` | 20 | KYC case management |
+| `investor` | 15 | Investor register, holdings |
+| `custody` | 40 | Settlement, safekeeping |
+| `gleif` | 15 | LEI lookup, hierarchy import |
+| `research.*` | 30+ | External source workflows |
