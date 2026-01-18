@@ -196,19 +196,13 @@ impl FeedbackAnalyzer {
 
     /// Run full analysis and store results
     pub async fn run_full_analysis(&self, days_back: i32) -> Result<AnalysisReport> {
-        let mut report = AnalysisReport::default();
-
-        // Pattern discoveries (seen 3+ times)
-        report.pattern_discoveries = self.discover_patterns(3, days_back).await?;
-
-        // Confusion pairs (seen 2+ times)
-        report.confusion_pairs = self.find_confusion_pairs(2, days_back).await?;
-
-        // Gaps (seen 3+ times)
-        report.gaps = self.find_gaps(3, days_back).await?;
-
-        // Low score successes (score < 0.7, seen 3+ times)
-        report.low_score_successes = self.find_low_score_successes(0.7, 3, days_back).await?;
+        // Build report with all analysis results
+        let report = AnalysisReport {
+            pattern_discoveries: self.discover_patterns(3, days_back).await?,
+            confusion_pairs: self.find_confusion_pairs(2, days_back).await?,
+            gaps: self.find_gaps(3, days_back).await?,
+            low_score_successes: self.find_low_score_successes(0.7, 3, days_back).await?,
+        };
 
         // Store results for review
         self.store_analysis_results(&report).await?;

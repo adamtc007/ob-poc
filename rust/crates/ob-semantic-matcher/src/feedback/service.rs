@@ -36,6 +36,7 @@ impl FeedbackService {
     }
 
     /// Capture an intent match result
+    #[allow(clippy::too_many_arguments)]
     pub async fn capture_match(
         &self,
         session_id: Uuid,
