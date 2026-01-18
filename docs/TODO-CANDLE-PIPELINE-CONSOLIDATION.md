@@ -3,8 +3,16 @@
 **Priority**: CRITICAL  
 **Estimated Effort**: 3-4 days  
 **Created**: 2025-01-18  
-**Status**: NOT STARTED  
+**Status**: ✅ COMPLETE (2026-01-18)  
 **Goal**: Single unified DSL pipeline with local Candle embeddings
+
+> **COMPLETED:** All items in this document have been implemented.
+> - CandleEmbedder wraps ob-semantic-matcher::Embedder
+> - OpenAI dependency removed from embeddings
+> - IntentExtractor deleted (dead code)
+> - AgentOrchestrator deleted (unused)
+> - Migration 034_candle_embeddings.sql created (1536→384 dim)
+> - All 598 tests passing
 
 ---
 

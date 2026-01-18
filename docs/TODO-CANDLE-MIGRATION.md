@@ -3,8 +3,11 @@
 **Priority**: HIGH (performance + cost)  
 **Estimated Effort**: 1-2 days  
 **Created**: 2025-01-18  
-**Status**: NOT STARTED  
+**Status**: ✅ COMPLETED (2025-01-18)  
 **Depends On**: None (can be done independently)
+
+> **COMPLETED**: Migration script applied, `CandleEmbedder` wired, 384-dim schema deployed.
+> See `migrations/034_candle_embeddings.sql` and `crates/ob-semantic-matcher/src/embedder.rs`
 
 ## Overview
 

@@ -115,6 +115,14 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Entity disambiguation | `ai-thoughts/025-entity-disambiguation-ux.md` | ✅ Done |
 | Trading matrix pivot | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ Done |
 | Verb governance | `ai-thoughts/028-verb-lexicon-governance.md` | ✅ Done |
+| Candle embeddings | `docs/TODO-CANDLE-MIGRATION.md` | ✅ Complete |
+| Candle pipeline | `docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | ✅ Complete |
+
+### Active TODOs
+
+| Topic | Document | Status |
+|-------|----------|--------|
+| **ESPER Navigation** | `TODO-ESPER-NAVIGATION-FULL.md` | ⚠️ In Progress |
 
 ---
 
