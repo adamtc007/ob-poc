@@ -3,7 +3,39 @@
 **Priority**: HIGH (core user experience)  
 **Estimated Effort**: 3-5 days  
 **Created**: 2025-01-18  
-**Status**: IN PROGRESS  
+**Status**: ✅ LARGELY COMPLETE (reviewed 2025-01-18)
+
+---
+
+## Implementation Status Summary
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **EsperRenderState** | ✅ Complete | All toggle methods: xray, peel, shadow, illuminate, red_flag_scan, black_hole |
+| **Scale Navigation** | ✅ Complete | Universe/Galaxy/System/Planet/Surface/Core all wired |
+| **Drill Navigation** | ✅ Complete | DrillThrough, SurfaceReturn wired to galaxy focus stack |
+| **Camera Animation** | ✅ Complete | Spring-based fly_to/zoom_to in Camera2D |
+| **GalaxyView** | ✅ Complete | Cluster rendering, force simulation, drill actions |
+| **X-ray/Peel/Shadow** | ✅ Complete | Toggle methods + render integration |
+| **Illuminate/RedFlag/BlackHole** | ✅ Complete | Toggle methods + render integration |
+| **Temporal Navigation** | ⏸️ Stubbed | Requires historical snapshot backend |
+| **Orbital Navigation** | ⏸️ Stubbed | Requires continuous camera orbit animation |
+
+### What's Working Now
+
+1. **Voice/Chat commands** route through NavigationVerb handlers in `app.rs`
+2. **Scale transitions** update view_level and trigger appropriate view switches
+3. **Galaxy view** renders at Universe level with cluster drill-down
+4. **EsperRenderState** toggles work and affect node rendering (alpha, highlight)
+5. **Camera spring animations** provide smooth transitions
+
+### Deferred (Requires Backend Support)
+
+- **TimeRewind/TimeSlice** - Need historical snapshot API
+- **TimeTrail** - Need entity history API  
+- **Orbit animation** - Need continuous camera rotation loop
+
+---  
 
 ## Overview
 
