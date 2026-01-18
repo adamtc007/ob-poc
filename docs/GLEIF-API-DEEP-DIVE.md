@@ -685,9 +685,12 @@ COMMIT;
 
 ### Current Entity Creation Verbs
 
-From `verb_rag_metadata.rs`, entity creation is handled via:
+Entity creation is handled via:
 - `cbu.create` - Creates CBU with entities
+- `entity.ensure-*` - Creates entities of specific types
 - Role assignment verbs
+
+Verb discovery uses YAML `invocation_phrases` and the learning system (`agent.invocation_phrases` table).
 
 ### Recommended New Verbs
 
