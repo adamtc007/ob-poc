@@ -93,6 +93,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 
 | When working on... | Read this annex | Contains |
 |--------------------|-----------------|----------|
+| **Semantic pipeline** | `docs/agent-semantic-pipeline.md` | Candle embeddings, 7-tier search, latency analysis |
 | **Agent/MCP pipeline** | `docs/agent-architecture.md` | Intent extraction, MCP tools, learning loop |
 | **Session & navigation** | `docs/session-visualization-architecture.md` | Scopes, filters, ESPER verbs, history |
 | **Data model (CBU/Entity/UBO)** | `docs/strategy-patterns.md` §1 | Why CBU is a lens, UBO discovery, holdings |
@@ -150,7 +151,44 @@ User says: "spin up a fund for Acme"
             dsl_execute tool
 ```
 
-### Embeddings: Candle Local (Complete)
+### Why This Matters: LLM Removed from Semantic Loop
+
+**Before Candle:** Verb discovery required LLM call (200-500ms, network, API cost).
+**After Candle:** Verb discovery is pure Rust (5-15ms, local, free).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  VERB DISCOVERY (100% Rust, NO LLM)                                         │
+│                                                                              │
+│  User: "set up an ISDA"                                                     │
+│      ↓                                                                       │
+│  Candle embed (local)          5-15ms   ← Pure Rust, no network             │
+│      ↓                                                                       │
+│  pgvector similarity           <1ms     ← In-memory index                   │
+│      ↓                                                                       │
+│  Result: isda.create           ────────── Total: 6-16ms                     │
+│                                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ARG EXTRACTION (LLM still needed)                                          │
+│                                                                              │
+│  LLM extracts JSON args        200-500ms  ← Only LLM call in pipeline       │
+│      ↓                                                                       │
+│  DSL builder (Rust)            1-5ms                                        │
+│      ↓                                                                       │
+│  (isda.create :counterparty "Goldman" :governing-law "NY")                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Metric | Before (OpenAI) | After (Candle) | Improvement |
+|--------|-----------------|----------------|-------------|
+| Embedding latency | 100-300ms | 5-15ms | **10-20x faster** |
+| Network required | Yes | No | **Offline capable** |
+| Cost per embed | $0.00002 | $0 | **100% savings** |
+| LLM calls per query | 2 (discover + extract) | 1 (extract only) | **50% reduction** |
+
+> **Full details:** `docs/agent-semantic-pipeline.md`
+
+### Embeddings: Candle Local
 
 | Component | Value |
 |-----------|-------|
@@ -160,8 +198,6 @@ User says: "spin up a fund for Acme"
 | Latency | 5-15ms |
 | Storage | pgvector (IVFFlat) |
 | API Key | Not required |
-
-**No external API calls.** Embeddings are computed locally.
 
 ---
 
