@@ -93,7 +93,6 @@ pub mod graph_executor;
 #[cfg(feature = "database")]
 pub mod idempotency;
 pub mod intent;
-pub mod intent_extractor;
 #[cfg(feature = "database")]
 pub mod lsp_validator;
 pub mod planning_facade;
@@ -143,7 +142,6 @@ pub use generic_executor::{GenericCrudExecutor, GenericExecutionResult};
 #[cfg(feature = "database")]
 pub use idempotency::{compute_idempotency_key, IdempotencyManager};
 pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
-pub use intent_extractor::IntentExtractor;
 #[cfg(feature = "database")]
 pub use lsp_validator::LspValidator;
 pub use planning_facade::{

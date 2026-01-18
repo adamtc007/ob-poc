@@ -4,7 +4,7 @@
 //! It uses a lexicon-based tokenizer with formal grammar parsing for intent classification.
 //!
 //! Most functionality is in the `ob-agentic` crate (no DB dependencies).
-//! The orchestrator module stays here as it requires the DB executor.
+//! DSL generation goes through the MCP pipeline: verb_search → dsl_generate → dsl_execute.
 
 // Re-export everything from ob-agentic crate
 pub use ob_agentic::anthropic_client;
@@ -20,9 +20,6 @@ pub use ob_agentic::openai_client;
 pub use ob_agentic::patterns;
 pub use ob_agentic::planner;
 pub use ob_agentic::validator;
-
-// Orchestrator stays local (has DB dependencies)
-pub mod orchestrator;
 
 // Lexicon agent requires gateway feature in ob-agentic
 #[cfg(feature = "database")]
@@ -41,9 +38,6 @@ pub use intent::{ClientIntent, CounterpartyIntent, InstrumentIntent, MarketInten
 pub use ob_agentic::intent::{
     ClarificationRequest as IntentClarificationRequest, IntentResult, OnboardingIntent,
 };
-
-// Re-export orchestrator
-pub use orchestrator::{AgentOrchestrator, GenerationResult, OrchestratorBuilder};
 
 // Re-export patterns and planner
 pub use ob_agentic::patterns::OnboardingPattern;

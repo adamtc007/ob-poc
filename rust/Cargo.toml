@@ -13,6 +13,7 @@ rust-version = "1.84"
 # Workspace crates
 dsl-core = { path = "crates/dsl-core" }
 ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
+ob-semantic-matcher = { path = "crates/ob-semantic-matcher" }
 ob-templates = { path = "crates/ob-templates" }
 ob-workflow = { path = "crates/ob-workflow", features = ["database"] }
 dsl_types = { path = "../dsl_types" }

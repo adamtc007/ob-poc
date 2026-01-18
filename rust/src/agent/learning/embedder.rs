@@ -1,16 +1,19 @@
 //! Embedding service for semantic learning
 //!
 //! Provides text embeddings for semantic phrase matching via pgvector.
+//! Uses local Candle embeddings (all-MiniLM-L6-v2) - no API key required.
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 
-/// Embedding vector type (matches pgvector dimension)
+/// Embedding vector type (384 dimensions for all-MiniLM-L6-v2)
 pub type Embedding = Vec<f32>;
+
+/// Standard embedding dimension (all-MiniLM-L6-v2)
+pub const EMBEDDING_DIMENSION: usize = 384;
 
 /// Trait for text embedding services
 #[async_trait]
@@ -31,114 +34,65 @@ pub trait Embedder: Send + Sync {
 /// Shared embedder type for use across handlers
 pub type SharedEmbedder = Arc<dyn Embedder>;
 
-/// OpenAI embeddings client
-pub struct OpenAIEmbedder {
-    client: reqwest::Client,
-    api_key: String,
-    model: String,
-    dimension: usize,
+/// Local embedder using Candle + all-MiniLM-L6-v2
+///
+/// 384-dimensional embeddings computed locally in 5-15ms.
+/// No API key required. Model cached in ~/.cache/huggingface/
+pub struct CandleEmbedder {
+    inner: Arc<Mutex<ob_semantic_matcher::Embedder>>,
 }
 
-impl OpenAIEmbedder {
-    /// Create embedder with default model (text-embedding-3-small)
-    pub fn new(api_key: String) -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            api_key,
-            model: "text-embedding-3-small".to_string(),
-            dimension: 1536,
-        }
-    }
-
-    /// Create embedder with specific model
-    pub fn with_model(api_key: String, model: String, dimension: usize) -> Self {
-        Self {
-            client: reqwest::Client::new(),
-            api_key,
-            model,
-            dimension,
-        }
-    }
-
-    /// Create from environment variable
-    pub fn from_env() -> Result<Self> {
-        let api_key = std::env::var("OPENAI_API_KEY")
-            .map_err(|_| anyhow!("OPENAI_API_KEY environment variable not set"))?;
-        Ok(Self::new(api_key))
+impl CandleEmbedder {
+    /// Create a new Candle embedder
+    ///
+    /// Downloads the model (~22MB) on first use.
+    /// Subsequent calls use the cached model from ~/.cache/huggingface/
+    pub fn new() -> Result<Self> {
+        let inner = ob_semantic_matcher::Embedder::new()
+            .map_err(|e| anyhow!("Failed to load Candle model: {}", e))?;
+        Ok(Self {
+            inner: Arc::new(Mutex::new(inner)),
+        })
     }
 }
 
 #[async_trait]
-impl Embedder for OpenAIEmbedder {
+impl Embedder for CandleEmbedder {
     async fn embed(&self, text: &str) -> Result<Embedding> {
-        let response = self
-            .client
-            .post("https://api.openai.com/v1/embeddings")
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&serde_json::json!({
-                "model": self.model,
-                "input": text
-            }))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<EmbeddingResponse>()
-            .await?;
-
-        response
-            .data
-            .into_iter()
-            .next()
-            .map(|d| d.embedding)
-            .ok_or_else(|| anyhow!("No embedding in response"))
+        let text = text.to_string();
+        let inner = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let guard = inner.blocking_lock();
+            guard
+                .embed(&text)
+                .map_err(|e| anyhow!("Candle embed failed: {}", e))
+        })
+        .await?
     }
 
     async fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Embedding>> {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-
-        // OpenAI supports batch embedding
-        let response = self
-            .client
-            .post("https://api.openai.com/v1/embeddings")
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&serde_json::json!({
-                "model": self.model,
-                "input": texts
-            }))
-            .send()
-            .await?
-            .error_for_status()?
-            .json::<EmbeddingResponse>()
-            .await?;
-
-        // Sort by index to maintain order
-        let mut embeddings: Vec<_> = response.data.into_iter().collect();
-        embeddings.sort_by_key(|d| d.index);
-
-        Ok(embeddings.into_iter().map(|d| d.embedding).collect())
+        let texts: Vec<String> = texts.iter().map(|s| s.to_string()).collect();
+        let inner = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let guard = inner.blocking_lock();
+            let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+            guard
+                .embed_batch(&refs)
+                .map_err(|e| anyhow!("Candle batch embed failed: {}", e))
+        })
+        .await?
     }
 
     fn model_name(&self) -> &str {
-        &self.model
+        "all-MiniLM-L6-v2"
     }
 
     fn dimension(&self) -> usize {
-        self.dimension
+        EMBEDDING_DIMENSION
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct EmbeddingResponse {
-    data: Vec<EmbeddingData>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EmbeddingData {
-    embedding: Vec<f32>,
-    #[serde(default)]
-    index: usize,
 }
 
 /// Cached embedder wrapper for efficiency
@@ -250,7 +204,13 @@ pub struct NullEmbedder {
 
 impl NullEmbedder {
     pub fn new() -> Self {
-        Self { dimension: 1536 }
+        Self {
+            dimension: EMBEDDING_DIMENSION,
+        }
+    }
+
+    pub fn with_dimension(dimension: usize) -> Self {
+        Self { dimension }
     }
 }
 
@@ -281,7 +241,7 @@ mod tests {
     async fn test_null_embedder() {
         let embedder = NullEmbedder::new();
         let embedding = embedder.embed("test").await.unwrap();
-        assert_eq!(embedding.len(), 1536);
+        assert_eq!(embedding.len(), EMBEDDING_DIMENSION);
         assert!(embedding.iter().all(|&x| x == 0.0));
     }
 
@@ -305,5 +265,11 @@ mod tests {
         let texts = vec!["one", "two", "three"];
         let embeddings = embedder.embed_batch(&texts).await.unwrap();
         assert_eq!(embeddings.len(), 3);
+        assert!(embeddings.iter().all(|e| e.len() == EMBEDDING_DIMENSION));
+    }
+
+    #[tokio::test]
+    async fn test_embedding_dimension_constant() {
+        assert_eq!(EMBEDDING_DIMENSION, 384);
     }
 }

@@ -43,7 +43,8 @@ pub mod warmup;
 pub use decay::ConfidenceDecay;
 pub use drain::{spawn_agent_drain_task, DrainConfig};
 pub use embedder::{
-    CachedEmbedder, Embedder, Embedding, NullEmbedder, OpenAIEmbedder, SharedEmbedder,
+    CachedEmbedder, CandleEmbedder, Embedder, Embedding, NullEmbedder, SharedEmbedder,
+    EMBEDDING_DIMENSION,
 };
 pub use emitter::{AgentEventEmitter, AgentEventReceiver, SharedAgentEmitter};
 pub use inspector::{AgentLearningInspector, LearningCandidate, LearningStatus, LearningType};

@@ -2,6 +2,64 @@
 
 This document explains how the DSL system works with Claude, particularly around verb discovery, intent resolution, and the learning loop.
 
+---
+
+## 📋 Key Architecture Decisions
+
+> **📄 Full Documentation:**
+> - [`/docs/ARCH-DECISION-CANDLE-EMBEDDINGS.md`](docs/ARCH-DECISION-CANDLE-EMBEDDINGS.md) — Enterprise architecture review (for ARB)
+> - [`/docs/VECTOR-DATABASE-PORTABILITY.md`](docs/VECTOR-DATABASE-PORTABILITY.md) — PostgreSQL vs Oracle analysis
+
+### Local ML Inference for Semantic Search
+
+This system uses **local ML inference** rather than external APIs:
+
+| Component | Choice | Rationale |
+|-----------|--------|----------|
+| **Framework** | [HuggingFace Candle](https://github.com/huggingface/candle) | Pure Rust, no Python, $4.5B company backing |
+| **Model** | [all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | 142M downloads/month, Apache 2.0 |
+| **Storage** | pgvector (PostgreSQL) | IVFFlat indexes, cosine similarity |
+
+**Why this matters:**
+- ✅ **No external API calls** — data never leaves BNY infrastructure
+- ✅ **10-20x faster** — 5-15ms vs 100-300ms (OpenAI API)
+- ✅ **$0 marginal cost** — no per-embedding charges
+- ✅ **Air-gap capable** — works in isolated networks
+- ✅ **No Python runtime** — static Rust binary
+
+**Enterprise validation:** HuggingFace backed by Google, Amazon, Nvidia, Intel, IBM, Salesforce ($4.5B valuation, $396M funding).
+
+### Database Portability
+
+**PostgreSQL coupling is LOW.** Oracle 23ai AI Vector Search uses the **same `<=>` operator** for cosine distance. Migration effort: ~2-3 days. See [VECTOR-DATABASE-PORTABILITY.md](docs/VECTOR-DATABASE-PORTABILITY.md).
+
+| Feature | pgvector | Oracle 23ai | Compatible? |
+|---------|----------|-------------|-------------|
+| Cosine operator | `<=>` | `<=>` | ✅ **Identical** |
+| Vector type | `vector(384)` | `VECTOR(384)` | ✅ Minor syntax |
+| Index DDL | `ivfflat` | `NEIGHBOR PARTITIONS` | ⚠️ Different |
+
+---
+
+## ⚠️ Active Migration: Candle Embeddings
+
+**Status**: Migration planned — see [`/docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md`](docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md)
+
+The system is migrating from OpenAI embeddings to local Candle embeddings:
+
+| | Before | After |
+|---|--------|-------|
+| **Embedder** | OpenAI API | Candle (local) |
+| **Model** | text-embedding-3-small | all-MiniLM-L6-v2 |
+| **Dimensions** | 1536 | 384 |
+| **Latency** | 100-300ms | 5-15ms |
+| **Cost** | $0.00002/embed | $0 |
+| **API Key** | Required | Not needed |
+
+**Impact**: After migration, `verb_search` semantic matching will be ~10x faster with no external dependencies.
+
+---
+
 ## Quick Reference
 
 ```
@@ -11,9 +69,9 @@ User says: "spin up a fund for Acme"
                     ↓
     ┌───────────────┴───────────────┐
     │     Search Priority Order      │
-    │  1. Learned phrases (DB)       │  ← User taught us this
-    │  2. YAML invocation_phrases    │  ← Author defined these
-    │  3. pgvector semantic          │  ← Embedding similarity
+    │  1. Learned phrases (exact)    │  ← User taught us this
+    │  2. YAML invocation_phrases    │  ← Author defined these  
+    │  3. Semantic similarity        │  ← Candle embeddings + pgvector
     └───────────────┬───────────────┘
                     ↓
             Top match: cbu.create
@@ -25,6 +83,26 @@ User says: "spin up a fund for Acme"
     Deterministic DSL assembly
                     ↓
             (cbu.create :name "Acme")
+```
+
+### The Golden Rule
+
+**ALL DSL generation MUST go through this pipeline.** No side doors, no bypass paths.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    UNIFIED DSL PIPELINE                      │
+│                                                              │
+│   verb_search ──► dsl_generate ──► dsl_execute              │
+│       │               │                                      │
+│       ▼               ▼                                      │
+│   Candle embed    LLM extracts JSON only                    │
+│   (384-dim)       Deterministic assembly                    │
+│                                                              │
+│   ❌ No direct DSL construction by LLM                      │
+│   ❌ No IntentExtractor (legacy - removed)                  │
+│   ❌ No FeedbackLoop.generate_valid_dsl() (legacy)          │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -58,19 +136,18 @@ domains:
 
 ### Search Priority (7-Tier System)
 
-| Priority | Source | Confidence | When Used |
-|----------|--------|------------|-----------|
-| 1 | **User learned exact** | 1.0 | User-specific learned phrases (exact match) |
-| 2 | **Global learned exact** | 1.0 | Global learned phrases from corrections |
-| 3 | **User learned semantic** | 0.7-0.95 | User-specific pgvector similarity |
-| 4 | **Global learned semantic** | 0.6-0.9 | Global pgvector similarity |
-| 5 | **Blocklist check** | — | Skip verbs blocked for this phrase pattern |
-| 6 | **YAML exact/substring** | 0.7-1.0 | Phrase matches `invocation_phrases` |
-| 7 | **Cold start semantic** | 0.5-0.8 | Fallback embedding similarity |
+| Priority | Source | Confidence | Latency |
+|----------|--------|------------|---------|
+| 1 | **User learned exact** | 1.0 | <1ms |
+| 2 | **Global learned exact** | 1.0 | <1ms |
+| 3 | **User learned semantic** | 0.7-0.95 | 10-20ms |
+| 4 | **Global learned semantic** | 0.6-0.9 | 10-20ms |
+| 5 | **Blocklist check** | — | 5-10ms |
+| 6 | **YAML exact/substring** | 0.7-1.0 | <1ms |
+| 7 | **Cold start semantic** | 0.5-0.8 | 10-20ms |
 
-**User-specific learning**: Pass `user_id` to `verb_search` for personalized results.
-
-**Blocklist**: Use `intent_block` to prevent a verb from matching certain phrases.
+**Fast path**: Tiers 1, 2, 6 are in-memory — sub-millisecond.
+**Semantic path**: Tiers 3, 4, 5, 7 use Candle embeddings + pgvector — 10-20ms total.
 
 ### The Learning Loop
 
@@ -154,14 +231,14 @@ Expected response:
 }
 ```
 
-### Step 4: Sync Embeddings (Future)
+### Step 4: Sync Embeddings
 
-Once pgvector integration is complete:
+After adding verbs with `invocation_phrases`:
 
 ```
 Claude: verbs_embed_sync domain="trading-profile"
 
-This generates embeddings for semantic fallback matching.
+This generates Candle embeddings (384-dim) for semantic matching.
 ```
 
 ---
@@ -194,7 +271,7 @@ invocation_phrases:
 
 **Fix**: Use `intent_feedback` repeatedly. After threshold (3+ occurrences), learned phrase takes priority.
 
-**Future**: `intent_block` tool will explicitly block a verb for a phrase pattern.
+**Alternative**: `intent_block` tool explicitly blocks a verb for a phrase pattern.
 
 ### 3. LLM Writes Bad DSL
 
@@ -220,6 +297,24 @@ Claude: dsl_lookup lookup_type="entity" search="Acme Corp"
 → Returns: { entity_id: "uuid-here", name: "Acme Corporation" }
 
 Then update DSL with resolved UUID.
+```
+
+### 5. Semantic Search Not Working
+
+**Symptom**: Only exact phrase matches work, similar phrases don't match.
+
+**Causes**:
+- Embedder not loaded (check startup logs)
+- Embeddings not generated for phrases
+- Embedding dimension mismatch (must be 384)
+
+**Debug**:
+```bash
+# Check embedder loaded
+grep "Candle" /var/log/dsl_mcp.log
+
+# Check embeddings exist
+psql -c "SELECT COUNT(*) FROM agent.invocation_phrases WHERE embedding IS NOT NULL"
 ```
 
 ---
@@ -286,11 +381,11 @@ Claude: verb_search query="set up a CSA"
 
 ## MCP Tools Reference
 
-### Core Tools
+### Core DSL Tools
 
 | Tool | Purpose | When to Use |
 |------|---------|-------------|
-| `verb_search` | Find verbs matching natural language | Before `dsl_generate` to understand options |
+| `verb_search` | Find verbs matching natural language | **Always first** — before `dsl_generate` |
 | `dsl_generate` | Convert instruction to DSL | After confirming verb with `verb_search` |
 | `dsl_lookup` | Resolve entity names to UUIDs | When `dsl_generate` returns `unresolved_refs` |
 | `dsl_execute` | Run DSL against database | After DSL is complete and valid |
@@ -309,6 +404,14 @@ Claude: verb_search query="set up a CSA"
 | `learning_reject` | Reject a learning candidate | Prevent bad learning from activating |
 | `learning_import` | Bulk import phrase→verb mappings | Bootstrap from CSV/JSON |
 | `learning_stats` | Get learning system statistics | Monitor learning health |
+
+### Verb Lifecycle Tools (Future)
+
+| Tool | Purpose | Status |
+|------|---------|--------|
+| `verbs_reload` | Hot reload VerbPhraseIndex | Planned |
+| `verbs_coverage` | Report verbs missing invocation_phrases | Planned |
+| `verbs_embed_sync` | Generate embeddings for phrases | Planned |
 
 ---
 
@@ -337,36 +440,85 @@ Benefits:
 - Arguments validated against signature
 - Corrections create learnable mappings
 
+### Embedding System
+
+**Model**: `all-MiniLM-L6-v2` (via Candle, local inference)
+**Dimensions**: 384
+**Index**: IVFFlat with cosine distance
+**Latency**: 5-15ms per embedding
+
+The embedder is loaded once at startup and cached. First startup downloads the model (~22MB) from HuggingFace to `~/.cache/huggingface/`.
+
 ### Database Schema (Learning)
 
-```
-agent.invocation_phrases    ← Learned phrase→verb mappings (+ embedding column)
-agent.entity_aliases        ← Learned entity name→canonical (+ embedding column)
-agent.learning_candidates   ← Pending learnings awaiting threshold
-agent.events               ← Full interaction log for analysis
-agent.phrase_blocklist      ← Blocked verb+phrase combinations (+ embedding)
-agent.user_learned_phrases  ← User-specific learned phrases (+ embedding, confidence)
-```
+```sql
+agent.invocation_phrases    -- Learned phrase→verb mappings
+  - phrase TEXT
+  - verb TEXT  
+  - embedding vector(384)   -- Candle embedding
+  - embedding_model TEXT    -- 'all-MiniLM-L6-v2'
 
-**pgvector**: Embeddings use `vector(1536)` from OpenAI text-embedding-3-small.
-Semantic search uses IVFFlat indexes with cosine distance.
+agent.entity_aliases        -- Learned entity name→canonical
+  - alias TEXT
+  - canonical_name TEXT
+  - embedding vector(384)
+
+agent.user_learned_phrases  -- User-specific learned phrases
+  - user_id UUID
+  - phrase TEXT
+  - verb TEXT
+  - confidence REAL
+  - embedding vector(384)
+
+agent.phrase_blocklist      -- Blocked verb+phrase combinations
+  - phrase TEXT
+  - blocked_verb TEXT
+  - embedding vector(384)
+
+agent.learning_candidates   -- Pending learnings awaiting threshold
+agent.events               -- Full interaction log for analysis
+```
 
 ### Hot Path vs Learning Path
 
 ```
-HOT PATH (sync, <100ms):
-  verb_search → in-memory LearnedData → VerbPhraseIndex → return
+HOT PATH (sync, <50ms total):
+  verb_search 
+    → in-memory LearnedData (exact match)
+    → VerbPhraseIndex (YAML phrases)
+    → Candle embed + pgvector (semantic)
+    → return results
 
 LEARNING PATH (async, background):
-  intent_feedback → INSERT agent.learning_candidates
-  (Later) warmup → load into LearnedData
+  intent_feedback 
+    → INSERT agent.learning_candidates
+    → (threshold reached) → promote to agent.invocation_phrases
+    → (next warmup) → load into LearnedData
 ```
+
+---
+
+## Startup Sequence
+
+```
+dsl_mcp startup:
+  1. Connect to database
+  2. Load Candle embedder (all-MiniLM-L6-v2)     ← ~1-3s first time
+  3. LearningWarmup loads from DB:
+     - agent.invocation_phrases → LearnedData
+     - agent.entity_aliases → LearnedData
+  4. VerbPhraseIndex.load_from_verbs_dir()      ← Scans YAML files
+  5. McpServer starts with learned_data + embedder
+  6. Ready for requests
+```
+
+**No API keys required.** Semantic search works out of the box.
 
 ---
 
 ## Debugging Checklist
 
-When verb discovery isn't working:
+### Verb discovery not working:
 
 - [ ] Does the verb YAML have `invocation_phrases`?
 - [ ] Was MCP server restarted after YAML changes?
@@ -374,16 +526,35 @@ When verb discovery isn't working:
 - [ ] Is there a learned phrase overriding? (Check `agent.invocation_phrases`)
 - [ ] Is the verb marked `internal: true`? (Internal verbs are excluded)
 
-When DSL generation fails:
+### DSL generation fails:
 
 - [ ] Did `verb_search` return the correct verb?
 - [ ] Does the verb exist in RuntimeRegistry?
 - [ ] Are required arguments being extracted?
 - [ ] Does `dsl_validate` pass on the output?
 
-When execution fails:
+### Execution fails:
 
 - [ ] Are all entity references resolved to UUIDs?
 - [ ] Do referenced entities exist in database?
 - [ ] Does user have permission for this operation?
 - [ ] Check `dsl_plan` output for execution strategy
+
+### Semantic search not working:
+
+- [ ] Check startup logs for "Candle embedder loaded"
+- [ ] Verify embeddings exist: `SELECT COUNT(*) FROM agent.invocation_phrases WHERE embedding IS NOT NULL`
+- [ ] Check embedding dimension is 384
+- [ ] Try `verbs_embed_sync` to regenerate embeddings
+
+---
+
+## Related Documentation
+
+| Document | Purpose |
+|----------|---------|
+| `/docs/VERB-AUTHORING-GUIDE.md` | How to write verb YAML files |
+| `/docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | Migration plan (Candle + cleanup) |
+| `/docs/TODO-LEARNING-ENHANCEMENTS-PGVECTOR.md` | Future learning system enhancements |
+| `/docs/PERFORMANCE-ANALYSIS-VERB-SEARCH.md` | Performance analysis and optimizations |
+| `/docs/CANDLE-EMBEDDER-GUIDE.md` | Deep dive on Candle embeddings |
