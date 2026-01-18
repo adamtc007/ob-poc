@@ -7,7 +7,7 @@
 > **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2)
 > **ESPER Navigation:** ✅ Complete - 48 commands, trie + semantic fallback
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
-> **REPL Session/Phased Execution:** ✅ Complete - State machine, DAG phases, sheet executor, 7 REST endpoints
+> **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -815,6 +815,7 @@ When you see these in a task, read the corresponding annex first:
 | "ESPER", "drill", "trace", "xray" | `docs/session-visualization-architecture.md` |
 | "investor register", "look-through" | `ai-thoughts/018-investor-register-visualization.md` |
 | "GROUP", "ownership graph" | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` |
+| "sheet", "phased execution", "DAG" | `ai-thoughts/035-repl-session-implementation-plan.md` |
 
 ---
 
