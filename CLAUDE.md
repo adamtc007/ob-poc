@@ -3,8 +3,11 @@
 > **Last reviewed:** 2026-01-18
 > **Crates:** 14 Rust crates
 > **Verbs:** 800+ across 103 YAML files
-> **Migrations:** 34 schema migrations
+> **Migrations:** 35 schema migrations
 > **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2)
+> **ESPER Navigation:** ✅ Complete - 48 commands, trie + semantic fallback
+> **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
+> **REPL Session/Phased Execution:** ✅ Complete - State machine, DAG phases, sheet executor, 7 REST endpoints
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -115,6 +118,10 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Entity disambiguation | `ai-thoughts/025-entity-disambiguation-ux.md` | ✅ Done |
 | Trading matrix pivot | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ Done |
 | Verb governance | `ai-thoughts/028-verb-lexicon-governance.md` | ✅ Done |
+| Entity resolution wiring | `ai-thoughts/033-entity-resolution-wiring-plan.md` | ✅ Done |
+| REPL state model | `ai-thoughts/034-repl-state-model-dsl-agent-protocol.md` | ⚠️ In Progress |
+| Session-runsheet-viewport | `ai-thoughts/035-session-runsheet-viewport-integration.md` | ✅ Done |
+| Session rip-and-replace | `ai-thoughts/036-session-rip-and-replace.md` | ✅ Done |
 | Candle embeddings | `docs/TODO-CANDLE-MIGRATION.md` | ✅ Complete |
 | Candle pipeline | `docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | ✅ Complete |
 
@@ -122,7 +129,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 
 | Topic | Document | Status |
 |-------|----------|--------|
-| **ESPER Navigation** | `TODO-ESPER-NAVIGATION-FULL.md` | ⚠️ In Progress |
+| **ESPER Navigation** | `TODO-ESPER-NAVIGATION-FULL.md` | ✅ Complete - Trie + semantic fallback |
 
 ---
 
@@ -238,10 +245,112 @@ Session manages which CBUs are loaded. Focus/camera is client-side.
 
 ---
 
+## ESPER Navigation System
+
+Blade Runner-inspired voice/chat navigation with trie-based instant lookup and semantic fallback.
+
+### Architecture
+
+```
+User: "make it bigger"
+    │
+    ├─ Trie Lookup (O(k)) ──► HIT → Execute instantly (<1μs)
+    │       │
+    │       └─ MISS + Semantic Ready?
+    │               │
+    │               └─ embed_blocking() ~10ms
+    │                       │
+    │                       └─ SemanticIndex.search()
+    │                               │
+    │                               ├─ confidence ≥ 0.80 → Auto-execute + Learn
+    │                               ├─ 0.50-0.80 → Disambiguation UI
+    │                               └─ < 0.50 → Fall through to DSL
+    │
+    ▼
+AgentCommand::ZoomIn { factor: Some(2.0) }
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/config/esper-commands.yaml` | 48 command definitions with aliases |
+| `rust/src/agent/esper/registry.rs` | Trie + semantic index + lookup |
+| `rust/src/agent/esper/warmup.rs` | Pre-compute embeddings at startup |
+| `rust/src/agent/esper/config.rs` | YAML schema types |
+| `rust/src/api/agent_service.rs` | `handle_esper_command()` integration |
+
+### Command Categories
+
+| Category | Commands | Examples |
+|----------|----------|----------|
+| **Zoom** | `zoom_in`, `zoom_out`, `zoom_fit` | "enhance", "zoom in 2x", "fit to screen" |
+| **Scale Navigation** | `scale_universe` → `scale_core` | "universe", "galaxy", "land on", "core sample" |
+| **Depth Navigation** | `drill_through`, `surface_return`, `xray`, `peel` | "drill through", "x-ray", "peel back" |
+| **Temporal** | `time_rewind`, `time_play`, `time_slice` | "rewind to 2023", "show changes" |
+| **Investigation** | `follow_the_money`, `who_controls`, `red_flag_scan` | "follow the money", "red flag scan" |
+| **Context** | `context_review`, `context_investigation` | "board review", "investigation mode" |
+
+### Semantic Fallback (Phase 8)
+
+On trie miss, falls back to Candle embeddings (all-MiniLM-L6-v2):
+
+| Threshold | Action |
+|-----------|--------|
+| ≥ 0.80 | Auto-execute + persist learned alias |
+| 0.50-0.80 | Show disambiguation UI |
+| < 0.50 | No match, fall through to DSL pipeline |
+
+### Adding New Phrases
+
+Edit `rust/config/esper-commands.yaml`:
+
+```yaml
+zoom_in:
+  canonical: "enhance"
+  response: "Enhancing..."
+  agent_command:
+    type: ZoomIn
+    params: { factor: extract }
+  aliases:
+    exact: ["enhance", "closer"]      # Must match exactly
+    contains: ["make it bigger"]      # Substring match
+    prefix: ["zoom in "]              # Prefix + extract rest
+```
+
+No Rust code changes needed for new phrases.
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `esper_list` | List all 48 commands with aliases |
+| `esper_lookup` | Test what command a phrase maps to |
+| `esper_add_alias` | Add learned alias (persists to DB) |
+| `esper_reload` | Reload config without restart |
+
+### Trigger Phrases (for Claude)
+
+When you see these in a task, you're working on ESPER:
+- "esper", "navigation command", "voice command"
+- "enhance", "zoom", "drill", "surface", "xray"
+- "semantic fallback", "trie lookup", "learned alias"
+- "AgentCommand", "EsperCommandRegistry"
+
+---
+
 ## Adding Verbs
 
 > ⚠️ **Before writing verb YAML, read `docs/verb-definition-spec.md`**
 > Serde structs are strict. Invalid YAML silently fails to load.
+
+### Verb Behaviors
+
+| Behavior | Execution | Use Case |
+|----------|-----------|----------|
+| `crud` | Generic executor, single DB operation | Simple CRUD |
+| `plugin` | Custom Rust handler | Complex logic |
+| `template` | Expands to multi-statement DSL | Workflows, macros |
 
 ### Quick Example (CRUD)
 
@@ -260,7 +369,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-        invocation_phrases:        # Required for discovery
+        invocation_phrases:        # Required for LLM discovery
           - "create my thing"
           - "add new record"
         args:
@@ -270,11 +379,347 @@ domains:
             maps_to: name
 ```
 
+### Template Verbs (Macros)
+
+Templates are **first-class verbs** that expand to multi-statement DSL. They enable the LLM to generate complex workflows without training on DSL syntax.
+
+**Key insight:** LLM does INTENT CLASSIFICATION (picks the right template), not DSL generation. Templates emit DSL source that flows through the normal pipeline.
+
+```
+User: "Research Aviva group and onboard their Lux funds"
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  LLM: Intent Classification                                 │
+│  verb: "onboarding.research-group"                         │
+│  lookups: { root-entity: "Aviva" }                         │
+│  params: { jurisdiction: "LU" }                            │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Entity Resolution (same as singleton verbs)               │
+│  "Aviva" → UUID via EntityGateway                          │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Template Expansion → DSL Source                           │
+│                                                             │
+│  (gleif.import-tree :entity-id "uuid-..." :as @import)     │
+│  (bulk.create-cbu :filter "type=FUND AND jur=LU")          │
+│  (bulk.add-products :cbu-set @created :products [...])     │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Normal DSL Pipeline (unchanged)                           │
+│  Parse → Compile → Session → Execute                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Template Verb Example:**
+
+```yaml
+domains:
+  onboarding:
+    description: "High-level onboarding workflows"
+    
+    invocation_hints:
+      - "onboard"
+      - "bulk"
+      - "research group"
+    
+    verbs:
+      research-group:
+        description: "Import group from GLEIF and bulk onboard funds"
+        behavior: template
+        
+        invocation_phrases:
+          - "research a group"
+          - "import corporate hierarchy"
+          - "bulk onboard funds from GLEIF"
+        
+        metadata:
+          tier: composite
+          source_of_truth: external
+          scope: global
+          noun: group_onboarding
+        
+        args:
+          - name: root-entity
+            type: uuid
+            required: true
+            description: "Group apex entity"
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          
+          - name: jurisdiction
+            type: string
+            required: false
+            default: "LU"
+            valid_values: [LU, IE, DE, UK, US]
+          
+          - name: products
+            type: list
+            required: false
+            default: [EQUITY, FIXED_INCOME]
+        
+        # Template body - expands to DSL source
+        template:
+          body: |
+            (gleif.import-tree :entity-id $root-entity :direction BOTH :as @import)
+            (bulk.create-cbu 
+              :filter "source=gleif_import AND type=FUND AND jurisdiction=$jurisdiction"
+              :as @created_cbus)
+            (bulk.add-products 
+              :cbu-set @created_cbus 
+              :products $products)
+```
+
+**Template vs Singleton:**
+
+| Aspect | Singleton Verb | Template Verb |
+|--------|---------------|---------------|
+| Invocation | `(cbu.assign-role ...)` | `(onboarding.research-group ...)` |
+| YAML location | Same (`config/verbs/`) | Same (`config/verbs/`) |
+| Intent matching | `invocation_phrases` | `invocation_phrases` (identical) |
+| Entity resolution | `lookup:` on args | `lookup:` on args (identical) |
+| Execution | Single operation | Expands → multiple statements |
+
+**Why templates are verbs:**
+- Single vocabulary for LLM tool (verbs + templates together)
+- Same entity resolution via `lookup:` config
+- Same linting and governance rules apply
+- User can invoke directly: `(onboarding.research-group :root <Aviva>)`
+
 ### Verify
 
 ```bash
 cargo x verbs check   # YAML matches DB
 cargo x verbs lint    # Tiering rules
+```
+
+### Entity Resolution in DSL
+
+Entity references in DSL use the `<entity_name>` syntax and are resolved via EntityGateway before execution.
+
+**3-Stage Compiler Model:**
+```
+DSL Source → Parse (Syntax) → Compile (Semantics) → Execute
+                                    │
+                                    ▼
+                         Detect unresolved <entity> refs
+                                    │
+                                    ▼
+                         Resolution Modal (if ambiguous)
+                                    │
+                                    ▼
+                         Substitute UUIDs → Execute
+```
+
+**Resolution config comes from verb YAML:**
+```yaml
+args:
+  - name: entity-id
+    type: uuid
+    lookup:
+      table: entities
+      entity_type: entity
+      schema: ob-poc
+      search_key: name                    # Simple key
+      # OR composite s-expression:
+      # search_key: "(search_name (nationality :selectivity 0.7) (date_of_birth :selectivity 0.95))"
+      primary_key: entity_id
+```
+
+**Resolution flow (simplified 2-hop):**
+1. Agent generates DSL with `<BlackRock>` entity ref
+2. Parser produces AST with `EntityRef { value: "BlackRock", resolved_key: None }`
+3. `ChatResponse.unresolved_refs` carries refs directly to UI (no sub-session API call)
+4. UI opens resolution modal via `pending_unresolved_refs` in `AsyncState`
+5. User selects → `resolved_key` populated with UUID
+6. Execute with fully resolved AST
+
+> **Note:** Legacy `needs_resolution_check` flag and `start_resolution()` API removed. Resolution state is inline in session, not a sub-session.
+
+### Two Session Models (Intentionally Separate)
+
+| Model | API | Purpose | Scope Storage |
+|-------|-----|---------|---------------|
+| `AgentSession` | `/api/session/*` | Full agent workflow (chat, DSL, execution) | `context.cbu_ids` |
+| `CbuSession` | `/api/cbu-session/*` | Standalone scope navigation (load/undo/redo) | `state.cbu_ids` (HashSet) |
+
+**Primary workflow:** Use DSL verbs (`session.load-galaxy`, etc.) which update `AgentSession.context.cbu_ids` after execution. This is the integrated path that feeds the viewport.
+
+**Standalone REST:** The `/api/cbu-session/*` endpoints are independent and don't sync to `AgentSession`. Use them for direct REST integration without the agent/DSL layer.
+
+> **Warning:** Don't mix the two models. Pick one per client integration.
+
+### Session = Run Sheet = Viewport Scope
+
+The session is the **single source of truth** that ties the REPL, DSL execution, and viewport together.
+
+> **Full design:** `ai-thoughts/035-session-runsheet-viewport-integration.md`, `ai-thoughts/036-session-rip-and-replace.md`
+
+**Unified Session Types (`rust/src/api/session.rs`):**
+- `AgentSession` - Single source of truth for agent conversations
+- `ServerRunSheet` - DSL statement ledger with per-statement status (replaces legacy `assembled_dsl`, `pending`, `executed_results`)
+- `ServerRunSheetEntry` - Individual DSL statement with status, AST, bindings, affected entities
+
+**RunSheet Status (`DslStatus`):**
+- `Draft` - Just added, not yet validated
+- `Ready` - Validated, ready to execute
+- `Executing` - Currently running
+- `Executed` - Successfully completed
+- `Failed` - Execution error
+- `Cancelled` - User cancelled (undo/clear)
+
+**Unified Session Types (`rust/src/session/unified.rs`):**
+- `UnifiedSession` - High-level session combining scope + view state
+- `TargetUniverse` - Book/Galaxy/Jurisdiction scope
+- `EntityScope` - Active CBU set being worked on  
+- `StateStack` - Navigation history (back/forward/go-to-start/go-to-last)
+- `ViewState` - Viewport rendering state
+- `ResolutionState` - Inline resolution (not a sub-session)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         SESSION = UNIVERSE OF WORK                          │
+│                                                                             │
+│  Session ID: abc-123                                                        │
+│  Entity Scope: [CBU-1, CBU-2, CBU-3, ...]  ← Drives viewport               │
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Run Sheet (accumulated DSL statements)                              │   │
+│  │                                                                       │   │
+│  │  ✓ (gleif.import-tree :entity-id "aviva" :as @import)                │   │
+│  │  ✓ (bulk.create-cbu :filter "..." :as @cbus) → [CBU-1..50]          │   │
+│  │  ⏳ (bulk.add-products :cbu-set @cbus :products [...])               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                              │                                              │
+│                              ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Viewport shows session.entity_scope                                 │   │
+│  │  Updates real-time as DSL executes                                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**The closed feedback loop:**
+- **REPL Panel** shows run sheet with per-statement status
+- **Session** tracks entity IDs created/modified by each statement
+- **Viewport** subscribes to `session.entity_scope` and shows those CBUs/entities
+- **User sees** graph update as DSL executes
+
+**Key fields:**
+- `session.entity_scope.cbu_ids` - CBUs being worked on (viewport universe)
+- `session.run_sheet.entries[]` - DSL statements with status + affected entities
+- `entry.status` - Draft/Ready/Executing/Executed/Failed/Cancelled
+- `entry.bindings` - Symbols produced (@cbu, @created_cbus)
+- `entry.affected_entities` - Entity UUIDs modified by this statement
+
+**Multi-CBU Viewport Refresh (Scope Graph):**
+
+Session scope is set via `session.load-*` verbs, then DSL execution modifies those CBUs, and the viewport refreshes:
+
+```
+1. User sets scope: "Load Allianz Lux book"
+    │
+    ▼
+(session.load-galaxy :apex-entity-id "allianz-se")
+    │
+    └─► CbuSession.load_many([cbu-1..cbu-50])
+            │
+            └─► Synced to context.cbu_ids after execution
+    │
+    ▼
+2. User modifies CBUs: "Add custody accounts to all"
+    │
+    ▼
+(bulk.add-custody-account :cbu-set @cbus ...)
+    │
+    └─► entry.affected_entities = [entity-1..entity-200]
+    │
+    ▼
+3. UI fetches combined graph:
+    │
+    ▼
+GET /api/session/:id/scope-graph
+    │
+    ▼
+MultiCbuGraphResponse {
+    graph: CbuGraph,              // Combined graph for all 50 CBUs
+    cbu_ids: Vec<Uuid>,           // CBUs in scope
+    affected_entity_ids: Vec<Uuid> // 200 entities modified
+}
+    │
+    ▼
+Viewport updates with combined graph
+```
+
+**Key files:**
+- `rust/src/api/graph_routes.rs` - `get_session_scope_graph()` endpoint
+- `rust/src/api/agent_routes.rs` - `exec_ctx.take_pending_cbu_session()` sync to `context.cbu_ids`
+- `rust/crates/ob-poc-ui/src/app.rs` - `fetch_scope_graph()` method
+- `rust/crates/ob-poc-ui/src/state.rs` - `pending_scope_graph`, `needs_scope_graph_refetch`
+
+---
+
+## REPL Session & Phased Execution
+
+> **Full design:** `ai-thoughts/034-repl-session-phased-execution.md`
+
+The agent REPL session is a **state machine** that handles multi-CBU bulk operations:
+
+```
+EMPTY → SCOPED → TEMPLATED → GENERATED → PARSED → READY → EXECUTED
+         │                                  │        │
+         │ scope_dsl                        │        │ user confirms "Run?"
+         │ + derived CBU set                │        │
+         └──────────────────────────────────┘        │
+                                             resolve loop (picker)
+```
+
+**Key concepts:**
+
+| Concept | Description |
+|---------|-------------|
+| **Scope derivation** | "Allianz Lux book" → queries GROUP structure → derives CBU set |
+| **Template × CBU set** | Single verb template expanded for each CBU in scope |
+| **DAG phases** | Statements grouped by dependency depth (0 = creators, 1 = needs phase 0, etc.) |
+| **Two tollgates** | Pre-compile (reorder) and pre-run (phase extraction) using same DAG |
+| **Phased execution** | Execute phase 0, collect PKs, substitute into phase 1, repeat |
+
+**Entity type hierarchy** (verb target determines attachment point):
+
+```
+Universe → Book → CBU → TradingProfile → Product
+                     → Entity (roles)
+                     → ISDA → Counterparty
+                     → KycCase
+```
+
+**Session record stores:**
+- `scope_dsl` - DSL that derived the scope
+- `template_dsl` - Unpopulated verb template  
+- `sheet.statements[]` - Populated DSL with `dag_depth` per statement
+- `returned_pk` - PKs collected after each phase executes
+
+**Failure handling:**
+- Single transaction wrapping all phases
+- Failure → rollback → no partial state
+- Downstream statements marked SKIPPED (blocked by failed dependency)
+- POC recovery: trash session, start fresh (idempotent verbs are safe)
+
+**`@session_cbus` iteration:**
+Template batch operations can use `@session_cbus` as source to iterate over all CBUs in session scope:
+```clojure
+(template.batch :id "add-custody" :source @session_cbus :bind-as "cbu_id" ...)
 ```
 
 ---

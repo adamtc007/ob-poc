@@ -938,3 +938,366 @@ impl eframe::App for App {
 7. **Mouse**: Click cluster → drill, scroll → zoom, drag → pan
 8. **Animation**: All transitions smooth (spring-based camera)
 9. **Performance**: 60fps maintained during navigation
+
+
+---
+
+## Phase 8: Semantic Fallback Integration
+
+**Goal**: Trie misses fall back to Candle semantic search, with auto-learning.
+
+### 8.1 The Pattern
+
+```
+Voice: "magnify that thing"
+         │
+         ▼
+    ┌─────────┐
+    │  Trie   │ ──HIT──► execute() immediately (0µs)
+    └────┬────┘
+         │ MISS
+         ▼
+    ┌───────────────┐
+    │ Candle search │ ~~15ms (1-2 frames, acceptable)
+    │ with timeout  │
+    └───────┬───────┘
+            │
+    ┌───────┴───────┬────────────────┐
+    │               │                │
+    ▼               ▼                ▼
+ >0.80          0.50-0.80         <0.50
+ confidence     confidence        or timeout
+    │               │                │
+    ▼               ▼                ▼
+ execute()     disambiguate()   escalate_to_chat()
+    +              UI                │
+ auto-learn    "Did you mean?"      ▼
+ (add to trie)                   Chat session
+```
+
+### 8.2 Implementation
+
+**File**: `crates/ob-poc-ui/src/app.rs` (or new `esper_intent.rs`)
+
+```rust
+/// Semantic fallback timeout - acceptable frame budget for misses
+const SEMANTIC_TIMEOUT: Duration = Duration::from_millis(50);
+
+/// Confidence thresholds
+const AUTO_EXECUTE_THRESHOLD: f32 = 0.80;
+const DISAMBIGUATION_THRESHOLD: f32 = 0.50;
+
+impl App {
+    /// Handle voice/text input with trie + semantic fallback
+    fn handle_esper_intent(&mut self, phrase: &str) {
+        // =====================================================
+        // FAST PATH: Trie hit (90%+ of cases, <1µs)
+        // =====================================================
+        if let Some(esper_match) = self.registry.lookup(&phrase) {
+            self.execute_esper_command(esper_match.command);
+            return;
+        }
+        
+        // =====================================================
+        // SLOW PATH: Semantic fallback (trie miss, ~15ms)
+        // Only fires for novel phrases
+        // =====================================================
+        let search_result = self.semantic_search_with_timeout(phrase, SEMANTIC_TIMEOUT);
+        
+        match search_result {
+            Some(result) if result.confidence > AUTO_EXECUTE_THRESHOLD => {
+                // High confidence: execute + auto-learn
+                self.execute_esper_command(result.command.clone());
+                
+                // Add to trie so next time it's instant
+                self.registry.add_learned_alias(phrase, &result.command_key);
+                
+                // Persist to DB (fire and forget)
+                self.persist_learned_alias(phrase, &result.command_key, result.confidence);
+            }
+            
+            Some(result) if result.confidence > DISAMBIGUATION_THRESHOLD => {
+                // Ambiguous: show quick alternatives
+                self.show_disambiguation_ui(phrase, result.alternatives);
+            }
+            
+            _ => {
+                // Total miss or timeout: escalate to chat
+                self.escalate_to_chat(phrase);
+            }
+        }
+    }
+    
+    /// Semantic search with hard timeout (blocks, but bounded)
+    fn semantic_search_with_timeout(
+        &self, 
+        phrase: &str, 
+        timeout: Duration
+    ) -> Option<SemanticSearchResult> {
+        // Use tokio::time::timeout or std::thread with timeout
+        // This is the Candle embed + pgvector search
+        
+        let embedder = self.embedder.as_ref()?;
+        
+        // Blocking is OK here - it's only 15ms and only on trie miss
+        let embedding = embedder.embed_blocking(phrase).ok()?;
+        
+        // Search navigation commands (not DSL verbs)
+        self.search_esper_commands_by_embedding(&embedding, timeout)
+    }
+    
+    /// Show quick disambiguation (not full chat)
+    fn show_disambiguation_ui(&mut self, phrase: &str, alternatives: Vec<Alternative>) {
+        // Modal or inline UI: "Did you mean?"
+        // [Zoom In] [Pan Left] [Something else...]
+        self.state.disambiguation = Some(DisambiguationState {
+            original_phrase: phrase.to_string(),
+            alternatives,
+            selected: None,
+        });
+    }
+    
+    /// User selected from disambiguation
+    fn handle_disambiguation_selection(&mut self, selected: &Alternative) {
+        // Execute the selected command
+        self.execute_esper_command(selected.command.clone());
+        
+        // Learn it (high confidence since user confirmed)
+        let phrase = self.state.disambiguation.as_ref()
+            .map(|d| d.original_phrase.clone())
+            .unwrap_or_default();
+        
+        self.registry.add_learned_alias(&phrase, &selected.command_key);
+        self.persist_learned_alias(&phrase, &selected.command_key, 0.95);
+        
+        // Clear disambiguation UI
+        self.state.disambiguation = None;
+    }
+    
+    /// Escalate to chat for complex/unclear intents
+    fn escalate_to_chat(&mut self, phrase: &str) {
+        // Open chat panel with context
+        self.state.chat_open = true;
+        self.state.chat_context = Some(ChatContext::UnresolvedIntent {
+            phrase: phrase.to_string(),
+            suggestion: "I didn't understand that navigation command. Can you rephrase?".into(),
+        });
+    }
+}
+```
+
+### 8.3 Embedding ESPER Commands
+
+Need to embed the ESPER command aliases for semantic search. Add to startup:
+
+**File**: `src/agent/esper/registry.rs`
+
+```rust
+impl EsperCommandRegistry {
+    /// Pre-compute embeddings for all builtin aliases
+    pub async fn compute_embeddings(&mut self, embedder: &dyn Embedder) -> Result<()> {
+        for (key, def) in &self.commands {
+            // Embed all exact aliases
+            for alias in &def.aliases.exact {
+                let embedding = embedder.embed(alias).await?;
+                self.alias_embeddings.insert(alias.clone(), EmbeddedAlias {
+                    command_key: key.clone(),
+                    embedding,
+                });
+            }
+            
+            // Also embed the canonical phrase (command description)
+            if let Some(desc) = &def.description {
+                let embedding = embedder.embed(desc).await?;
+                self.description_embeddings.insert(key.clone(), embedding);
+            }
+        }
+        Ok(())
+    }
+    
+    /// Search by embedding (called on trie miss)
+    pub fn search_by_embedding(
+        &self, 
+        query_embedding: &[f32], 
+        top_k: usize
+    ) -> Vec<SemanticMatch> {
+        let mut matches: Vec<_> = self.alias_embeddings
+            .iter()
+            .map(|(alias, entry)| {
+                let similarity = cosine_similarity(query_embedding, &entry.embedding);
+                SemanticMatch {
+                    command_key: entry.command_key.clone(),
+                    matched_alias: alias.clone(),
+                    confidence: similarity,
+                }
+            })
+            .collect();
+        
+        matches.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+        matches.truncate(top_k);
+        matches
+    }
+}
+
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    // Embeddings are L2-normalized, so dot product = cosine
+    a.iter().zip(b).map(|(x, y)| x * y).sum()
+}
+```
+
+### 8.4 Self-Healing Vocabulary Flow
+
+```
+Day 1: User says "make it bigger"
+       ├─ Trie: MISS
+       ├─ Semantic: ZoomIn (0.84)
+       ├─ Execute + Learn
+       └─ Trie now has: "make it bigger" → ZoomIn
+
+Day 2: User says "make it bigger"
+       ├─ Trie: HIT (learned)
+       └─ Execute instantly (<1µs)
+
+Day 3: User says "embiggen"
+       ├─ Trie: MISS
+       ├─ Semantic: ZoomIn (0.78) ← similar to "make it bigger" embedding
+       ├─ Disambiguation: "Did you mean Zoom In?"
+       ├─ User confirms
+       └─ Trie now has: "embiggen" → ZoomIn
+```
+
+### 8.5 Database Schema for Learned Aliases
+
+**File**: `migrations/0XX_esper_learned_aliases.sql`
+
+```sql
+-- Learned ESPER navigation aliases (per-user vocabulary)
+CREATE TABLE IF NOT EXISTS agent.esper_learned_aliases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id),
+    phrase TEXT NOT NULL,
+    command_key TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    source TEXT DEFAULT 'auto',  -- 'auto', 'disambiguation', 'chat', 'explicit'
+    use_count INT DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    last_used_at TIMESTAMPTZ DEFAULT now(),
+    
+    -- Embedding for semantic clustering
+    embedding vector(384),
+    
+    UNIQUE(user_id, phrase)
+);
+
+-- Index for loading user's vocabulary at session start
+CREATE INDEX idx_esper_aliases_user ON agent.esper_learned_aliases(user_id);
+
+-- Index for semantic search fallback
+CREATE INDEX idx_esper_aliases_embedding 
+ON agent.esper_learned_aliases 
+USING ivfflat (embedding vector_cosine_ops) WITH (lists = 50);
+```
+
+### 8.6 Startup: Load Learned Vocabulary
+
+```rust
+impl App {
+    async fn load_user_vocabulary(&mut self, user_id: Uuid) -> Result<()> {
+        let aliases: Vec<LearnedAlias> = sqlx::query_as(
+            "SELECT phrase, command_key FROM agent.esper_learned_aliases 
+             WHERE user_id = $1 
+             ORDER BY use_count DESC 
+             LIMIT 1000"
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await?;
+        
+        for alias in aliases {
+            self.registry.add_learned_alias(&alias.phrase, &alias.command_key);
+        }
+        
+        Ok(())
+    }
+}
+```
+
+---
+
+## Phase 8 Testing Checklist
+
+### Fast Path (Trie)
+- [ ] "zoom in" → instant execution, no semantic search
+- [ ] "show universe" → instant execution
+- [ ] Known learned phrase → instant execution
+
+### Slow Path (Semantic)
+- [ ] Novel phrase → semantic search completes in <50ms
+- [ ] High confidence hit → auto-execute + auto-learn
+- [ ] Medium confidence → disambiguation UI appears
+- [ ] Low confidence → chat escalation
+
+### Learning Loop
+- [ ] Auto-learned phrase → trie hit on next use
+- [ ] Disambiguation selection → persisted to DB
+- [ ] User vocabulary survives session restart
+
+### Thresholds
+- [ ] 0.85+ confidence → no hesitation, just works
+- [ ] 0.70-0.85 → maybe add micro-confirmation?
+- [ ] <0.50 → definitely needs help
+
+---
+
+## Files to Modify (Phase 8)
+
+| File | Changes |
+|------|---------|
+| `crates/ob-poc-ui/src/app.rs` | `handle_esper_intent()` with fallback |
+| `src/agent/esper/registry.rs` | `compute_embeddings()`, `search_by_embedding()` |
+| `src/agent/learning/embedder.rs` | `embed_blocking()` for sync path |
+| `migrations/0XX_esper_learned_aliases.sql` | NEW - learned alias storage |
+| `crates/ob-poc-ui/src/disambiguation.rs` | NEW - quick "did you mean?" UI |
+
+---
+
+## Summary: The Complete Intent Pipeline
+
+```
+Voice/Text Input
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────┐
+│  1. Trie Lookup (<1µs)                                       │
+│     • Builtin aliases (50+ commands)                         │
+│     • User's learned aliases (grows over time)               │
+│     HIT → execute immediately                                │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ MISS (novel phrase)
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  2. Candle Semantic Search (~15ms, 1-2 frames)               │
+│     • Embed phrase with all-MiniLM-L6-v2                     │
+│     • Cosine similarity against command embeddings           │
+│     • Return top-3 with confidence scores                    │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+         ┌─────────────────┼─────────────────┐
+         ▼                 ▼                 ▼
+     >0.80             0.50-0.80          <0.50
+   confidence         confidence         confidence
+         │                 │                 │
+         ▼                 ▼                 ▼
+    Execute +         Quick UI:         Escalate:
+    Auto-learn       "Did you mean?"    Chat session
+         │                 │                 │
+         └────────┬────────┘                 │
+                  ▼                          │
+         Add to trie                         │
+         (next time = instant)               │
+                                             ▼
+                                    LLM clarification
+                                    (async, out of band)
+```
+
+**Result**: 90%+ of commands execute in <1µs. Novel phrases work within 2 frames. Vocabulary self-improves with use.

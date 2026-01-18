@@ -330,6 +330,15 @@ pub struct SessionStateResponse {
     /// UI uses this to detect external changes (MCP/REPL modifying session)
     #[serde(default)]
     pub version: Option<String>,
+
+    /// Run sheet - DSL statement ledger with per-statement status
+    /// Used by REPL panel to show statement history and status
+    #[serde(default)]
+    pub run_sheet: Option<RunSheet>,
+
+    /// Symbol bindings in this session (symbol name → bound entity)
+    #[serde(default)]
+    pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
 }
 
 impl SessionStateResponse {
@@ -548,6 +557,141 @@ pub struct IntentValidationStatus {
     pub unresolved_refs: Vec<String>,
 }
 
+// ============================================================================
+// RUN SHEET - DSL Statement Ledger with per-statement status
+// ============================================================================
+
+/// Run sheet - DSL statement ledger for REPL panel display
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RunSheet {
+    /// Entries in the run sheet (ordered by creation)
+    #[serde(default)]
+    pub entries: Vec<RunSheetEntry>,
+    /// Current cursor position (index of active entry)
+    #[serde(default)]
+    pub cursor: usize,
+}
+
+impl RunSheet {
+    /// Check if empty
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Get entry count
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Get current entry at cursor
+    pub fn current(&self) -> Option<&RunSheetEntry> {
+        self.entries.get(self.cursor)
+    }
+
+    /// Count entries by status
+    pub fn count_by_status(&self, status: RunSheetEntryStatus) -> usize {
+        self.entries.iter().filter(|e| e.status == status).count()
+    }
+
+    /// Get executed count
+    pub fn executed_count(&self) -> usize {
+        self.count_by_status(RunSheetEntryStatus::Executed)
+    }
+
+    /// Get pending count (draft + ready + executing)
+    pub fn pending_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.status.is_pending())
+            .count()
+    }
+}
+
+/// Single entry in the run sheet
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunSheetEntry {
+    /// Unique entry ID
+    pub id: String,
+    /// DSL source text
+    pub dsl_source: String,
+    /// Display-friendly DSL (may have comments, formatting)
+    #[serde(default)]
+    pub display_dsl: Option<String>,
+    /// Entry status
+    #[serde(default)]
+    pub status: RunSheetEntryStatus,
+    /// Creation timestamp (ISO 8601)
+    #[serde(default)]
+    pub created_at: Option<String>,
+    /// Execution timestamp (ISO 8601)
+    #[serde(default)]
+    pub executed_at: Option<String>,
+    /// Entity IDs affected by execution
+    #[serde(default)]
+    pub affected_entities: Vec<String>,
+    /// Symbol bindings created by this entry
+    #[serde(default)]
+    pub bindings: std::collections::HashMap<String, BoundEntityInfo>,
+    /// Error message if failed
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// Run sheet entry status
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RunSheetEntryStatus {
+    /// Parsed, awaiting user confirmation
+    #[default]
+    Draft,
+    /// User confirmed, ready to execute
+    Ready,
+    /// Execution in progress
+    Executing,
+    /// Successfully executed
+    Executed,
+    /// User cancelled
+    Cancelled,
+    /// Execution failed
+    Failed,
+}
+
+impl RunSheetEntryStatus {
+    /// Check if this is a terminal status
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Executed | Self::Cancelled | Self::Failed)
+    }
+
+    /// Check if this is a pending status
+    pub fn is_pending(&self) -> bool {
+        matches!(self, Self::Draft | Self::Ready | Self::Executing)
+    }
+
+    /// Get display icon for UI
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Draft => "📝",
+            Self::Ready => "✓",
+            Self::Executing => "⏳",
+            Self::Executed => "✅",
+            Self::Cancelled => "⊘",
+            Self::Failed => "❌",
+        }
+    }
+
+    /// Get display color (as RGB tuple)
+    pub fn color_rgb(&self) -> (u8, u8, u8) {
+        match self {
+            Self::Draft => (148, 163, 184),     // slate-400
+            Self::Ready => (34, 197, 94),       // green-500
+            Self::Executing => (250, 204, 21),  // yellow-400
+            Self::Executed => (34, 197, 94),    // green-500
+            Self::Cancelled => (148, 163, 184), // slate-400
+            Self::Failed => (239, 68, 68),      // red-500
+        }
+    }
+}
+
 /// Chat response from agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatResponse {
@@ -569,6 +713,15 @@ pub struct ChatResponse {
     /// Disambiguation request if agent needs user to resolve ambiguous entities
     #[serde(default)]
     pub disambiguation_request: Option<DisambiguationRequest>,
+
+    /// Unresolved entity references needing resolution (post-DSL parsing)
+    /// When present, UI should trigger resolution modal before execution
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unresolved_refs: Option<Vec<crate::resolution::UnresolvedRefResponse>>,
+
+    /// Index of current ref being resolved (if in resolution state)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_ref_index: Option<usize>,
 }
 
 /// Session state enum for typed responses - matches server's SessionState
@@ -1025,6 +1178,25 @@ pub struct CbuGraphResponse {
     pub jurisdiction: Option<String>,
     pub nodes: Vec<GraphNode>,
     pub edges: Vec<GraphEdge>,
+}
+
+/// Multi-CBU scope graph response
+/// Contains combined graph for all CBUs in session scope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopeGraphResponse {
+    /// Combined graph containing all CBUs
+    pub graph: Option<CbuGraphResponse>,
+    /// All CBU IDs included in the graph
+    #[serde(default)]
+    pub cbu_ids: Vec<String>,
+    /// Count of CBUs in scope
+    #[serde(default)]
+    pub cbu_count: usize,
+    /// Entity IDs that were recently affected (for highlighting)
+    #[serde(default)]
+    pub affected_entity_ids: Vec<String>,
+    /// Error message if graph couldn't be loaded
+    pub error: Option<String>,
 }
 
 /// Node in the CBU graph

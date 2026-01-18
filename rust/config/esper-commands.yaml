@@ -1,0 +1,806 @@
+# ESPER Navigation Commands Configuration
+# ========================================
+# Blade Runner-inspired voice/chat commands for graph visualization navigation.
+# These are deterministic, instant-response commands (60fps requirement).
+#
+# Schema:
+#   canonical: The "proper" way to say it (for help text)
+#   response: What to show user when command matches
+#   priority: Higher wins for overlapping patterns (default: 100)
+#   agent_command.type: Maps to AgentCommand enum variant
+#   agent_command.params: Parameter extraction hints
+#     - extract: Parse from phrase (number, direction, etc.)
+#     - context: Get from session (current entity/cbu)
+#     - rest_of_phrase: Everything after prefix match
+#   aliases.exact: Must match exactly (after normalization)
+#   aliases.contains: Substring match
+#   aliases.prefix: Match prefix, extract rest as parameter
+
+version: "1.0"
+
+commands:
+  # ===========================================================================
+  # STOP / HOLD (highest priority - Esper classic)
+  # ===========================================================================
+  stop:
+    canonical: "stop"
+    response: "Stopping."
+    priority: 1000
+    agent_command:
+      type: Stop
+    aliases:
+      exact:
+        - "stop"
+        - "hold"
+        - "freeze"
+        - "pause"
+        - "wait"
+        - "halt"
+        - "that's good"
+        - "right there"
+        - "there"
+        - "okay stop"
+
+  # ===========================================================================
+  # ZOOM COMMANDS
+  # ===========================================================================
+  zoom_in:
+    canonical: "enhance"
+    response: "Enhancing..."
+    priority: 100
+    agent_command:
+      type: ZoomIn
+      params:
+        factor: extract
+    aliases:
+      exact:
+        - "enhance"
+        - "closer"
+        - "magnify"
+      prefix:
+        - "enhance "
+        - "zoom in"
+        - "move in"
+
+  zoom_out:
+    canonical: "zoom out"
+    response: "Zooming out..."
+    priority: 100
+    agent_command:
+      type: ZoomOut
+      params:
+        factor: extract
+    aliases:
+      exact:
+        - "wider"
+      prefix:
+        - "zoom out"
+        - "pull back"
+        - "move out"
+
+  zoom_fit:
+    canonical: "fit to screen"
+    response: "Fitting to screen."
+    priority: 100
+    agent_command:
+      type: ZoomFit
+    aliases:
+      exact:
+        - "fit"
+      contains:
+        - "fit to screen"
+        - "show all"
+        - "bird"
+        - "overview"
+        - "30000 foot"
+
+  # ===========================================================================
+  # PAN COMMANDS
+  # ===========================================================================
+  pan:
+    canonical: "track"
+    response: "Tracking..."
+    priority: 90
+    agent_command:
+      type: Pan
+      params:
+        direction: extract
+        amount: extract
+    aliases:
+      exact:
+        - "left"
+        - "right"
+        - "up"
+        - "down"
+      prefix:
+        - "track "
+        - "pan "
+        - "scroll "
+
+  # ===========================================================================
+  # CENTER / HOME
+  # ===========================================================================
+  center:
+    canonical: "center"
+    response: "Centering view."
+    priority: 100
+    agent_command:
+      type: Center
+    aliases:
+      exact:
+        - "center"
+        - "home"
+        - "center and stop"
+
+  # ===========================================================================
+  # HIERARCHY NAVIGATION
+  # ===========================================================================
+  taxonomy_zoom_out:
+    canonical: "drill up"
+    response: "Zooming out..."
+    priority: 100
+    agent_command:
+      type: TaxonomyZoomOut
+    aliases:
+      prefix:
+        - "drill up"
+        - "go up"
+        - "back up"
+      contains:
+        - "show parent"
+
+  # ===========================================================================
+  # EXPORT (Blade Runner classic: "Give me a hard copy")
+  # ===========================================================================
+  export:
+    canonical: "give me a hard copy"
+    response: "Generating hard copy..."
+    priority: 100
+    agent_command:
+      type: Export
+      params:
+        format: extract
+    aliases:
+      contains:
+        - "hard copy"
+        - "print"
+        - "screenshot"
+        - "export"
+        - "save image"
+
+  # ===========================================================================
+  # LAYOUT COMMANDS
+  # ===========================================================================
+  reset_layout:
+    canonical: "reset layout"
+    response: "Resetting layout."
+    priority: 100
+    agent_command:
+      type: ResetLayout
+    aliases:
+      contains:
+        - "reset layout"
+        - "auto arrange"
+        - "auto layout"
+        - "rearrange"
+
+  toggle_orientation:
+    canonical: "flip layout"
+    response: "Toggling orientation."
+    priority: 100
+    agent_command:
+      type: ToggleOrientation
+    aliases:
+      contains:
+        - "flip layout"
+        - "rotate layout"
+        - "toggle orientation"
+        - "switch orientation"
+
+  # ===========================================================================
+  # SEARCH
+  # ===========================================================================
+  search:
+    canonical: "find"
+    response: "Searching..."
+    priority: 80
+    agent_command:
+      type: Search
+      params:
+        query: rest_of_phrase
+    aliases:
+      prefix:
+        - "find "
+        - "search "
+        - "locate "
+
+  # ===========================================================================
+  # HELP
+  # ===========================================================================
+  help:
+    canonical: "help"
+    response: "Here are the available navigation commands..."
+    priority: 100
+    agent_command:
+      type: ShowHelp
+      params:
+        topic: rest_of_phrase
+    aliases:
+      exact:
+        - "help"
+      contains:
+        - "what can i say"
+        - "what commands"
+        - "navigation help"
+
+  # ===========================================================================
+  # SCALE NAVIGATION (Astronomical metaphor)
+  # ===========================================================================
+  scale_universe:
+    canonical: "show universe"
+    response: "Showing full universe..."
+    priority: 100
+    agent_command:
+      type: ScaleUniverse
+    aliases:
+      contains:
+        - "universe"
+        - "full book"
+        - "entire book"
+        - "client book"
+        - "god view"
+        - "see everything"
+        - "all clients"
+        - "the whole picture"
+
+  scale_galaxy:
+    canonical: "galaxy view"
+    response: "Showing galaxy view..."
+    priority: 100
+    agent_command:
+      type: ScaleGalaxy
+      params:
+        segment: extract
+    aliases:
+      contains:
+        - "galaxy"
+        - "segment view"
+        - "cluster view"
+        - "portfolio view"
+
+  scale_system:
+    canonical: "enter system"
+    response: "Entering system view..."
+    priority: 100
+    agent_command:
+      type: ScaleSystem
+      params:
+        cbu_id: context
+    aliases:
+      contains:
+        - "enter system"
+        - "solar system"
+        - "cbu system"
+        - "with satellites"
+        - "what's orbiting"
+
+  scale_planet:
+    canonical: "land on"
+    response: "Landing on entity..."
+    priority: 100
+    agent_command:
+      type: ScalePlanet
+      params:
+        entity_id: context
+    aliases:
+      contains:
+        - "land on"
+        - "planet view"
+        - "touch down"
+        - "go to surface"
+
+  scale_surface:
+    canonical: "surface scan"
+    response: "Scanning surface..."
+    priority: 100
+    agent_command:
+      type: ScaleSurface
+    aliases:
+      contains:
+        - "surface scan"
+        - "surface view"
+        - "ground level"
+        - "show attributes"
+        - "entity details"
+        - "full profile"
+        - "what do we know"
+        - "everything about"
+
+  scale_core:
+    canonical: "core sample"
+    response: "Sampling core data..."
+    priority: 100
+    agent_command:
+      type: ScaleCore
+    aliases:
+      contains:
+        - "core sample"
+        - "to the core"
+        - "deep scan"
+        - "below surface"
+        - "hidden layers"
+        - "what's hidden"
+        - "indirect ownership"
+        - "indirect control"
+        - "derived"
+        - "inferred"
+        - "beneath the surface"
+
+  # ===========================================================================
+  # DEPTH NAVIGATION (Z-axis through entity structures)
+  # ===========================================================================
+  drill_through:
+    canonical: "drill through"
+    response: "Drilling through to natural persons..."
+    priority: 100
+    agent_command:
+      type: DrillThrough
+    aliases:
+      contains:
+        - "drill through"
+        - "drill all the way"
+        - "to the bottom"
+        - "find the humans"
+        - "find natural persons"
+        - "who's really behind"
+        - "ultimate owners"
+        - "trace to terminus"
+        - "follow the money"
+        - "cui bono"
+
+  surface_return:
+    canonical: "surface"
+    response: "Returning to surface..."
+    priority: 100
+    agent_command:
+      type: SurfaceReturn
+    aliases:
+      exact:
+        - "surface"
+      contains:
+        - "come up"
+        - "return to surface"
+        - "back to top"
+        - "top level"
+        - "emerge"
+        - "rise up"
+        - "float up"
+        - "back to daylight"
+
+  xray:
+    canonical: "x-ray"
+    response: "Activating x-ray view..."
+    priority: 100
+    agent_command:
+      type: XRay
+    aliases:
+      contains:
+        - "x-ray"
+        - "xray"
+        - "transparent"
+        - "see through"
+        - "skeleton view"
+        - "wireframe"
+        - "show all layers"
+        - "reveal structure"
+
+  peel:
+    canonical: "peel"
+    response: "Peeling layer..."
+    priority: 100
+    agent_command:
+      type: Peel
+    aliases:
+      exact:
+        - "peel"
+      contains:
+        - "peel back"
+        - "next layer"
+        - "one layer"
+        - "remove layer"
+        - "unwrap"
+        - "layer by layer"
+
+  cross_section:
+    canonical: "cross section"
+    response: "Showing cross section..."
+    priority: 100
+    agent_command:
+      type: CrossSection
+    aliases:
+      contains:
+        - "cross section"
+        - "horizontal slice"
+        - "slice"
+        - "cut through"
+        - "peers at this level"
+        - "same level"
+        - "siblings"
+        - "who else is at this level"
+
+  depth_indicator:
+    canonical: "how deep"
+    response: "Checking depth..."
+    priority: 100
+    agent_command:
+      type: DepthIndicator
+    aliases:
+      contains:
+        - "how deep"
+        - "what depth"
+        - "how many layers"
+        - "depth check"
+        - "where am i"
+        - "how far down"
+
+  # ===========================================================================
+  # ORBITAL NAVIGATION
+  # ===========================================================================
+  orbit:
+    canonical: "orbit"
+    response: "Orbiting entity..."
+    priority: 100
+    agent_command:
+      type: Orbit
+      params:
+        entity_id: context
+    aliases:
+      exact:
+        - "orbit"
+      contains:
+        - "orbit around"
+        - "circle around"
+        - "rotate around"
+        - "360 view"
+        - "full rotation"
+        - "all connections"
+        - "what's connected"
+
+  rotate_layer:
+    canonical: "rotate to"
+    response: "Rotating to layer..."
+    priority: 100
+    agent_command:
+      type: RotateLayer
+      params:
+        layer: extract
+    aliases:
+      contains:
+        - "rotate to"
+        - "switch layer"
+        - "flip to"
+
+  flip:
+    canonical: "flip"
+    response: "Flipping view..."
+    priority: 100
+    agent_command:
+      type: Flip
+    aliases:
+      exact:
+        - "flip"
+      contains:
+        - "flip view"
+        - "invert"
+        - "reverse view"
+        - "opposite view"
+        - "upstream"
+        - "downstream"
+
+  tilt:
+    canonical: "tilt"
+    response: "Tilting view..."
+    priority: 100
+    agent_command:
+      type: Tilt
+      params:
+        dimension: extract
+    aliases:
+      exact:
+        - "tilt"
+      contains:
+        - "tilt view"
+        - "angle"
+
+  # ===========================================================================
+  # TEMPORAL NAVIGATION (4th dimension - time)
+  # ===========================================================================
+  time_rewind:
+    canonical: "rewind"
+    response: "Rewinding..."
+    priority: 100
+    agent_command:
+      type: TimeRewind
+      params:
+        target_date: extract
+    aliases:
+      contains:
+        - "rewind"
+        - "go back to"
+        - "as of"
+        - "at date"
+        - "historical"
+        - "back in time"
+        - "time travel"
+        - "take me back"
+        - "before the"
+        - "previous state"
+
+  time_play:
+    canonical: "play"
+    response: "Playing timeline..."
+    priority: 90  # Lower to avoid "display" false positive
+    agent_command:
+      type: TimePlay
+      params:
+        from_date: extract
+        to_date: extract
+    aliases:
+      exact:
+        - "play"
+      contains:
+        - "play forward"
+        - "animate"
+        - "show changes"
+        - "evolve"
+        - "progression"
+        - "time lapse"
+        - "show evolution"
+        - "watch it change"
+
+  time_freeze:
+    canonical: "freeze time"
+    response: "Freezing time..."
+    priority: 100
+    agent_command:
+      type: TimeFreeze
+    aliases:
+      contains:
+        - "freeze time"
+        - "freeze frame"
+        - "lock time"
+        - "fix date"
+        - "temporal lock"
+        - "hold that date"
+
+  time_slice:
+    canonical: "time slice"
+    response: "Comparing time slices..."
+    priority: 100
+    agent_command:
+      type: TimeSlice
+      params:
+        date1: extract
+        date2: extract
+    aliases:
+      contains:
+        - "time slice"
+        - "compare times"
+        - "temporal diff"
+        - "before after"
+        - "then vs now"
+        - "what changed"
+        - "year over year"
+        - "show the difference"
+        - "what moved"
+        - "ownership delta"
+
+  time_trail:
+    canonical: "show trail"
+    response: "Showing timeline..."
+    priority: 100
+    agent_command:
+      type: TimeTrail
+      params:
+        entity_id: context
+    aliases:
+      contains:
+        - "show trail"
+        - "history trail"
+        - "audit trail"
+        - "timeline"
+        - "chronology"
+        - "full history"
+        - "event history"
+        - "how did we get here"
+
+  # ===========================================================================
+  # INVESTIGATION PATTERNS
+  # ===========================================================================
+  follow_the_money:
+    canonical: "follow the money"
+    response: "Following the money..."
+    priority: 100
+    agent_command:
+      type: FollowTheMoney
+      params:
+        from_entity: context
+    aliases:
+      contains:
+        - "follow the money"
+        - "trace the money"
+        - "money trail"
+        - "capital flow"
+        - "trace ownership"
+        - "ownership chain"
+        - "who owns who"
+
+  who_controls:
+    canonical: "who controls"
+    response: "Tracing control..."
+    priority: 100
+    agent_command:
+      type: WhoControls
+      params:
+        entity_id: context
+    aliases:
+      contains:
+        - "who controls"
+        - "who's in charge"
+        - "who decides"
+        - "control trace"
+        - "decision makers"
+        - "power structure"
+        - "puppet master"
+        - "who's really running"
+
+  illuminate:
+    canonical: "illuminate"
+    response: "Illuminating..."
+    priority: 100
+    agent_command:
+      type: Illuminate
+      params:
+        aspect: extract
+    aliases:
+      exact:
+        - "illuminate"
+      contains:
+        - "bring out"
+        - "spotlight"
+        - "light it up"
+        - "make it obvious"
+
+  shadow:
+    canonical: "show shadow"
+    response: "Showing shadow relationships..."
+    priority: 100
+    agent_command:
+      type: Shadow
+    aliases:
+      contains:
+        - "show shadow"
+        - "shadow view"
+        - "indirect"
+        - "behind the scenes"
+        - "hidden connections"
+        - "implicit"
+
+  red_flag_scan:
+    canonical: "red flag"
+    response: "Scanning for red flags..."
+    priority: 100
+    agent_command:
+      type: RedFlagScan
+    aliases:
+      contains:
+        - "red flag"
+        - "risk scan"
+        - "anomaly"
+        - "what's wrong"
+        - "problems"
+        - "suspicious"
+        - "circular ownership"
+        - "show me problems"
+        - "what should worry"
+
+  black_hole:
+    canonical: "black holes"
+    response: "Finding black holes..."
+    priority: 100
+    agent_command:
+      type: BlackHole
+    aliases:
+      contains:
+        - "black hole"
+        - "missing information"
+        - "data void"
+        - "information gap"
+        - "what's missing"
+        - "incomplete"
+        - "dead end"
+        - "where does it go dark"
+        - "opacity"
+        - "can't see past"
+
+  # ===========================================================================
+  # CONTEXT INTENTIONS
+  # ===========================================================================
+  context_review:
+    canonical: "board review"
+    response: "Setting context: Board/Committee Review"
+    priority: 100
+    agent_command:
+      type: ContextReview
+    aliases:
+      contains:
+        - "board review"
+        - "committee review"
+        - "quarterly review"
+        - "annual review"
+        - "audit preparation"
+        - "preparing for review"
+        - "need board pack"
+
+  context_investigation:
+    canonical: "investigation mode"
+    response: "Setting context: Investigation"
+    priority: 100
+    agent_command:
+      type: ContextInvestigation
+    aliases:
+      contains:
+        - "investigation mode"
+        - "investigating"
+        - "forensic"
+        - "deep dive"
+        - "due diligence"
+        - "enhanced due diligence"
+        - "suspicious activity"
+        - "something's not right"
+
+  context_onboarding:
+    canonical: "onboarding mode"
+    response: "Setting context: Onboarding"
+    priority: 100
+    agent_command:
+      type: ContextOnboarding
+    aliases:
+      contains:
+        - "onboarding mode"
+        - "new client"
+        - "client intake"
+        - "initial setup"
+        - "setting up new"
+        - "kyc collection"
+
+  context_monitoring:
+    canonical: "monitoring mode"
+    response: "Setting context: Monitoring"
+    priority: 100
+    agent_command:
+      type: ContextMonitoring
+    aliases:
+      contains:
+        - "monitoring mode"
+        - "ongoing monitoring"
+        - "pkyc"
+        - "periodic kyc"
+        - "event monitoring"
+        - "checking for changes"
+
+  context_remediation:
+    canonical: "remediation mode"
+    response: "Setting context: Remediation"
+    priority: 100
+    agent_command:
+      type: ContextRemediation
+    aliases:
+      contains:
+        - "remediation mode"
+        - "fixing"
+        - "gap filling"
+        - "completing"
+        - "need to fix"
+        - "what's outstanding"
+        - "what's blocking"

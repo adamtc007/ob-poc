@@ -12,6 +12,7 @@
 //! - Callbacks for widget events (use return values)
 //! - Caching entities locally
 
+use crate::api::ScopeGraphData;
 use crate::panels::ContainerBrowseState;
 use crate::tokens::TokenRegistry;
 use ob_poc_graph::{
@@ -24,6 +25,7 @@ use ob_poc_types::investor_register::{
 };
 use ob_poc_types::{
     galaxy::{NavigationScope, UniverseGraph, ViewLevel},
+    resolution::{DiscriminatorField, ResolutionModeHint, SearchKeyField, UnresolvedRefResponse},
     CbuSummary, ExecuteResponse, ResolutionSearchResponse, ResolutionSessionResponse,
     SessionContext, SessionStateResponse, ValidateDslResponse,
 };
@@ -606,7 +608,7 @@ impl WindowStack {
 pub struct ResolutionPanelUi {
     /// Currently selected ref_id for resolution
     pub selected_ref_id: Option<String>,
-    /// Search query for current ref
+    /// Search query for current ref (legacy - kept for backward compat)
     pub search_query: String,
     /// Chat buffer for sub-session conversation
     pub chat_buffer: String,
@@ -628,6 +630,22 @@ pub struct ResolutionPanelUi {
     pub voice_active: bool,
     /// Last voice transcript received
     pub last_voice_transcript: Option<String>,
+
+    // === Entity-specific config (from UnresolvedRefResponse) ===
+    /// Current entity type being resolved (e.g., "cbu", "person", "jurisdiction")
+    pub current_entity_type: Option<String>,
+    /// Search key fields for this entity type (from entity_index.yaml)
+    pub search_keys: Vec<SearchKeyField>,
+    /// Multi-key search values (e.g., {"name": "Allianz", "jurisdiction": "LU"})
+    pub search_key_values: std::collections::HashMap<String, String>,
+    /// Discriminator fields for scoring refinement
+    pub discriminator_fields: Vec<DiscriminatorField>,
+    /// Resolution mode hint (SearchModal vs Autocomplete)
+    pub resolution_mode: ResolutionModeHint,
+    /// Current unresolved ref being worked on
+    pub current_ref: Option<UnresolvedRefResponse>,
+    /// Debounce: pending search trigger time (for 300ms delay)
+    pub pending_search_trigger: Option<f64>,
 }
 
 /// CBU search modal UI state
@@ -733,6 +751,7 @@ pub struct AsyncState {
     /// Pending watch result (from long-polling /api/session/:id/watch)
     pub pending_watch: Option<Result<crate::api::WatchSessionResponse, String>>,
     pub pending_graph: Option<Result<CbuGraphData, String>>,
+    pub pending_scope_graph: Option<Result<ScopeGraphData, String>>,
     pub pending_validation: Option<Result<ValidateDslResponse, String>>,
     pub pending_execution: Option<Result<ExecuteResponse, String>>,
     pub pending_cbu_list: Option<Result<Vec<CbuSummary>, String>>,
@@ -759,6 +778,12 @@ pub struct AsyncState {
     pub pending_cbu_lookup: Option<Result<(Uuid, String), String>>,
     /// Loading flag for CBU lookup
     pub loading_cbu_lookup: bool,
+
+    // Unresolved refs (direct from ChatResponse - new simplified flow)
+    /// Unresolved refs from chat response - opens resolution modal directly
+    pub pending_unresolved_refs: Option<Vec<UnresolvedRefResponse>>,
+    /// Current ref index from chat response
+    pub pending_current_ref_index: Option<usize>,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -798,6 +823,7 @@ pub struct AsyncState {
     pub pending_resolution_skip: bool,                     // Skip current ref
     pub pending_resolution_complete: Option<bool>,         // Complete with apply flag
     pub pending_resolution_cancel: bool,                   // Cancel resolution
+    pub loading_resolution_search: bool,                   // Loading flag for multi-key search
 
     // Extended Esper 3D/Multi-dimensional commands
     // Scale navigation (astronomical metaphor)
@@ -867,13 +893,15 @@ pub struct AsyncState {
     // State change flags (set by actions, processed centrally in update loop)
     // These are checked ONCE in update() AFTER process_async_results()
     pub needs_graph_refetch: bool, // CBU selected or view mode changed
+    pub needs_scope_graph_refetch: bool, // Execution complete, fetch multi-CBU scope graph
     pub needs_context_refetch: bool, // CBU selected, fetch session context
     pub needs_trading_matrix_refetch: bool, // Trading view mode selected
     pub needs_session_refetch: bool, // Version changed, need full session refetch
-    pub needs_resolution_check: bool, // Chat completed with DSL, check for unresolved entities
+    // NOTE: needs_resolution_check removed - now using direct ChatResponse.unresolved_refs flow
+    // See ai-thoughts/036-session-rip-and-replace.md
     pub needs_investor_register_refetch: bool, // Investor register view selected
-    pub pending_cbu_id: Option<Uuid>, // CBU to fetch graph for (set by select_cbu)
-    pub pending_issuer_id: Option<Uuid>, // Issuer to fetch investor register for
+    pub pending_cbu_id: Option<Uuid>,          // CBU to fetch graph for (set by select_cbu)
+    pub pending_issuer_id: Option<Uuid>,       // Issuer to fetch investor register for
 
     // Execution tracking - prevents repeated refetch
     pub execution_handled: bool,
@@ -929,9 +957,6 @@ impl AppState {
             state.loading_session = false;
             match result {
                 Ok(session) => {
-                    // Check if DSL content is present
-                    let has_dsl = session.has_dsl();
-
                     // Sync DSL editor from session.combined_dsl if server has content and we're not dirty
                     if !self.buffers.dsl_dirty {
                         if let Some(ref dsl) = session.combined_dsl {
@@ -941,16 +966,8 @@ impl AppState {
                         }
                     }
 
-                    // If DSL is present with unresolved refs, trigger resolution check
-                    // This enables automatic entity lookup popup when DSL has unresolved refs
-                    // Only trigger if can_execute is false (meaning there ARE unresolved refs)
-                    if has_dsl
-                        && !session.can_execute
-                        && self.resolution.is_none()
-                        && !state.loading_resolution
-                    {
-                        state.needs_resolution_check = true;
-                    }
+                    // NOTE: Legacy resolution check removed - unresolved refs now come directly
+                    // in ChatResponse.unresolved_refs and are handled via pending_unresolved_refs
 
                     // Track session version for external change detection (MCP/REPL)
                     self.last_known_version = session.version.clone();
@@ -1084,6 +1101,37 @@ impl AppState {
             }
         }
 
+        // Process scope graph fetch (multi-CBU session graph)
+        if let Some(result) = state.pending_scope_graph.take() {
+            match result {
+                Ok(data) => {
+                    web_sys::console::log_1(
+                        &format!(
+                            "process_async_results: scope graph received for {} CBUs, {} affected entities",
+                            data.cbu_count,
+                            data.affected_entity_ids.len()
+                        )
+                        .into(),
+                    );
+                    // If we got a graph, use it like a regular graph
+                    if let Some(graph_data) = data.graph {
+                        self.graph_widget.set_data(graph_data.clone());
+                        self.graph_data = Some(graph_data);
+
+                        // Populate ontology counts from graph data
+                        if let Some(layout_graph) = self.graph_widget.get_layout_graph() {
+                            self.entity_ontology.populate_counts(layout_graph);
+                        }
+                    }
+                    // TODO: Could highlight affected_entity_ids in the viewport
+                }
+                Err(e) => {
+                    web_sys::console::error_1(&format!("Scope graph fetch failed: {}", e).into());
+                    state.last_error = Some(format!("Scope graph fetch failed: {}", e));
+                }
+            }
+        }
+
         // Process validation
         if let Some(result) = state.pending_validation.take() {
             match result {
@@ -1154,6 +1202,39 @@ impl AppState {
                     }
                 }
                 Err(e) => state.last_error = Some(format!("Disambiguation search failed: {}", e)),
+            }
+        }
+
+        // Process unresolved refs from ChatResponse - DIRECT FLOW (2 hops, not 5+)
+        // This is the new simplified resolution flow per ai-thoughts/036
+        if let Some(refs) = state.pending_unresolved_refs.take() {
+            let current_index = state.pending_current_ref_index.take().unwrap_or(0);
+
+            web_sys::console::log_1(
+                &format!(
+                    "process_async_results: opening resolution modal for {} refs (index {})",
+                    refs.len(),
+                    current_index
+                )
+                .into(),
+            );
+
+            // Set up resolution UI state
+            self.resolution_ui.show_panel = true;
+
+            // Set current ref from the list
+            if let Some(current_ref) = refs.get(current_index) {
+                self.resolution_ui.current_ref = Some(current_ref.clone());
+                self.resolution_ui.current_entity_type = Some(current_ref.entity_type.clone());
+                self.resolution_ui.search_keys = current_ref.search_keys.clone();
+                self.resolution_ui.discriminator_fields = current_ref.discriminator_fields.clone();
+                self.resolution_ui.resolution_mode = current_ref.resolution_mode.clone();
+
+                // Initialize search with the search value
+                self.resolution_ui.search_query = current_ref.search_value.clone();
+
+                // Clear previous search results
+                self.resolution_ui.search_results = None;
             }
         }
 
@@ -1436,13 +1517,29 @@ impl AppState {
             return Some(cbu_id);
         }
 
-        // Fall back to active CBU from session (for view mode changes, execution complete)
+        // Fall back to active CBU from session (for view mode changes)
         // NOTE: We must NOT use session_id here - that's the SESSION UUID, not the CBU ID
         drop(state); // Release lock before accessing self
         self.session
             .as_ref()
             .and_then(|s| s.active_cbu_id())
             .and_then(|id| Uuid::parse_str(&id).ok())
+    }
+
+    /// Check if scope graph refetch is needed (multi-CBU session graph after execution)
+    /// Called ONCE per frame in update() - returns true if refetch needed
+    pub fn take_pending_scope_graph_refetch(&self) -> bool {
+        let Ok(mut state) = self.async_state.lock() else {
+            return false;
+        };
+
+        if !state.needs_scope_graph_refetch {
+            return false;
+        }
+
+        // Clear the flag
+        state.needs_scope_graph_refetch = false;
+        true
     }
 
     /// Check if trading matrix refetch is needed and return the CBU ID to fetch
@@ -1528,20 +1625,8 @@ impl AppState {
         None
     }
 
-    /// Check if resolution check is needed (DSL has unresolved entity refs)
-    pub fn take_pending_resolution_check(&self) -> bool {
-        let Ok(mut state) = self.async_state.lock() else {
-            return false;
-        };
-
-        if !state.needs_resolution_check {
-            return false;
-        }
-
-        // Clear the flag
-        state.needs_resolution_check = false;
-        true
-    }
+    // NOTE: take_pending_resolution_check removed - now using direct ChatResponse.unresolved_refs flow
+    // See ai-thoughts/036-session-rip-and-replace.md
 
     /// Check if a filter by type command is pending
     pub fn take_pending_filter_by_type(&self) -> Option<Vec<String>> {

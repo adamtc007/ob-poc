@@ -474,16 +474,358 @@ async fn delete_session(
 }
 
 // =============================================================================
+// SHEET EXECUTION ENDPOINTS
+// =============================================================================
+
+/// Request to set scope DSL
+#[derive(Debug, Deserialize)]
+pub struct SetScopeRequest {
+    /// DSL commands that define the scope
+    pub scope_dsl: Vec<String>,
+}
+
+/// Request to set template DSL
+#[derive(Debug, Deserialize)]
+pub struct SetTemplateRequest {
+    /// Template DSL (may contain @cbu placeholder)
+    pub template_dsl: String,
+    /// Target entity type (e.g., "cbu")
+    pub target_entity_type: String,
+}
+
+/// Request to confirm intent
+#[derive(Debug, Deserialize)]
+pub struct ConfirmIntentRequest {
+    /// Must be true to confirm
+    pub confirm: bool,
+}
+
+/// Request to submit sheet for execution
+#[derive(Debug, Deserialize)]
+pub struct SubmitSheetRequest {
+    /// Must be true to execute
+    pub confirm: bool,
+}
+
+/// POST /api/cbu-session/:id/scope - Set scope DSL
+async fn set_scope(
+    Path(session_id): Path<Uuid>,
+    State(state): State<CbuSessionState>,
+    Json(request): Json<SetScopeRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    ensure_session_in_store(session_id, &state).await;
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    session
+        .set_scope(request.scope_dsl)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    // Persist to DB
+    session
+        .force_save(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "session_id": session_id,
+        "state": format!("{:?}", session.repl_state),
+        "scope_dsl_count": session.scope_dsl.len(),
+    })))
+}
+
+/// POST /api/cbu-session/:id/template - Set template DSL
+async fn set_template(
+    Path(session_id): Path<Uuid>,
+    State(state): State<CbuSessionState>,
+    Json(request): Json<SetTemplateRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    ensure_session_in_store(session_id, &state).await;
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    session
+        .set_template(request.template_dsl, request.target_entity_type)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    // Persist to DB
+    session
+        .force_save(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "session_id": session_id,
+        "state": format!("{:?}", session.repl_state),
+        "template_set": true,
+    })))
+}
+
+/// POST /api/cbu-session/:id/confirm-intent - Confirm template intent
+async fn confirm_intent(
+    Path(session_id): Path<Uuid>,
+    State(state): State<CbuSessionState>,
+    Json(request): Json<ConfirmIntentRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    if !request.confirm {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Must set confirm: true".to_string(),
+        ));
+    }
+
+    ensure_session_in_store(session_id, &state).await;
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    session
+        .confirm_intent()
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    // Persist to DB
+    session
+        .force_save(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "session_id": session_id,
+        "state": format!("{:?}", session.repl_state),
+        "intent_confirmed": true,
+    })))
+}
+
+/// POST /api/cbu-session/:id/sheet/generate - Generate DSL sheet from template
+async fn generate_sheet(
+    Path(session_id): Path<Uuid>,
+    State(state): State<CbuSessionState>,
+) -> Result<Json<crate::session::dsl_sheet::DslSheet>, (StatusCode, String)> {
+    use crate::session::dsl_sheet::{DslSheet, SessionDslStatement, StatementStatus};
+
+    ensure_session_in_store(session_id, &state).await;
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    // Validate state - must be Templated with confirmed=true
+    if !session.intent_confirmed {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Intent not confirmed. Call /confirm-intent first.".to_string(),
+        ));
+    }
+
+    let template = session
+        .template_dsl
+        .as_ref()
+        .ok_or((StatusCode::BAD_REQUEST, "No template DSL set".to_string()))?;
+
+    // Get entities from current scope
+    let entity_ids: Vec<Uuid> = session.cbu_ids().copied().collect();
+    if entity_ids.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "No entities in scope. Load CBUs first.".to_string(),
+        ));
+    }
+
+    // Generate statements by expanding template for each entity
+    let mut statements = Vec::with_capacity(entity_ids.len());
+    for (idx, entity_id) in entity_ids.iter().enumerate() {
+        // Replace @cbu placeholder with actual UUID
+        let populated = template.replace("@cbu", &format!("\"{}\"", entity_id));
+        statements.push(SessionDslStatement {
+            index: idx,
+            source: populated,
+            dag_depth: 0, // Will be computed after DAG analysis
+            produces: None,
+            consumes: vec!["cbu".to_string()],
+            resolved_args: std::collections::HashMap::new(),
+            returned_pk: None,
+            status: StatementStatus::Pending,
+        });
+    }
+
+    let sheet = DslSheet::with_statements(session_id, statements);
+
+    // Update session state
+    session
+        .set_generated(sheet.clone())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Persist to DB
+    session
+        .force_save(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(sheet))
+}
+
+/// POST /api/cbu-session/:id/sheet/submit - Submit sheet for execution
+async fn submit_sheet(
+    Path(session_id): Path<Uuid>,
+    State(state): State<CbuSessionState>,
+    Json(request): Json<SubmitSheetRequest>,
+) -> Result<Json<crate::session::dsl_sheet::SheetExecutionResult>, (StatusCode, String)> {
+    use crate::dsl_v2::SheetExecutor;
+    use crate::session::dsl_sheet::SheetStatus;
+
+    if !request.confirm {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Must set confirm: true".to_string(),
+        ));
+    }
+
+    ensure_session_in_store(session_id, &state).await;
+
+    // Get session and validate state
+    let (mut sheet, phases, scope_dsl, template_dsl) = {
+        let sessions = state.sessions.read().await;
+        let session = sessions
+            .get(&session_id)
+            .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+        // Validate state - must be Ready
+        if !matches!(
+            session.repl_state,
+            crate::session::ReplSessionState::Ready
+                | crate::session::ReplSessionState::Generated
+                | crate::session::ReplSessionState::Parsed
+        ) {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Session not ready for execution (state: {:?})",
+                    session.repl_state
+                ),
+            ));
+        }
+
+        let sheet = session.sheet.clone().ok_or((
+            StatusCode::BAD_REQUEST,
+            "No sheet generated. Call /sheet/generate first.".to_string(),
+        ))?;
+
+        let phases = sheet.phases.clone();
+        let scope_dsl = session.scope_dsl.clone();
+        let template_dsl = session.template_dsl.clone();
+
+        (sheet, phases, scope_dsl, template_dsl)
+    };
+
+    // Execute the sheet
+    let executor = SheetExecutor::new(&state.pool, None);
+    let result = executor
+        .execute_phased(&mut sheet, &phases)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Persist audit trail
+    let _ = executor
+        .persist_audit(
+            &sheet,
+            &result,
+            &scope_dsl,
+            template_dsl.as_deref(),
+            None, // TODO: Get user from auth context
+        )
+        .await;
+
+    // Update session state
+    {
+        let mut sessions = state.sessions.write().await;
+        if let Some(session) = sessions.get_mut(&session_id) {
+            let success = result.overall_status == SheetStatus::Success;
+            let _ = session.mark_executed(success);
+
+            // Persist to DB
+            let _ = session.force_save(&state.pool).await;
+        }
+    }
+
+    Ok(Json(result))
+}
+
+/// GET /api/cbu-session/:id/state - Get REPL state machine info
+async fn get_repl_state(
+    Path(session_id): Path<Uuid>,
+    State(state): State<CbuSessionState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let session = get_or_load_session(session_id, &state)
+        .await
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "session_id": session_id,
+        "repl_state": format!("{:?}", session.repl_state),
+        "scope_dsl_count": session.scope_dsl.len(),
+        "template_set": session.template_dsl.is_some(),
+        "target_entity_type": session.target_entity_type,
+        "intent_confirmed": session.intent_confirmed,
+        "sheet": session.sheet.as_ref().map(|s| serde_json::json!({
+            "id": s.id,
+            "statement_count": s.statement_count(),
+            "phase_count": s.phase_count(),
+        })),
+        "cbu_count": session.count(),
+    })))
+}
+
+/// POST /api/cbu-session/:id/reset - Reset to scoped state
+async fn reset_session(
+    Path(session_id): Path<Uuid>,
+    State(state): State<CbuSessionState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    ensure_session_in_store(session_id, &state).await;
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions
+        .get_mut(&session_id)
+        .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
+
+    session
+        .reset_to_scoped()
+        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+
+    // Persist to DB
+    session
+        .force_save(&state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(serde_json::json!({
+        "session_id": session_id,
+        "state": format!("{:?}", session.repl_state),
+        "reset": true,
+    })))
+}
+
+// =============================================================================
 // ROUTER
 // =============================================================================
 
 /// Create the CBU session router
 pub fn create_cbu_session_router(state: CbuSessionState) -> Router {
     Router::new()
+        // Basic session operations
         .route("/", post(create_session))
         .route("/", get(list_sessions))
         .route("/{id}", get(get_session))
         .route("/{id}", delete(delete_session))
+        // Scope navigation
         .route("/{id}/load-cbu", post(load_cbu))
         .route("/{id}/load-jurisdiction", post(load_jurisdiction))
         .route("/{id}/load-galaxy", post(load_galaxy))
@@ -491,6 +833,15 @@ pub fn create_cbu_session_router(state: CbuSessionState) -> Router {
         .route("/{id}/clear", post(clear_session))
         .route("/{id}/undo", post(undo))
         .route("/{id}/redo", post(redo))
+        // REPL state machine
+        .route("/{id}/state", get(get_repl_state))
+        .route("/{id}/scope", post(set_scope))
+        .route("/{id}/template", post(set_template))
+        .route("/{id}/confirm-intent", post(confirm_intent))
+        .route("/{id}/reset", post(reset_session))
+        // Sheet execution
+        .route("/{id}/sheet/generate", post(generate_sheet))
+        .route("/{id}/sheet/submit", post(submit_sheet))
         .with_state(state)
 }
 

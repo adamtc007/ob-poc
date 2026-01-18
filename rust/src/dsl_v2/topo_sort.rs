@@ -52,6 +52,102 @@ pub struct TopoSortResult {
     pub index_map: Vec<usize>,
     /// Lifecycle-related diagnostics (violations, reorderings)
     pub lifecycle_diagnostics: Vec<PlannerDiagnostic>,
+    /// Dependency graph (statement index → set of indices it depends on)
+    /// Available for phase computation
+    pub deps: HashMap<usize, HashSet<usize>>,
+}
+
+/// An execution phase - group of statements at the same DAG depth
+#[derive(Debug, Clone)]
+pub struct ExecutionPhase {
+    /// Phase depth (0 = no dependencies, 1 = depends on depth 0, etc.)
+    pub depth: usize,
+    /// Statement indices in this phase (in sorted order)
+    pub statement_indices: Vec<usize>,
+}
+
+impl TopoSortResult {
+    /// Compute execution phases from dependency graph.
+    ///
+    /// Groups statements by their DAG depth:
+    /// - Depth 0: No dependencies (can execute first)
+    /// - Depth 1: Depends only on depth 0 statements
+    /// - Depth N: Depends on statements up to depth N-1
+    ///
+    /// Statements within a phase can theoretically execute in parallel.
+    pub fn compute_phases(&self) -> Vec<ExecutionPhase> {
+        if self.program.statements.is_empty() {
+            return vec![];
+        }
+
+        let n = self.program.statements.len();
+        let mut depths: HashMap<usize, usize> = HashMap::new();
+
+        // Compute depth for each statement using memoized recursion
+        for idx in 0..n {
+            compute_depth_recursive(idx, &self.deps, &mut depths);
+        }
+
+        // Find max depth
+        let max_depth = depths.values().copied().max().unwrap_or(0);
+
+        // Group statements by depth
+        let mut phases: Vec<ExecutionPhase> = (0..=max_depth)
+            .map(|d| ExecutionPhase {
+                depth: d,
+                statement_indices: vec![],
+            })
+            .collect();
+
+        // Use index_map to get the sorted order
+        for (sorted_pos, &original_idx) in self.index_map.iter().enumerate() {
+            let depth = depths.get(&original_idx).copied().unwrap_or(0);
+            // Store the sorted position, not the original index
+            phases[depth].statement_indices.push(sorted_pos);
+        }
+
+        phases
+    }
+
+    /// Get the DAG depth for a specific statement index
+    pub fn get_depth(&self, stmt_index: usize) -> usize {
+        let mut depths: HashMap<usize, usize> = HashMap::new();
+        compute_depth_recursive(stmt_index, &self.deps, &mut depths);
+        depths.get(&stmt_index).copied().unwrap_or(0)
+    }
+}
+
+/// Recursively compute depth for a statement
+fn compute_depth_recursive(
+    idx: usize,
+    deps: &HashMap<usize, HashSet<usize>>,
+    depths: &mut HashMap<usize, usize>,
+) -> usize {
+    // Already computed
+    if let Some(&d) = depths.get(&idx) {
+        return d;
+    }
+
+    // Get dependencies for this statement
+    let my_deps = deps.get(&idx);
+
+    let depth = if let Some(dep_set) = my_deps {
+        if dep_set.is_empty() {
+            0
+        } else {
+            // Depth is 1 + max depth of dependencies
+            dep_set
+                .iter()
+                .map(|&dep_idx| compute_depth_recursive(dep_idx, deps, depths) + 1)
+                .max()
+                .unwrap_or(0)
+        }
+    } else {
+        0
+    };
+
+    depths.insert(idx, depth);
+    depth
 }
 
 /// Topologically sort pending statements respecting dataflow dependencies
@@ -77,6 +173,7 @@ pub fn topological_sort(
             reordered: false,
             index_map: vec![],
             lifecycle_diagnostics: vec![],
+            deps: HashMap::new(),
         });
     }
 
@@ -214,6 +311,7 @@ pub fn topological_sort(
         reordered,
         index_map: sorted_indices,
         lifecycle_diagnostics: vec![],
+        deps,
     })
 }
 
@@ -247,6 +345,7 @@ pub fn topological_sort_with_lifecycle(
             reordered: false,
             index_map: vec![],
             lifecycle_diagnostics: vec![],
+            deps: HashMap::new(),
         });
     }
 
@@ -546,6 +645,7 @@ pub fn topological_sort_with_lifecycle(
         reordered,
         index_map: sorted_indices,
         lifecycle_diagnostics,
+        deps,
     })
 }
 
@@ -1053,5 +1153,104 @@ mod tests {
                 "First should create entity"
             );
         }
+    }
+
+    // =========================================================================
+    // Phase computation tests
+    // =========================================================================
+
+    #[test]
+    fn test_compute_phases_empty() {
+        let ast = Program { statements: vec![] };
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+
+        let result = topological_sort(&ast, &ctx, registry).expect("sort");
+        let phases = result.compute_phases();
+
+        assert!(phases.is_empty(), "Empty program should have no phases");
+    }
+
+    #[test]
+    fn test_compute_phases_independent_statements() {
+        // Two independent statements should be in phase 0
+        let source = r#"
+            (cbu.ensure :name "Fund A" :jurisdiction "LU" :as @funda)
+            (cbu.ensure :name "Fund B" :jurisdiction "US" :as @fundb)
+        "#;
+
+        let ast = parse_program(source).expect("parse");
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+
+        let result = topological_sort(&ast, &ctx, registry).expect("sort");
+        let phases = result.compute_phases();
+
+        assert_eq!(
+            phases.len(),
+            1,
+            "Independent statements should be in one phase"
+        );
+        assert_eq!(phases[0].depth, 0, "Phase should be depth 0");
+        assert_eq!(
+            phases[0].statement_indices.len(),
+            2,
+            "Both statements in phase 0"
+        );
+    }
+
+    #[test]
+    fn test_compute_phases_dependency_chain() {
+        // A chain: create fund → create person → assign role
+        let source = r#"
+            (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR")
+        "#;
+
+        let ast = parse_program(source).expect("parse");
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+
+        let result = topological_sort(&ast, &ctx, registry).expect("sort");
+        let phases = result.compute_phases();
+
+        // fund and john are independent (phase 0)
+        // assign-role depends on both (phase 1)
+        assert_eq!(phases.len(), 2, "Should have 2 phases");
+        assert_eq!(phases[0].depth, 0);
+        assert_eq!(
+            phases[0].statement_indices.len(),
+            2,
+            "Two producers in phase 0"
+        );
+        assert_eq!(phases[1].depth, 1);
+        assert_eq!(
+            phases[1].statement_indices.len(),
+            1,
+            "One consumer in phase 1"
+        );
+    }
+
+    #[test]
+    fn test_compute_phases_deep_chain() {
+        // Deep chain: A → B → C (each depends on previous)
+        let source = r#"
+            (cbu.ensure :name "Fund" :jurisdiction "LU" :as @fund)
+            (entity.create-proper-person :first-name "John" :last-name "Smith" :as @john)
+            (cbu.assign-role :cbu-id @fund :entity-id @john :role "DIRECTOR" :as @role)
+        "#;
+
+        let ast = parse_program(source).expect("parse");
+        let registry = runtime_registry();
+        let ctx = BindingContext::new();
+
+        let result = topological_sort(&ast, &ctx, registry).expect("sort");
+        let phases = result.compute_phases();
+
+        // Phase 0: fund, john (independent)
+        // Phase 1: assign-role (depends on fund and john)
+        assert!(phases.len() >= 2, "Should have at least 2 phases");
+        assert_eq!(phases[0].depth, 0);
     }
 }

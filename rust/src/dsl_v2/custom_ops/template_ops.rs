@@ -478,6 +478,7 @@ impl CustomOperation for TemplateBatchOp {
             source_attribution: ctx.source_attribution.clone(),
             session_id: ctx.session_id,
             pending_cbu_session: None, // Batch operations don't modify session
+            session_cbu_ids: ctx.session_cbu_ids.clone(), // Inherit for bulk ops
         };
 
         // 10. Create and run BatchExecutor
@@ -543,25 +544,42 @@ fn extract_shared_params(
 
 /// Get entity query items from context
 ///
-/// The source symbol should have been bound by a prior `entity.query` call.
-/// We need to retrieve the EntityQueryResult from execution state.
+/// The source symbol should have been bound by a prior `entity.query` call,
+/// or be the special `@session_cbus` symbol which provides session's active CBUs.
+///
+/// Special symbols:
+/// - `@session_cbus` - Returns all CBU IDs currently in session scope
 #[cfg(feature = "database")]
 fn get_entity_query_items(
-    _source_symbol: &str,
-    _ctx: &ExecutionContext,
+    source_symbol: &str,
+    ctx: &ExecutionContext,
 ) -> Result<Vec<(Uuid, String)>> {
-    // TODO: The EntityQueryResult needs to be stored somewhere accessible.
-    // For now, we'll need to extend ExecutionContext to store query results.
-    // This is a placeholder - the actual implementation requires adding
-    // query_results: HashMap<String, EntityQueryResult> to ExecutionContext.
+    // Check for special @session_cbus symbol - iterates over session's active CBU set
+    if source_symbol == "session_cbus" {
+        let cbu_ids = ctx.session_cbu_ids();
+        if cbu_ids.is_empty() {
+            tracing::info!("@session_cbus: No CBUs in session scope");
+            return Ok(vec![]);
+        }
+        tracing::info!(
+            "@session_cbus: Providing {} CBUs from session scope for iteration",
+            cbu_ids.len()
+        );
+        // Return CBU IDs with a placeholder name (the actual name can be resolved later)
+        return Ok(cbu_ids
+            .iter()
+            .map(|id| (*id, format!("cbu:{}", id)))
+            .collect());
+    }
 
-    // As a workaround, we can re-query based on the source symbol if it
-    // contains the query parameters, or require the batch to be passed
-    // the items directly via a different mechanism.
+    // Check for other special symbols or context bindings
+    // TODO: Add support for EntityQueryResult storage in ExecutionContext
+    // query_results: HashMap<String, EntityQueryResult>
 
     Err(anyhow!(
-        "EntityQueryResult retrieval not yet implemented. \
-         Consider using batch_executor directly with items."
+        "Source symbol @{} not found. Use @session_cbus for session CBUs, \
+         or ensure the symbol was bound by a prior entity.query call.",
+        source_symbol
     ))
 }
 

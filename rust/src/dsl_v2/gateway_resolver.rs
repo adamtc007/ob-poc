@@ -15,7 +15,8 @@ use crate::dsl_v2::validation::{
 };
 use async_trait::async_trait;
 use entity_gateway::proto::ob::gateway::v1::{
-    entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
+    entity_gateway_client::EntityGatewayClient, GetEntityConfigRequest, GetEntityConfigResponse,
+    SearchMode, SearchRequest,
 };
 use tonic::transport::Channel;
 use uuid::Uuid;
@@ -403,6 +404,36 @@ impl GatewayRefResolver {
         Ok(ResolveResult::NotFound { suggestions })
     }
 
+    /// Get entity configuration for resolution UI
+    ///
+    /// Returns search keys, discriminators, and resolution mode for an entity type.
+    /// Used by the resolution modal to render entity-specific search fields.
+    pub async fn get_entity_config(
+        &mut self,
+        nickname: &str,
+    ) -> Result<GetEntityConfigResponse, String> {
+        let request = GetEntityConfigRequest {
+            nickname: nickname.to_string(),
+        };
+
+        let response = self
+            .client
+            .get_entity_config(request)
+            .await
+            .map_err(|e| format!("EntityGateway get_entity_config failed: {}", e))?;
+
+        Ok(response.into_inner())
+    }
+
+    /// Get entity configuration by RefType
+    pub async fn get_entity_config_by_ref_type(
+        &mut self,
+        ref_type: RefType,
+    ) -> Result<GetEntityConfigResponse, String> {
+        let nickname = ref_type_to_nickname(ref_type);
+        self.get_entity_config(nickname).await
+    }
+
     /// Search with fuzzy matching (for autocomplete-like scenarios)
     pub async fn search_fuzzy(
         &mut self,
@@ -441,6 +472,66 @@ impl GatewayRefResolver {
             .collect();
 
         Ok(matches)
+    }
+
+    /// Multi-key search with filter support
+    ///
+    /// This method supports:
+    /// - Multiple search keys (name, jurisdiction, etc.)
+    /// - Filter values to narrow results
+    /// - Discriminators for scoring boost
+    ///
+    /// Returns (matches, total_count, was_filtered)
+    pub async fn search_multi_key(
+        &mut self,
+        ref_type: RefType,
+        query: &str,
+        search_key: Option<&str>,
+        filters: &std::collections::HashMap<String, String>,
+        discriminators: &std::collections::HashMap<String, String>,
+        limit: usize,
+    ) -> Result<(Vec<SuggestedMatch>, usize, bool), String> {
+        let nickname = ref_type_to_nickname(ref_type);
+
+        // Build discriminators map with both filters and discriminators
+        // Filters act as hard constraints, discriminators as soft scoring boost
+        let mut all_discriminators = discriminators.clone();
+        for (k, v) in filters {
+            all_discriminators.insert(k.clone(), v.clone());
+        }
+
+        let request = SearchRequest {
+            nickname: nickname.to_string(),
+            values: vec![query.to_string()],
+            search_key: search_key.map(|s| s.to_string()),
+            mode: SearchMode::Fuzzy as i32,
+            limit: Some(limit as i32),
+            discriminators: all_discriminators,
+            tenant_id: None,
+            cbu_id: None,
+        };
+
+        let response = self
+            .client
+            .search(request)
+            .await
+            .map_err(|e| format!("EntityGateway search failed: {}", e))?;
+
+        let inner = response.into_inner();
+        let total = inner.matches.len();
+        let was_filtered = !filters.is_empty();
+
+        let matches = inner
+            .matches
+            .into_iter()
+            .map(|m| SuggestedMatch {
+                value: m.token,
+                display: m.display,
+                score: m.score,
+            })
+            .collect();
+
+        Ok((matches, total, was_filtered))
     }
 
     /// Create a diagnostic for a failed resolution

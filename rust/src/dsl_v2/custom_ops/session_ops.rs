@@ -21,6 +21,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -685,6 +686,100 @@ impl CustomOperation for SessionListOp {
 }
 
 // =============================================================================
+// FILTER-JURISDICTION (Narrow scope to single jurisdiction)
+// =============================================================================
+
+/// Filter result type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilterJurisdictionResult {
+    pub jurisdiction: String,
+    pub count_kept: usize,
+    pub count_removed: usize,
+    pub total_loaded: usize,
+}
+
+/// Narrow session scope to only CBUs in a specific jurisdiction
+pub struct SessionFilterJurisdictionOp;
+
+#[async_trait]
+impl CustomOperation for SessionFilterJurisdictionOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "filter-jurisdiction"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Narrows session scope to only CBUs in a specific jurisdiction"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let jurisdiction = get_required_string(verb_call, "jurisdiction")?;
+
+        let session = ctx.get_or_create_cbu_session_mut();
+        let before_count = session.count();
+
+        // Get current CBU IDs
+        let current_cbu_ids = session.cbu_ids_vec();
+
+        if current_cbu_ids.is_empty() {
+            return Ok(ExecutionResult::Record(json!(FilterJurisdictionResult {
+                jurisdiction,
+                count_kept: 0,
+                count_removed: 0,
+                total_loaded: 0,
+            })));
+        }
+
+        // Query which of our CBUs match the jurisdiction
+        let matching_cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
+            r#"
+            SELECT cbu_id
+            FROM "ob-poc".cbus
+            WHERE cbu_id = ANY($1) AND jurisdiction = $2
+            "#,
+            &current_cbu_ids,
+            &jurisdiction
+        )
+        .fetch_all(pool)
+        .await?;
+
+        // Clear and reload with only matching CBUs (this pushes history)
+        session.clear();
+        let count_kept = session.load_many(matching_cbu_ids);
+        let count_removed = before_count - count_kept;
+
+        let result = FilterJurisdictionResult {
+            jurisdiction,
+            count_kept,
+            count_removed,
+            total_loaded: session.count(),
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
 // REGISTRATION
 // =============================================================================
 
@@ -695,6 +790,7 @@ pub fn register_session_ops_v2(registry: &mut crate::dsl_v2::custom_ops::CustomO
     registry.register(Arc::new(SessionLoadCbuOp));
     registry.register(Arc::new(SessionLoadJurisdictionOp));
     registry.register(Arc::new(SessionLoadGalaxyOp));
+    registry.register(Arc::new(SessionFilterJurisdictionOp));
     registry.register(Arc::new(SessionUnloadCbuOp));
     registry.register(Arc::new(SessionClearOp2));
     registry.register(Arc::new(SessionUndoOp));

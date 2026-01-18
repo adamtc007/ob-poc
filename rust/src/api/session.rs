@@ -66,11 +66,17 @@ pub struct ResolutionSubSession {
 }
 
 /// Info about an unresolved entity reference
+///
+/// This is the s-expression for the entity reference, carrying:
+/// - Entity type (from verb arg definition)
+/// - Search key fields with current values
+/// - Discriminator fields with current values
+/// - The resolved PK (UUID) once found
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UnresolvedRefInfo {
     /// Unique ID for this ref (stmt_idx:arg_name)
     pub ref_id: String,
-    /// Entity type (e.g., "entity", "cbu", "person")
+    /// Entity type (e.g., "entity", "cbu", "person") - from verb arg lookup config
     pub entity_type: String,
     /// The search value from DSL (e.g., "John Smith")
     pub search_value: String,
@@ -78,6 +84,87 @@ pub struct UnresolvedRefInfo {
     pub context_line: String,
     /// Initial search matches (pre-fetched)
     pub initial_matches: Vec<EntityMatchInfo>,
+
+    // === Entity Resolution Config (from EntityGateway) ===
+    /// Search key fields for this entity type (e.g., name, lei, jurisdiction)
+    /// Each field has: key name, display label, current value (if populated)
+    #[serde(default)]
+    pub search_keys: Vec<SearchKeyField>,
+
+    /// Discriminator fields for narrowing results (e.g., manco_name, fund_type)
+    #[serde(default)]
+    pub discriminators: Vec<DiscriminatorField>,
+
+    /// Resolution mode hint from entity config
+    #[serde(default)]
+    pub resolution_mode: ResolutionModeHint,
+
+    /// The verb and arg that created this ref (for applying resolution back)
+    #[serde(default)]
+    pub verb_context: Option<VerbArgContext>,
+
+    // === Resolution State ===
+    /// Resolved primary key (UUID or code) - populated after user selection
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_key: Option<String>,
+
+    /// Display name of resolved entity
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolved_display: Option<String>,
+}
+
+/// Search key field definition with current value
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct SearchKeyField {
+    /// Field key (e.g., "name", "lei", "jurisdiction")
+    pub key: String,
+    /// Display label (e.g., "Entity Name", "LEI Code")
+    pub label: String,
+    /// Current value (populated from DSL or user input)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// Whether this is a primary search key
+    #[serde(default)]
+    pub is_primary: bool,
+}
+
+/// Discriminator field for narrowing search results
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct DiscriminatorField {
+    /// Field key (e.g., "manco_name", "fund_type")
+    pub key: String,
+    /// Display label
+    pub label: String,
+    /// Current value (if set)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// Available options (for dropdown)
+    #[serde(default)]
+    pub options: Vec<String>,
+}
+
+/// Resolution mode hint from entity config
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionModeHint {
+    /// Show search modal with multiple fields
+    #[default]
+    SearchModal,
+    /// Show inline autocomplete (single field)
+    InlineAutocomplete,
+    /// Show dropdown with all options
+    Dropdown,
+}
+
+/// Context about which verb/arg created this ref
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct VerbArgContext {
+    /// Full verb name (e.g., "session.set-cbu")
+    pub verb: String,
+    /// Argument name (e.g., "cbu-id")
+    pub arg_name: String,
+    /// Statement index in AST
+    pub stmt_index: usize,
 }
 
 /// Entity match info for resolution UI
@@ -112,19 +199,36 @@ impl ResolutionSubSession {
     ///
     /// Walks the AST and collects all EntityRef nodes that have `resolved_key: None`.
     /// Each ref gets a unique ref_id based on its span location.
+    ///
+    /// Also captures verb/arg context so we can look up the LookupConfig from verb registry.
     pub fn from_statements(statements: &[Statement]) -> Self {
+        use crate::dsl_v2::verb_registry::registry;
+
         let mut unresolved_refs = Vec::new();
 
         for (stmt_idx, stmt) in statements.iter().enumerate() {
             if let Statement::VerbCall(vc) = stmt {
                 // Build context line for display
                 let context_line = vc.to_dsl_string();
+                let full_verb = format!("{}.{}", vc.domain, vc.verb);
+
+                // Look up verb definition to get arg lookup configs
+                let verb_def = registry().get(&vc.domain, &vc.verb);
 
                 for arg in &vc.arguments {
+                    // Get lookup config for this arg from verb definition
+                    let lookup_config = verb_def
+                        .as_ref()
+                        .and_then(|v| v.args.iter().find(|a| a.name == arg.key))
+                        .and_then(|a| a.lookup.as_ref());
+
                     Self::collect_unresolved_refs(
                         &arg.value,
                         stmt_idx,
                         &context_line,
+                        &full_verb,
+                        &arg.key,
+                        lookup_config,
                         &mut unresolved_refs,
                     );
                 }
@@ -140,10 +244,15 @@ impl ResolutionSubSession {
     }
 
     /// Recursively collect unresolved EntityRefs from an AstNode
+    ///
+    /// Now also captures verb context and extracts search key config from LookupConfig
     fn collect_unresolved_refs(
         node: &crate::dsl_v2::ast::AstNode,
         stmt_idx: usize,
         context_line: &str,
+        verb: &str,
+        arg_name: &str,
+        lookup_config: Option<&dsl_core::config::types::LookupConfig>,
         out: &mut Vec<UnresolvedRefInfo>,
     ) {
         use crate::dsl_v2::ast::AstNode;
@@ -163,33 +272,146 @@ impl ResolutionSubSession {
                         .clone()
                         .unwrap_or_else(|| format!("{}:{}-{}", stmt_idx, span.start, span.end));
 
+                    // Extract search keys and discriminators from LookupConfig
+                    let (search_keys, discriminators, resolution_mode) =
+                        Self::extract_search_config(lookup_config, value);
+
                     out.push(UnresolvedRefInfo {
                         ref_id: ref_id_str,
                         entity_type: entity_type.clone(),
                         search_value: value.clone(),
                         context_line: context_line.to_string(),
                         initial_matches: Vec::new(), // Populated by pre_fetch_matches
+                        search_keys,
+                        discriminators,
+                        resolution_mode,
+                        verb_context: Some(VerbArgContext {
+                            verb: verb.to_string(),
+                            arg_name: arg_name.to_string(),
+                            stmt_index: stmt_idx,
+                        }),
+                        resolved_key: None,
+                        resolved_display: None,
                     });
                 }
             }
             AstNode::List { items, .. } => {
                 for item in items {
-                    Self::collect_unresolved_refs(item, stmt_idx, context_line, out);
+                    Self::collect_unresolved_refs(
+                        item,
+                        stmt_idx,
+                        context_line,
+                        verb,
+                        arg_name,
+                        lookup_config,
+                        out,
+                    );
                 }
             }
             AstNode::Map { entries, .. } => {
                 for (_, v) in entries {
-                    Self::collect_unresolved_refs(v, stmt_idx, context_line, out);
+                    Self::collect_unresolved_refs(
+                        v,
+                        stmt_idx,
+                        context_line,
+                        verb,
+                        arg_name,
+                        lookup_config,
+                        out,
+                    );
                 }
             }
             AstNode::Nested(vc) => {
                 for arg in &vc.arguments {
-                    Self::collect_unresolved_refs(&arg.value, stmt_idx, context_line, out);
+                    // For nested verb calls, we don't have lookup config
+                    Self::collect_unresolved_refs(
+                        &arg.value,
+                        stmt_idx,
+                        context_line,
+                        verb,
+                        &arg.key,
+                        None,
+                        out,
+                    );
                 }
             }
             // Literals and SymbolRefs don't contain EntityRefs
             _ => {}
         }
+    }
+
+    /// Extract search keys and discriminators from LookupConfig
+    fn extract_search_config(
+        lookup_config: Option<&dsl_core::config::types::LookupConfig>,
+        search_value: &str,
+    ) -> (
+        Vec<SearchKeyField>,
+        Vec<DiscriminatorField>,
+        ResolutionModeHint,
+    ) {
+        let Some(config) = lookup_config else {
+            // No lookup config - return minimal defaults
+            return (
+                vec![SearchKeyField {
+                    key: "name".to_string(),
+                    label: "Name".to_string(),
+                    value: Some(search_value.to_string()),
+                    is_primary: true,
+                }],
+                vec![],
+                ResolutionModeHint::SearchModal,
+            );
+        };
+
+        // Extract primary search key
+        let primary_col = config.search_key.primary_column();
+        let search_keys = vec![SearchKeyField {
+            key: primary_col.to_string(),
+            label: Self::humanize_label(primary_col),
+            value: Some(search_value.to_string()),
+            is_primary: true,
+        }];
+
+        // Extract discriminators from composite search key
+        let discriminators: Vec<DiscriminatorField> = config
+            .search_key
+            .discriminators()
+            .iter()
+            .map(|d| DiscriminatorField {
+                key: d.field.clone(),
+                label: Self::humanize_label(&d.field),
+                value: None,     // Will be populated from other verb args or user input
+                options: vec![], // Could be populated from reference data
+            })
+            .collect();
+
+        // Determine resolution mode from config
+        let resolution_mode = match config.resolution_mode {
+            Some(dsl_core::config::types::ResolutionMode::Entity) => {
+                ResolutionModeHint::SearchModal
+            }
+            Some(dsl_core::config::types::ResolutionMode::Reference) => {
+                ResolutionModeHint::Dropdown
+            }
+            None => ResolutionModeHint::SearchModal, // Default to modal
+        };
+
+        (search_keys, discriminators, resolution_mode)
+    }
+
+    /// Convert snake_case field names to human-readable labels
+    fn humanize_label(field: &str) -> String {
+        field
+            .split('_')
+            .map(|word| {
+                let mut chars: Vec<char> = word.chars().collect();
+                if let Some(first) = chars.first_mut() {
+                    *first = first.to_uppercase().next().unwrap_or(*first);
+                }
+                chars.into_iter().collect::<String>()
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     /// Select a resolution for a ref_id
@@ -435,6 +657,231 @@ impl DslStatus {
     }
 }
 
+// =============================================================================
+// RUN SHEET - Server-side DSL statement ledger
+// =============================================================================
+
+/// Server-side run sheet - DSL statement ledger with per-statement status
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ServerRunSheet {
+    /// Entries in the run sheet (ordered by creation)
+    pub entries: Vec<ServerRunSheetEntry>,
+    /// Current cursor position (index of active/draft entry)
+    pub cursor: usize,
+}
+
+impl ServerRunSheet {
+    /// Add a new draft entry
+    pub fn add_draft(&mut self, dsl_source: String, ast: Vec<Statement>) -> Uuid {
+        let id = Uuid::new_v4();
+        self.entries.push(ServerRunSheetEntry {
+            id,
+            dsl_source,
+            ast,
+            plan: None,
+            status: DslStatus::Draft,
+            created_at: Utc::now(),
+            executed_at: None,
+            affected_entities: Vec::new(),
+            bindings: HashMap::new(),
+            error: None,
+        });
+        self.cursor = self.entries.len() - 1;
+        id
+    }
+
+    /// Get current entry at cursor
+    pub fn current(&self) -> Option<&ServerRunSheetEntry> {
+        self.entries.get(self.cursor)
+    }
+
+    /// Get mutable current entry at cursor
+    pub fn current_mut(&mut self) -> Option<&mut ServerRunSheetEntry> {
+        self.entries.get_mut(self.cursor)
+    }
+
+    /// Get entry by ID
+    pub fn get(&self, id: Uuid) -> Option<&ServerRunSheetEntry> {
+        self.entries.iter().find(|e| e.id == id)
+    }
+
+    /// Get mutable entry by ID
+    pub fn get_mut(&mut self, id: Uuid) -> Option<&mut ServerRunSheetEntry> {
+        self.entries.iter_mut().find(|e| e.id == id)
+    }
+
+    /// Mark entry as executed
+    pub fn mark_executed(
+        &mut self,
+        id: Uuid,
+        affected: Vec<Uuid>,
+        bindings: HashMap<String, BoundEntity>,
+    ) {
+        if let Some(entry) = self.get_mut(id) {
+            entry.status = DslStatus::Executed;
+            entry.executed_at = Some(Utc::now());
+            entry.affected_entities = affected;
+            entry.bindings = bindings;
+        }
+    }
+
+    /// Mark entry as failed
+    pub fn mark_failed(&mut self, id: Uuid, error: String) {
+        if let Some(entry) = self.get_mut(id) {
+            entry.status = DslStatus::Failed;
+            entry.error = Some(error);
+        }
+    }
+
+    /// Get all executed entries
+    pub fn executed(&self) -> impl Iterator<Item = &ServerRunSheetEntry> {
+        self.entries
+            .iter()
+            .filter(|e| e.status == DslStatus::Executed)
+    }
+
+    /// Get combined DSL source (for backwards compat)
+    pub fn combined_dsl(&self) -> Option<String> {
+        let sources: Vec<_> = self.entries.iter().map(|e| e.dsl_source.as_str()).collect();
+        if sources.is_empty() {
+            None
+        } else {
+            Some(sources.join("\n"))
+        }
+    }
+
+    /// Check if there's any runnable DSL
+    pub fn has_runnable(&self) -> bool {
+        self.entries.iter().any(|e| e.status.is_runnable())
+    }
+
+    /// Count runnable entries
+    pub fn runnable_count(&self) -> usize {
+        self.entries
+            .iter()
+            .filter(|e| e.status.is_runnable())
+            .count()
+    }
+
+    /// Undo (cancel) the last draft/ready entry, returns the removed entry
+    pub fn undo_last(&mut self) -> Option<ServerRunSheetEntry> {
+        // Find last undoable entry (draft or ready, not executed)
+        let idx = self.entries.iter().rposition(|e| e.status.is_runnable())?;
+        let mut entry = self.entries.remove(idx);
+        entry.status = DslStatus::Cancelled;
+        // Adjust cursor if needed
+        if self.cursor >= self.entries.len() && !self.entries.is_empty() {
+            self.cursor = self.entries.len() - 1;
+        } else if self.entries.is_empty() {
+            self.cursor = 0;
+        }
+        Some(entry)
+    }
+
+    /// Clear all draft/ready entries (cancel them)
+    pub fn clear_drafts(&mut self) {
+        for entry in &mut self.entries {
+            if entry.status.is_runnable() {
+                entry.status = DslStatus::Cancelled;
+            }
+        }
+        // Remove cancelled entries
+        self.entries.retain(|e| e.status != DslStatus::Cancelled);
+        self.cursor = 0;
+    }
+
+    /// Remove a runnable entry matching the search term (case-insensitive)
+    pub fn remove_matching(&mut self, search_term: &str) -> Option<ServerRunSheetEntry> {
+        let search_lower = search_term.to_lowercase();
+        let idx = self.entries.iter().position(|e| {
+            e.status.is_runnable() && e.dsl_source.to_lowercase().contains(&search_lower)
+        })?;
+        let mut entry = self.entries.remove(idx);
+        entry.status = DslStatus::Cancelled;
+        // Adjust cursor
+        if self.cursor >= self.entries.len() && !self.entries.is_empty() {
+            self.cursor = self.entries.len() - 1;
+        } else if self.entries.is_empty() {
+            self.cursor = 0;
+        }
+        Some(entry)
+    }
+
+    /// Convert to API type for responses
+    pub fn to_api(&self) -> ob_poc_types::RunSheet {
+        ob_poc_types::RunSheet {
+            entries: self.entries.iter().map(|e| e.to_api()).collect(),
+            cursor: self.cursor,
+        }
+    }
+}
+
+/// Single entry in the server-side run sheet
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerRunSheetEntry {
+    /// Unique entry ID
+    pub id: Uuid,
+    /// DSL source text
+    pub dsl_source: String,
+    /// Parsed AST statements
+    pub ast: Vec<Statement>,
+    /// Compiled execution plan (toposorted, ready to run)
+    #[serde(skip)]
+    pub plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
+    /// Current status
+    pub status: DslStatus,
+    /// When this was created
+    pub created_at: DateTime<Utc>,
+    /// When this was executed (if executed)
+    pub executed_at: Option<DateTime<Utc>>,
+    /// Entity IDs affected by execution
+    pub affected_entities: Vec<Uuid>,
+    /// Symbol bindings created by this entry
+    pub bindings: HashMap<String, BoundEntity>,
+    /// Error message if failed
+    pub error: Option<String>,
+}
+
+impl ServerRunSheetEntry {
+    /// Convert to API type
+    pub fn to_api(&self) -> ob_poc_types::RunSheetEntry {
+        ob_poc_types::RunSheetEntry {
+            id: self.id.to_string(),
+            dsl_source: self.dsl_source.clone(),
+            display_dsl: None,
+            status: match self.status {
+                DslStatus::Draft => ob_poc_types::RunSheetEntryStatus::Draft,
+                DslStatus::Ready => ob_poc_types::RunSheetEntryStatus::Ready,
+                DslStatus::Executed => ob_poc_types::RunSheetEntryStatus::Executed,
+                DslStatus::Cancelled => ob_poc_types::RunSheetEntryStatus::Cancelled,
+                DslStatus::Failed => ob_poc_types::RunSheetEntryStatus::Failed,
+            },
+            created_at: Some(self.created_at.to_rfc3339()),
+            executed_at: self.executed_at.map(|t| t.to_rfc3339()),
+            affected_entities: self
+                .affected_entities
+                .iter()
+                .map(|id| id.to_string())
+                .collect(),
+            bindings: self
+                .bindings
+                .iter()
+                .map(|(k, v)| {
+                    (
+                        k.clone(),
+                        ob_poc_types::BoundEntityInfo {
+                            id: v.id.to_string(),
+                            name: v.display_name.clone(),
+                            entity_type: v.entity_type.clone(),
+                        },
+                    )
+                })
+                .collect(),
+            error: self.error.clone(),
+        }
+    }
+}
+
 /// Pending DSL/AST pair in the session (not yet persisted to DB)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PendingDsl {
@@ -524,19 +971,15 @@ pub struct AgentSession {
     /// Conversation history
     pub messages: Vec<ChatMessage>,
 
-    /// Current pending intents (before validation)
-    pub pending_intents: Vec<VerbIntent>,
+    /// Run sheet - DSL statement ledger with per-statement status
+    /// Replaces: assembled_dsl, pending, executed_results
+    #[serde(default)]
+    pub run_sheet: ServerRunSheet,
 
-    /// Validated and assembled DSL statements (legacy - for backward compat)
-    pub assembled_dsl: Vec<String>,
-
-    /// Current pending DSL/AST awaiting user confirmation (in-memory only)
-    /// This is cleared on execute, cancel, or new chat message
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pending: Option<PendingDsl>,
-
-    /// Results from execution
-    pub executed_results: Vec<ExecutionResult>,
+    /// Pending verb intents during disambiguation flow
+    /// Stored temporarily while user resolves entity ambiguities
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pending_intents: Vec<super::intent::VerbIntent>,
 
     /// Context accumulated during session
     pub context: SessionContext,
@@ -567,10 +1010,8 @@ impl AgentSession {
             sub_session_type: SubSessionType::Root,
             inherited_symbols: HashMap::new(),
             messages: Vec::new(),
+            run_sheet: ServerRunSheet::default(),
             pending_intents: Vec::new(),
-            assembled_dsl: Vec::new(),
-            pending: None,
-            executed_results: Vec::new(),
             context: SessionContext {
                 domain_hint,
                 ..Default::default()
@@ -609,10 +1050,8 @@ impl AgentSession {
             sub_session_type,
             inherited_symbols,
             messages: Vec::new(),
+            run_sheet: ServerRunSheet::default(),
             pending_intents: Vec::new(),
-            assembled_dsl: Vec::new(),
-            pending: None,
-            executed_results: Vec::new(),
             context: SessionContext {
                 // Inherit key context from parent
                 domain_hint: parent.context.domain_hint.clone(),
@@ -681,83 +1120,63 @@ impl AgentSession {
         source: String,
         ast: Vec<Statement>,
         plan: Option<crate::dsl_v2::execution_plan::ExecutionPlan>,
-        was_reordered: bool,
+        _was_reordered: bool,
     ) {
-        let pending_bindings = ast
-            .iter()
-            .filter_map(|stmt| {
-                if let Statement::VerbCall(vc) = stmt {
-                    vc.binding.as_ref().map(|b| (b.clone(), vc.domain.clone()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        self.pending = Some(PendingDsl {
-            id: Uuid::new_v4(),
-            source,
-            ast,
-            plan,
-            status: DslStatus::Draft,
-            created_at: Utc::now(),
-            error: None,
-            pending_bindings,
-            was_reordered,
-        });
+        // Add to run sheet as draft entry
+        let id = self.run_sheet.add_draft(source, ast);
+        // Set plan on the entry
+        if let Some(entry) = self.run_sheet.get_mut(id) {
+            entry.plan = plan;
+        }
         self.state = SessionState::ReadyToExecute;
         self.updated_at = Utc::now();
     }
 
     /// Cancel pending DSL (user declined)
     pub fn cancel_pending(&mut self) {
-        if let Some(ref mut pending) = self.pending {
-            pending.status = DslStatus::Cancelled;
-        }
-        // Clear pending - cancelled drafts don't persist
-        self.pending = None;
+        // Cancel last draft entry
+        self.run_sheet.undo_last();
         self.state = SessionState::Executed; // Ready for next command
         self.updated_at = Utc::now();
     }
 
     /// Mark pending DSL as ready to execute (user confirmed)
     pub fn confirm_pending(&mut self) {
-        if let Some(ref mut pending) = self.pending {
-            pending.status = DslStatus::Ready;
+        // Mark current entry as ready
+        if let Some(entry) = self.run_sheet.current_mut() {
+            entry.status = DslStatus::Ready;
         }
         self.updated_at = Utc::now();
     }
 
-    /// Mark pending DSL as executed (after successful execution)
+    /// Mark current run sheet entry as executed (after successful execution)
     pub fn mark_executed(&mut self) {
-        if let Some(ref mut pending) = self.pending {
-            pending.status = DslStatus::Executed;
+        if let Some(entry) = self.run_sheet.current_mut() {
+            entry.status = DslStatus::Executed;
+            entry.executed_at = Some(Utc::now());
         }
         self.state = SessionState::Executed;
         self.updated_at = Utc::now();
     }
 
-    /// Mark pending DSL as failed (execution error)
+    /// Mark current run sheet entry as failed (execution error)
     pub fn mark_failed(&mut self, error: String) {
-        if let Some(ref mut pending) = self.pending {
-            pending.status = DslStatus::Failed;
-            pending.error = Some(error);
+        if let Some(entry) = self.run_sheet.current_mut() {
+            entry.status = DslStatus::Failed;
+            entry.error = Some(error);
         }
         self.state = SessionState::Executed; // Can try again
         self.updated_at = Utc::now();
     }
 
-    /// Get pending DSL if in runnable state
-    pub fn get_runnable_dsl(&self) -> Option<&PendingDsl> {
-        self.pending.as_ref().filter(|p| p.status.is_runnable())
+    /// Get current runnable entry from run sheet
+    pub fn get_runnable_dsl(&self) -> Option<&ServerRunSheetEntry> {
+        self.run_sheet.current().filter(|e| e.status.is_runnable())
     }
 
-    /// Check if there's pending DSL awaiting confirmation
+    /// Check if there's runnable DSL in the run sheet
     pub fn has_pending(&self) -> bool {
-        self.pending
-            .as_ref()
-            .map(|p| !p.status.is_terminal())
-            .unwrap_or(false)
+        self.run_sheet.has_runnable()
     }
 
     /// Add a user message to the session
@@ -803,16 +1222,20 @@ impl AgentSession {
     }
 
     /// Set assembled DSL after validation (keep intents for execution-time resolution)
+    /// Deprecated: Use set_pending_dsl which adds to run_sheet
     pub fn set_assembled_dsl(&mut self, dsl: Vec<String>) {
-        self.assembled_dsl = dsl;
+        // Add each DSL string to run sheet as draft
+        for source in dsl {
+            self.run_sheet.add_draft(source, Vec::new());
+        }
         // NOTE: Don't clear pending_intents - we need them for execution-time ref resolution
         self.state = SessionState::ReadyToExecute;
         self.updated_at = Utc::now();
     }
 
-    /// Clear assembled DSL
+    /// Clear draft DSL entries
     pub fn clear_assembled_dsl(&mut self) {
-        self.assembled_dsl.clear();
+        self.run_sheet.clear_drafts();
         self.state = if self.pending_intents.is_empty() {
             SessionState::New
         } else {
@@ -842,20 +1265,21 @@ impl AgentSession {
             }
         }
 
-        self.executed_results = results;
-        self.assembled_dsl.clear();
+        // Mark executed entries in run sheet (execution results are now per-entry)
+        // For now, just update session state
+        let _ = results; // Results stored per-entry via run_sheet.mark_executed()
         self.state = SessionState::Executed;
         self.updated_at = Utc::now();
     }
 
     /// Get all accumulated DSL as a single combined string
     pub fn combined_dsl(&self) -> String {
-        self.assembled_dsl.join("\n\n")
+        self.run_sheet.combined_dsl().unwrap_or_default()
     }
 
     /// Check if the session can execute
     pub fn can_execute(&self) -> bool {
-        self.state == SessionState::ReadyToExecute && !self.assembled_dsl.is_empty()
+        self.state == SessionState::ReadyToExecute && self.run_sheet.has_runnable()
     }
 }
 
@@ -1720,6 +2144,26 @@ impl SessionContext {
             .map(|cbu| format!("ACTIVE_CBU: \"{}\" (id: {})", cbu.display_name, cbu.id))
     }
 
+    /// Get the session scope context formatted for LLM
+    /// Returns multi-CBU scope info for bulk operations
+    pub fn scope_context_for_llm(&self) -> Option<String> {
+        if self.cbu_ids.is_empty() {
+            return None;
+        }
+
+        let count = self.cbu_ids.len();
+        if count == 1 {
+            // Single CBU - just reference active_cbu
+            return None;
+        }
+
+        // Multi-CBU scope - provide count and hint for bulk operations
+        Some(format!(
+            "SESSION_SCOPE: {} CBUs in scope. Use @session_cbus for bulk operations that should apply to all CBUs in scope.",
+            count
+        ))
+    }
+
     /// Set the active CBU for this session
     pub fn set_active_cbu(&mut self, id: Uuid, display_name: &str) {
         self.active_cbu = Some(BoundEntity {
@@ -2323,6 +2767,12 @@ pub struct SessionStateResponse {
     /// UI uses this to detect external changes (MCP/REPL modifying session)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    /// Run sheet - DSL statement ledger with per-statement status
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_sheet: Option<ob_poc_types::RunSheet>,
+    /// Symbol bindings in this session
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub bindings: std::collections::HashMap<String, ob_poc_types::BoundEntityInfo>,
 }
 
 /// Request to execute accumulated DSL
@@ -2479,7 +2929,7 @@ mod tests {
         assert!(!session.id.is_nil());
         assert_eq!(session.state, SessionState::New);
         assert!(session.messages.is_empty());
-        assert!(session.assembled_dsl.is_empty());
+        assert!(session.run_sheet.entries.is_empty());
         assert_eq!(session.context.domain_hint, Some("cbu".to_string()));
     }
 
@@ -2503,19 +2953,31 @@ mod tests {
         session.set_assembled_dsl(vec!["(cbu.ensure :cbu-name \"Test\")".to_string()]);
         assert_eq!(session.state, SessionState::ReadyToExecute);
         assert_eq!(session.pending_intents.len(), 1); // Intents preserved
+        assert!(session.run_sheet.has_runnable()); // Entry is draft/runnable
 
-        // Record execution -> Executed
+        // Get the entry ID to mark as executed
+        let entry_id = session.run_sheet.entries[0].id;
+
+        // Mark entry as executed via run_sheet (new approach)
+        let cbu_id = Uuid::new_v4();
+        session
+            .run_sheet
+            .mark_executed(entry_id, vec![cbu_id], HashMap::new());
+
+        // Record execution results (updates context)
         session.record_execution(vec![ExecutionResult {
             statement_index: 0,
             dsl: "(cbu.ensure :cbu-name \"Test\")".to_string(),
             success: true,
             message: "OK".to_string(),
-            entity_id: Some(Uuid::new_v4()),
+            entity_id: Some(cbu_id),
             entity_type: Some("CBU".to_string()),
             result: None,
         }]);
         assert_eq!(session.state, SessionState::Executed);
-        assert!(session.assembled_dsl.is_empty());
+        // After execution, there should be no more runnable entries
+        // (entries remain in run_sheet with Executed status but none are Draft/Ready)
+        assert!(!session.run_sheet.has_runnable());
     }
 
     #[test]

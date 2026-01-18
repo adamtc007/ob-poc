@@ -68,6 +68,9 @@ rand = "0.8"
 # Fuzzy matching for smart suggestions (Jaro-Winkler, Levenshtein, etc.)
 strsim = "0.11"
 
+# Trie for ESPER command phrase lookup
+radix_trie = "0.2"
+
 # Template rendering for research macros
 handlebars = "6.0"
 

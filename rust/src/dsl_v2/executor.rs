@@ -253,6 +253,12 @@ pub struct ExecutionContext {
     pub source_attribution: super::idempotency::SourceAttribution,
     /// Session ID for view state audit linkage
     pub session_id: Option<Uuid>,
+    /// Session's active CBU IDs (for reading during execution)
+    ///
+    /// Pre-populated from `SessionContext.cbu_ids` before execution.
+    /// Used by bulk operations that should apply to all session CBUs.
+    /// Access via `session_cbu_ids()` method or `@session_cbus` symbol.
+    pub session_cbu_ids: Vec<Uuid>,
     /// Pending CBU session from session.* operations (Phase 6)
     ///
     /// Session operations (session.load-cbu, session.undo, etc.) modify the CBU
@@ -283,6 +289,7 @@ impl Default for ExecutionContext {
             pending_scope_change: None,
             source_attribution: super::idempotency::SourceAttribution::default(),
             session_id: None,
+            session_cbu_ids: Vec::new(),
             pending_cbu_session: None,
         }
     }
@@ -403,6 +410,8 @@ impl ExecutionContext {
             session_id: self.session_id,
             // Don't inherit pending_cbu_session - each iteration starts fresh
             pending_cbu_session: None,
+            // Inherit session CBU IDs for bulk operations
+            session_cbu_ids: self.session_cbu_ids.clone(),
         }
     }
 
@@ -619,6 +628,31 @@ impl ExecutionContext {
     /// Get a reference to the pending CBU session (if any)
     pub fn pending_cbu_session(&self) -> Option<&CbuSession> {
         self.pending_cbu_session.as_ref()
+    }
+
+    // =========================================================================
+    // SESSION CBU SCOPE - For bulk operations on session's active CBUs
+    // =========================================================================
+
+    /// Set the session's active CBU IDs (called before execution)
+    ///
+    /// Pre-populates the execution context with the session's CBU scope.
+    /// Bulk operations can then access this via `session_cbu_ids()`.
+    pub fn set_session_cbu_ids(&mut self, cbu_ids: Vec<Uuid>) {
+        self.session_cbu_ids = cbu_ids;
+    }
+
+    /// Get the session's active CBU IDs
+    ///
+    /// Returns the CBU IDs that were in the session scope when execution started.
+    /// Used by bulk operations that should apply to all session CBUs.
+    pub fn session_cbu_ids(&self) -> &[Uuid] {
+        &self.session_cbu_ids
+    }
+
+    /// Check if there are any CBUs in session scope
+    pub fn has_session_cbus(&self) -> bool {
+        !self.session_cbu_ids.is_empty()
     }
 
     // =========================================================================

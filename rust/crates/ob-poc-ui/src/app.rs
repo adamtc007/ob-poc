@@ -916,16 +916,26 @@ impl eframe::App for App {
         // All graph/session refetches happen here, after ALL state changes
         // =================================================================
 
-        // After execution completes, refetch session
+        // After execution completes, refetch session and scope graph
         if self.state.should_handle_execution_complete() {
             self.state.refetch_session();
-            // Also trigger graph refetch
+            // Trigger scope graph refetch (multi-CBU aware)
             if let Ok(mut async_state) = self.state.async_state.lock() {
-                async_state.needs_graph_refetch = true;
+                async_state.needs_scope_graph_refetch = true;
             }
         }
 
-        // Central graph refetch - triggered by: select_cbu, set_view_mode, execution complete
+        // Central scope graph refetch - triggered by: execution complete (multi-CBU session graph)
+        if self.state.take_pending_scope_graph_refetch() {
+            if let Some(session_id) = self.state.session_id {
+                web_sys::console::log_1(
+                    &format!("update: scope graph fetch for session_id={}", session_id).into(),
+                );
+                self.state.fetch_scope_graph(session_id);
+            }
+        }
+
+        // Central graph refetch - triggered by: select_cbu, set_view_mode
         if let Some(cbu_id) = self.state.take_pending_graph_refetch() {
             web_sys::console::log_1(
                 &format!("update: central graph fetch for cbu_id={}", cbu_id).into(),
@@ -969,12 +979,10 @@ impl eframe::App for App {
             }
         }
 
-        // Central resolution check - triggered when session has DSL with potential unresolved refs
-        // This enables automatic entity lookup popup for disambiguation
-        if self.state.take_pending_resolution_check() {
-            web_sys::console::log_1(&"update: triggering resolution check for DSL".into());
-            self.state.start_resolution();
-        }
+        // NOTE: Legacy resolution check removed - now using direct ChatResponse → Resolution flow
+        // See ai-thoughts/036-session-rip-and-replace.md for details
+        // Unresolved refs come directly in ChatResponse.unresolved_refs and are handled
+        // in process_async_results() via pending_unresolved_refs
 
         // Check for pending execute command from agent
         if let Some(session_id) = self.state.take_pending_execute() {
@@ -1916,6 +1924,58 @@ impl eframe::App for App {
                 })
                 .unwrap_or_default();
 
+            // Convert fallback matches if present
+            let fallback_matches: Vec<EntityMatchDisplay> = self
+                .state
+                .resolution_ui
+                .search_results
+                .as_ref()
+                .and_then(|r| r.fallback_matches.as_ref())
+                .map(|fb| {
+                    fb.iter()
+                        .map(|m| EntityMatchDisplay {
+                            id: m.id.clone(),
+                            name: m.display.clone(),
+                            score: m.score,
+                            details: m.context.clone(),
+                            entity_type: Some(m.entity_type.clone()),
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            // Extract filtered_by and suggestions from search results
+            let filtered_by = self
+                .state
+                .resolution_ui
+                .search_results
+                .as_ref()
+                .and_then(|r| r.filtered_by.clone());
+            let suggestions = self
+                .state
+                .resolution_ui
+                .search_results
+                .as_ref()
+                .and_then(|r| r.suggestions.clone());
+
+            // Get searching state from async_state
+            let searching = self
+                .state
+                .async_state
+                .lock()
+                .map(|s| s.loading_resolution_search)
+                .unwrap_or(false);
+
+            // Clone config data to avoid borrow conflict with mutable resolution_ui
+            let search_keys = self.state.resolution_ui.search_keys.clone();
+            let discriminator_fields = self.state.resolution_ui.discriminator_fields.clone();
+            let entity_type = self.state.resolution_ui.current_entity_type.clone();
+            let resolution_mode = self.state.resolution_ui.resolution_mode.clone();
+            let current_ref_name = self.state.resolution_ui.current_ref_name.clone();
+            let dsl_context = self.state.resolution_ui.dsl_context.clone();
+            let messages = self.state.resolution_ui.messages.clone();
+            let voice_active = self.state.resolution_ui.voice_active;
+
             let resolution_data = ResolutionPanelData {
                 window,
                 matches: if matches.is_empty() {
@@ -1923,19 +1983,27 @@ impl eframe::App for App {
                 } else {
                     Some(&matches)
                 },
-                searching: false, // TODO: track via async_state
-                current_ref_name: self.state.resolution_ui.current_ref_name.clone(),
-                dsl_context: self.state.resolution_ui.dsl_context.clone(),
-                messages: self.state.resolution_ui.messages.clone(),
-                voice_active: self.state.resolution_ui.voice_active,
+                searching,
+                current_ref_name,
+                dsl_context,
+                messages,
+                voice_active,
+                // Entity-specific config
+                entity_type: entity_type.as_deref(),
+                search_keys: &search_keys,
+                discriminator_fields: &discriminator_fields,
+                resolution_mode,
+                // Fallback/suggestions
+                fallback_matches: if fallback_matches.is_empty() {
+                    None
+                } else {
+                    Some(&fallback_matches)
+                },
+                filtered_by: filtered_by.as_ref(),
+                suggestions: suggestions.as_ref(),
             };
 
-            resolution_modal(
-                ctx,
-                &mut self.state.resolution_ui.search_query,
-                &mut self.state.resolution_ui.chat_buffer,
-                &resolution_data,
-            )
+            resolution_modal(ctx, &mut self.state.resolution_ui, &resolution_data)
         } else {
             None
         };
@@ -2202,70 +2270,55 @@ impl App {
         let Some(action) = action else { return };
 
         match action {
-            ResolutionPanelAction::Search { query } => {
-                web_sys::console::log_1(&format!("Resolution: Search query={}", query).into());
-                // TODO: Trigger search via resolution API
-                // self.state.search_resolution(&query);
+            ResolutionPanelAction::SearchMultiKey {
+                search_key_values,
+                discriminators,
+            } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "Resolution: SearchMultiKey keys={:?} discriminators={:?}",
+                        search_key_values, discriminators
+                    )
+                    .into(),
+                );
+
+                // Set pending search trigger for debounce (300ms)
+                // The actual search will be triggered when debounce elapses
+                // Use js_sys::Date for time since web_sys::Performance requires feature flag
+                let now = js_sys::Date::now();
+                self.state.resolution_ui.pending_search_trigger = Some(now + 300.0);
+
+                // Store the values for when the search fires
+                self.state.resolution_ui.search_key_values = search_key_values;
+                self.state.resolution_ui.discriminator_values = discriminators;
             }
             ResolutionPanelAction::Select { index, entity_id } => {
                 web_sys::console::log_1(
                     &format!("Resolution: Select index={} entity_id={}", index, entity_id).into(),
                 );
+                // TODO: Call resolution_select API to record the selection
+                self.advance_resolution_ref();
+            }
+            ResolutionPanelAction::SelectFallback { index, entity_id } => {
+                web_sys::console::log_1(
+                    &format!(
+                        "Resolution: SelectFallback index={} entity_id={}",
+                        index, entity_id
+                    )
+                    .into(),
+                );
+                // Same as Select, but user chose from "found elsewhere" section
                 // TODO: Call resolution_select API
-                // Advance to next ref or complete
-                if let Some(window) = self
-                    .state
-                    .window_stack
-                    .find_by_type_mut(crate::state::WindowType::Resolution)
-                {
-                    if let Some(crate::state::WindowData::Resolution {
-                        current_ref_index,
-                        total_refs,
-                        ..
-                    }) = &mut window.data
-                    {
-                        *current_ref_index += 1;
-                        if *current_ref_index >= *total_refs {
-                            // All refs resolved, close modal
-                            self.state
-                                .window_stack
-                                .close_by_type(crate::state::WindowType::Resolution);
-                        }
-                    }
-                }
-                // Clear search for next ref
-                self.state.resolution_ui.search_query.clear();
-                self.state.resolution_ui.search_results = None;
+                self.advance_resolution_ref();
             }
             ResolutionPanelAction::Skip => {
                 web_sys::console::log_1(&"Resolution: Skip".into());
-                // Advance to next ref
-                if let Some(window) = self
-                    .state
-                    .window_stack
-                    .find_by_type_mut(crate::state::WindowType::Resolution)
-                {
-                    if let Some(crate::state::WindowData::Resolution {
-                        current_ref_index,
-                        total_refs,
-                        ..
-                    }) = &mut window.data
-                    {
-                        *current_ref_index += 1;
-                        if *current_ref_index >= *total_refs {
-                            self.state
-                                .window_stack
-                                .close_by_type(crate::state::WindowType::Resolution);
-                        }
-                    }
-                }
-                // Clear search for next ref
-                self.state.resolution_ui.search_query.clear();
-                self.state.resolution_ui.search_results = None;
+                self.advance_resolution_ref();
             }
             ResolutionPanelAction::CreateNew => {
                 web_sys::console::log_1(&"Resolution: Create New".into());
                 // TODO: Open entity creation flow
+                // For now, just advance to next ref
             }
             ResolutionPanelAction::Complete { apply } => {
                 web_sys::console::log_1(&format!("Resolution: Complete apply={}", apply).into());
@@ -2274,19 +2327,14 @@ impl App {
                     .window_stack
                     .close_by_type(crate::state::WindowType::Resolution);
                 // Clear resolution UI state
-                self.state.resolution_ui.search_query.clear();
-                self.state.resolution_ui.search_results = None;
-                self.state.resolution_ui.messages.clear();
+                self.clear_resolution_ui_state();
                 // TODO: If apply, merge resolutions to parent session
             }
             ResolutionPanelAction::Close => {
                 self.state
                     .window_stack
                     .close_by_type(crate::state::WindowType::Resolution);
-                // Clear resolution UI state
-                self.state.resolution_ui.search_query.clear();
-                self.state.resolution_ui.search_results = None;
-                self.state.resolution_ui.messages.clear();
+                self.clear_resolution_ui_state();
             }
             ResolutionPanelAction::SendMessage { message } => {
                 web_sys::console::log_1(&format!("Resolution: SendMessage={}", message).into());
@@ -2317,7 +2365,123 @@ impl App {
                     }
                 }
             }
+            ResolutionPanelAction::ClearFilter { key } => {
+                web_sys::console::log_1(&format!("Resolution: ClearFilter key={}", key).into());
+                // Remove the specific filter from search_key_values
+                self.state.resolution_ui.search_key_values.remove(&key);
+                // Trigger immediate re-search
+                self.trigger_resolution_search();
+            }
+            ResolutionPanelAction::ClearAllFilters => {
+                web_sys::console::log_1(&"Resolution: ClearAllFilters".into());
+                // Keep only the "name" key, clear all others
+                let name_value = self
+                    .state
+                    .resolution_ui
+                    .search_key_values
+                    .get("name")
+                    .cloned();
+                self.state.resolution_ui.search_key_values.clear();
+                if let Some(name) = name_value {
+                    self.state
+                        .resolution_ui
+                        .search_key_values
+                        .insert("name".to_string(), name);
+                }
+                // Clear discriminators too
+                self.state.resolution_ui.discriminator_values.clear();
+                // Trigger immediate re-search
+                self.trigger_resolution_search();
+            }
         }
+    }
+
+    /// Advance to next ref in resolution or close modal if done
+    fn advance_resolution_ref(&mut self) {
+        if let Some(window) = self
+            .state
+            .window_stack
+            .find_by_type_mut(crate::state::WindowType::Resolution)
+        {
+            if let Some(crate::state::WindowData::Resolution {
+                current_ref_index,
+                total_refs,
+                ..
+            }) = &mut window.data
+            {
+                *current_ref_index += 1;
+                if *current_ref_index >= *total_refs {
+                    // All refs resolved, close modal
+                    self.state
+                        .window_stack
+                        .close_by_type(crate::state::WindowType::Resolution);
+                    self.clear_resolution_ui_state();
+                    return;
+                }
+            }
+        }
+        // Clear search state for next ref but keep modal open
+        self.state.resolution_ui.search_query.clear();
+        self.state.resolution_ui.search_key_values.clear();
+        self.state.resolution_ui.discriminator_values.clear();
+        self.state.resolution_ui.search_results = None;
+        // TODO: Load next ref's entity config
+    }
+
+    /// Clear all resolution UI state
+    fn clear_resolution_ui_state(&mut self) {
+        self.state.resolution_ui.search_query.clear();
+        self.state.resolution_ui.search_key_values.clear();
+        self.state.resolution_ui.discriminator_values.clear();
+        self.state.resolution_ui.search_results = None;
+        self.state.resolution_ui.messages.clear();
+        self.state.resolution_ui.current_entity_type = None;
+        self.state.resolution_ui.search_keys.clear();
+        self.state.resolution_ui.discriminator_fields.clear();
+        self.state.resolution_ui.current_ref = None;
+        self.state.resolution_ui.pending_search_trigger = None;
+    }
+
+    /// Trigger resolution search immediately (bypassing debounce)
+    fn trigger_resolution_search(&mut self) {
+        // Get current ref_id from window data
+        let ref_id = self
+            .state
+            .window_stack
+            .find_by_type(crate::state::WindowType::Resolution)
+            .and_then(|w| match &w.data {
+                Some(crate::state::WindowData::Resolution { subsession_id, .. }) => {
+                    Some(subsession_id.clone())
+                }
+                _ => None,
+            });
+
+        let Some(ref_id) = ref_id else { return };
+
+        // Build search request
+        let search_key_values = self.state.resolution_ui.search_key_values.clone();
+        let discriminators = self.state.resolution_ui.discriminator_values.clone();
+
+        // Set loading state
+        if let Ok(mut async_state) = self.state.async_state.lock() {
+            async_state.loading_resolution_search = true;
+        }
+
+        // Spawn async search
+        let async_state = self.state.async_state.clone();
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = crate::api::search_resolution_multi_key(
+                &ref_id,
+                &search_key_values,
+                &discriminators,
+            )
+            .await;
+
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_resolution_search = false;
+                state.pending_resolution_search = Some(result);
+            }
+        });
     }
 
     /// Handle disambiguation modal actions
@@ -3646,6 +3810,47 @@ impl AppState {
         });
     }
 
+    /// Fetch scope graph for session (multi-CBU view after execution)
+    pub fn fetch_scope_graph(&mut self, session_id: Uuid) {
+        web_sys::console::log_1(&format!("fetch_scope_graph: session_id={}", session_id).into());
+
+        {
+            let mut state = self.async_state.lock().unwrap();
+            state.loading_graph = true;
+        }
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            web_sys::console::log_1(
+                &format!(
+                    "fetch_scope_graph: calling API for session {}...",
+                    session_id
+                )
+                .into(),
+            );
+            let result = api::get_session_scope_graph(session_id).await;
+            web_sys::console::log_1(
+                &format!(
+                    "fetch_scope_graph: API returned, success={}",
+                    result.is_ok()
+                )
+                .into(),
+            );
+            if let Err(ref e) = result {
+                web_sys::console::error_1(&format!("fetch_scope_graph error: {}", e).into());
+            }
+            if let Ok(mut state) = async_state.lock() {
+                state.pending_scope_graph = Some(result);
+                state.loading_graph = false;
+            }
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+    }
+
     /// Select a CBU - sets state, graph refetch happens centrally in update()
     pub fn select_cbu(&mut self, cbu_id: Uuid, display_name: &str) {
         web_sys::console::log_1(
@@ -4375,6 +4580,21 @@ impl AppState {
                             );
                             state.pending_disambiguation = Some(disambig);
                         }
+
+                        // Handle unresolved refs - direct flow to resolution modal (2 hops, not 5+)
+                        if let Some(refs) = chat_response.unresolved_refs {
+                            if !refs.is_empty() {
+                                web_sys::console::log_1(
+                                    &format!(
+                                        "send_chat: {} unresolved refs, opening resolution modal directly",
+                                        refs.len()
+                                    )
+                                    .into(),
+                                );
+                                state.pending_unresolved_refs = Some(refs);
+                                state.pending_current_ref_index = chat_response.current_ref_index;
+                            }
+                        }
                     }
                     Err(e) => {
                         web_sys::console::error_1(&format!("send_chat error: {}", e).into());
@@ -4526,32 +4746,9 @@ impl AppState {
     // Resolution Methods
     // =========================================================================
 
-    /// Start entity resolution for current session's DSL
-    pub fn start_resolution(&mut self) {
-        let Some(session_id) = self.session_id else {
-            web_sys::console::warn_1(&"start_resolution: no session_id".into());
-            return;
-        };
-
-        {
-            let mut state = self.async_state.lock().unwrap();
-            state.loading_resolution = true;
-        }
-
-        let async_state = Arc::clone(&self.async_state);
-        let ctx = self.ctx.clone();
-
-        spawn_local(async move {
-            let result = api::start_resolution(session_id).await;
-            if let Ok(mut state) = async_state.lock() {
-                state.pending_resolution = Some(result);
-                state.loading_resolution = false;
-            }
-            if let Some(ctx) = ctx {
-                ctx.request_repaint();
-            }
-        });
-    }
+    // NOTE: start_resolution() removed - now using direct ChatResponse.unresolved_refs flow
+    // Unresolved refs come directly in ChatResponse and are handled via pending_unresolved_refs
+    // in process_async_results(). See ai-thoughts/036-session-rip-and-replace.md
 
     /// Search for entity matches for a specific ref
     pub fn search_resolution(&mut self, ref_id: &str) {

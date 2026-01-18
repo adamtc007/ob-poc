@@ -870,6 +870,21 @@ pub struct SessionGraphResponse {
     pub error: Option<String>,
 }
 
+/// Response for multi-CBU session graph endpoint
+#[derive(Debug, Serialize)]
+pub struct MultiCbuGraphResponse {
+    /// Combined graph containing all CBUs in session scope
+    pub graph: Option<CbuGraph>,
+    /// All CBU IDs included in the graph
+    pub cbu_ids: Vec<Uuid>,
+    /// Count of CBUs in scope
+    pub cbu_count: usize,
+    /// Entity IDs that were recently affected (for highlighting)
+    pub affected_entity_ids: Vec<Uuid>,
+    /// Error message if graph couldn't be loaded
+    pub error: Option<String>,
+}
+
 /// GET /api/session/:session_id/graph
 ///
 /// Returns the graph for the session's active CBU, using the same session state
@@ -960,6 +975,119 @@ async fn get_session_graph(
     }))
 }
 
+/// GET /api/session/:session_id/scope-graph
+///
+/// Returns combined graph for ALL CBUs in session scope (context.cbu_ids).
+/// This supports the multi-CBU bulk update workflow where users see all
+/// entities they're working on in a single viewport.
+async fn get_session_scope_graph(
+    Path(session_id): Path<Uuid>,
+    Query(params): Query<GraphQuery>,
+    State(state): State<SessionGraphState>,
+) -> Result<Json<MultiCbuGraphResponse>, (StatusCode, String)> {
+    // Get session and extract CBU IDs + affected entities from run_sheet
+    let (cbu_ids, affected_entity_ids, view_mode_hint) = {
+        let sessions = state.sessions.read().await;
+        let session = sessions.get(&session_id).ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                format!("Session {} not found", session_id),
+            )
+        })?;
+
+        // Get all CBU IDs from session context
+        let cbu_ids = session.context.cbu_ids.clone();
+
+        // Get affected entity IDs from recent run_sheet entries (for highlighting)
+        let affected: Vec<Uuid> = session
+            .run_sheet
+            .entries
+            .iter()
+            .filter(|e| e.status == crate::api::session::DslStatus::Executed)
+            .flat_map(|e| e.affected_entities.iter().copied())
+            .collect();
+
+        let view_mode = session.context.view_mode.clone();
+
+        (cbu_ids, affected, view_mode)
+    };
+
+    if cbu_ids.is_empty() {
+        return Ok(Json(MultiCbuGraphResponse {
+            graph: None,
+            cbu_ids: vec![],
+            cbu_count: 0,
+            affected_entity_ids: vec![],
+            error: Some("No CBUs in session scope. Execute DSL to create CBUs.".to_string()),
+        }));
+    }
+
+    let cbu_count = cbu_ids.len();
+
+    // Build combined graph for all CBUs
+    let view_mode = params
+        .view_mode
+        .as_deref()
+        .or(view_mode_hint.as_deref())
+        .unwrap_or("TRADING");
+    let orientation = params.orientation.as_deref().unwrap_or("VERTICAL");
+    let horizontal = orientation.eq_ignore_ascii_case("HORIZONTAL");
+
+    // Build graphs for each CBU and merge them
+    let mut combined_graph = CbuGraph {
+        cbu_id: cbu_ids.first().copied().unwrap_or_default(),
+        label: format!("{} CBUs in scope", cbu_count),
+        cbu_category: None,
+        jurisdiction: None,
+        nodes: Vec::new(),
+        edges: Vec::new(),
+        layers: Vec::new(),
+        stats: Default::default(),
+    };
+
+    let repo = VisualizationRepository::new(state.pool.clone());
+
+    for cbu_id in &cbu_ids {
+        let builder = match ConfigDrivenGraphBuilder::new(&state.pool, *cbu_id, view_mode).await {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!("Failed to build graph for CBU {}: {}", cbu_id, e);
+                continue;
+            }
+        };
+
+        match builder.build(&repo).await {
+            Ok(mut graph) => {
+                // Apply layout to this CBU's graph
+                let layout_engine =
+                    match LayoutEngineV2::from_database(&state.pool, view_mode, horizontal).await {
+                        Ok(e) => e,
+                        Err(e) => {
+                            tracing::warn!("Failed to load layout for CBU {}: {}", cbu_id, e);
+                            continue;
+                        }
+                    };
+                layout_engine.layout(&mut graph);
+
+                // Merge into combined graph
+                combined_graph.nodes.extend(graph.nodes);
+                combined_graph.edges.extend(graph.edges);
+            }
+            Err(e) => {
+                tracing::warn!("Failed to build graph for CBU {}: {}", cbu_id, e);
+            }
+        }
+    }
+
+    Ok(Json(MultiCbuGraphResponse {
+        graph: Some(combined_graph),
+        cbu_ids,
+        cbu_count,
+        affected_entity_ids,
+        error: None,
+    }))
+}
+
 /// Create the session-scoped graph router
 ///
 /// This router shares session state with the REPL and taxonomy navigation,
@@ -969,5 +1097,9 @@ pub fn create_session_graph_router(pool: PgPool, sessions: SessionStore) -> Rout
 
     Router::new()
         .route("/api/session/:session_id/graph", get(get_session_graph))
+        .route(
+            "/api/session/:session_id/scope-graph",
+            get(get_session_scope_graph),
+        )
         .with_state(state)
 }

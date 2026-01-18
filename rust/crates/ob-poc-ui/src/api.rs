@@ -11,8 +11,8 @@ use ob_poc_types::{
     ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse, ExecuteRequest,
     ExecuteResponse, GetContextResponse, ResolutionSearchRequest, ResolutionSearchResponse,
     ResolutionSessionResponse, SelectResolutionRequest, SelectResolutionResponse, SessionContext,
-    SessionStateResponse, SetBindingRequest, SetBindingResponse, StartResolutionRequest,
-    ValidateDslRequest, ValidateDslResponse,
+    SessionStateResponse, SetBindingRequest, SetBindingResponse, ValidateDslRequest,
+    ValidateDslResponse,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::collections::HashMap;
@@ -335,7 +335,7 @@ pub async fn search_entities(
 // Graph API (single source of truth - no delegation)
 // =============================================================================
 
-/// Get CBU graph data
+/// Get CBU graph data (single CBU)
 pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraphData, String> {
     let view_mode_str = view_mode.as_str();
     let url = format!("/api/cbu/{}/graph?view_mode={}", cbu_id, view_mode_str);
@@ -343,6 +343,49 @@ pub async fn get_cbu_graph(cbu_id: Uuid, view_mode: ViewMode) -> Result<CbuGraph
     // Use shared CbuGraphResponse type, then convert to CbuGraphData
     let response: ob_poc_types::CbuGraphResponse = get(&url).await?;
     Ok(response.into())
+}
+
+/// Get session scope graph (all CBUs in session)
+/// Returns combined graph for all CBUs created/modified in this session
+pub async fn get_session_scope_graph(session_id: Uuid) -> Result<ScopeGraphData, String> {
+    let url = format!("/api/session/{}/scope-graph", session_id);
+    let response: ob_poc_types::ScopeGraphResponse = get(&url).await?;
+    Ok(response.into())
+}
+
+/// Scope graph data for multi-CBU viewport
+#[derive(Debug, Clone, Default)]
+pub struct ScopeGraphData {
+    /// Combined graph data
+    pub graph: Option<CbuGraphData>,
+    /// CBU IDs in scope
+    pub cbu_ids: Vec<Uuid>,
+    /// Count of CBUs
+    pub cbu_count: usize,
+    /// Entity IDs recently affected (for highlighting)
+    pub affected_entity_ids: Vec<Uuid>,
+    /// Error message
+    pub error: Option<String>,
+}
+
+impl From<ob_poc_types::ScopeGraphResponse> for ScopeGraphData {
+    fn from(resp: ob_poc_types::ScopeGraphResponse) -> Self {
+        Self {
+            graph: resp.graph.map(|g| g.into()),
+            cbu_ids: resp
+                .cbu_ids
+                .iter()
+                .filter_map(|s| Uuid::parse_str(s).ok())
+                .collect(),
+            cbu_count: resp.cbu_count,
+            affected_entity_ids: resp
+                .affected_entity_ids
+                .iter()
+                .filter_map(|s| Uuid::parse_str(s).ok())
+                .collect(),
+            error: resp.error,
+        }
+    }
 }
 
 // =============================================================================
@@ -525,14 +568,8 @@ pub async fn load_cbu_into_scope(
 // Resolution API
 // =============================================================================
 
-/// Start entity resolution for session's DSL
-pub async fn start_resolution(session_id: Uuid) -> Result<ResolutionSessionResponse, String> {
-    post(
-        &format!("/api/session/{}/resolution/start", session_id),
-        &StartResolutionRequest { ref_ids: None },
-    )
-    .await
-}
+// NOTE: start_resolution() removed - now using direct ChatResponse.unresolved_refs flow
+// See ai-thoughts/036-session-rip-and-replace.md
 
 /// Get current resolution state
 #[allow(dead_code)]
@@ -552,8 +589,56 @@ pub async fn search_resolution(
         &ResolutionSearchRequest {
             ref_id: ref_id.to_string(),
             query: query.to_string(),
+            search_key: None,
+            filters: HashMap::new(),
             discriminators,
             limit: Some(10),
+        },
+    )
+    .await
+}
+
+/// Search for entity matches with multi-key support
+///
+/// This version supports:
+/// - Multiple search key fields (e.g., name + jurisdiction)
+/// - Filters to narrow results
+/// - Discriminators to boost scoring
+pub async fn search_resolution_multi_key(
+    ref_id: &str,
+    search_key_values: &HashMap<String, String>,
+    discriminators: &HashMap<String, String>,
+) -> Result<ResolutionSearchResponse, String> {
+    // Extract the primary query from "name" key or first key with value
+    let query = search_key_values
+        .get("name")
+        .cloned()
+        .or_else(|| search_key_values.values().next().cloned())
+        .unwrap_or_default();
+
+    // Build filters from non-name search keys
+    let filters: HashMap<String, String> = search_key_values
+        .iter()
+        .filter(|(k, v)| *k != "name" && !v.is_empty())
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+
+    // Determine which search key is being used (if not just "name")
+    let search_key = if filters.is_empty() {
+        None
+    } else {
+        Some("name".to_string())
+    };
+
+    post(
+        "/api/resolution/search",
+        &ResolutionSearchRequest {
+            ref_id: ref_id.to_string(),
+            query,
+            search_key,
+            filters,
+            discriminators: discriminators.clone(),
+            limit: Some(15),
         },
     )
     .await

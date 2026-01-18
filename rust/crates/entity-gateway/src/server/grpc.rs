@@ -7,9 +7,12 @@ use std::sync::Arc;
 
 use tonic::{Request, Response, Status};
 
+use crate::config::IndexMode;
 use crate::index::{IndexRegistry, MatchMode, SearchQuery};
 use crate::proto::ob::gateway::v1::{
-    entity_gateway_server::EntityGateway, Match, SearchMode, SearchRequest, SearchResponse,
+    entity_gateway_server::EntityGateway, DiscriminatorInfo, DiscriminatorType, EnumValue,
+    GetEntityConfigRequest, GetEntityConfigResponse, Match, ResolutionModeHint, SearchKeyInfo,
+    SearchKeyType, SearchMode, SearchRequest, SearchResponse,
 };
 
 /// gRPC service implementation
@@ -113,6 +116,137 @@ impl EntityGateway for EntityGatewayService {
         };
 
         Ok(Response::new(response))
+    }
+
+    async fn get_entity_config(
+        &self,
+        request: Request<GetEntityConfigRequest>,
+    ) -> Result<Response<GetEntityConfigResponse>, Status> {
+        let req = request.into_inner();
+
+        // Look up entity config by nickname
+        let entity_config = self
+            .registry
+            .get_config(&req.nickname)
+            .ok_or_else(|| Status::not_found(format!("Unknown entity type: {}", req.nickname)))?;
+
+        // Determine resolution mode based on index mode and table size hint
+        // Reference data tables (exact mode, no sharding) use autocomplete
+        let resolution_mode = if entity_config.index_mode == IndexMode::Exact
+            && entity_config
+                .shard
+                .as_ref()
+                .map(|s| !s.enabled)
+                .unwrap_or(true)
+        {
+            ResolutionModeHint::Autocomplete
+        } else {
+            ResolutionModeHint::SearchModal
+        };
+
+        // Convert search keys
+        let search_keys: Vec<SearchKeyInfo> = entity_config
+            .search_keys
+            .iter()
+            .map(|key| {
+                // Determine field type based on column name heuristics
+                let (field_type, enum_values) = infer_search_key_type(&key.name, &key.column);
+
+                SearchKeyInfo {
+                    name: key.name.clone(),
+                    label: humanize_label(&key.name),
+                    is_default: key.default,
+                    field_type: field_type.into(),
+                    enum_values,
+                }
+            })
+            .collect();
+
+        // Convert discriminators
+        let discriminators: Vec<DiscriminatorInfo> = entity_config
+            .discriminators
+            .iter()
+            .map(|disc| {
+                let (field_type, enum_values) =
+                    infer_discriminator_type(&disc.name, disc.match_mode.as_deref());
+
+                DiscriminatorInfo {
+                    name: disc.name.clone(),
+                    label: humanize_label(&disc.name),
+                    selectivity: disc.selectivity,
+                    field_type: field_type.into(),
+                    enum_values,
+                }
+            })
+            .collect();
+
+        // Determine return key type (uuid vs code)
+        let return_key_type =
+            if entity_config.return_key.ends_with("_id") || entity_config.return_key == "id" {
+                "uuid".to_string()
+            } else {
+                "code".to_string()
+            };
+
+        let response = GetEntityConfigResponse {
+            nickname: entity_config.nickname.clone(),
+            display_name: humanize_label(&entity_config.nickname),
+            search_keys,
+            discriminators,
+            resolution_mode: resolution_mode.into(),
+            return_key_type,
+        };
+
+        Ok(Response::new(response))
+    }
+}
+
+/// Convert snake_case to Title Case for display labels
+fn humanize_label(name: &str) -> String {
+    name.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Infer search key field type from name/column
+fn infer_search_key_type(name: &str, column: &str) -> (SearchKeyType, Vec<EnumValue>) {
+    match name {
+        // Known enum fields - these should eventually be populated from DB
+        "jurisdiction" => (SearchKeyType::Enum, vec![]), // TODO: populate from master_jurisdictions
+        "client_type" => (SearchKeyType::Enum, vec![]),  // TODO: populate from client_types
+        "type" => (SearchKeyType::Enum, vec![]),
+
+        // UUID fields
+        "id" => (SearchKeyType::Uuid, vec![]),
+
+        // Default to text
+        _ if column.ends_with("_id") => (SearchKeyType::Uuid, vec![]),
+        _ => (SearchKeyType::Text, vec![]),
+    }
+}
+
+/// Infer discriminator field type from name and match mode
+fn infer_discriminator_type(
+    name: &str,
+    match_mode: Option<&str>,
+) -> (DiscriminatorType, Vec<EnumValue>) {
+    // Date fields
+    if name.contains("date") || name.contains("dob") || match_mode == Some("year_or_exact") {
+        return (DiscriminatorType::Date, vec![]);
+    }
+
+    // Known enum discriminators
+    match name {
+        "nationality" => (DiscriminatorType::DiscEnum, vec![]), // TODO: populate from countries
+        "person_state" => (DiscriminatorType::DiscEnum, vec![]),
+        _ => (DiscriminatorType::String, vec![]),
     }
 }
 

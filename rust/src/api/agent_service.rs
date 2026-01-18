@@ -101,11 +101,14 @@
 //!
 //! Both `agentic_server` and `ob-poc-web` should use this service.
 
+use crate::agent::esper::{EsperCommandRegistry, LookupResult};
+use crate::agent::learning::embedder::CandleEmbedder;
 use crate::agentic::llm_client::{LlmClient, ToolDefinition};
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{
-    AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption, SessionState,
+    AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption,
+    ResolutionSubSession, SessionState, UnresolvedRefInfo,
 };
 use crate::database::derive_semantic_state;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
@@ -229,12 +232,19 @@ pub struct AgentChatResponse {
     /// The full AST for debugging
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ast: Option<Vec<Statement>>,
-    /// Disambiguation request if needed
+    /// Disambiguation request if needed (LEGACY - use unresolved_refs instead)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disambiguation: Option<DisambiguationRequest>,
     /// UI commands (show CBU, highlight entity, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commands: Option<Vec<AgentCommand>>,
+    /// Unresolved entity references needing resolution (post-DSL parsing)
+    /// When present, UI should show resolution modal for each ref
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unresolved_refs: Option<Vec<UnresolvedRefInfo>>,
+    /// Index of current ref being resolved (if in resolution state)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_ref_index: Option<usize>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -339,6 +349,10 @@ pub struct AgentService {
     config: AgentServiceConfig,
     /// Client scope (if operating in client portal mode)
     client_scope: Option<ClientScope>,
+    /// ESPER command registry for instant navigation (optional)
+    esper_registry: Option<Arc<EsperCommandRegistry>>,
+    /// Embedder for ESPER semantic fallback (optional)
+    embedder: Option<Arc<CandleEmbedder>>,
 }
 
 #[allow(dead_code)]
@@ -349,6 +363,8 @@ impl AgentService {
             pool: None,
             config: AgentServiceConfig::default(),
             client_scope: None,
+            esper_registry: None,
+            embedder: None,
         }
     }
 
@@ -358,6 +374,8 @@ impl AgentService {
             pool: Some(pool),
             config: AgentServiceConfig::default(),
             client_scope: None,
+            esper_registry: None,
+            embedder: None,
         }
     }
 
@@ -367,7 +385,21 @@ impl AgentService {
             pool,
             config,
             client_scope: None,
+            esper_registry: None,
+            embedder: None,
         }
+    }
+
+    /// Set ESPER registry for instant navigation commands
+    pub fn with_esper_registry(mut self, registry: Arc<EsperCommandRegistry>) -> Self {
+        self.esper_registry = Some(registry);
+        self
+    }
+
+    /// Set embedder for ESPER semantic fallback
+    pub fn with_embedder(mut self, embedder: Arc<CandleEmbedder>) -> Self {
+        self.embedder = Some(embedder);
+        self
     }
 
     /// Create a client-scoped agent service for the client portal
@@ -381,6 +413,8 @@ impl AgentService {
             pool: Some(pool),
             config: AgentServiceConfig::default(),
             client_scope: Some(ClientScope::new(client_id, accessible_cbus)),
+            esper_registry: None,
+            embedder: None,
         }
     }
 
@@ -397,6 +431,8 @@ impl AgentService {
             pool: Some(pool),
             config: AgentServiceConfig::default(),
             client_scope: Some(scope),
+            esper_registry: None,
+            embedder: None,
         }
     }
 
@@ -804,6 +840,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return Ok(response);
         }
 
+        // Handle ESPER navigation commands (bypass LLM)
+        // These are instant voice/chat commands like "enhance", "zoom in 2x", "universe"
+        if let Some(response) = self.handle_esper_command(&request.message) {
+            return Ok(response);
+        }
+
         // If this is a disambiguation response, handle it
         if let Some(disambig_response) = &request.disambiguation_response {
             return self
@@ -868,8 +910,9 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             stage_focus_context
         );
 
-        // Build session context for LLM - include active CBU, bindings, and semantic state
+        // Build session context for LLM - include active CBU, scope, bindings, and semantic state
         let active_cbu_context = session.context.active_cbu_for_llm();
+        let scope_context = session.context.scope_context_for_llm();
 
         // Derive semantic state if we have an active CBU
         let semantic_context = if let Some(ref cbu) = session.context.active_cbu {
@@ -890,6 +933,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
         let bindings_context = if !session_bindings.is_empty()
             || active_cbu_context.is_some()
+            || scope_context.is_some()
             || semantic_context.is_some()
             || kyc_case_context.is_some()
             || taxonomy_context.is_some()
@@ -897,6 +941,10 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             let mut parts = Vec::new();
             if let Some(cbu) = active_cbu_context {
                 parts.push(cbu);
+            }
+            // Add multi-CBU scope context for bulk operations
+            if let Some(scope) = scope_context {
+                parts.push(scope);
             }
             if !session_bindings.is_empty() {
                 parts.push(format!(
@@ -1041,6 +1089,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     ast: None,
                     disambiguation: None,
                     commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
                 });
             }
 
@@ -1088,6 +1138,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         ast: None,
                         disambiguation: Some(disambig),
                         commands: None,
+                        unresolved_refs: None,
+                        current_ref_index: None,
                     });
                 }
                 UnifiedResolution::Error(msg) => {
@@ -1336,11 +1388,147 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         .await
     }
 
-    /// Handle graph filter and view mode commands.
+    /// Handle ESPER navigation commands (Blade Runner-style voice/chat navigation).
     ///
-    /// Recognized patterns:
-    /// - "show only shells" / "filter to shells" → FilterByType
-    /// - "show only people" / "filter to persons" → FilterByType
+    /// Flow:
+    /// ```text
+    /// User phrase → Trie lookup → EsperMatch → AgentChatResponse
+    ///                    ↓
+    ///              Miss? → Semantic fallback (if ready)
+    ///                    ↓
+    ///              Miss? → Return None → Falls through to DSL pipeline
+    /// ```
+    fn handle_esper_command(&self, message: &str) -> Option<AgentChatResponse> {
+        let registry = self.esper_registry.as_ref()?;
+
+        // Try fast path first (trie lookup)
+        // Only compute embedding on trie miss + semantic index ready
+        let query_embedding = if registry.lookup(message).is_none() && registry.semantic_ready() {
+            // Slow path: compute embedding for semantic search (~5-15ms)
+            self.embedder.as_ref().and_then(|e| {
+                e.embed_blocking(message)
+                    .map_err(|err| {
+                        tracing::warn!("ESPER semantic embed failed: {}", err);
+                        err
+                    })
+                    .ok()
+            })
+        } else {
+            None
+        };
+
+        // Lookup with semantic fallback
+        match registry.lookup_with_semantic(message, query_embedding.as_deref()) {
+            LookupResult::Matched(esper_match) => {
+                // Fast path hit - trie match
+                Some(AgentChatResponse {
+                    message: esper_match.response.clone(),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: SessionState::New,
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: Some(vec![esper_match.command.clone()]),
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                })
+            }
+            LookupResult::SemanticMatch {
+                esper_match,
+                semantic,
+                should_learn,
+            } => {
+                // Semantic match with high confidence - auto-execute
+                tracing::info!(
+                    "ESPER semantic match: '{}' → {} (confidence: {:.2}, learn: {})",
+                    message,
+                    semantic.command_key,
+                    semantic.confidence,
+                    should_learn
+                );
+
+                // Self-healing: persist learned alias to DB (fire-and-forget)
+                if should_learn {
+                    if let Some(pool) = &self.pool {
+                        let pool = pool.clone();
+                        let phrase = message.to_lowercase();
+                        let command_key = semantic.command_key.clone();
+                        let confidence = semantic.confidence;
+
+                        tokio::spawn(async move {
+                            if let Err(e) = persist_learned_esper_alias(
+                                &pool,
+                                &phrase,
+                                &command_key,
+                                confidence,
+                            )
+                            .await
+                            {
+                                tracing::warn!("Failed to persist ESPER learned alias: {}", e);
+                            }
+                        });
+                    }
+                }
+
+                Some(AgentChatResponse {
+                    message: esper_match.response.clone(),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: SessionState::New,
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: Some(vec![esper_match.command.clone()]),
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                })
+            }
+            LookupResult::NeedsDisambiguation {
+                candidates,
+                original_phrase,
+            } => {
+                // Medium confidence - show disambiguation UI
+                tracing::info!(
+                    "ESPER needs disambiguation for '{}': {:?}",
+                    original_phrase,
+                    candidates
+                        .iter()
+                        .map(|c| format!("{} ({:.2})", c.command_key, c.confidence))
+                        .collect::<Vec<_>>()
+                );
+
+                let options: Vec<String> = candidates
+                    .iter()
+                    .map(|c| format!("{} (matched: '{}')", c.command_key, c.matched_alias))
+                    .collect();
+
+                Some(AgentChatResponse {
+                    message: format!(
+                        "I'm not sure what you mean by '{}'. Did you mean one of these?\n{}",
+                        original_phrase,
+                        options.join("\n")
+                    ),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: SessionState::New,
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                })
+            }
+            LookupResult::NoMatch => None,
+        }
+    }
+
+    /// Handle filter/view commands for graph visualization
+    ///
     /// - "highlight shells" / "highlight people" → HighlightType
     /// - "clear filter" / "show all" / "reset filter" → ClearFilter
     /// - "show kyc view" / "switch to custody view" → SetViewMode
@@ -1373,6 +1561,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 ast: None,
                 disambiguation: None,
                 commands: Some(vec![AgentCommand::ClearFilter]),
+                unresolved_refs: None,
+                current_ref_index: None,
             });
         }
 
@@ -1390,6 +1580,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 ast: None,
                 disambiguation: None,
                 commands: Some(vec![AgentCommand::SetViewMode { view_mode: mode }]),
+                unresolved_refs: None,
+                current_ref_index: None,
             });
         }
 
@@ -1414,6 +1606,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     ast: None,
                     disambiguation: None,
                     commands: Some(vec![AgentCommand::FilterByType { type_codes }]),
+                    unresolved_refs: None,
+                    current_ref_index: None,
                 });
             }
         }
@@ -1437,6 +1631,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         ast: None,
                         disambiguation: None,
                         commands: Some(vec![AgentCommand::HighlightType { type_code }]),
+                        unresolved_refs: None,
+                        current_ref_index: None,
                     });
                 }
             }
@@ -1559,1100 +1755,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         }
     }
 
-    /// Handle Esper-style UI navigation commands (Blade Runner photo analysis style).
-    ///
-    /// Recognized patterns:
-    /// - "enhance" / "zoom in" / "closer" / "magnify" → ZoomIn
-    /// - "pull back" / "zoom out" / "wider" → ZoomOut
-    /// - "fit" / "show all" / "bird's eye" → ZoomFit
-    /// - "track left" / "pan left" / "move left" → Pan(Left)
-    /// - "track right" / "pan right" / "move right" → Pan(Right)
-    /// - "track 45 left" → Pan(Left, 45)
-    /// - "stop" / "hold" / "freeze" / "that's good" → Stop
-    /// - "center" / "home" → Center
-    /// - "drill up" / "go up" / "back up" → TaxonomyZoomOut
-    /// - "give me a hard copy" / "print" / "screenshot" → Export
-    /// - "reset layout" / "auto arrange" → ResetLayout
-    /// - "flip" / "rotate layout" → ToggleOrientation
-    /// - "find X" / "search for X" → Search
-    /// - "help" / "what can I say" → ShowHelp
-    fn handle_esper_command(&self, message: &str) -> Option<AgentChatResponse> {
-        use ob_poc_types::PanDirection;
-
-        let lower_msg = message.to_lowercase().trim().to_string();
-        let words: Vec<&str> = lower_msg.split_whitespace().collect();
-
-        if words.is_empty() {
-            return None;
-        }
-
-        // Helper to build response
-        let make_response = |msg: &str, cmd: AgentCommand| AgentChatResponse {
-            message: msg.to_string(),
-            intents: vec![],
-            validation_results: vec![],
-            session_state: SessionState::New,
-            can_execute: false,
-            dsl_source: None,
-            ast: None,
-            disambiguation: None,
-            commands: Some(vec![cmd]),
-        };
-
-        // =========================================================================
-        // STOP / HOLD / FREEZE (highest priority - Esper classic)
-        // =========================================================================
-        if matches!(
-            words[0],
-            "stop" | "hold" | "freeze" | "pause" | "wait" | "halt"
-        ) || lower_msg == "that's good"
-            || lower_msg == "right there"
-            || lower_msg == "there"
-            || lower_msg == "okay stop"
-        {
-            return Some(make_response("Stopping.", AgentCommand::Stop));
-        }
-
-        // =========================================================================
-        // ZOOM COMMANDS (Esper-style)
-        // =========================================================================
-
-        // "enhance" - the classic Blade Runner command
-        if words[0] == "enhance" {
-            let factor = self.parse_number_after(&words, "enhance");
-            return Some(make_response(
-                "Enhancing...",
-                AgentCommand::ZoomIn { factor },
-            ));
-        }
-
-        // "zoom in" / "zoom" / "closer" / "magnify"
-        if (words[0] == "zoom" && words.get(1) == Some(&"in"))
-            || words[0] == "closer"
-            || words[0] == "magnify"
-            || (words[0] == "move" && words.get(1) == Some(&"in"))
-        {
-            let factor = self.parse_number_from_message(&lower_msg);
-            return Some(make_response(
-                "Zooming in...",
-                AgentCommand::ZoomIn { factor },
-            ));
-        }
-
-        // "zoom out" / "pull back" / "wider"
-        if (words[0] == "zoom" && words.get(1) == Some(&"out"))
-            || (words[0] == "pull" && words.get(1) == Some(&"back"))
-            || words[0] == "wider"
-            || (words[0] == "move" && words.get(1) == Some(&"out"))
-        {
-            let factor = self.parse_number_from_message(&lower_msg);
-            return Some(make_response(
-                "Zooming out...",
-                AgentCommand::ZoomOut { factor },
-            ));
-        }
-
-        // "fit" / "fit to screen" / "show all" / "bird's eye"
-        if words[0] == "fit"
-            || lower_msg.contains("fit to screen")
-            || lower_msg.contains("show all")
-            || lower_msg.contains("bird")
-            || lower_msg.contains("overview")
-            || lower_msg.contains("30000 foot")
-        {
-            return Some(make_response("Fitting to screen.", AgentCommand::ZoomFit));
-        }
-
-        // =========================================================================
-        // PAN COMMANDS (Esper-style: "track 45 left")
-        // =========================================================================
-
-        // "track" / "pan" + direction
-        if matches!(words[0], "track" | "pan" | "move" | "go" | "scroll") {
-            // Parse direction and optional amount
-            // "track 45 left" → direction=Left, amount=45
-            // "track left" → direction=Left, amount=None
-            // "pan right 100" → direction=Right, amount=100
-
-            let (direction, amount) = self.parse_pan_direction_and_amount(&words);
-
-            if let Some(dir) = direction {
-                let dir_name = match dir {
-                    PanDirection::Left => "left",
-                    PanDirection::Right => "right",
-                    PanDirection::Up => "up",
-                    PanDirection::Down => "down",
-                };
-                return Some(make_response(
-                    &format!("Tracking {}...", dir_name),
-                    AgentCommand::Pan {
-                        direction: dir,
-                        amount,
-                    },
-                ));
-            }
-        }
-
-        // Simple direction commands: "left", "right", "up", "down"
-        if words.len() == 1 {
-            let dir = match words[0] {
-                "left" => Some(PanDirection::Left),
-                "right" => Some(PanDirection::Right),
-                "up" => Some(PanDirection::Up),
-                "down" => Some(PanDirection::Down),
-                _ => None,
-            };
-            if let Some(d) = dir {
-                return Some(make_response(
-                    &format!("Panning {}...", words[0]),
-                    AgentCommand::Pan {
-                        direction: d,
-                        amount: None,
-                    },
-                ));
-            }
-        }
-
-        // =========================================================================
-        // CENTER / HOME
-        // =========================================================================
-        if words[0] == "center" || words[0] == "home" || lower_msg == "center and stop" {
-            return Some(make_response("Centering view.", AgentCommand::Center));
-        }
-
-        // =========================================================================
-        // HIERARCHY NAVIGATION
-        // =========================================================================
-
-        // "drill down" / "go deeper" / "expand"
-        // "drill up" / "go up" / "back up" → TaxonomyZoomOut
-        if (words[0] == "drill" && words.get(1) == Some(&"up"))
-            || (words[0] == "go" && words.get(1) == Some(&"up"))
-            || (words[0] == "back" && words.get(1) == Some(&"up"))
-            || lower_msg.contains("show parent")
-        {
-            return Some(make_response(
-                "Zooming out...",
-                AgentCommand::TaxonomyZoomOut,
-            ));
-        }
-
-        // =========================================================================
-        // EXPORT ("Give me a hard copy" - Blade Runner classic)
-        // =========================================================================
-        if lower_msg.contains("hard copy")
-            || lower_msg.contains("print")
-            || lower_msg.contains("screenshot")
-            || lower_msg.contains("export")
-            || lower_msg.contains("save image")
-        {
-            let format = if lower_msg.contains("svg") {
-                Some("svg".to_string())
-            } else if lower_msg.contains("pdf") {
-                Some("pdf".to_string())
-            } else {
-                Some("png".to_string())
-            };
-            return Some(make_response(
-                "Generating hard copy...",
-                AgentCommand::Export { format },
-            ));
-        }
-
-        // =========================================================================
-        // LAYOUT COMMANDS
-        // =========================================================================
-        if lower_msg.contains("reset layout")
-            || lower_msg.contains("auto arrange")
-            || lower_msg.contains("auto layout")
-            || lower_msg.contains("rearrange")
-        {
-            return Some(make_response(
-                "Resetting layout.",
-                AgentCommand::ResetLayout,
-            ));
-        }
-
-        if lower_msg.contains("flip layout")
-            || lower_msg.contains("rotate layout")
-            || lower_msg.contains("toggle orientation")
-            || lower_msg.contains("switch orientation")
-        {
-            return Some(make_response(
-                "Toggling orientation.",
-                AgentCommand::ToggleOrientation,
-            ));
-        }
-
-        // =========================================================================
-        // SEARCH
-        // =========================================================================
-        if (words[0] == "find" || words[0] == "search" || words[0] == "locate") && words.len() > 1 {
-            let query = words[1..].join(" ");
-            return Some(make_response(
-                &format!("Searching for '{}'...", query),
-                AgentCommand::Search { query },
-            ));
-        }
-
-        // =========================================================================
-        // HELP
-        // =========================================================================
-        if words[0] == "help"
-            || lower_msg.contains("what can i say")
-            || lower_msg.contains("what commands")
-            || lower_msg.contains("navigation help")
-        {
-            let topic = if words.len() > 1 {
-                Some(words[1..].join(" "))
-            } else {
-                None
-            };
-            return Some(make_response(
-                "Here are the available navigation commands...",
-                AgentCommand::ShowHelp { topic },
-            ));
-        }
-
-        // =========================================================================
-        // SCALE NAVIGATION (Astronomical metaphor)
-        // =========================================================================
-
-        // Universe view - full client book
-        if lower_msg.contains("universe")
-            || lower_msg.contains("full book")
-            || lower_msg.contains("entire book")
-            || lower_msg.contains("client book")
-            || lower_msg.contains("god view")
-            || lower_msg.contains("see everything")
-            || lower_msg.contains("all clients")
-            || lower_msg.contains("the whole picture")
-        {
-            return Some(make_response(
-                "Showing full universe...",
-                AgentCommand::ScaleUniverse,
-            ));
-        }
-
-        // Galaxy view - segment level
-        if lower_msg.contains("galaxy")
-            || lower_msg.contains("segment view")
-            || lower_msg.contains("cluster view")
-            || lower_msg.contains("portfolio view")
-        {
-            let segment = if lower_msg.contains("hedge fund") {
-                Some("hedge_fund".to_string())
-            } else if lower_msg.contains("pension") {
-                Some("pension".to_string())
-            } else if lower_msg.contains("sovereign") {
-                Some("sovereign_wealth".to_string())
-            } else if lower_msg.contains("family office") {
-                Some("family_office".to_string())
-            } else if lower_msg.contains("insurance") {
-                Some("insurance".to_string())
-            } else {
-                None
-            };
-            return Some(make_response(
-                "Showing galaxy view...",
-                AgentCommand::ScaleGalaxy { segment },
-            ));
-        }
-
-        // System view - CBU with satellites
-        if lower_msg.contains("enter system")
-            || lower_msg.contains("solar system")
-            || lower_msg.contains("cbu system")
-            || lower_msg.contains("with satellites")
-            || lower_msg.contains("what's orbiting")
-        {
-            return Some(make_response(
-                "Entering system view...",
-                AgentCommand::ScaleSystem { cbu_id: None },
-            ));
-        }
-
-        // Planet view - single entity
-        if lower_msg.contains("land on")
-            || lower_msg.contains("planet view")
-            || lower_msg.contains("touch down")
-            || lower_msg.contains("go to surface")
-        {
-            return Some(make_response(
-                "Landing on entity...",
-                AgentCommand::ScalePlanet { entity_id: None },
-            ));
-        }
-
-        // Surface view - entity details
-        if lower_msg.contains("surface scan")
-            || lower_msg.contains("surface view")
-            || lower_msg.contains("ground level")
-            || lower_msg.contains("show attributes")
-            || lower_msg.contains("entity details")
-            || lower_msg.contains("full profile")
-            || lower_msg.contains("what do we know")
-            || lower_msg.contains("everything about")
-        {
-            return Some(make_response(
-                "Scanning surface...",
-                AgentCommand::ScaleSurface,
-            ));
-        }
-
-        // Core view - derived/hidden data
-        if lower_msg.contains("core sample")
-            || lower_msg.contains("to the core")
-            || lower_msg.contains("deep scan")
-            || lower_msg.contains("below surface")
-            || lower_msg.contains("hidden layers")
-            || lower_msg.contains("what's hidden")
-            || lower_msg.contains("indirect ownership")
-            || lower_msg.contains("indirect control")
-            || lower_msg.contains("derived")
-            || lower_msg.contains("inferred")
-            || lower_msg.contains("beneath the surface")
-        {
-            return Some(make_response(
-                "Sampling core data...",
-                AgentCommand::ScaleCore,
-            ));
-        }
-
-        // =========================================================================
-        // DEPTH NAVIGATION (Z-axis through structures)
-        // =========================================================================
-
-        // Drill through - all the way to natural persons
-        if lower_msg.contains("drill through")
-            || lower_msg.contains("drill all the way")
-            || lower_msg.contains("to the bottom")
-            || lower_msg.contains("find the humans")
-            || lower_msg.contains("find natural persons")
-            || lower_msg.contains("who's really behind")
-            || lower_msg.contains("ultimate owners")
-            || lower_msg.contains("trace to terminus")
-            || lower_msg.contains("follow the money")
-            || lower_msg.contains("cui bono")
-        {
-            return Some(make_response(
-                "Drilling through to natural persons...",
-                AgentCommand::DrillThrough,
-            ));
-        }
-
-        // Surface return
-        if lower_msg == "surface"
-            || lower_msg.contains("come up")
-            || lower_msg.contains("return to surface")
-            || lower_msg.contains("back to top")
-            || lower_msg.contains("top level")
-            || lower_msg.contains("emerge")
-            || lower_msg.contains("rise up")
-            || lower_msg.contains("float up")
-            || lower_msg.contains("back to daylight")
-        {
-            return Some(make_response(
-                "Returning to surface...",
-                AgentCommand::SurfaceReturn,
-            ));
-        }
-
-        // X-ray view
-        if lower_msg.contains("x-ray")
-            || lower_msg.contains("xray")
-            || lower_msg.contains("transparent")
-            || lower_msg.contains("see through")
-            || lower_msg.contains("skeleton view")
-            || lower_msg.contains("wireframe")
-            || lower_msg.contains("show all layers")
-            || lower_msg.contains("reveal structure")
-        {
-            return Some(make_response(
-                "Activating x-ray view...",
-                AgentCommand::XRay,
-            ));
-        }
-
-        // Peel layer
-        if words[0] == "peel"
-            || lower_msg.contains("peel back")
-            || lower_msg.contains("next layer")
-            || lower_msg.contains("one layer")
-            || lower_msg.contains("remove layer")
-            || lower_msg.contains("unwrap")
-            || lower_msg.contains("layer by layer")
-        {
-            return Some(make_response("Peeling layer...", AgentCommand::Peel));
-        }
-
-        // Cross section
-        if lower_msg.contains("cross section")
-            || lower_msg.contains("horizontal slice")
-            || lower_msg.contains("slice")
-            || lower_msg.contains("cut through")
-            || lower_msg.contains("peers at this level")
-            || lower_msg.contains("same level")
-            || lower_msg.contains("siblings")
-            || lower_msg.contains("who else is at this level")
-        {
-            return Some(make_response(
-                "Showing cross section...",
-                AgentCommand::CrossSection,
-            ));
-        }
-
-        // Depth indicator
-        if lower_msg.contains("how deep")
-            || lower_msg.contains("what depth")
-            || lower_msg.contains("how many layers")
-            || lower_msg.contains("depth check")
-            || lower_msg.contains("where am i")
-            || lower_msg.contains("how far down")
-        {
-            return Some(make_response(
-                "Checking depth...",
-                AgentCommand::DepthIndicator,
-            ));
-        }
-
-        // =========================================================================
-        // ORBITAL NAVIGATION (Rotating around entities)
-        // =========================================================================
-
-        // Orbit
-        if words[0] == "orbit"
-            || lower_msg.contains("orbit around")
-            || lower_msg.contains("circle around")
-            || lower_msg.contains("rotate around")
-            || lower_msg.contains("360 view")
-            || lower_msg.contains("full rotation")
-            || lower_msg.contains("all connections")
-            || lower_msg.contains("what's connected")
-        {
-            return Some(make_response(
-                "Orbiting entity...",
-                AgentCommand::Orbit { entity_id: None },
-            ));
-        }
-
-        // Rotate layer
-        if lower_msg.contains("rotate to")
-            || lower_msg.contains("switch layer")
-            || lower_msg.contains("flip to")
-        {
-            let layer = if lower_msg.contains("ownership") {
-                "ownership"
-            } else if lower_msg.contains("control") {
-                "control"
-            } else if lower_msg.contains("service") {
-                "services"
-            } else if lower_msg.contains("custody") {
-                "custody"
-            } else {
-                "ownership"
-            };
-            return Some(make_response(
-                &format!("Rotating to {} layer...", layer),
-                AgentCommand::RotateLayer {
-                    layer: layer.to_string(),
-                },
-            ));
-        }
-
-        // Flip
-        if words[0] == "flip"
-            || lower_msg.contains("flip view")
-            || lower_msg.contains("invert")
-            || lower_msg.contains("reverse view")
-            || lower_msg.contains("opposite view")
-            || lower_msg.contains("upstream")
-            || lower_msg.contains("downstream")
-        {
-            return Some(make_response("Flipping view...", AgentCommand::Flip));
-        }
-
-        // Tilt
-        if words[0] == "tilt" || lower_msg.contains("tilt view") || lower_msg.contains("angle") {
-            let dimension = if lower_msg.contains("time") {
-                "time"
-            } else if lower_msg.contains("service") {
-                "services"
-            } else if lower_msg.contains("ownership") {
-                "ownership"
-            } else {
-                "default"
-            };
-            return Some(make_response(
-                &format!("Tilting towards {}...", dimension),
-                AgentCommand::Tilt {
-                    dimension: dimension.to_string(),
-                },
-            ));
-        }
-
-        // =========================================================================
-        // TEMPORAL NAVIGATION (4th dimension - time)
-        // =========================================================================
-
-        // Time rewind
-        if lower_msg.contains("rewind")
-            || lower_msg.contains("go back to")
-            || lower_msg.contains("as of")
-            || lower_msg.contains("at date")
-            || lower_msg.contains("historical")
-            || lower_msg.contains("back in time")
-            || lower_msg.contains("time travel")
-            || lower_msg.contains("take me back")
-            || lower_msg.contains("before the")
-            || lower_msg.contains("previous state")
-        {
-            // Try to extract date reference
-            let target_date = if lower_msg.contains("last quarter") {
-                Some("last_quarter".to_string())
-            } else if lower_msg.contains("last year") {
-                Some("last_year".to_string())
-            } else if lower_msg.contains("year end") {
-                Some("year_end".to_string())
-            } else {
-                None
-            };
-            return Some(make_response(
-                "Rewinding...",
-                AgentCommand::TimeRewind { target_date },
-            ));
-        }
-
-        // Time play
-        if (words[0] == "play" && !lower_msg.contains("display"))
-            || lower_msg.contains("play forward")
-            || lower_msg.contains("animate")
-            || lower_msg.contains("show changes")
-            || lower_msg.contains("evolve")
-            || lower_msg.contains("progression")
-            || lower_msg.contains("time lapse")
-            || lower_msg.contains("show evolution")
-            || lower_msg.contains("watch it change")
-        {
-            return Some(make_response(
-                "Playing timeline...",
-                AgentCommand::TimePlay {
-                    from_date: None,
-                    to_date: None,
-                },
-            ));
-        }
-
-        // Time freeze
-        if lower_msg.contains("freeze time")
-            || lower_msg.contains("freeze frame")
-            || lower_msg.contains("lock time")
-            || lower_msg.contains("fix date")
-            || lower_msg.contains("temporal lock")
-            || lower_msg.contains("hold that date")
-        {
-            return Some(make_response("Freezing time...", AgentCommand::TimeFreeze));
-        }
-
-        // Time slice (comparison)
-        if lower_msg.contains("time slice")
-            || lower_msg.contains("compare times")
-            || lower_msg.contains("temporal diff")
-            || lower_msg.contains("before after")
-            || lower_msg.contains("then vs now")
-            || lower_msg.contains("what changed")
-            || lower_msg.contains("year over year")
-            || lower_msg.contains("show the difference")
-            || lower_msg.contains("what moved")
-            || lower_msg.contains("ownership delta")
-        {
-            return Some(make_response(
-                "Comparing time slices...",
-                AgentCommand::TimeSlice {
-                    date1: None,
-                    date2: None,
-                },
-            ));
-        }
-
-        // Time trail
-        if lower_msg.contains("show trail")
-            || lower_msg.contains("history trail")
-            || lower_msg.contains("audit trail")
-            || lower_msg.contains("timeline")
-            || lower_msg.contains("chronology")
-            || lower_msg.contains("full history")
-            || lower_msg.contains("event history")
-            || lower_msg.contains("how did we get here")
-        {
-            return Some(make_response(
-                "Showing timeline...",
-                AgentCommand::TimeTrail { entity_id: None },
-            ));
-        }
-
-        // =========================================================================
-        // INVESTIGATION PATTERNS
-        // =========================================================================
-
-        // Follow the money (also caught above in drill through)
-        if lower_msg.contains("follow the money")
-            || lower_msg.contains("trace the money")
-            || lower_msg.contains("money trail")
-            || lower_msg.contains("capital flow")
-            || lower_msg.contains("trace ownership")
-            || lower_msg.contains("ownership chain")
-            || lower_msg.contains("who owns who")
-        {
-            return Some(make_response(
-                "Following the money...",
-                AgentCommand::FollowTheMoney { from_entity: None },
-            ));
-        }
-
-        // Who controls
-        if lower_msg.contains("who controls")
-            || lower_msg.contains("who's in charge")
-            || lower_msg.contains("who decides")
-            || lower_msg.contains("control trace")
-            || lower_msg.contains("decision makers")
-            || lower_msg.contains("power structure")
-            || lower_msg.contains("puppet master")
-            || lower_msg.contains("who's really running")
-        {
-            return Some(make_response(
-                "Tracing control...",
-                AgentCommand::WhoControls { entity_id: None },
-            ));
-        }
-
-        // Illuminate
-        if words[0] == "illuminate"
-            || lower_msg.contains("bring out")
-            || lower_msg.contains("spotlight")
-            || lower_msg.contains("light it up")
-            || lower_msg.contains("make it obvious")
-        {
-            let aspect = if lower_msg.contains("ownership") {
-                "ownership"
-            } else if lower_msg.contains("control") {
-                "control"
-            } else if lower_msg.contains("risk") {
-                "risk"
-            } else if lower_msg.contains("change") {
-                "changes"
-            } else {
-                "all"
-            };
-            return Some(make_response(
-                &format!("Illuminating {}...", aspect),
-                AgentCommand::Illuminate {
-                    aspect: aspect.to_string(),
-                },
-            ));
-        }
-
-        // Shadow view
-        if lower_msg.contains("show shadow")
-            || lower_msg.contains("shadow view")
-            || lower_msg.contains("indirect")
-            || lower_msg.contains("behind the scenes")
-            || lower_msg.contains("hidden connections")
-            || lower_msg.contains("implicit")
-        {
-            return Some(make_response(
-                "Showing shadow relationships...",
-                AgentCommand::Shadow,
-            ));
-        }
-
-        // Red flag scan
-        if lower_msg.contains("red flag")
-            || lower_msg.contains("risk scan")
-            || lower_msg.contains("anomaly")
-            || lower_msg.contains("what's wrong")
-            || lower_msg.contains("problems")
-            || lower_msg.contains("suspicious")
-            || lower_msg.contains("circular ownership")
-            || lower_msg.contains("show me problems")
-            || lower_msg.contains("what should worry")
-        {
-            return Some(make_response(
-                "Scanning for red flags...",
-                AgentCommand::RedFlagScan,
-            ));
-        }
-
-        // Black holes - data gaps
-        if lower_msg.contains("black hole")
-            || lower_msg.contains("missing information")
-            || lower_msg.contains("data void")
-            || lower_msg.contains("information gap")
-            || lower_msg.contains("what's missing")
-            || lower_msg.contains("incomplete")
-            || lower_msg.contains("dead end")
-            || lower_msg.contains("where does it go dark")
-            || lower_msg.contains("opacity")
-            || lower_msg.contains("can't see past")
-        {
-            return Some(make_response(
-                "Finding black holes...",
-                AgentCommand::BlackHole,
-            ));
-        }
-
-        // =========================================================================
-        // CONTEXT INTENTIONS
-        // =========================================================================
-
-        // Context: Review
-        if lower_msg.contains("board review")
-            || lower_msg.contains("committee review")
-            || lower_msg.contains("quarterly review")
-            || lower_msg.contains("annual review")
-            || lower_msg.contains("audit preparation")
-            || lower_msg.contains("preparing for review")
-            || lower_msg.contains("need board pack")
-        {
-            return Some(make_response(
-                "Setting context: Board/Committee Review",
-                AgentCommand::ContextReview,
-            ));
-        }
-
-        // Context: Investigation
-        if lower_msg.contains("investigation mode")
-            || lower_msg.contains("investigating")
-            || lower_msg.contains("forensic")
-            || lower_msg.contains("deep dive")
-            || lower_msg.contains("due diligence")
-            || lower_msg.contains("enhanced due diligence")
-            || lower_msg.contains("suspicious activity")
-            || lower_msg.contains("something's not right")
-        {
-            return Some(make_response(
-                "Setting context: Investigation",
-                AgentCommand::ContextInvestigation,
-            ));
-        }
-
-        // Context: Onboarding
-        if lower_msg.contains("onboarding mode")
-            || lower_msg.contains("new client")
-            || lower_msg.contains("client intake")
-            || lower_msg.contains("initial setup")
-            || lower_msg.contains("setting up new")
-            || lower_msg.contains("kyc collection")
-        {
-            return Some(make_response(
-                "Setting context: Onboarding",
-                AgentCommand::ContextOnboarding,
-            ));
-        }
-
-        // Context: Monitoring
-        if lower_msg.contains("monitoring mode")
-            || lower_msg.contains("ongoing monitoring")
-            || lower_msg.contains("pkyc")
-            || lower_msg.contains("periodic kyc")
-            || lower_msg.contains("event monitoring")
-            || lower_msg.contains("checking for changes")
-        {
-            return Some(make_response(
-                "Setting context: Monitoring",
-                AgentCommand::ContextMonitoring,
-            ));
-        }
-
-        // Context: Remediation
-        if lower_msg.contains("remediation mode")
-            || lower_msg.contains("fixing")
-            || lower_msg.contains("gap filling")
-            || lower_msg.contains("completing")
-            || lower_msg.contains("need to fix")
-            || lower_msg.contains("what's outstanding")
-            || lower_msg.contains("what's blocking")
-        {
-            return Some(make_response(
-                "Setting context: Remediation",
-                AgentCommand::ContextRemediation,
-            ));
-        }
-
-        // Not an Esper command
-        None
-    }
-
-    /// Parse a number that appears after a keyword in the word list
-    fn parse_number_after(&self, words: &[&str], keyword: &str) -> Option<f32> {
-        for (i, word) in words.iter().enumerate() {
-            if *word == keyword {
-                // Look at next word for a number
-                if let Some(next) = words.get(i + 1) {
-                    if let Ok(n) = next.parse::<f32>() {
-                        return Some(n);
-                    }
-                }
-            }
-        }
-        None
-    }
-
-    /// Parse any number from the message
-    fn parse_number_from_message(&self, message: &str) -> Option<f32> {
-        for word in message.split_whitespace() {
-            // Try parsing as float
-            if let Ok(n) = word.parse::<f32>() {
-                return Some(n);
-            }
-            // Try parsing percentage like "50%"
-            if word.ends_with('%') {
-                if let Ok(n) = word.trim_end_matches('%').parse::<f32>() {
-                    return Some(n / 100.0);
-                }
-            }
-        }
-        None
-    }
-
-    /// Parse pan direction and amount from words like "track 45 left" or "pan right 100"
-    fn parse_pan_direction_and_amount(
-        &self,
-        words: &[&str],
-    ) -> (Option<ob_poc_types::PanDirection>, Option<f32>) {
-        use ob_poc_types::PanDirection;
-
-        let mut direction: Option<PanDirection> = None;
-        let mut amount: Option<f32> = None;
-
-        for word in words.iter().skip(1) {
-            // Skip the command word (track, pan, etc.)
-            match *word {
-                "left" => direction = Some(PanDirection::Left),
-                "right" => direction = Some(PanDirection::Right),
-                "up" => direction = Some(PanDirection::Up),
-                "down" => direction = Some(PanDirection::Down),
-                _ => {
-                    // Try to parse as number
-                    if let Ok(n) = word.parse::<f32>() {
-                        amount = Some(n);
-                    }
-                }
-            }
-        }
-
-        (direction, amount)
-    }
-
-    /// Handle taxonomy navigation commands like "drill into shells", "show taxonomy", "zoom out"
-    fn handle_taxonomy_command(
-        &self,
-        session: &AgentSession,
-        message: &str,
-    ) -> Option<AgentChatResponse> {
-        let lower_msg = message.to_lowercase().trim().to_string();
-        let words: Vec<&str> = lower_msg.split_whitespace().collect();
-
-        if words.is_empty() {
-            return None;
-        }
-
-        // Helper to build response with taxonomy command
-        let make_response = |msg: &str, cmd: AgentCommand| AgentChatResponse {
-            message: msg.to_string(),
-            intents: vec![],
-            validation_results: vec![],
-            session_state: SessionState::New,
-            can_execute: false,
-            dsl_source: None,
-            ast: None,
-            disambiguation: None,
-            commands: Some(vec![cmd]),
-        };
-
-        // =========================================================================
-        // SHOW TAXONOMY / WHERE AM I
-        // =========================================================================
-        if lower_msg == "show taxonomy"
-            || lower_msg == "taxonomy"
-            || lower_msg == "where am i"
-            || lower_msg == "taxonomy position"
-            || lower_msg.contains("current taxonomy")
-            || lower_msg.contains("taxonomy status")
-        {
-            // Build a description of current position
-            let stack = &session.context.taxonomy_stack;
-            if stack.is_empty() {
-                return Some(make_response(
-                    "Taxonomy navigation not active. Use 'browse entities' or 'show entity types' to start.",
-                    AgentCommand::TaxonomyShow,
-                ));
-            }
-
-            let breadcrumbs = stack.breadcrumbs();
-            let depth = stack.depth();
-            let msg = format!(
-                "Taxonomy position: {} (depth {})\nPath: {}",
-                breadcrumbs.last().unwrap_or(&"root".to_string()),
-                depth,
-                breadcrumbs.join(" → ")
-            );
-            return Some(make_response(&msg, AgentCommand::TaxonomyShow));
-        }
-
-        // =========================================================================
-        // DRILL INTO / EXPLORE / ENTER
-        // =========================================================================
-        if lower_msg.starts_with("drill into ")
-            || lower_msg.starts_with("explore ")
-            || lower_msg.starts_with("enter ")
-            || lower_msg.starts_with("go into ")
-            || lower_msg.starts_with("open ")
-            || lower_msg.starts_with("expand ")
-            || lower_msg.starts_with("browse ")
-        {
-            // Extract the target node label
-            let target = lower_msg
-                .trim_start_matches("drill into ")
-                .trim_start_matches("explore ")
-                .trim_start_matches("enter ")
-                .trim_start_matches("go into ")
-                .trim_start_matches("open ")
-                .trim_start_matches("expand ")
-                .trim_start_matches("browse ")
-                .trim()
-                .to_uppercase();
-
-            if target.is_empty() {
-                return Some(make_response(
-                    "Please specify what to drill into (e.g., 'drill into SHELL', 'explore funds').",
-                    AgentCommand::TaxonomyShow,
-                ));
-            }
-
-            // Normalize common names
-            let node_label = match target.as_str() {
-                "SHELLS" | "LEGAL VEHICLES" | "COMPANIES" => "SHELL".to_string(),
-                "PEOPLE" | "PERSONS" | "NATURAL PERSONS" | "INDIVIDUALS" => "PERSON".to_string(),
-                "FUNDS" | "FUND" => "FUND".to_string(),
-                "TRUSTS" | "TRUST" => "TRUST".to_string(),
-                "PARTNERSHIPS" | "PARTNERSHIP" => "PARTNERSHIP".to_string(),
-                "LIMITED COMPANIES" | "LIMITED COMPANY" | "LTD" => "LIMITED_COMPANY".to_string(),
-                _ => target,
-            };
-
-            return Some(make_response(
-                &format!("Drilling into {}...", node_label),
-                AgentCommand::TaxonomyDrillIn { node_label },
-            ));
-        }
-
-        // =========================================================================
-        // ZOOM OUT / GO BACK / UP
-        // =========================================================================
-        if lower_msg == "zoom out"
-            || lower_msg == "go back"
-            || lower_msg == "back"
-            || lower_msg == "up"
-            || lower_msg == "up one level"
-            || lower_msg == "parent"
-            || lower_msg == "go up"
-            || lower_msg.contains("taxonomy back")
-            || lower_msg.contains("taxonomy up")
-        {
-            let stack = &session.context.taxonomy_stack;
-            if !stack.can_zoom_out() {
-                return Some(make_response(
-                    "Already at the top level of the taxonomy.",
-                    AgentCommand::TaxonomyShow,
-                ));
-            }
-            return Some(make_response(
-                "Zooming out one level...",
-                AgentCommand::TaxonomyZoomOut,
-            ));
-        }
-
-        // =========================================================================
-        // RESET TAXONOMY / HOME
-        // =========================================================================
-        if lower_msg == "reset taxonomy"
-            || lower_msg == "taxonomy home"
-            || lower_msg == "taxonomy reset"
-            || lower_msg.contains("taxonomy root")
-            || lower_msg.contains("back to root")
-            || lower_msg.contains("start over taxonomy")
-        {
-            return Some(make_response(
-                "Resetting taxonomy to root level.",
-                AgentCommand::TaxonomyReset,
-            ));
-        }
-
-        // =========================================================================
-        // FILTER TAXONOMY
-        // =========================================================================
-        if lower_msg.starts_with("filter taxonomy ")
-            || lower_msg.starts_with("taxonomy filter ")
-            || lower_msg.starts_with("show only ")
-            || lower_msg.starts_with("filter to ")
-        {
-            let filter = lower_msg
-                .trim_start_matches("filter taxonomy ")
-                .trim_start_matches("taxonomy filter ")
-                .trim_start_matches("show only ")
-                .trim_start_matches("filter to ")
-                .trim()
-                .to_string();
-
-            if filter.is_empty() {
-                return Some(make_response(
-                    "Please specify a filter (e.g., 'filter to active', 'show only funds').",
-                    AgentCommand::TaxonomyShow,
-                ));
-            }
-
-            return Some(make_response(
-                &format!("Filtering taxonomy: {}", filter),
-                AgentCommand::TaxonomyFilter { filter },
-            ));
-        }
-
-        // =========================================================================
-        // CLEAR FILTER
-        // =========================================================================
-        if lower_msg == "clear taxonomy filter"
-            || lower_msg == "clear filter"
-            || lower_msg == "remove taxonomy filter"
-            || lower_msg == "show all"
-        {
-            return Some(make_response(
-                "Clearing taxonomy filter.",
-                AgentCommand::TaxonomyClearFilter,
-            ));
-        }
-
-        // =========================================================================
-        // BROWSE ENTITIES / SHOW ENTITY TYPES (Start taxonomy navigation)
-        // =========================================================================
-        if lower_msg == "browse entities"
-            || lower_msg == "show entity types"
-            || lower_msg == "entity types"
-            || lower_msg == "show types"
-            || lower_msg == "type hierarchy"
-            || lower_msg.contains("entity taxonomy")
-            || lower_msg.contains("browse entity")
-        {
-            // This should trigger the UI to load the taxonomy at root
-            return Some(make_response(
-                "Opening entity type taxonomy browser...",
-                AgentCommand::TaxonomyShow,
-            ));
-        }
-
-        // Not a taxonomy command
-        None
-    }
+    // NOTE: Legacy handle_esper_command removed - now using trie-based EsperCommandRegistry
+    // See handle_esper_command() above (line ~1388) which uses registry.lookup_with_semantic()
 
     /// Handle "show/load/select CBU" commands
     async fn handle_show_command(
@@ -2698,6 +1802,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     ast: None,
                     disambiguation: None,
                     commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
                 }));
             }
         };
@@ -2721,6 +1827,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 commands: Some(vec![AgentCommand::ShowCbu {
                     cbu_id: id.to_string(),
                 }]),
+                unresolved_refs: None,
+                current_ref_index: None,
             })),
             ResolveResult::FoundByCode { display, uuid, .. } => {
                 let cbu_id = uuid.map(|u| u.to_string()).unwrap_or_default();
@@ -2738,6 +1846,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     } else {
                         None
                     },
+                    unresolved_refs: None,
+                    current_ref_index: None,
                 }))
             }
             ResolveResult::NotFound { suggestions } if !suggestions.is_empty() => {
@@ -2767,6 +1877,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         ast: None,
                         disambiguation: None,
                         commands: None,
+                        unresolved_refs: None,
+                        current_ref_index: None,
                     }))
                 } else {
                     let disambig = DisambiguationRequest {
@@ -2793,6 +1905,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         ast: None,
                         disambiguation: Some(disambig),
                         commands: None,
+                        unresolved_refs: None,
+                        current_ref_index: None,
                     }))
                 }
             }
@@ -2812,6 +1926,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 commands: Some(vec![AgentCommand::SearchCbu {
                     query: search_term.clone(),
                 }]),
+                unresolved_refs: None,
+                current_ref_index: None,
             })),
         }
     }
@@ -2850,7 +1966,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 ));
         if is_execute {
             tracing::info!("[DSL_CMD] Matched execute/run/go command");
-            if session.assembled_dsl.is_empty() {
+            if !session.run_sheet.has_runnable() {
                 return Ok(Some(AgentChatResponse {
                     message: "No DSL to execute. Add some statements first.".to_string(),
                     intents: vec![],
@@ -2861,27 +1977,63 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     ast: None,
                     disambiguation: None,
                     commands: Some(vec![AgentCommand::Execute]),
+                    unresolved_refs: None,
+                    current_ref_index: None,
                 }));
             }
+            let runnable_count = session.run_sheet.runnable_count();
             return Ok(Some(AgentChatResponse {
-                message: format!(
-                    "Executing {} DSL statement(s)...",
-                    session.assembled_dsl.len()
-                ),
+                message: format!("Executing {} DSL statement(s)...", runnable_count),
                 intents: vec![],
                 validation_results: vec![],
                 session_state: SessionState::ReadyToExecute,
                 can_execute: true,
-                dsl_source: Some(session.assembled_dsl.join("\n\n")),
+                dsl_source: session.run_sheet.combined_dsl(),
                 ast: None,
                 disambiguation: None,
                 commands: Some(vec![AgentCommand::Execute]),
+                unresolved_refs: None,
+                current_ref_index: None,
             }));
         }
 
         // Undo command
         if words[0] == "undo" {
-            if session.assembled_dsl.is_empty() {
+            if let Some(removed) = session.run_sheet.undo_last() {
+                // Extract a short description from the removed DSL
+                let desc = removed
+                    .dsl_source
+                    .lines()
+                    .next()
+                    .unwrap_or(&removed.dsl_source);
+                let desc_short = if desc.len() > 60 {
+                    format!("{}...", &desc[..60])
+                } else {
+                    desc.to_string()
+                };
+                let remaining = session.run_sheet.runnable_count();
+                session.state = if remaining == 0 {
+                    SessionState::New
+                } else {
+                    SessionState::ReadyToExecute
+                };
+                return Ok(Some(AgentChatResponse {
+                    message: format!(
+                        "Removed: {}\n{} statement(s) remaining.",
+                        desc_short, remaining
+                    ),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: session.state.clone(),
+                    can_execute: remaining > 0,
+                    dsl_source: session.run_sheet.combined_dsl(),
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                }));
+            } else {
                 return Ok(Some(AgentChatResponse {
                     message: "Nothing to undo.".to_string(),
                     intents: vec![],
@@ -2892,46 +2044,16 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     ast: None,
                     disambiguation: None,
                     commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
                 }));
             }
-            let removed = session.assembled_dsl.pop().unwrap_or_default();
-            // Extract a short description from the removed DSL
-            let desc = removed.lines().next().unwrap_or(&removed);
-            let desc_short = if desc.len() > 60 {
-                format!("{}...", &desc[..60])
-            } else {
-                desc.to_string()
-            };
-            session.state = if session.assembled_dsl.is_empty() {
-                SessionState::New
-            } else {
-                SessionState::ReadyToExecute
-            };
-            return Ok(Some(AgentChatResponse {
-                message: format!(
-                    "Removed: {}\n{} statement(s) remaining.",
-                    desc_short,
-                    session.assembled_dsl.len()
-                ),
-                intents: vec![],
-                validation_results: vec![],
-                session_state: session.state.clone(),
-                can_execute: !session.assembled_dsl.is_empty(),
-                dsl_source: if session.assembled_dsl.is_empty() {
-                    None
-                } else {
-                    Some(session.assembled_dsl.join("\n\n"))
-                },
-                ast: None,
-                disambiguation: None,
-                commands: None,
-            }));
         }
 
         // Clear command
         if matches!(words[0], "clear" | "reset") {
-            let count = session.assembled_dsl.len();
-            session.assembled_dsl.clear();
+            let count = session.run_sheet.runnable_count();
+            session.run_sheet.clear_drafts();
             session.pending_intents.clear();
             session.state = SessionState::New;
             return Ok(Some(AgentChatResponse {
@@ -2944,6 +2066,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 ast: None,
                 disambiguation: None,
                 commands: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }));
         }
 
@@ -2952,48 +2076,43 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // Otherwise, pass through to LLM for DSL generation (e.g., "remove product from cbu")
         if matches!(words[0], "delete" | "remove")
             && words.len() > 1
-            && !session.assembled_dsl.is_empty()
+            && session.run_sheet.has_runnable()
         {
             let search_term = words[1..].join(" ");
 
-            // Find statement containing the search term (case-insensitive)
-            let idx = session
-                .assembled_dsl
-                .iter()
-                .position(|stmt| stmt.to_lowercase().contains(&search_term));
-
-            if let Some(idx) = idx {
-                let removed = session.assembled_dsl.remove(idx);
-                let desc = removed.lines().next().unwrap_or(&removed);
+            // Find runnable entry containing the search term (case-insensitive)
+            if let Some(removed) = session.run_sheet.remove_matching(&search_term) {
+                let desc = removed
+                    .dsl_source
+                    .lines()
+                    .next()
+                    .unwrap_or(&removed.dsl_source);
                 let desc_short = if desc.len() > 60 {
                     format!("{}...", &desc[..60])
                 } else {
                     desc.to_string()
                 };
-                session.state = if session.assembled_dsl.is_empty() {
+                let remaining = session.run_sheet.runnable_count();
+                session.state = if remaining == 0 {
                     SessionState::New
                 } else {
                     SessionState::ReadyToExecute
                 };
                 return Ok(Some(AgentChatResponse {
                     message: format!(
-                        "Removed statement {}: {}\n{} statement(s) remaining.",
-                        idx + 1,
-                        desc_short,
-                        session.assembled_dsl.len()
+                        "Removed: {}\n{} statement(s) remaining.",
+                        desc_short, remaining
                     ),
                     intents: vec![],
                     validation_results: vec![],
                     session_state: session.state.clone(),
-                    can_execute: !session.assembled_dsl.is_empty(),
-                    dsl_source: if session.assembled_dsl.is_empty() {
-                        None
-                    } else {
-                        Some(session.assembled_dsl.join("\n\n"))
-                    },
+                    can_execute: remaining > 0,
+                    dsl_source: session.run_sheet.combined_dsl(),
                     ast: None,
                     disambiguation: None,
                     commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
                 }));
             }
             // No match found in buffer - fall through to LLM for DSL generation
@@ -3352,11 +2471,6 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     was_reordered,
                 );
             }
-            // Push user-friendly DSL to accumulated DSL (for chat display)
-            if let Some(ref user_dsl_str) = user_dsl {
-                session.assembled_dsl.push(user_dsl_str.clone());
-            }
-
             if all_valid {
                 session.state = SessionState::ReadyToExecute;
             } else {
@@ -3366,11 +2480,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
         session.add_agent_message(explanation.clone(), None, user_dsl.clone());
 
-        let combined_dsl = if session.assembled_dsl.is_empty() {
-            None
-        } else {
-            Some(session.assembled_dsl.join("\n\n"))
-        };
+        let combined_dsl = session.run_sheet.combined_dsl();
 
         // Include active CBU name in response message for clarity
         let message = if let Some(ref cbu) = session.context.active_cbu {
@@ -3379,9 +2489,29 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             explanation
         };
 
+        // Check for unresolved entity references in the AST
+        // This enables the 3-stage compiler model: Syntax → Semantics → Resolution
+        let (unresolved_refs, current_ref_index) = if let Some(ref ast_statements) = ast {
+            let resolution = ResolutionSubSession::from_statements(ast_statements);
+            if !resolution.unresolved_refs.is_empty() {
+                tracing::info!(
+                    "Found {} unresolved refs in AST, triggering resolution",
+                    resolution.unresolved_refs.len()
+                );
+                // Mark session as needing resolution
+                session.state = SessionState::PendingValidation;
+                (Some(resolution.unresolved_refs), Some(0usize))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
         // Set can_execute flag but do NOT auto-execute
         // User must explicitly type "run"/"execute" or click Execute button
-        let can_execute = session.can_execute() && all_valid;
+        // Can't execute if there are unresolved refs
+        let can_execute = session.can_execute() && all_valid && unresolved_refs.is_none();
         let commands: Option<Vec<AgentCommand>> = None;
 
         Ok(AgentChatResponse {
@@ -3394,6 +2524,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             ast,
             disambiguation: None,
             commands,
+            unresolved_refs,
+            current_ref_index,
         })
     }
 
@@ -3780,4 +2912,46 @@ impl Default for AgentService {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// ============================================================================
+// ESPER Learning Persistence
+// ============================================================================
+
+/// Persist a learned ESPER alias to the database (fire-and-forget)
+///
+/// Uses upsert to increment occurrence_count if alias already exists.
+/// Auto-approves aliases with confidence >= 0.80.
+async fn persist_learned_esper_alias(
+    pool: &PgPool,
+    phrase: &str,
+    command_key: &str,
+    confidence: f32,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        INSERT INTO agent.esper_aliases (phrase, command_key, occurrence_count, confidence, auto_approved, source)
+        VALUES ($1, $2, 1, $3, $4, 'semantic_match')
+        ON CONFLICT (phrase, command_key) DO UPDATE SET
+            occurrence_count = agent.esper_aliases.occurrence_count + 1,
+            confidence = GREATEST(agent.esper_aliases.confidence, $3),
+            auto_approved = agent.esper_aliases.auto_approved OR $4,
+            updated_at = NOW()
+        "#,
+        phrase,
+        command_key,
+        confidence as f64,
+        confidence >= 0.80
+    )
+    .execute(pool)
+    .await?;
+
+    tracing::debug!(
+        "Persisted ESPER learned alias: '{}' → {} (confidence: {:.2})",
+        phrase,
+        command_key,
+        confidence
+    );
+
+    Ok(())
 }

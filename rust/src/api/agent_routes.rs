@@ -35,6 +35,12 @@ use crate::dsl_v2::{
 };
 use crate::ontology::SemanticStageRegistry;
 use ob_poc_types::{
+    resolution::{
+        DiscriminatorField as ApiDiscriminatorField, DiscriminatorFieldType, RefContext,
+        ResolutionModeHint as ApiResolutionModeHint, ReviewRequirement,
+        SearchKeyField as ApiSearchKeyField, SearchKeyFieldType,
+        UnresolvedRefResponse as ApiUnresolvedRefResponse,
+    },
     AstArgument, AstSpan, AstStatement, AstValue, BoundEntityInfo, ChatResponse, DslState,
     DslValidation, SessionStateEnum, ValidationError as ApiValidationError, VerbIntentInfo,
 };
@@ -342,6 +348,98 @@ fn build_dsl_state(
         intents: api_intents,
         bindings: api_bindings,
     })
+}
+
+/// Convert internal UnresolvedRefInfo to API UnresolvedRefResponse
+fn to_api_unresolved_ref(info: &UnresolvedRefInfo) -> ApiUnresolvedRefResponse {
+    use crate::api::session::ResolutionModeHint;
+
+    // Convert search keys
+    let search_keys: Vec<ApiSearchKeyField> = info
+        .search_keys
+        .iter()
+        .map(|sk| ApiSearchKeyField {
+            name: sk.key.clone(),
+            label: sk.label.clone(),
+            is_default: sk.is_primary,
+            field_type: SearchKeyFieldType::Text, // Default to text
+            enum_values: None,
+        })
+        .collect();
+
+    // Convert discriminators
+    let discriminator_fields: Vec<ApiDiscriminatorField> = info
+        .discriminators
+        .iter()
+        .map(|d| ApiDiscriminatorField {
+            name: d.key.clone(),
+            label: d.label.clone(),
+            selectivity: 0.5, // Default selectivity
+            field_type: DiscriminatorFieldType::String,
+            enum_values: None,
+            value: d.value.clone(),
+        })
+        .collect();
+
+    // Convert resolution mode
+    let resolution_mode = match info.resolution_mode {
+        ResolutionModeHint::SearchModal => ApiResolutionModeHint::SearchModal,
+        ResolutionModeHint::InlineAutocomplete => ApiResolutionModeHint::Autocomplete,
+        ResolutionModeHint::Dropdown => ApiResolutionModeHint::Autocomplete, // Map dropdown to autocomplete
+    };
+
+    // Build context from verb_context
+    let context = if let Some(vc) = &info.verb_context {
+        RefContext {
+            statement_index: vc.stmt_index,
+            verb: vc.verb.clone(),
+            arg_name: vc.arg_name.clone(),
+            dsl_snippet: Some(info.context_line.clone()),
+        }
+    } else {
+        RefContext {
+            statement_index: 0,
+            verb: String::new(),
+            arg_name: String::new(),
+            dsl_snippet: Some(info.context_line.clone()),
+        }
+    };
+
+    // Convert initial matches
+    let initial_matches: Vec<ob_poc_types::resolution::EntityMatchResponse> = info
+        .initial_matches
+        .iter()
+        .map(|m| ob_poc_types::resolution::EntityMatchResponse {
+            id: m.value.clone(),
+            display: m.display.clone(),
+            entity_type: info.entity_type.clone(),
+            score: (m.score_pct as f32) / 100.0,
+            discriminators: std::collections::HashMap::new(),
+            status: ob_poc_types::resolution::EntityStatus::Unknown,
+            context: m.detail.clone(),
+        })
+        .collect();
+
+    ApiUnresolvedRefResponse {
+        ref_id: info.ref_id.clone(),
+        entity_type: info.entity_type.clone(),
+        entity_subtype: None,
+        search_value: info.search_value.clone(),
+        context,
+        initial_matches,
+        agent_suggestion: None,
+        suggestion_reason: None,
+        review_requirement: ReviewRequirement::Optional,
+        search_keys,
+        discriminator_fields,
+        resolution_mode,
+        return_key_type: Some("uuid".to_string()),
+    }
+}
+
+/// Convert a list of UnresolvedRefInfo to API types
+fn to_api_unresolved_refs(refs: &[UnresolvedRefInfo]) -> Vec<ApiUnresolvedRefResponse> {
+    refs.iter().map(to_api_unresolved_ref).collect()
 }
 
 // ============================================================================
@@ -857,17 +955,29 @@ async fn get_session(
         entity_id: session.entity_id,
         state: session.state.clone(),
         message_count: session.messages.len(),
-        pending_intents: session.pending_intents.clone(),
-        assembled_dsl: session.assembled_dsl.clone(),
-        combined_dsl: if session.assembled_dsl.is_empty() {
-            None
-        } else {
-            Some(session.assembled_dsl.join("\n"))
-        },
+        pending_intents: vec![], // Legacy - now in run_sheet
+        assembled_dsl: vec![],   // Legacy - now in run_sheet
+        combined_dsl: session.run_sheet.combined_dsl(),
         context: session.context.clone(),
         messages: session.messages.clone(),
-        can_execute: !session.assembled_dsl.is_empty(),
+        can_execute: session.run_sheet.has_runnable(),
         version: Some(session.updated_at.to_rfc3339()),
+        run_sheet: Some(session.run_sheet.to_api()),
+        bindings: session
+            .context
+            .bindings
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    ob_poc_types::BoundEntityInfo {
+                        id: v.id.to_string(),
+                        name: v.display_name.clone(),
+                        entity_type: v.entity_type.clone(),
+                    },
+                )
+            })
+            .collect(),
     })
 }
 
@@ -1250,6 +1360,8 @@ async fn chat_subsession(
                 session_state: to_session_state_enum(&child.state),
                 commands: None,
                 disambiguation_request: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }
         }
         SubSessionType::Review(_) => {
@@ -1260,6 +1372,8 @@ async fn chat_subsession(
                 session_state: to_session_state_enum(&child.state),
                 commands: None,
                 disambiguation_request: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }
         }
         _ => {
@@ -1345,6 +1459,8 @@ async fn process_resolution_message(
         session_state: to_session_state_enum(&session.state),
         commands: None,
         disambiguation_request: None,
+        unresolved_refs: None,
+        current_ref_index: None,
     })
 }
 
@@ -1424,6 +1540,8 @@ fn handle_resolution_selection(
             session_state: to_session_state_enum(&session.state),
             commands: None,
             disambiguation_request: None,
+            unresolved_refs: None,
+            current_ref_index: None,
         });
     }
 
@@ -1491,6 +1609,8 @@ fn handle_resolution_selection(
         session_state: to_session_state_enum(&session.state),
         commands: None,
         disambiguation_request: None,
+        unresolved_refs: None,
+        current_ref_index: None,
     })
 }
 
@@ -1537,6 +1657,8 @@ fn handle_resolution_skip(
         session_state: to_session_state_enum(&session.state),
         commands: None,
         disambiguation_request: None,
+        unresolved_refs: None,
+        current_ref_index: None,
     })
 }
 
@@ -1996,6 +2118,8 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }));
         }
         // /commands <domain> or /verbs <domain> - show verbs for domain
@@ -2006,6 +2130,8 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }));
         }
         // /verbs (no args) - show all verbs
@@ -2016,6 +2142,8 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }));
         }
         _ => {} // Not a slash command, continue to LLM
@@ -2035,6 +2163,8 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }));
         }
     };
@@ -2068,6 +2198,8 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                unresolved_refs: None,
+                current_ref_index: None,
             }));
         }
     };
@@ -2101,6 +2233,11 @@ async fn chat_session(
             .disambiguation
             .as_ref()
             .map(to_api_disambiguation_request),
+        unresolved_refs: response
+            .unresolved_refs
+            .as_ref()
+            .map(|refs| to_api_unresolved_refs(refs)),
+        current_ref_index: response.current_ref_index,
     }))
 }
 
@@ -2142,25 +2279,25 @@ async fn execute_session_dsl(
         let sessions = state.sessions.read().await;
         let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
-        // Determine DSL source
+        // Determine DSL source - prefer explicit request, then run_sheet current entry
         let dsl_source = if let Some(ref req) = req {
             if let Some(ref dsl_str) = req.dsl {
                 dsl_str.clone()
             } else {
-                session.assembled_dsl.join("\n")
+                session.run_sheet.combined_dsl().unwrap_or_default()
             }
         } else {
-            session.assembled_dsl.join("\n")
+            session.run_sheet.combined_dsl().unwrap_or_default()
         };
 
         // Check if we have a pre-compiled plan that matches this DSL
         let (plan, ast) = session
-            .pending
-            .as_ref()
-            .and_then(|pending| {
-                if pending.source == dsl_source && pending.plan.is_some() {
-                    tracing::debug!("[EXEC] Using pre-compiled plan from session.pending");
-                    Some((pending.plan.clone(), Some(pending.ast.clone())))
+            .run_sheet
+            .current()
+            .and_then(|entry| {
+                if entry.dsl_source == dsl_source && entry.plan.is_some() {
+                    tracing::debug!("[EXEC] Using pre-compiled plan from run_sheet");
+                    Some((entry.plan.clone(), Some(entry.ast.clone())))
                 } else {
                     tracing::debug!(
                         "[EXEC] DSL changed or no pre-compiled plan, will run full pipeline"
@@ -2221,6 +2358,16 @@ async fn execute_session_dsl(
     for (name, id) in &context.named_refs {
         exec_ctx.bind(name, *id);
         tracing::debug!("[EXEC] Pre-bound @{} = {}", name, id);
+    }
+
+    // Pre-populate session's CBU scope for bulk operations
+    // Verbs can access this via ctx.session_cbu_ids() or @session_cbus symbol
+    if !context.cbu_ids.is_empty() {
+        tracing::debug!(
+            "[EXEC] Pre-populating session CBU scope: {} CBUs",
+            context.cbu_ids.len()
+        );
+        exec_ctx.set_session_cbu_ids(context.cbu_ids.clone());
     }
 
     // =========================================================================
@@ -2659,6 +2806,26 @@ async fn execute_session_dsl(
             }
 
             // =========================================================================
+            // PROPAGATE CBU SESSION FROM EXECUTION CONTEXT
+            // =========================================================================
+            // Session load operations (session.load-galaxy, session.load-cbu, etc.) store
+            // loaded CBU IDs in ExecutionContext.pending_cbu_session. Sync these to
+            // SessionContext.cbu_ids so the scope-graph endpoint can build the multi-CBU view.
+            if let Some(cbu_session) = exec_ctx.take_pending_cbu_session() {
+                let loaded_cbu_ids = cbu_session.cbu_ids_vec();
+                tracing::info!(
+                    "[EXEC] Propagating {} CBU IDs from CbuSession to context.cbu_ids",
+                    loaded_cbu_ids.len()
+                );
+                // Merge loaded CBUs into context (avoid duplicates)
+                for cbu_id in loaded_cbu_ids {
+                    if !context.cbu_ids.contains(&cbu_id) {
+                        context.cbu_ids.push(cbu_id);
+                    }
+                }
+            }
+
+            // =========================================================================
             // LOG SUCCESS
             // =========================================================================
             if let Some(lid) = log_id {
@@ -2911,11 +3078,26 @@ async fn execute_session_dsl(
                 .collect();
             session.record_execution(session_results);
 
-            // Mark pending DSL as executed and clear it
-            // Only EXECUTED status triggers DB persistence
-            session.mark_executed();
-            session.pending = None; // Clear pending after successful execution
-            session.assembled_dsl.clear();
+            // Mark current run_sheet entry as executed with affected entities
+            if let Some(entry) = session.run_sheet.current_mut() {
+                entry.status = crate::api::session::DslStatus::Executed;
+                entry.executed_at = Some(chrono::Utc::now());
+                // Collect all entity IDs affected by this execution
+                entry.affected_entities = results.iter().filter_map(|r| r.entity_id).collect();
+                // Copy bindings created during this execution
+                for (name, id) in &session.context.named_refs {
+                    if let Some(binding_info) = session.context.bindings.get(name) {
+                        entry.bindings.insert(
+                            name.clone(),
+                            crate::api::session::BoundEntity {
+                                id: *id,
+                                entity_type: binding_info.entity_type.clone(),
+                                display_name: binding_info.display_name.clone(),
+                            },
+                        );
+                    }
+                }
+            }
 
             session.state.clone()
         } else {
@@ -2947,10 +3129,12 @@ async fn clear_session_dsl(
     let mut sessions = state.sessions.write().await;
     let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
-    // Cancel any pending DSL (marks as CANCELLED, clears from session)
-    session.cancel_pending();
-    session.pending_intents.clear();
-    session.assembled_dsl.clear();
+    // Cancel any pending/draft entries in run_sheet
+    for entry in session.run_sheet.entries.iter_mut() {
+        if entry.status == crate::api::session::DslStatus::Draft {
+            entry.status = crate::api::session::DslStatus::Cancelled;
+        }
+    }
 
     Ok(Json(SessionStateResponse {
         session_id,
@@ -2958,13 +3142,29 @@ async fn clear_session_dsl(
         entity_id: session.entity_id,
         state: session.state.clone(),
         message_count: session.messages.len(),
-        pending_intents: session.pending_intents.clone(),
-        assembled_dsl: session.assembled_dsl.clone(),
+        pending_intents: vec![],
+        assembled_dsl: vec![],
         combined_dsl: None,
         context: session.context.clone(),
         messages: session.messages.clone(),
         can_execute: false,
         version: Some(session.updated_at.to_rfc3339()),
+        run_sheet: Some(session.run_sheet.to_api()),
+        bindings: session
+            .context
+            .bindings
+            .iter()
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    ob_poc_types::BoundEntityInfo {
+                        id: v.id.to_string(),
+                        name: v.display_name.clone(),
+                        entity_type: v.entity_type.clone(),
+                    },
+                )
+            })
+            .collect(),
     }))
 }
 
@@ -3360,12 +3560,11 @@ async fn get_enriched_dsl(
     let sessions = state.sessions.read().await;
     let session = sessions.get(&session_id).ok_or(StatusCode::NOT_FOUND)?;
 
-    // Get DSL source from session
-    let dsl_source = if !session.assembled_dsl.is_empty() {
-        session.assembled_dsl.join("\n\n")
-    } else {
-        session.context.to_dsl_source()
-    };
+    // Get DSL source from session run sheet
+    let dsl_source = session
+        .run_sheet
+        .combined_dsl()
+        .unwrap_or_else(|| session.context.to_dsl_source());
 
     if dsl_source.trim().is_empty() {
         // Return empty enriched DSL

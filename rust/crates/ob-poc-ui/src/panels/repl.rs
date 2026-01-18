@@ -11,8 +11,8 @@
 use crate::state::{AppState, ChatMessage, MessageRole};
 use egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use ob_poc_types::{
-    EntityMatchResponse, ResolutionStateResponse, ResolvedRefResponse, ReviewRequirement,
-    UnresolvedRefResponse,
+    EntityMatchResponse, ResolutionStateResponse, ResolvedRefResponse, ReviewRequirement, RunSheet,
+    RunSheetEntry, UnresolvedRefResponse,
 };
 
 /// Main REPL panel - combines chat, resolution, and DSL
@@ -466,34 +466,83 @@ fn render_resolved_ref(ui: &mut Ui, resolved: &ResolvedRefResponse) {
 }
 
 // =============================================================================
-// DSL SECTION
+// RUN SHEET / DSL SECTION
 // =============================================================================
 
 fn has_dsl_content(state: &AppState) -> bool {
     !state.buffers.dsl_editor.trim().is_empty()
         || state.session.as_ref().map(|s| s.has_dsl()).unwrap_or(false)
+        || state
+            .session
+            .as_ref()
+            .and_then(|s| s.run_sheet.as_ref())
+            .map(|rs| !rs.is_empty())
+            .unwrap_or(false)
 }
 
 fn render_dsl_section(ui: &mut Ui, state: &mut AppState) {
+    // Extract run sheet from session (Rule 3: extract, then render)
+    let run_sheet = state.session.as_ref().and_then(|s| s.run_sheet.clone());
+
+    // Extract bindings
+    let bindings = state
+        .session
+        .as_ref()
+        .map(|s| s.bindings.clone())
+        .unwrap_or_default();
+
+    let has_run_sheet = run_sheet.as_ref().map(|rs| !rs.is_empty()).unwrap_or(false);
+
+    // Header with status summary
+    let header_text = if let Some(ref rs) = run_sheet {
+        let executed = rs.executed_count();
+        let pending = rs.pending_count();
+        if executed > 0 || pending > 0 {
+            format!("Run Sheet ({} executed, {} pending)", executed, pending)
+        } else {
+            "Run Sheet".to_string()
+        }
+    } else {
+        "DSL".to_string()
+    };
+
     let header = egui::CollapsingHeader::new(
-        RichText::new("DSL")
+        RichText::new(header_text)
             .strong()
             .color(Color32::from_rgb(200, 180, 120)),
     )
     .default_open(true);
 
     header.show(ui, |ui| {
+        // Run sheet entries (if any)
+        if has_run_sheet {
+            if let Some(ref rs) = run_sheet {
+                render_run_sheet(ui, rs);
+            }
+            ui.add_space(8.0);
+        }
+
+        // Symbol bindings (if any)
+        if !bindings.is_empty() {
+            render_bindings(ui, &bindings);
+            ui.add_space(8.0);
+        }
+
+        // DSL editor (for new/draft DSL)
         egui::Frame::default()
             .fill(Color32::from_rgb(30, 32, 35))
             .inner_margin(8.0)
             .rounding(4.0)
             .show(ui, |ui| {
+                ui.label(RichText::new("Draft DSL").small().color(Color32::GRAY));
+                ui.add_space(4.0);
+
                 // DSL editor
                 let response = TextEdit::multiline(&mut state.buffers.dsl_editor)
                     .font(egui::TextStyle::Monospace)
                     .code_editor()
                     .desired_width(f32::INFINITY)
-                    .desired_rows(6)
+                    .desired_rows(4)
                     .show(ui);
 
                 if response.response.changed() {
@@ -520,6 +569,160 @@ fn render_dsl_section(ui: &mut Ui, state: &mut AppState) {
                 }
             });
     });
+}
+
+/// Render the run sheet entries with per-statement status
+fn render_run_sheet(ui: &mut Ui, run_sheet: &RunSheet) {
+    for (idx, entry) in run_sheet.entries.iter().enumerate() {
+        let is_current = idx == run_sheet.cursor;
+        render_run_sheet_entry(ui, entry, is_current);
+        ui.add_space(4.0);
+    }
+}
+
+/// Render a single run sheet entry
+fn render_run_sheet_entry(ui: &mut Ui, entry: &RunSheetEntry, is_current: bool) {
+    let (r, g, b) = entry.status.color_rgb();
+    let status_color = Color32::from_rgb(r, g, b);
+
+    let bg_color = if is_current {
+        Color32::from_rgb(40, 50, 60) // Highlighted
+    } else {
+        Color32::from_rgb(30, 32, 35)
+    };
+
+    let border_color = if is_current {
+        Color32::from_rgb(80, 120, 180)
+    } else {
+        Color32::TRANSPARENT
+    };
+
+    egui::Frame::default()
+        .fill(bg_color)
+        .stroke(egui::Stroke::new(1.0, border_color))
+        .inner_margin(8.0)
+        .rounding(4.0)
+        .show(ui, |ui| {
+            // Header: status icon + status text + timestamp
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(entry.status.icon()).color(status_color));
+                ui.label(
+                    RichText::new(format!("{:?}", entry.status))
+                        .small()
+                        .color(status_color),
+                );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if let Some(ref ts) = entry.executed_at {
+                        ui.label(RichText::new(ts).small().color(Color32::DARK_GRAY));
+                    } else if let Some(ref ts) = entry.created_at {
+                        ui.label(RichText::new(ts).small().color(Color32::DARK_GRAY));
+                    }
+                });
+            });
+
+            // DSL source (truncated for display)
+            let display_dsl = entry.display_dsl.as_deref().unwrap_or(&entry.dsl_source);
+            let truncated = if display_dsl.len() > 120 {
+                format!("{}...", &display_dsl[..120])
+            } else {
+                display_dsl.to_string()
+            };
+
+            ui.add_space(4.0);
+            ui.label(
+                RichText::new(truncated)
+                    .monospace()
+                    .size(11.0)
+                    .color(Color32::LIGHT_GRAY),
+            );
+
+            // Bindings created by this entry
+            if !entry.bindings.is_empty() {
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("→").small().color(Color32::GRAY));
+                    for (symbol, info) in &entry.bindings {
+                        ui.label(
+                            RichText::new(format!("@{}", symbol))
+                                .small()
+                                .color(Color32::from_rgb(180, 140, 255))
+                                .background_color(Color32::from_rgb(40, 35, 50)),
+                        );
+                        ui.label(
+                            RichText::new(format!("= {}", info.name))
+                                .small()
+                                .color(Color32::LIGHT_GRAY),
+                        );
+                    }
+                });
+            }
+
+            // Affected entities count
+            if !entry.affected_entities.is_empty() {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "Affected: {} entities",
+                            entry.affected_entities.len()
+                        ))
+                        .small()
+                        .color(Color32::DARK_GRAY),
+                    );
+                });
+            }
+
+            // Error message (if failed)
+            if let Some(ref error) = entry.error {
+                ui.add_space(4.0);
+                ui.label(
+                    RichText::new(format!("✗ {}", error))
+                        .small()
+                        .color(Color32::from_rgb(220, 80, 80)),
+                );
+            }
+        });
+}
+
+/// Render symbol bindings
+fn render_bindings(
+    ui: &mut Ui,
+    bindings: &std::collections::HashMap<String, ob_poc_types::BoundEntityInfo>,
+) {
+    if bindings.is_empty() {
+        return;
+    }
+
+    egui::Frame::default()
+        .fill(Color32::from_rgb(35, 30, 45))
+        .inner_margin(8.0)
+        .rounding(4.0)
+        .show(ui, |ui| {
+            ui.label(
+                RichText::new("Symbol Bindings")
+                    .small()
+                    .strong()
+                    .color(Color32::from_rgb(180, 140, 255)),
+            );
+            ui.add_space(4.0);
+
+            for (symbol, info) in bindings {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(format!("@{}", symbol))
+                            .monospace()
+                            .color(Color32::from_rgb(180, 140, 255)),
+                    );
+                    ui.label(RichText::new("→").small().color(Color32::GRAY));
+                    ui.label(RichText::new(&info.name).small().color(Color32::LIGHT_GRAY));
+                    ui.label(
+                        RichText::new(format!("({})", info.entity_type))
+                            .small()
+                            .color(Color32::DARK_GRAY),
+                    );
+                });
+            }
+        });
 }
 
 // =============================================================================

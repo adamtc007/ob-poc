@@ -54,6 +54,8 @@ use uuid::Uuid;
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+use super::dsl_sheet::DslSheet;
+
 /// Debounce interval for background saves
 const SAVE_DEBOUNCE_SECS: u64 = 2;
 
@@ -101,6 +103,136 @@ impl CbuSessionState {
 }
 
 // =============================================================================
+// REPL SESSION STATE MACHINE
+// =============================================================================
+
+/// State machine for REPL session DSL execution pipeline.
+///
+/// Transitions:
+/// ```text
+/// EMPTY → SCOPED → TEMPLATED → GENERATED → PARSED → RESOLVING → READY → EXECUTING → EXECUTED
+///   │        │          │           │          │          │                            │
+///   │        │          │           │          │          │                            │
+///   └────────┴──────────┴───────────┴──────────┴──────────┴────────────────────────────┘
+///                                   (reset_to_scoped on any failure or restart)
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub enum ReplSessionState {
+    /// No scope defined yet
+    #[default]
+    Empty,
+
+    /// Scope is set (CBU set loaded, derived from galaxy/jurisdiction/etc.)
+    Scoped,
+
+    /// Template DSL is set, awaiting user confirmation
+    Templated {
+        /// Whether the user has confirmed the intent
+        confirmed: bool,
+    },
+
+    /// DSL sheet generated from template × entity set
+    Generated,
+
+    /// Sheet parsed, symbols extracted, DAG computed
+    Parsed,
+
+    /// Resolving entity references (disambiguation in progress)
+    Resolving {
+        /// Number of unresolved references remaining
+        remaining: usize,
+    },
+
+    /// All references resolved, ready for execution
+    Ready,
+
+    /// Execution in progress
+    Executing {
+        /// Statements completed so far
+        completed: usize,
+        /// Total statements
+        total: usize,
+    },
+
+    /// Execution complete
+    Executed {
+        /// Whether execution was successful
+        success: bool,
+    },
+}
+
+impl ReplSessionState {
+    /// Check if state allows setting scope
+    pub fn can_set_scope(&self) -> bool {
+        matches!(self, Self::Empty | Self::Scoped | Self::Executed { .. })
+    }
+
+    /// Check if state allows setting template
+    pub fn can_set_template(&self) -> bool {
+        matches!(self, Self::Scoped)
+    }
+
+    /// Check if state allows confirming intent
+    pub fn can_confirm_intent(&self) -> bool {
+        matches!(self, Self::Templated { confirmed: false })
+    }
+
+    /// Check if state allows generating sheet
+    pub fn can_generate(&self) -> bool {
+        matches!(self, Self::Templated { confirmed: true })
+    }
+
+    /// Check if state allows execution
+    pub fn can_execute(&self) -> bool {
+        matches!(self, Self::Ready)
+    }
+
+    /// Check if state is terminal (requires reset to continue)
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Executed { .. })
+    }
+
+    /// Get human-readable state name
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Empty => "empty",
+            Self::Scoped => "scoped",
+            Self::Templated { .. } => "templated",
+            Self::Generated => "generated",
+            Self::Parsed => "parsed",
+            Self::Resolving { .. } => "resolving",
+            Self::Ready => "ready",
+            Self::Executing { .. } => "executing",
+            Self::Executed { .. } => "executed",
+        }
+    }
+}
+
+impl std::fmt::Display for ReplSessionState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, "Empty"),
+            Self::Scoped => write!(f, "Scoped"),
+            Self::Templated { confirmed } => {
+                write!(f, "Templated(confirmed={})", confirmed)
+            }
+            Self::Generated => write!(f, "Generated"),
+            Self::Parsed => write!(f, "Parsed"),
+            Self::Resolving { remaining } => {
+                write!(f, "Resolving({} remaining)", remaining)
+            }
+            Self::Ready => write!(f, "Ready"),
+            Self::Executing { completed, total } => {
+                write!(f, "Executing({}/{})", completed, total)
+            }
+            Self::Executed { success } => {
+                write!(f, "Executed(success={})", success)
+            }
+        }
+    }
+}
+
+// =============================================================================
 // DATABASE ROW TYPES (for runtime queries)
 // =============================================================================
 
@@ -130,7 +262,9 @@ struct SessionSummaryRow {
 // SESSION WITH HISTORY
 // =============================================================================
 
-/// CBU session with undo/redo history and background persistence
+/// CBU session with undo/redo history and background persistence.
+///
+/// Extended with REPL state machine for phased DSL execution.
 #[derive(Debug)]
 pub struct CbuSession {
     /// Session ID
@@ -139,17 +273,41 @@ pub struct CbuSession {
     /// Optional friendly name
     pub name: Option<String>,
 
-    /// Current state
+    /// Current CBU set state (which CBUs are loaded)
     pub state: CbuSessionState,
 
-    /// Undo stack (previous states)
+    /// Undo stack (previous CBU states)
     history: Vec<CbuSessionState>,
 
-    /// Redo stack (future states after undo)
+    /// Redo stack (future CBU states after undo)
     future: Vec<CbuSessionState>,
 
     /// Max history depth (prevents unbounded memory growth)
     max_history: usize,
+
+    // =========================================================================
+    // REPL STATE MACHINE (for phased DSL execution)
+    // =========================================================================
+    /// Current state in the REPL pipeline
+    pub repl_state: ReplSessionState,
+
+    /// DSL that defined the current scope (for audit/replay)
+    /// e.g., ["(session.load-jurisdiction :jurisdiction \"LU\")"]
+    pub scope_dsl: Vec<String>,
+
+    /// Template DSL before expansion (the unpopulated intent)
+    /// e.g., "(trading-profile.materialize :cbu-id @cbu)"
+    pub template_dsl: Option<String>,
+
+    /// Target entity type for template expansion
+    /// e.g., "cbu" - the template will be expanded for each entity of this type in scope
+    pub target_entity_type: Option<String>,
+
+    /// Whether the user has confirmed the intent (for TEMPLATED state)
+    pub intent_confirmed: bool,
+
+    /// The generated DSL sheet (populated template × entity set)
+    pub sheet: Option<DslSheet>,
 
     // =========================================================================
     // Persistence tracking (not persisted to DB)
@@ -170,6 +328,14 @@ impl Clone for CbuSession {
             history: self.history.clone(),
             future: self.future.clone(),
             max_history: self.max_history,
+            // REPL state machine
+            repl_state: self.repl_state.clone(),
+            scope_dsl: self.scope_dsl.clone(),
+            template_dsl: self.template_dsl.clone(),
+            target_entity_type: self.target_entity_type.clone(),
+            intent_confirmed: self.intent_confirmed,
+            sheet: self.sheet.clone(),
+            // Persistence tracking
             dirty: self.dirty,
             last_saved: Instant::now(), // Reset on clone
         }
@@ -192,6 +358,14 @@ impl CbuSession {
             history: Vec::new(),
             future: Vec::new(),
             max_history: 50,
+            // REPL state machine - starts empty
+            repl_state: ReplSessionState::Empty,
+            scope_dsl: Vec::new(),
+            template_dsl: None,
+            target_entity_type: None,
+            intent_confirmed: false,
+            sheet: None,
+            // Persistence tracking
             dirty: false,
             last_saved: Instant::now(),
         }
@@ -380,6 +554,216 @@ impl CbuSession {
     }
 
     // =========================================================================
+    // REPL STATE MACHINE TRANSITIONS
+    // =========================================================================
+
+    /// Set scope from DSL commands (transition: EMPTY/SCOPED/EXECUTED → SCOPED)
+    ///
+    /// Called after session.load-* verbs execute to record the scope definition.
+    pub fn set_scope(&mut self, scope_dsl: Vec<String>) -> Result<(), String> {
+        if !self.repl_state.can_set_scope() {
+            return Err(format!(
+                "Cannot set scope in state '{}'. Must be Empty, Scoped, or Executed.",
+                self.repl_state
+            ));
+        }
+        self.scope_dsl = scope_dsl;
+        self.repl_state = ReplSessionState::Scoped;
+        // Clear downstream state
+        self.template_dsl = None;
+        self.target_entity_type = None;
+        self.intent_confirmed = false;
+        self.sheet = None;
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Set template DSL (transition: SCOPED → TEMPLATED)
+    ///
+    /// The template will be expanded for each entity of `target_type` in scope.
+    pub fn set_template(
+        &mut self,
+        template_dsl: String,
+        target_type: String,
+    ) -> Result<(), String> {
+        if !self.repl_state.can_set_template() {
+            return Err(format!(
+                "Cannot set template in state '{}'. Must be Scoped.",
+                self.repl_state
+            ));
+        }
+        self.template_dsl = Some(template_dsl);
+        self.target_entity_type = Some(target_type);
+        self.intent_confirmed = false;
+        self.repl_state = ReplSessionState::Templated { confirmed: false };
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Confirm the intent (transition: TEMPLATED(unconfirmed) → TEMPLATED(confirmed))
+    pub fn confirm_intent(&mut self) -> Result<(), String> {
+        if !self.repl_state.can_confirm_intent() {
+            return Err(format!(
+                "Cannot confirm intent in state '{}'. Must be Templated(unconfirmed).",
+                self.repl_state
+            ));
+        }
+        self.intent_confirmed = true;
+        self.repl_state = ReplSessionState::Templated { confirmed: true };
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Set generated sheet (transition: TEMPLATED(confirmed) → GENERATED)
+    pub fn set_generated(&mut self, sheet: DslSheet) -> Result<(), String> {
+        if !self.repl_state.can_generate() {
+            return Err(format!(
+                "Cannot set generated sheet in state '{}'. Must be Templated(confirmed).",
+                self.repl_state
+            ));
+        }
+        self.sheet = Some(sheet);
+        self.repl_state = ReplSessionState::Generated;
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Mark sheet as parsed with unresolved count (transition: GENERATED → PARSED/RESOLVING/READY)
+    pub fn set_parsed(&mut self, unresolved_count: usize) -> Result<(), String> {
+        if !matches!(self.repl_state, ReplSessionState::Generated) {
+            return Err(format!(
+                "Cannot set parsed in state '{}'. Must be Generated.",
+                self.repl_state
+            ));
+        }
+        self.repl_state = if unresolved_count > 0 {
+            ReplSessionState::Resolving {
+                remaining: unresolved_count,
+            }
+        } else {
+            ReplSessionState::Ready
+        };
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Resolve a reference (decrements remaining count)
+    pub fn resolve_ref(&mut self, remaining: usize) -> Result<(), String> {
+        if !matches!(self.repl_state, ReplSessionState::Resolving { .. }) {
+            return Err(format!(
+                "Cannot resolve ref in state '{}'. Must be Resolving.",
+                self.repl_state
+            ));
+        }
+        self.repl_state = if remaining > 0 {
+            ReplSessionState::Resolving { remaining }
+        } else {
+            ReplSessionState::Ready
+        };
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Mark ready for execution (transition: RESOLVING(0) → READY)
+    pub fn set_ready(&mut self) -> Result<(), String> {
+        match &self.repl_state {
+            ReplSessionState::Resolving { remaining: 0 } | ReplSessionState::Parsed => {
+                self.repl_state = ReplSessionState::Ready;
+                self.mark_dirty();
+                Ok(())
+            }
+            _ => Err(format!(
+                "Cannot set ready in state '{}'. Must be Resolving(0) or Parsed.",
+                self.repl_state
+            )),
+        }
+    }
+
+    /// Start execution (transition: READY → EXECUTING)
+    pub fn set_executing(&mut self, total: usize) -> Result<(), String> {
+        if !self.repl_state.can_execute() {
+            return Err(format!(
+                "Cannot execute in state '{}'. Must be Ready.",
+                self.repl_state
+            ));
+        }
+        self.repl_state = ReplSessionState::Executing {
+            completed: 0,
+            total,
+        };
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Update execution progress
+    pub fn update_progress(&mut self, completed: usize, total: usize) {
+        if matches!(self.repl_state, ReplSessionState::Executing { .. }) {
+            self.repl_state = ReplSessionState::Executing { completed, total };
+            // Don't mark dirty for every progress update (too chatty)
+        }
+    }
+
+    /// Mark execution complete (transition: EXECUTING → EXECUTED)
+    pub fn mark_executed(&mut self, success: bool) -> Result<(), String> {
+        if !matches!(self.repl_state, ReplSessionState::Executing { .. }) {
+            return Err(format!(
+                "Cannot mark executed in state '{}'. Must be Executing.",
+                self.repl_state
+            ));
+        }
+        self.repl_state = ReplSessionState::Executed { success };
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Reset to scoped state (for retry or new intent)
+    ///
+    /// Keeps the scope but clears template and sheet.
+    pub fn reset_to_scoped(&mut self) -> Result<(), String> {
+        if self.scope_dsl.is_empty() {
+            return Err("Cannot reset to scoped - no scope defined".to_string());
+        }
+        self.template_dsl = None;
+        self.target_entity_type = None;
+        self.intent_confirmed = false;
+        self.sheet = None;
+        self.repl_state = ReplSessionState::Scoped;
+        self.mark_dirty();
+        Ok(())
+    }
+
+    /// Reset to empty state (full reset)
+    pub fn reset_to_empty(&mut self) {
+        self.scope_dsl.clear();
+        self.template_dsl = None;
+        self.target_entity_type = None;
+        self.intent_confirmed = false;
+        self.sheet = None;
+        self.repl_state = ReplSessionState::Empty;
+        self.mark_dirty();
+    }
+
+    /// Get current REPL state
+    pub fn repl_state(&self) -> &ReplSessionState {
+        &self.repl_state
+    }
+
+    /// Check if session is ready for execution
+    pub fn is_ready_to_execute(&self) -> bool {
+        self.repl_state.can_execute()
+    }
+
+    /// Get the sheet if available
+    pub fn sheet(&self) -> Option<&DslSheet> {
+        self.sheet.as_ref()
+    }
+
+    /// Get mutable sheet reference
+    pub fn sheet_mut(&mut self) -> Option<&mut DslSheet> {
+        self.sheet.as_mut()
+    }
+
+    // =========================================================================
     // PERSISTENCE (fire-and-forget, never blocks)
     // =========================================================================
 
@@ -491,9 +875,8 @@ impl CbuSession {
                 },
                 history,
                 future,
-                max_history: 50,
-                dirty: false,
-                last_saved: Instant::now(),
+                // REPL state and other fields use defaults from new()
+                ..Self::new()
             }
         }))
     }

@@ -322,6 +322,45 @@ impl AgentLearningInspector {
             AgentEventPayload::SessionSummary { .. } => (
                 None, None, None, None, false, None, None, None, None, None, None, None,
             ),
+            AgentEventPayload::EsperCommandMatched {
+                phrase,
+                command_key,
+                source,
+                match_type,
+                extracted_params,
+            } => (
+                Some(phrase.clone()),
+                Some(serde_json::json!({
+                    "command_key": command_key,
+                    "source": source,
+                    "match_type": match_type,
+                    "extracted_params": extracted_params,
+                })),
+                Some(command_key.clone()),
+                None,
+                false,
+                None,
+                None,
+                None,
+                None,
+                Some(true), // ESPER commands always succeed
+                None,
+                None,
+            ),
+            AgentEventPayload::EsperCommandMiss { phrase } => (
+                Some(phrase.clone()),
+                None,
+                None,
+                None,
+                false,
+                None,
+                None,
+                None,
+                None,
+                Some(false), // Miss = fell through to DSL
+                None,
+                None,
+            ),
         };
 
         let id = sqlx::query_scalar!(

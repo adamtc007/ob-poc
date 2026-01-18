@@ -103,6 +103,35 @@ domains:
           fields: [apex_name, count_added, total_loaded]
 
       # ============================================
+      # Filter/Narrow scope (removes CBUs not matching filter)
+      # ============================================
+
+      filter-jurisdiction:
+        description: Narrow session to only CBUs in a specific jurisdiction
+        behavior: plugin
+        handler: SessionFilterJurisdictionOp
+        invocation_phrases:
+          - "filter to"
+          - "narrow to"
+          - "just the"
+          - "only"
+          - "switch to"
+          - "now use"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [filter, narrow, jurisdiction]
+        args:
+          - name: jurisdiction
+            type: string
+            required: true
+            description: ISO country code to keep (LU, IE, DE, US, etc.)
+        returns:
+          type: record
+          fields: [jurisdiction, count_kept, count_removed, total_loaded]
+
+      # ============================================
       # Unload CBUs from session
       # ============================================
 

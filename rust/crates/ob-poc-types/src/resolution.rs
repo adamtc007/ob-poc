@@ -92,9 +92,18 @@ pub struct UnresolvedRefResponse {
     pub suggestion_reason: Option<String>,
     /// Review requirement level
     pub review_requirement: ReviewRequirement,
-    /// Discriminator fields from search schema (for UI)
+    /// Search key fields for filtering (from entity_index.yaml)
+    #[serde(default)]
+    pub search_keys: Vec<SearchKeyField>,
+    /// Discriminator fields for scoring refinement (from entity_index.yaml)
     #[serde(default)]
     pub discriminator_fields: Vec<DiscriminatorField>,
+    /// Resolution mode hint for UI (search modal vs autocomplete)
+    #[serde(default)]
+    pub resolution_mode: ResolutionModeHint,
+    /// Return key type (uuid or code)
+    #[serde(default)]
+    pub return_key_type: Option<String>,
 }
 
 /// Context about where a reference appears in DSL
@@ -111,18 +120,88 @@ pub struct RefContext {
     pub dsl_snippet: Option<String>,
 }
 
-/// Discriminator field for search refinement
+/// Discriminator field for search refinement (scoring boost)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscriminatorField {
-    /// Field name (e.g., "date_of_birth", "jurisdiction")
+    /// Field name (e.g., "date_of_birth", "nationality")
     pub name: String,
     /// Display label
     pub label: String,
     /// Selectivity (0.0-1.0, higher = more selective)
     pub selectivity: f32,
+    /// Field type for rendering
+    #[serde(default)]
+    pub field_type: DiscriminatorFieldType,
+    /// For ENUM type: list of valid values
+    #[serde(default)]
+    pub enum_values: Option<Vec<EnumValue>>,
     /// Current value if known
     #[serde(default)]
     pub value: Option<String>,
+}
+
+/// Search key field for filtering (from entity_index.yaml search_keys)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchKeyField {
+    /// Key name (e.g., "name", "jurisdiction", "client_type")
+    pub name: String,
+    /// Display label for UI
+    pub label: String,
+    /// Whether this is the default search field
+    #[serde(default)]
+    pub is_default: bool,
+    /// Field type for rendering
+    #[serde(default)]
+    pub field_type: SearchKeyFieldType,
+    /// For ENUM type: list of valid values
+    #[serde(default)]
+    pub enum_values: Option<Vec<EnumValue>>,
+}
+
+/// Search key field type
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchKeyFieldType {
+    /// Free text search
+    #[default]
+    Text,
+    /// Dropdown selection
+    Enum,
+    /// UUID lookup (rarely user-facing)
+    Uuid,
+}
+
+/// Discriminator field type
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DiscriminatorFieldType {
+    /// Free text
+    #[default]
+    String,
+    /// Date picker (supports year-only)
+    Date,
+    /// Dropdown selection
+    Enum,
+}
+
+/// Enum value for dropdown fields
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnumValue {
+    /// Code value (e.g., "LU", "FUND")
+    pub code: String,
+    /// Display text (e.g., "Luxembourg", "Fund")
+    pub display: String,
+}
+
+/// How to render the resolution UI
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionModeHint {
+    /// Full search modal with multiple fields
+    #[default]
+    SearchModal,
+    /// Simple autocomplete dropdown (reference data)
+    Autocomplete,
 }
 
 /// Review requirement level
@@ -265,9 +344,15 @@ pub struct StartResolutionRequest {
 pub struct ResolutionSearchRequest {
     /// Which ref we're searching for
     pub ref_id: String,
-    /// Search query
+    /// Search query (primary key field value)
     pub query: String,
-    /// Optional discriminator values to refine search
+    /// Which search key field to query (default: "name" or first default key)
+    #[serde(default)]
+    pub search_key: Option<String>,
+    /// Filter key values (e.g., {"jurisdiction": "LU", "client_type": "FUND"})
+    #[serde(default)]
+    pub filters: HashMap<String, String>,
+    /// Optional discriminator values to boost scoring
     #[serde(default)]
     pub discriminators: HashMap<String, String>,
     /// Max results to return
@@ -284,6 +369,48 @@ pub struct ResolutionSearchResponse {
     pub total: usize,
     /// Whether results were truncated
     pub truncated: bool,
+    /// Fallback matches (if filtered search returned 0, these are unfiltered results)
+    #[serde(default)]
+    pub fallback_matches: Option<Vec<EntityMatchResponse>>,
+    /// Which filters were applied (for UI display)
+    #[serde(default)]
+    pub filtered_by: Option<HashMap<String, String>>,
+    /// Suggestions for empty/failed searches
+    #[serde(default)]
+    pub suggestions: Option<SearchSuggestions>,
+}
+
+/// Suggestions when search returns no results
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchSuggestions {
+    /// Suggestion message
+    pub message: String,
+    /// Suggested actions
+    #[serde(default)]
+    pub actions: Vec<SuggestedAction>,
+}
+
+/// A suggested action for failed search
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuggestedAction {
+    /// Action label
+    pub label: String,
+    /// Action type
+    pub action: SuggestedActionType,
+}
+
+/// Types of suggested actions
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SuggestedActionType {
+    /// Clear all filters
+    ClearFilters,
+    /// Clear specific filter
+    ClearFilter { key: String },
+    /// Simplify query (remove special chars)
+    SimplifyQuery,
+    /// Create new entity
+    CreateNew,
 }
 
 /// Request to select a resolution

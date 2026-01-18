@@ -54,6 +54,33 @@ impl CandleEmbedder {
             inner: Arc::new(Mutex::new(inner)),
         })
     }
+
+    /// Blocking embed for synchronous code paths (like ESPER navigation).
+    ///
+    /// Intended for rare trie misses where we need to fall back to semantic search.
+    /// Takes ~5-15ms per embed, acceptable for occasional fallback.
+    ///
+    /// # Panics
+    /// Must not be called from an async context (use `embed` instead).
+    pub fn embed_blocking(&self, text: &str) -> Result<Embedding> {
+        let guard = self.inner.blocking_lock();
+        guard
+            .embed(text)
+            .map_err(|e| anyhow!("Candle embed failed: {}", e))
+    }
+
+    /// Blocking batch embed for synchronous code paths.
+    ///
+    /// More efficient than calling embed_blocking multiple times.
+    pub fn embed_batch_blocking(&self, texts: &[&str]) -> Result<Vec<Embedding>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let guard = self.inner.blocking_lock();
+        guard
+            .embed_batch(texts)
+            .map_err(|e| anyhow!("Candle batch embed failed: {}", e))
+    }
 }
 
 #[async_trait]

@@ -8,6 +8,10 @@ service EntityGateway {
   // Search resolves entity references by nickname and input value(s).
   // Supports single or batch lookups, fuzzy or exact matching.
   rpc Search(SearchRequest) returns (SearchResponse);
+
+  // GetEntityConfig returns the search keys and discriminators for an entity type.
+  // Used by resolution UI to render entity-specific search fields.
+  rpc GetEntityConfig(GetEntityConfigRequest) returns (GetEntityConfigResponse);
 }
 
 message SearchRequest {
@@ -39,8 +43,8 @@ message SearchRequest {
 }
 
 enum SearchMode {
-  FUZZY = 0;    // Prefix match, ranked by relevance
-  EXACT = 1;    // Precise match only
+  FUZZY = 0; // Prefix match, ranked by relevance
+  EXACT = 1; // Precise match only
 }
 
 message SearchResponse {
@@ -48,8 +52,92 @@ message SearchResponse {
 }
 
 message Match {
-  string input = 1;     // Echo: which input value this matched
-  string display = 2;   // Human-readable label for UI
-  string token = 3;     // Resolved ID/UUID for DSL insertion
-  float score = 4;      // Relevance score (meaningful in FUZZY mode)
+  string input = 1; // Echo: which input value this matched
+  string display = 2; // Human-readable label for UI
+  string token = 3; // Resolved ID/UUID for DSL insertion
+  float score = 4; // Relevance score (meaningful in FUZZY mode)
+}
+
+// GetEntityConfig - Request entity type configuration for resolution UI
+message GetEntityConfigRequest {
+  // Entity type identifier (e.g., "cbu", "person", "jurisdiction")
+  string nickname = 1;
+}
+
+message GetEntityConfigResponse {
+  // Entity type identifier
+  string nickname = 1;
+
+  // Display name for the entity type
+  string display_name = 2;
+
+  // Available search keys for filtering
+  repeated SearchKeyInfo search_keys = 3;
+
+  // Discriminator fields for scoring refinement
+  repeated DiscriminatorInfo discriminators = 4;
+
+  // Resolution mode hint for UI
+  ResolutionModeHint resolution_mode = 5;
+
+  // Return key type (uuid or code)
+  string return_key_type = 6;
+}
+
+// Search key definition (from entity_index.yaml)
+message SearchKeyInfo {
+  // Key name (e.g., "name", "jurisdiction", "client_type")
+  string name = 1;
+
+  // Display label for UI
+  string label = 2;
+
+  // Whether this is the default search field
+  bool is_default = 3;
+
+  // Field type: TEXT, ENUM, UUID
+  SearchKeyType field_type = 4;
+
+  // For ENUM fields: list of valid values
+  repeated EnumValue enum_values = 5;
+}
+
+enum SearchKeyType {
+  TEXT = 0; // Free text search
+  ENUM = 1; // Dropdown selection
+  UUID = 2; // UUID lookup (rarely user-facing)
+}
+
+message EnumValue {
+  string code = 1; // "LU", "FUND"
+  string display = 2; // "Luxembourg", "Fund"
+}
+
+// Discriminator field for scoring refinement
+message DiscriminatorInfo {
+  // Field name (e.g., "nationality", "date_of_birth")
+  string name = 1;
+
+  // Display label for UI
+  string label = 2;
+
+  // Selectivity score (0.0-1.0, higher = more unique)
+  float selectivity = 3;
+
+  // Field type for rendering
+  DiscriminatorType field_type = 4;
+
+  // For ENUM: valid values
+  repeated EnumValue enum_values = 5;
+}
+
+enum DiscriminatorType {
+  STRING = 0; // Free text
+  DATE = 1; // Date picker (supports year-only)
+  DISC_ENUM = 2; // Dropdown
+}
+
+enum ResolutionModeHint {
+  SEARCH_MODAL = 0; // Full search modal with multiple fields
+  AUTOCOMPLETE = 1; // Simple dropdown (reference data)
 }

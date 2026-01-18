@@ -92,6 +92,26 @@ pub enum AgentEventPayload {
         corrections_made: u32,
         duration_secs: u64,
     },
+
+    /// ESPER navigation command matched
+    EsperCommandMatched {
+        /// Original user phrase
+        phrase: String,
+        /// Command key that matched (e.g., "zoom_in", "scale_universe")
+        command_key: String,
+        /// Whether this was a builtin or learned alias
+        source: String, // "Builtin" or "Learned"
+        /// Match type (exact, contains, prefix)
+        match_type: String,
+        /// Any parameters extracted from the phrase
+        extracted_params: std::collections::HashMap<String, String>,
+    },
+
+    /// ESPER command miss (phrase didn't match, fell through to DSL)
+    EsperCommandMiss {
+        /// Original user phrase
+        phrase: String,
+    },
 }
 
 /// An intent extracted by the LLM.
@@ -344,6 +364,39 @@ impl AgentEvent {
             },
         }
     }
+
+    /// Create an ESPER command matched event.
+    #[inline]
+    pub fn esper_command_matched(
+        session_id: Option<Uuid>,
+        phrase: String,
+        command_key: String,
+        source: &str,
+        match_type: &str,
+        extracted_params: std::collections::HashMap<String, String>,
+    ) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            session_id,
+            payload: AgentEventPayload::EsperCommandMatched {
+                phrase,
+                command_key,
+                source: source.to_string(),
+                match_type: match_type.to_string(),
+                extracted_params,
+            },
+        }
+    }
+
+    /// Create an ESPER command miss event.
+    #[inline]
+    pub fn esper_command_miss(session_id: Option<Uuid>, phrase: String) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            session_id,
+            payload: AgentEventPayload::EsperCommandMiss { phrase },
+        }
+    }
 }
 
 impl AgentEventPayload {
@@ -359,6 +412,8 @@ impl AgentEventPayload {
             AgentEventPayload::UserCorrection { .. } => "user_correction",
             AgentEventPayload::ExecutionCompleted { .. } => "execution_completed",
             AgentEventPayload::SessionSummary { .. } => "session_summary",
+            AgentEventPayload::EsperCommandMatched { .. } => "esper_command_matched",
+            AgentEventPayload::EsperCommandMiss { .. } => "esper_command_miss",
         }
     }
 
@@ -368,6 +423,7 @@ impl AgentEventPayload {
             self,
             AgentEventPayload::UserCorrection { .. }
                 | AgentEventPayload::EntityResolutionFailed { .. }
+                | AgentEventPayload::EsperCommandMiss { .. } // Misses are learning opportunities
         )
     }
 }

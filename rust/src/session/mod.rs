@@ -20,11 +20,13 @@ pub mod agent_context;
 pub mod agent_mode;
 pub mod canonical_hash;
 pub mod cbu_session;
+pub mod dsl_sheet;
 pub mod enhanced_context;
 pub mod research_context;
 pub mod scope;
 pub mod scope_path;
 pub mod struct_mass;
+pub mod unified;
 pub mod verb_contract;
 pub mod verb_discovery;
 pub mod verb_hash_lookup;
@@ -50,8 +52,13 @@ pub use agent_mode::{
 pub use canonical_hash::{canonical_json_hash, hash_to_hex, hex_to_hash, sha256};
 pub use cbu_session::{
     CbuSession, CbuSessionState, CbuSummary, ClearResult, HistoryResult, JurisdictionCount,
-    LoadCbuResult, LoadGalaxyResult, LoadJurisdictionResult, SessionInfo, SessionSummary,
-    UnloadCbuResult,
+    LoadCbuResult, LoadGalaxyResult, LoadJurisdictionResult, ReplSessionState, SessionInfo,
+    SessionSummary, UnloadCbuResult,
+};
+pub use dsl_sheet::{
+    CyclicDependency, DslSheet, EntityCandidate, ErrorCode, ExecutionPhase, SessionDslStatement,
+    SheetExecutionResult, SheetStatus, SourceSpan, StatementError, StatementResult,
+    StatementStatus, UnresolvedReference, ValidationError, ValidationResult, ValidationWarning,
 };
 pub use enhanced_context::{
     get_verb_suggestions, EnhancedAgentContext, EnhancedContextBuilder, SerializableAgentContext,
@@ -62,6 +69,12 @@ pub use scope::{ExpandableNode, LoadStatus, ScopeSummary, SessionScope};
 pub use scope_path::{ScopePath, ScopeSegment};
 pub use struct_mass::{
     MassBreakdown, MassContributions, MassThresholds, MassViewMode, MassWeights, StructMass,
+};
+pub use unified::{
+    BoundEntity, ChatMessage, DiscriminatorField, EntityMatch, EntityScope, EntryStatus, EnumValue,
+    FieldType, MessageRole, ResolutionState, ResolvedRef, RunSheet, RunSheetEntry, SearchKeyField,
+    StateSnapshot, StateStack, TargetUniverse, UnifiedSession, UniverseDefinition, UnresolvedRef,
+    ViewState as UnifiedViewState, ZoomLevel,
 };
 pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostic, VerbDiagnostics};
 pub use verb_discovery::{

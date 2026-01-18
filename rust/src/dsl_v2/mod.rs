@@ -102,6 +102,8 @@ pub mod repl_session;
 pub mod runtime_registry;
 #[cfg(feature = "database")]
 pub mod semantic_validator;
+#[cfg(feature = "database")]
+pub mod sheet_executor;
 pub mod submission;
 pub mod suggestions;
 pub mod topo_sort;
@@ -154,12 +156,15 @@ pub use repl_session::{ExecutedBlock, ReplSession};
 pub use runtime_registry::{runtime_registry, runtime_registry_arc, RuntimeVerbRegistry};
 #[cfg(feature = "database")]
 pub use semantic_validator::{validate_dsl, validate_dsl_with_csg, SemanticValidator};
+#[cfg(feature = "database")]
+pub use sheet_executor::SheetExecutor;
 pub use submission::{
     DslSubmission, ExpandedSubmission, IterationKey, IterationStatements, SubmissionError,
     SubmissionLimits, SubmissionState, SymbolBinding,
 };
 pub use topo_sort::{
-    emit_dsl, topological_sort, topological_sort_with_lifecycle, TopoSortError, TopoSortResult,
+    emit_dsl, topological_sort, topological_sort_with_lifecycle,
+    ExecutionPhase as TopoExecutionPhase, TopoSortError, TopoSortResult,
 };
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
