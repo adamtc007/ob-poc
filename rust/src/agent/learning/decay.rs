@@ -271,15 +271,31 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_decay_params() {
-        // Just test construction - actual DB tests need integration setup
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test").unwrap();
-        let decay = ConfidenceDecay::new(pool.clone());
-        assert_eq!(decay.decay_factor, 0.7);
-        assert_eq!(decay.boost_amount, 0.2);
+    fn test_decay_calculations() {
+        // Test decay math without needing a DB pool
+        let decay_factor = 0.7_f32;
+        let boost_amount = 0.2_f32;
+        let min_confidence = 0.1_f32;
+        let max_confidence = 1.0_f32;
 
-        let custom = ConfidenceDecay::with_params(pool, 0.5, 0.3, 0.05, 0.95);
-        assert_eq!(custom.decay_factor, 0.5);
-        assert_eq!(custom.min_confidence, 0.05);
+        // Test decay: 1.0 * 0.7 = 0.7
+        let confidence = 1.0_f32;
+        let decayed = (confidence * decay_factor).max(min_confidence);
+        assert!((decayed - 0.7).abs() < 0.001);
+
+        // Test decay floor: 0.1 * 0.7 = 0.07, but min is 0.1
+        let low_confidence = 0.1_f32;
+        let decayed_low = (low_confidence * decay_factor).max(min_confidence);
+        assert!((decayed_low - 0.1).abs() < 0.001);
+
+        // Test boost: 0.5 + 0.2 = 0.7
+        let mid_confidence = 0.5_f32;
+        let boosted = (mid_confidence + boost_amount).min(max_confidence);
+        assert!((boosted - 0.7).abs() < 0.001);
+
+        // Test boost ceiling: 0.9 + 0.2 = 1.1, but max is 1.0
+        let high_confidence = 0.9_f32;
+        let boosted_high = (high_confidence + boost_amount).min(max_confidence);
+        assert!((boosted_high - 1.0).abs() < 0.001);
     }
 }

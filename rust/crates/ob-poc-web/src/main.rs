@@ -165,16 +165,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         result.verbs_unchanged,
                         result.duration_ms
                     );
-
-                    // Populate RAG metadata (intent patterns, workflow phases, etc.)
-                    match verb_sync_service.populate_rag_metadata().await {
-                        Ok(count) => {
-                            tracing::info!("RAG metadata populated for {} verbs", count);
-                        }
-                        Err(e) => {
-                            tracing::warn!("RAG metadata population failed (non-fatal): {}", e);
-                        }
-                    }
                 }
                 Err(e) => {
                     tracing::warn!("Verb sync failed (non-fatal): {}", e);

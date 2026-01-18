@@ -28,7 +28,6 @@ pub mod struct_mass;
 pub mod verb_contract;
 pub mod verb_discovery;
 pub mod verb_hash_lookup;
-pub mod verb_rag_metadata;
 pub mod verb_sync;
 pub mod verb_tiering_linter;
 pub mod view_state;
