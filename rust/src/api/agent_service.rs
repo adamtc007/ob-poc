@@ -841,6 +841,13 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return Ok(response);
         }
 
+        // Handle REPL control commands (bypass LLM)
+        // These are session control commands like "run", "execute", "undo", "clear"
+        // They don't generate DSL - they control the REPL session state
+        if let Some(response) = self.handle_repl_command(&request.message, session) {
+            return Ok(response);
+        }
+
         // If this is a disambiguation response, handle it
         if let Some(disambig_response) = &request.disambiguation_response {
             return self
@@ -1523,16 +1530,15 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     }
 
     // =============================================================================
-    // DEAD CODE REMOVED - One Path, Same Path
+    // UNIFIED DSL PIPELINE - One Path, Same Path
     // =============================================================================
-    // The following special-case handlers were removed because ALL user input
-    // now goes through LLM intent extraction:
+    // The following special-case handlers were removed because ALL DSL-generating
+    // user input now goes through LLM intent extraction:
     //
     // - handle_filter_command: "highlight shells", "clear filter" etc.
     // - parse_view_mode: view mode parsing
     // - parse_entity_types: entity type parsing for filters
     // - handle_show_command: "show cbu Allianz" etc.
-    // - handle_dsl_command: "run", "undo", "clear" etc.
     // - try_direct_dsl: direct DSL input parsing
     //
     // The LLM handles all these cases. Whether the user types:
@@ -1542,7 +1548,96 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     //
     // The result is always: valid DSL ready for execution.
     // One path. Same path. Quality design.
+    //
+    // EXCEPTIONS (bypass LLM because they're not DSL-generating):
+    // - ESPER commands: UI navigation (zoom, pan, drill) → handle_esper_command()
+    // - REPL commands: session control (run, undo, clear) → handle_repl_command()
     // =============================================================================
+
+    /// Handle REPL control commands (run, execute, undo, clear, etc.)
+    ///
+    /// These are NOT DSL-generating commands - they control the REPL session state.
+    /// They bypass the LLM entirely because they're instant control commands.
+    ///
+    /// Returns Some(response) if the message is a REPL command, None otherwise.
+    fn handle_repl_command(
+        &self,
+        message: &str,
+        session: &AgentSession,
+    ) -> Option<AgentChatResponse> {
+        let msg = message.trim().to_lowercase();
+
+        // Execute/Run commands - trigger execution of pending DSL
+        if msg == "run" || msg == "execute" || msg == "go" || msg == "do it" {
+            // Check if there's pending DSL to execute
+            if session.can_execute() {
+                return Some(AgentChatResponse {
+                    message: "Executing...".to_string(),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: session.state.clone(),
+                    can_execute: true,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: Some(vec![AgentCommand::Execute]),
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                });
+            } else {
+                return Some(AgentChatResponse {
+                    message: "Nothing to execute. Generate some DSL first.".to_string(),
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: session.state.clone(),
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                });
+            }
+        }
+
+        // Undo command
+        if msg == "undo" {
+            return Some(AgentChatResponse {
+                message: "Undoing last action...".to_string(),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: session.state.clone(),
+                can_execute: false,
+                dsl_source: None,
+                ast: None,
+                disambiguation: None,
+                commands: Some(vec![AgentCommand::Undo]),
+                unresolved_refs: None,
+                current_ref_index: None,
+            });
+        }
+
+        // Clear command
+        if msg == "clear" || msg == "reset" {
+            return Some(AgentChatResponse {
+                message: "Clearing session...".to_string(),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: session.state.clone(),
+                can_execute: false,
+                dsl_source: None,
+                ast: None,
+                disambiguation: None,
+                commands: Some(vec![AgentCommand::Clear]),
+                unresolved_refs: None,
+                current_ref_index: None,
+            });
+        }
+
+        // Not a REPL command - let it flow to LLM
+        None
+    }
 
     /// Collect all entity lookups from intents
     /// Unified reference resolution: resolves ALL references (entities + codes) in a single pass.
