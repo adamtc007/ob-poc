@@ -9,6 +9,7 @@
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
+> **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

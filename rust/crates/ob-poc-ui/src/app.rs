@@ -4053,6 +4053,17 @@ impl AppState {
                             timestamp: chrono::Utc::now(),
                         }));
 
+                        // If DSL source came back (e.g., DirectDsl with error), put it back
+                        // in chat input so user can edit and resubmit
+                        if let Some(ref dsl) = chat_response.dsl {
+                            if let Some(ref source) = dsl.source {
+                                if !source.is_empty() && !dsl.can_execute {
+                                    // DSL has errors - put it back for editing
+                                    state.pending_chat_input = Some(source.clone());
+                                }
+                            }
+                        }
+
                         // Handle agent commands
                         if let Some(ref commands) = chat_response.commands {
                             web_sys::console::log_1(

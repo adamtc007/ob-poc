@@ -36,6 +36,8 @@ pub enum MatchMethod {
     Exact,
     /// Cached from previous lookup
     Cached,
+    /// User input DSL directly - verb extracted from syntax
+    DirectDsl,
 }
 
 impl std::fmt::Display for MatchMethod {
@@ -45,6 +47,7 @@ impl std::fmt::Display for MatchMethod {
             MatchMethod::Phonetic => write!(f, "phonetic"),
             MatchMethod::Exact => write!(f, "exact"),
             MatchMethod::Cached => write!(f, "cached"),
+            MatchMethod::DirectDsl => write!(f, "direct_dsl"),
         }
     }
 }

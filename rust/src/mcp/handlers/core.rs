@@ -40,6 +40,7 @@ pub struct ToolHandlersConfig {
     pub cbu_sessions: Option<CbuSessionStore>,
     pub learned_data: Option<SharedLearnedData>,
     pub embedder: Option<SharedEmbedder>,
+    pub feedback_service: Option<Arc<ob_semantic_matcher::FeedbackService>>,
 }
 
 impl ToolHandlersConfig {
@@ -51,6 +52,7 @@ impl ToolHandlersConfig {
             cbu_sessions: None,
             learned_data: None,
             embedder: None,
+            feedback_service: None,
         }
     }
 
@@ -90,7 +92,17 @@ impl ToolHandlersConfig {
             verb_searcher: Arc::new(Mutex::new(None)),
             learned_data: self.learned_data,
             embedder: self.embedder,
+            feedback_service: self.feedback_service,
         }
+    }
+
+    /// Add feedback service for learning loop
+    pub fn with_feedback_service(
+        mut self,
+        feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
+    ) -> Self {
+        self.feedback_service = Some(feedback_service);
+        self
     }
 }
 
@@ -111,6 +123,8 @@ pub struct ToolHandlers {
     learned_data: Option<SharedLearnedData>,
     /// Embedder for semantic operations (optional)
     embedder: Option<SharedEmbedder>,
+    /// Feedback service for learning loop
+    feedback_service: Option<Arc<ob_semantic_matcher::FeedbackService>>,
 }
 
 impl ToolHandlers {
@@ -499,6 +513,9 @@ impl ToolHandlers {
     }
 
     /// Execute DSL against the database
+    ///
+    /// Optional parameters:
+    /// - `intent_feedback_id`: Links to learning loop (from dsl_generate flow)
     async fn dsl_execute(&self, args: Value) -> Result<Value> {
         let source = args["source"]
             .as_str()
@@ -513,7 +530,10 @@ impl ToolHandlers {
         // Extract user_intent if provided, otherwise use a default
         let user_intent = args["intent"].as_str().unwrap_or("MCP tool execution");
 
-        // Start generation log (no intent_feedback_id for direct MCP calls)
+        // Extract intent_feedback_id if provided (links to learning loop)
+        let intent_feedback_id = args["intent_feedback_id"].as_i64();
+
+        // Start generation log with optional learning loop linkage
         let log_id = self
             .generation_log
             .start_log(
@@ -522,7 +542,7 @@ impl ToolHandlers {
                 None, // session_id
                 None, // cbu_id
                 None, // model
-                None, // intent_feedback_id - MCP direct execution
+                intent_feedback_id,
             )
             .await
             .ok();
@@ -1183,6 +1203,9 @@ impl ToolHandlers {
             .ok_or_else(|| anyhow!("instruction required"))?;
         let domain = args["domain"].as_str();
         let execute = args["execute"].as_bool().unwrap_or(false);
+        let session_id = args["session_id"]
+            .as_str()
+            .and_then(|s| uuid::Uuid::parse_str(s).ok());
 
         // Get verb searcher and create intent pipeline
         let searcher = self.get_verb_searcher().await?;
@@ -1190,6 +1213,50 @@ impl ToolHandlers {
 
         // Process through structured pipeline
         let result = pipeline.process(instruction, domain).await?;
+
+        // Capture feedback for learning loop
+        let feedback_id = if let Some(ref feedback_svc) = self.feedback_service {
+            let top_verb = result.verb_candidates.first();
+            let match_result = top_verb.map(|v| ob_semantic_matcher::MatchResult {
+                verb_name: v.verb.clone(),
+                pattern_phrase: v.matched_phrase.clone(),
+                similarity: v.score,
+                match_method: ob_semantic_matcher::MatchMethod::Semantic,
+                category: "mcp".to_string(),
+                is_agent_bound: true,
+            });
+
+            match feedback_svc
+                .capture_match(
+                    session_id.unwrap_or_else(uuid::Uuid::new_v4),
+                    instruction,
+                    ob_semantic_matcher::feedback::InputSource::Command,
+                    match_result.as_ref(),
+                    &[], // alternatives
+                    domain,
+                    None, // workflow_phase
+                )
+                .await
+            {
+                Ok(interaction_id) => {
+                    // Look up the feedback row ID for FK linking
+                    sqlx::query_scalar::<_, i64>(
+                        r#"SELECT id FROM "ob-poc".intent_feedback WHERE interaction_id = $1"#,
+                    )
+                    .bind(interaction_id)
+                    .fetch_optional(&self.pool)
+                    .await
+                    .ok()
+                    .flatten()
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to capture MCP feedback: {}", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
 
         // Build response
         let response = json!({

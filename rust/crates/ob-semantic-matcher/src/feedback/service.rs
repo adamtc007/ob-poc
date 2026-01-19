@@ -92,12 +92,41 @@ impl FeedbackService {
         correction_input: Option<String>,
         time_to_outcome_ms: Option<i32>,
     ) -> Result<bool> {
+        self.record_outcome_with_dsl(
+            interaction_id,
+            outcome,
+            outcome_verb,
+            correction_input,
+            time_to_outcome_ms,
+            None,
+            None,
+            None,
+        )
+        .await
+    }
+
+    /// Record the outcome of an interaction with DSL diff tracking
+    #[allow(clippy::too_many_arguments)]
+    pub async fn record_outcome_with_dsl(
+        &self,
+        interaction_id: Uuid,
+        outcome: Outcome,
+        outcome_verb: Option<String>,
+        correction_input: Option<String>,
+        time_to_outcome_ms: Option<i32>,
+        generated_dsl: Option<String>,
+        final_dsl: Option<String>,
+        user_edits: Option<serde_json::Value>,
+    ) -> Result<bool> {
         let update = OutcomeUpdate {
             interaction_id,
             outcome,
             outcome_verb,
             correction_input,
             time_to_outcome_ms,
+            generated_dsl,
+            final_dsl,
+            user_edits,
         };
 
         self.repository.record_outcome(&update).await

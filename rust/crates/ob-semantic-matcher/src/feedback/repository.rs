@@ -59,7 +59,10 @@ impl FeedbackRepository {
             SET outcome = $2,
                 outcome_verb = $3,
                 correction_input = $4,
-                time_to_outcome_ms = $5
+                time_to_outcome_ms = $5,
+                generated_dsl = $6,
+                final_dsl = $7,
+                user_edits = $8
             WHERE interaction_id = $1
               AND outcome IS NULL
             "#,
@@ -69,6 +72,9 @@ impl FeedbackRepository {
         .bind(&update.outcome_verb)
         .bind(&update.correction_input)
         .bind(update.time_to_outcome_ms)
+        .bind(&update.generated_dsl)
+        .bind(&update.final_dsl)
+        .bind(&update.user_edits)
         .execute(&self.pool)
         .await?;
 

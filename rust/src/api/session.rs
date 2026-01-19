@@ -2049,6 +2049,19 @@ pub struct SessionContext {
     /// Used to call FeedbackService.record_outcome() after execution
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pending_interaction_id: Option<Uuid>,
+
+    // =========================================================================
+    // DSL Diff Tracking (for learning from user edits)
+    // =========================================================================
+    /// DSL as proposed by agent (before user edits in REPL)
+    /// Set when agent generates DSL, compared against final_dsl on execute
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proposed_dsl: Option<String>,
+
+    /// Current DSL in REPL (may differ from proposed if user edited)
+    /// Updated via REPL edit events, used to compute diff on execute
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_dsl: Option<String>,
 }
 
 /// Primary domain keys tracked across the session

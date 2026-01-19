@@ -828,6 +828,7 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         .route("/api/session/:id", delete(delete_session))
         .route("/api/session/:id/chat", post(chat_session))
         .route("/api/session/:id/execute", post(execute_session_dsl))
+        .route("/api/session/:id/repl-edit", post(repl_edit_session))
         .route("/api/session/:id/clear", post(clear_session_dsl))
         .route("/api/session/:id/bind", post(set_session_binding))
         .route("/api/session/:id/context", get(get_session_context))
@@ -2215,12 +2216,21 @@ async fn chat_session(
     // =========================================================================
     if !response.intents.is_empty() {
         let first_intent = &response.intents[0];
+
+        // Determine match method: DirectDsl if user typed DSL, Semantic if LLM generated
+        let is_direct_dsl = req.message.trim().starts_with('(');
+        let match_method = if is_direct_dsl {
+            ob_semantic_matcher::MatchMethod::DirectDsl
+        } else {
+            ob_semantic_matcher::MatchMethod::Semantic
+        };
+
         // Build a MatchResult from the intent for feedback capture
         let match_result = ob_semantic_matcher::MatchResult {
             verb_name: first_intent.verb.clone(),
             pattern_phrase: req.message.clone(), // The user's input
-            similarity: 1.0,                     // LLM selected this verb
-            match_method: ob_semantic_matcher::MatchMethod::Semantic, // LLM uses semantic understanding
+            similarity: 1.0,                     // Direct DSL or LLM-selected verb
+            match_method,
             category: "chat".to_string(),
             is_agent_bound: true,
         };
@@ -2252,15 +2262,30 @@ async fn chat_session(
                 {
                     session.context.pending_feedback_id = Some(feedback_id);
                     tracing::debug!(
-                        "Captured feedback: interaction_id={}, feedback_id={}",
+                        "Captured feedback: interaction_id={}, feedback_id={}, method={:?}",
                         interaction_id,
-                        feedback_id
+                        feedback_id,
+                        match_method
                     );
                 }
             }
             Err(e) => {
                 tracing::warn!("Failed to capture feedback: {}", e);
             }
+        }
+    }
+
+    // =========================================================================
+    // TRACK PROPOSED DSL FOR DIFF (learning from user edits)
+    // =========================================================================
+    if let Some(ref dsl_source) = response.dsl_source {
+        // Only set proposed_dsl if agent generated it (not DirectDsl)
+        let is_direct_dsl = req.message.trim().starts_with('(');
+        if !is_direct_dsl {
+            state
+                .session_manager
+                .set_proposed_dsl(session_id, dsl_source)
+                .await;
         }
     }
 
@@ -2901,6 +2926,30 @@ async fn execute_session_dsl(
             }
 
             // =========================================================================
+            // CAPTURE DSL DIFF FOR LEARNING (proposed vs final)
+            // =========================================================================
+            let dsl_diff = state
+                .session_manager
+                .capture_dsl_diff(session_id, &dsl)
+                .await;
+            if let Some(ref diff) = dsl_diff {
+                if diff.was_edited {
+                    tracing::info!(
+                        "[EXEC] DSL was edited by user: {} edit(s) detected",
+                        diff.edits.len()
+                    );
+                    for edit in &diff.edits {
+                        tracing::debug!(
+                            "[EXEC] Edit: {} changed from '{}' to '{}'",
+                            edit.field,
+                            edit.from,
+                            edit.to
+                        );
+                    }
+                }
+            }
+
+            // =========================================================================
             // LOG SUCCESS
             // =========================================================================
             if let Some(lid) = log_id {
@@ -2938,17 +2987,38 @@ async fn execute_session_dsl(
                     .await;
             }
 
-            // Update intent_feedback outcome
+            // Update intent_feedback outcome with DSL diff
             if let Some(interaction_id) = pending_interaction_id {
                 let elapsed_ms = start_time.elapsed().as_millis() as i32;
+
+                // Convert DSL diff to feedback format
+                let (generated_dsl, final_dsl_str, user_edits_json) =
+                    if let Some(ref diff) = dsl_diff {
+                        let edits_json = if diff.edits.is_empty() {
+                            None
+                        } else {
+                            Some(serde_json::to_value(&diff.edits).unwrap_or_default())
+                        };
+                        (
+                            Some(diff.proposed.clone()),
+                            Some(diff.final_dsl.clone()),
+                            edits_json,
+                        )
+                    } else {
+                        (None, Some(dsl.clone()), None)
+                    };
+
                 let _ = state
                     .feedback_service
-                    .record_outcome(
+                    .record_outcome_with_dsl(
                         interaction_id,
                         ob_semantic_matcher::feedback::Outcome::Executed,
                         None, // outcome_verb same as matched
                         None, // no correction
                         Some(elapsed_ms),
+                        generated_dsl,
+                        final_dsl_str,
+                        user_edits_json,
                     )
                     .await;
             }
@@ -3233,6 +3303,52 @@ async fn execute_session_dsl(
         } else {
             Some(bindings_map)
         },
+    }))
+}
+
+/// POST /api/session/:id/repl-edit - Record REPL edit event
+///
+/// Called by the UI when the user edits DSL in the REPL editor.
+/// This tracks the current_dsl so we can compute diff on execute.
+async fn repl_edit_session(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<ReplEditRequest>,
+) -> Result<Json<ReplEditResponse>, StatusCode> {
+    use crate::dsl_v2::parse_program;
+
+    tracing::debug!(
+        "[REPL_EDIT] Session {} - DSL length: {}",
+        session_id,
+        req.current_dsl.len()
+    );
+
+    // Update current_dsl in session via SessionManager
+    state
+        .session_manager
+        .update_current_dsl(session_id, &req.current_dsl)
+        .await;
+
+    // Check if there are edits (proposed != current)
+    let has_edits = state.session_manager.has_dsl_edits(session_id).await;
+
+    // Validate the current DSL
+    let (valid, errors) = match parse_program(&req.current_dsl) {
+        Ok(ast) => {
+            // Parse succeeded, try compile
+            match crate::dsl_v2::compile(&ast) {
+                Ok(_) => (true, None),
+                Err(e) => (false, Some(vec![format!("Compile error: {:?}", e)])),
+            }
+        }
+        Err(e) => (false, Some(vec![format!("Parse error: {:?}", e)])),
+    };
+
+    Ok(Json(ReplEditResponse {
+        recorded: true,
+        has_edits,
+        valid,
+        errors,
     }))
 }
 
@@ -5661,6 +5777,27 @@ pub struct ExecuteDslRequest {
     /// DSL source to execute. If None/missing, uses session's assembled_dsl.
     #[serde(default)]
     pub dsl: Option<String>,
+}
+
+/// Request body for REPL edit events
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReplEditRequest {
+    /// Current DSL content in the REPL editor
+    pub current_dsl: String,
+}
+
+/// Response for REPL edit events
+#[derive(Debug, Clone, Serialize)]
+pub struct ReplEditResponse {
+    /// Whether the edit was recorded
+    pub recorded: bool,
+    /// Whether the DSL differs from the proposed DSL
+    pub has_edits: bool,
+    /// Validation status of the current DSL
+    pub valid: bool,
+    /// Validation errors if any
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub errors: Option<Vec<String>>,
 }
 
 // NOTE: Direct /execute endpoint removed - use /api/session/:id/execute instead

@@ -756,6 +756,8 @@ pub struct AsyncState {
     pub pending_execution: Option<Result<ExecuteResponse, String>>,
     pub pending_cbu_list: Option<Result<Vec<CbuSummary>, String>>,
     pub pending_chat: Option<Result<ChatMessage, String>>,
+    /// DSL source to put back in chat input (for editing after error)
+    pub pending_chat_input: Option<String>,
     pub pending_resolution: Option<Result<ResolutionSessionResponse, String>>,
     pub pending_resolution_search: Option<Result<ResolutionSearchResponse, String>>,
     pub pending_cbu_search: Option<Result<crate::api::CbuSearchResponse, String>>,
@@ -1148,6 +1150,11 @@ impl AppState {
                 Ok(msg) => self.messages.push(msg),
                 Err(e) => state.last_error = Some(e),
             }
+        }
+
+        // If DSL source should be put back in chat input (for editing after error)
+        if let Some(dsl_source) = state.pending_chat_input.take() {
+            self.buffers.chat_input = dsl_source;
         }
 
         // Process pending disambiguation request - opens modal
