@@ -156,7 +156,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             };
 
-            match verb_sync_service.sync_all(&registry).await {
+            // Sync verbs AND invocation_phrases to DB (intent_patterns column)
+            // This makes dsl_verbs.intent_patterns the source of truth for Candle semantic pipeline
+            match verb_sync_service
+                .sync_all_with_phrases(&registry, &verbs_config)
+                .await
+            {
                 Ok(result) => {
                     tracing::info!(
                         "Verb sync complete: {} added, {} updated, {} unchanged in {}ms",

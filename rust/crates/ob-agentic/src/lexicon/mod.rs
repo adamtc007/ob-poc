@@ -52,7 +52,9 @@ mod pipeline;
 pub mod test_harness;
 mod tokenizer;
 mod tokens;
-pub mod verb_phrases;
+
+// NOTE: verb_phrases module removed - verb discovery now uses VerbService
+// with DB-sourced patterns from dsl_verbs.intent_patterns
 
 #[cfg(feature = "gateway")]
 pub use db_resolver::{CompositeEntityResolver, DatabaseEntityResolver};
@@ -73,4 +75,3 @@ pub use tokenizer::{
 pub use tokens::{
     EntityClass, ModifierType, NumberType, PrepType, Token, TokenSource, TokenType, VerbClass,
 };
-pub use verb_phrases::{VerbEntry, VerbMatch, VerbPhraseIndex, VerbPhraseStats};

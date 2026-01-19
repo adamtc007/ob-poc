@@ -889,8 +889,6 @@ impl From<SessionEntryRow> for SessionEntry {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     // Helper to test extract_source_from_verb without database
     fn extract_source_from_verb(verb: &str) -> Option<String> {
         let known_sources = ["gleif", "lbr", "bods", "brave"];

@@ -359,11 +359,9 @@ mod tests {
             notes: vec![],
         };
 
-        let searcher = HybridVerbSearcher::phrase_only("config/verbs");
-        if searcher.is_err() {
-            return; // Skip if config not available
-        }
-        let pipeline = IntentPipeline::new(searcher.unwrap());
+        // Use minimal searcher for testing (no DB required)
+        let searcher = HybridVerbSearcher::minimal();
+        let pipeline = IntentPipeline::new(searcher);
 
         let (dsl, unresolved) = pipeline.assemble_dsl(&intent).unwrap();
         assert!(dsl.contains("cbu.create"));

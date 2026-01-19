@@ -24,10 +24,21 @@
 //!
 //! # RAG Metadata
 //!
-//! The `dsl_verbs` table includes additional RAG columns that don't exist in RuntimeVerb:
+//! The `dsl_verbs` table includes additional RAG columns:
 //! - `search_text`: Auto-generated from description + intent_patterns (via DB trigger)
-//! - `intent_patterns`: Natural language patterns - populated separately
+//! - `intent_patterns`: Natural language patterns - synced from YAML invocation_phrases
 //! - `typical_next`: Workflow hints - populated separately
+//!
+//! # Intent Patterns Sync (Candle Pipeline)
+//!
+//! YAML `invocation_phrases` are synced to `dsl_verbs.intent_patterns` which is then
+//! the source of truth for the Candle semantic pipeline:
+//!
+//! ```text
+//! YAML invocation_phrases → dsl_verbs.intent_patterns → verb_pattern_embeddings
+//!                                     ↑
+//!                           Learning loop adds patterns
+//! ```
 //! - `workflow_phases`: KYC phases - populated separately
 //! - `graph_contexts`: Graph cursor contexts - populated separately
 
@@ -40,6 +51,7 @@ use uuid::Uuid;
 
 use crate::dsl_v2::runtime_registry::{RuntimeBehavior, RuntimeVerb};
 use crate::dsl_v2::RuntimeVerbRegistry;
+use dsl_core::config::types::VerbsConfig;
 
 use super::canonical_hash::canonical_json_hash;
 use super::verb_contract::{codes, VerbDiagnostics};
@@ -198,6 +210,76 @@ impl VerbSyncService {
             "Verb sync complete: {} added, {} updated, {} unchanged, {} orphaned in {}ms",
             added, updated, unchanged, removed, duration_ms
         );
+
+        Ok(result)
+    }
+
+    /// Sync invocation_phrases from YAML config to dsl_verbs.intent_patterns
+    ///
+    /// This makes dsl_verbs.intent_patterns the source of truth for the Candle semantic pipeline.
+    /// After sync, run `populate_embeddings` to update verb_pattern_embeddings.
+    pub async fn sync_invocation_phrases(
+        &self,
+        config: &VerbsConfig,
+    ) -> Result<i32, VerbSyncError> {
+        let mut synced = 0;
+
+        for (domain_name, domain_config) in &config.domains {
+            for (verb_name, verb_config) in &domain_config.verbs {
+                let full_name = format!("{}.{}", domain_name, verb_name);
+
+                // Skip if no invocation_phrases
+                if verb_config.invocation_phrases.is_empty() {
+                    continue;
+                }
+
+                // Update intent_patterns in dsl_verbs
+                let result = sqlx::query(
+                    r#"
+                    UPDATE "ob-poc".dsl_verbs
+                    SET intent_patterns = $2,
+                        updated_at = now()
+                    WHERE full_name = $1
+                    "#,
+                )
+                .bind(&full_name)
+                .bind(&verb_config.invocation_phrases)
+                .execute(&self.pool)
+                .await?;
+
+                if result.rows_affected() > 0 {
+                    synced += 1;
+                    debug!(
+                        "Synced {} invocation_phrases for {}",
+                        verb_config.invocation_phrases.len(),
+                        full_name
+                    );
+                }
+            }
+        }
+
+        info!(
+            "Synced invocation_phrases for {} verbs to dsl_verbs.intent_patterns",
+            synced
+        );
+
+        Ok(synced)
+    }
+
+    /// Combined sync: verbs + invocation_phrases
+    ///
+    /// Use this for startup sync to ensure both verb definitions and intent_patterns are current.
+    pub async fn sync_all_with_phrases(
+        &self,
+        registry: &RuntimeVerbRegistry,
+        config: &VerbsConfig,
+    ) -> Result<SyncResult, VerbSyncError> {
+        // First sync verb definitions
+        let result = self.sync_all(registry).await?;
+
+        // Then sync invocation_phrases to intent_patterns
+        let phrases_synced = self.sync_invocation_phrases(config).await?;
+        info!("Synced invocation_phrases for {} verbs", phrases_synced);
 
         Ok(result)
     }

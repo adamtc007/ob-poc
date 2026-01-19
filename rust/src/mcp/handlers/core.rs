@@ -22,13 +22,77 @@ use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
-use crate::database::VisualizationRepository;
+use crate::database::{VerbService, VisualizationRepository};
 use crate::dsl_v2::{
     compile, gateway_resolver, parse_program, registry, DslExecutor, ExecutionContext,
 };
 use crate::mcp::verb_search::HybridVerbSearcher;
 
 use crate::mcp::protocol::ToolCallResult;
+
+/// Configuration for ToolHandlers construction
+///
+/// Use the builder pattern: `ToolHandlersConfig::new(pool).with_sessions(s).build()`
+#[derive(Clone)]
+pub struct ToolHandlersConfig {
+    pub pool: PgPool,
+    pub sessions: Option<SessionStore>,
+    pub cbu_sessions: Option<CbuSessionStore>,
+    pub learned_data: Option<SharedLearnedData>,
+    pub embedder: Option<SharedEmbedder>,
+}
+
+impl ToolHandlersConfig {
+    /// Create config with required pool
+    pub fn new(pool: PgPool) -> Self {
+        Self {
+            pool,
+            sessions: None,
+            cbu_sessions: None,
+            learned_data: None,
+            embedder: None,
+        }
+    }
+
+    /// Add UI session store
+    pub fn with_sessions(mut self, sessions: SessionStore) -> Self {
+        self.sessions = Some(sessions);
+        self
+    }
+
+    /// Add CBU session store
+    pub fn with_cbu_sessions(mut self, cbu_sessions: CbuSessionStore) -> Self {
+        self.cbu_sessions = Some(cbu_sessions);
+        self
+    }
+
+    /// Add learned data for semantic pipeline
+    pub fn with_learned_data(mut self, learned_data: SharedLearnedData) -> Self {
+        self.learned_data = Some(learned_data);
+        self
+    }
+
+    /// Add embedder for semantic operations
+    pub fn with_embedder(mut self, embedder: SharedEmbedder) -> Self {
+        self.embedder = Some(embedder);
+        self
+    }
+
+    /// Build ToolHandlers from config
+    pub fn build(self) -> ToolHandlers {
+        ToolHandlers {
+            generation_log: GenerationLogRepository::new(self.pool.clone()),
+            repo: VisualizationRepository::new(self.pool.clone()),
+            pool: self.pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+            sessions: self.sessions,
+            cbu_sessions: self.cbu_sessions,
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: self.learned_data,
+            embedder: self.embedder,
+        }
+    }
+}
 
 /// Tool handlers with database access, EntityGateway client, and UI session store
 pub struct ToolHandlers {
@@ -50,34 +114,21 @@ pub struct ToolHandlers {
 }
 
 impl ToolHandlers {
+    /// Create handlers from config (preferred)
+    pub fn from_config(config: ToolHandlersConfig) -> Self {
+        config.build()
+    }
+
     /// Create handlers without session store (standalone MCP mode)
     pub fn new(pool: PgPool) -> Self {
-        Self {
-            generation_log: GenerationLogRepository::new(pool.clone()),
-            repo: VisualizationRepository::new(pool.clone()),
-            pool,
-            gateway_client: Arc::new(Mutex::new(None)),
-            sessions: None,
-            cbu_sessions: None,
-            verb_searcher: Arc::new(Mutex::new(None)),
-            learned_data: None,
-            embedder: None,
-        }
+        ToolHandlersConfig::new(pool).build()
     }
 
     /// Create handlers with UI session store (integrated mode)
     pub fn with_sessions(pool: PgPool, sessions: SessionStore) -> Self {
-        Self {
-            generation_log: GenerationLogRepository::new(pool.clone()),
-            repo: VisualizationRepository::new(pool.clone()),
-            pool,
-            gateway_client: Arc::new(Mutex::new(None)),
-            sessions: Some(sessions),
-            cbu_sessions: None,
-            verb_searcher: Arc::new(Mutex::new(None)),
-            learned_data: None,
-            embedder: None,
-        }
+        ToolHandlersConfig::new(pool)
+            .with_sessions(sessions)
+            .build()
     }
 
     /// Create handlers with both session stores (full integrated mode)
@@ -86,32 +137,17 @@ impl ToolHandlers {
         sessions: SessionStore,
         cbu_sessions: CbuSessionStore,
     ) -> Self {
-        Self {
-            generation_log: GenerationLogRepository::new(pool.clone()),
-            repo: VisualizationRepository::new(pool.clone()),
-            pool,
-            gateway_client: Arc::new(Mutex::new(None)),
-            sessions: Some(sessions),
-            cbu_sessions: Some(cbu_sessions),
-            verb_searcher: Arc::new(Mutex::new(None)),
-            learned_data: None,
-            embedder: None,
-        }
+        ToolHandlersConfig::new(pool)
+            .with_sessions(sessions)
+            .with_cbu_sessions(cbu_sessions)
+            .build()
     }
 
     /// Create handlers with learned data for semantic intent pipeline (standalone MCP mode)
     pub fn with_learned_data(pool: PgPool, learned_data: SharedLearnedData) -> Self {
-        Self {
-            generation_log: GenerationLogRepository::new(pool.clone()),
-            repo: VisualizationRepository::new(pool.clone()),
-            pool,
-            gateway_client: Arc::new(Mutex::new(None)),
-            sessions: None,
-            cbu_sessions: None,
-            verb_searcher: Arc::new(Mutex::new(None)),
-            learned_data: Some(learned_data),
-            embedder: None,
-        }
+        ToolHandlersConfig::new(pool)
+            .with_learned_data(learned_data)
+            .build()
     }
 
     /// Create handlers with learned data and embedder (full semantic pipeline)
@@ -120,17 +156,10 @@ impl ToolHandlers {
         learned_data: SharedLearnedData,
         embedder: SharedEmbedder,
     ) -> Self {
-        Self {
-            generation_log: GenerationLogRepository::new(pool.clone()),
-            repo: VisualizationRepository::new(pool.clone()),
-            pool,
-            gateway_client: Arc::new(Mutex::new(None)),
-            sessions: None,
-            cbu_sessions: None,
-            verb_searcher: Arc::new(Mutex::new(None)),
-            learned_data: Some(learned_data),
-            embedder: Some(embedder),
-        }
+        ToolHandlersConfig::new(pool)
+            .with_learned_data(learned_data)
+            .with_embedder(embedder)
+            .build()
     }
 
     /// Create handlers with all session stores and learned data (full integrated mode)
@@ -140,17 +169,11 @@ impl ToolHandlers {
         cbu_sessions: CbuSessionStore,
         learned_data: SharedLearnedData,
     ) -> Self {
-        Self {
-            generation_log: GenerationLogRepository::new(pool.clone()),
-            repo: VisualizationRepository::new(pool.clone()),
-            pool,
-            gateway_client: Arc::new(Mutex::new(None)),
-            sessions: Some(sessions),
-            cbu_sessions: Some(cbu_sessions),
-            verb_searcher: Arc::new(Mutex::new(None)),
-            learned_data: Some(learned_data),
-            embedder: None,
-        }
+        ToolHandlersConfig::new(pool)
+            .with_sessions(sessions)
+            .with_cbu_sessions(cbu_sessions)
+            .with_learned_data(learned_data)
+            .build()
     }
 
     /// Get the session store, or error if not configured
@@ -190,32 +213,23 @@ impl ToolHandlers {
 
     /// Get or create HybridVerbSearcher for verb discovery
     ///
-    /// Lazy-initializes on first use. Includes:
-    /// - Phrase index from YAML invocation_phrases
-    /// - Semantic matcher (if database available)
-    /// - Learned data (if provided at construction)
+    /// Lazy-initializes on first use. All DB access through VerbService.
     async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher> {
         let mut guard = self.verb_searcher.lock().await;
         if let Some(searcher) = guard.as_ref() {
             return Ok(searcher.clone());
         }
 
-        // Determine verbs directory
-        let verbs_dir = std::env::var("DSL_CONFIG_DIR")
-            .map(|d| format!("{}/verbs", d))
-            .unwrap_or_else(|_| "config/verbs".to_string());
+        // Create VerbService for centralized DB access
+        let verb_service = Arc::new(VerbService::new(self.pool.clone()));
 
-        // Create searcher based on available resources
-        let searcher = if let Some(learned) = &self.learned_data {
-            // Full mode with learned data
-            HybridVerbSearcher::full(&verbs_dir, self.pool.clone(), Some(learned.clone()))
-                .await
-                .map_err(|e| anyhow!("Failed to create verb searcher: {}", e))?
-        } else {
-            // Phrase-only mode (no learned data yet)
-            HybridVerbSearcher::phrase_only(&verbs_dir)
-                .map_err(|e| anyhow!("Failed to create verb searcher: {}", e))?
-        };
+        // Create searcher with VerbService
+        let mut searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone());
+
+        // Add embedder if available
+        if let Some(embedder) = &self.embedder {
+            searcher = searcher.with_embedder(embedder.clone());
+        }
 
         *guard = Some(searcher.clone());
         Ok(searcher)
@@ -2828,6 +2842,13 @@ impl ToolHandlers {
                     entity_type: r["entity_type"].as_str().unwrap_or("entity").to_string(),
                     context_line: r["context_line"].as_str().unwrap_or("").to_string(),
                     initial_matches,
+                    // Fields with defaults
+                    search_keys: Vec::new(),
+                    discriminators: Vec::new(),
+                    resolution_mode: Default::default(),
+                    verb_context: None,
+                    resolved_key: None,
+                    resolved_display: None,
                 }
             })
             .collect();
@@ -5803,7 +5824,7 @@ impl ToolHandlers {
 
     /// List all available ESPER navigation commands
     async fn esper_list(&self, args: Value) -> Result<Value> {
-        use crate::agent::esper::{EsperConfig, EsperWarmup};
+        use crate::agent::esper::EsperWarmup;
 
         #[derive(serde::Deserialize, Default)]
         struct Args {
@@ -5813,7 +5834,7 @@ impl ToolHandlers {
         let args: Args = serde_json::from_value(args).unwrap_or_default();
 
         // Load config from YAML
-        let warmup = EsperWarmup::new(self.pool.clone());
+        let warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
         let config = warmup.load_config()?;
 
         // Filter by category prefix if provided
@@ -5859,8 +5880,8 @@ impl ToolHandlers {
         let args: Args = serde_json::from_value(args)?;
 
         // Build registry from config + learned aliases
-        let warmup = EsperWarmup::new(self.pool.clone());
-        let registry = warmup.warmup().await?;
+        let warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
+        let (registry, _stats) = warmup.warmup().await?;
 
         match registry.lookup(&args.phrase) {
             Some(m) => Ok(json!({
@@ -5895,7 +5916,7 @@ impl ToolHandlers {
         let pool = self.require_pool()?;
 
         // Validate command exists in config
-        let warmup = EsperWarmup::new(self.pool.clone());
+        let warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
         let config = warmup.load_config()?;
 
         if !config.commands.contains_key(&args.command_key) {
@@ -5925,8 +5946,8 @@ impl ToolHandlers {
         use crate::agent::esper::EsperWarmup;
 
         // Rebuild registry from YAML + DB
-        let warmup = EsperWarmup::new(self.pool.clone());
-        let registry = warmup.warmup().await?;
+        let warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
+        let (registry, _warmup_stats) = warmup.warmup().await?;
 
         let stats = registry.stats();
 

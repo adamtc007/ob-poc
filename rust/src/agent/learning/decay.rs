@@ -268,8 +268,6 @@ pub struct CorrectionResult {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_decay_calculations() {
         // Test decay math without needing a DB pool

@@ -1,13 +1,14 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-18
+> **Last reviewed:** 2026-01-19
 > **Crates:** 14 Rust crates
-> **Verbs:** 800+ across 103 YAML files
-> **Migrations:** 35 schema migrations
-> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2)
+> **Verbs:** 923 verbs, 7334 intent patterns (DB-sourced)
+> **Migrations:** 37 schema migrations
+> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2) - 7500+ patterns vectorized
 > **ESPER Navigation:** ✅ Complete - 48 commands, trie + semantic fallback
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
+> **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -213,6 +214,117 @@ User says: "spin up a fund for Acme"
 | Latency | 5-15ms |
 | Storage | pgvector (IVFFlat) |
 | API Key | Not required |
+
+### Candle Semantic Pipeline - DB as Source of Truth
+
+> ✅ **IMPLEMENTED (2026-01-19)**: Full pipeline operational with DB-sourced patterns.
+
+**Architecture:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    SOURCE OF TRUTH: dsl_verbs.intent_patterns               │
+│                                                                              │
+│   YAML invocation_phrases                                                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│   VerbSyncService.sync_all_with_phrases() [server startup]                  │
+│         │                                                                    │
+│         ▼                                                                    │
+│   dsl_verbs.intent_patterns (923 verbs, 7334 patterns)                      │
+│         │                                                                    │
+│         ▼                                                                    │
+│   populate_embeddings [binary]                                               │
+│   - Reads from v_verb_intent_patterns view                                  │
+│   - Candle embeds each pattern (384-dim, all-MiniLM-L6-v2)                  │
+│   - Inserts to verb_pattern_embeddings with phonetic codes                  │
+│         │                                                                    │
+│         ▼                                                                    │
+│   verb_pattern_embeddings (7500+ patterns with vectors)                     │
+│         │                                                                    │
+│         ▼                                                                    │
+│   HybridVerbSearcher.search_global_semantic()                               │
+│   - pgvector cosine similarity                                               │
+│   - Returns ranked verb matches                                              │
+│                                                                              │
+│   Learning loop:                                                             │
+│   PatternLearner → add_learned_pattern() → dsl_verbs.intent_patterns        │
+│                         ↑                                                    │
+│   (Re-run populate_embeddings to pick up new patterns)                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `rust/src/database/verb_service.rs` | `VerbService` - centralized verb DB access |
+| `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher` - semantic search (uses VerbService) |
+| `rust/src/session/verb_sync.rs` | `VerbSyncService` - syncs YAML to DB |
+| `rust/crates/ob-semantic-matcher/src/bin/populate_embeddings.rs` | Populates verb_pattern_embeddings |
+| `rust/crates/ob-semantic-matcher/src/feedback/learner.rs` | Learning loop |
+| `migrations/037_candle_pipeline_complete.sql` | DB schema |
+
+**Database Tables:**
+
+| Table | Purpose | Records |
+|-------|---------|---------|
+| `ob-poc.dsl_verbs` | Verb definitions + intent_patterns | 923 verbs |
+| `ob-poc.verb_pattern_embeddings` | Patterns with Candle embeddings | 7500+ |
+| `ob-poc.v_verb_intent_patterns` | View that flattens intent_patterns array | — |
+| `agent.user_learned_phrases` | Per-user learned patterns | Runtime |
+| `agent.phrase_blocklist` | Blocked verb mappings | Runtime |
+
+**Startup Sync:**
+
+On server startup (`ob-poc-web/src/main.rs`):
+1. Load verb YAML config
+2. `VerbSyncService.sync_all_with_phrases()` syncs verbs AND invocation_phrases to `dsl_verbs.intent_patterns`
+3. `populate_embeddings` must be run separately to create vectors
+
+**Populating Embeddings:**
+
+```bash
+# Run after YAML changes or first setup
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings
+```
+
+Options:
+- `--bootstrap`: Generate patterns for verbs without intent_patterns (use sparingly)
+- `--force`: Re-embed all patterns even if already present
+
+**Search Priority (HybridVerbSearcher):**
+
+All DB access goes through `VerbService` (no direct sqlx calls).
+
+1. User learned exact → `agent.user_learned_phrases`
+2. Global learned exact → In-memory LearnedData
+3. User semantic → pgvector on user_learned_phrases
+4. Global semantic → pgvector on invocation_phrases
+5. Blocklist check → Filter blocked verbs
+6. **Global semantic → `verb_pattern_embeddings`** ← PRIMARY LOOKUP
+
+> **Removed (2026-01-19):** Tier 6 YAML phrase matching via `VerbPhraseIndex` has been removed.
+> All verb discovery now goes through DB-sourced semantic search.
+
+**Learning Loop:**
+
+When users correct the system:
+1. `PatternLearner.add_pattern()` calls `add_learned_pattern(verb, phrase)`
+2. Pattern added to `dsl_verbs.intent_patterns`
+3. Re-run `populate_embeddings` to create vector
+4. Future queries now match the learned phrase
+
+**Coverage Stats:**
+
+```sql
+SELECT * FROM "ob-poc".v_verb_embedding_stats;
+-- total_verbs: 923
+-- verbs_with_patterns: 923
+-- total_embeddings: 7500+
+-- unique_verbs_embedded: 962
+```
 
 ---
 
@@ -724,6 +836,48 @@ Template batch operations can use `@session_cbus` as source to iterate over all 
 
 ---
 
+## Code Patterns
+
+### Config Struct Pattern
+
+For types with many optional parameters, use a builder-style config struct:
+
+```rust
+// Instead of many constructors:
+// fn new(pool: PgPool) -> Self
+// fn with_sessions(pool: PgPool, sessions: SessionStore) -> Self
+// fn with_all_sessions(...) -> Self
+
+// Use config struct with builder:
+pub struct ToolHandlersConfig {
+    pub pool: PgPool,
+    pub sessions: Option<SessionStore>,
+    pub cbu_sessions: Option<CbuSessionStore>,
+    pub learned_data: Option<SharedLearnedData>,
+    pub embedder: Option<SharedEmbedder>,
+}
+
+// Usage:
+let handlers = ToolHandlersConfig::new(pool)
+    .with_sessions(sessions)
+    .with_embedder(embedder)
+    .build();
+```
+
+See `rust/src/mcp/handlers/core.rs` for the `ToolHandlersConfig` pattern.
+
+### Centralized DB Access
+
+All database access should go through service modules in `rust/src/database/`:
+- `VerbService` for verb discovery and semantic search
+- `VisualizationRepository` for graph/viewport queries
+- `SessionRepository` for session persistence
+- `GenerationLogRepository` for training data
+
+No direct `sqlx::query` calls outside of service modules.
+
+---
+
 ## Key Directories
 
 ```
@@ -829,6 +983,8 @@ When you see these in a task, read the corresponding annex first:
 | `AgentOrchestrator` | MCP pipeline |
 | `verb_rag_metadata.rs` | YAML `invocation_phrases` + pgvector |
 | `FeedbackLoop.generate_valid_dsl()` | MCP `dsl_generate` |
+| `VerbPhraseIndex` (YAML phrase matcher) | `VerbService` + pgvector semantic search |
+| Direct sqlx in `HybridVerbSearcher` | `VerbService` centralized DB access |
 
 ---
 

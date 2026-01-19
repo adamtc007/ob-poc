@@ -6,22 +6,26 @@
 //! 3. User-specific learned phrases (semantic match via pgvector)
 //! 4. Global learned phrases (semantic match via pgvector)
 //! 5. Blocklist check (semantic filtering)
-//! 6. YAML invocation_phrases (exact/substring)
-//! 7. Global semantic (cold start fallback)
+//! 6. Global semantic via verb_pattern_embeddings - PRIMARY LOOKUP
 //!
-//! Key insight: Learned phrases become semantic anchors - one learned phrase
-//! catches 5-10 paraphrases via embedding similarity.
+//! Architecture (DB as source of truth):
+//!   YAML invocation_phrases → VerbSyncService → dsl_verbs.intent_patterns
+//!                                                       ↓
+//!   populate_embeddings binary → verb_pattern_embeddings (with Candle vectors)
+//!                                                       ↓
+//!   HybridVerbSearcher.search_global_semantic() ← PRIMARY SEMANTIC LOOKUP
+//!
+//! All DB access goes through VerbService (no direct sqlx calls).
 
 use anyhow::Result;
-use ob_agentic::lexicon::verb_phrases::VerbPhraseIndex;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
+use crate::database::VerbService;
 
 /// A unified verb search result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,19 +48,16 @@ pub enum VerbSearchSource {
     LearnedExact,
     /// Global learned semantic match
     LearnedSemantic,
-    /// Exact match from YAML invocation_phrases
-    PhraseExact,
-    /// Substring match from YAML
-    PhraseSubstring,
     /// pgvector embedding similarity (cold start)
     Semantic,
 }
 
 /// Hybrid verb searcher combining all discovery strategies
+///
+/// All DB access is through VerbService - no direct sqlx calls.
 pub struct HybridVerbSearcher {
-    phrase_index: Arc<VerbPhraseIndex>,
+    verb_service: Option<Arc<VerbService>>,
     learned_data: Option<SharedLearnedData>,
-    pool: Option<PgPool>,
     embedder: Option<SharedEmbedder>,
     /// Similarity threshold for semantic matches (0.0-1.0)
     semantic_threshold: f32,
@@ -67,9 +68,8 @@ pub struct HybridVerbSearcher {
 impl Clone for HybridVerbSearcher {
     fn clone(&self) -> Self {
         Self {
-            phrase_index: Arc::clone(&self.phrase_index),
+            verb_service: self.verb_service.clone(),
             learned_data: self.learned_data.clone(),
-            pool: self.pool.clone(),
             embedder: self.embedder.clone(),
             semantic_threshold: self.semantic_threshold,
             blocklist_threshold: self.blocklist_threshold,
@@ -78,59 +78,42 @@ impl Clone for HybridVerbSearcher {
 }
 
 impl HybridVerbSearcher {
-    /// Create searcher with phrase index only (no DB required)
-    pub fn phrase_only(verbs_dir: &str) -> Result<Self> {
-        let phrase_index = VerbPhraseIndex::load_from_verbs_dir(verbs_dir)?;
-        Ok(Self {
-            phrase_index: Arc::new(phrase_index),
-            learned_data: None,
-            pool: None,
-            embedder: None,
-            semantic_threshold: 0.80,
-            blocklist_threshold: 0.75,
-        })
-    }
-
     /// Create searcher with full capabilities including pgvector semantic search
-    pub async fn full(
-        verbs_dir: &str,
-        pool: PgPool,
-        learned_data: Option<SharedLearnedData>,
-    ) -> Result<Self> {
-        let phrase_index = VerbPhraseIndex::load_from_verbs_dir(verbs_dir)?;
-
-        Ok(Self {
-            phrase_index: Arc::new(phrase_index),
+    pub fn new(verb_service: Arc<VerbService>, learned_data: Option<SharedLearnedData>) -> Self {
+        Self {
+            verb_service: Some(verb_service),
             learned_data,
-            pool: Some(pool),
             embedder: None, // Embedder added separately via with_embedder
             semantic_threshold: 0.80,
             blocklist_threshold: 0.75,
-        })
+        }
     }
 
-    /// Create searcher with learned data only (no semantic matching)
-    pub fn with_learned_data(verbs_dir: &str, learned_data: SharedLearnedData) -> Result<Self> {
-        let phrase_index = VerbPhraseIndex::load_from_verbs_dir(verbs_dir)?;
-        Ok(Self {
-            phrase_index: Arc::new(phrase_index),
+    /// Create searcher with learned data only (no DB)
+    pub fn with_learned_data_only(learned_data: SharedLearnedData) -> Self {
+        Self {
+            verb_service: None,
             learned_data: Some(learned_data),
-            pool: None,
             embedder: None,
             semantic_threshold: 0.80,
             blocklist_threshold: 0.75,
-        })
+        }
+    }
+
+    /// Create minimal searcher (for testing)
+    pub fn minimal() -> Self {
+        Self {
+            verb_service: None,
+            learned_data: None,
+            embedder: None,
+            semantic_threshold: 0.80,
+            blocklist_threshold: 0.75,
+        }
     }
 
     /// Add embedder for semantic search capabilities
     pub fn with_embedder(mut self, embedder: SharedEmbedder) -> Self {
         self.embedder = Some(embedder);
-        self
-    }
-
-    /// Add database pool for semantic queries
-    pub fn with_pool(mut self, pool: PgPool) -> Self {
-        self.pool = Some(pool);
         self
     }
 
@@ -142,14 +125,13 @@ impl HybridVerbSearcher {
 
     /// Search for verbs matching user intent
     ///
-    /// Extended priority order with user-specific and semantic tiers:
+    /// Priority order:
     /// 1. User-specific learned (exact) - score 1.0
     /// 2. Global learned (exact) - score 1.0
     /// 3. User-specific learned (semantic) - score 0.8-0.99
     /// 4. Global learned (semantic) - score 0.8-0.99
     /// 5. Blocklist filter (rejects blocked verbs)
-    /// 6. YAML phrase match - score 0.7-1.0
-    /// 7. Global semantic (cold start) - score 0.5-0.95
+    /// 6. Global semantic (cold start) - score 0.5-0.95
     pub async fn search(
         &self,
         query: &str,
@@ -177,12 +159,13 @@ impl HybridVerbSearcher {
                 let guard = learned.read().await;
                 if let Some(verb) = guard.resolve_phrase(&normalized) {
                     if self.matches_domain(verb, domain_filter) {
+                        let description = self.get_verb_description(verb).await;
                         results.push(VerbSearchResult {
                             verb: verb.to_string(),
                             score: 1.0,
                             source: VerbSearchSource::LearnedExact,
                             matched_phrase: query.to_string(),
-                            description: self.get_verb_description(verb),
+                            description,
                         });
                         seen_verbs.insert(verb.to_string());
                     }
@@ -230,48 +213,8 @@ impl HybridVerbSearcher {
             }
         }
 
-        // 6. YAML phrase index (exact + substring)
-        if results.len() < limit {
-            let phrase_matches = self.phrase_index.find_matches(query);
-            for m in phrase_matches {
-                if seen_verbs.contains(&m.fq_name) {
-                    continue;
-                }
-                if !self.matches_domain(&m.fq_name, domain_filter) {
-                    continue;
-                }
-
-                // Check blocklist for this candidate too
-                if self.has_semantic_capability()
-                    && self.check_blocklist(query, user_id, &m.fq_name).await?
-                {
-                    seen_verbs.insert(m.fq_name.clone());
-                    continue;
-                }
-
-                let source = if m.confidence >= 1.0 {
-                    VerbSearchSource::PhraseExact
-                } else {
-                    VerbSearchSource::PhraseSubstring
-                };
-
-                results.push(VerbSearchResult {
-                    verb: m.fq_name.clone(),
-                    score: m.confidence,
-                    source,
-                    matched_phrase: m.matched_phrase,
-                    description: self.get_verb_description(&m.fq_name),
-                });
-                seen_verbs.insert(m.fq_name);
-
-                if results.len() >= limit {
-                    break;
-                }
-            }
-        }
-
-        // 7. Global semantic search (cold start fallback)
-        // This uses the semantic_verb_patterns table for general verb matching
+        // 6. Global semantic search (cold start fallback)
+        // Uses verb_pattern_embeddings for primary semantic lookup
         if results.len() < limit && self.has_semantic_capability() {
             if let Ok(semantic_results) = self
                 .search_global_semantic(query, limit - results.len())
@@ -322,7 +265,7 @@ impl HybridVerbSearcher {
 
     /// Check if semantic search is available
     fn has_semantic_capability(&self) -> bool {
-        self.pool.is_some() && self.embedder.is_some()
+        self.verb_service.is_some() && self.embedder.is_some()
     }
 
     /// Search user-specific learned phrases by exact match
@@ -331,30 +274,28 @@ impl HybridVerbSearcher {
         user_id: Uuid,
         phrase: &str,
     ) -> Result<Option<VerbSearchResult>> {
-        let pool = match &self.pool {
-            Some(p) => p,
+        let verb_service = match &self.verb_service {
+            Some(s) => s,
             None => return Ok(None),
         };
 
-        let row = sqlx::query_as::<_, (String, String, f32)>(
-            r#"
-            SELECT phrase, verb, confidence
-            FROM agent.user_learned_phrases
-            WHERE user_id = $1 AND LOWER(phrase) = $2
-            "#,
-        )
-        .bind(user_id)
-        .bind(phrase)
-        .fetch_optional(pool)
-        .await?;
+        let result = verb_service
+            .find_user_learned_exact(user_id, phrase)
+            .await?;
 
-        Ok(row.map(|(phrase, verb, confidence)| VerbSearchResult {
-            verb: verb.clone(),
-            score: confidence,
-            source: VerbSearchSource::UserLearnedExact,
-            matched_phrase: phrase,
-            description: self.get_verb_description(&verb),
-        }))
+        match result {
+            Some(m) => {
+                let description = self.get_verb_description(&m.verb).await;
+                Ok(Some(VerbSearchResult {
+                    verb: m.verb,
+                    score: m.confidence,
+                    source: VerbSearchSource::UserLearnedExact,
+                    matched_phrase: m.phrase,
+                    description,
+                }))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Search user-specific learned phrases by semantic similarity
@@ -363,120 +304,95 @@ impl HybridVerbSearcher {
         user_id: Uuid,
         query: &str,
     ) -> Result<Option<VerbSearchResult>> {
-        let (pool, embedder) = match (&self.pool, &self.embedder) {
-            (Some(p), Some(e)) => (p, e),
+        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
+            (Some(s), Some(e)) => (s, e),
             _ => return Ok(None),
         };
 
         let query_embedding = embedder.embed(query).await?;
 
-        let row = sqlx::query_as::<_, (String, String, f32, f64)>(
-            r#"
-            SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
-            FROM agent.user_learned_phrases
-            WHERE user_id = $2
-              AND embedding IS NOT NULL
-            ORDER BY embedding <=> $1::vector
-            LIMIT 1
-            "#,
-        )
-        .bind(&query_embedding)
-        .bind(user_id)
-        .fetch_optional(pool)
-        .await?;
+        let result = verb_service
+            .find_user_learned_semantic(user_id, &query_embedding, self.semantic_threshold)
+            .await?;
 
-        match row {
-            Some((phrase, verb, confidence, similarity))
-                if similarity as f32 > self.semantic_threshold =>
-            {
+        match result {
+            Some(m) => {
+                let description = self.get_verb_description(&m.verb).await;
+                let score = (m.similarity as f32) * m.confidence.unwrap_or(1.0);
                 Ok(Some(VerbSearchResult {
-                    verb: verb.clone(),
-                    score: (similarity as f32) * confidence, // Combine similarity with confidence
+                    verb: m.verb,
+                    score,
                     source: VerbSearchSource::UserLearnedSemantic,
-                    matched_phrase: phrase,
-                    description: self.get_verb_description(&verb),
+                    matched_phrase: m.phrase,
+                    description,
                 }))
             }
-            _ => Ok(None),
+            None => Ok(None),
         }
     }
 
     /// Search global learned phrases by semantic similarity
     async fn search_learned_semantic(&self, query: &str) -> Result<Option<VerbSearchResult>> {
-        let (pool, embedder) = match (&self.pool, &self.embedder) {
-            (Some(p), Some(e)) => (p, e),
+        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
+            (Some(s), Some(e)) => (s, e),
             _ => return Ok(None),
         };
 
         let query_embedding = embedder.embed(query).await?;
 
-        let row = sqlx::query_as::<_, (String, String, f64)>(
-            r#"
-            SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
-            FROM agent.invocation_phrases
-            WHERE embedding IS NOT NULL
-            ORDER BY embedding <=> $1::vector
-            LIMIT 1
-            "#,
-        )
-        .bind(&query_embedding)
-        .fetch_optional(pool)
-        .await?;
+        let result = verb_service
+            .find_global_learned_semantic(&query_embedding, self.semantic_threshold)
+            .await?;
 
-        match row {
-            Some((phrase, verb, similarity)) if similarity as f32 > self.semantic_threshold => {
+        match result {
+            Some(m) => {
+                let description = self.get_verb_description(&m.verb).await;
                 Ok(Some(VerbSearchResult {
-                    verb: verb.clone(),
-                    score: similarity as f32,
+                    verb: m.verb,
+                    score: m.similarity as f32,
                     source: VerbSearchSource::LearnedSemantic,
-                    matched_phrase: phrase,
-                    description: self.get_verb_description(&verb),
+                    matched_phrase: m.phrase,
+                    description,
                 }))
             }
-            _ => Ok(None),
+            None => Ok(None),
         }
     }
 
     /// Search global semantic verb patterns (cold start)
+    ///
+    /// Uses verb_pattern_embeddings table which is populated from dsl_verbs.intent_patterns
+    /// by the populate_embeddings binary. This is the primary semantic lookup.
     async fn search_global_semantic(
         &self,
         query: &str,
         limit: usize,
     ) -> Result<Vec<VerbSearchResult>> {
-        let (pool, embedder) = match (&self.pool, &self.embedder) {
-            (Some(p), Some(e)) => (p, e),
+        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
+            (Some(s), Some(e)) => (s, e),
             _ => return Ok(Vec::new()),
         };
 
         let query_embedding = embedder.embed(query).await?;
 
-        // Search semantic_verb_patterns table if it exists
-        let rows = sqlx::query_as::<_, (String, String, f64)>(
-            r#"
-            SELECT pattern_phrase, verb_name, 1 - (embedding <=> $1::vector) as similarity
-            FROM "ob-poc".semantic_verb_patterns
-            WHERE embedding IS NOT NULL
-              AND 1 - (embedding <=> $1::vector) > 0.5
-            ORDER BY embedding <=> $1::vector
-            LIMIT $2
-            "#,
-        )
-        .bind(&query_embedding)
-        .bind(limit as i32)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
+        let matches = verb_service
+            .search_verb_patterns_semantic(&query_embedding, limit, 0.5)
+            .await
+            .unwrap_or_default();
 
-        Ok(rows
-            .into_iter()
-            .map(|(phrase, verb, similarity)| VerbSearchResult {
-                verb: verb.clone(),
-                score: similarity as f32,
+        let mut results = Vec::with_capacity(matches.len());
+        for m in matches {
+            let description = self.get_verb_description(&m.verb).await;
+            results.push(VerbSearchResult {
+                verb: m.verb,
+                score: m.similarity as f32,
                 source: VerbSearchSource::Semantic,
-                matched_phrase: phrase,
-                description: self.get_verb_description(&verb),
-            })
-            .collect())
+                matched_phrase: m.phrase,
+                description,
+            });
+        }
+
+        Ok(results)
     }
 
     /// Check if a verb is blocked for this query (semantic match)
@@ -486,32 +402,16 @@ impl HybridVerbSearcher {
         user_id: Option<Uuid>,
         verb: &str,
     ) -> Result<bool> {
-        let (pool, embedder) = match (&self.pool, &self.embedder) {
-            (Some(p), Some(e)) => (p, e),
+        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
+            (Some(s), Some(e)) => (s, e),
             _ => return Ok(false),
         };
 
         let query_embedding = embedder.embed(query).await?;
 
-        // Check if any blocklist entry matches semantically
-        let blocked = sqlx::query_scalar::<_, bool>(
-            r#"
-            SELECT EXISTS (
-                SELECT 1 FROM agent.phrase_blocklist
-                WHERE blocked_verb = $1
-                  AND (user_id IS NULL OR user_id = $2)
-                  AND (expires_at IS NULL OR expires_at > now())
-                  AND embedding IS NOT NULL
-                  AND 1 - (embedding <=> $3::vector) > $4
-            )
-            "#,
-        )
-        .bind(verb)
-        .bind(user_id)
-        .bind(&query_embedding)
-        .bind(self.blocklist_threshold)
-        .fetch_one(pool)
-        .await?;
+        let blocked = verb_service
+            .check_blocklist(&query_embedding, user_id, verb, self.blocklist_threshold)
+            .await?;
 
         Ok(blocked)
     }
@@ -523,15 +423,11 @@ impl HybridVerbSearcher {
         }
     }
 
-    fn get_verb_description(&self, verb: &str) -> Option<String> {
-        self.phrase_index
-            .get_verb(verb)
-            .map(|v| v.description.clone())
-    }
-
-    /// Get the phrase index for direct access
-    pub fn phrase_index(&self) -> &VerbPhraseIndex {
-        &self.phrase_index
+    async fn get_verb_description(&self, verb: &str) -> Option<String> {
+        match &self.verb_service {
+            Some(s) => s.get_verb_description(verb).await.ok().flatten(),
+            None => None,
+        }
     }
 }
 
@@ -540,18 +436,12 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_phrase_only_search() {
-        // This test requires config/verbs to exist
-        let verbs_dir = "config/verbs";
-        if !std::path::Path::new(verbs_dir).exists() {
-            return;
-        }
-
-        let searcher = HybridVerbSearcher::phrase_only(verbs_dir).unwrap();
+    async fn test_minimal_searcher() {
+        let searcher = HybridVerbSearcher::minimal();
         let results = searcher.search_simple("create cbu", None, 5).await.unwrap();
 
-        // Should find some matches
-        println!("Results for 'create cbu': {:?}", results);
+        // Minimal searcher has no DB, so no results
+        assert!(results.is_empty());
     }
 
     #[test]
@@ -561,8 +451,6 @@ mod tests {
             VerbSearchSource::UserLearnedSemantic,
             VerbSearchSource::LearnedExact,
             VerbSearchSource::LearnedSemantic,
-            VerbSearchSource::PhraseExact,
-            VerbSearchSource::PhraseSubstring,
             VerbSearchSource::Semantic,
         ];
 

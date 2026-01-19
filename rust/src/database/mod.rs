@@ -31,6 +31,7 @@ pub mod resource_instance_service;
 pub mod service_resource_service;
 pub mod service_service;
 pub mod session_repository;
+pub mod verb_service;
 pub mod view_config_service;
 pub mod view_state_audit;
 pub mod viewport_service;
@@ -102,6 +103,8 @@ pub use context_discovery_service::{
 pub use view_state_audit::{
     RecordViewStateChange, SessionViewHistoryEntry, ViewStateAuditRepository, ViewStateChange,
 };
+
+pub use verb_service::{SemanticMatch, UserLearnedExactMatch, VerbDescription, VerbService};
 
 pub use view_config_service::{
     EdgeTypeConfig, LayoutCacheEntry, LayoutConfigEntry, NodeLayoutOverride, NodeTypeConfig,
