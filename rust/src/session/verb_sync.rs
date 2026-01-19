@@ -25,22 +25,25 @@
 //! # RAG Metadata
 //!
 //! The `dsl_verbs` table includes additional RAG columns:
-//! - `search_text`: Auto-generated from description + intent_patterns (via DB trigger)
-//! - `intent_patterns`: Natural language patterns - synced from YAML invocation_phrases
+//! - `search_text`: Auto-generated from description + patterns (via DB trigger)
+//! - `yaml_intent_patterns`: YAML invocation_phrases (overwritten on startup)
+//! - `intent_patterns`: Learned patterns from feedback (preserved across restarts)
 //! - `typical_next`: Workflow hints - populated separately
+//! - `workflow_phases`: KYC phases - populated separately
+//! - `graph_contexts`: Graph cursor contexts - populated separately
 //!
 //! # Intent Patterns Sync (Candle Pipeline)
 //!
-//! YAML `invocation_phrases` are synced to `dsl_verbs.intent_patterns` which is then
-//! the source of truth for the Candle semantic pipeline:
+//! Pattern sources are kept separate to preserve learned patterns:
 //!
 //! ```text
-//! YAML invocation_phrases → dsl_verbs.intent_patterns → verb_pattern_embeddings
-//!                                     ↑
-//!                           Learning loop adds patterns
+//! YAML invocation_phrases → VerbSyncService → dsl_verbs.yaml_intent_patterns
+//! Learning loop feedback  → PatternLearner  → dsl_verbs.intent_patterns
+//!                                                     ↓
+//!                          v_verb_intent_patterns (UNION of both)
+//!                                                     ↓
+//!                          populate_embeddings → verb_pattern_embeddings
 //! ```
-//! - `workflow_phases`: KYC phases - populated separately
-//! - `graph_contexts`: Graph cursor contexts - populated separately
 
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;

@@ -369,8 +369,9 @@ impl HybridVerbSearcher {
 
     /// Search global semantic verb patterns (cold start)
     ///
-    /// Uses verb_pattern_embeddings table which is populated from dsl_verbs.intent_patterns
-    /// by the populate_embeddings binary. This is the primary semantic lookup.
+    /// Uses verb_pattern_embeddings table which is populated from v_verb_intent_patterns
+    /// (UNION of yaml_intent_patterns + intent_patterns) by populate_embeddings binary.
+    /// This is the primary semantic lookup.
     async fn search_global_semantic(
         &self,
         query: &str,
