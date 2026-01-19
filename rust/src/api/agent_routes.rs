@@ -2239,7 +2239,9 @@ async fn chat_session(
             .await
         {
             Ok(interaction_id) => {
-                // Store interaction_id in session for linking to dsl_generation_log
+                // Store both interaction_id (for record_outcome) and feedback_id (for FK)
+                session.context.pending_interaction_id = Some(interaction_id);
+
                 // intent_feedback uses BIGSERIAL id, need to look it up by interaction_id
                 if let Ok(Some(feedback_id)) = sqlx::query_scalar::<_, i64>(
                     r#"SELECT id FROM "ob-poc".intent_feedback WHERE interaction_id = $1"#,
@@ -2380,13 +2382,19 @@ async fn execute_session_dsl(
 
     // =========================================================================
     // START GENERATION LOG
-    // Get intent_feedback_id from session context if available (set by chat handler)
+    // Get feedback IDs from session context if available (set by chat handler)
     // =========================================================================
-    let intent_feedback_id = {
+    let (intent_feedback_id, pending_interaction_id) = {
         let sessions = state.sessions.read().await;
         sessions
             .get(&session_id)
-            .and_then(|s| s.context.pending_feedback_id)
+            .map(|s| {
+                (
+                    s.context.pending_feedback_id,
+                    s.context.pending_interaction_id,
+                )
+            })
+            .unwrap_or((None, None))
     };
 
     let log_id = state
@@ -2929,6 +2937,21 @@ async fn execute_session_dsl(
                     .record_execution_outcome(lid, ExecutionStatus::Executed, None, None)
                     .await;
             }
+
+            // Update intent_feedback outcome
+            if let Some(interaction_id) = pending_interaction_id {
+                let elapsed_ms = start_time.elapsed().as_millis() as i32;
+                let _ = state
+                    .feedback_service
+                    .record_outcome(
+                        interaction_id,
+                        ob_semantic_matcher::feedback::Outcome::Executed,
+                        None, // outcome_verb same as matched
+                        None, // no correction
+                        Some(elapsed_ms),
+                    )
+                    .await;
+            }
         }
         Err(e) => {
             all_success = false;
@@ -2968,6 +2991,21 @@ async fn execute_session_dsl(
                 let _ = state
                     .generation_log
                     .record_execution_outcome(lid, ExecutionStatus::Failed, Some(&error_msg), None)
+                    .await;
+            }
+
+            // Update intent_feedback outcome (execution failed)
+            if let Some(interaction_id) = pending_interaction_id {
+                let elapsed_ms = start_time.elapsed().as_millis() as i32;
+                let _ = state
+                    .feedback_service
+                    .record_outcome(
+                        interaction_id,
+                        ob_semantic_matcher::feedback::Outcome::Executed, // Still "executed" from feedback perspective
+                        None,
+                        None,
+                        Some(elapsed_ms),
+                    )
                     .await;
             }
 

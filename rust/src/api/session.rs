@@ -2039,11 +2039,16 @@ pub struct SessionContext {
     // =========================================================================
     // Learning Loop Fields
     // =========================================================================
-    /// Pending feedback interaction ID from chat handler
+    /// Pending feedback row ID (bigserial) from chat handler
     /// Links dsl_generation_log to intent_feedback when DSL is executed
     /// Set by chat_session, consumed by execute_session_dsl
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pending_feedback_id: Option<i64>,
+
+    /// Pending feedback interaction_id (UUID) for recording outcomes
+    /// Used to call FeedbackService.record_outcome() after execution
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending_interaction_id: Option<Uuid>,
 }
 
 /// Primary domain keys tracked across the session

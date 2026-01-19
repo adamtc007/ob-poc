@@ -66,7 +66,7 @@ pub struct CompileResult {
 
 /// Execution status for DSL (matches DB enum)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
-#[sqlx(type_name = "execution_status", rename_all = "lowercase")]
+#[sqlx(type_name = "\"ob-poc\".execution_status", rename_all = "lowercase")]
 pub enum ExecutionStatus {
     Pending,
     Executed,
