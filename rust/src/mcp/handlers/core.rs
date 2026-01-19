@@ -513,7 +513,7 @@ impl ToolHandlers {
         // Extract user_intent if provided, otherwise use a default
         let user_intent = args["intent"].as_str().unwrap_or("MCP tool execution");
 
-        // Start generation log
+        // Start generation log (no intent_feedback_id for direct MCP calls)
         let log_id = self
             .generation_log
             .start_log(
@@ -522,6 +522,7 @@ impl ToolHandlers {
                 None, // session_id
                 None, // cbu_id
                 None, // model
+                None, // intent_feedback_id - MCP direct execution
             )
             .await
             .ok();

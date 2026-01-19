@@ -39,18 +39,23 @@ SET intent_patterns = (
 WHERE intent_patterns IS NOT NULL
   AND array_length(intent_patterns, 1) > 0;
 
--- 4. Update the view to UNION both pattern sources
-CREATE OR REPLACE VIEW "ob-poc".v_verb_intent_patterns AS
+-- 4. Drop and recreate view to UNION both pattern sources
+DROP VIEW IF EXISTS "ob-poc".v_verb_intent_patterns CASCADE;
+DROP VIEW IF EXISTS "ob-poc".v_verb_embedding_stats CASCADE;
+
+CREATE VIEW "ob-poc".v_verb_intent_patterns AS
 SELECT
     v.full_name as verb_full_name,
     pattern,
-    COALESCE(m.category, 'general') as category,
-    m.is_agent_bound,
-    COALESCE(m.priority, 1) as priority,
+    v.category,
+    CASE
+        WHEN v.category IN ('investigation', 'screening', 'kyc_workflow') THEN true
+        ELSE false
+    END as is_agent_bound,
+    1 as priority,
     'yaml' as source
 FROM "ob-poc".dsl_verbs v
 CROSS JOIN LATERAL unnest(v.yaml_intent_patterns) as pattern
-LEFT JOIN "ob-poc".verb_metadata m ON m.verb_full_name = v.full_name
 WHERE v.yaml_intent_patterns IS NOT NULL
   AND array_length(v.yaml_intent_patterns, 1) > 0
 
@@ -59,21 +64,23 @@ UNION ALL
 SELECT
     v.full_name as verb_full_name,
     pattern,
-    COALESCE(m.category, 'general') as category,
-    m.is_agent_bound,
-    COALESCE(m.priority, 2) as priority,  -- Learned patterns get higher priority
+    v.category,
+    CASE
+        WHEN v.category IN ('investigation', 'screening', 'kyc_workflow') THEN true
+        ELSE false
+    END as is_agent_bound,
+    2 as priority,  -- Learned patterns get higher priority
     'learned' as source
 FROM "ob-poc".dsl_verbs v
 CROSS JOIN LATERAL unnest(v.intent_patterns) as pattern
-LEFT JOIN "ob-poc".verb_metadata m ON m.verb_full_name = v.full_name
 WHERE v.intent_patterns IS NOT NULL
   AND array_length(v.intent_patterns, 1) > 0;
 
 COMMENT ON VIEW "ob-poc".v_verb_intent_patterns IS
     'Flattened view of all intent patterns (YAML + learned) for embedding population';
 
--- 5. Update stats view to show both sources
-CREATE OR REPLACE VIEW "ob-poc".v_verb_embedding_stats AS
+-- 5. Recreate stats view with new columns
+CREATE VIEW "ob-poc".v_verb_embedding_stats AS
 SELECT
     (SELECT COUNT(*) FROM "ob-poc".dsl_verbs) as total_verbs,
     (SELECT COUNT(*) FROM "ob-poc".dsl_verbs

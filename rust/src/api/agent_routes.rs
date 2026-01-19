@@ -27,7 +27,8 @@ use crate::api::session::{
 // API types - SINGLE SOURCE OF TRUTH for HTTP boundary
 use crate::database::derive_semantic_state;
 use crate::database::generation_log_repository::{
-    CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
+    CompileResult, ExecutionStatus, GenerationAttempt, GenerationLogRepository, LintResult,
+    ParseResult,
 };
 use crate::dsl_v2::{
     compile, parse_program, verb_registry::registry, DslExecutor, ExecutionContext,
@@ -773,6 +774,8 @@ pub struct AgentState {
     pub dsl_repo: Arc<crate::database::DslRepository>,
     /// Centralized agent service for chat/disambiguation
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
+    /// Feedback service for learning loop
+    pub feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
 }
 
 impl AgentState {
@@ -789,6 +792,7 @@ impl AgentState {
         let agent_service = Arc::new(crate::api::agent_service::AgentService::with_pool(
             pool.clone(),
         ));
+        let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
         // Create SessionManager wrapping the same session store
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
         Self {
@@ -800,6 +804,7 @@ impl AgentState {
             session_repo,
             dsl_repo,
             agent_service,
+            feedback_service,
         }
     }
 }
@@ -2204,6 +2209,59 @@ async fn chat_session(
         }
     };
 
+    // =========================================================================
+    // CAPTURE FEEDBACK FOR LEARNING LOOP
+    // Record the verb match so we can correlate with execution outcome later
+    // =========================================================================
+    if !response.intents.is_empty() {
+        let first_intent = &response.intents[0];
+        // Build a MatchResult from the intent for feedback capture
+        let match_result = ob_semantic_matcher::MatchResult {
+            verb_name: first_intent.verb.clone(),
+            pattern_phrase: req.message.clone(), // The user's input
+            similarity: 1.0,                     // LLM selected this verb
+            match_method: ob_semantic_matcher::MatchMethod::Semantic, // LLM uses semantic understanding
+            category: "chat".to_string(),
+            is_agent_bound: true,
+        };
+
+        match state
+            .feedback_service
+            .capture_match(
+                session_id,
+                &req.message,
+                ob_semantic_matcher::feedback::InputSource::Chat,
+                Some(&match_result),
+                &[], // No alternatives from LLM path
+                session.context.domain_hint.as_deref(),
+                session.context.stage_focus.as_deref(),
+            )
+            .await
+        {
+            Ok(interaction_id) => {
+                // Store interaction_id in session for linking to dsl_generation_log
+                // intent_feedback uses BIGSERIAL id, need to look it up by interaction_id
+                if let Ok(Some(feedback_id)) = sqlx::query_scalar::<_, i64>(
+                    r#"SELECT id FROM "ob-poc".intent_feedback WHERE interaction_id = $1"#,
+                )
+                .bind(interaction_id)
+                .fetch_optional(&state.pool)
+                .await
+                {
+                    session.context.pending_feedback_id = Some(feedback_id);
+                    tracing::debug!(
+                        "Captured feedback: interaction_id={}, feedback_id={}",
+                        interaction_id,
+                        feedback_id
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to capture feedback: {}", e);
+            }
+        }
+    }
+
     // Persist session changes back
     {
         let mut sessions = state.sessions.write().await;
@@ -2322,7 +2380,15 @@ async fn execute_session_dsl(
 
     // =========================================================================
     // START GENERATION LOG
+    // Get intent_feedback_id from session context if available (set by chat handler)
     // =========================================================================
+    let intent_feedback_id = {
+        let sessions = state.sessions.read().await;
+        sessions
+            .get(&session_id)
+            .and_then(|s| s.context.pending_feedback_id)
+    };
+
     let log_id = state
         .generation_log
         .start_log(
@@ -2331,6 +2397,7 @@ async fn execute_session_dsl(
             Some(session_id),
             context.last_cbu_id,
             None,
+            intent_feedback_id,
         )
         .await
         .ok();
@@ -2856,6 +2923,11 @@ async fn execute_session_dsl(
                 };
                 let _ = state.generation_log.add_attempt(lid, &attempt).await;
                 let _ = state.generation_log.mark_success(lid, &dsl, None).await;
+                // Record execution outcome for learning loop
+                let _ = state
+                    .generation_log
+                    .record_execution_outcome(lid, ExecutionStatus::Executed, None, None)
+                    .await;
             }
         }
         Err(e) => {
@@ -2892,6 +2964,11 @@ async fn execute_session_dsl(
                 };
                 let _ = state.generation_log.add_attempt(lid, &attempt).await;
                 let _ = state.generation_log.mark_failed(lid).await;
+                // Record execution outcome for learning loop
+                let _ = state
+                    .generation_log
+                    .record_execution_outcome(lid, ExecutionStatus::Failed, Some(&error_msg), None)
+                    .await;
             }
 
             results.push(ExecutionResult {

@@ -6,6 +6,18 @@
 //! - Few-shot RAG retrieval of successful examples
 //! - Error recovery pattern learning
 //! - Prompt effectiveness analysis
+//!
+//! # Learning Loop Integration
+//!
+//! The `intent_feedback_id` FK links to `intent_feedback` table for learning:
+//! ```text
+//! intent_feedback (phrase → verb match)
+//!        ↓ FK
+//! dsl_generation_log (LLM → DSL + execution outcome)
+//!
+//! Learning query: JOIN both to find false positives
+//! (high confidence match → DSL generated → execution failed)
+//! ```
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -50,6 +62,17 @@ pub struct CompileResult {
     pub success: bool,
     pub error: Option<String>,
     pub step_count: i32,
+}
+
+/// Execution status for DSL (matches DB enum)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "execution_status", rename_all = "lowercase")]
+pub enum ExecutionStatus {
+    Pending,
+    Executed,
+    Failed,
+    Cancelled,
+    Skipped,
 }
 
 /// Training pair: user intent → valid DSL
@@ -97,6 +120,12 @@ pub struct GenerationLogRow {
     pub total_output_tokens: Option<i32>,
     pub created_at: Option<DateTime<Utc>>,
     pub completed_at: Option<DateTime<Utc>>,
+    // Learning loop fields (migration 039)
+    pub intent_feedback_id: Option<i64>,
+    pub execution_status: Option<ExecutionStatus>,
+    pub execution_error: Option<String>,
+    pub executed_at: Option<DateTime<Utc>>,
+    pub affected_entity_ids: Option<Vec<Uuid>>,
 }
 
 /// Repository for generation log operations
@@ -117,6 +146,9 @@ impl GenerationLogRepository {
 
     /// Start a new generation log entry
     /// Returns log_id for adding iterations
+    ///
+    /// # Arguments
+    /// * `intent_feedback_id` - Links to intent_feedback for learning loop (optional)
     pub async fn start_log(
         &self,
         user_intent: &str,
@@ -124,14 +156,15 @@ impl GenerationLogRepository {
         session_id: Option<Uuid>,
         cbu_id: Option<Uuid>,
         model_used: Option<&str>,
+        intent_feedback_id: Option<i64>,
     ) -> Result<Uuid, sqlx::Error> {
         let log_id = Uuid::new_v4();
 
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".dsl_generation_log
-            (log_id, user_intent, domain_name, session_id, cbu_id, model_used, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            (log_id, user_intent, domain_name, session_id, cbu_id, model_used, intent_feedback_id, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
             "#,
         )
         .bind(log_id)
@@ -140,6 +173,7 @@ impl GenerationLogRepository {
         .bind(session_id)
         .bind(cbu_id)
         .bind(model_used)
+        .bind(intent_feedback_id)
         .execute(&self.pool)
         .await?;
 
@@ -221,6 +255,58 @@ impl GenerationLogRepository {
         Ok(())
     }
 
+    /// Record execution outcome for learning loop
+    ///
+    /// Called after DSL execution completes (success or failure)
+    pub async fn record_execution_outcome(
+        &self,
+        log_id: Uuid,
+        status: ExecutionStatus,
+        error: Option<&str>,
+        affected_entities: Option<&[Uuid]>,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".dsl_generation_log
+            SET
+                execution_status = $2,
+                execution_error = $3,
+                affected_entity_ids = $4,
+                executed_at = NOW()
+            WHERE log_id = $1
+            "#,
+        )
+        .bind(log_id)
+        .bind(status)
+        .bind(error)
+        .bind(affected_entities)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Link an existing log entry to intent_feedback (if not set at creation)
+    pub async fn link_to_feedback(
+        &self,
+        log_id: Uuid,
+        intent_feedback_id: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE "ob-poc".dsl_generation_log
+            SET intent_feedback_id = $2
+            WHERE log_id = $1 AND intent_feedback_id IS NULL
+            "#,
+        )
+        .bind(log_id)
+        .bind(intent_feedback_id)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
     /// Get a generation log by ID
     pub async fn get_by_id(&self, log_id: Uuid) -> Result<Option<GenerationLogRow>, sqlx::Error> {
         sqlx::query_as::<_, GenerationLogRow>(
@@ -228,7 +314,8 @@ impl GenerationLogRepository {
             SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
                    domain_name, session_id, cbu_id, model_used, total_attempts,
                    success, total_latency_ms, total_input_tokens, total_output_tokens,
-                   created_at, completed_at
+                   created_at, completed_at,
+                   intent_feedback_id, execution_status, execution_error, executed_at, affected_entity_ids
             FROM "ob-poc".dsl_generation_log
             WHERE log_id = $1
             "#,
@@ -245,7 +332,8 @@ impl GenerationLogRepository {
             SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
                    domain_name, session_id, cbu_id, model_used, total_attempts,
                    success, total_latency_ms, total_input_tokens, total_output_tokens,
-                   created_at, completed_at
+                   created_at, completed_at,
+                   intent_feedback_id, execution_status, execution_error, executed_at, affected_entity_ids
             FROM "ob-poc".dsl_generation_log
             ORDER BY created_at DESC
             LIMIT $1
@@ -373,7 +461,8 @@ impl GenerationLogRepository {
             SELECT log_id, instance_id, user_intent, final_valid_dsl, iterations,
                    domain_name, session_id, cbu_id, model_used, total_attempts,
                    success, total_latency_ms, total_input_tokens, total_output_tokens,
-                   created_at, completed_at
+                   created_at, completed_at,
+                   intent_feedback_id, execution_status, execution_error, executed_at, affected_entity_ids
             FROM "ob-poc".dsl_generation_log
             WHERE session_id = $1
             ORDER BY created_at ASC

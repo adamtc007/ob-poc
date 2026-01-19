@@ -2035,6 +2035,15 @@ pub struct SessionContext {
     /// Used for fractal navigation persistence.
     #[serde(default, skip_serializing_if = "std::collections::HashSet::is_empty")]
     pub expanded_nodes: std::collections::HashSet<Uuid>,
+
+    // =========================================================================
+    // Learning Loop Fields
+    // =========================================================================
+    /// Pending feedback interaction ID from chat handler
+    /// Links dsl_generation_log to intent_feedback when DSL is executed
+    /// Set by chat_session, consumed by execute_session_dsl
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pending_feedback_id: Option<i64>,
 }
 
 /// Primary domain keys tracked across the session
