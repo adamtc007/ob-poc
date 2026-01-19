@@ -218,6 +218,13 @@ impl VerbSyncService {
     ///
     /// This makes dsl_verbs.intent_patterns the source of truth for the Candle semantic pipeline.
     /// After sync, run `populate_embeddings` to update verb_pattern_embeddings.
+    /// Sync invocation_phrases from YAML to yaml_intent_patterns column
+    ///
+    /// IMPORTANT: This updates yaml_intent_patterns (not intent_patterns).
+    /// - yaml_intent_patterns: YAML-sourced, safe to overwrite on startup
+    /// - intent_patterns: Learned patterns, preserved across restarts
+    ///
+    /// The v_verb_intent_patterns view unions both for embedding.
     pub async fn sync_invocation_phrases(
         &self,
         config: &VerbsConfig,
@@ -233,11 +240,11 @@ impl VerbSyncService {
                     continue;
                 }
 
-                // Update intent_patterns in dsl_verbs
+                // Update yaml_intent_patterns (NOT intent_patterns which holds learned patterns)
                 let result = sqlx::query(
                     r#"
                     UPDATE "ob-poc".dsl_verbs
-                    SET intent_patterns = $2,
+                    SET yaml_intent_patterns = $2,
                         updated_at = now()
                     WHERE full_name = $1
                     "#,

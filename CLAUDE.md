@@ -144,14 +144,13 @@ User says: "spin up a fund for Acme"
             verb_search tool
                     ↓
     ┌───────────────┴───────────────┐
-    │     Search Priority (7-tier)   │
+    │     Search Priority (6-tier)   │
     │  1. User learned (exact)       │
     │  2. Global learned (exact)     │
     │  3. User semantic (pgvector)   │
     │  4. Global semantic (pgvector) │
     │  5. Blocklist check            │
-    │  6. YAML invocation_phrases    │
-    │  7. Cold start semantic        │
+    │  6. Global semantic fallback   │
     └───────────────┬───────────────┘
                     ↓
             Top match: cbu.create
@@ -279,8 +278,9 @@ User says: "spin up a fund for Acme"
 
 On server startup (`ob-poc-web/src/main.rs`):
 1. Load verb YAML config
-2. `VerbSyncService.sync_all_with_phrases()` syncs verbs AND invocation_phrases to `dsl_verbs.intent_patterns`
+2. `VerbSyncService.sync_all_with_phrases()` syncs verbs AND invocation_phrases to `dsl_verbs.yaml_intent_patterns`
 3. `populate_embeddings` must be run separately to create vectors
+4. Background learning task spawns (30s delay, then 6hr interval)
 
 **Populating Embeddings:**
 
@@ -301,20 +301,26 @@ All DB access goes through `VerbService` (no direct sqlx calls).
 1. User learned exact → `agent.user_learned_phrases`
 2. Global learned exact → In-memory LearnedData
 3. User semantic → pgvector on user_learned_phrases
-4. Global semantic → pgvector on invocation_phrases
+4. Global semantic → pgvector on `verb_pattern_embeddings`
 5. Blocklist check → Filter blocked verbs
-6. **Global semantic → `verb_pattern_embeddings`** ← PRIMARY LOOKUP
+6. **Global semantic fallback** ← Lower threshold, wider net
 
-> **Removed (2026-01-19):** Tier 6 YAML phrase matching via `VerbPhraseIndex` has been removed.
-> All verb discovery now goes through DB-sourced semantic search.
+**Pattern Sources (v_verb_intent_patterns view):**
+- `yaml_intent_patterns` - YAML invocation_phrases, overwritten on startup
+- `intent_patterns` - Learned patterns, preserved across restarts
 
 **Learning Loop:**
 
-When users correct the system:
-1. `PatternLearner.add_pattern()` calls `add_learned_pattern(verb, phrase)`
-2. Pattern added to `dsl_verbs.intent_patterns`
-3. Re-run `populate_embeddings` to create vector
-4. Future queries now match the learned phrase
+Automatic learning via background task (or MCP tools):
+1. `learning_analyze` identifies high-frequency unmatched phrases
+2. `learning_apply` promotes candidates to `dsl_verbs.intent_patterns`
+3. `populate_embeddings` creates vectors for new patterns
+4. Future queries match the learned phrases
+
+**MCP Tools:**
+- `learning_analyze` - Find patterns worth learning (days_back, min_occurrences)
+- `learning_apply` - Apply a specific pattern → verb mapping
+- `embeddings_status` - Check embedding coverage stats
 
 **Coverage Stats:**
 
@@ -322,6 +328,8 @@ When users correct the system:
 SELECT * FROM "ob-poc".v_verb_embedding_stats;
 -- total_verbs: 923
 -- verbs_with_patterns: 923
+-- verbs_with_yaml_patterns: 920   -- From YAML invocation_phrases
+-- verbs_with_learned_patterns: 15 -- From learning loop
 -- total_embeddings: 7500+
 -- unique_verbs_embedded: 962
 ```

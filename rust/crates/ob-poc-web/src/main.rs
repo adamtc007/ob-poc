@@ -40,6 +40,10 @@ use ob_poc::dsl_v2::{gateway_resolver::gateway_addr, GatewayRefResolver};
 use ob_poc::dsl_v2::ConfigLoader;
 use ob_poc::session::VerbSyncService;
 
+// Import background learning task
+use ob_poc::agent::learning::{create_learning_status, spawn_learning_task, LearningConfig};
+use std::sync::atomic::AtomicBool;
+
 // EntityGateway for entity resolution
 use entity_gateway::{
     config::StartupMode,
@@ -455,6 +459,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("Failed to bind to {}: {}", addr, e).into());
         }
     };
+
+    // =========================================================================
+    // Spawn background learning task (non-blocking)
+    // =========================================================================
+    let learning_config = LearningConfig::from_env();
+    let learning_status = create_learning_status();
+    let shutdown_flag = Arc::new(AtomicBool::new(false));
+
+    spawn_learning_task(
+        pool.clone(),
+        learning_config,
+        learning_status,
+        shutdown_flag,
+    );
+
+    tracing::info!("Background learning task spawned");
 
     if let Err(e) = axum::serve(listener, app).await {
         tracing::error!("Server error: {}", e);

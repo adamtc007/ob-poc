@@ -32,6 +32,7 @@
 //! Both loops use fire-and-forget emission (< 1μs overhead) with background
 //! database persistence.
 
+pub mod background;
 pub mod decay;
 pub mod drain;
 pub mod embedder;
@@ -53,3 +54,8 @@ pub use types::{
     ResolutionMethod, ResolvedEntity,
 };
 pub use warmup::{LearnedData, LearningWarmup, SharedLearnedData, WarmupStats};
+
+pub use background::{
+    create_learning_status, spawn_learning_task, trigger_learning_cycle, LearningConfig,
+    LearningCycleResult, LearningStatus as BackgroundLearningStatus, SharedLearningStatus,
+};

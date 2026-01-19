@@ -229,18 +229,21 @@ pub fn get_tools() -> Vec<Tool> {
             description: r#"Search for DSL verbs matching natural language intent.
 
 Uses a hybrid search strategy in priority order:
-1. LEARNED phrases (from user corrections) - exact match, highest confidence
-2. YAML invocation_phrases - exact and substring matches
-3. Semantic embeddings (pgvector) - fallback for novel phrases
+1. User learned exact - phrases user taught us (highest confidence)
+2. Global learned exact - phrases learned from all users
+3. User learned semantic - pgvector similarity on user phrases
+4. Global learned semantic - pgvector on global learned phrases
+5. Blocklist check - filters blocked verb mappings
+6. Global semantic (PRIMARY) - pgvector on verb_pattern_embeddings
 
 Returns ranked candidates with source attribution:
-- learned: User taught us this phrase→verb mapping
-- phrase_exact: Exact match from YAML invocation_phrases
-- phrase_substring: Partial match from YAML
-- semantic: Embedding similarity (fallback)
+- user_learned_exact: User-specific learned mapping
+- learned_exact: Global learned mapping
+- user_learned_semantic / learned_semantic: Semantic match on learned phrases
+- semantic: Embedding similarity from verb_pattern_embeddings (primary lookup)
 
 Use this BEFORE dsl_generate to understand available verbs.
-The learning system improves over time - Day 1 ~70% hit rate, Day 30 ~90%+."#.into(),
+The learning system improves over time as user corrections accumulate."#.into(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -331,7 +334,7 @@ The system will:
             description: r#"Generate DSL from natural language using structured intent extraction.
 
 PIPELINE:
-1. verb_search finds matching verbs (learned → phrase → semantic)
+1. verb_search finds matching verbs (learned → semantic via pgvector)
 2. LLM extracts argument values as JSON (NEVER writes DSL syntax)
 3. DSL assembled deterministically from structured intent
 4. Validated before return
@@ -2461,6 +2464,77 @@ Use this after:
 - Editing the YAML config file
 - Manually modifying the database
 - Adding new commands during development"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        // =====================================================================
+        // Learning System Tools
+        // =====================================================================
+        Tool {
+            name: "learning_analyze".into(),
+            description: r#"Analyze user feedback to discover learnable patterns.
+
+Runs feedback analysis to find:
+- Pattern discoveries: user inputs that led to successful executions
+- Confusion pairs: verb A matched but user wanted verb B
+- Gaps: inputs where matching failed or had low confidence
+- Low-score successes: patterns that worked despite low match scores
+
+Returns analysis report without applying changes. Use learning_apply to apply."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "days_back": {
+                        "type": "integer",
+                        "default": 7,
+                        "description": "Days of feedback history to analyze"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "learning_apply".into(),
+            description: r#"Apply discovered patterns to improve verb matching.
+
+Runs analysis and auto-applies high-confidence pattern discoveries:
+- Patterns seen 5+ times (configurable)
+- Average match score > 0.5
+- Adds patterns to dsl_verbs.intent_patterns
+
+After applying, run embeddings_status to check if re-embedding is needed."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "days_back": {
+                        "type": "integer",
+                        "default": 7,
+                        "description": "Days of feedback history to analyze"
+                    },
+                    "min_occurrences": {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "Minimum occurrences to auto-apply a pattern"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "embeddings_status".into(),
+            description: r#"Check embedding coverage for verb patterns.
+
+Reports:
+- Total patterns from v_verb_intent_patterns (YAML + learned combined)
+- Patterns with embeddings in verb_pattern_embeddings
+- Pending patterns (need embedding)
+- Whether re-embedding is recommended
+
+Pattern sources:
+- yaml_intent_patterns: from YAML invocation_phrases (overwritten on startup)
+- intent_patterns: learned from user feedback (preserved across restarts)
+
+If pending > 0, run: cargo run --release --bin populate_embeddings"#.into(),
             input_schema: json!({
                 "type": "object",
                 "properties": {}

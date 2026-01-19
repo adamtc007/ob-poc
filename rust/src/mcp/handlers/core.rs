@@ -387,6 +387,10 @@ impl ToolHandlers {
             "esper_lookup" => self.esper_lookup(args).await,
             "esper_add_alias" => self.esper_add_alias(args).await,
             "esper_reload" => self.esper_reload(args).await,
+            // Learning system tools
+            "learning_analyze" => self.learning_analyze(args).await,
+            "learning_apply" => self.learning_apply(args).await,
+            "embeddings_status" => self.embeddings_status(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -5960,6 +5964,111 @@ impl ToolHandlers {
                 "contains_patterns": stats.contains_count,
                 "prefix_patterns": stats.prefix_count,
                 "learned_aliases": stats.learned_count
+            }
+        }))
+    }
+
+    // =========================================================================
+    // Learning System Tools
+    // =========================================================================
+
+    /// Analyze user feedback to discover learnable patterns
+    async fn learning_analyze(&self, args: Value) -> Result<Value> {
+        use ob_semantic_matcher::FeedbackService;
+
+        let days_back = args.get("days_back").and_then(|v| v.as_i64()).unwrap_or(7) as i32;
+
+        let feedback_service = FeedbackService::new(self.pool.clone());
+        let report = feedback_service.analyze(days_back).await?;
+
+        Ok(json!({
+            "success": true,
+            "days_analyzed": days_back,
+            "summary": report.summary(),
+            "pattern_discoveries": report.pattern_discoveries.len(),
+            "confusion_pairs": report.confusion_pairs.len(),
+            "gaps": report.gaps.len(),
+            "low_score_successes": report.low_score_successes.len(),
+            "details": {
+                "patterns": report.pattern_discoveries.iter().take(10).collect::<Vec<_>>(),
+                "confusions": report.confusion_pairs.iter().take(5).collect::<Vec<_>>(),
+                "gaps": report.gaps.iter().take(5).collect::<Vec<_>>()
+            }
+        }))
+    }
+
+    /// Apply discovered patterns to improve verb matching
+    async fn learning_apply(&self, args: Value) -> Result<Value> {
+        use crate::agent::learning::trigger_learning_cycle;
+
+        let days_back = args.get("days_back").and_then(|v| v.as_i64()).unwrap_or(7) as i32;
+
+        let min_occurrences = args
+            .get("min_occurrences")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(5);
+
+        let result = trigger_learning_cycle(&self.pool, days_back, min_occurrences).await?;
+
+        let needs_reembed = result.pending_embeddings > 0;
+
+        Ok(json!({
+            "success": true,
+            "days_analyzed": days_back,
+            "min_occurrences": min_occurrences,
+            "patterns_discovered": result.patterns_discovered,
+            "patterns_applied": result.patterns_applied,
+            "applied_patterns": result.applied_patterns,
+            "pending_embeddings": result.pending_embeddings,
+            "needs_reembed": needs_reembed,
+            "message": if needs_reembed {
+                format!("{} patterns applied. {} patterns need embedding. Run: cargo run --release --bin populate_embeddings",
+                    result.patterns_applied, result.pending_embeddings)
+            } else if result.patterns_applied > 0 {
+                format!("{} patterns applied and ready for use", result.patterns_applied)
+            } else {
+                "No new patterns to apply".to_string()
+            }
+        }))
+    }
+
+    /// Check embedding coverage for verb patterns
+    async fn embeddings_status(&self, _args: Value) -> Result<Value> {
+        use ob_semantic_matcher::PatternLearner;
+
+        let learner = PatternLearner::new(self.pool.clone());
+        let pending = learner.count_pending_embeddings().await?;
+
+        // Get total counts
+        let total_patterns: (i64,) =
+            sqlx::query_as(r#"SELECT COUNT(*) FROM "ob-poc".v_verb_intent_patterns"#)
+                .fetch_one(&self.pool)
+                .await?;
+
+        let total_embeddings: (i64,) = sqlx::query_as(
+            r#"SELECT COUNT(*) FROM "ob-poc".verb_pattern_embeddings WHERE embedding IS NOT NULL"#,
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let coverage = if total_patterns.0 > 0 {
+            (total_embeddings.0 as f64 / total_patterns.0 as f64 * 100.0).round()
+        } else {
+            0.0
+        };
+
+        Ok(json!({
+            "success": true,
+            "total_patterns": total_patterns.0,
+            "embedded_patterns": total_embeddings.0,
+            "pending_patterns": pending,
+            "coverage_percent": coverage,
+            "needs_reembed": pending > 0,
+            "message": if pending > 0 {
+                format!("{} patterns need embedding ({}% coverage). Run: cargo run --release --bin populate_embeddings",
+                    pending, coverage)
+            } else {
+                format!("All patterns embedded ({}% coverage)", coverage)
             }
         }))
     }

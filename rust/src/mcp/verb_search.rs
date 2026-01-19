@@ -9,9 +9,17 @@
 //! 6. Global semantic via verb_pattern_embeddings - PRIMARY LOOKUP
 //!
 //! Architecture (DB as source of truth):
-//!   YAML invocation_phrases → VerbSyncService → dsl_verbs.intent_patterns
+//!
+//!   Pattern sources (two columns in dsl_verbs):
+//!   - yaml_intent_patterns: from YAML invocation_phrases (overwritten on startup)
+//!   - intent_patterns: learned from user feedback (preserved across restarts)
+//!
+//!   YAML invocation_phrases → VerbSyncService → dsl_verbs.yaml_intent_patterns
+//!   Learning loop feedback  → PatternLearner  → dsl_verbs.intent_patterns
 //!                                                       ↓
-//!   populate_embeddings binary → verb_pattern_embeddings (with Candle vectors)
+//!   v_verb_intent_patterns (UNION of both) → populate_embeddings binary
+//!                                                       ↓
+//!   verb_pattern_embeddings (Candle 384-dim vectors)
 //!                                                       ↓
 //!   HybridVerbSearcher.search_global_semantic() ← PRIMARY SEMANTIC LOOKUP
 //!
