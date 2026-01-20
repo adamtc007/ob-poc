@@ -11,6 +11,7 @@
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
 > **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
+> **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
