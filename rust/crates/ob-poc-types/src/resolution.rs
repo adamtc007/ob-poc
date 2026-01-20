@@ -599,6 +599,9 @@ mod tests {
             suggestion_reason: None,
             review_requirement: ReviewRequirement::Optional,
             discriminator_fields: vec![],
+            search_keys: vec![],
+            resolution_mode: ResolutionModeHint::default(),
+            return_key_type: None,
         };
 
         let json = serde_json::to_string(&unresolved).unwrap();

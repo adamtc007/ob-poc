@@ -27,8 +27,9 @@
 use ob_poc_graph::graph::animation::{SpringConfig, SpringF32};
 use ob_poc_graph::graph::camera::Camera2D;
 use ob_poc_types::galaxy::{
-    ClusterDetailGraph, ClusterType, DepthColors, NavigationAction, NavigationScope,
-    PrefetchStatus, UniverseGraph, ViewLevel, ViewTransition,
+    ClusterDetailGraph, ClusterType, DepthColors, NavResult, NavigationAction, NavigationHistory,
+    NavigationScope, OrbitPos, PrefetchStatus, UniverseGraph, ViewLevel, ViewState, ViewStateKey,
+    ViewTransition,
 };
 
 use egui::Pos2;
@@ -80,6 +81,25 @@ pub struct BreadcrumbEntry {
     pub label: String,
     pub scope: NavigationScope,
     pub icon: Option<String>,
+}
+
+// =============================================================================
+// COMMIT VIEW HELPER (038 Design Spec - Part 4c)
+// =============================================================================
+
+/// Commit a view state change: validate, push to history, update current.
+///
+/// # Design Decision (038 v3)
+/// This is the ONLY way to change view_state in navigation operations.
+/// History verbs (back/forward/rewind) bypass this and manipulate cursor directly.
+fn commit_view(view_state: &mut ViewState, nav_history: &mut NavigationHistory, next: ViewState) {
+    debug_assert!(
+        next.validate().is_ok(),
+        "Invalid ViewState in commit_view: {:?}",
+        next.validate()
+    );
+    nav_history.push_if_changed(next.clone());
+    *view_state = next;
 }
 
 // =============================================================================
@@ -146,10 +166,16 @@ pub struct NavigationService {
     hovered_node_id: Option<String>,
 
     // =========================================================================
-    // NAVIGATION HISTORY
+    // NAVIGATION HISTORY (038 Design Spec)
     // =========================================================================
-    /// Breadcrumb trail for back navigation
+    /// Breadcrumb trail for back navigation (legacy - kept for UI compatibility)
     breadcrumbs: Vec<BreadcrumbEntry>,
+
+    /// Semantic view state (038 - captures WHERE user is looking)
+    view_state: ViewState,
+
+    /// Navigation history with browser-style back/forward (038)
+    nav_history: NavigationHistory,
 
     // =========================================================================
     // PREFETCH CACHE
@@ -203,10 +229,33 @@ impl NavigationService {
                 scope: NavigationScope::Universe,
                 icon: Some("🌌".to_string()),
             }],
+            // 038: Initialize semantic view state at Universe
+            // Note: We seed history with initial state so rewind() has somewhere to go
+            view_state: ViewState::universe(Self::now_timestamp()),
+            nav_history: {
+                let mut h = NavigationHistory::with_default_size();
+                h.push_if_changed(ViewState::universe(Self::now_timestamp()));
+                h
+            },
             prefetch_status: HashMap::new(),
             pending_fetch_universe: true, // Start by fetching universe
             pending_fetch_cluster: None,
             pending_fetch_cbu: None,
+        }
+    }
+
+    /// Get current timestamp in milliseconds (for ViewState)
+    fn now_timestamp() -> i64 {
+        #[cfg(target_arch = "wasm32")]
+        {
+            js_sys::Date::now() as i64
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0)
         }
     }
 
@@ -344,6 +393,407 @@ impl NavigationService {
         if let Some(ref mut transition) = self.active_transition {
             transition.content_ready = true;
         }
+    }
+
+    // =========================================================================
+    // 038 SOLAR NAVIGATION - STATE ACCESS
+    // =========================================================================
+
+    /// Get current semantic view state (038)
+    pub fn view_state(&self) -> &ViewState {
+        &self.view_state
+    }
+
+    /// Get navigation history (038)
+    pub fn nav_history(&self) -> &NavigationHistory {
+        &self.nav_history
+    }
+
+    /// Check if we can navigate back in history
+    pub fn can_go_back(&self) -> bool {
+        self.nav_history.can_go_back()
+    }
+
+    /// Check if we can navigate forward in history
+    pub fn can_go_forward(&self) -> bool {
+        self.nav_history.can_go_forward()
+    }
+
+    /// Get history breadcrumbs for UI (index + ViewStateKey)
+    pub fn history_breadcrumbs(&self) -> Vec<(usize, ViewStateKey)> {
+        self.nav_history.breadcrumbs()
+    }
+
+    // =========================================================================
+    // 038 SOLAR NAVIGATION - HISTORY VERBS
+    // =========================================================================
+
+    /// Navigate back one step in history.
+    ///
+    /// # Critical Rule (038 v3)
+    /// This does NOT push to history. It only moves the cursor.
+    pub fn nav_back(&mut self) -> NavResult {
+        if let Some(prev) = self.nav_history.back().cloned() {
+            debug_assert!(prev.validate().is_ok());
+            self.view_state = prev.clone();
+            self.sync_view_level_from_view_state();
+            NavResult::Ok("Back")
+        } else {
+            NavResult::NoOp("Already at oldest state")
+        }
+    }
+
+    /// Navigate forward one step in history.
+    ///
+    /// # Critical Rule (038 v3)
+    /// This does NOT push to history. It only moves the cursor.
+    pub fn nav_forward(&mut self) -> NavResult {
+        if let Some(next) = self.nav_history.forward().cloned() {
+            debug_assert!(next.validate().is_ok());
+            self.view_state = next.clone();
+            self.sync_view_level_from_view_state();
+            NavResult::Ok("Forward")
+        } else {
+            NavResult::NoOp("Already at newest state")
+        }
+    }
+
+    /// Jump to first (oldest) entry in history.
+    ///
+    /// # Critical Rule (038 v3)
+    /// This does NOT push to history. It only moves the cursor.
+    pub fn nav_rewind(&mut self) -> NavResult {
+        if let Some(first) = self.nav_history.rewind().cloned() {
+            debug_assert!(first.validate().is_ok());
+            self.view_state = first.clone();
+            self.sync_view_level_from_view_state();
+            NavResult::Ok("Rewind")
+        } else {
+            NavResult::NoOp("History is empty")
+        }
+    }
+
+    /// Jump to specific history index (for breadcrumb clicks).
+    ///
+    /// # Critical Rule (038 v3)
+    /// This does NOT push to history. It only moves the cursor.
+    pub fn nav_jump_to(&mut self, index: usize) -> NavResult {
+        if let Some(snap) = self.nav_history.jump_to(index).cloned() {
+            debug_assert!(snap.validate().is_ok());
+            self.view_state = snap.clone();
+            self.sync_view_level_from_view_state();
+            NavResult::Ok("Jumped")
+        } else {
+            NavResult::Err(format!("History index out of range: {}", index))
+        }
+    }
+
+    // =========================================================================
+    // 038 SOLAR NAVIGATION - ORBIT VERBS (System Level)
+    // =========================================================================
+
+    /// Move clockwise in current orbit ring.
+    ///
+    /// # Precondition
+    /// Must be at System level. If orbit_pos is None, initializes to (0,0).
+    pub fn nav_orbit_next(&mut self, ring_len: usize) -> NavResult {
+        if self.view_state.level != ViewLevel::System {
+            return NavResult::NoOp("Orbit navigation only works in System view");
+        }
+
+        if ring_len == 0 {
+            return NavResult::NoOp("No planets in this system");
+        }
+
+        let now = Self::now_timestamp();
+        let mut next = self.view_state.clone();
+        next.timestamp = now;
+
+        // Get current position, or initialize to (0,0) if None
+        let pos = next.orbit_pos.unwrap_or(OrbitPos::origin());
+
+        // Move clockwise (increment index with wrap)
+        next.orbit_pos = Some(OrbitPos {
+            ring: pos.ring,
+            index: (pos.index + 1) % ring_len,
+        });
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        NavResult::Ok("Orbit next")
+    }
+
+    /// Move counter-clockwise in current orbit ring.
+    ///
+    /// # Precondition
+    /// Must be at System level. If orbit_pos is None, initializes to (0,0).
+    pub fn nav_orbit_prev(&mut self, ring_len: usize) -> NavResult {
+        if self.view_state.level != ViewLevel::System {
+            return NavResult::NoOp("Orbit navigation only works in System view");
+        }
+
+        if ring_len == 0 {
+            return NavResult::NoOp("No planets in this system");
+        }
+
+        let now = Self::now_timestamp();
+        let mut next = self.view_state.clone();
+        next.timestamp = now;
+
+        // Get current position, or initialize to (0,0) if None
+        let pos = next.orbit_pos.unwrap_or(OrbitPos::origin());
+
+        // Move counter-clockwise (decrement index with wrap)
+        next.orbit_pos = Some(OrbitPos {
+            ring: pos.ring,
+            index: if pos.index == 0 {
+                ring_len - 1
+            } else {
+                pos.index - 1
+            },
+        });
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        NavResult::Ok("Orbit prev")
+    }
+
+    /// Move to inner orbit ring (toward ManCo sun).
+    ///
+    /// # Precondition
+    /// Must be at System level with orbit_pos set, and not already at innermost.
+    pub fn nav_ring_in(&mut self, inner_ring_len: usize) -> NavResult {
+        if self.view_state.level != ViewLevel::System {
+            return NavResult::NoOp("Ring navigation only works in System view");
+        }
+
+        let pos = match self.view_state.orbit_pos {
+            Some(p) => p,
+            None => return NavResult::NoOp("Select a planet first"),
+        };
+
+        if pos.ring == 0 {
+            return NavResult::NoOp("Already at innermost ring");
+        }
+
+        if inner_ring_len == 0 {
+            return NavResult::NoOp("Inner ring is empty");
+        }
+
+        let now = Self::now_timestamp();
+        let mut next = self.view_state.clone();
+        next.timestamp = now;
+
+        // Move to inner ring, preserve angular position proportionally
+        let new_index = (pos.index * inner_ring_len) / inner_ring_len.max(1);
+        next.orbit_pos = Some(OrbitPos {
+            ring: pos.ring - 1,
+            index: new_index.min(inner_ring_len.saturating_sub(1)),
+        });
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        NavResult::Ok("Ring in")
+    }
+
+    /// Move to outer orbit ring (away from ManCo sun).
+    ///
+    /// # Precondition
+    /// Must be at System level with orbit_pos set, and outer ring must exist.
+    pub fn nav_ring_out(&mut self, outer_ring_len: usize, max_ring: usize) -> NavResult {
+        if self.view_state.level != ViewLevel::System {
+            return NavResult::NoOp("Ring navigation only works in System view");
+        }
+
+        let pos = match self.view_state.orbit_pos {
+            Some(p) => p,
+            None => return NavResult::NoOp("Select a planet first"),
+        };
+
+        if pos.ring >= max_ring {
+            return NavResult::NoOp("Already at outermost ring");
+        }
+
+        if outer_ring_len == 0 {
+            return NavResult::NoOp("Outer ring is empty");
+        }
+
+        let now = Self::now_timestamp();
+        let mut next = self.view_state.clone();
+        next.timestamp = now;
+
+        // Move to outer ring, preserve angular position proportionally
+        let new_index = (pos.index * outer_ring_len) / outer_ring_len.max(1);
+        next.orbit_pos = Some(OrbitPos {
+            ring: pos.ring + 1,
+            index: new_index.min(outer_ring_len.saturating_sub(1)),
+        });
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        NavResult::Ok("Ring out")
+    }
+
+    /// Set orbit position explicitly (e.g., from click).
+    pub fn nav_orbit_select(&mut self, ring: usize, index: usize) -> NavResult {
+        if self.view_state.level != ViewLevel::System {
+            return NavResult::NoOp("Orbit selection only works in System view");
+        }
+
+        let now = Self::now_timestamp();
+        let mut next = self.view_state.clone();
+        next.timestamp = now;
+        next.orbit_pos = Some(OrbitPos::new(ring, index));
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        NavResult::Ok("Orbit selected")
+    }
+
+    // =========================================================================
+    // 038 SOLAR NAVIGATION - LEVEL TRANSITIONS
+    // =========================================================================
+
+    /// Zoom in one level (Galaxy→System, System→Planet, Planet→Surface).
+    ///
+    /// # Preconditions (per 038 Transition Matrix)
+    /// - Galaxy→System: requires focus_manco_id
+    /// - System→Planet: requires orbit_pos (to derive CBU)
+    /// - Planet→Surface: requires focus_cbu_id
+    pub fn nav_zoom_in(&mut self, cbu_id_from_orbit: Option<&str>) -> NavResult {
+        let now = Self::now_timestamp();
+
+        let next = match self.view_state.level {
+            ViewLevel::Universe => {
+                return NavResult::NoOp(
+                    "Zoom in from Universe not supported - enter a cluster first",
+                );
+            }
+            ViewLevel::Cluster => {
+                let manco_id = match &self.view_state.focus_manco_id {
+                    Some(id) => id.clone(),
+                    None => return NavResult::NoOp("Select a ManCo first"),
+                };
+                ViewState::system(manco_id, now)
+            }
+            ViewLevel::System => {
+                let _pos = match self.view_state.orbit_pos {
+                    Some(p) => p,
+                    None => return NavResult::NoOp("Select a planet first"),
+                };
+                let cbu_id = match cbu_id_from_orbit {
+                    Some(id) => id.to_string(),
+                    None => return NavResult::Err("Cannot derive CBU from orbit position".into()),
+                };
+                let parent_manco = self.view_state.focus_manco_id.clone();
+                ViewState::planet(cbu_id, parent_manco, now)
+            }
+            ViewLevel::Planet => {
+                let cbu_id = match &self.view_state.focus_cbu_id {
+                    Some(id) => id.clone(),
+                    None => return NavResult::Err("Planet view missing focus_cbu_id".into()),
+                };
+                ViewState::surface(cbu_id, now)
+            }
+            ViewLevel::Surface => {
+                let cbu_id = match &self.view_state.focus_cbu_id {
+                    Some(id) => id.clone(),
+                    None => return NavResult::Err("Surface view missing focus_cbu_id".into()),
+                };
+                ViewState::core(cbu_id, now)
+            }
+            ViewLevel::Core => {
+                return NavResult::NoOp("Already at deepest level");
+            }
+        };
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        self.sync_view_level_from_view_state();
+        NavResult::Ok("Zoom in")
+    }
+
+    /// Zoom out one level (Surface→Planet, Planet→System, System→Galaxy).
+    ///
+    /// # Preconditions (per 038 Transition Matrix)
+    /// For Planet→System, uses focus_manco_id if available for clean return.
+    pub fn nav_zoom_out(&mut self, orbit_pos_for_cbu: Option<OrbitPos>) -> NavResult {
+        let now = Self::now_timestamp();
+
+        let next = match self.view_state.level {
+            ViewLevel::Universe => {
+                return NavResult::NoOp("Already at universe level");
+            }
+            ViewLevel::Cluster => ViewState::universe(now),
+            ViewLevel::System => {
+                // Return to Cluster, keeping manco as focus for highlighting
+                let manco_id = self.view_state.focus_manco_id.clone();
+                let mut state = ViewState::cluster(manco_id.unwrap_or_default(), now);
+                // Clear orbit pos when leaving system
+                state.orbit_pos = None;
+                state
+            }
+            ViewLevel::Planet => {
+                // Return to System view
+                let manco_id = match &self.view_state.focus_manco_id {
+                    Some(id) => id.clone(),
+                    None => {
+                        return NavResult::Err("Cannot return to system - no parent ManCo".into())
+                    }
+                };
+                let mut state = ViewState::system(manco_id, now);
+                // Restore orbit position if provided
+                state.orbit_pos = orbit_pos_for_cbu;
+                state
+            }
+            ViewLevel::Surface => {
+                let cbu_id = match &self.view_state.focus_cbu_id {
+                    Some(id) => id.clone(),
+                    None => return NavResult::Err("Surface view missing focus_cbu_id".into()),
+                };
+                let parent_manco = self.view_state.focus_manco_id.clone();
+                ViewState::planet(cbu_id, parent_manco, now)
+            }
+            ViewLevel::Core => {
+                let cbu_id = match &self.view_state.focus_cbu_id {
+                    Some(id) => id.clone(),
+                    None => return NavResult::Err("Core view missing focus_cbu_id".into()),
+                };
+                ViewState::surface(cbu_id, now)
+            }
+        };
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        self.sync_view_level_from_view_state();
+        NavResult::Ok("Zoom out")
+    }
+
+    /// Enter a specific system (ManCo) directly.
+    pub fn nav_enter_system(&mut self, manco_id: &str) -> NavResult {
+        let now = Self::now_timestamp();
+        let next = ViewState::system(manco_id.to_string(), now);
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        self.sync_view_level_from_view_state();
+        NavResult::Ok("Entered system")
+    }
+
+    /// Land on a specific planet (CBU) directly.
+    pub fn nav_land_on(&mut self, cbu_id: &str, parent_manco_id: Option<&str>) -> NavResult {
+        let now = Self::now_timestamp();
+        let next = ViewState::planet(
+            cbu_id.to_string(),
+            parent_manco_id.map(|s| s.to_string()),
+            now,
+        );
+
+        commit_view(&mut self.view_state, &mut self.nav_history, next);
+        self.sync_view_level_from_view_state();
+        NavResult::Ok("Landed on planet")
+    }
+
+    // =========================================================================
+    // 038 INTERNAL HELPERS
+    // =========================================================================
+
+    /// Sync the legacy view_level field from view_state.
+    /// Called after history navigation or level transitions.
+    fn sync_view_level_from_view_state(&mut self) {
+        self.view_level = self.view_state.level;
     }
 
     // =========================================================================
@@ -884,5 +1334,195 @@ mod tests {
         assert_eq!(service.breadcrumbs.len(), 1);
         assert!(matches!(service.scope(), NavigationScope::Universe));
         assert_eq!(service.view_level(), ViewLevel::Universe);
+    }
+
+    // =========================================================================
+    // 038 SOLAR NAVIGATION TESTS
+    // =========================================================================
+
+    #[test]
+    fn test_038_initial_view_state() {
+        let service = NavigationService::new();
+        assert_eq!(service.view_state().level, ViewLevel::Universe);
+        assert!(service.view_state().validate().is_ok());
+    }
+
+    #[test]
+    fn test_038_nav_enter_system() {
+        let mut service = NavigationService::new();
+
+        let result = service.nav_enter_system("manco-123");
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().level, ViewLevel::System);
+        assert_eq!(
+            service.view_state().focus_manco_id,
+            Some("manco-123".to_string())
+        );
+        assert_eq!(service.view_level(), ViewLevel::System);
+    }
+
+    #[test]
+    fn test_038_nav_land_on() {
+        let mut service = NavigationService::new();
+
+        let result = service.nav_land_on("cbu-456", Some("manco-123"));
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().level, ViewLevel::Planet);
+        assert_eq!(
+            service.view_state().focus_cbu_id,
+            Some("cbu-456".to_string())
+        );
+        assert_eq!(
+            service.view_state().focus_manco_id,
+            Some("manco-123".to_string())
+        );
+    }
+
+    #[test]
+    fn test_038_history_back_forward() {
+        let mut service = NavigationService::new();
+
+        // Navigate: Universe -> System -> Planet
+        service.nav_enter_system("manco-1");
+        service.nav_land_on("cbu-1", Some("manco-1"));
+
+        assert_eq!(service.view_state().level, ViewLevel::Planet);
+        assert!(service.can_go_back());
+        assert!(!service.can_go_forward());
+
+        // Go back
+        let result = service.nav_back();
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().level, ViewLevel::System);
+        assert!(service.can_go_forward());
+
+        // Go forward
+        let result = service.nav_forward();
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().level, ViewLevel::Planet);
+    }
+
+    #[test]
+    fn test_038_history_rewind() {
+        let mut service = NavigationService::new();
+
+        // Navigate through several states
+        service.nav_enter_system("manco-1");
+        service.nav_land_on("cbu-1", Some("manco-1"));
+
+        // Rewind to start
+        let result = service.nav_rewind();
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().level, ViewLevel::Universe);
+    }
+
+    #[test]
+    fn test_038_history_dedupe() {
+        let mut service = NavigationService::new();
+
+        // Enter same system twice (should dedupe)
+        service.nav_enter_system("manco-1");
+        let len_after_first = service.nav_history().len();
+
+        service.nav_enter_system("manco-1"); // Same state
+        let len_after_second = service.nav_history().len();
+
+        // Should not add duplicate
+        assert_eq!(len_after_first, len_after_second);
+    }
+
+    #[test]
+    fn test_038_orbit_navigation() {
+        let mut service = NavigationService::new();
+
+        // Enter system first
+        service.nav_enter_system("manco-1");
+        assert_eq!(service.view_state().level, ViewLevel::System);
+
+        // Navigate orbit (5 planets in ring)
+        let result = service.nav_orbit_next(5);
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().orbit_pos, Some(OrbitPos::new(0, 1)));
+
+        // Next again
+        service.nav_orbit_next(5);
+        assert_eq!(service.view_state().orbit_pos, Some(OrbitPos::new(0, 2)));
+
+        // Prev
+        service.nav_orbit_prev(5);
+        assert_eq!(service.view_state().orbit_pos, Some(OrbitPos::new(0, 1)));
+    }
+
+    #[test]
+    fn test_038_orbit_wrap_around() {
+        let mut service = NavigationService::new();
+        service.nav_enter_system("manco-1");
+
+        // Set to last position
+        service.nav_orbit_select(0, 4);
+
+        // Next should wrap to 0
+        service.nav_orbit_next(5);
+        assert_eq!(service.view_state().orbit_pos, Some(OrbitPos::new(0, 0)));
+
+        // Prev should wrap to 4
+        service.nav_orbit_prev(5);
+        assert_eq!(service.view_state().orbit_pos, Some(OrbitPos::new(0, 4)));
+    }
+
+    #[test]
+    fn test_038_orbit_select() {
+        let mut service = NavigationService::new();
+        service.nav_enter_system("manco-1");
+
+        let result = service.nav_orbit_select(1, 3);
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().orbit_pos, Some(OrbitPos::new(1, 3)));
+    }
+
+    #[test]
+    fn test_038_orbit_invalid_level() {
+        let mut service = NavigationService::new();
+        // Still at Universe level
+
+        let result = service.nav_orbit_next(5);
+        assert!(result.is_noop());
+    }
+
+    #[test]
+    fn test_038_zoom_out_from_planet() {
+        let mut service = NavigationService::new();
+
+        // Navigate to planet
+        service.nav_enter_system("manco-1");
+        service.nav_orbit_select(0, 2);
+        service.nav_land_on("cbu-1", Some("manco-1"));
+
+        assert_eq!(service.view_state().level, ViewLevel::Planet);
+
+        // Zoom out should return to System with orbit position
+        let result = service.nav_zoom_out(Some(OrbitPos::new(0, 2)));
+        assert!(result.is_ok());
+        assert_eq!(service.view_state().level, ViewLevel::System);
+        assert_eq!(service.view_state().orbit_pos, Some(OrbitPos::new(0, 2)));
+    }
+
+    #[test]
+    fn test_038_back_then_push_truncates() {
+        let mut service = NavigationService::new();
+
+        // Navigate: Universe -> System -> Planet
+        service.nav_enter_system("manco-1");
+        service.nav_land_on("cbu-1", Some("manco-1"));
+
+        // Go back to System
+        service.nav_back();
+        assert_eq!(service.view_state().level, ViewLevel::System);
+
+        // Navigate to different planet (should truncate forward history)
+        service.nav_land_on("cbu-2", Some("manco-1"));
+
+        // Forward should not be available (truncated)
+        assert!(!service.can_go_forward());
     }
 }

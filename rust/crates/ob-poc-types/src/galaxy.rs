@@ -1524,6 +1524,577 @@ pub enum AutopilotStatus {
 }
 
 // ============================================================================
+// SOLAR NAVIGATION TYPES (038 Design Spec)
+// ============================================================================
+
+/// Canonical orbit position for System-level navigation.
+/// This is the authoritative "cursor" when in System view.
+/// `focus_cbu_id` is DERIVED from this via layout, not the other way around.
+///
+/// # Design Decision (038 v2)
+/// At System level, orbit_pos is the source of truth. When navigating
+/// clockwise/counter-clockwise/inner/outer, we mutate orbit_pos and
+/// derive the focused CBU from the layout engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct OrbitPos {
+    /// Ring index (0 = innermost orbit)
+    pub ring: usize,
+    /// Position within ring (0 = first CBU, clockwise)
+    pub index: usize,
+}
+
+impl OrbitPos {
+    /// Create a new orbit position
+    pub fn new(ring: usize, index: usize) -> Self {
+        Self { ring, index }
+    }
+
+    /// Default starting position (first planet in innermost ring)
+    pub fn origin() -> Self {
+        Self { ring: 0, index: 0 }
+    }
+}
+
+/// Complete semantic view state for navigation.
+///
+/// This captures WHERE the user is looking, not HOW it's rendered.
+/// Layout and camera are derived from this state.
+///
+/// # Design Decisions (038 v2-v4)
+/// - `timestamp` is metadata only, excluded from identity checks
+/// - At System level, `orbit_pos` is canonical; `focus_cbu_id` is derived
+/// - Constructors prevent invalid state combinations
+/// - `validate()` catches bugs in debug builds
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ViewState {
+    /// Current discrete view level
+    pub level: ViewLevel,
+
+    /// Focus for Cluster/System views (ManCo or cluster being viewed)
+    /// At System level, this is the ManCo whose CBUs are in orbit
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub focus_manco_id: Option<String>,
+
+    /// Focus for Planet/Surface views (the CBU being examined)
+    /// At System level, this is DERIVED from orbit_pos via layout
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub focus_cbu_id: Option<String>,
+
+    /// System-level position cursor (canonical for orbital navigation)
+    /// Only meaningful at System level
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub orbit_pos: Option<OrbitPos>,
+
+    /// Timestamp when this state was created (metadata only)
+    /// Excluded from identity comparisons via ViewStateKey
+    pub timestamp: i64,
+}
+
+impl ViewState {
+    /// Create Universe view state
+    pub fn universe(timestamp: i64) -> Self {
+        Self {
+            level: ViewLevel::Universe,
+            focus_manco_id: None,
+            focus_cbu_id: None,
+            orbit_pos: None,
+            timestamp,
+        }
+    }
+
+    /// Create Cluster view state (viewing a cluster of CBUs)
+    pub fn cluster(cluster_id: String, timestamp: i64) -> Self {
+        Self {
+            level: ViewLevel::Cluster,
+            focus_manco_id: Some(cluster_id),
+            focus_cbu_id: None,
+            orbit_pos: None,
+            timestamp,
+        }
+    }
+
+    /// Create System view state (ManCo + orbiting CBUs)
+    pub fn system(manco_id: String, timestamp: i64) -> Self {
+        Self {
+            level: ViewLevel::System,
+            focus_manco_id: Some(manco_id),
+            focus_cbu_id: None,
+            orbit_pos: None,
+            timestamp,
+        }
+    }
+
+    /// Create System view with explicit orbit position
+    pub fn system_at(manco_id: String, orbit_pos: OrbitPos, timestamp: i64) -> Self {
+        Self {
+            level: ViewLevel::System,
+            focus_manco_id: Some(manco_id),
+            focus_cbu_id: None, // Derived from orbit_pos via layout
+            orbit_pos: Some(orbit_pos),
+            timestamp,
+        }
+    }
+
+    /// Create Planet view state (single CBU focused)
+    /// `parent_manco_id` enables clean zoom_out back to System view
+    pub fn planet(cbu_id: String, parent_manco_id: Option<String>, timestamp: i64) -> Self {
+        Self {
+            level: ViewLevel::Planet,
+            focus_manco_id: parent_manco_id,
+            focus_cbu_id: Some(cbu_id),
+            orbit_pos: None,
+            timestamp,
+        }
+    }
+
+    /// Create Planet view without parent ManCo context
+    pub fn planet_simple(cbu_id: String, timestamp: i64) -> Self {
+        Self::planet(cbu_id, None, timestamp)
+    }
+
+    /// Create Surface view state (entities within CBU)
+    pub fn surface(cbu_id: String, timestamp: i64) -> Self {
+        Self {
+            level: ViewLevel::Surface,
+            focus_manco_id: None,
+            focus_cbu_id: Some(cbu_id),
+            orbit_pos: None,
+            timestamp,
+        }
+    }
+
+    /// Create Core view state (deep analysis)
+    pub fn core(cbu_id: String, timestamp: i64) -> Self {
+        Self {
+            level: ViewLevel::Core,
+            focus_manco_id: None,
+            focus_cbu_id: Some(cbu_id),
+            orbit_pos: None,
+            timestamp,
+        }
+    }
+
+    /// Get stable identity key (excludes timestamp for dedupe)
+    pub fn key(&self) -> ViewStateKey {
+        ViewStateKey {
+            level: self.level,
+            focus_manco_id: self.focus_manco_id.clone(),
+            focus_cbu_id: self.focus_cbu_id.clone(),
+            orbit_pos: self.orbit_pos,
+        }
+    }
+
+    /// Validate state invariants (call in debug builds)
+    ///
+    /// # Returns
+    /// - `Ok(())` if state is valid
+    /// - `Err(message)` describing the invariant violation
+    pub fn validate(&self) -> Result<(), String> {
+        match self.level {
+            ViewLevel::Universe => {
+                // Universe has no requirements
+                Ok(())
+            }
+            ViewLevel::Cluster => {
+                // Cluster may have focus_manco_id but no orbit
+                if self.orbit_pos.is_some() {
+                    return Err("Cluster view must not have orbit_pos".into());
+                }
+                Ok(())
+            }
+            ViewLevel::System => {
+                if self.focus_manco_id.is_none() {
+                    return Err("System view requires focus_manco_id".into());
+                }
+                // orbit_pos is optional (allow "entered but not selected")
+                Ok(())
+            }
+            ViewLevel::Planet => {
+                if self.focus_cbu_id.is_none() {
+                    return Err("Planet view requires focus_cbu_id".into());
+                }
+                Ok(())
+            }
+            ViewLevel::Surface => {
+                if self.focus_cbu_id.is_none() {
+                    return Err("Surface view requires focus_cbu_id".into());
+                }
+                Ok(())
+            }
+            ViewLevel::Core => {
+                if self.focus_cbu_id.is_none() {
+                    return Err("Core view requires focus_cbu_id".into());
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// Compact string encoding for URLs/sharing
+    /// Format: "U" | "C:id" | "S:id" | "P:id" | "R:id" | "X:id"
+    pub fn to_compact_string(&self) -> String {
+        match self.level {
+            ViewLevel::Universe => "U".into(),
+            ViewLevel::Cluster => format!("C:{}", self.focus_manco_id.as_deref().unwrap_or("")),
+            ViewLevel::System => format!("S:{}", self.focus_manco_id.as_deref().unwrap_or("")),
+            ViewLevel::Planet => format!("P:{}", self.focus_cbu_id.as_deref().unwrap_or("")),
+            ViewLevel::Surface => format!("R:{}", self.focus_cbu_id.as_deref().unwrap_or("")),
+            ViewLevel::Core => format!("X:{}", self.focus_cbu_id.as_deref().unwrap_or("")),
+        }
+    }
+
+    /// Parse compact string back to ViewState
+    pub fn from_compact_string(s: &str, timestamp: i64) -> Option<Self> {
+        if s == "U" {
+            return Some(Self::universe(timestamp));
+        }
+        if let Some(id) = s.strip_prefix("C:") {
+            return Some(Self::cluster(id.to_string(), timestamp));
+        }
+        if let Some(id) = s.strip_prefix("S:") {
+            return Some(Self::system(id.to_string(), timestamp));
+        }
+        if let Some(id) = s.strip_prefix("P:") {
+            return Some(Self::planet_simple(id.to_string(), timestamp));
+        }
+        if let Some(id) = s.strip_prefix("R:") {
+            return Some(Self::surface(id.to_string(), timestamp));
+        }
+        if let Some(id) = s.strip_prefix("X:") {
+            return Some(Self::core(id.to_string(), timestamp));
+        }
+        None
+    }
+}
+
+impl Default for ViewState {
+    fn default() -> Self {
+        Self::universe(0)
+    }
+}
+
+/// Identity key for ViewState (excludes timestamp for dedupe).
+///
+/// Two ViewStates with the same key are semantically identical,
+/// even if their timestamps differ. Used by NavigationHistory
+/// to prevent duplicate entries.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ViewStateKey {
+    pub level: ViewLevel,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub focus_manco_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub focus_cbu_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub orbit_pos: Option<OrbitPos>,
+}
+
+// ============================================================================
+// NAVIGATION HISTORY (038 Design Spec - Part 2.3)
+// ============================================================================
+
+/// Navigation history with browser-style back/forward/rewind.
+///
+/// # Design Decisions (038 v2)
+/// - Uses VecDeque for efficient front removal when max_size exceeded
+/// - Cursor is Option<usize> to handle empty state safely
+/// - `push_if_changed()` dedupes by ViewStateKey (ignores timestamp)
+/// - Forward history is truncated when pushing after back()
+///
+/// # Critical Rule (038 v3)
+/// History navigation verbs (back/forward/rewind) NEVER call push_if_changed().
+/// They only move the cursor. Otherwise "back" creates new history entries
+/// and becomes impossible to use correctly.
+#[derive(Debug, Clone, Default)]
+pub struct NavigationHistory {
+    /// Snapshots stored in order (oldest first)
+    snapshots: std::collections::VecDeque<ViewState>,
+    /// Current position in history (None if empty)
+    cursor: Option<usize>,
+    /// Maximum history size (oldest dropped when exceeded)
+    max_size: usize,
+}
+
+impl NavigationHistory {
+    /// Create new history with specified max size
+    pub fn new(max_size: usize) -> Self {
+        Self {
+            snapshots: std::collections::VecDeque::new(),
+            cursor: None,
+            max_size: max_size.max(1),
+        }
+    }
+
+    /// Create with default max size (50)
+    pub fn with_default_size() -> Self {
+        Self::new(50)
+    }
+
+    /// Check if history is empty
+    pub fn is_empty(&self) -> bool {
+        self.snapshots.is_empty()
+    }
+
+    /// Get number of entries
+    pub fn len(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    /// Get current cursor position
+    pub fn cursor(&self) -> Option<usize> {
+        self.cursor
+    }
+
+    /// Get current view state (at cursor)
+    pub fn current(&self) -> Option<&ViewState> {
+        self.cursor.and_then(|i| self.snapshots.get(i))
+    }
+
+    /// Push a state ONLY if it meaningfully changes the semantic view.
+    ///
+    /// - Dedupes by ViewStateKey (timestamp-only changes are ignored)
+    /// - Truncates forward history if cursor is not at end
+    /// - Enforces max_size by dropping oldest entries
+    /// - Cursor always ends pointing at the new state
+    ///
+    /// # Returns
+    /// `true` if state was pushed, `false` if dedupe prevented it
+    pub fn push_if_changed(&mut self, state: ViewState) -> bool {
+        // Validate in debug builds
+        debug_assert!(
+            state.validate().is_ok(),
+            "Invalid ViewState pushed to history"
+        );
+
+        // Dedupe: if same semantic state, do nothing
+        if let Some(cur) = self.current() {
+            if cur.key() == state.key() {
+                return false;
+            }
+        }
+
+        // If cursor is not at end, drop forward history (browser semantics)
+        if let Some(c) = self.cursor {
+            let keep_len = c + 1;
+            while self.snapshots.len() > keep_len {
+                self.snapshots.pop_back();
+            }
+        }
+
+        // Push new state
+        self.snapshots.push_back(state);
+        self.cursor = Some(self.snapshots.len() - 1);
+
+        // Enforce max size by dropping from front
+        while self.snapshots.len() > self.max_size {
+            self.snapshots.pop_front();
+            // Adjust cursor (it shifted left)
+            if let Some(c) = self.cursor {
+                self.cursor = Some(c.saturating_sub(1));
+            }
+        }
+
+        true
+    }
+
+    /// Move back one step in history.
+    ///
+    /// # Critical Rule
+    /// This does NOT push to history. It only moves the cursor.
+    ///
+    /// # Returns
+    /// The previous state if available, None if already at oldest
+    pub fn back(&mut self) -> Option<&ViewState> {
+        let c = self.cursor?;
+        if c == 0 {
+            return None;
+        }
+        self.cursor = Some(c - 1);
+        self.current()
+    }
+
+    /// Move forward one step in history.
+    ///
+    /// # Critical Rule
+    /// This does NOT push to history. It only moves the cursor.
+    ///
+    /// # Returns
+    /// The next state if available, None if already at newest
+    pub fn forward(&mut self) -> Option<&ViewState> {
+        let c = self.cursor?;
+        if c + 1 >= self.snapshots.len() {
+            return None;
+        }
+        self.cursor = Some(c + 1);
+        self.current()
+    }
+
+    /// Jump to the first (oldest) entry.
+    ///
+    /// # Critical Rule
+    /// This does NOT push to history. It only moves the cursor.
+    pub fn rewind(&mut self) -> Option<&ViewState> {
+        if self.snapshots.is_empty() {
+            self.cursor = None;
+            return None;
+        }
+        self.cursor = Some(0);
+        self.current()
+    }
+
+    /// Jump to a specific index.
+    ///
+    /// # Critical Rule
+    /// This does NOT push to history. It only moves the cursor.
+    pub fn jump_to(&mut self, index: usize) -> Option<&ViewState> {
+        if index >= self.snapshots.len() {
+            return None;
+        }
+        self.cursor = Some(index);
+        self.current()
+    }
+
+    /// Get breadcrumbs for UI display (index + key)
+    pub fn breadcrumbs(&self) -> Vec<(usize, ViewStateKey)> {
+        self.snapshots
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (i, s.key()))
+            .collect()
+    }
+
+    /// Check if we can go back
+    pub fn can_go_back(&self) -> bool {
+        self.cursor.map(|c| c > 0).unwrap_or(false)
+    }
+
+    /// Check if we can go forward
+    pub fn can_go_forward(&self) -> bool {
+        self.cursor
+            .map(|c| c + 1 < self.snapshots.len())
+            .unwrap_or(false)
+    }
+
+    /// Clear all history
+    pub fn clear(&mut self) {
+        self.snapshots.clear();
+        self.cursor = None;
+    }
+}
+
+// ============================================================================
+// NAVIGATION RESULT (038 Design Spec - Part 4c)
+// ============================================================================
+
+/// Result of a navigation operation.
+///
+/// Three-state result for clean error handling:
+/// - `Ok`: Operation succeeded, state changed
+/// - `NoOp`: Operation valid but no change needed (e.g., already at destination)
+/// - `Err`: Operation failed (invalid transition, missing data)
+///
+/// # Design Decision (038 v3)
+/// NoOp is distinct from Err because:
+/// - NoOp: "clockwise" when already at same position = valid, no change
+/// - Err: "land on" when not at System level = invalid transition
+///
+/// Both NoOp and Err should NOT push to history.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NavResult {
+    /// Operation succeeded, message describes what happened
+    Ok(&'static str),
+    /// Operation valid but no state change (dedupe, already there, etc.)
+    NoOp(&'static str),
+    /// Operation failed with error message
+    Err(String),
+}
+
+impl NavResult {
+    /// Check if operation was successful
+    pub fn is_ok(&self) -> bool {
+        matches!(self, NavResult::Ok(_))
+    }
+
+    /// Check if operation was a no-op
+    pub fn is_noop(&self) -> bool {
+        matches!(self, NavResult::NoOp(_))
+    }
+
+    /// Check if operation failed
+    pub fn is_err(&self) -> bool {
+        matches!(self, NavResult::Err(_))
+    }
+
+    /// Get the message regardless of variant
+    pub fn message(&self) -> &str {
+        match self {
+            NavResult::Ok(msg) => msg,
+            NavResult::NoOp(msg) => msg,
+            NavResult::Err(msg) => msg,
+        }
+    }
+
+    /// Convert to Result for ? operator compatibility
+    pub fn to_result(self) -> Result<&'static str, String> {
+        match self {
+            NavResult::Ok(msg) => Ok(msg),
+            NavResult::NoOp(msg) => Ok(msg), // NoOp is not an error
+            NavResult::Err(msg) => Err(msg),
+        }
+    }
+}
+
+/// Error type for navigation failures (used with NavResult::Err)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NavError {
+    /// Invalid level transition
+    InvalidTransition {
+        from: ViewLevel,
+        to: ViewLevel,
+        hint: String,
+    },
+    /// Entity not in current scope
+    NotInScope {
+        entity_type: &'static str,
+        id: String,
+    },
+    /// Missing required state
+    MissingState(&'static str),
+    /// No orbit position set
+    NoOrbitPosition,
+    /// Layout error
+    LayoutError(String),
+}
+
+impl std::fmt::Display for NavError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NavError::InvalidTransition { from, to, hint } => {
+                write!(f, "Cannot transition from {:?} to {:?}. {}", from, to, hint)
+            }
+            NavError::NotInScope { entity_type, id } => {
+                write!(f, "{} '{}' is not in current scope", entity_type, id)
+            }
+            NavError::MissingState(field) => {
+                write!(f, "Missing required state: {}", field)
+            }
+            NavError::NoOrbitPosition => {
+                write!(f, "No orbit position set. Select a planet first.")
+            }
+            NavError::LayoutError(msg) => {
+                write!(f, "Layout error: {}", msg)
+            }
+        }
+    }
+}
+
+impl From<NavError> for NavResult {
+    fn from(err: NavError) -> Self {
+        NavResult::Err(err.to_string())
+    }
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -1581,5 +2152,275 @@ mod tests {
         };
         let json = serde_json::to_string(&action).unwrap();
         assert!(json.contains(r#""action":"drill_into_cbu""#));
+    }
+
+    // ========================================================================
+    // SOLAR NAVIGATION TESTS (038 Design Spec)
+    // ========================================================================
+
+    #[test]
+    fn orbit_pos_creation() {
+        let pos = OrbitPos::new(1, 5);
+        assert_eq!(pos.ring, 1);
+        assert_eq!(pos.index, 5);
+
+        let origin = OrbitPos::origin();
+        assert_eq!(origin.ring, 0);
+        assert_eq!(origin.index, 0);
+    }
+
+    #[test]
+    fn view_state_constructors() {
+        let ts = 1234567890;
+
+        let universe = ViewState::universe(ts);
+        assert_eq!(universe.level, ViewLevel::Universe);
+        assert!(universe.validate().is_ok());
+
+        let cluster = ViewState::cluster("cluster-1".into(), ts);
+        assert_eq!(cluster.level, ViewLevel::Cluster);
+        assert_eq!(cluster.focus_manco_id, Some("cluster-1".into()));
+        assert!(cluster.validate().is_ok());
+
+        let system = ViewState::system("manco-1".into(), ts);
+        assert_eq!(system.level, ViewLevel::System);
+        assert_eq!(system.focus_manco_id, Some("manco-1".into()));
+        assert!(system.validate().is_ok());
+
+        let system_at = ViewState::system_at("manco-1".into(), OrbitPos::new(0, 3), ts);
+        assert_eq!(system_at.orbit_pos, Some(OrbitPos::new(0, 3)));
+        assert!(system_at.validate().is_ok());
+
+        let planet = ViewState::planet("cbu-1".into(), Some("manco-1".into()), ts);
+        assert_eq!(planet.level, ViewLevel::Planet);
+        assert_eq!(planet.focus_cbu_id, Some("cbu-1".into()));
+        assert_eq!(planet.focus_manco_id, Some("manco-1".into())); // For zoom_out
+        assert!(planet.validate().is_ok());
+
+        let surface = ViewState::surface("cbu-1".into(), ts);
+        assert_eq!(surface.level, ViewLevel::Surface);
+        assert!(surface.validate().is_ok());
+
+        let core = ViewState::core("cbu-1".into(), ts);
+        assert_eq!(core.level, ViewLevel::Core);
+        assert!(core.validate().is_ok());
+    }
+
+    #[test]
+    fn view_state_validation_failures() {
+        // System without focus_manco_id
+        let invalid_system = ViewState {
+            level: ViewLevel::System,
+            focus_manco_id: None,
+            focus_cbu_id: None,
+            orbit_pos: None,
+            timestamp: 0,
+        };
+        assert!(invalid_system.validate().is_err());
+
+        // Planet without focus_cbu_id
+        let invalid_planet = ViewState {
+            level: ViewLevel::Planet,
+            focus_manco_id: None,
+            focus_cbu_id: None,
+            orbit_pos: None,
+            timestamp: 0,
+        };
+        assert!(invalid_planet.validate().is_err());
+
+        // Cluster with orbit_pos (invalid)
+        let invalid_cluster = ViewState {
+            level: ViewLevel::Cluster,
+            focus_manco_id: Some("c".into()),
+            focus_cbu_id: None,
+            orbit_pos: Some(OrbitPos::origin()),
+            timestamp: 0,
+        };
+        assert!(invalid_cluster.validate().is_err());
+    }
+
+    #[test]
+    fn view_state_key_excludes_timestamp() {
+        let state1 = ViewState::system("manco-1".into(), 1000);
+        let state2 = ViewState::system("manco-1".into(), 2000);
+
+        // Same semantic state, different timestamps
+        assert_eq!(state1.key(), state2.key());
+
+        // Different focus = different key
+        let state3 = ViewState::system("manco-2".into(), 1000);
+        assert_ne!(state1.key(), state3.key());
+    }
+
+    #[test]
+    fn view_state_compact_string_roundtrip() {
+        let ts = 12345;
+        let states = vec![
+            ViewState::universe(ts),
+            ViewState::cluster("cluster-abc".into(), ts),
+            ViewState::system("manco-xyz".into(), ts),
+            ViewState::planet_simple("cbu-123".into(), ts),
+            ViewState::surface("cbu-456".into(), ts),
+            ViewState::core("cbu-789".into(), ts),
+        ];
+
+        for state in states {
+            let compact = state.to_compact_string();
+            let parsed = ViewState::from_compact_string(&compact, ts).unwrap();
+            assert_eq!(state.key(), parsed.key());
+        }
+    }
+
+    #[test]
+    fn navigation_history_push_and_dedupe() {
+        let mut history = NavigationHistory::new(10);
+
+        // Push first state
+        let state1 = ViewState::universe(1000);
+        assert!(history.push_if_changed(state1.clone()));
+        assert_eq!(history.len(), 1);
+        assert_eq!(history.cursor(), Some(0));
+
+        // Push same state again (different timestamp) - should be deduped
+        let state1_again = ViewState::universe(2000);
+        assert!(!history.push_if_changed(state1_again));
+        assert_eq!(history.len(), 1); // No change
+
+        // Push different state
+        let state2 = ViewState::cluster("c1".into(), 3000);
+        assert!(history.push_if_changed(state2));
+        assert_eq!(history.len(), 2);
+        assert_eq!(history.cursor(), Some(1));
+    }
+
+    #[test]
+    fn navigation_history_back_forward() {
+        let mut history = NavigationHistory::new(10);
+
+        history.push_if_changed(ViewState::universe(1));
+        history.push_if_changed(ViewState::cluster("c1".into(), 2));
+        history.push_if_changed(ViewState::system("m1".into(), 3));
+
+        assert_eq!(history.cursor(), Some(2));
+        assert!(history.can_go_back());
+        assert!(!history.can_go_forward());
+
+        // Go back
+        let prev = history.back().unwrap();
+        assert_eq!(prev.level, ViewLevel::Cluster);
+        assert_eq!(history.cursor(), Some(1));
+        assert!(history.can_go_forward());
+
+        // Go forward
+        let next = history.forward().unwrap();
+        assert_eq!(next.level, ViewLevel::System);
+        assert_eq!(history.cursor(), Some(2));
+
+        // Can't go forward from end
+        assert!(history.forward().is_none());
+    }
+
+    #[test]
+    fn navigation_history_back_then_push_truncates_forward() {
+        let mut history = NavigationHistory::new(10);
+
+        history.push_if_changed(ViewState::universe(1));
+        history.push_if_changed(ViewState::cluster("c1".into(), 2));
+        history.push_if_changed(ViewState::system("m1".into(), 3));
+
+        // Go back twice
+        history.back();
+        history.back();
+        assert_eq!(history.cursor(), Some(0));
+
+        // Push new state - should truncate forward history
+        history.push_if_changed(ViewState::planet_simple("cbu-1".into(), 4));
+        assert_eq!(history.len(), 2); // Universe + Planet (Cluster and System truncated)
+        assert!(!history.can_go_forward());
+    }
+
+    #[test]
+    fn navigation_history_rewind() {
+        let mut history = NavigationHistory::new(10);
+
+        history.push_if_changed(ViewState::universe(1));
+        history.push_if_changed(ViewState::cluster("c1".into(), 2));
+        history.push_if_changed(ViewState::system("m1".into(), 3));
+
+        let first = history.rewind().unwrap();
+        assert_eq!(first.level, ViewLevel::Universe);
+        assert_eq!(history.cursor(), Some(0));
+    }
+
+    #[test]
+    fn navigation_history_max_size() {
+        let mut history = NavigationHistory::new(3);
+
+        history.push_if_changed(ViewState::universe(1));
+        history.push_if_changed(ViewState::cluster("c1".into(), 2));
+        history.push_if_changed(ViewState::system("m1".into(), 3));
+        assert_eq!(history.len(), 3);
+
+        // Push 4th - oldest should be dropped
+        history.push_if_changed(ViewState::planet_simple("p1".into(), 4));
+        assert_eq!(history.len(), 3);
+
+        // Cursor should still be valid (adjusted after drop)
+        assert_eq!(history.cursor(), Some(2));
+
+        // First entry is now Cluster (Universe was dropped)
+        let first = history.rewind().unwrap();
+        assert_eq!(first.level, ViewLevel::Cluster);
+    }
+
+    #[test]
+    fn navigation_history_jump_to() {
+        let mut history = NavigationHistory::new(10);
+
+        history.push_if_changed(ViewState::universe(1));
+        history.push_if_changed(ViewState::cluster("c1".into(), 2));
+        history.push_if_changed(ViewState::system("m1".into(), 3));
+
+        let jumped = history.jump_to(1).unwrap();
+        assert_eq!(jumped.level, ViewLevel::Cluster);
+        assert_eq!(history.cursor(), Some(1));
+
+        // Invalid index
+        assert!(history.jump_to(10).is_none());
+    }
+
+    #[test]
+    fn nav_result_variants() {
+        let ok = NavResult::Ok("Success");
+        assert!(ok.is_ok());
+        assert!(!ok.is_noop());
+        assert!(!ok.is_err());
+        assert_eq!(ok.message(), "Success");
+
+        let noop = NavResult::NoOp("Already there");
+        assert!(!noop.is_ok());
+        assert!(noop.is_noop());
+        assert!(!noop.is_err());
+
+        let err = NavResult::Err("Failed".into());
+        assert!(!err.is_ok());
+        assert!(!err.is_noop());
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn nav_error_display() {
+        let err = NavError::InvalidTransition {
+            from: ViewLevel::Cluster,
+            to: ViewLevel::Surface,
+            hint: "Enter a system first".into(),
+        };
+        let msg = err.to_string();
+        assert!(msg.contains("Cluster"));
+        assert!(msg.contains("Surface"));
+        assert!(msg.contains("Enter a system first"));
+
+        let result: NavResult = err.into();
+        assert!(result.is_err());
     }
 }

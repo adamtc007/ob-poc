@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-19
+> **Last reviewed:** 2026-01-20
 > **Crates:** 14 Rust crates
 > **Verbs:** 923 verbs, 7334 intent patterns (DB-sourced)
 > **Migrations:** 37 schema migrations
@@ -10,6 +10,7 @@
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
 > **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
+> **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -124,6 +125,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | REPL state model | `ai-thoughts/034-repl-state-model-dsl-agent-protocol.md` | ⚠️ In Progress |
 | Session-runsheet-viewport | `ai-thoughts/035-session-runsheet-viewport-integration.md` | ✅ Done |
 | Session rip-and-replace | `ai-thoughts/036-session-rip-and-replace.md` | ✅ Done |
+| Solar navigation | `ai-thoughts/038-solar-navigation-unified-design.md` | ✅ Done |
 | Candle embeddings | `docs/TODO-CANDLE-MIGRATION.md` | ✅ Complete |
 | Candle pipeline | `docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | ✅ Complete |
 
@@ -979,6 +981,7 @@ When you see these in a task, read the corresponding annex first:
 | "investor register", "look-through" | `ai-thoughts/018-investor-register-visualization.md` |
 | "GROUP", "ownership graph" | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` |
 | "sheet", "phased execution", "DAG" | `ai-thoughts/035-repl-session-implementation-plan.md` |
+| "solar navigation", "ViewState", "orbit", "nav_history" | `ai-thoughts/038-solar-navigation-unified-design.md` |
 
 ---
 
