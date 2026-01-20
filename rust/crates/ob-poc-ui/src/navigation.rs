@@ -27,9 +27,9 @@
 use ob_poc_graph::graph::animation::{SpringConfig, SpringF32};
 use ob_poc_graph::graph::camera::Camera2D;
 use ob_poc_types::galaxy::{
-    ClusterDetailGraph, ClusterType, DepthColors, NavResult, NavigationAction, NavigationHistory,
-    NavigationScope, OrbitPos, PrefetchStatus, UniverseGraph, ViewLevel, ViewState, ViewStateKey,
-    ViewTransition,
+    ClusterDetailGraph, ClusterType, DepthColors, NavReason, NavResult, NavigationAction,
+    NavigationHistory, NavigationScope, OrbitPos, PrefetchStatus, UniverseGraph, ViewLevel,
+    ViewState, ViewStateKey, ViewTransition,
 };
 
 use egui::Pos2;
@@ -439,7 +439,7 @@ impl NavigationService {
             self.sync_view_level_from_view_state();
             NavResult::Ok("Back")
         } else {
-            NavResult::NoOp("Already at oldest state")
+            NavResult::noop(NavReason::AtOldest)
         }
     }
 
@@ -454,7 +454,7 @@ impl NavigationService {
             self.sync_view_level_from_view_state();
             NavResult::Ok("Forward")
         } else {
-            NavResult::NoOp("Already at newest state")
+            NavResult::noop(NavReason::AtNewest)
         }
     }
 
@@ -469,7 +469,7 @@ impl NavigationService {
             self.sync_view_level_from_view_state();
             NavResult::Ok("Rewind")
         } else {
-            NavResult::NoOp("History is empty")
+            NavResult::noop(NavReason::EmptyHistory)
         }
     }
 
@@ -484,7 +484,7 @@ impl NavigationService {
             self.sync_view_level_from_view_state();
             NavResult::Ok("Jumped")
         } else {
-            NavResult::Err(format!("History index out of range: {}", index))
+            NavResult::err(NavReason::IndexOutOfRange)
         }
     }
 
@@ -498,11 +498,11 @@ impl NavigationService {
     /// Must be at System level. If orbit_pos is None, initializes to (0,0).
     pub fn nav_orbit_next(&mut self, ring_len: usize) -> NavResult {
         if self.view_state.level != ViewLevel::System {
-            return NavResult::NoOp("Orbit navigation only works in System view");
+            return NavResult::noop(NavReason::OrbitOnlyInSystem);
         }
 
         if ring_len == 0 {
-            return NavResult::NoOp("No planets in this system");
+            return NavResult::noop(NavReason::NoPlanets);
         }
 
         let now = Self::now_timestamp();
@@ -528,11 +528,11 @@ impl NavigationService {
     /// Must be at System level. If orbit_pos is None, initializes to (0,0).
     pub fn nav_orbit_prev(&mut self, ring_len: usize) -> NavResult {
         if self.view_state.level != ViewLevel::System {
-            return NavResult::NoOp("Orbit navigation only works in System view");
+            return NavResult::noop(NavReason::OrbitOnlyInSystem);
         }
 
         if ring_len == 0 {
-            return NavResult::NoOp("No planets in this system");
+            return NavResult::noop(NavReason::NoPlanets);
         }
 
         let now = Self::now_timestamp();
@@ -562,20 +562,20 @@ impl NavigationService {
     /// Must be at System level with orbit_pos set, and not already at innermost.
     pub fn nav_ring_in(&mut self, inner_ring_len: usize) -> NavResult {
         if self.view_state.level != ViewLevel::System {
-            return NavResult::NoOp("Ring navigation only works in System view");
+            return NavResult::noop(NavReason::OrbitOnlyInSystem);
         }
 
         let pos = match self.view_state.orbit_pos {
             Some(p) => p,
-            None => return NavResult::NoOp("Select a planet first"),
+            None => return NavResult::noop(NavReason::MissingOrbitPos),
         };
 
         if pos.ring == 0 {
-            return NavResult::NoOp("Already at innermost ring");
+            return NavResult::noop(NavReason::NoMoreRings);
         }
 
         if inner_ring_len == 0 {
-            return NavResult::NoOp("Inner ring is empty");
+            return NavResult::noop(NavReason::NoPlanets);
         }
 
         let now = Self::now_timestamp();
@@ -599,20 +599,20 @@ impl NavigationService {
     /// Must be at System level with orbit_pos set, and outer ring must exist.
     pub fn nav_ring_out(&mut self, outer_ring_len: usize, max_ring: usize) -> NavResult {
         if self.view_state.level != ViewLevel::System {
-            return NavResult::NoOp("Ring navigation only works in System view");
+            return NavResult::noop(NavReason::OrbitOnlyInSystem);
         }
 
         let pos = match self.view_state.orbit_pos {
             Some(p) => p,
-            None => return NavResult::NoOp("Select a planet first"),
+            None => return NavResult::noop(NavReason::MissingOrbitPos),
         };
 
         if pos.ring >= max_ring {
-            return NavResult::NoOp("Already at outermost ring");
+            return NavResult::noop(NavReason::NoMoreRings);
         }
 
         if outer_ring_len == 0 {
-            return NavResult::NoOp("Outer ring is empty");
+            return NavResult::noop(NavReason::NoPlanets);
         }
 
         let now = Self::now_timestamp();
@@ -633,7 +633,7 @@ impl NavigationService {
     /// Set orbit position explicitly (e.g., from click).
     pub fn nav_orbit_select(&mut self, ring: usize, index: usize) -> NavResult {
         if self.view_state.level != ViewLevel::System {
-            return NavResult::NoOp("Orbit selection only works in System view");
+            return NavResult::noop(NavReason::OrbitOnlyInSystem);
         }
 
         let now = Self::now_timestamp();
@@ -660,25 +660,23 @@ impl NavigationService {
 
         let next = match self.view_state.level {
             ViewLevel::Universe => {
-                return NavResult::NoOp(
-                    "Zoom in from Universe not supported - enter a cluster first",
-                );
+                return NavResult::noop(NavReason::LevelBlocked);
             }
             ViewLevel::Cluster => {
                 let manco_id = match &self.view_state.focus_manco_id {
                     Some(id) => id.clone(),
-                    None => return NavResult::NoOp("Select a ManCo first"),
+                    None => return NavResult::noop(NavReason::MissingFocusManco),
                 };
                 ViewState::system(manco_id, now)
             }
             ViewLevel::System => {
                 let _pos = match self.view_state.orbit_pos {
                     Some(p) => p,
-                    None => return NavResult::NoOp("Select a planet first"),
+                    None => return NavResult::noop(NavReason::MissingOrbitPos),
                 };
                 let cbu_id = match cbu_id_from_orbit {
                     Some(id) => id.to_string(),
-                    None => return NavResult::Err("Cannot derive CBU from orbit position".into()),
+                    None => return NavResult::err(NavReason::SelectionOutOfRange),
                 };
                 let parent_manco = self.view_state.focus_manco_id.clone();
                 ViewState::planet(cbu_id, parent_manco, now)
@@ -686,19 +684,19 @@ impl NavigationService {
             ViewLevel::Planet => {
                 let cbu_id = match &self.view_state.focus_cbu_id {
                     Some(id) => id.clone(),
-                    None => return NavResult::Err("Planet view missing focus_cbu_id".into()),
+                    None => return NavResult::err(NavReason::MissingFocusCbu),
                 };
                 ViewState::surface(cbu_id, now)
             }
             ViewLevel::Surface => {
                 let cbu_id = match &self.view_state.focus_cbu_id {
                     Some(id) => id.clone(),
-                    None => return NavResult::Err("Surface view missing focus_cbu_id".into()),
+                    None => return NavResult::err(NavReason::MissingFocusCbu),
                 };
                 ViewState::core(cbu_id, now)
             }
             ViewLevel::Core => {
-                return NavResult::NoOp("Already at deepest level");
+                return NavResult::noop(NavReason::AlreadyDeepest);
             }
         };
 
@@ -716,7 +714,7 @@ impl NavigationService {
 
         let next = match self.view_state.level {
             ViewLevel::Universe => {
-                return NavResult::NoOp("Already at universe level");
+                return NavResult::noop(NavReason::AlreadyShallowest);
             }
             ViewLevel::Cluster => ViewState::universe(now),
             ViewLevel::System => {
@@ -731,9 +729,7 @@ impl NavigationService {
                 // Return to System view
                 let manco_id = match &self.view_state.focus_manco_id {
                     Some(id) => id.clone(),
-                    None => {
-                        return NavResult::Err("Cannot return to system - no parent ManCo".into())
-                    }
+                    None => return NavResult::err(NavReason::CannotDeriveParent),
                 };
                 let mut state = ViewState::system(manco_id, now);
                 // Restore orbit position if provided
@@ -743,7 +739,7 @@ impl NavigationService {
             ViewLevel::Surface => {
                 let cbu_id = match &self.view_state.focus_cbu_id {
                     Some(id) => id.clone(),
-                    None => return NavResult::Err("Surface view missing focus_cbu_id".into()),
+                    None => return NavResult::err(NavReason::MissingFocusCbu),
                 };
                 let parent_manco = self.view_state.focus_manco_id.clone();
                 ViewState::planet(cbu_id, parent_manco, now)
@@ -751,7 +747,7 @@ impl NavigationService {
             ViewLevel::Core => {
                 let cbu_id = match &self.view_state.focus_cbu_id {
                     Some(id) => id.clone(),
-                    None => return NavResult::Err("Core view missing focus_cbu_id".into()),
+                    None => return NavResult::err(NavReason::MissingFocusCbu),
                 };
                 ViewState::surface(cbu_id, now)
             }

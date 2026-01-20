@@ -1999,6 +1999,11 @@ impl NavigationHistory {
 /// - Err: "land on" when not at System level = invalid transition
 ///
 /// Both NoOp and Err should NOT push to history.
+///
+/// # Structured Errors (UX/Telemetry Enhancement)
+/// Use `noop()` and `err()` constructors to include reason codes for
+/// telemetry aggregation and agent decision-making. The old string-only
+/// variants still work for backwards compatibility.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NavResult {
     /// Operation succeeded, message describes what happened
@@ -2010,6 +2015,33 @@ pub enum NavResult {
 }
 
 impl NavResult {
+    // === Constructors with reason codes ===
+
+    /// Create a NoOp with a standard reason code.
+    /// Message is derived from the reason.
+    pub fn noop(reason: NavReason) -> Self {
+        NavResult::NoOp(reason.message())
+    }
+
+    /// Create an Err with a standard reason code.
+    /// Message is derived from the reason.
+    pub fn err(reason: NavReason) -> Self {
+        NavResult::Err(reason.message().to_string())
+    }
+
+    /// Create an Err with a formatted message (for dynamic content like names).
+    /// Use when the standard message needs interpolation.
+    pub fn err_fmt(reason: NavReason, name: &str) -> Self {
+        let msg = match reason {
+            NavReason::UnknownAlias => format!("Unknown ManCo: \"{}\".", name),
+            NavReason::NotInScope => format!("{} not available in current scope.", name),
+            _ => reason.message().to_string(),
+        };
+        NavResult::Err(msg)
+    }
+
+    // === Predicates ===
+
     /// Check if operation was successful
     pub fn is_ok(&self) -> bool {
         matches!(self, NavResult::Ok(_))
@@ -2024,6 +2056,8 @@ impl NavResult {
     pub fn is_err(&self) -> bool {
         matches!(self, NavResult::Err(_))
     }
+
+    // === Accessors ===
 
     /// Get the message regardless of variant
     pub fn message(&self) -> &str {
@@ -2040,6 +2074,48 @@ impl NavResult {
             NavResult::Ok(msg) => Ok(msg),
             NavResult::NoOp(msg) => Ok(msg), // NoOp is not an error
             NavResult::Err(msg) => Err(msg),
+        }
+    }
+
+    /// Get suggestion for this result (if it's a NoOp/Err with known reason).
+    /// Returns None for Ok results or unknown error messages.
+    pub fn suggestion(&self) -> Option<NavSuggestion> {
+        let msg = match self {
+            NavResult::Ok(_) => return None,
+            NavResult::NoOp(msg) => *msg,
+            NavResult::Err(msg) => msg.as_str(),
+        };
+        Self::reason_from_message(msg).and_then(NavSuggestion::for_reason)
+    }
+
+    /// Try to extract reason code from message (for telemetry).
+    /// This is a reverse lookup - prefer using noop()/err() constructors.
+    fn reason_from_message(msg: &str) -> Option<NavReason> {
+        // Match against known standard messages
+        match msg {
+            "Not available at this zoom level." => Some(NavReason::LevelBlocked),
+            "Orbit navigation only works in System view." => Some(NavReason::OrbitOnlyInSystem),
+            "ManCo selection works in Galaxy view." => Some(NavReason::SelectionOnlyInGalaxy),
+            "Planet selection works in System view." => Some(NavReason::SelectionOnlyInSystem),
+            "Select a ManCo first." => Some(NavReason::MissingFocusManco),
+            "Select a planet first." => Some(NavReason::MissingOrbitPos),
+            "No planet is focused." => Some(NavReason::MissingFocusCbu),
+            "Already at deepest level." => Some(NavReason::AlreadyDeepest),
+            "Already at galaxy level." => Some(NavReason::AlreadyShallowest),
+            "Already at oldest state." => Some(NavReason::AtOldest),
+            "Already at newest state." => Some(NavReason::AtNewest),
+            "Already selected." => Some(NavReason::SelectionUnchanged),
+            "Selected planet no longer exists." => Some(NavReason::SelectionOutOfRange),
+            "History index out of range." => Some(NavReason::IndexOutOfRange),
+            "History is empty." => Some(NavReason::EmptyHistory),
+            "No planets in this system." => Some(NavReason::NoPlanets),
+            "No more rings in that direction." => Some(NavReason::NoMoreRings),
+            "Layout not ready yet." => Some(NavReason::LayoutNotReady),
+            "Cannot determine parent system." => Some(NavReason::CannotDeriveParent),
+            "Navigation state is invalid. Try returning to Galaxy." => {
+                Some(NavReason::InvalidState)
+            }
+            _ => None,
         }
     }
 }
@@ -2091,6 +2167,236 @@ impl std::fmt::Display for NavError {
 impl From<NavError> for NavResult {
     fn from(err: NavError) -> Self {
         NavResult::Err(err.to_string())
+    }
+}
+
+// ============================================================================
+// NAVIGATION REASON CODES & SUGGESTIONS (UX/Telemetry)
+// ============================================================================
+
+/// Stable reason codes for navigation outcomes.
+///
+/// Used for:
+/// - Telemetry aggregation (same condition = same code)
+/// - Agent decision-making (can retry vs needs user action)
+/// - Structured error handling
+///
+/// # Design Rules
+/// - Codes are stable strings, not changing messages
+/// - Keep enumerable for clean analytics
+/// - Use `level_blocked` not `wrong_level` (describe condition, not blame)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NavReason {
+    // === Level/Context errors ===
+    /// Verb not valid at current zoom level
+    LevelBlocked,
+    /// Need to be at System level for orbit operations
+    OrbitOnlyInSystem,
+    /// Need to be at Galaxy level for ManCo selection
+    SelectionOnlyInGalaxy,
+    /// Need to be at System level for planet selection
+    SelectionOnlyInSystem,
+
+    // === Missing focus/selection ===
+    /// No ManCo selected (required for zoom in from Galaxy)
+    MissingFocusManco,
+    /// No orbit position selected (required for zoom in from System)
+    MissingOrbitPos,
+    /// No CBU focused (required for deeper zoom)
+    MissingFocusCbu,
+
+    // === Boundary conditions ===
+    /// Already at deepest level
+    AlreadyDeepest,
+    /// Already at shallowest level
+    AlreadyShallowest,
+    /// Already at oldest history entry
+    AtOldest,
+    /// Already at newest history entry
+    AtNewest,
+    /// Selection unchanged (same item re-selected)
+    SelectionUnchanged,
+
+    // === Invalid input ===
+    /// Orbit ring/index out of range
+    SelectionOutOfRange,
+    /// History index out of range
+    IndexOutOfRange,
+    /// Alias/name cannot be resolved
+    UnknownAlias,
+    /// Entity exists but not in current scope
+    NotInScope,
+
+    // === State issues ===
+    /// History is empty
+    EmptyHistory,
+    /// No planets in current system
+    NoPlanets,
+    /// No more rings in requested direction
+    NoMoreRings,
+    /// Layout not computed yet
+    LayoutNotReady,
+    /// Cannot determine parent (orphan node)
+    CannotDeriveParent,
+    /// Internal state inconsistency
+    InvalidState,
+}
+
+impl NavReason {
+    /// Get the standard user-facing message for this reason.
+    ///
+    /// These messages follow UX copy guidelines:
+    /// - Short, actionable phrases
+    /// - No internal IDs exposed
+    /// - Consistent across all navigation verbs
+    pub fn message(&self) -> &'static str {
+        match self {
+            // Level/Context
+            NavReason::LevelBlocked => "Not available at this zoom level.",
+            NavReason::OrbitOnlyInSystem => "Orbit navigation only works in System view.",
+            NavReason::SelectionOnlyInGalaxy => "ManCo selection works in Galaxy view.",
+            NavReason::SelectionOnlyInSystem => "Planet selection works in System view.",
+
+            // Missing focus
+            NavReason::MissingFocusManco => "Select a ManCo first.",
+            NavReason::MissingOrbitPos => "Select a planet first.",
+            NavReason::MissingFocusCbu => "No planet is focused.",
+
+            // Boundaries
+            NavReason::AlreadyDeepest => "Already at deepest level.",
+            NavReason::AlreadyShallowest => "Already at galaxy level.",
+            NavReason::AtOldest => "Already at oldest state.",
+            NavReason::AtNewest => "Already at newest state.",
+            NavReason::SelectionUnchanged => "Already selected.",
+
+            // Invalid input
+            NavReason::SelectionOutOfRange => "Selected planet no longer exists.",
+            NavReason::IndexOutOfRange => "History index out of range.",
+            NavReason::UnknownAlias => "Unknown name.", // Caller should format with actual name
+            NavReason::NotInScope => "Not available in current scope.",
+
+            // State issues
+            NavReason::EmptyHistory => "History is empty.",
+            NavReason::NoPlanets => "No planets in this system.",
+            NavReason::NoMoreRings => "No more rings in that direction.",
+            NavReason::LayoutNotReady => "Layout not ready yet.",
+            NavReason::CannotDeriveParent => "Cannot determine parent system.",
+            NavReason::InvalidState => "Navigation state is invalid. Try returning to Galaxy.",
+        }
+    }
+
+    /// Is this a retryable condition (agent can try alternative)?
+    pub fn is_retryable(&self) -> bool {
+        matches!(
+            self,
+            NavReason::MissingFocusManco
+                | NavReason::MissingOrbitPos
+                | NavReason::LayoutNotReady
+                | NavReason::NoPlanets
+        )
+    }
+
+    /// Does this require user action to fix?
+    pub fn needs_user_action(&self) -> bool {
+        matches!(
+            self,
+            NavReason::UnknownAlias | NavReason::NotInScope | NavReason::InvalidState
+        )
+    }
+}
+
+impl std::fmt::Display for NavReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message())
+    }
+}
+
+/// Suggested follow-up actions when navigation fails or no-ops.
+///
+/// Helps the agent (and UI) offer constructive next steps without
+/// hardcoding natural language in multiple places.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NavSuggestion {
+    /// Human-readable hint (e.g., "Select a ManCo to zoom into")
+    pub hint: String,
+    /// Suggested verbs/actions the user or agent could take
+    pub actions: Vec<String>,
+}
+
+impl NavSuggestion {
+    /// Create a new suggestion
+    pub fn new(hint: &'static str, actions: &[&'static str]) -> Self {
+        Self {
+            hint: hint.to_string(),
+            actions: actions.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// No ManCo selected - suggest selection or direct entry
+    pub fn select_manco() -> Self {
+        Self::new(
+            "Select a ManCo to zoom into",
+            &["nav.select_manco", "nav.enter_system"],
+        )
+    }
+
+    /// No planet selected - suggest orbit navigation
+    pub fn select_planet() -> Self {
+        Self::new(
+            "Select a planet to land on",
+            &["nav.orbit_select", "nav.orbit_next"],
+        )
+    }
+
+    /// At deepest level - suggest zoom out
+    pub fn zoom_out() -> Self {
+        Self::new("Use zoom out to go back", &["nav.zoom_out", "nav.back"])
+    }
+
+    /// Wrong level for operation - suggest correct level
+    pub fn go_to_system() -> Self {
+        Self::new("Enter a system first", &["nav.enter_system", "nav.zoom_in"])
+    }
+
+    /// Wrong level for operation - suggest correct level
+    pub fn go_to_galaxy() -> Self {
+        Self::new(
+            "Return to galaxy view first",
+            &["nav.zoom_out", "nav.rewind"],
+        )
+    }
+
+    /// History navigation failed - suggest content navigation
+    pub fn use_content_nav() -> Self {
+        Self::new(
+            "Navigate to content instead",
+            &["nav.enter_system", "nav.enter_planet"],
+        )
+    }
+
+    /// Invalid state - suggest reset
+    pub fn reset() -> Self {
+        Self::new(
+            "Reset navigation to recover",
+            &["nav.rewind", "view.universe"],
+        )
+    }
+
+    /// Get suggestion for a given reason code
+    pub fn for_reason(reason: NavReason) -> Option<Self> {
+        match reason {
+            NavReason::MissingFocusManco => Some(Self::select_manco()),
+            NavReason::MissingOrbitPos => Some(Self::select_planet()),
+            NavReason::AlreadyDeepest => Some(Self::zoom_out()),
+            NavReason::OrbitOnlyInSystem => Some(Self::go_to_system()),
+            NavReason::SelectionOnlyInGalaxy => Some(Self::go_to_galaxy()),
+            NavReason::EmptyHistory | NavReason::AtOldest | NavReason::AtNewest => {
+                Some(Self::use_content_nav())
+            }
+            NavReason::InvalidState => Some(Self::reset()),
+            _ => None,
+        }
     }
 }
 
@@ -2422,5 +2728,82 @@ mod tests {
 
         let result: NavResult = err.into();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn nav_reason_messages() {
+        // Each reason has a standard message
+        assert_eq!(
+            NavReason::MissingFocusManco.message(),
+            "Select a ManCo first."
+        );
+        assert_eq!(
+            NavReason::OrbitOnlyInSystem.message(),
+            "Orbit navigation only works in System view."
+        );
+        assert_eq!(NavReason::EmptyHistory.message(), "History is empty.");
+    }
+
+    #[test]
+    fn nav_reason_retryable() {
+        // These are retryable (agent can try alternative)
+        assert!(NavReason::MissingFocusManco.is_retryable());
+        assert!(NavReason::LayoutNotReady.is_retryable());
+
+        // These are not (boundary or invalid input)
+        assert!(!NavReason::AlreadyDeepest.is_retryable());
+        assert!(!NavReason::IndexOutOfRange.is_retryable());
+    }
+
+    #[test]
+    fn nav_result_with_reason() {
+        // noop() constructor uses reason's message
+        let noop = NavResult::noop(NavReason::AtOldest);
+        assert!(noop.is_noop());
+        assert_eq!(noop.message(), "Already at oldest state.");
+
+        // err() constructor uses reason's message
+        let err = NavResult::err(NavReason::InvalidState);
+        assert!(err.is_err());
+        assert_eq!(
+            err.message(),
+            "Navigation state is invalid. Try returning to Galaxy."
+        );
+
+        // err_fmt() allows dynamic content
+        let err_fmt = NavResult::err_fmt(NavReason::UnknownAlias, "Allianz");
+        assert!(err_fmt.is_err());
+        assert_eq!(err_fmt.message(), "Unknown ManCo: \"Allianz\".");
+    }
+
+    #[test]
+    fn nav_result_suggestion() {
+        // NoOp with known reason gets suggestion
+        let noop = NavResult::noop(NavReason::MissingFocusManco);
+        let suggestion = noop.suggestion();
+        assert!(suggestion.is_some());
+        let s = suggestion.unwrap();
+        assert_eq!(s.hint, "Select a ManCo to zoom into");
+        assert!(s.actions.contains(&"nav.select_manco".to_string()));
+
+        // Ok results have no suggestion
+        let ok = NavResult::Ok("Success");
+        assert!(ok.suggestion().is_none());
+
+        // Unknown error message has no suggestion
+        let err = NavResult::Err("Something weird happened".into());
+        assert!(err.suggestion().is_none());
+    }
+
+    #[test]
+    fn nav_suggestion_for_reason() {
+        // Each retryable reason should have a suggestion
+        assert!(NavSuggestion::for_reason(NavReason::MissingFocusManco).is_some());
+        assert!(NavSuggestion::for_reason(NavReason::MissingOrbitPos).is_some());
+        assert!(NavSuggestion::for_reason(NavReason::EmptyHistory).is_some());
+        assert!(NavSuggestion::for_reason(NavReason::InvalidState).is_some());
+
+        // Boundary conditions may not have suggestions
+        assert!(NavSuggestion::for_reason(NavReason::SelectionOutOfRange).is_none());
     }
 }
