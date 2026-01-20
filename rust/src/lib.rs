@@ -38,6 +38,10 @@ pub mod services;
 // DSL v2 - Unified S-expression DSL with data-driven execution
 pub mod dsl_v2;
 
+// Domain operations - custom verb handlers (extracted from dsl_v2 for faster builds)
+#[cfg(feature = "database")]
+pub mod domain_ops;
+
 // Ontology - Entity taxonomy and lifecycle management
 pub mod ontology;
 

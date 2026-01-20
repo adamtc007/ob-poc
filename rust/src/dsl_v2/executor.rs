@@ -34,8 +34,6 @@ use super::ast::{AstNode, Literal, VerbCall};
 #[cfg(feature = "database")]
 use super::compiler::compile_to_ops;
 #[cfg(feature = "database")]
-use super::custom_ops::CustomOperationRegistry;
-#[cfg(feature = "database")]
 use super::dag::{build_execution_plan, describe_plan};
 #[cfg(feature = "database")]
 use super::domain_context::DomainContext;
@@ -47,6 +45,8 @@ use super::ops::{EntityKey, Op};
 use super::runtime_registry::{runtime_registry, RuntimeBehavior};
 #[cfg(feature = "database")]
 use super::submission::{DslSubmission, SubmissionError, SubmissionLimits};
+#[cfg(feature = "database")]
+use crate::domain_ops::CustomOperationRegistry;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -181,13 +181,13 @@ pub enum ExecutionResult {
     /// No result (void operation)
     Void,
     /// Entity query result for batch iteration (entity.query verb)
-    EntityQuery(super::custom_ops::entity_query::EntityQueryResult),
+    EntityQuery(crate::domain_ops::entity_query::EntityQueryResult),
     /// Template invocation result (template.invoke verb)
-    TemplateInvoked(super::custom_ops::template_ops::TemplateInvokeResult),
+    TemplateInvoked(crate::domain_ops::template_ops::TemplateInvokeResult),
     /// Template batch execution result (template.batch verb)
-    TemplateBatch(super::custom_ops::template_ops::TemplateBatchResult),
+    TemplateBatch(crate::domain_ops::template_ops::TemplateBatchResult),
     /// Batch control operation result (batch.pause, batch.resume, etc.)
-    BatchControl(super::custom_ops::batch_control_ops::BatchControlResult),
+    BatchControl(crate::domain_ops::batch_control_ops::BatchControlResult),
 }
 
 /// Execution context holding state during DSL execution

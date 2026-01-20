@@ -334,7 +334,7 @@ impl From<ExposureSummaryRow> for serde_json::Value {
 
 /// Register economic exposure operations with the registry
 pub fn register_economic_exposure_ops(
-    registry: &mut crate::dsl_v2::custom_ops::CustomOperationRegistry,
+    registry: &mut crate::domain_ops::CustomOperationRegistry,
 ) {
     registry.register(Arc::new(EconomicExposureComputeOp));
     registry.register(Arc::new(EconomicExposureSummaryOp));

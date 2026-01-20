@@ -40,6 +40,7 @@ mod investor_ops;
 mod investor_role_ops;
 mod kyc_case_ops;
 mod lifecycle_ops;
+mod manco_ops;
 mod matrix_overlay_ops;
 mod observation_ops;
 mod onboarding;
@@ -76,8 +77,9 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::ast::VerbCall;
-use super::executor::{ExecutionContext, ExecutionResult};
+// Re-export DSL types for use by operation implementations
+pub use crate::dsl_v2::ast::VerbCall;
+pub use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 pub use batch_control_ops::{
     BatchAbortOp, BatchAddProductsOp, BatchContinueOp, BatchControlResult, BatchPauseOp,
@@ -702,6 +704,9 @@ impl CustomOperationRegistry {
         // Research source loader operations (GLEIF, Companies House, SEC EDGAR)
         source_loader_ops::register_source_loader_ops(&mut registry);
 
+        // ManCo / Governance Controller operations
+        manco_ops::register_manco_ops(&mut registry);
+
         registry
     }
 
@@ -1004,6 +1009,16 @@ mod tests {
         assert!(registry.has("research.sec-edgar", "fetch-beneficial-owners"));
         assert!(registry.has("research.sec-edgar", "fetch-filings"));
         assert!(registry.has("research.sec-edgar", "import-company"));
+        // ManCo / Governance Controller operations
+        assert!(registry.has("manco", "bridge.manco-roles"));
+        assert!(registry.has("manco", "bridge.gleif-fund-managers"));
+        assert!(registry.has("manco", "bridge.bods-ownership"));
+        assert!(registry.has("manco", "group.derive"));
+        assert!(registry.has("manco", "group.cbus"));
+        assert!(registry.has("manco", "group.for-cbu"));
+        assert!(registry.has("manco", "primary-controller"));
+        assert!(registry.has("manco", "control-chain"));
+        assert!(registry.has("ownership", "control-links.compute"));
     }
 
     #[test]

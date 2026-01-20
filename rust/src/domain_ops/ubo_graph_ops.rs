@@ -13,8 +13,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::custom_ops::helpers::{extract_cbu_id, extract_entity_ref};
-use crate::dsl_v2::custom_ops::CustomOperation;
+use crate::domain_ops::helpers::{extract_cbu_id, extract_entity_ref};
+use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 #[cfg(feature = "database")]

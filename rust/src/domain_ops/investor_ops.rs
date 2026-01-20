@@ -953,7 +953,7 @@ impl CustomOperation for InvestorCountByStateOp {
 // ============================================================================
 
 /// Register all investor operations with the registry
-pub fn register_investor_ops(registry: &mut crate::dsl_v2::custom_ops::CustomOperationRegistry) {
+pub fn register_investor_ops(registry: &mut crate::domain_ops::CustomOperationRegistry) {
     use std::sync::Arc;
 
     registry.register(Arc::new(InvestorRequestDocumentsOp));

@@ -22,7 +22,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::dsl_v2::ast::VerbCall;
-use crate::dsl_v2::custom_ops::CustomOperation;
+use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 use crate::session::{
     ContextMode, DetailLevel, DrillDirection, GapType, IlluminateAspect, RedFlagCategory,

@@ -77,7 +77,6 @@ pub mod applicability_rules;
 #[cfg(feature = "database")]
 pub mod batch_executor;
 pub mod csg_linter;
-pub mod custom_ops;
 pub mod domain_context;
 pub mod enrichment;
 pub mod entity_deps;

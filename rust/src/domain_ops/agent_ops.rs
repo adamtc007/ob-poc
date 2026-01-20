@@ -875,7 +875,7 @@ impl CustomOperation for AgentSetModeOp {
 // ============================================================================
 
 /// Register all agent operations with the registry
-pub fn register_agent_ops(registry: &mut crate::dsl_v2::custom_ops::CustomOperationRegistry) {
+pub fn register_agent_ops(registry: &mut crate::domain_ops::CustomOperationRegistry) {
     use std::sync::Arc;
 
     // Lifecycle

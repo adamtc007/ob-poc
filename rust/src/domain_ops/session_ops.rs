@@ -1,13 +1,18 @@
-//! Simplified Session Operations (Phase 6)
+//! Session Operations - Astro Navigation Model
 //!
-//! 9 verbs instead of 20. Memory is truth, DB is backup.
+//! Metaphor hierarchy:
+//!   Universe  = All regions client operates in (global footprint)
+//!   Galaxy    = Regional (LU, DE, IE) - may have multiple ManCos
+//!   Cluster   = ManCo's controlled CBUs (gravitational grouping)
+//!   System    = Single CBU (solar system container)
 //!
 //! # Verbs
 //!
-//! - `session.load-cbu` - Load a CBU by ID
-//! - `session.load-jurisdiction` - Load all CBUs in a jurisdiction
-//! - `session.load-galaxy` - Load all CBUs under an apex entity
-//! - `session.unload-cbu` - Remove a CBU from session
+//! - `session.load-universe` - Load all CBUs (optionally filtered by client)
+//! - `session.load-galaxy` - Load all CBUs in a jurisdiction (regional)
+//! - `session.load-cluster` - Load all CBUs under a ManCo/governance controller
+//! - `session.load-system` - Load a single CBU
+//! - `session.unload-system` - Remove a CBU from session
 //! - `session.clear` - Clear all CBUs
 //! - `session.undo` - Undo last action
 //! - `session.redo` - Redo undone action
@@ -28,19 +33,66 @@ use uuid::Uuid;
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-use crate::session::{
-    CbuSummary, ClearResult, HistoryResult, JurisdictionCount, LoadCbuResult, LoadGalaxyResult,
-    LoadJurisdictionResult, SessionInfo, UnloadCbuResult,
-};
+use crate::session::{CbuSummary, ClearResult, HistoryResult, JurisdictionCount, SessionInfo};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
 // =============================================================================
+// RESULT TYPES
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadUniverseResult {
+    pub count_added: usize,
+    pub total_loaded: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadGalaxyResult {
+    pub jurisdiction: String,
+    pub count_added: usize,
+    pub total_loaded: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadClusterResult {
+    pub manco_name: String,
+    pub manco_entity_id: Uuid,
+    pub jurisdiction: Option<String>,
+    pub count_added: usize,
+    pub total_loaded: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadSystemResult {
+    pub cbu_id: Uuid,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+    pub total_loaded: usize,
+    pub was_new: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnloadSystemResult {
+    pub cbu_id: Uuid,
+    pub name: String,
+    pub total_loaded: usize,
+    pub was_present: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FilterJurisdictionResult {
+    pub jurisdiction: String,
+    pub count_kept: usize,
+    pub count_removed: usize,
+    pub total_loaded: usize,
+}
+
+// =============================================================================
 // HELPER FUNCTIONS
 // =============================================================================
 
-/// Extract a required UUID argument from verb call
 #[cfg(feature = "database")]
 fn get_required_uuid(verb_call: &VerbCall, key: &str, ctx: &ExecutionContext) -> Result<Uuid> {
     let arg = verb_call
@@ -49,7 +101,6 @@ fn get_required_uuid(verb_call: &VerbCall, key: &str, ctx: &ExecutionContext) ->
         .find(|a| a.key == key)
         .ok_or_else(|| anyhow::anyhow!("Missing required argument :{}", key))?;
 
-    // Try as symbol reference first
     if let Some(ref_name) = arg.value.as_symbol() {
         let resolved = ctx
             .resolve(ref_name)
@@ -57,12 +108,10 @@ fn get_required_uuid(verb_call: &VerbCall, key: &str, ctx: &ExecutionContext) ->
         return Ok(resolved);
     }
 
-    // Try as UUID directly
     if let Some(uuid_val) = arg.value.as_uuid() {
         return Ok(uuid_val);
     }
 
-    // Try as string (may be UUID string)
     if let Some(str_val) = arg.value.as_string() {
         return Uuid::parse_str(str_val)
             .map_err(|e| anyhow::anyhow!("Invalid UUID for :{}: {}", key, e));
@@ -71,7 +120,25 @@ fn get_required_uuid(verb_call: &VerbCall, key: &str, ctx: &ExecutionContext) ->
     Err(anyhow::anyhow!(":{} must be a UUID or @reference", key))
 }
 
-/// Extract an optional string argument from verb call
+#[cfg(feature = "database")]
+fn get_optional_uuid(verb_call: &VerbCall, key: &str, ctx: &ExecutionContext) -> Option<Uuid> {
+    let arg = verb_call.arguments.iter().find(|a| a.key == key)?;
+
+    if let Some(ref_name) = arg.value.as_symbol() {
+        return ctx.resolve(ref_name);
+    }
+
+    if let Some(uuid_val) = arg.value.as_uuid() {
+        return Some(uuid_val);
+    }
+
+    if let Some(str_val) = arg.value.as_string() {
+        return Uuid::parse_str(str_val).ok();
+    }
+
+    None
+}
+
 #[cfg(feature = "database")]
 fn get_optional_string(verb_call: &VerbCall, key: &str) -> Option<String> {
     verb_call
@@ -81,14 +148,12 @@ fn get_optional_string(verb_call: &VerbCall, key: &str) -> Option<String> {
         .and_then(|a| a.value.as_string().map(|s| s.to_string()))
 }
 
-/// Extract a required string argument from verb call
 #[cfg(feature = "database")]
 fn get_required_string(verb_call: &VerbCall, key: &str) -> Result<String> {
     get_optional_string(verb_call, key)
         .ok_or_else(|| anyhow::anyhow!("Missing required argument :{}", key))
 }
 
-/// Extract an optional integer argument from verb call
 #[cfg(feature = "database")]
 fn get_optional_integer(verb_call: &VerbCall, key: &str) -> Option<i64> {
     verb_call
@@ -99,24 +164,253 @@ fn get_optional_integer(verb_call: &VerbCall, key: &str) -> Option<i64> {
 }
 
 // =============================================================================
-// LOAD-CBU
+// LOAD-UNIVERSE (all CBUs, optionally filtered by client)
 // =============================================================================
 
-/// Load a single CBU into the session
-pub struct SessionLoadCbuOp;
+pub struct SessionLoadUniverseOp;
 
 #[async_trait]
-impl CustomOperation for SessionLoadCbuOp {
+impl CustomOperation for SessionLoadUniverseOp {
     fn domain(&self) -> &'static str {
         "session"
     }
 
     fn verb(&self) -> &'static str {
-        "load-cbu"
+        "load-universe"
     }
 
     fn rationale(&self) -> &'static str {
-        "Loads a CBU into the session by ID"
+        "Loads all CBUs into the session (Universe = global footprint)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let client_id = get_optional_uuid(verb_call, "client-id", ctx);
+
+        // Fetch all CBU IDs (optionally filtered by client/apex entity)
+        let cbu_ids: Vec<Uuid> = if let Some(client_id) = client_id {
+            sqlx::query_scalar!(
+                r#"
+                SELECT DISTINCT c.cbu_id as "cbu_id!"
+                FROM "ob-poc".cbus c
+                LEFT JOIN "ob-poc".cbu_groups g ON g.manco_entity_id = $1
+                LEFT JOIN "ob-poc".cbu_group_members gm ON gm.group_id = g.group_id AND gm.cbu_id = c.cbu_id
+                WHERE c.commercial_client_entity_id = $1
+                   OR gm.cbu_id IS NOT NULL
+                "#,
+                client_id
+            )
+            .fetch_all(pool)
+            .await?
+        } else {
+            sqlx::query_scalar!(r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus"#)
+                .fetch_all(pool)
+                .await?
+        };
+
+        let session = ctx.get_or_create_cbu_session_mut();
+        let count_added = session.load_many(cbu_ids);
+
+        let result = LoadUniverseResult {
+            count_added,
+            total_loaded: session.count(),
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
+// LOAD-GALAXY (all CBUs in a jurisdiction/region)
+// =============================================================================
+
+pub struct SessionLoadGalaxyOp;
+
+#[async_trait]
+impl CustomOperation for SessionLoadGalaxyOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "load-galaxy"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Loads all CBUs in a jurisdiction (Galaxy = regional)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let jurisdiction = get_required_string(verb_call, "jurisdiction")?;
+
+        let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
+            r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus WHERE jurisdiction = $1"#,
+            jurisdiction
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let session = ctx.get_or_create_cbu_session_mut();
+        let count_added = session.load_many(cbu_ids);
+
+        let result = LoadGalaxyResult {
+            jurisdiction,
+            count_added,
+            total_loaded: session.count(),
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
+// LOAD-CLUSTER (all CBUs under a ManCo/governance controller)
+// =============================================================================
+
+pub struct SessionLoadClusterOp;
+
+#[async_trait]
+impl CustomOperation for SessionLoadClusterOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "load-cluster"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Loads all CBUs under a ManCo/governance controller (Cluster = ManCo's sphere)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let manco_entity_id = get_required_uuid(verb_call, "manco-entity-id", ctx)?;
+        let jurisdiction = get_optional_string(verb_call, "jurisdiction");
+
+        // Get ManCo name
+        let manco_name: String = sqlx::query_scalar!(
+            r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#,
+            manco_entity_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("ManCo entity not found: {}", manco_entity_id))?;
+
+        // Find all CBUs under this governance controller via cbu_groups
+        // Falls back to commercial_client_entity_id if no group exists
+        let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
+            r#"
+            SELECT DISTINCT gm.cbu_id as "cbu_id!"
+            FROM "ob-poc".cbu_groups g
+            JOIN "ob-poc".cbu_group_members gm ON gm.group_id = g.group_id
+            WHERE g.manco_entity_id = $1
+              AND g.effective_to IS NULL
+              AND gm.effective_to IS NULL
+              AND ($2::text IS NULL OR g.jurisdiction = $2)
+            UNION
+            -- Fallback: direct commercial_client_entity_id link (for CBUs not yet in groups)
+            SELECT c.cbu_id as "cbu_id!"
+            FROM "ob-poc".cbus c
+            WHERE c.commercial_client_entity_id = $1
+              AND ($2::text IS NULL OR c.jurisdiction = $2)
+              AND NOT EXISTS (
+                  SELECT 1 FROM "ob-poc".cbu_group_members gm2
+                  JOIN "ob-poc".cbu_groups g2 ON g2.group_id = gm2.group_id
+                  WHERE gm2.cbu_id = c.cbu_id
+                    AND g2.manco_entity_id = $1
+                    AND g2.effective_to IS NULL
+                    AND gm2.effective_to IS NULL
+              )
+            "#,
+            manco_entity_id,
+            jurisdiction.as_deref()
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let session = ctx.get_or_create_cbu_session_mut();
+        let count_added = session.load_many(cbu_ids);
+
+        let result = LoadClusterResult {
+            manco_name,
+            manco_entity_id,
+            jurisdiction,
+            count_added,
+            total_loaded: session.count(),
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
+// LOAD-SYSTEM (single CBU)
+// =============================================================================
+
+pub struct SessionLoadSystemOp;
+
+#[async_trait]
+impl CustomOperation for SessionLoadSystemOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "load-system"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Loads a single CBU into the session (System = solar system container)"
     }
 
     #[cfg(feature = "database")]
@@ -128,25 +422,18 @@ impl CustomOperation for SessionLoadCbuOp {
     ) -> Result<ExecutionResult> {
         let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
 
-        // Fetch CBU details from DB
         let cbu = sqlx::query!(
-            r#"
-            SELECT cbu_id, name, jurisdiction
-            FROM "ob-poc".cbus
-            WHERE cbu_id = $1
-            "#,
+            r#"SELECT cbu_id, name, jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1"#,
             cbu_id
         )
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
 
-        // Get or create session from context
-        // NOTE: Session is stored in pending_session field and propagated by caller
         let session = ctx.get_or_create_cbu_session_mut();
         let was_new = session.load_cbu(cbu_id);
 
-        let result = LoadCbuResult {
+        let result = LoadSystemResult {
             cbu_id,
             name: cbu.name,
             jurisdiction: cbu.jurisdiction,
@@ -170,165 +457,19 @@ impl CustomOperation for SessionLoadCbuOp {
 }
 
 // =============================================================================
-// LOAD-JURISDICTION
+// UNLOAD-SYSTEM (remove a CBU)
 // =============================================================================
 
-/// Load all CBUs in a jurisdiction
-pub struct SessionLoadJurisdictionOp;
+pub struct SessionUnloadSystemOp;
 
 #[async_trait]
-impl CustomOperation for SessionLoadJurisdictionOp {
+impl CustomOperation for SessionUnloadSystemOp {
     fn domain(&self) -> &'static str {
         "session"
     }
 
     fn verb(&self) -> &'static str {
-        "load-jurisdiction"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Loads all CBUs in a jurisdiction into the session"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let jurisdiction = get_required_string(verb_call, "jurisdiction")?;
-
-        // Fetch all CBU IDs in the jurisdiction
-        let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
-            r#"
-            SELECT cbu_id
-            FROM "ob-poc".cbus
-            WHERE jurisdiction = $1
-            "#,
-            jurisdiction
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let session = ctx.get_or_create_cbu_session_mut();
-        let count_added = session.load_many(cbu_ids);
-
-        let result = LoadJurisdictionResult {
-            jurisdiction,
-            count_added,
-            total_loaded: session.count(),
-        };
-
-        Ok(ExecutionResult::Record(json!(result)))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for session operations"
-        ))
-    }
-}
-
-// =============================================================================
-// LOAD-GALAXY
-// =============================================================================
-
-/// Load all CBUs under an apex entity
-pub struct SessionLoadGalaxyOp;
-
-#[async_trait]
-impl CustomOperation for SessionLoadGalaxyOp {
-    fn domain(&self) -> &'static str {
-        "session"
-    }
-
-    fn verb(&self) -> &'static str {
-        "load-galaxy"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Loads all CBUs under an apex entity (commercial client group)"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let apex_entity_id = get_required_uuid(verb_call, "apex-entity-id", ctx)?;
-
-        // Get apex name
-        let apex_name: String = sqlx::query_scalar!(
-            r#"
-            SELECT name
-            FROM "ob-poc".entities
-            WHERE entity_id = $1
-            "#,
-            apex_entity_id
-        )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Apex entity not found: {}", apex_entity_id))?;
-
-        // Find all CBUs under this apex via commercial_client_entity_id
-        let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
-            r#"
-            SELECT cbu_id
-            FROM "ob-poc".cbus
-            WHERE commercial_client_entity_id = $1
-            "#,
-            apex_entity_id
-        )
-        .fetch_all(pool)
-        .await?;
-
-        let session = ctx.get_or_create_cbu_session_mut();
-        let count_added = session.load_many(cbu_ids);
-
-        let result = LoadGalaxyResult {
-            apex_name,
-            count_added,
-            total_loaded: session.count(),
-        };
-
-        Ok(ExecutionResult::Record(json!(result)))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for session operations"
-        ))
-    }
-}
-
-// =============================================================================
-// UNLOAD-CBU
-// =============================================================================
-
-/// Unload a CBU from the session
-pub struct SessionUnloadCbuOp;
-
-#[async_trait]
-impl CustomOperation for SessionUnloadCbuOp {
-    fn domain(&self) -> &'static str {
-        "session"
-    }
-
-    fn verb(&self) -> &'static str {
-        "unload-cbu"
+        "unload-system"
     }
 
     fn rationale(&self) -> &'static str {
@@ -344,7 +485,6 @@ impl CustomOperation for SessionUnloadCbuOp {
     ) -> Result<ExecutionResult> {
         let cbu_id = get_required_uuid(verb_call, "cbu-id", ctx)?;
 
-        // Get CBU name for response (optional, may not exist)
         let name: String = sqlx::query_scalar!(
             r#"SELECT name FROM "ob-poc".cbus WHERE cbu_id = $1"#,
             cbu_id
@@ -356,7 +496,7 @@ impl CustomOperation for SessionUnloadCbuOp {
         let session = ctx.get_or_create_cbu_session_mut();
         let was_present = session.unload_cbu(cbu_id);
 
-        let result = UnloadCbuResult {
+        let result = UnloadSystemResult {
             cbu_id,
             name,
             total_loaded: session.count(),
@@ -379,14 +519,89 @@ impl CustomOperation for SessionUnloadCbuOp {
 }
 
 // =============================================================================
+// FILTER-JURISDICTION (narrow scope)
+// =============================================================================
+
+pub struct SessionFilterJurisdictionOp;
+
+#[async_trait]
+impl CustomOperation for SessionFilterJurisdictionOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "filter-jurisdiction"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Narrows session scope to only CBUs in a specific jurisdiction"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let jurisdiction = get_required_string(verb_call, "jurisdiction")?;
+
+        let session = ctx.get_or_create_cbu_session_mut();
+        let before_count = session.count();
+        let current_cbu_ids = session.cbu_ids_vec();
+
+        if current_cbu_ids.is_empty() {
+            return Ok(ExecutionResult::Record(json!(FilterJurisdictionResult {
+                jurisdiction,
+                count_kept: 0,
+                count_removed: 0,
+                total_loaded: 0,
+            })));
+        }
+
+        let matching_cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
+            r#"SELECT cbu_id as "cbu_id!" FROM "ob-poc".cbus WHERE cbu_id = ANY($1) AND jurisdiction = $2"#,
+            &current_cbu_ids,
+            &jurisdiction
+        )
+        .fetch_all(pool)
+        .await?;
+
+        session.clear();
+        let count_kept = session.load_many(matching_cbu_ids);
+        let count_removed = before_count - count_kept;
+
+        let result = FilterJurisdictionResult {
+            jurisdiction,
+            count_kept,
+            count_removed,
+            total_loaded: session.count(),
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
 // CLEAR
 // =============================================================================
 
-/// Clear all CBUs from the session
-pub struct SessionClearOp2;
+pub struct SessionClearOp;
 
 #[async_trait]
-impl CustomOperation for SessionClearOp2 {
+impl CustomOperation for SessionClearOp {
     fn domain(&self) -> &'static str {
         "session"
     }
@@ -408,10 +623,9 @@ impl CustomOperation for SessionClearOp2 {
     ) -> Result<ExecutionResult> {
         let session = ctx.get_or_create_cbu_session_mut();
         let count_removed = session.clear();
-
-        let result = ClearResult { count_removed };
-
-        Ok(ExecutionResult::Record(json!(result)))
+        Ok(ExecutionResult::Record(json!(ClearResult {
+            count_removed
+        })))
     }
 
     #[cfg(not(feature = "database"))]
@@ -430,7 +644,6 @@ impl CustomOperation for SessionClearOp2 {
 // UNDO
 // =============================================================================
 
-/// Undo last session action
 pub struct SessionUndoOp;
 
 #[async_trait]
@@ -483,7 +696,6 @@ impl CustomOperation for SessionUndoOp {
 // REDO
 // =============================================================================
 
-/// Redo previously undone action
 pub struct SessionRedoOp;
 
 #[async_trait]
@@ -536,11 +748,10 @@ impl CustomOperation for SessionRedoOp {
 // INFO
 // =============================================================================
 
-/// Get session info
-pub struct SessionInfoOp2;
+pub struct SessionInfoOp;
 
 #[async_trait]
-impl CustomOperation for SessionInfoOp2 {
+impl CustomOperation for SessionInfoOp {
     fn domain(&self) -> &'static str {
         "session"
     }
@@ -563,7 +774,6 @@ impl CustomOperation for SessionInfoOp2 {
         let session = ctx.get_or_create_cbu_session_mut();
         let cbu_ids = session.cbu_ids_vec();
 
-        // Get jurisdiction breakdown
         let jurisdictions: Vec<JurisdictionCount> = if cbu_ids.is_empty() {
             vec![]
         } else {
@@ -615,7 +825,6 @@ impl CustomOperation for SessionInfoOp2 {
 // LIST
 // =============================================================================
 
-/// List CBUs in the session
 pub struct SessionListOp;
 
 #[async_trait]
@@ -686,115 +895,29 @@ impl CustomOperation for SessionListOp {
 }
 
 // =============================================================================
-// FILTER-JURISDICTION (Narrow scope to single jurisdiction)
-// =============================================================================
-
-/// Filter result type
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FilterJurisdictionResult {
-    pub jurisdiction: String,
-    pub count_kept: usize,
-    pub count_removed: usize,
-    pub total_loaded: usize,
-}
-
-/// Narrow session scope to only CBUs in a specific jurisdiction
-pub struct SessionFilterJurisdictionOp;
-
-#[async_trait]
-impl CustomOperation for SessionFilterJurisdictionOp {
-    fn domain(&self) -> &'static str {
-        "session"
-    }
-
-    fn verb(&self) -> &'static str {
-        "filter-jurisdiction"
-    }
-
-    fn rationale(&self) -> &'static str {
-        "Narrows session scope to only CBUs in a specific jurisdiction"
-    }
-
-    #[cfg(feature = "database")]
-    async fn execute(
-        &self,
-        verb_call: &VerbCall,
-        ctx: &mut ExecutionContext,
-        pool: &PgPool,
-    ) -> Result<ExecutionResult> {
-        let jurisdiction = get_required_string(verb_call, "jurisdiction")?;
-
-        let session = ctx.get_or_create_cbu_session_mut();
-        let before_count = session.count();
-
-        // Get current CBU IDs
-        let current_cbu_ids = session.cbu_ids_vec();
-
-        if current_cbu_ids.is_empty() {
-            return Ok(ExecutionResult::Record(json!(FilterJurisdictionResult {
-                jurisdiction,
-                count_kept: 0,
-                count_removed: 0,
-                total_loaded: 0,
-            })));
-        }
-
-        // Query which of our CBUs match the jurisdiction
-        let matching_cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
-            r#"
-            SELECT cbu_id
-            FROM "ob-poc".cbus
-            WHERE cbu_id = ANY($1) AND jurisdiction = $2
-            "#,
-            &current_cbu_ids,
-            &jurisdiction
-        )
-        .fetch_all(pool)
-        .await?;
-
-        // Clear and reload with only matching CBUs (this pushes history)
-        session.clear();
-        let count_kept = session.load_many(matching_cbu_ids);
-        let count_removed = before_count - count_kept;
-
-        let result = FilterJurisdictionResult {
-            jurisdiction,
-            count_kept,
-            count_removed,
-            total_loaded: session.count(),
-        };
-
-        Ok(ExecutionResult::Record(json!(result)))
-    }
-
-    #[cfg(not(feature = "database"))]
-    async fn execute(
-        &self,
-        _verb_call: &VerbCall,
-        _ctx: &mut ExecutionContext,
-    ) -> Result<ExecutionResult> {
-        Err(anyhow::anyhow!(
-            "Database feature required for session operations"
-        ))
-    }
-}
-
-// =============================================================================
 // REGISTRATION
 // =============================================================================
 
-/// Register all v2 session operations with the registry
-pub fn register_session_ops_v2(registry: &mut crate::dsl_v2::custom_ops::CustomOperationRegistry) {
+/// Register all session operations with the registry (Astro model)
+pub fn register_session_ops_v2(registry: &mut crate::domain_ops::CustomOperationRegistry) {
     use std::sync::Arc;
 
-    registry.register(Arc::new(SessionLoadCbuOp));
-    registry.register(Arc::new(SessionLoadJurisdictionOp));
+    // Load verbs (Universe → Galaxy → Cluster → System)
+    registry.register(Arc::new(SessionLoadUniverseOp));
     registry.register(Arc::new(SessionLoadGalaxyOp));
+    registry.register(Arc::new(SessionLoadClusterOp));
+    registry.register(Arc::new(SessionLoadSystemOp));
+
+    // Unload/filter
+    registry.register(Arc::new(SessionUnloadSystemOp));
     registry.register(Arc::new(SessionFilterJurisdictionOp));
-    registry.register(Arc::new(SessionUnloadCbuOp));
-    registry.register(Arc::new(SessionClearOp2));
+    registry.register(Arc::new(SessionClearOp));
+
+    // History
     registry.register(Arc::new(SessionUndoOp));
     registry.register(Arc::new(SessionRedoOp));
-    registry.register(Arc::new(SessionInfoOp2));
+
+    // Query
+    registry.register(Arc::new(SessionInfoOp));
     registry.register(Arc::new(SessionListOp));
 }

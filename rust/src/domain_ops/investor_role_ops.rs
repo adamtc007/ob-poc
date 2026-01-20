@@ -330,7 +330,7 @@ impl From<RoleProfileRow> for serde_json::Value {
 
 /// Register investor role operations with the registry
 pub fn register_investor_role_ops(
-    registry: &mut crate::dsl_v2::custom_ops::CustomOperationRegistry,
+    registry: &mut crate::domain_ops::CustomOperationRegistry,
 ) {
     registry.register(Arc::new(InvestorRoleSetOp));
     registry.register(Arc::new(InvestorRoleReadAsOfOp));
