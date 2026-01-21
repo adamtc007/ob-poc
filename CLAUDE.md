@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-21 (Intent Pipeline Fixes complete)
+> **Last reviewed:** 2026-01-21
 > **Crates:** 14 Rust crates
 > **Verbs:** 938 verbs, 7397 intent patterns (DB-sourced)
-> **Migrations:** 37 schema migrations
-> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2) - 7928 patterns vectorized
+> **Migrations:** 44 schema migrations
+> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2) - 7397 patterns vectorized
 > **ESPER Navigation:** ✅ Complete - 48 commands, trie + semantic fallback
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
@@ -12,7 +12,8 @@
 > **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
-> **Intent Pipeline Fixes (042):** ✅ Complete - Schema-based resolution, single embed, fail-early
+> **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
+> **Teaching Mechanism (044):** ✅ Complete - Direct phrase→verb mapping for trusted sources
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
