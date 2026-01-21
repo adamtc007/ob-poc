@@ -302,3 +302,99 @@ domains:
               hybrid (checkpoints on ambiguous)
         returns:
           type: affected
+
+      # ============================================
+      # Teaching Operations (Direct Pattern Learning)
+      # ============================================
+      teach:
+        description: Teach a phrase→verb mapping to improve intent recognition
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: phrase_mapping
+        behavior: plugin
+        handler: AgentTeachOp
+        invocation_phrases:
+          - "teach the system"
+          - "learn this phrase"
+          - "remember this mapping"
+          - "when I say X do Y"
+        args:
+          - name: phrase
+            type: string
+            required: true
+            description: The phrase to teach (will be normalized)
+          - name: verb
+            type: string
+            required: true
+            description: The DSL verb it should trigger (e.g., 'cbu.create')
+          - name: source
+            type: string
+            required: false
+            default: dsl_teaching
+            description: Source identifier for audit trail
+        returns:
+          type: record
+          capture: false
+
+      unteach:
+        description: Remove a previously taught phrase→verb mapping
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: phrase_mapping
+        behavior: plugin
+        handler: AgentUnteachOp
+        invocation_phrases:
+          - "unteach"
+          - "forget this phrase"
+          - "remove this mapping"
+          - "unlearn"
+        args:
+          - name: phrase
+            type: string
+            required: true
+            description: The phrase to remove
+          - name: verb
+            type: string
+            required: false
+            description: The verb it was mapped to (optional, removes all if not specified)
+          - name: reason
+            type: string
+            required: false
+            default: dsl_unteach
+            description: Reason for removal (for audit)
+        returns:
+          type: record
+          capture: false
+
+      teaching-status:
+        description: Show recently taught patterns and their embedding status
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: global
+          noun: phrase_mapping
+        behavior: plugin
+        handler: AgentTeachingStatusOp
+        invocation_phrases:
+          - "teaching status"
+          - "what have I taught"
+          - "show taught phrases"
+          - "list learned patterns"
+        args:
+          - name: limit
+            type: integer
+            required: false
+            default: 20
+            description: Maximum patterns to return
+          - name: include-stats
+            type: boolean
+            required: false
+            default: true
+            description: Include aggregate statistics
+        returns:
+          type: record
+          capture: false

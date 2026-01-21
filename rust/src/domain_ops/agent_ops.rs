@@ -20,6 +20,10 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+// chrono is used for teaching status timestamps
+#[allow(unused_imports)]
+use chrono;
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -871,6 +875,255 @@ impl CustomOperation for AgentSetModeOp {
 }
 
 // ============================================================================
+// Teaching Operations (Direct Pattern Learning)
+// ============================================================================
+
+/// Teach a phrase→verb mapping to improve intent recognition
+pub struct AgentTeachOp;
+
+#[async_trait]
+impl CustomOperation for AgentTeachOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "teach"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Teaches a phrase→verb mapping for improved intent recognition"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let phrase = get_required_string(verb_call, "phrase")?;
+        let verb = get_required_string(verb_call, "verb")?;
+        let source =
+            get_optional_string(verb_call, "source").unwrap_or_else(|| "dsl_teaching".to_string());
+
+        // Call the database function
+        let result: (bool,) = sqlx::query_as(r#"SELECT agent.teach_phrase($1, $2, $3)"#)
+            .bind(&phrase)
+            .bind(&verb)
+            .bind(&source)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to teach phrase: {}", e))?;
+
+        if result.0 {
+            Ok(ExecutionResult::Record(json!({
+                "success": true,
+                "taught": true,
+                "phrase": phrase,
+                "verb": verb,
+                "source": source,
+                "message": format!("Taught: '{}' → {}", phrase, verb),
+                "needs_reembed": true,
+                "hint": "Run populate_embeddings to enable semantic matching for the new pattern"
+            })))
+        } else {
+            Ok(ExecutionResult::Record(json!({
+                "success": false,
+                "taught": false,
+                "phrase": phrase,
+                "verb": verb,
+                "error": "Pattern already exists or verb not found"
+            })))
+        }
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for teaching operations"
+        ))
+    }
+}
+
+/// Remove a previously taught phrase→verb mapping
+pub struct AgentUnteachOp;
+
+#[async_trait]
+impl CustomOperation for AgentUnteachOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "unteach"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Removes a taught phrase→verb mapping"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let phrase = get_required_string(verb_call, "phrase")?;
+        let verb = get_optional_string(verb_call, "verb");
+        let reason =
+            get_optional_string(verb_call, "reason").unwrap_or_else(|| "dsl_unteach".to_string());
+
+        // Call the database function
+        let result: (i32,) = sqlx::query_as(r#"SELECT agent.unteach_phrase($1, $2, $3)"#)
+            .bind(&phrase)
+            .bind(verb.as_deref())
+            .bind(&reason)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to unteach phrase: {}", e))?;
+
+        let removed_count = result.0;
+
+        Ok(ExecutionResult::Record(json!({
+            "success": true,
+            "untaught": removed_count > 0,
+            "phrase": phrase,
+            "verb": verb,
+            "removed_count": removed_count,
+            "message": if removed_count > 0 {
+                format!("Removed {} pattern(s) for phrase '{}'", removed_count, phrase)
+            } else {
+                "No matching patterns found to remove".to_string()
+            }
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for teaching operations"
+        ))
+    }
+}
+
+/// Show recently taught patterns and their embedding status
+pub struct AgentTeachingStatusOp;
+
+#[async_trait]
+impl CustomOperation for AgentTeachingStatusOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "teaching-status"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Shows recently taught patterns and statistics"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let limit = get_optional_integer(verb_call, "limit").unwrap_or(20) as i32;
+        let include_stats = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "include-stats")
+            .and_then(|a| a.value.as_boolean())
+            .unwrap_or(true);
+
+        // Get recently taught patterns
+        let recent: Vec<(String, String, String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
+            r#"
+            SELECT phrase, verb, source, taught_at
+            FROM agent.v_recently_taught
+            ORDER BY taught_at DESC
+            LIMIT $1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to get recently taught: {}", e))?;
+
+        let recent_json: Vec<serde_json::Value> = recent
+            .iter()
+            .map(|(phrase, verb, source, taught_at)| {
+                json!({
+                    "phrase": phrase,
+                    "verb": verb,
+                    "source": source,
+                    "taught_at": taught_at.to_rfc3339()
+                })
+            })
+            .collect();
+
+        // Get stats if requested
+        let stats = if include_stats {
+            let row: Option<(i64, i64, i64, Option<chrono::DateTime<chrono::Utc>>)> =
+                sqlx::query_as(
+                    r#"
+                    SELECT
+                        total_taught,
+                        taught_today,
+                        taught_this_week,
+                        most_recent
+                    FROM agent.v_teaching_stats
+                    "#,
+                )
+                .fetch_optional(pool)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to get teaching stats: {}", e))?;
+
+            row.map(|(total, today, week, most_recent)| {
+                json!({
+                    "total_taught": total,
+                    "taught_today": today,
+                    "taught_this_week": week,
+                    "most_recent": most_recent.map(|t| t.to_rfc3339())
+                })
+            })
+        } else {
+            None
+        };
+
+        Ok(ExecutionResult::Record(json!({
+            "success": true,
+            "recent_count": recent_json.len(),
+            "recent": recent_json,
+            "stats": stats
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for teaching operations"
+        ))
+    }
+}
+
+// ============================================================================
 // Registration
 // ============================================================================
 
@@ -896,4 +1149,9 @@ pub fn register_agent_ops(registry: &mut crate::domain_ops::CustomOperationRegis
     // Configuration
     registry.register(Arc::new(AgentSetThresholdOp));
     registry.register(Arc::new(AgentSetModeOp));
+
+    // Teaching
+    registry.register(Arc::new(AgentTeachOp));
+    registry.register(Arc::new(AgentUnteachOp));
+    registry.register(Arc::new(AgentTeachingStatusOp));
 }

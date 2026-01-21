@@ -6399,13 +6399,12 @@ impl ToolHandlers {
     }
 
     // =========================================================================
-    // Teaching Tools (Direct Phrase→Verb Mapping)
+    // Teaching Tools (via DSL verbs)
     // =========================================================================
 
-    /// Teach a phrase→verb mapping directly (bypasses candidate staging)
+    /// Teach a phrase→verb mapping via DSL execution
     ///
-    /// This is for trusted sources (admin, Claude) to directly add patterns
-    /// without going through the candidate promotion pipeline.
+    /// Routes through: (agent.teach :phrase "..." :verb "...")
     async fn teach_phrase(&self, args: Value) -> Result<Value> {
         let phrase = args
             .get("phrase")
@@ -6420,146 +6419,74 @@ impl ToolHandlers {
             .and_then(|v| v.as_str())
             .unwrap_or("mcp_teaching");
 
-        // Call the database function
-        let result: (bool,) = sqlx::query_as(r#"SELECT agent.teach_phrase($1, $2, $3)"#)
-            .bind(phrase)
-            .bind(verb)
-            .bind(source)
-            .fetch_one(&self.pool)
-            .await?;
+        // Build DSL and execute via dsl_execute
+        let dsl = format!(
+            r#"(agent.teach :phrase "{}" :verb "{}" :source "{}")"#,
+            phrase.replace('"', r#"\""#),
+            verb,
+            source
+        );
 
-        if result.0 {
-            Ok(json!({
-                "success": true,
-                "taught": true,
-                "phrase": phrase,
-                "verb": verb,
-                "source": source,
-                "message": format!("Taught: '{}' → {}", phrase, verb),
-                "needs_reembed": true,
-                "hint": "Run populate_embeddings to enable semantic matching for the new pattern"
-            }))
-        } else {
-            Ok(json!({
-                "success": false,
-                "taught": false,
-                "phrase": phrase,
-                "verb": verb,
-                "error": "Verb not found or phrase empty"
-            }))
-        }
+        self.dsl_execute(json!({
+            "source": dsl,
+            "intent": format!("teach phrase '{}' → {}", phrase, verb)
+        }))
+        .await
     }
 
-    /// Remove a taught phrase→verb mapping
+    /// Remove a taught phrase→verb mapping via DSL execution
+    ///
+    /// Routes through: (agent.unteach :phrase "..." [:verb "..."] [:reason "..."])
     async fn unteach_phrase(&self, args: Value) -> Result<Value> {
         let phrase = args
             .get("phrase")
             .and_then(|v| v.as_str())
             .ok_or_else(|| anyhow!("phrase required"))?;
-        let verb = args.get("verb").and_then(|v| v.as_str()); // Optional: if provided, only untag that specific verb
+        let verb = args.get("verb").and_then(|v| v.as_str());
         let reason = args
             .get("reason")
             .and_then(|v| v.as_str())
             .unwrap_or("mcp_unteach");
 
-        // Call the database function
-        let result: (i32,) = sqlx::query_as(r#"SELECT agent.unteach_phrase($1, $2, $3)"#)
-            .bind(phrase)
-            .bind(verb)
-            .bind(reason)
-            .fetch_one(&self.pool)
-            .await?;
+        // Build DSL with optional verb arg
+        let verb_arg = verb
+            .map(|v| format!(r#" :verb "{}""#, v))
+            .unwrap_or_default();
 
-        let removed_count = result.0;
+        let dsl = format!(
+            r#"(agent.unteach :phrase "{}"{} :reason "{}")"#,
+            phrase.replace('"', r#"\""#),
+            verb_arg,
+            reason
+        );
 
-        if removed_count > 0 {
-            Ok(json!({
-                "success": true,
-                "untaught": true,
-                "phrase": phrase,
-                "verb": verb,
-                "removed_count": removed_count,
-                "message": format!("Removed {} pattern(s) for phrase '{}'", removed_count, phrase)
-            }))
-        } else {
-            Ok(json!({
-                "success": true,
-                "untaught": false,
-                "phrase": phrase,
-                "verb": verb,
-                "removed_count": 0,
-                "message": "No matching patterns found to remove"
-            }))
-        }
+        self.dsl_execute(json!({
+            "source": dsl,
+            "intent": format!("unteach phrase '{}'", phrase)
+        }))
+        .await
     }
 
-    /// Get teaching status and recently taught patterns
+    /// Get teaching status via DSL execution
+    ///
+    /// Routes through: (agent.teaching-status [:limit N] [:include-stats true/false])
     async fn teaching_status(&self, args: Value) -> Result<Value> {
-        let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20) as i32;
+        let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20);
         let include_stats = args
             .get("include_stats")
             .and_then(|v| v.as_bool())
             .unwrap_or(true);
 
-        // Get recently taught patterns
-        let recent: Vec<(String, String, String, chrono::DateTime<chrono::Utc>)> = sqlx::query_as(
-            r#"
-            SELECT phrase, verb, source, taught_at
-            FROM agent.v_recently_taught
-            ORDER BY taught_at DESC
-            LIMIT $1
-            "#,
-        )
-        .bind(limit)
-        .fetch_all(&self.pool)
-        .await?;
+        let dsl = format!(
+            r#"(agent.teaching-status :limit {} :include-stats {})"#,
+            limit, include_stats
+        );
 
-        let recent_json: Vec<_> = recent
-            .iter()
-            .map(|(phrase, verb, source, taught_at)| {
-                json!({
-                    "phrase": phrase,
-                    "verb": verb,
-                    "source": source,
-                    "taught_at": taught_at.to_rfc3339()
-                })
-            })
-            .collect();
-
-        // Get stats if requested
-        let stats = if include_stats {
-            let row: Option<(i64, i64, i64, Option<chrono::DateTime<chrono::Utc>>)> =
-                sqlx::query_as(
-                    r#"
-                    SELECT
-                        total_taught,
-                        taught_today,
-                        taught_this_week,
-                        most_recent
-                    FROM agent.v_teaching_stats
-                    "#,
-                )
-                .fetch_optional(&self.pool)
-                .await?;
-
-            row.map(|(total, today, week, most_recent)| {
-                json!({
-                    "total_taught": total,
-                    "taught_today": today,
-                    "taught_this_week": week,
-                    "most_recent": most_recent.map(|t| t.to_rfc3339())
-                })
-            })
-        } else {
-            None
-        };
-
-        Ok(json!({
-            "success": true,
-            "recent_count": recent_json.len(),
-            "recent": recent_json,
-            "stats": stats
+        self.dsl_execute(json!({
+            "source": dsl,
+            "intent": "get teaching status"
         }))
+        .await
     }
 }
 
