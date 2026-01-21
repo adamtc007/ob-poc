@@ -2112,6 +2112,33 @@ fn generate_commands_help() -> String {
 |---------|-------------|
 | `trading_matrix_get` | Get trading matrix summary for a CBU |
 
+## Learning & Feedback
+| Command | Description |
+|---------|-------------|
+| `verb_search` | Search for verbs matching natural language |
+| `intent_feedback` | Record user correction for learning loop |
+| `learning_analyze` | Analyze unmatched phrases for learning |
+| `learning_apply` | Apply a pattern→verb mapping |
+| `embeddings_status` | Check embedding coverage stats |
+
+## Promotion Pipeline (Quality-Gated Learning)
+| Command | Description |
+|---------|-------------|
+| `promotion_run_cycle` | Run full promotion pipeline manually |
+| `promotion_candidates` | List candidates ready for auto-promotion |
+| `promotion_review_queue` | List candidates needing manual review |
+| `promotion_approve` | Manually approve a candidate |
+| `promotion_reject` | Reject and add to blocklist |
+| `promotion_health` | Weekly health metrics |
+| `promotion_pipeline_status` | Pipeline summary by status |
+
+## Teaching (Direct Pattern Learning)
+| Command | Description |
+|---------|-------------|
+| `teach_phrase` | Directly add phrase→verb mapping |
+| `unteach_phrase` | Remove a taught mapping (with audit) |
+| `teaching_status` | View recently taught patterns and stats |
+
 ## View Commands (Natural Language)
 | Say | Effect |
 |-----|--------|
