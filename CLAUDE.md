@@ -133,6 +133,56 @@ pub use ob_poc_types::manco_group::{
 
 ---
 
+## Agent Chat `/commands` Help
+
+The agent chat includes a built-in help system. Type `/commands` to see available operations with natural language examples.
+
+**Chat Commands:**
+| Command | Description |
+|---------|-------------|
+| `/commands` | Full command reference with natural language examples |
+| `/verbs` | List all DSL verbs |
+| `/verbs <domain>` | Verbs for specific domain (e.g., `/verbs kyc`, `/verbs session`) |
+| `/help` | Quick help |
+
+**Categories in `/commands`:**
+
+| Section | Content |
+|---------|---------|
+| **DSL Operations** | `dsl_validate`, `dsl_execute`, `dsl_generate` with NL examples |
+| **Session & Navigation** | Load/unload CBUs, undo/redo, scope management |
+| **CBU & Entity** | Create, search, roles, products |
+| **View & Zoom (ESPER)** | "enhance", "drill", "surface", "follow the money" |
+| **KYC & UBO** | Case management, ownership discovery, screening |
+| **Trading Profile & Custody** | Instruments, markets, SSIs |
+| **Research Macros** | GLEIF lookup, UBO research, approval flow |
+| **Learning & Feedback** | Pattern learning, corrections, semantic status |
+| **Promotion Pipeline** | Quality-gated auto-promotion with thresholds |
+| **Teaching** | Direct phrase→verb mapping for trusted sources |
+| **Workflow & Templates** | Workflow instances, template expansion |
+| **Batch Operations** | Multi-entity template application |
+
+**Example Natural Language → DSL:**
+
+```
+User: "create a fund for Acme Corp"
+→ dsl_generate
+→ (cbu.create :name "Acme Corp" :type FUND)
+
+User: "load the Allianz book"  
+→ (session.load-galaxy :apex-name "Allianz")
+
+User: "who owns this company?"
+→ (ubo.discover :entity-id @entity)
+
+User: "teach: 'spin up a fund' = cbu.create"
+→ (agent.teach :phrase "spin up a fund" :verb "cbu.create")
+```
+
+**Key file:** `rust/src/api/agent_routes.rs` - `generate_commands_help()`
+
+---
+
 ## Core Architecture: CBU-Centric Model
 
 **CBU (Client Business Unit) is the atomic unit.** Everything resolves to sets of CBUs.
