@@ -475,6 +475,37 @@ fn classify_error(e: &anyhow::Error) -> ErrorCode {
     }
 }
 
+/// Pure function for symbol substitution (testable without pool)
+fn substitute_symbols_pure(
+    source: &str,
+    symbols: &HashMap<String, Uuid>,
+) -> Result<String, String> {
+    let mut result = source.to_string();
+
+    // Replace each @symbol with its UUID
+    for (symbol, uuid) in symbols {
+        let pattern = format!("@{}", symbol);
+        result = result.replace(&pattern, &format!("\"{}\"", uuid));
+    }
+
+    // Check for remaining unresolved @symbols
+    let mut chars = result.chars().peekable();
+    let mut pos = 0;
+    while let Some(c) = chars.next() {
+        if c == '@' {
+            if let Some(&next) = chars.peek() {
+                if next.is_alphabetic() {
+                    let remaining: String = result[pos..].chars().take(30).collect();
+                    return Err(format!("Unresolved symbol in: {}", remaining));
+                }
+            }
+        }
+        pos += c.len_utf8();
+    }
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -542,35 +573,4 @@ mod tests {
             ErrorCode::InternalError
         );
     }
-}
-
-/// Pure function for symbol substitution (testable without pool)
-fn substitute_symbols_pure(
-    source: &str,
-    symbols: &HashMap<String, Uuid>,
-) -> Result<String, String> {
-    let mut result = source.to_string();
-
-    // Replace each @symbol with its UUID
-    for (symbol, uuid) in symbols {
-        let pattern = format!("@{}", symbol);
-        result = result.replace(&pattern, &format!("\"{}\"", uuid));
-    }
-
-    // Check for remaining unresolved @symbols
-    let mut chars = result.chars().peekable();
-    let mut pos = 0;
-    while let Some(c) = chars.next() {
-        if c == '@' {
-            if let Some(&next) = chars.peek() {
-                if next.is_alphabetic() {
-                    let remaining: String = result[pos..].chars().take(30).collect();
-                    return Err(format!("Unresolved symbol in: {}", remaining));
-                }
-            }
-        }
-        pos += c.len_utf8();
-    }
-
-    Ok(result)
 }

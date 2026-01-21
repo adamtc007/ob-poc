@@ -595,16 +595,20 @@ mod tests {
 
     #[test]
     fn test_zoom_in_bounds() {
-        let mut vp = ViewportContext::default();
-        vp.zoom = 1.9;
+        let mut vp = ViewportContext {
+            zoom: 1.9,
+            ..Default::default()
+        };
         vp.zoom_in();
         assert!(vp.zoom <= 2.0);
     }
 
     #[test]
     fn test_zoom_out_bounds() {
-        let mut vp = ViewportContext::default();
-        vp.zoom = 0.15;
+        let mut vp = ViewportContext {
+            zoom: 0.15,
+            ..Default::default()
+        };
         vp.zoom_out();
         assert!(vp.zoom >= 0.1);
     }

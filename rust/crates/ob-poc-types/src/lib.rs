@@ -20,6 +20,7 @@
 pub mod control;
 pub mod galaxy;
 pub mod investor_register;
+pub mod manco_group;
 pub mod resolution;
 pub mod semantic_stage;
 pub mod trading_matrix;
@@ -1056,6 +1057,31 @@ pub enum AgentCommand {
     TaxonomyClearFilter,
 
     // =========================================================================
+    // Ring Navigation (Cluster view - CBUs orbiting ManCo)
+    // =========================================================================
+    /// Move to outer ring in cluster view ("ring out", "outer ring")
+    RingOut,
+    /// Move to inner ring in cluster view ("ring in", "inner ring")
+    RingIn,
+    /// Rotate clockwise within current ring ("clockwise", "cw", "next")
+    Clockwise {
+        /// Number of steps to rotate (default 1)
+        #[serde(default)]
+        steps: Option<u32>,
+    },
+    /// Rotate counterclockwise within current ring ("counterclockwise", "ccw", "prev")
+    Counterclockwise {
+        /// Number of steps to rotate (default 1)
+        #[serde(default)]
+        steps: Option<u32>,
+    },
+    /// Jump directly to a specific CBU ("snap to", "go to", "select")
+    SnapTo {
+        /// Target CBU name or ID
+        target: String,
+    },
+
+    // =========================================================================
     // Help
     // =========================================================================
     /// Show help for navigation ("help", "what can I say")
@@ -1484,6 +1510,15 @@ pub enum DisambiguationItem {
         search_text: String,
         /// Matching entities to choose from
         matches: Vec<EntityMatch>,
+        /// Entity type for search (e.g., "entity", "cbu") - Fix K
+        #[serde(skip_serializing_if = "Option::is_none")]
+        entity_type: Option<String>,
+        /// Search column from lookup config (e.g., "name") - Fix K
+        #[serde(skip_serializing_if = "Option::is_none")]
+        search_column: Option<String>,
+        /// Unique ref_id for commit targeting (e.g., "0:15-30") - Fix K
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ref_id: Option<String>,
     },
     /// Ambiguous interpretation (e.g., "UK" = name part or jurisdiction?)
     InterpretationChoice {

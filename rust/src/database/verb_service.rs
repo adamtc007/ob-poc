@@ -125,6 +125,44 @@ impl VerbService {
         }
     }
 
+    /// Find user-learned phrases by semantic similarity (top-k) - Issue D/J
+    pub async fn find_user_learned_semantic_topk(
+        &self,
+        user_id: Uuid,
+        query_embedding: &[f32],
+        threshold: f32,
+        limit: usize,
+    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        let rows = sqlx::query_as::<_, (String, String, f32, f64)>(
+            r#"
+            SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
+            FROM agent.user_learned_phrases
+            WHERE user_id = $2
+              AND embedding IS NOT NULL
+              AND 1 - (embedding <=> $1::vector) > $4
+            ORDER BY embedding <=> $1::vector
+            LIMIT $3
+            "#,
+        )
+        .bind(query_embedding)
+        .bind(user_id)
+        .bind(limit as i32)
+        .bind(threshold)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(phrase, verb, confidence, similarity)| SemanticMatch {
+                phrase,
+                verb,
+                similarity,
+                confidence: Some(confidence),
+                category: None,
+            })
+            .collect())
+    }
+
     // ========================================================================
     // Global Learned Phrases
     // ========================================================================
@@ -160,6 +198,41 @@ impl VerbService {
             }
             _ => Ok(None),
         }
+    }
+
+    /// Find global learned phrases by semantic similarity (top-k) - Issue D/J
+    pub async fn find_global_learned_semantic_topk(
+        &self,
+        query_embedding: &[f32],
+        threshold: f32,
+        limit: usize,
+    ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        let rows = sqlx::query_as::<_, (String, String, f64)>(
+            r#"
+            SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
+            FROM agent.invocation_phrases
+            WHERE embedding IS NOT NULL
+              AND 1 - (embedding <=> $1::vector) > $3
+            ORDER BY embedding <=> $1::vector
+            LIMIT $2
+            "#,
+        )
+        .bind(query_embedding)
+        .bind(limit as i32)
+        .bind(threshold)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|(phrase, verb, similarity)| SemanticMatch {
+                phrase,
+                verb,
+                similarity,
+                confidence: None,
+                category: None,
+            })
+            .collect())
     }
 
     // ========================================================================

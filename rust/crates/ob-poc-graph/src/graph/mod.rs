@@ -37,6 +37,7 @@ pub mod animation;
 pub mod astronomy;
 pub mod board_control;
 pub mod camera;
+pub mod cluster;
 pub mod colors;
 pub mod edges;
 pub mod focus_card;

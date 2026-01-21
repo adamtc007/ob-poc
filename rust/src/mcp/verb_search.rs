@@ -3,10 +3,10 @@
 //! Combines multiple verb discovery strategies in priority order:
 //! 1. User-specific learned phrases (exact match) - highest priority
 //! 2. Global learned phrases (exact match)
-//! 3. User-specific learned phrases (semantic match via pgvector)
-//! 4. Global learned phrases (semantic match via pgvector)
+//! 3. User-specific learned phrases (semantic match via pgvector, top-k)
+//! 4. [REMOVED] - was redundant with step 6, see Issue I/J
 //! 5. Blocklist check (semantic filtering)
-//! 6. Global semantic via verb_pattern_embeddings - PRIMARY LOOKUP
+//! 6. Global semantic - UNION of learned + cold-start patterns (top-k)
 //!
 //! Architecture (DB as source of truth):
 //!
@@ -58,6 +58,102 @@ pub enum VerbSearchSource {
     LearnedSemantic,
     /// pgvector embedding similarity (cold start)
     Semantic,
+    /// Direct DSL input (user typed DSL directly)
+    DirectDsl,
+    /// Global learned via invocation_phrases (Issue I distinction)
+    GlobalLearned,
+    /// Cold start pattern embeddings (Issue I distinction)
+    PatternEmbedding,
+}
+
+// ============================================================================
+// Ambiguity Detection (Issue D/J)
+// ============================================================================
+
+/// Margin threshold for ambiguity detection
+/// If top two candidates are within this margin, flag as ambiguous
+pub const AMBIGUITY_MARGIN: f32 = 0.05;
+
+/// Outcome of verb search with ambiguity detection (Issue D/J)
+#[derive(Debug, Clone)]
+pub enum VerbSearchOutcome {
+    /// Clear winner - proceed with LLM extraction
+    Matched(VerbSearchResult),
+    /// Top candidates too close - need user clarification
+    Ambiguous {
+        top: VerbSearchResult,
+        runner_up: VerbSearchResult,
+        margin: f32,
+    },
+    /// Nothing matched threshold
+    NoMatch,
+}
+
+/// Check for ambiguity in search results (Issue D/J)
+///
+/// Ambiguity rule: If top >= threshold AND runner_up >= threshold
+/// AND (top.score - runner_up.score) < AMBIGUITY_MARGIN, flag ambiguous.
+///
+/// IMPORTANT: Run this AFTER union+dedupe+sort (Issue I), so margin
+/// reflects true best alternatives across all semantic sources.
+pub fn check_ambiguity(candidates: &[VerbSearchResult], threshold: f32) -> VerbSearchOutcome {
+    match candidates.first() {
+        None => VerbSearchOutcome::NoMatch,
+        Some(top) if top.score < threshold => VerbSearchOutcome::NoMatch,
+        Some(top) => match candidates.get(1) {
+            // Only one candidate above threshold
+            None => VerbSearchOutcome::Matched(top.clone()),
+            Some(runner_up) if runner_up.score < threshold => {
+                // Runner-up below threshold - clear winner
+                VerbSearchOutcome::Matched(top.clone())
+            }
+            Some(runner_up) => {
+                let margin = top.score - runner_up.score;
+                if margin < AMBIGUITY_MARGIN {
+                    VerbSearchOutcome::Ambiguous {
+                        top: top.clone(),
+                        runner_up: runner_up.clone(),
+                        margin,
+                    }
+                } else {
+                    VerbSearchOutcome::Matched(top.clone())
+                }
+            }
+        },
+    }
+}
+
+/// Normalize candidate list: dedupe by verb (keep highest score), sort desc, truncate
+///
+/// Essential for J/D correctness — candidates are appended tier-by-tier during search,
+/// so without this, candidates[0] is not guaranteed to be the best match.
+pub fn normalize_candidates(
+    mut results: Vec<VerbSearchResult>,
+    limit: usize,
+) -> Vec<VerbSearchResult> {
+    use std::collections::HashMap;
+
+    // Deduplicate by verb (keep highest score; preserve best metadata)
+    let mut by_verb: HashMap<String, VerbSearchResult> = HashMap::new();
+    for r in results.drain(..) {
+        by_verb
+            .entry(r.verb.clone())
+            .and_modify(|existing| {
+                if r.score > existing.score {
+                    *existing = r.clone();
+                }
+            })
+            .or_insert(r);
+    }
+
+    let mut v: Vec<VerbSearchResult> = by_verb.into_values().collect();
+    v.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    v.truncate(limit);
+    v
 }
 
 /// Hybrid verb searcher combining all discovery strategies
@@ -67,8 +163,10 @@ pub struct HybridVerbSearcher {
     verb_service: Option<Arc<VerbService>>,
     learned_data: Option<SharedLearnedData>,
     embedder: Option<SharedEmbedder>,
-    /// Similarity threshold for semantic matches (0.0-1.0)
+    /// Similarity threshold for learned semantic matches (high confidence, 0.80)
     semantic_threshold: f32,
+    /// Similarity threshold for cold start / fallback semantic matches (0.65)
+    fallback_threshold: f32,
     /// Similarity threshold for blocklist matches
     blocklist_threshold: f32,
 }
@@ -80,6 +178,7 @@ impl Clone for HybridVerbSearcher {
             learned_data: self.learned_data.clone(),
             embedder: self.embedder.clone(),
             semantic_threshold: self.semantic_threshold,
+            fallback_threshold: self.fallback_threshold,
             blocklist_threshold: self.blocklist_threshold,
         }
     }
@@ -93,6 +192,7 @@ impl HybridVerbSearcher {
             learned_data,
             embedder: None, // Embedder added separately via with_embedder
             semantic_threshold: 0.80,
+            fallback_threshold: 0.65,
             blocklist_threshold: 0.75,
         }
     }
@@ -104,6 +204,7 @@ impl HybridVerbSearcher {
             learned_data: Some(learned_data),
             embedder: None,
             semantic_threshold: 0.80,
+            fallback_threshold: 0.65,
             blocklist_threshold: 0.75,
         }
     }
@@ -115,6 +216,7 @@ impl HybridVerbSearcher {
             learned_data: None,
             embedder: None,
             semantic_threshold: 0.80,
+            fallback_threshold: 0.65,
             blocklist_threshold: 0.75,
         }
     }
@@ -131,6 +233,11 @@ impl HybridVerbSearcher {
         self
     }
 
+    /// Get the semantic threshold (for ambiguity checks in IntentPipeline)
+    pub fn semantic_threshold(&self) -> f32 {
+        self.semantic_threshold
+    }
+
     /// Search for verbs matching user intent
     ///
     /// Priority order:
@@ -139,7 +246,7 @@ impl HybridVerbSearcher {
     /// 3. User-specific learned (semantic) - score 0.8-0.99
     /// 4. Global learned (semantic) - score 0.8-0.99
     /// 5. Blocklist filter (rejects blocked verbs)
-    /// 6. Global semantic (cold start) - score 0.5-0.95
+    /// 6. Global semantic (cold start) - score fallback_threshold-0.95
     pub async fn search(
         &self,
         query: &str,
@@ -149,7 +256,24 @@ impl HybridVerbSearcher {
     ) -> Result<Vec<VerbSearchResult>> {
         let mut results = Vec::new();
         let mut seen_verbs: HashSet<String> = HashSet::new();
+
+        // Normalize query ONCE at the start (used for exact matching)
         let normalized = query.trim().to_lowercase();
+
+        // Compute embedding ONCE at the start (used for all semantic lookups)
+        // This avoids computing the same embedding 4 times (user semantic, learned semantic,
+        // global semantic, blocklist) - saves ~15-30ms per search
+        let query_embedding: Option<Vec<f32>> = if self.has_semantic_capability() {
+            match self.embedder.as_ref().unwrap().embed(query).await {
+                Ok(emb) => Some(emb),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to compute query embedding, falling back to exact matches only");
+                    None
+                }
+            }
+        } else {
+            None
+        };
 
         // 1. User-specific learned phrases (exact match)
         if let Some(uid) = user_id {
@@ -181,82 +305,102 @@ impl HybridVerbSearcher {
             }
         }
 
-        // 3. User-specific learned (SEMANTIC match)
-        if results.is_empty() && user_id.is_some() && self.has_semantic_capability() {
-            if let Some(result) = self
-                .search_user_learned_semantic(user_id.unwrap(), query)
-                .await?
-            {
-                if self.matches_domain(&result.verb, domain_filter)
-                    && !seen_verbs.contains(&result.verb)
-                {
-                    seen_verbs.insert(result.verb.clone());
-                    results.push(result);
+        // 3. User-specific learned (SEMANTIC match) - top-k for ambiguity detection
+        if results.is_empty() && user_id.is_some() {
+            if let Some(ref embedding) = query_embedding {
+                let user_results = self
+                    .search_user_learned_semantic_with_embedding(user_id.unwrap(), embedding, 3)
+                    .await?;
+                for result in user_results {
+                    if self.matches_domain(&result.verb, domain_filter)
+                        && !seen_verbs.contains(&result.verb)
+                    {
+                        seen_verbs.insert(result.verb.clone());
+                        results.push(result);
+                    }
                 }
             }
         }
 
-        // 4. Global learned (SEMANTIC match)
-        if results.is_empty() && self.has_semantic_capability() {
-            if let Some(result) = self.search_learned_semantic(query).await? {
-                if self.matches_domain(&result.verb, domain_filter)
-                    && !seen_verbs.contains(&result.verb)
-                {
-                    seen_verbs.insert(result.verb.clone());
-                    results.push(result);
-                }
-            }
-        }
+        // 4. [REMOVED] Global learned semantic was redundant with step 6
+        //    Step 6 fetches from BOTH sources (learned + cold start) via union.
+        //    Keeping a separate LIMIT 1 learned lookup here would:
+        //    - Block consultation of cold-start patterns if learned had a mediocre 0.81 match
+        //    - Prevent ambiguity detection across sources
+        //    See Issue I in intent-pipeline-fixes-todo.md for rationale.
 
         // 5. Blocklist check - remove blocked verbs from results
-        if !results.is_empty() && self.has_semantic_capability() {
-            let verb = &results[0].verb;
-            if self.check_blocklist(query, user_id, verb).await? {
-                tracing::info!(
-                    query = query,
-                    verb = verb,
-                    "Verb blocked by blocklist, continuing search"
-                );
-                seen_verbs.insert(results.remove(0).verb);
+        if !results.is_empty() {
+            if let Some(ref embedding) = query_embedding {
+                let verb = &results[0].verb;
+                if self
+                    .check_blocklist_with_embedding(embedding, user_id, verb)
+                    .await?
+                {
+                    tracing::info!(
+                        query = query,
+                        verb = verb,
+                        "Verb blocked by blocklist, continuing search"
+                    );
+                    seen_verbs.insert(results.remove(0).verb);
+                }
             }
         }
 
         // 6. Global semantic search (cold start fallback)
         // Uses verb_pattern_embeddings for primary semantic lookup
-        if results.len() < limit && self.has_semantic_capability() {
-            if let Ok(semantic_results) = self
-                .search_global_semantic(query, limit - results.len())
-                .await
-            {
-                for result in semantic_results {
-                    if seen_verbs.contains(&result.verb) {
-                        continue;
-                    }
-                    if !self.matches_domain(&result.verb, domain_filter) {
-                        continue;
-                    }
-                    if self.check_blocklist(query, user_id, &result.verb).await? {
+        if results.len() < limit {
+            if let Some(ref embedding) = query_embedding {
+                if let Ok(semantic_results) = self
+                    .search_global_semantic_with_embedding(embedding, limit - results.len())
+                    .await
+                {
+                    for result in semantic_results {
+                        if seen_verbs.contains(&result.verb) {
+                            continue;
+                        }
+                        if !self.matches_domain(&result.verb, domain_filter) {
+                            continue;
+                        }
+                        if self
+                            .check_blocklist_with_embedding(embedding, user_id, &result.verb)
+                            .await?
+                        {
+                            seen_verbs.insert(result.verb.clone());
+                            continue;
+                        }
+
                         seen_verbs.insert(result.verb.clone());
-                        continue;
-                    }
+                        results.push(result);
 
-                    seen_verbs.insert(result.verb.clone());
-                    results.push(result);
-
-                    if results.len() >= limit {
-                        break;
+                        if results.len() >= limit {
+                            break;
+                        }
                     }
                 }
             }
         }
 
-        // Sort by score descending, truncate
-        results.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        results.truncate(limit);
+        // Dedupe by verb, sort by score descending, truncate (Issue J/D fix)
+        let mut results = normalize_candidates(results, limit);
+
+        // Final blocklist filter across entire candidate list (ChatGPT review feedback)
+        // Earlier checks only filtered per-tier; this ensures no blocked verbs slip through
+        if let Some(ref embedding) = query_embedding {
+            let mut blocked_verbs = Vec::new();
+            for result in &results {
+                if self
+                    .check_blocklist_with_embedding(embedding, user_id, &result.verb)
+                    .await
+                    .unwrap_or(false)
+                {
+                    blocked_verbs.push(result.verb.clone());
+                }
+            }
+            if !blocked_verbs.is_empty() {
+                results.retain(|r| !blocked_verbs.contains(&r.verb));
+            }
+        }
 
         Ok(results)
     }
@@ -306,120 +450,156 @@ impl HybridVerbSearcher {
         }
     }
 
-    /// Search user-specific learned phrases by semantic similarity
-    async fn search_user_learned_semantic(
+    /// Search user-specific learned phrases by semantic similarity (top-k)
+    ///
+    /// Takes pre-computed embedding to avoid redundant computation.
+    /// Returns top-k results for ambiguity detection.
+    async fn search_user_learned_semantic_with_embedding(
         &self,
         user_id: Uuid,
-        query: &str,
-    ) -> Result<Option<VerbSearchResult>> {
-        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
-            (Some(s), Some(e)) => (s, e),
-            _ => return Ok(None),
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<VerbSearchResult>> {
+        let verb_service = match &self.verb_service {
+            Some(s) => s,
+            None => return Ok(vec![]),
         };
 
-        let query_embedding = embedder.embed(query).await?;
-
-        let result = verb_service
-            .find_user_learned_semantic(user_id, &query_embedding, self.semantic_threshold)
+        let matches = verb_service
+            .find_user_learned_semantic_topk(
+                user_id,
+                query_embedding,
+                self.semantic_threshold,
+                limit,
+            )
             .await?;
 
-        match result {
-            Some(m) => {
-                let description = self.get_verb_description(&m.verb).await;
-                let score = (m.similarity as f32) * m.confidence.unwrap_or(1.0);
-                Ok(Some(VerbSearchResult {
-                    verb: m.verb,
-                    score,
-                    source: VerbSearchSource::UserLearnedSemantic,
-                    matched_phrase: m.phrase,
-                    description,
-                }))
-            }
-            None => Ok(None),
+        let mut results = Vec::with_capacity(matches.len());
+        for m in matches {
+            let description = self.get_verb_description(&m.verb).await;
+            let score = (m.similarity as f32) * m.confidence.unwrap_or(1.0);
+            results.push(VerbSearchResult {
+                verb: m.verb,
+                score,
+                source: VerbSearchSource::UserLearnedSemantic,
+                matched_phrase: m.phrase,
+                description,
+            });
         }
+        Ok(results)
     }
 
-    /// Search global learned phrases by semantic similarity
-    async fn search_learned_semantic(&self, query: &str) -> Result<Option<VerbSearchResult>> {
-        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
-            (Some(s), Some(e)) => (s, e),
-            _ => return Ok(None),
-        };
-
-        let query_embedding = embedder.embed(query).await?;
-
-        let result = verb_service
-            .find_global_learned_semantic(&query_embedding, self.semantic_threshold)
-            .await?;
-
-        match result {
-            Some(m) => {
-                let description = self.get_verb_description(&m.verb).await;
-                Ok(Some(VerbSearchResult {
-                    verb: m.verb,
-                    score: m.similarity as f32,
-                    source: VerbSearchSource::LearnedSemantic,
-                    matched_phrase: m.phrase,
-                    description,
-                }))
-            }
-            None => Ok(None),
-        }
-    }
+    // NOTE: search_learned_semantic_with_embedding was REMOVED (Issue I/J).
+    // It was redundant with search_global_semantic_with_embedding which
+    // fetches from BOTH learned + cold-start sources via union.
+    // See step 4 comment in search() for rationale.
 
     /// Search global semantic verb patterns (cold start)
     ///
     /// Uses verb_pattern_embeddings table which is populated from v_verb_intent_patterns
     /// (UNION of yaml_intent_patterns + intent_patterns) by populate_embeddings binary.
-    /// This is the primary semantic lookup.
-    async fn search_global_semantic(
+    /// Global semantic search - union of learned phrases + cold start patterns (Issue I)
+    ///
+    /// Takes pre-computed embedding to avoid redundant computation.
+    /// Uses `fallback_threshold` (0.65) instead of hardcoded 0.5.
+    ///
+    /// Issue I fix: Fetches from BOTH sources:
+    /// 1. agent.invocation_phrases (learned)
+    /// 2. ob-poc.verb_pattern_embeddings (cold start)
+    ///
+    /// Then unions and dedupes by verb, keeping highest score.
+    async fn search_global_semantic_with_embedding(
         &self,
-        query: &str,
+        query_embedding: &[f32],
         limit: usize,
     ) -> Result<Vec<VerbSearchResult>> {
-        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
-            (Some(s), Some(e)) => (s, e),
-            _ => return Ok(Vec::new()),
+        use std::collections::HashMap;
+
+        let verb_service = match &self.verb_service {
+            Some(s) => s,
+            None => return Ok(Vec::new()),
         };
 
-        let query_embedding = embedder.embed(query).await?;
-
-        let matches = verb_service
-            .search_verb_patterns_semantic(&query_embedding, limit, 0.5)
+        // Fetch top-k from BOTH sources (Issue I)
+        let learned_matches = verb_service
+            .find_global_learned_semantic_topk(query_embedding, self.fallback_threshold, limit)
             .await
             .unwrap_or_default();
 
-        let mut results = Vec::with_capacity(matches.len());
-        for m in matches {
-            let description = self.get_verb_description(&m.verb).await;
-            results.push(VerbSearchResult {
+        let pattern_matches = verb_service
+            .search_verb_patterns_semantic(query_embedding, limit, self.fallback_threshold)
+            .await
+            .unwrap_or_default();
+
+        // Convert to VerbSearchResult with source metadata
+        let learned_results: Vec<VerbSearchResult> = learned_matches
+            .into_iter()
+            .map(|m| VerbSearchResult {
                 verb: m.verb,
                 score: m.similarity as f32,
-                source: VerbSearchSource::Semantic,
+                source: VerbSearchSource::GlobalLearned,
                 matched_phrase: m.phrase,
-                description,
-            });
+                description: None,
+            })
+            .collect();
+
+        let pattern_results: Vec<VerbSearchResult> = pattern_matches
+            .into_iter()
+            .map(|m| VerbSearchResult {
+                verb: m.verb,
+                score: m.similarity as f32,
+                source: VerbSearchSource::PatternEmbedding,
+                matched_phrase: m.phrase,
+                description: None,
+            })
+            .collect();
+
+        // Union and dedupe by verb, keeping highest score (Issue I)
+        let mut combined: HashMap<String, VerbSearchResult> = HashMap::new();
+        for result in learned_results.into_iter().chain(pattern_results) {
+            combined
+                .entry(result.verb.clone())
+                .and_modify(|existing| {
+                    if result.score > existing.score {
+                        *existing = result.clone();
+                    }
+                })
+                .or_insert(result);
         }
 
-        Ok(results)
+        // Sort by score descending
+        let mut sorted: Vec<VerbSearchResult> = combined.into_values().collect();
+        sorted.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        sorted.truncate(limit);
+
+        // Add descriptions
+        for result in &mut sorted {
+            result.description = self.get_verb_description(&result.verb).await;
+        }
+
+        Ok(sorted)
     }
 
     /// Check if a verb is blocked for this query (semantic match)
-    async fn check_blocklist(
+    ///
+    /// Takes pre-computed embedding to avoid redundant computation.
+    async fn check_blocklist_with_embedding(
         &self,
-        query: &str,
+        query_embedding: &[f32],
         user_id: Option<Uuid>,
         verb: &str,
     ) -> Result<bool> {
-        let (verb_service, embedder) = match (&self.verb_service, &self.embedder) {
-            (Some(s), Some(e)) => (s, e),
-            _ => return Ok(false),
+        let verb_service = match &self.verb_service {
+            Some(s) => s,
+            None => return Ok(false),
         };
 
-        let query_embedding = embedder.embed(query).await?;
-
         let blocked = verb_service
-            .check_blocklist(&query_embedding, user_id, verb, self.blocklist_threshold)
+            .check_blocklist(query_embedding, user_id, verb, self.blocklist_threshold)
             .await?;
 
         Ok(blocked)
@@ -466,6 +646,179 @@ mod tests {
         for source in sources {
             let json = serde_json::to_string(&source).unwrap();
             println!("{:?} -> {}", source, json);
+        }
+    }
+
+    // =========================================================================
+    // Issue J/D Acceptance Tests - Ambiguity Detection
+    // =========================================================================
+
+    #[test]
+    fn test_normalize_candidates_dedupes_and_sorts() {
+        // Simulate tier-by-tier appending: same verb appears twice with different scores
+        let candidates = vec![
+            VerbSearchResult {
+                verb: "cbu.create".to_string(),
+                score: 0.82, // lower score, added first (tier 3)
+                source: VerbSearchSource::LearnedSemantic,
+                matched_phrase: "make a cbu".to_string(),
+                description: None,
+            },
+            VerbSearchResult {
+                verb: "cbu.ensure".to_string(),
+                score: 0.80,
+                source: VerbSearchSource::Semantic,
+                matched_phrase: "ensure cbu".to_string(),
+                description: None,
+            },
+            VerbSearchResult {
+                verb: "cbu.create".to_string(),
+                score: 0.91, // higher score, added later (tier 6)
+                source: VerbSearchSource::PatternEmbedding,
+                matched_phrase: "create cbu".to_string(),
+                description: None,
+            },
+        ];
+
+        let normalized = normalize_candidates(candidates, 5);
+
+        // Should have 2 unique verbs
+        assert_eq!(normalized.len(), 2);
+
+        // First should be cbu.create with the HIGHER score (0.91)
+        assert_eq!(normalized[0].verb, "cbu.create");
+        assert!((normalized[0].score - 0.91).abs() < 0.001);
+        assert!(matches!(
+            normalized[0].source,
+            VerbSearchSource::PatternEmbedding
+        ));
+
+        // Second should be cbu.ensure
+        assert_eq!(normalized[1].verb, "cbu.ensure");
+    }
+
+    #[test]
+    fn test_check_ambiguity_blocks_on_close_margin() {
+        let threshold = 0.80;
+
+        // Two candidates within margin, both above threshold
+        let candidates = vec![
+            VerbSearchResult {
+                verb: "cbu.create".to_string(),
+                score: 0.85,
+                source: VerbSearchSource::Semantic,
+                matched_phrase: "create cbu".to_string(),
+                description: None,
+            },
+            VerbSearchResult {
+                verb: "cbu.ensure".to_string(),
+                score: 0.83, // margin = 0.02 < AMBIGUITY_MARGIN (0.05)
+                source: VerbSearchSource::Semantic,
+                matched_phrase: "ensure cbu".to_string(),
+                description: None,
+            },
+        ];
+
+        let outcome = check_ambiguity(&candidates, threshold);
+
+        match outcome {
+            VerbSearchOutcome::Ambiguous {
+                top,
+                runner_up,
+                margin,
+            } => {
+                assert_eq!(top.verb, "cbu.create");
+                assert_eq!(runner_up.verb, "cbu.ensure");
+                assert!(
+                    margin < AMBIGUITY_MARGIN,
+                    "margin {} should be < {}",
+                    margin,
+                    AMBIGUITY_MARGIN
+                );
+            }
+            other => panic!("Expected Ambiguous, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_check_ambiguity_passes_on_clear_winner() {
+        let threshold = 0.80;
+
+        // Clear winner - margin > AMBIGUITY_MARGIN
+        let candidates = vec![
+            VerbSearchResult {
+                verb: "cbu.create".to_string(),
+                score: 0.92,
+                source: VerbSearchSource::Semantic,
+                matched_phrase: "create cbu".to_string(),
+                description: None,
+            },
+            VerbSearchResult {
+                verb: "cbu.ensure".to_string(),
+                score: 0.82, // margin = 0.10 > AMBIGUITY_MARGIN (0.05)
+                source: VerbSearchSource::Semantic,
+                matched_phrase: "ensure cbu".to_string(),
+                description: None,
+            },
+        ];
+
+        let outcome = check_ambiguity(&candidates, threshold);
+
+        match outcome {
+            VerbSearchOutcome::Matched(result) => {
+                assert_eq!(result.verb, "cbu.create");
+            }
+            other => panic!("Expected Matched, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_check_ambiguity_no_match_below_threshold() {
+        let threshold = 0.80;
+
+        // All candidates below threshold
+        let candidates = vec![VerbSearchResult {
+            verb: "cbu.create".to_string(),
+            score: 0.75, // below threshold
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create cbu".to_string(),
+            description: None,
+        }];
+
+        let outcome = check_ambiguity(&candidates, threshold);
+
+        assert!(matches!(outcome, VerbSearchOutcome::NoMatch));
+    }
+
+    #[test]
+    fn test_check_ambiguity_empty_candidates() {
+        let threshold = 0.80;
+        let candidates: Vec<VerbSearchResult> = vec![];
+
+        let outcome = check_ambiguity(&candidates, threshold);
+
+        assert!(matches!(outcome, VerbSearchOutcome::NoMatch));
+    }
+
+    #[test]
+    fn test_check_ambiguity_single_candidate_above_threshold() {
+        let threshold = 0.80;
+
+        let candidates = vec![VerbSearchResult {
+            verb: "cbu.create".to_string(),
+            score: 0.90,
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create cbu".to_string(),
+            description: None,
+        }];
+
+        let outcome = check_ambiguity(&candidates, threshold);
+
+        match outcome {
+            VerbSearchOutcome::Matched(result) => {
+                assert_eq!(result.verb, "cbu.create");
+            }
+            other => panic!("Expected Matched, got {:?}", other),
         }
     }
 }

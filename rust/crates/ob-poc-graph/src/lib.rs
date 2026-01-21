@@ -7,6 +7,10 @@ pub mod graph;
 
 #[allow(deprecated)]
 pub use graph::{
+    // Cluster view (ManCo center + CBU orbital rings)
+    cluster::ClusterCbuData,
+    cluster::ClusterView,
+    cluster::ManCoData,
     entity_matches_type,
     get_entities_for_type,
     // Trading Matrix (hierarchical custody config browser)

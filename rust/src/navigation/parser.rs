@@ -950,7 +950,7 @@ mod tests {
 
     fn parse_ok(input: &str) -> NavCommand {
         parse_nav_command(input)
-            .expect(&format!("Failed to parse: {}", input))
+            .unwrap_or_else(|_| panic!("Failed to parse: {}", input))
             .1
     }
 

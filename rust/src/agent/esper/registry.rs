@@ -499,6 +499,28 @@ impl EsperCommandRegistry {
                 }
                 Some("default".into())
             }
+            "steps" => {
+                // Parse step count from phrase (e.g., "clockwise 5", "next 3")
+                for word in phrase.split_whitespace() {
+                    if let Ok(n) = word.parse::<u32>() {
+                        return Some(n.to_string());
+                    }
+                }
+                None // Default will be 1 in AgentCommand handler
+            }
+            "target" => {
+                // For snap_to, extract the target name after known prefixes
+                let prefixes = ["snap to ", "go to ", "jump to ", "focus on ", "select "];
+                for prefix in prefixes {
+                    if let Some(rest) = phrase.strip_prefix(prefix) {
+                        let target = rest.trim();
+                        if !target.is_empty() {
+                            return Some(target.to_string());
+                        }
+                    }
+                }
+                None
+            }
             _ => None,
         }
     }
@@ -620,6 +642,19 @@ impl EsperCommandRegistry {
             "ContextOnboarding" => AgentCommand::ContextOnboarding,
             "ContextMonitoring" => AgentCommand::ContextMonitoring,
             "ContextRemediation" => AgentCommand::ContextRemediation,
+
+            // Ring Navigation (cluster view)
+            "RingOut" => AgentCommand::RingOut,
+            "RingIn" => AgentCommand::RingIn,
+            "Clockwise" => AgentCommand::Clockwise {
+                steps: params.get("steps").and_then(|s| s.parse().ok()),
+            },
+            "Counterclockwise" => AgentCommand::Counterclockwise {
+                steps: params.get("steps").and_then(|s| s.parse().ok()),
+            },
+            "SnapTo" => AgentCommand::SnapTo {
+                target: params.get("target").cloned().unwrap_or_default(),
+            },
 
             _ => return None,
         })

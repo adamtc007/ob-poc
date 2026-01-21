@@ -105,10 +105,16 @@ fn to_api_disambiguation_item(
             param,
             search_text,
             matches,
+            entity_type,
+            search_column,
+            ref_id,
         } => ob_poc_types::DisambiguationItem::EntityMatch {
             param: param.clone(),
             search_text: search_text.clone(),
             matches: matches.iter().map(to_api_entity_match).collect(),
+            entity_type: entity_type.clone(),
+            search_column: search_column.clone(),
+            ref_id: ref_id.clone(),
         },
         crate::api::session::DisambiguationItem::InterpretationChoice { text, options } => {
             ob_poc_types::DisambiguationItem::InterpretationChoice {
@@ -700,6 +706,60 @@ pub struct ResolutionStats {
     pub unresolved_count: i32,
 }
 
+// ============================================================================
+// Span-Based Resolution Types (Issue K)
+// ============================================================================
+
+/// Request to resolve an EntityRef by span-based ref_id (Issue K)
+///
+/// Uses span-based ref_id format ("stmt_idx:start-end") for precise targeting
+/// of refs in lists and maps. Includes dsl_hash to prevent stale commits.
+#[derive(Debug, Deserialize)]
+pub struct ResolveByRefIdRequest {
+    /// Session containing the AST
+    pub session_id: Uuid,
+    /// Span-based ref_id (e.g., "0:15-30")
+    pub ref_id: String,
+    /// Primary key from entity search (UUID)
+    pub resolved_key: String,
+    /// Hash of DSL this resolution applies to (prevents race conditions)
+    pub dsl_hash: String,
+}
+
+/// Response from resolving by ref_id (Issue K)
+#[derive(Debug, Serialize)]
+pub struct ResolveByRefIdResponse {
+    /// Whether the update succeeded
+    pub success: bool,
+    /// Updated DSL with resolved ref
+    pub dsl: String,
+    /// New hash for the updated DSL
+    pub dsl_hash: String,
+    /// Remaining unresolved refs (so UI can continue without round-trip)
+    pub remaining_unresolved: Vec<RemainingUnresolvedRef>,
+    /// Whether all refs are now resolved
+    pub fully_resolved: bool,
+    /// Error message if failed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Info about an unresolved ref (for ResolveByRefIdResponse)
+#[derive(Debug, Clone, Serialize)]
+pub struct RemainingUnresolvedRef {
+    /// Argument key (e.g., "entity-id")
+    pub param_name: String,
+    /// Search text (e.g., "John Smith")
+    pub search_value: String,
+    /// Entity type (e.g., "entity", "cbu")
+    pub entity_type: String,
+    /// Search column (e.g., "name")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub search_column: Option<String>,
+    /// Span-based ref_id (e.g., "0:15-30")
+    pub ref_id: String,
+}
+
 /// Response from resolving an EntityRef
 #[derive(Debug, Serialize)]
 pub struct ResolveRefResponse {
@@ -807,6 +867,144 @@ impl AgentState {
             feedback_service,
         }
     }
+
+    /// Create with ESPER navigation support (fast startup + lazy semantic loading)
+    ///
+    /// Strategy:
+    /// 1. Server starts immediately with trie-only ESPER (~10ms)
+    /// 2. Background task initializes Candle embedder (~3-5s)
+    /// 3. Once ready, semantic index is built and injected into registry
+    /// 4. Semantic fallback becomes available without restart
+    ///
+    /// Trie lookups handle exact/prefix/contains matches which cover 95%+ of use cases.
+    /// Semantic fallback handles novel phrases that don't match any pattern.
+    pub async fn with_esper(pool: PgPool, sessions: SessionStore) -> Self {
+        use crate::agent::esper::EsperWarmup;
+        use crate::agent::learning::embedder::CandleEmbedder;
+        use tokio::sync::RwLock;
+
+        let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
+        let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
+        let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
+        let dsl_repo = Arc::new(crate::database::DslRepository::new(pool.clone()));
+        let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
+        let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
+
+        // Phase 1: Build ESPER registry with trie only (fast - ~10ms)
+        let esper_registry: Option<Arc<RwLock<crate::agent::esper::EsperCommandRegistry>>> = {
+            let warmup = EsperWarmup::from_pool(Some(pool.clone()));
+
+            match warmup.warmup_without_semantic().await {
+                Ok((registry, stats)) => {
+                    tracing::info!(
+                        "ESPER registry loaded (trie only): {} commands, {} learned aliases",
+                        stats.command_count,
+                        stats.learned_count
+                    );
+                    Some(Arc::new(RwLock::new(registry)))
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load ESPER registry: {}", e);
+                    tracing::warn!("ESPER navigation commands will be disabled");
+                    None
+                }
+            }
+        };
+
+        // Build agent service with ESPER support
+        let mut agent_service = crate::api::agent_service::AgentService::with_pool(pool.clone());
+        if let Some(ref reg) = esper_registry {
+            agent_service = agent_service.with_esper_registry(reg.clone());
+        }
+
+        // Phase 2: Spawn background task to initialize Candle and build semantic index
+        // This runs after server is ready to accept requests
+        if let Some(registry) = esper_registry.clone() {
+            tokio::spawn(async move {
+                tracing::info!("Starting lazy Candle embedder initialization...");
+                let start = std::time::Instant::now();
+
+                // Initialize Candle embedder (blocking - runs in spawn_blocking internally)
+                let embedder = match tokio::task::spawn_blocking(CandleEmbedder::new).await {
+                    Ok(Ok(e)) => {
+                        let init_ms = start.elapsed().as_millis();
+                        tracing::info!("Candle embedder initialized in {}ms", init_ms);
+                        Arc::new(e)
+                    }
+                    Ok(Err(e)) => {
+                        tracing::warn!("Failed to initialize Candle embedder: {}", e);
+                        tracing::warn!("ESPER semantic fallback will be disabled");
+                        return;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Candle embedder task panicked: {}", e);
+                        return;
+                    }
+                };
+
+                // Build semantic index from registry aliases
+                let embed_start = std::time::Instant::now();
+                tracing::info!("Building ESPER semantic index...");
+                let aliases = {
+                    let reg = registry.read().await;
+                    reg.all_aliases()
+                };
+                tracing::info!("Found {} ESPER aliases to embed", aliases.len());
+
+                if aliases.is_empty() {
+                    tracing::info!("No ESPER aliases to embed, semantic fallback ready (empty)");
+                    return;
+                }
+
+                // Batch embed all aliases using async method (avoids blocking_lock panic)
+                use crate::agent::learning::embedder::Embedder;
+                let texts: Vec<&str> = aliases.iter().map(|(text, _)| text.as_str()).collect();
+                tracing::info!("Starting batch embedding of {} texts...", texts.len());
+                let embeddings = match embedder.embed_batch(&texts).await {
+                    Ok(e) => e,
+                    Err(e) => {
+                        tracing::warn!("Failed to embed ESPER aliases: {}", e);
+                        return;
+                    }
+                };
+
+                // Build semantic index
+                let mut index = crate::agent::esper::SemanticIndex::new();
+                for ((alias, command_key), embedding) in aliases.into_iter().zip(embeddings) {
+                    index.add_alias(alias, command_key, embedding);
+                }
+                index.mark_ready();
+
+                let embed_ms = embed_start.elapsed().as_millis();
+                let total_ms = start.elapsed().as_millis();
+
+                // Inject into registry
+                {
+                    let mut reg = registry.write().await;
+                    let count = index.len();
+                    reg.set_semantic_index(index);
+                    tracing::info!(
+                        "ESPER semantic index ready: {} embeddings in {}ms (total: {}ms)",
+                        count,
+                        embed_ms,
+                        total_ms
+                    );
+                }
+            });
+        }
+
+        Self {
+            pool,
+            dsl_v2_executor,
+            sessions,
+            session_manager,
+            generation_log,
+            session_repo,
+            dsl_repo,
+            agent_service: Arc::new(agent_service),
+            feedback_service,
+        }
+    }
 }
 
 // ============================================================================
@@ -820,7 +1018,20 @@ pub fn create_agent_router(pool: PgPool) -> Router {
 /// Create agent router with a shared session store
 pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -> Router {
     let state = AgentState::with_sessions(pool, sessions);
+    create_agent_router_with_state(state)
+}
 
+/// Create agent router with ESPER navigation support (async)
+///
+/// This is the preferred way to create the agent router - it initializes
+/// the Candle embedder and ESPER registry for semantic navigation fallback.
+pub async fn create_agent_router_with_esper(pool: PgPool, sessions: SessionStore) -> Router {
+    let state = AgentState::with_esper(pool, sessions).await;
+    create_agent_router_with_state(state)
+}
+
+/// Internal: create router from pre-built state
+fn create_agent_router_with_state(state: AgentState) -> Router {
     Router::new()
         // Session management
         .route("/api/session", post(create_session))
@@ -854,6 +1065,7 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
         // DSL parsing and entity reference resolution
         .route("/api/dsl/parse", post(parse_dsl))
         .route("/api/dsl/resolve-ref", post(resolve_entity_ref))
+        .route("/api/dsl/resolve-by-ref-id", post(resolve_by_ref_id))
         // Discriminator parsing for resolution
         .route(
             "/api/resolution/parse-discriminators",
@@ -2095,7 +2307,7 @@ async fn chat_session(
     tracing::info!("Message: {:?}", req.message);
     tracing::info!("CBU ID: {:?}", req.cbu_id);
 
-    // Get session (create if needed)
+    // Get session (create if needed - matches get_session behavior)
     let session = {
         let sessions = state.sessions.read().await;
         tracing::info!("Looking up session in store...");
@@ -2105,8 +2317,13 @@ async fn chat_session(
                 s.clone()
             }
             None => {
-                tracing::warn!("Session NOT FOUND: {}", session_id);
-                return Err(StatusCode::NOT_FOUND);
+                tracing::info!("Session not found, creating new session: {}", session_id);
+                drop(sessions); // Release read lock before acquiring write lock
+                let new_session = AgentSession::new(None);
+                let mut sessions = state.sessions.write().await;
+                sessions.insert(session_id, new_session.clone());
+                tracing::info!("Session created: {}", session_id);
+                new_session
             }
         }
     };
@@ -4323,6 +4540,223 @@ async fn resolve_entity_ref(
             code: Some(code),
         })),
     }
+}
+
+// ============================================================================
+// Span-Based Resolution Handler (Issue K)
+// ============================================================================
+
+/// POST /api/dsl/resolve-by-ref-id
+///
+/// Resolve an EntityRef by span-based ref_id with dsl_hash verification.
+/// This enables precise targeting of refs in lists and maps.
+///
+/// ## Request
+/// ```json
+/// {
+///   "session_id": "...",
+///   "ref_id": "0:15-30",
+///   "resolved_key": "550e8400-e29b-41d4-a716-446655440000",
+///   "dsl_hash": "a1b2c3d4e5f67890"
+/// }
+/// ```
+async fn resolve_by_ref_id(
+    State(state): State<AgentState>,
+    Json(req): Json<ResolveByRefIdRequest>,
+) -> Result<Json<ResolveByRefIdResponse>, StatusCode> {
+    use crate::dsl_v2::ast::{find_unresolved_ref_locations, Statement};
+
+    let mut sessions = state.sessions.write().await;
+    let session = sessions
+        .get_mut(&req.session_id)
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    // Step 1: Verify dsl_hash matches current session DSL
+    let current_dsl = session.context.to_dsl_source();
+    let current_hash = compute_dsl_hash_internal(&current_dsl);
+
+    if current_hash != req.dsl_hash {
+        return Ok(Json(ResolveByRefIdResponse {
+            success: false,
+            dsl: current_dsl,
+            dsl_hash: current_hash,
+            remaining_unresolved: vec![],
+            fully_resolved: false,
+            error: Some(
+                "DSL has changed since disambiguation was generated. Please refresh.".to_string(),
+            ),
+        }));
+    }
+
+    // Step 2: Parse ref_id format "stmt_idx:start-end"
+    let parts: Vec<&str> = req.ref_id.split(':').collect();
+    if parts.len() != 2 {
+        return Ok(Json(ResolveByRefIdResponse {
+            success: false,
+            dsl: current_dsl,
+            dsl_hash: current_hash,
+            remaining_unresolved: vec![],
+            fully_resolved: false,
+            error: Some(format!(
+                "Invalid ref_id format: '{}'. Expected 'stmt_idx:start-end'",
+                req.ref_id
+            )),
+        }));
+    }
+
+    let stmt_idx: usize = parts[0].parse().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let span_parts: Vec<&str> = parts[1].split('-').collect();
+    if span_parts.len() != 2 {
+        return Ok(Json(ResolveByRefIdResponse {
+            success: false,
+            dsl: current_dsl,
+            dsl_hash: current_hash,
+            remaining_unresolved: vec![],
+            fully_resolved: false,
+            error: Some(format!("Invalid span format in ref_id: '{}'", req.ref_id)),
+        }));
+    }
+
+    let span_start: usize = span_parts[0].parse().map_err(|_| StatusCode::BAD_REQUEST)?;
+    let span_end: usize = span_parts[1].parse().map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    // Step 3: Find and update the EntityRef by span
+    if stmt_idx >= session.context.ast.len() {
+        return Ok(Json(ResolveByRefIdResponse {
+            success: false,
+            dsl: current_dsl,
+            dsl_hash: current_hash,
+            remaining_unresolved: vec![],
+            fully_resolved: false,
+            error: Some(format!("Statement index {} out of range", stmt_idx)),
+        }));
+    }
+
+    let stmt = &mut session.context.ast[stmt_idx];
+    let update_result = match stmt {
+        Statement::VerbCall(vc) => {
+            update_entity_ref_by_span(&mut vc.arguments, span_start, span_end, &req.resolved_key)
+        }
+        Statement::Comment(_) => Err("Cannot resolve ref in a comment statement".to_string()),
+    };
+
+    match update_result {
+        Ok(()) => {
+            // Step 4: Re-render DSL and compute new hash
+            let updated_dsl = session.context.to_dsl_source();
+            let new_hash = compute_dsl_hash_internal(&updated_dsl);
+
+            // Step 5: Get remaining unresolved refs
+            let program = session.context.as_program();
+            let locations = find_unresolved_ref_locations(&program);
+
+            let remaining: Vec<RemainingUnresolvedRef> = locations
+                .into_iter()
+                .map(|loc| RemainingUnresolvedRef {
+                    param_name: loc.arg_key,
+                    search_value: loc.search_text,
+                    entity_type: loc.entity_type,
+                    search_column: loc.search_column,
+                    ref_id: loc.ref_id.unwrap_or_default(),
+                })
+                .collect();
+
+            let fully_resolved = remaining.is_empty();
+
+            // Update session state if ready to execute
+            if fully_resolved && !session.context.ast.is_empty() {
+                session.state = SessionState::ReadyToExecute;
+            }
+
+            Ok(Json(ResolveByRefIdResponse {
+                success: true,
+                dsl: updated_dsl,
+                dsl_hash: new_hash,
+                remaining_unresolved: remaining,
+                fully_resolved,
+                error: None,
+            }))
+        }
+        Err(message) => Ok(Json(ResolveByRefIdResponse {
+            success: false,
+            dsl: current_dsl,
+            dsl_hash: current_hash,
+            remaining_unresolved: vec![],
+            fully_resolved: false,
+            error: Some(message),
+        })),
+    }
+}
+
+/// Recursively update an EntityRef by matching span coordinates
+fn update_entity_ref_by_span(
+    args: &mut [crate::dsl_v2::ast::Argument],
+    span_start: usize,
+    span_end: usize,
+    resolved_key: &str,
+) -> Result<(), String> {
+    for arg in args.iter_mut() {
+        if update_node_by_span(&mut arg.value, span_start, span_end, resolved_key)? {
+            return Ok(());
+        }
+    }
+    Err(format!(
+        "No EntityRef found with span {}-{}",
+        span_start, span_end
+    ))
+}
+
+/// Recursively search and update a node by span (handles lists/maps)
+fn update_node_by_span(
+    node: &mut crate::dsl_v2::ast::AstNode,
+    span_start: usize,
+    span_end: usize,
+    resolved_key: &str,
+) -> Result<bool, String> {
+    use crate::dsl_v2::ast::AstNode;
+
+    match node {
+        AstNode::EntityRef {
+            span,
+            resolved_key: ref mut existing_key,
+            ..
+        } => {
+            if span.start == span_start && span.end == span_end {
+                if existing_key.is_some() {
+                    return Err("EntityRef already resolved".to_string());
+                }
+                *existing_key = Some(resolved_key.to_string());
+                return Ok(true);
+            }
+            Ok(false)
+        }
+        AstNode::List { items, .. } => {
+            for item in items.iter_mut() {
+                if update_node_by_span(item, span_start, span_end, resolved_key)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        AstNode::Map { entries, .. } => {
+            for (_, value) in entries.iter_mut() {
+                if update_node_by_span(value, span_start, span_end, resolved_key)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        _ => Ok(false),
+    }
+}
+
+/// Compute SHA-256 hash of DSL string (first 16 hex chars)
+fn compute_dsl_hash_internal(dsl: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(dsl.as_bytes());
+    let result = hasher.finalize();
+    format!("{:x}", result)[..16].to_string()
 }
 
 // ============================================================================

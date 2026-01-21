@@ -170,6 +170,7 @@ impl App {
             service_taxonomy_state: ob_poc_graph::ServiceTaxonomyState::new(),
             // Galaxy navigation state
             galaxy_view: ob_poc_graph::GalaxyView::new(),
+            cluster_view: ob_poc_graph::ClusterView::new(),
             navigation_scope: ob_poc_types::galaxy::NavigationScope::default(),
             view_level: ob_poc_types::galaxy::ViewLevel::default(),
             navigation_stack: Vec::new(),
@@ -1413,6 +1414,32 @@ impl eframe::App for App {
             // TODO: Tilt to reveal specific dimension
         }
 
+        // Ring Navigation (cluster view)
+        if self.state.take_pending_ring_out() {
+            web_sys::console::log_1(&"update: ring out".into());
+            self.state.cluster_view.ring_out();
+        }
+
+        if self.state.take_pending_ring_in() {
+            web_sys::console::log_1(&"update: ring in".into());
+            self.state.cluster_view.ring_in();
+        }
+
+        if let Some(steps) = self.state.take_pending_clockwise() {
+            web_sys::console::log_1(&format!("update: clockwise steps={}", steps).into());
+            self.state.cluster_view.clockwise(steps);
+        }
+
+        if let Some(steps) = self.state.take_pending_counterclockwise() {
+            web_sys::console::log_1(&format!("update: counterclockwise steps={}", steps).into());
+            self.state.cluster_view.counterclockwise(steps);
+        }
+
+        if let Some(target) = self.state.take_pending_snap_to() {
+            web_sys::console::log_1(&format!("update: snap to target={}", target).into());
+            self.state.cluster_view.snap_to(&target);
+        }
+
         // Temporal Navigation
         if let Some(target_date) = self.state.take_pending_time_rewind() {
             web_sys::console::log_1(&format!("update: time rewind to={:?}", target_date).into());
@@ -2134,10 +2161,10 @@ impl eframe::App for App {
                     .into(),
                 );
 
-                if self.state.view_level == ViewLevel::Universe {
-                    self.render_galaxy_view(ui);
-                } else {
-                    self.state.graph_widget.ui(ui);
+                match self.state.view_level {
+                    ViewLevel::Universe => self.render_galaxy_view(ui),
+                    ViewLevel::Cluster => self.render_cluster_view(ui),
+                    _ => self.state.graph_widget.ui(ui),
                 }
             });
         } else {
@@ -3152,11 +3179,11 @@ impl App {
                 .inner_margin(0.0)
                 .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
                 .show(ui, |ui| {
-                    // Render galaxy view at Universe level, otherwise render CBU graph
-                    if self.state.view_level == ViewLevel::Universe {
-                        self.render_galaxy_view(ui);
-                    } else {
-                        self.state.graph_widget.ui(ui);
+                    // Render based on view level
+                    match self.state.view_level {
+                        ViewLevel::Universe => self.render_galaxy_view(ui),
+                        ViewLevel::Cluster => self.render_cluster_view(ui),
+                        _ => self.state.graph_widget.ui(ui),
                     }
                 });
         });
@@ -3301,11 +3328,11 @@ impl App {
 
                             // Graph takes remaining space
                             ui.vertical(|ui| {
-                                // Render galaxy view at Universe level, otherwise render CBU graph
-                                if self.state.view_level == ViewLevel::Universe {
-                                    self.render_galaxy_view(ui);
-                                } else {
-                                    self.state.graph_widget.ui(ui);
+                                // Render based on view level
+                                match self.state.view_level {
+                                    ViewLevel::Universe => self.render_galaxy_view(ui),
+                                    ViewLevel::Cluster => self.render_cluster_view(ui),
+                                    _ => self.state.graph_widget.ui(ui),
                                 }
                             });
 
@@ -3429,11 +3456,11 @@ impl App {
             // Graph (70% width)
             ui.vertical(|ui| {
                 ui.set_width(ui.available_width() * 0.7);
-                // Render galaxy view at Universe level, otherwise render CBU graph
-                if self.state.view_level == ViewLevel::Universe {
-                    self.render_galaxy_view(ui);
-                } else {
-                    self.state.graph_widget.ui(ui);
+                // Render based on view level
+                match self.state.view_level {
+                    ViewLevel::Universe => self.render_galaxy_view(ui),
+                    ViewLevel::Cluster => self.render_cluster_view(ui),
+                    _ => self.state.graph_widget.ui(ui),
                 }
             });
 
@@ -3462,11 +3489,11 @@ impl App {
             .inner_margin(0.0)
             .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
             .show(ui, |ui| {
-                // Render galaxy view at Universe level, otherwise render CBU graph
-                if self.state.view_level == ViewLevel::Universe {
-                    self.render_galaxy_view(ui);
-                } else {
-                    self.state.graph_widget.ui(ui);
+                // Render based on view level
+                match self.state.view_level {
+                    ViewLevel::Universe => self.render_galaxy_view(ui),
+                    ViewLevel::Cluster => self.render_cluster_view(ui),
+                    _ => self.state.graph_widget.ui(ui),
                 }
             });
     }
@@ -3505,6 +3532,50 @@ impl App {
         {
             web_sys::console::log_1(&format!("Galaxy navigation action: {:?}", action).into());
             self.handle_galaxy_action(action);
+        }
+    }
+
+    /// Render the cluster view widget (ManCo center + CBU orbital rings)
+    fn render_cluster_view(&mut self, ui: &mut egui::Ui) {
+        // Tick animations before rendering (egui-rules: tick BEFORE ui)
+        let dt = ui.input(|i| i.stable_dt);
+        self.state.cluster_view.tick(dt);
+
+        // Allocate space and get response
+        let (response, painter) =
+            ui.allocate_painter(ui.available_size(), egui::Sense::click_and_drag());
+        let screen_rect = response.rect;
+
+        // Create a simple camera for rendering
+        use ob_poc_graph::graph::Camera2D;
+        let camera = Camera2D::new();
+
+        // Render the cluster
+        self.state
+            .cluster_view
+            .render(&painter, &camera, screen_rect);
+
+        // Handle input and get any navigation action
+        if let Some(action) = self.state.cluster_view.handle_input(&response, screen_rect) {
+            web_sys::console::log_1(&format!("Cluster navigation action: {:?}", action).into());
+            self.handle_cluster_action(action);
+        }
+    }
+
+    /// Handle navigation actions from the cluster view
+    fn handle_cluster_action(&mut self, action: NavigationAction) {
+        match action {
+            NavigationAction::DrillIntoCbu { cbu_id } => {
+                web_sys::console::log_1(&format!("Cluster: drilling into CBU: {}", cbu_id).into());
+                // Execute DSL to drill into CBU
+                if let Some(session_id) = self.state.session_id {
+                    let dsl = format!("(view.cbu :cbu-id \"{}\")", cbu_id);
+                    self.state.execute_dsl_with_content(session_id, dsl);
+                }
+            }
+            _ => {
+                // Other actions (zoom, pan, etc.) handled by widget internally
+            }
         }
     }
 
@@ -4573,6 +4644,34 @@ impl AppState {
                                             &"Command: ResolutionCancel".into(),
                                         );
                                         state.pending_resolution_cancel = true;
+                                    }
+                                    // Ring navigation commands (cluster view)
+                                    ob_poc_types::AgentCommand::RingOut => {
+                                        web_sys::console::log_1(&"Command: RingOut".into());
+                                        state.pending_ring_out = true;
+                                    }
+                                    ob_poc_types::AgentCommand::RingIn => {
+                                        web_sys::console::log_1(&"Command: RingIn".into());
+                                        state.pending_ring_in = true;
+                                    }
+                                    ob_poc_types::AgentCommand::Clockwise { steps } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: Clockwise steps={:?}", steps).into(),
+                                        );
+                                        state.pending_clockwise = Some(steps.unwrap_or(1));
+                                    }
+                                    ob_poc_types::AgentCommand::Counterclockwise { steps } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: Counterclockwise steps={:?}", steps)
+                                                .into(),
+                                        );
+                                        state.pending_counterclockwise = Some(steps.unwrap_or(1));
+                                    }
+                                    ob_poc_types::AgentCommand::SnapTo { target } => {
+                                        web_sys::console::log_1(
+                                            &format!("Command: SnapTo target={}", target).into(),
+                                        );
+                                        state.pending_snap_to = Some(target.clone());
                                     }
                                 }
                             }

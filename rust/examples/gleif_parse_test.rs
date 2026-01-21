@@ -1,4 +1,4 @@
-use ob_poc::gleif::types::{GleifResponse, LeiRecord};
+use ob_poc::gleif::types::LeiRecord;
 use std::fs;
 
 fn main() {

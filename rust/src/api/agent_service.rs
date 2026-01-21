@@ -103,25 +103,28 @@
 
 use crate::agent::esper::{EsperCommandRegistry, LookupResult};
 use crate::agent::learning::embedder::CandleEmbedder;
-use crate::agentic::llm_client::{LlmClient, ToolDefinition};
+use crate::agentic::llm_client::LlmClient;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{
     AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption,
     ResolutionSubSession, SessionState, UnresolvedRefInfo,
 };
-use crate::database::derive_semantic_state;
+use crate::database::{derive_semantic_state, VerbService};
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::semantic_validator::SemanticValidator;
 use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, ValidationRequest};
 use crate::dsl_v2::verb_registry::registry;
 use crate::dsl_v2::Statement;
+use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
+use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::ontology::SemanticStageRegistry;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 // ============================================================================
@@ -177,6 +180,32 @@ const CODE_PARAMS: &[(&str, RefType)] = &[
     // Screening and compliance
     ("screening-type", RefType::ScreeningType),
 ];
+
+/// Convert IntentArgValue to ParamValue for VerbIntent construction
+fn intent_arg_to_param_value(value: &IntentArgValue) -> ParamValue {
+    match value {
+        IntentArgValue::String(s) => ParamValue::String(s.clone()),
+        IntentArgValue::Number(n) => ParamValue::Number(*n),
+        IntentArgValue::Boolean(b) => ParamValue::Boolean(*b),
+        IntentArgValue::Reference(r) => ParamValue::String(format!("@{}", r)),
+        IntentArgValue::Uuid(u) => ParamValue::String(u.clone()),
+        IntentArgValue::Unresolved { value, .. } => ParamValue::String(format!("<{}>", value)),
+        IntentArgValue::Missing { arg_name } => {
+            ParamValue::String(format!("<missing:{}>", arg_name))
+        }
+        IntentArgValue::List(items) => {
+            let converted: Vec<ParamValue> = items.iter().map(intent_arg_to_param_value).collect();
+            ParamValue::List(converted)
+        }
+        IntentArgValue::Map(entries) => {
+            let converted: HashMap<String, ParamValue> = entries
+                .iter()
+                .map(|(k, v)| (k.clone(), intent_arg_to_param_value(v)))
+                .collect();
+            ParamValue::Object(converted)
+        }
+    }
+}
 
 /// Unified result of resolving ALL references (entities + codes) in intents.
 /// Replaces the old 3-method approach (collect_lookups, resolve_lookups, inject_resolved_ids).
@@ -245,6 +274,10 @@ pub struct AgentChatResponse {
     /// Index of current ref being resolved (if in resolution state)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_ref_index: Option<usize>,
+    /// Hash of current DSL for resolution commit verification (Issue K)
+    /// UI must pass this back to /resolve-by-ref-id to prevent stale commits
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dsl_hash: Option<String>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -350,9 +383,12 @@ pub struct AgentService {
     /// Client scope (if operating in client portal mode)
     client_scope: Option<ClientScope>,
     /// ESPER command registry for instant navigation (optional)
-    esper_registry: Option<Arc<EsperCommandRegistry>>,
-    /// Embedder for ESPER semantic fallback (optional)
+    /// Wrapped in RwLock to allow lazy semantic index updates
+    esper_registry: Option<Arc<RwLock<EsperCommandRegistry>>>,
+    /// Embedder for semantic fallback (ESPER + verb search)
     embedder: Option<Arc<CandleEmbedder>>,
+    /// Cached verb searcher for semantic intent matching
+    verb_searcher: tokio::sync::Mutex<Option<HybridVerbSearcher>>,
 }
 
 #[allow(dead_code)]
@@ -365,6 +401,7 @@ impl AgentService {
             client_scope: None,
             esper_registry: None,
             embedder: None,
+            verb_searcher: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -376,6 +413,7 @@ impl AgentService {
             client_scope: None,
             esper_registry: None,
             embedder: None,
+            verb_searcher: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -387,19 +425,56 @@ impl AgentService {
             client_scope: None,
             esper_registry: None,
             embedder: None,
+            verb_searcher: tokio::sync::Mutex::new(None),
         }
     }
 
     /// Set ESPER registry for instant navigation commands
-    pub fn with_esper_registry(mut self, registry: Arc<EsperCommandRegistry>) -> Self {
+    pub fn with_esper_registry(mut self, registry: Arc<RwLock<EsperCommandRegistry>>) -> Self {
         self.esper_registry = Some(registry);
         self
+    }
+
+    /// Get a reference to the ESPER registry (for lazy semantic index updates)
+    pub fn esper_registry(&self) -> Option<Arc<RwLock<EsperCommandRegistry>>> {
+        self.esper_registry.clone()
     }
 
     /// Set embedder for ESPER semantic fallback
     pub fn with_embedder(mut self, embedder: Arc<CandleEmbedder>) -> Self {
         self.embedder = Some(embedder);
         self
+    }
+
+    /// Get or create verb searcher for semantic intent matching
+    async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher, String> {
+        let mut guard = self.verb_searcher.lock().await;
+        if let Some(searcher) = guard.as_ref() {
+            return Ok(searcher.clone());
+        }
+
+        // Need pool to create searcher
+        let pool = self.pool.as_ref().ok_or("No database pool available")?;
+
+        // Create VerbService for centralized DB access
+        let verb_service = Arc::new(VerbService::new(pool.clone()));
+
+        // Create searcher with VerbService
+        let mut searcher = HybridVerbSearcher::new(verb_service, None);
+
+        // Add embedder if available (for semantic fallback)
+        if let Some(embedder) = &self.embedder {
+            searcher = searcher.with_embedder(embedder.clone());
+        }
+
+        *guard = Some(searcher.clone());
+        Ok(searcher)
+    }
+
+    /// Get or create IntentPipeline for processing user input
+    async fn get_intent_pipeline(&self) -> Result<IntentPipeline, String> {
+        let searcher = self.get_verb_searcher().await?;
+        Ok(IntentPipeline::new(searcher))
     }
 
     /// Create a client-scoped agent service for the client portal
@@ -415,6 +490,7 @@ impl AgentService {
             client_scope: Some(ClientScope::new(client_id, accessible_cbus)),
             esper_registry: None,
             embedder: None,
+            verb_searcher: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -433,6 +509,7 @@ impl AgentService {
             client_scope: Some(scope),
             esper_registry: None,
             embedder: None,
+            verb_searcher: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -837,7 +914,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // Handle ESPER navigation commands (bypass LLM)
         // These are instant UI commands like "enhance", "zoom in 2x", "universe"
         // ESPER is kept as fast-path because it's UI navigation, not DSL generation
-        if let Some(response) = self.handle_esper_command(&request.message) {
+        if let Some(response) = self.handle_esper_command(&request.message).await {
             return Ok(response);
         }
 
@@ -851,400 +928,224 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // If this is a disambiguation response, handle it
         if let Some(disambig_response) = &request.disambiguation_response {
             return self
-                .handle_disambiguation_response(session, disambig_response, llm_client)
+                .handle_disambiguation_response(session, disambig_response, llm_client.clone())
                 .await;
         }
 
-        // Store user message
-        session.add_user_message(request.message.clone());
+        // =========================================================================
+        // PRIMARY PATH: IntentPipeline handles ALL natural language and direct DSL
+        // =========================================================================
+        // This is the unified entry point for:
+        // - Direct DSL: "(view.book :client <Allianz>)" → parse, validate, return
+        // - Natural language: "show all allianz lux cbu" → semantic search → LLM → DSL
+        //
+        // The pipeline uses semantic verb search to narrow candidates, then LLM
+        // extracts arguments (JSON only). LLM never writes DSL syntax.
+        if let Ok(pipeline) = self.get_intent_pipeline().await {
+            let pipeline_result = pipeline.process(&request.message, None).await;
 
-        // Get session context for LLM
-        let session_bindings = session.context.bindings_for_llm();
-        let session_named_refs = session.context.named_refs.clone();
+            match pipeline_result {
+                Ok(result) => {
+                    tracing::info!(
+                        "IntentPipeline matched verb: {} (score: {:.2})",
+                        result.intent.verb,
+                        result
+                            .verb_candidates
+                            .first()
+                            .map(|c| c.score)
+                            .unwrap_or(0.0)
+                    );
 
-        // Enhancement #1: Pre-resolve available entities before LLM call
-        // This injects available CBUs, entities, products, etc. into the prompt
-        // so the LLM can only reference things that actually exist
-        let pre_resolved = if self.config.enable_pre_resolution {
-            self.pre_resolve_entities().await
-        } else {
-            PreResolvedContext::default()
-        };
-        let pre_resolved_context = self.format_pre_resolved_context(&pre_resolved);
-
-        // Get relevant verbs filter from stage focus (if set)
-        let stage_verb_filter: Option<Vec<String>> =
-            if let Some(ref stage_code) = session.context.stage_focus {
-                // Load the semantic stage registry to get relevant verbs
-                match SemanticStageRegistry::load_default() {
-                    Ok(registry) => registry
-                        .get_stage(stage_code)
-                        .and_then(|s| s.relevant_verbs.clone()),
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to load semantic stage registry for verb filtering: {}",
-                            e
+                    // If we have unresolved entity refs, trigger disambiguation using pipeline result
+                    if !result.unresolved_refs.is_empty() {
+                        tracing::info!(
+                            "Pipeline has {} unresolved refs, triggering disambiguation",
+                            result.unresolved_refs.len()
                         );
-                        None
-                    }
-                }
-            } else {
-                None
-            };
 
-        // Build prompts with pre-resolved data and optional verb filtering
-        let vocab = self.build_vocab_prompt(None, stage_verb_filter.as_deref());
+                        session.add_user_message(request.message.clone());
 
-        // Add stage focus context to the prompt if filtering is active
-        let stage_focus_context = if let Some(ref stage_code) = session.context.stage_focus {
-            format!(
-                "\n\n## FOCUS: {} Stage\nYou are focused on the {} stage. Prioritize verbs relevant to this stage.",
-                stage_code, stage_code
-            )
-        } else {
-            String::new()
-        };
-
-        let system_prompt = format!(
-            "{}{}{}",
-            self.build_intent_extraction_prompt(&vocab),
-            pre_resolved_context,
-            stage_focus_context
-        );
-
-        // Build session context for LLM - include active CBU, scope, bindings, and semantic state
-        let active_cbu_context = session.context.active_cbu_for_llm();
-        let scope_context = session.context.scope_context_for_llm();
-
-        // Derive semantic state if we have an active CBU
-        let semantic_context = if let Some(ref cbu) = session.context.active_cbu {
-            self.derive_semantic_context(cbu.id).await
-        } else {
-            None
-        };
-
-        // Derive KYC case context if a case is active in the session
-        let kyc_case_context = if let Some(case_id) = session.context.primary_keys.kyc_case_id {
-            self.derive_kyc_case_context(case_id).await
-        } else {
-            None
-        };
-
-        // Derive taxonomy navigation context if active
-        let taxonomy_context = self.derive_taxonomy_context(session);
-
-        let bindings_context = if !session_bindings.is_empty()
-            || active_cbu_context.is_some()
-            || scope_context.is_some()
-            || semantic_context.is_some()
-            || kyc_case_context.is_some()
-            || taxonomy_context.is_some()
-        {
-            let mut parts = Vec::new();
-            if let Some(cbu) = active_cbu_context {
-                parts.push(cbu);
-            }
-            // Add multi-CBU scope context for bulk operations
-            if let Some(scope) = scope_context {
-                parts.push(scope);
-            }
-            if !session_bindings.is_empty() {
-                parts.push(format!(
-                    "Available references: {}",
-                    session_bindings.join(", ")
-                ));
-            }
-
-            // Add semantic stage context if available
-            let semantic_section = if let Some(ref sem_ctx) = semantic_context {
-                format!("\n\n{}", sem_ctx)
-            } else {
-                String::new()
-            };
-
-            // Add KYC case context if available (domain-coherent view with embedded requests)
-            let kyc_section = if let Some(ref kyc_ctx) = kyc_case_context {
-                format!("\n\n{}", kyc_ctx)
-            } else {
-                String::new()
-            };
-
-            // Add taxonomy navigation context if available
-            let taxonomy_section = if let Some(ref tax_ctx) = taxonomy_context {
-                format!("\n\n{}", tax_ctx)
-            } else {
-                String::new()
-            };
-
-            format!(
-                "\n\n[SESSION CONTEXT: {}. Use the active CBU for operations that need a CBU. Use exact @names in the refs field when referring to entities.]{}{}{}",
-                parts.join(". "),
-                semantic_section,
-                kyc_section,
-                taxonomy_section
-            )
-        } else {
-            String::new()
-        };
-
-        let user_message = format!("{}{}", request.message, bindings_context);
-
-        // Define tool for intent extraction with entity lookups
-        let tool = self.build_intent_tool();
-
-        // Retry loop with validation feedback
-        let mut feedback_context = String::new();
-        let mut final_dsl: Option<String> = None;
-        let mut final_user_dsl: Option<String> = None;
-        let mut final_explanation = String::new();
-        let mut all_intents: Vec<VerbIntent> = Vec::new();
-        let mut validation_results: Vec<IntentValidation> = Vec::new();
-
-        for attempt in 0..self.config.max_retries {
-            // Build message with optional feedback from previous attempt
-            let attempt_message = if feedback_context.is_empty() {
-                user_message.clone()
-            } else {
-                format!(
-                    "{}\n\n[LINTER FEEDBACK - Please fix these issues]\n{}",
-                    user_message, feedback_context
-                )
-            };
-
-            // Call LLM with tool use for structured intent extraction
-            let tool_result = match llm_client
-                .chat_with_tool(&system_prompt, &attempt_message, &tool)
-                .await
-            {
-                Ok(result) => result,
-                Err(e) => {
-                    tracing::error!("LLM API error (attempt {}): {}", attempt + 1, e);
-                    if attempt == self.config.max_retries - 1 {
-                        return Err(format!("LLM API error: {}", e));
-                    }
-                    continue;
-                }
-            };
-
-            // Check for clarification request first
-            let needs_clarification = tool_result.arguments["needs_clarification"]
-                .as_bool()
-                .unwrap_or(false);
-
-            let explanation = tool_result.arguments["explanation"]
-                .as_str()
-                .unwrap_or("")
-                .to_string();
-
-            if needs_clarification {
-                // LLM detected ambiguity and needs clarification from user
-                let clarification = &tool_result.arguments["clarification"];
-                let question = clarification["question"]
-                    .as_str()
-                    .unwrap_or("Could you please clarify your request?");
-                let ambiguity_type = clarification["ambiguity_type"]
-                    .as_str()
-                    .unwrap_or("unknown");
-
-                tracing::debug!(
-                    "Clarification needed: type={}, question={}",
-                    ambiguity_type,
-                    question
-                );
-
-                // Build a user-friendly clarification message
-                let clarification_message =
-                    if let Some(interpretations) = clarification["interpretations"].as_array() {
-                        let options: Vec<String> = interpretations
+                        // Convert pipeline unresolved refs to disambiguation items (Fix K)
+                        let disambig_items: Vec<DisambiguationItem> = result
+                            .unresolved_refs
                             .iter()
-                            .filter_map(|i| {
-                                let opt = i["option"].as_i64().unwrap_or(0);
-                                let desc = i["description"].as_str().unwrap_or("");
-                                if !desc.is_empty() {
-                                    Some(format!("  {}. {}", opt, desc))
-                                } else {
-                                    None
-                                }
+                            .map(|r| DisambiguationItem::EntityMatch {
+                                param: r.param_name.clone(),
+                                search_text: r.search_value.clone(),
+                                matches: vec![], // Will be populated by UI via entity search
+                                entity_type: r.entity_type.clone(),
+                                search_column: r.search_column.clone(),
+                                ref_id: r.ref_id.clone(),
                             })
                             .collect();
 
-                        if options.is_empty() {
-                            question.to_string()
-                        } else {
-                            format!("{}\n\nOptions:\n{}", question, options.join("\n"))
+                        // Build VerbIntent from pipeline result
+                        let mut params: HashMap<String, ParamValue> = HashMap::new();
+                        for arg in &result.intent.arguments {
+                            let value = intent_arg_to_param_value(&arg.value);
+                            params.insert(arg.name.clone(), value);
                         }
+
+                        let intent = VerbIntent {
+                            verb: result.intent.verb.clone(),
+                            params,
+                            refs: HashMap::new(),
+                            lookups: None,
+                            sequence: None,
+                        };
+
+                        // Store intent in session for after disambiguation
+                        session.pending_intents = vec![intent.clone()];
+
+                        let disambig = DisambiguationRequest {
+                            request_id: Uuid::new_v4(),
+                            items: disambig_items,
+                            prompt: format!(
+                                "Please select the correct entities for {}:",
+                                result.intent.verb
+                            ),
+                            original_intents: Some(vec![intent.clone()]),
+                        };
+
+                        let response_msg = format!(
+                            "I need to resolve some entities for `{}`",
+                            result.intent.verb
+                        );
+                        session.add_agent_message(response_msg.clone(), None, None);
+                        session.state = SessionState::PendingValidation;
+
+                        return Ok(AgentChatResponse {
+                            message: response_msg,
+                            intents: vec![intent],
+                            validation_results: vec![],
+                            session_state: SessionState::PendingValidation,
+                            can_execute: false,
+                            dsl_source: Some(result.dsl),
+                            ast: None,
+                            disambiguation: Some(disambig),
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                        });
+                    } else if result.valid {
+                        // Valid DSL with all refs resolved - execute directly
+                        session.add_user_message(request.message.clone());
+
+                        // Parse to AST for response - extract statements
+                        let ast = dsl_core::parser::parse_program(&result.dsl)
+                            .ok()
+                            .map(|p| p.statements);
+
+                        // Build response with the pipeline result
+                        let response_msg = if result.intent.notes.is_empty() {
+                            format!("Generated: {}", result.dsl)
+                        } else {
+                            result.intent.notes.join("\n")
+                        };
+                        // Build VerbIntent with proper params HashMap
+                        let mut params: HashMap<String, ParamValue> = HashMap::new();
+                        for arg in &result.intent.arguments {
+                            let value = intent_arg_to_param_value(&arg.value);
+                            params.insert(arg.name.clone(), value);
+                        }
+
+                        let intent = VerbIntent {
+                            verb: result.intent.verb.clone(),
+                            params,
+                            refs: HashMap::new(),
+                            lookups: None,
+                            sequence: None,
+                        };
+
+                        session.add_agent_message(
+                            response_msg.clone(),
+                            Some(vec![intent.clone()]),
+                            Some(result.dsl.clone()),
+                        );
+                        session.state = SessionState::ReadyToExecute;
+
+                        return Ok(AgentChatResponse {
+                            message: response_msg,
+                            intents: vec![intent.clone()],
+                            validation_results: vec![IntentValidation {
+                                valid: true,
+                                intent,
+                                errors: vec![],
+                                warnings: vec![],
+                            }],
+                            session_state: SessionState::ReadyToExecute,
+                            can_execute: true,
+                            dsl_source: Some(result.dsl),
+                            ast,
+                            disambiguation: None,
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                        });
                     } else {
-                        question.to_string()
-                    };
+                        // DSL validation failed - return error with details
+                        let error_msg = result
+                            .validation_error
+                            .unwrap_or_else(|| "DSL validation failed".to_string());
+                        tracing::warn!("Pipeline DSL validation failed: {}", error_msg);
 
-                session.add_agent_message(clarification_message.clone(), None, None);
-                // Use PendingValidation to indicate we're waiting for user clarification
-                session.state = SessionState::PendingValidation;
+                        session.add_user_message(request.message.clone());
+                        session.add_agent_message(error_msg.clone(), None, None);
 
-                return Ok(AgentChatResponse {
-                    message: clarification_message,
-                    intents: vec![],
-                    validation_results: vec![],
-                    session_state: SessionState::PendingValidation,
-                    can_execute: false,
-                    dsl_source: None,
-                    ast: None,
-                    disambiguation: None,
-                    commands: None,
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                });
-            }
-
-            // Parse intents
-            let intents: Vec<VerbIntent> =
-                serde_json::from_value(tool_result.arguments["intents"].clone())
-                    .unwrap_or_default();
-
-            if intents.is_empty() {
-                if attempt < self.config.max_retries - 1 {
-                    feedback_context = "Could not extract any DSL intents. Please try again with clearer verb and parameter names.".to_string();
-                    continue;
+                        return Ok(AgentChatResponse {
+                            message: format!(
+                                "I understood `{}` but the DSL is invalid: {}",
+                                result.intent.verb, error_msg
+                            ),
+                            intents: vec![],
+                            validation_results: vec![],
+                            session_state: SessionState::New,
+                            can_execute: false,
+                            dsl_source: Some(result.dsl),
+                            ast: None,
+                            disambiguation: None,
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                        });
+                    }
                 }
-                break;
-            }
+                Err(e) => {
+                    // Pipeline failed - return error, don't fall through
+                    tracing::error!("IntentPipeline error: {}", e);
 
-            // Unified resolution: entities + codes in one pass
-            let resolution = self.resolve_all(intents).await;
-
-            match resolution {
-                UnifiedResolution::NeedsDisambiguation {
-                    items,
-                    partial_intents,
-                } => {
-                    // Need disambiguation - store intents in session for retrieval after user selection
-                    session.pending_intents = partial_intents.clone();
-
-                    let disambig = DisambiguationRequest {
-                        request_id: Uuid::new_v4(),
-                        items,
-                        prompt: "Please select the correct entities:".to_string(),
-                        original_intents: Some(partial_intents),
-                    };
-
-                    session.add_agent_message(explanation.clone(), None, None);
-                    session.state = SessionState::PendingValidation;
+                    session.add_user_message(request.message.clone());
+                    let error_msg = format!("I couldn't understand that request: {}", e);
+                    session.add_agent_message(error_msg.clone(), None, None);
 
                     return Ok(AgentChatResponse {
-                        message: explanation,
+                        message: error_msg,
                         intents: vec![],
                         validation_results: vec![],
-                        session_state: SessionState::PendingValidation,
+                        session_state: SessionState::New,
                         can_execute: false,
                         dsl_source: None,
                         ast: None,
-                        disambiguation: Some(disambig),
+                        disambiguation: None,
                         commands: None,
                         unresolved_refs: None,
                         current_ref_index: None,
+                        dsl_hash: None,
                     });
-                }
-                UnifiedResolution::Error(msg) => {
-                    // Could be entity lookup failure OR invalid code
-                    return Err(msg);
-                }
-                UnifiedResolution::Resolved {
-                    intents: modified_intents,
-                    corrections,
-                } => {
-                    // Log any code corrections
-                    for (param, from, to) in &corrections {
-                        tracing::info!("Resolved {}: '{}' → '{}'", param, from, to);
-                    }
-
-                    // Validate intents against registry
-                    validation_results.clear();
-                    let mut has_errors = false;
-                    let mut error_feedback = Vec::new();
-
-                    for intent in &modified_intents {
-                        let validation = validate_intent(intent);
-                        if !validation.valid {
-                            has_errors = true;
-                            for err in &validation.errors {
-                                error_feedback.push(format!(
-                                    "Verb '{}': {} {}",
-                                    intent.verb,
-                                    err.message,
-                                    err.param
-                                        .as_deref()
-                                        .map(|p| format!("(param: {})", p))
-                                        .unwrap_or_default()
-                                ));
-                            }
-                        }
-                        validation_results.push(validation);
-                    }
-
-                    // Build DSL from intents - both execution (UUIDs) and user (display names)
-                    let dsl = build_dsl_program(&modified_intents);
-                    let user_dsl = build_user_dsl_program(&modified_intents);
-                    tracing::debug!("[CHAT] Built DSL from intents: {}", dsl);
-
-                    // Run semantic validation if we have a database pool
-                    if let Some(ref pool) = self.pool {
-                        if let Some(errors) = self
-                            .run_semantic_validation(pool, &dsl, &session_named_refs)
-                            .await
-                        {
-                            has_errors = true;
-                            error_feedback.extend(errors);
-                        }
-                    }
-
-                    // If no errors, we're done
-                    if !has_errors {
-                        tracing::info!(
-                            "Validation passed on attempt {}, DSL length: {}",
-                            attempt + 1,
-                            dsl.len()
-                        );
-                        final_dsl = Some(dsl);
-                        final_user_dsl = Some(user_dsl);
-                        final_explanation = explanation;
-                        all_intents = modified_intents;
-                        break;
-                    } else {
-                        tracing::warn!(
-                            "Validation failed on attempt {}: {:?}",
-                            attempt + 1,
-                            error_feedback
-                        );
-                    }
-
-                    // Build feedback for next attempt
-                    if attempt < self.config.max_retries - 1 {
-                        feedback_context = error_feedback.join("\n");
-                    } else {
-                        // Last attempt - return what we have with errors
-                        final_dsl = Some(dsl);
-                        final_user_dsl = Some(user_dsl);
-                        final_explanation = format!(
-                            "{}\n\nNote: DSL has validation issues:\n{}",
-                            explanation,
-                            error_feedback.join("\n")
-                        );
-                        all_intents = modified_intents;
-                    }
                 }
             }
         }
 
-        // Build final response
-        self.build_response(
-            session,
-            all_intents,
-            validation_results,
-            final_dsl,
-            final_user_dsl,
-            final_explanation,
-        )
-        .await
+        // =========================================================================
+        // ERROR: IntentPipeline unavailable - system is down
+        // =========================================================================
+        // If we reach here, the database pool is unavailable. This is a critical
+        // system failure - return error rather than pretending to work.
+        tracing::error!("IntentPipeline unavailable - database pool not configured");
+        Err("Service unavailable: database connection required".to_string())
     }
 
     /// Run semantic validation on DSL
@@ -1400,8 +1301,9 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     ///                    ↓
     ///              Miss? → Return None → Falls through to DSL pipeline
     /// ```
-    fn handle_esper_command(&self, message: &str) -> Option<AgentChatResponse> {
-        let registry = self.esper_registry.as_ref()?;
+    async fn handle_esper_command(&self, message: &str) -> Option<AgentChatResponse> {
+        let registry_lock = self.esper_registry.as_ref()?;
+        let registry = registry_lock.read().await;
 
         // Try fast path first (trie lookup)
         // Only compute embedding on trie miss + semantic index ready
@@ -1435,6 +1337,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     commands: Some(vec![esper_match.command.clone()]),
                     unresolved_refs: None,
                     current_ref_index: None,
+                    dsl_hash: None,
                 })
             }
             LookupResult::SemanticMatch {
@@ -1486,6 +1389,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     commands: Some(vec![esper_match.command.clone()]),
                     unresolved_refs: None,
                     current_ref_index: None,
+                    dsl_hash: None,
                 })
             }
             LookupResult::NeedsDisambiguation {
@@ -1523,6 +1427,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     commands: None,
                     unresolved_refs: None,
                     current_ref_index: None,
+                    dsl_hash: None,
                 })
             }
             LookupResult::NoMatch => None,
@@ -1583,6 +1488,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     commands: Some(vec![AgentCommand::Execute]),
                     unresolved_refs: None,
                     current_ref_index: None,
+                    dsl_hash: None,
                 });
             } else {
                 return Some(AgentChatResponse {
@@ -1597,6 +1503,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     commands: None,
                     unresolved_refs: None,
                     current_ref_index: None,
+                    dsl_hash: None,
                 });
             }
         }
@@ -1615,6 +1522,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 commands: Some(vec![AgentCommand::Undo]),
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             });
         }
 
@@ -1632,6 +1540,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 commands: Some(vec![AgentCommand::Clear]),
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             });
         }
 
@@ -1733,8 +1642,11 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                             if !matches.is_empty() {
                                 disambiguations.push(DisambiguationItem::EntityMatch {
                                     param,
-                                    search_text: lookup.search_text,
+                                    search_text: lookup.search_text.clone(),
                                     matches,
+                                    entity_type: lookup.entity_type.clone(),
+                                    search_column: None, // Legacy path doesn't have search_column
+                                    ref_id: None,        // Legacy path doesn't have ref_id
                                 });
                             }
                         }
@@ -2030,6 +1942,14 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         let can_execute = session.can_execute() && all_valid && unresolved_refs.is_none();
         let commands: Option<Vec<AgentCommand>> = None;
 
+        // Compute dsl_hash for resolution commits (Issue K)
+        // Only needed when there are unresolved refs
+        let dsl_hash = if unresolved_refs.is_some() {
+            combined_dsl.as_ref().map(|dsl| compute_dsl_hash(dsl))
+        } else {
+            None
+        };
+
         Ok(AgentChatResponse {
             message,
             intents,
@@ -2042,270 +1962,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             commands,
             unresolved_refs,
             current_ref_index,
+            dsl_hash,
         })
-    }
-
-    /// Build vocabulary prompt from verb registry
-    ///
-    /// If `verb_filter` is provided, only include those specific verbs.
-    /// Otherwise, if `domain_filter` is provided, filter by domain.
-    fn build_vocab_prompt(
-        &self,
-        domain_filter: Option<&str>,
-        verb_filter: Option<&[String]>,
-    ) -> String {
-        let reg = registry();
-        let mut lines = Vec::new();
-
-        for verb in reg.all_verbs() {
-            // First check verb filter (most specific)
-            if let Some(verbs) = verb_filter {
-                let full_name = format!("{}.{}", verb.domain, verb.verb);
-                if !verbs.iter().any(|v| v == &full_name) {
-                    continue;
-                }
-            } else if let Some(domain) = domain_filter {
-                // Fall back to domain filter
-                if verb.domain != domain {
-                    continue;
-                }
-            }
-
-            let required: Vec<_> = verb
-                .args
-                .iter()
-                .filter(|a| a.required)
-                .map(|a| a.name.as_str())
-                .collect();
-            let optional: Vec<_> = verb
-                .args
-                .iter()
-                .filter(|a| !a.required)
-                .map(|a| a.name.as_str())
-                .collect();
-
-            lines.push(format!(
-                "- {}.{}: {} [required: {:?}] [optional: {:?}]",
-                verb.domain, verb.verb, verb.description, required, optional
-            ));
-        }
-
-        lines.join("\n")
-    }
-
-    /// Build system prompt for intent extraction
-    ///
-    /// Uses a 10-layer architecture for maintainability (see prompts/INTEGRATION.md):
-    /// 1. Role definition and constraints
-    /// 2. Structure rules (output format)
-    /// 3. Verb vocabulary (from registry)
-    /// 4. DAG dependencies (@result_N semantics)
-    /// 5. Domain knowledge (code mappings)
-    /// 6. Entity context (pre-resolved - injected separately)
-    /// 7. Session state (injected separately)
-    /// 8. Ambiguity detection rules
-    /// 9. Few-shot examples
-    /// 10. Error context (if retrying - injected separately)
-    fn build_intent_extraction_prompt(&self, vocab: &str) -> String {
-        // Layer 1: Role and constraints
-        let role_prompt = r#"You are a KYC/AML onboarding DSL assistant. Convert natural language to structured DSL intents.
-
-IMPORTANT: You MUST use the generate_dsl_intents tool to return your response. Do NOT return plain text.
-
-## Your Role
-- Translate natural language requests into structured DSL operations
-- Identify entity references that need database resolution
-- Ask for clarification when requests are ambiguous (set needs_clarification=true)
-- Rate your confidence in each interpretation (0.0-1.0)
-- Never execute anything - only generate structured intents
-
-## Constraints
-- Only use verbs from the AVAILABLE VERBS list below
-- Never invent verbs, parameters, or entity types
-- Express uncertainty in confidence scores
-- If unsure, ask rather than guess"#;
-
-        // Layer 2: Intent structure rules
-        let structure_rules = r#"
-## Intent Structure
-
-Each intent represents a single DSL verb call with:
-- verb: The verb name (e.g., "cbu.ensure", "entity.create-proper-person")
-- params: Literal parameter values (e.g., {"name": "Acme Corp", "jurisdiction": "LU"})
-- refs: References to previous results or session bindings (e.g., {"cbu-id": "@cbu"} or {"cbu-id": "@result_1"})
-- lookups: Entity references needing database resolution
-
-## Rules
-
-1. Use exact verb names from the vocabulary
-2. Use exact parameter names (with hyphens, e.g., "client-type" not "clientType")
-3. If @cbu is available in session context, use it for cbu-id parameters
-4. For sequences of new entities, use @result_N references where N is the sequence number
-5. Check for ambiguity before generating intents - ask for clarification if needed
-6. Recognize REMOVAL intent: words like "remove", "delete", "drop", "unlink", "take off", "unassign" indicate removal operations
-   - "remove [product]" / "delete [product]" → cbu.remove-product
-   - "remove [entity] as [role]" / "unassign [role]" → cbu.remove-role
-   - "delete [entity]" → entity.delete
-   - "end ownership" → ubo.end-ownership
-
-## Entity Lookups
-
-When the user mentions existing entities by name:
-- Use the "lookups" field to request entity resolution
-- Provide search_text (the name) and entity_type (person, company, cbu, entity, product, role)
-- If jurisdiction is mentioned, include jurisdiction_hint
-
-## Confidence Scoring
-
-Rate your confidence in each interpretation:
-- 0.95-1.0: Unambiguous request with all required info
-- 0.85-0.94: Clear intent but requires entity lookup
-- 0.70-0.84: Some inference required, minor assumptions
-- 0.50-0.69: Significant assumptions, consider asking
-- 0.30-0.49: Multiple interpretations, ASK for clarification
-- 0.0-0.29: Very unclear, MUST ask for clarification"#;
-
-        // Layer 4: DAG dependencies - teaches @result_N semantics
-        let dag_dependencies = include_str!("prompts/dag_dependencies.md");
-
-        // Layer 5: Domain knowledge (code mappings)
-        let domain_knowledge = include_str!("prompts/domain_knowledge.md");
-
-        // Layer 5b: KYC async patterns (fire-and-forget, domain coherence)
-        let kyc_async_patterns = include_str!("prompts/kyc_async_patterns.md");
-
-        // Layer 8: Ambiguity detection rules
-        let ambiguity_rules = include_str!("prompts/ambiguity_detection.md");
-
-        // Layer 9: Few-shot examples
-        let few_shot_examples = include_str!("prompts/few_shot_examples.md");
-
-        format!(
-            r#"{role_prompt}
-
-## Available DSL Verbs
-
-{vocab}
-
-{structure_rules}
-
-{dag_dependencies}
-
-{domain_knowledge}
-
-{kyc_async_patterns}
-
-{ambiguity_rules}
-
-{few_shot_examples}"#
-        )
-    }
-
-    /// Build tool definition for intent extraction
-    ///
-    /// Enhancement #2: The verb field uses an enum of all valid verb names from
-    /// the registry. This constrains LLM output to only valid verbs, eliminating
-    /// "unknown verb" errors entirely.
-    fn build_intent_tool(&self) -> ToolDefinition {
-        // Get all valid verb names from registry for constrained output
-        let reg = registry();
-        let verb_names: Vec<String> = reg.all_verbs().map(|v| v.full_name()).collect();
-
-        ToolDefinition {
-            name: "generate_dsl_intents".to_string(),
-            description: "Generate structured DSL intents from user request. Use 'lookups' for entity references that need database resolution. Set needs_clarification=true if the request is ambiguous.".to_string(),
-            parameters: serde_json::json!({
-                "type": "object",
-                "properties": {
-                    "needs_clarification": {
-                        "type": "boolean",
-                        "description": "Set to true if the request is ambiguous and needs clarification before proceeding",
-                        "default": false
-                    },
-                    "clarification": {
-                        "type": "object",
-                        "description": "Required when needs_clarification is true",
-                        "properties": {
-                            "ambiguity_type": {
-                                "type": "string",
-                                "enum": ["name_parsing", "entity_match", "missing_context", "multiple_interpretations"],
-                                "description": "Type of ambiguity detected"
-                            },
-                            "original_text": {
-                                "type": "string",
-                                "description": "The ambiguous part of the input"
-                            },
-                            "interpretations": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "option": { "type": "integer" },
-                                        "interpretation": { "type": "string" },
-                                        "description": { "type": "string" }
-                                    }
-                                },
-                                "description": "Possible interpretations of the ambiguous input"
-                            },
-                            "question": {
-                                "type": "string",
-                                "description": "Clear question to ask the user for clarification"
-                            }
-                        },
-                        "required": ["ambiguity_type", "question"]
-                    },
-                    "intents": {
-                        "type": "array",
-                        "description": "List of DSL verb intents (empty if needs_clarification is true)",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "verb": {
-                                    "type": "string",
-                                    "enum": verb_names,
-                                    "description": "The DSL verb - MUST be one of the allowed values"
-                                },
-                                "params": {
-                                    "type": "object",
-                                    "description": "Parameters with literal values",
-                                    "additionalProperties": true
-                                },
-                                "refs": {
-                                    "type": "object",
-                                    "description": "References to previous results, e.g., {\"cbu-id\": \"@result_1\"}",
-                                    "additionalProperties": {"type": "string"}
-                                },
-                                "lookups": {
-                                    "type": "object",
-                                    "description": "Entity lookups needing resolution. Key is param name, value is {search_text, entity_type, jurisdiction_hint}",
-                                    "additionalProperties": {
-                                        "type": "object",
-                                        "properties": {
-                                            "search_text": { "type": "string", "description": "The name/text to search for" },
-                                            "entity_type": { "type": "string", "description": "Type: person, company, cbu, entity, product, role" },
-                                            "jurisdiction_hint": { "type": "string", "description": "Optional jurisdiction filter (e.g., 'UK', 'US')" }
-                                        },
-                                        "required": ["search_text"]
-                                    }
-                                }
-                            },
-                            "required": ["verb", "params"]
-                        }
-                    },
-                    "explanation": {
-                        "type": "string",
-                        "description": "Brief explanation of what the DSL will do, or why clarification is needed"
-                    },
-                    "confidence": {
-                        "type": "number",
-                        "minimum": 0.0,
-                        "maximum": 1.0,
-                        "description": "Confidence in interpretation: 0.95-1.0=certain, 0.85-0.94=high, 0.70-0.84=good, 0.50-0.69=medium (consider asking), <0.50=ask for clarification"
-                    }
-                },
-                "required": ["intents", "explanation", "confidence"]
-            }),
-        }
     }
 
     // ========================================================================

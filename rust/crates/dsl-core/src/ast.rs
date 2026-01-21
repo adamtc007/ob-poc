@@ -878,19 +878,23 @@ pub struct UnresolvedRefLocation {
     pub entity_type: String,
     /// The search text entered by user
     pub search_text: String,
+    /// Search column from lookup config (e.g., "name")
+    pub search_column: Option<String>,
+    /// Unique ref_id for commit targeting (span-based, e.g., "0:15-30")
+    pub ref_id: Option<String>,
 }
 
 /// Extract locations of all unresolved EntityRefs in the AST
 ///
-/// Returns a list of (statement_index, arg_key, entity_type, search_text) for each
-/// unresolved EntityRef, which the UI uses to show resolution popups.
+/// Handles nested structures (lists, maps) and extracts full metadata
+/// including search_column and span-based ref_id for commit targeting.
 ///
 /// # Example
 /// ```ignore
 /// let unresolved = find_unresolved_ref_locations(&program);
 /// for loc in unresolved {
-///     println!("Statement {}, arg '{}': resolve '{}' as {}",
-///         loc.statement_index, loc.arg_key, loc.search_text, loc.entity_type);
+///     println!("Statement {}, arg '{}': resolve '{}' as {} (ref_id: {:?})",
+///         loc.statement_index, loc.arg_key, loc.search_text, loc.entity_type, loc.ref_id);
 /// }
 /// ```
 pub fn find_unresolved_ref_locations(program: &Program) -> Vec<UnresolvedRefLocation> {
@@ -899,27 +903,60 @@ pub fn find_unresolved_ref_locations(program: &Program) -> Vec<UnresolvedRefLoca
     for (stmt_idx, stmt) in program.statements.iter().enumerate() {
         if let Statement::VerbCall(vc) = stmt {
             for arg in &vc.arguments {
-                if let AstNode::EntityRef {
-                    entity_type,
-                    value,
-                    resolved_key,
-                    ..
-                } = &arg.value
-                {
-                    if resolved_key.is_none() {
-                        results.push(UnresolvedRefLocation {
-                            statement_index: stmt_idx,
-                            arg_key: arg.key.clone(),
-                            entity_type: entity_type.clone(),
-                            search_text: value.clone(),
-                        });
-                    }
-                }
+                collect_unresolved_from_node(&arg.value, &arg.key, stmt_idx, &mut results);
             }
         }
     }
 
     results
+}
+
+/// Recursively collect unresolved EntityRefs from an AST node
+/// Handles nested Lists and Maps
+fn collect_unresolved_from_node(
+    node: &AstNode,
+    arg_key: &str,
+    stmt_idx: usize,
+    results: &mut Vec<UnresolvedRefLocation>,
+) {
+    match node {
+        AstNode::EntityRef {
+            entity_type,
+            search_column,
+            value,
+            resolved_key,
+            span,
+            ref_id,
+            ..
+        } => {
+            if resolved_key.is_none() {
+                // Use the stored ref_id if present (set during enrichment with list_index),
+                // otherwise generate from span. This ensures list items have unique ref_ids.
+                let final_ref_id = ref_id
+                    .clone()
+                    .unwrap_or_else(|| format!("{}:{}-{}", stmt_idx, span.start, span.end));
+                results.push(UnresolvedRefLocation {
+                    statement_index: stmt_idx,
+                    arg_key: arg_key.to_string(),
+                    entity_type: entity_type.clone(),
+                    search_text: value.clone(),
+                    search_column: Some(search_column.clone()),
+                    ref_id: Some(final_ref_id),
+                });
+            }
+        }
+        AstNode::List { items, .. } => {
+            for item in items {
+                collect_unresolved_from_node(item, arg_key, stmt_idx, results);
+            }
+        }
+        AstNode::Map { entries, .. } => {
+            for (_, value) in entries {
+                collect_unresolved_from_node(value, arg_key, stmt_idx, results);
+            }
+        }
+        _ => {}
+    }
 }
 
 // =============================================================================

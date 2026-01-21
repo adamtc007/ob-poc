@@ -130,7 +130,7 @@ impl<'a> Enricher<'a> {
         // Get lookup config if present
         let lookup_config = arg_def.and_then(|a| a.lookup.as_ref());
 
-        let enriched_value = self.enrich_node(arg.value, lookup_config, arg.span, stmt_index);
+        let enriched_value = self.enrich_node(arg.value, lookup_config, arg.span, stmt_index, None);
 
         Argument {
             key: arg.key,
@@ -145,6 +145,7 @@ impl<'a> Enricher<'a> {
         lookup_config: Option<&LookupConfig>,
         arg_span: Span,
         stmt_index: usize,
+        list_index: Option<usize>, // NEW: index within parent list for unique ref_id
     ) -> AstNode {
         match node {
             // String literal - potentially convert to EntityRef
@@ -157,11 +158,14 @@ impl<'a> Enricher<'a> {
                         .unwrap_or_else(|| config.table.clone());
 
                     // Generate span-based ref_id for stable commit targeting
-                    // Format: "{stmt_index}:{span.start}-{span.end}"
-                    let ref_id = Some(format!(
-                        "{}:{}-{}",
-                        stmt_index, arg_span.start, arg_span.end
-                    ));
+                    // Format: "{stmt_index}:{span.start}-{span.end}" or
+                    //         "{stmt_index}:{span.start}-{span.end}:{list_index}" for list items
+                    let ref_id = Some(match list_index {
+                        Some(idx) => {
+                            format!("{}:{}-{}:{}", stmt_index, arg_span.start, arg_span.end, idx)
+                        }
+                        None => format!("{}:{}-{}", stmt_index, arg_span.start, arg_span.end),
+                    });
 
                     AstNode::EntityRef {
                         entity_type,
@@ -187,10 +191,12 @@ impl<'a> Enricher<'a> {
                         .unwrap_or_else(|| config.table.clone());
 
                     // Generate span-based ref_id for stable commit targeting
-                    let ref_id = Some(format!(
-                        "{}:{}-{}",
-                        stmt_index, arg_span.start, arg_span.end
-                    ));
+                    let ref_id = Some(match list_index {
+                        Some(idx) => {
+                            format!("{}:{}-{}:{}", stmt_index, arg_span.start, arg_span.end, idx)
+                        }
+                        None => format!("{}:{}-{}", stmt_index, arg_span.start, arg_span.end),
+                    });
 
                     // UUID is already the resolved key
                     AstNode::EntityRef {
@@ -217,10 +223,14 @@ impl<'a> Enricher<'a> {
             AstNode::Literal(lit) => AstNode::Literal(lit),
 
             // Lists - enrich each item (with same lookup config for homogeneous lists)
+            // Pass index to each item for unique ref_id generation
             AstNode::List { items, span } => AstNode::List {
                 items: items
                     .into_iter()
-                    .map(|item| self.enrich_node(item, lookup_config, span, stmt_index))
+                    .enumerate()
+                    .map(|(idx, item)| {
+                        self.enrich_node(item, lookup_config, span, stmt_index, Some(idx))
+                    })
                     .collect(),
                 span,
             },
@@ -229,7 +239,7 @@ impl<'a> Enricher<'a> {
             AstNode::Map { entries, span } => AstNode::Map {
                 entries: entries
                     .into_iter()
-                    .map(|(k, v)| (k, self.enrich_node(v, None, span, stmt_index)))
+                    .map(|(k, v)| (k, self.enrich_node(v, None, span, stmt_index, None)))
                     .collect(),
                 span,
             },
@@ -676,6 +686,103 @@ mod tests {
             let name_arg = vc.get_arg("name").unwrap();
             // Should stay as literal string since no lookup config
             assert!(name_arg.value.is_literal());
+        }
+    }
+
+    #[test]
+    fn test_list_items_have_unique_ref_ids() {
+        let registry = test_registry();
+
+        // Raw AST with list of 3 items that should become EntityRefs
+        let raw = Program {
+            statements: vec![Statement::VerbCall(VerbCall {
+                domain: "cbu".to_string(),
+                verb: "assign-role".to_string(),
+                arguments: vec![
+                    Argument {
+                        key: "cbu-id".to_string(),
+                        value: AstNode::SymbolRef {
+                            name: "fund".to_string(),
+                            span: Span::default(),
+                        },
+                        span: Span::default(),
+                    },
+                    // entity-id as a list of 3 items
+                    Argument {
+                        key: "entity-id".to_string(),
+                        value: AstNode::List {
+                            items: vec![
+                                AstNode::Literal(Literal::String("Alice".to_string())),
+                                AstNode::Literal(Literal::String("Bob".to_string())),
+                                AstNode::Literal(Literal::String("Charlie".to_string())),
+                            ],
+                            span: Span { start: 20, end: 55 }, // Simulate real span
+                        },
+                        span: Span { start: 10, end: 56 },
+                    },
+                    Argument {
+                        key: "role".to_string(),
+                        value: AstNode::Literal(Literal::String("DIRECTOR".to_string())),
+                        span: Span::default(),
+                    },
+                ],
+                binding: None,
+                span: Span::default(),
+            })],
+        };
+
+        let result = enrich_program(raw, &registry);
+
+        if let Statement::VerbCall(vc) = &result.program.statements[0] {
+            let entity_arg = vc.get_arg("entity-id").unwrap();
+            if let AstNode::List { items, .. } = &entity_arg.value {
+                assert_eq!(items.len(), 3);
+
+                // Extract ref_ids
+                let ref_ids: Vec<Option<String>> = items
+                    .iter()
+                    .map(|item| {
+                        if let AstNode::EntityRef { ref_id, .. } = item {
+                            ref_id.clone()
+                        } else {
+                            panic!("Expected EntityRef, got {:?}", item);
+                        }
+                    })
+                    .collect();
+
+                // All should have ref_ids
+                assert!(
+                    ref_ids.iter().all(|r| r.is_some()),
+                    "All items should have ref_id"
+                );
+
+                // All should be UNIQUE
+                let unique: std::collections::HashSet<_> = ref_ids.iter().collect();
+                assert_eq!(unique.len(), 3, "ref_ids should be unique: {:?}", ref_ids);
+
+                // Verify format includes index suffix
+                let r0 = ref_ids[0].as_ref().unwrap();
+                let r1 = ref_ids[1].as_ref().unwrap();
+                let r2 = ref_ids[2].as_ref().unwrap();
+
+                assert!(
+                    r0.ends_with(":0"),
+                    "First item should end with :0, got {}",
+                    r0
+                );
+                assert!(
+                    r1.ends_with(":1"),
+                    "Second item should end with :1, got {}",
+                    r1
+                );
+                assert!(
+                    r2.ends_with(":2"),
+                    "Third item should end with :2, got {}",
+                    r2
+                );
+            } else {
+                panic!("Expected List");
+            }
         }
     }
 }

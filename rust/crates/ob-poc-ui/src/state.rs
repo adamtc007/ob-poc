@@ -16,9 +16,9 @@ use crate::api::ScopeGraphData;
 use crate::panels::ContainerBrowseState;
 use crate::tokens::TokenRegistry;
 use ob_poc_graph::{
-    CbuGraphData, CbuGraphWidget, EntityTypeOntology, GalaxyView, ServiceTaxonomy,
-    ServiceTaxonomyState, TaxonomyState, TradingMatrix, TradingMatrixNode, TradingMatrixState,
-    ViewMode,
+    CbuGraphData, CbuGraphWidget, ClusterCbuData, ClusterView, EntityTypeOntology, GalaxyView,
+    ManCoData, ServiceTaxonomy, ServiceTaxonomyState, TaxonomyState, TradingMatrix,
+    TradingMatrixNode, TradingMatrixState, ViewMode,
 };
 use ob_poc_types::investor_register::{
     BreakdownDimension, InvestorFilters, InvestorListResponse, InvestorRegisterView,
@@ -216,6 +216,10 @@ pub struct AppState {
     /// Owns camera, force simulation - call tick() BEFORE render() per egui rules
     pub galaxy_view: GalaxyView,
 
+    /// Cluster view widget (ManCo center + CBU orbital rings)
+    /// Used when session loads a "book" (e.g., "show Allianz Lux book")
+    pub cluster_view: ClusterView,
+
     /// Current navigation scope (Universe, Cluster, Cbu, Entity, etc.)
     pub navigation_scope: NavigationScope,
 
@@ -299,6 +303,7 @@ impl Default for AppState {
             selected_matrix_node: None,
             service_taxonomy_state: ServiceTaxonomyState::new(),
             galaxy_view: GalaxyView::new(),
+            cluster_view: ClusterView::new(),
             navigation_scope: NavigationScope::default(),
             view_level: ViewLevel::default(),
             navigation_stack: Vec::new(),
@@ -727,6 +732,83 @@ impl Default for InvestorRegisterUi {
 }
 
 // =============================================================================
+// PENDING RESULTS - Extracted from AsyncState for lock-free processing
+// =============================================================================
+
+/// Pending results extracted from AsyncState in one atomic operation.
+///
+/// This struct enables the "extract all, drop lock, then process" pattern
+/// which avoids borrow checker conflicts when processing needs `&mut self`.
+///
+/// Pattern:
+/// 1. Lock async_state
+/// 2. Call async_state.extract_pending() to get all pending results at once
+/// 3. Drop the lock (extract_pending returns owned data)
+/// 4. Process each field with full `&mut self` access
+#[derive(Default)]
+pub struct PendingResults {
+    // === Results that need &mut self processing ===
+    /// CBU lookup result - needs to call select_cbu(&mut self)
+    pub cbu_lookup: Option<Result<(Uuid, String), String>>,
+
+    // === Results that update AppState fields directly ===
+    pub session: Option<Result<SessionStateResponse, String>>,
+    pub session_id: Option<Uuid>,
+    pub version_check: Option<Result<String, String>>,
+    pub watch: Option<Result<crate::api::WatchSessionResponse, String>>,
+    pub graph: Option<Result<CbuGraphData, String>>,
+    pub scope_graph: Option<Result<ScopeGraphData, String>>,
+    pub validation: Option<Result<ValidateDslResponse, String>>,
+    pub execution: Option<Result<ExecuteResponse, String>>,
+    pub cbu_list: Option<Result<Vec<CbuSummary>, String>>,
+    pub chat: Option<Result<ChatMessage, String>>,
+    pub chat_input: Option<String>,
+    pub resolution: Option<Result<ResolutionSessionResponse, String>>,
+    pub resolution_search: Option<Result<ResolutionSearchResponse, String>>,
+    pub cbu_search: Option<Result<crate::api::CbuSearchResponse, String>>,
+    pub session_context: Option<Result<SessionContext, String>>,
+    pub trading_matrix: Option<Result<TradingMatrix, String>>,
+    pub service_taxonomy: Option<Result<ServiceTaxonomy, String>>,
+    pub investor_register: Option<Result<InvestorRegisterView, String>>,
+    pub investor_list: Option<Result<InvestorListResponse, String>>,
+
+    // Disambiguation
+    pub disambiguation: Option<ob_poc_types::DisambiguationRequest>,
+    pub disambiguation_results: Option<Result<Vec<ob_poc_types::EntityMatch>, String>>,
+
+    // Unresolved refs (direct from ChatResponse)
+    pub unresolved_refs: Option<Vec<UnresolvedRefResponse>>,
+    pub current_ref_index: Option<usize>,
+
+    // Command triggers
+    pub search_cbu_query: Option<String>,
+
+    // Taxonomy responses
+    pub taxonomy_breadcrumbs_response:
+        Option<Result<crate::api::TaxonomyBreadcrumbsResponse, String>>,
+    pub taxonomy_zoom_response: Option<Result<crate::api::TaxonomyZoomResponse, String>>,
+
+    // Galaxy/Universe
+    pub universe_graph: Option<Result<UniverseGraph, String>>,
+
+    // === Flags that were set ===
+    pub session_refetch_requested: bool,
+    pub chat_just_finished: bool,
+}
+
+/// Flags that were captured from AsyncState for processing
+/// These are "needs_*" flags that trigger dependent operations
+#[derive(Default)]
+pub struct NeedsFlags {
+    pub session_refetch: bool,
+    pub graph_refetch: bool,
+    pub context_refetch: bool,
+    pub trading_matrix_refetch: bool,
+    pub scope_graph_refetch: bool,
+    pub cbu_search_trigger: Option<String>,
+}
+
+// =============================================================================
 // ASYNC STATE - Coordination for spawn_local operations
 // =============================================================================
 
@@ -740,7 +822,7 @@ impl Default for InvestorRegisterUi {
 /// 2. spawn_local fetches from server
 /// 3. spawn_local sets pending_* = Some(result), loading_* = false
 /// 4. spawn_local calls ctx.request_repaint()
-/// 5. update() calls process_async_results() which moves pending_* to AppState
+/// 5. update() calls process_async_results() which extracts PendingResults and processes
 #[derive(Default)]
 pub struct AsyncState {
     // Pending results from async operations
@@ -850,6 +932,13 @@ pub struct AsyncState {
     pub pending_flip: bool,
     pub pending_tilt: Option<String>, // dimension
 
+    // Ring navigation (cluster view - CBUs orbiting ManCo)
+    pub pending_ring_out: bool,
+    pub pending_ring_in: bool,
+    pub pending_clockwise: Option<u32>,        // steps
+    pub pending_counterclockwise: Option<u32>, // steps
+    pub pending_snap_to: Option<String>,       // target CBU name
+
     // Temporal navigation
     pub pending_time_rewind: Option<Option<String>>, // target_date
     pub pending_time_play: Option<(Option<String>, Option<String>)>, // from, to
@@ -933,6 +1022,72 @@ pub struct AsyncState {
     pub last_error: Option<String>,
 }
 
+impl AsyncState {
+    /// Extract all pending results in one atomic operation.
+    ///
+    /// This allows the caller to drop the lock before processing,
+    /// enabling full `&mut self` access during processing.
+    pub fn extract_pending(&mut self) -> PendingResults {
+        PendingResults {
+            // Results that need &mut self processing
+            cbu_lookup: self.pending_cbu_lookup.take(),
+
+            // Results that update AppState fields
+            session: self.pending_session.take(),
+            session_id: self.pending_session_id.take(),
+            version_check: self.pending_version_check.take(),
+            watch: self.pending_watch.take(),
+            graph: self.pending_graph.take(),
+            scope_graph: self.pending_scope_graph.take(),
+            validation: self.pending_validation.take(),
+            execution: self.pending_execution.take(),
+            cbu_list: self.pending_cbu_list.take(),
+            chat: self.pending_chat.take(),
+            chat_input: self.pending_chat_input.take(),
+            resolution: self.pending_resolution.take(),
+            resolution_search: self.pending_resolution_search.take(),
+            cbu_search: self.pending_cbu_search.take(),
+            session_context: self.pending_session_context.take(),
+            trading_matrix: self.pending_trading_matrix.take(),
+            service_taxonomy: self.pending_service_taxonomy.take(),
+            investor_register: self.pending_investor_register.take(),
+            investor_list: self.pending_investor_list.take(),
+
+            // Disambiguation
+            disambiguation: self.pending_disambiguation.take(),
+            disambiguation_results: self.pending_disambiguation_results.take(),
+
+            // Unresolved refs
+            unresolved_refs: self.pending_unresolved_refs.take(),
+            current_ref_index: self.pending_current_ref_index.take(),
+
+            // Command triggers
+            search_cbu_query: self.pending_search_cbu_query.take(),
+
+            // Taxonomy
+            taxonomy_breadcrumbs_response: self.pending_taxonomy_breadcrumbs_response.take(),
+            taxonomy_zoom_response: self.pending_taxonomy_zoom_response.take(),
+
+            // Galaxy/Universe
+            universe_graph: self.pending_universe_graph.take(),
+
+            // Flags - take and reset
+            session_refetch_requested: std::mem::take(&mut self.pending_session_refetch),
+            chat_just_finished: std::mem::take(&mut self.chat_just_finished),
+        }
+    }
+
+    /// Update loading flags after extraction (separate from extract to keep atomicity)
+    pub fn clear_loading_flags_for_extracted(&mut self) {
+        // These correspond to the pending results we extracted
+        self.loading_session = false;
+        self.loading_disambiguation = false;
+        self.loading_cbu_lookup = false;
+        self.loading_taxonomy = false;
+        self.loading_universe = false;
+    }
+}
+
 // =============================================================================
 // STATE PROCESSING - Called at start of each frame
 // =============================================================================
@@ -941,54 +1096,97 @@ impl AppState {
     /// Process pending async results at the start of each frame
     ///
     /// This is the ONLY place where async results flow into AppState.
-    /// Pattern: pending_* -> AppState field, then trigger dependent refetches.
+    /// Pattern: extract all pending → drop lock → process with full &mut self.
     pub fn process_async_results(&mut self) {
-        let mut state = match self.async_state.lock() {
-            Ok(s) => s,
-            Err(_) => return,
+        // Extract all pending results while holding the lock
+        let (pending, mut needs_flags) = {
+            let mut state = match self.async_state.lock() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+
+            let pending = state.extract_pending();
+
+            // Capture flags that need to be processed
+            let needs = NeedsFlags {
+                session_refetch: state.needs_session_refetch,
+                graph_refetch: state.needs_graph_refetch,
+                context_refetch: state.needs_context_refetch,
+                trading_matrix_refetch: state.needs_trading_matrix_refetch,
+                scope_graph_refetch: state.needs_scope_graph_refetch,
+                cbu_search_trigger: state.needs_cbu_search_trigger.take(),
+            };
+
+            (pending, needs)
+        };
+        // Lock is now dropped - we have full &mut self access
+
+        // Make pending mutable so we can take values
+        let mut pending = pending;
+
+        // Process results that need &mut self methods first (take ownership before passing pending)
+        if let Some(result) = pending.cbu_lookup.take() {
+            match result {
+                Ok((uuid, display_name)) => {
+                    self.select_cbu(uuid, &display_name);
+                }
+                Err(e) => {
+                    if let Ok(mut state) = self.async_state.lock() {
+                        state.last_error = Some(e);
+                    }
+                }
+            }
+        }
+
+        // Now process remaining results (same as before, but lock-free)
+        self.process_pending_results(pending, &mut needs_flags);
+    }
+
+    /// Process the extracted pending results (called after lock is dropped)
+    fn process_pending_results(&mut self, pending: PendingResults, _needs: &mut NeedsFlags) {
+        // Helper to set error
+        let set_error = |async_state: &Arc<Mutex<AsyncState>>, msg: String| {
+            if let Ok(mut state) = async_state.lock() {
+                state.last_error = Some(msg);
+            }
         };
 
+        let async_state = &self.async_state;
+
         // Process new session creation
-        if let Some(session_id) = state.pending_session_id.take() {
+        if let Some(session_id) = pending.session_id {
             self.session_id = Some(session_id);
-            // Don't refetch here - we'll do it after dropping the lock
         }
 
         // Process session fetch
-        if let Some(result) = state.pending_session.take() {
-            state.loading_session = false;
+        if let Some(result) = pending.session {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_session = false;
+            }
             match result {
                 Ok(session) => {
                     // Sync DSL editor from session.combined_dsl if server has content and we're not dirty
                     if !self.buffers.dsl_dirty {
                         if let Some(ref dsl) = session.combined_dsl {
                             self.buffers.dsl_editor = dsl.clone();
-                            // Track agent-generated DSL for correction detection
                             self.buffers.last_agent_dsl = Some(dsl.clone());
                         }
                     }
-
-                    // NOTE: Legacy resolution check removed - unresolved refs now come directly
-                    // in ChatResponse.unresolved_refs and are handled via pending_unresolved_refs
-
-                    // Track session version for external change detection (MCP/REPL)
                     self.last_known_version = session.version.clone();
                     self.session = Some(session);
                 }
-                Err(e) => {
-                    state.last_error = Some(format!("Session fetch failed: {}", e));
-                }
+                Err(e) => set_error(async_state, format!("Session fetch failed: {}", e)),
             }
         }
 
-        // Process version check - if version changed, trigger full session refetch
-        if let Some(result) = state.pending_version_check.take() {
-            state.checking_version = false;
+        // Process version check
+        if let Some(result) = pending.version_check {
+            if let Ok(mut state) = async_state.lock() {
+                state.checking_version = false;
+            }
             if let Ok(server_version) = result {
                 if let Some(ref known_version) = self.last_known_version {
                     if &server_version != known_version {
-                        // Version changed externally (MCP/REPL modified session)
-                        // Trigger full session refetch
                         web_sys::console::log_1(
                             &format!(
                                 "Session version changed: {} -> {}, triggering refetch",
@@ -996,19 +1194,22 @@ impl AppState {
                             )
                             .into(),
                         );
-                        state.needs_session_refetch = true;
-                        state.needs_graph_refetch = true;
+                        if let Ok(mut state) = async_state.lock() {
+                            state.needs_session_refetch = true;
+                            state.needs_graph_refetch = true;
+                        }
                     }
                 }
             }
         }
 
-        // Process watch result - reactive session updates via long-polling
-        if let Some(result) = state.pending_watch.take() {
-            state.watching_session = false;
+        // Process watch result
+        if let Some(result) = pending.watch {
+            if let Ok(mut state) = async_state.lock() {
+                state.watching_session = false;
+            }
             match result {
                 Ok(watch_response) => {
-                    // Check if session actually changed (version comparison)
                     let version_str = watch_response.version.to_string();
                     let changed = self
                         .last_known_version
@@ -1019,38 +1220,24 @@ impl AppState {
                     if changed {
                         web_sys::console::log_1(
                             &format!(
-                                "Session watch: version changed to {}, scope={}, scope_type={:?}, triggering refetch",
-                                watch_response.version, watch_response.scope_path, watch_response.scope_type
+                                "Session watch: version changed to {}, triggering refetch",
+                                watch_response.version
                             )
                             .into(),
                         );
-                        // Update last known version
                         self.last_known_version = Some(version_str);
-
-                        // Trigger refetches based on what changed
-                        state.needs_session_refetch = true;
-
-                        // If active_cbu changed, refetch graph
-                        if watch_response.active_cbu_id.is_some() {
-                            state.needs_graph_refetch = true;
-                            state.pending_cbu_id = watch_response.active_cbu_id;
-                        }
-
-                        // If scope type changed (session.set-* verb ran), trigger graph refetch
-                        // The new scope will be loaded from the session context
-                        if watch_response.scope_type.is_some() {
-                            web_sys::console::log_1(
-                                &format!(
-                                    "Session watch: scope changed to {:?}, triggering viewport rebuild",
-                                    watch_response.scope_type
-                                )
-                                .into(),
-                            );
-                            state.needs_graph_refetch = true;
+                        if let Ok(mut state) = async_state.lock() {
+                            state.needs_session_refetch = true;
+                            if watch_response.active_cbu_id.is_some() {
+                                state.needs_graph_refetch = true;
+                                state.pending_cbu_id = watch_response.active_cbu_id;
+                            }
+                            if watch_response.scope_type.is_some() {
+                                state.needs_graph_refetch = true;
+                            }
                         }
                     }
 
-                    // Always update current scope from watch response
                     if let Some(ref scope_type) = watch_response.scope_type {
                         self.current_scope = Some(CurrentScope {
                             scope_type: scope_type.clone(),
@@ -1060,7 +1247,6 @@ impl AppState {
                     }
                 }
                 Err(e) => {
-                    // Don't show error for timeout - that's expected
                     if !e.contains("timeout") && !e.contains("Timeout") {
                         web_sys::console::warn_1(&format!("Session watch failed: {}", e).into());
                     }
@@ -1069,8 +1255,10 @@ impl AppState {
         }
 
         // Process graph fetch
-        if let Some(result) = state.pending_graph.take() {
-            state.loading_graph = false;
+        if let Some(result) = pending.graph {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_graph = false;
+            }
             match result {
                 Ok(data) => {
                     web_sys::console::log_1(
@@ -1084,81 +1272,97 @@ impl AppState {
                     self.graph_widget.set_data(data.clone());
                     self.graph_data = Some(data);
 
-                    // Populate ontology counts from graph data
                     if let Some(layout_graph) = self.graph_widget.get_layout_graph() {
                         self.entity_ontology.populate_counts(layout_graph);
-                        web_sys::console::log_1(
-                            &format!(
-                                "process_async_results: ontology populated, root count={}",
-                                self.entity_ontology.root.total_count
-                            )
-                            .into(),
-                        );
                     }
                 }
                 Err(e) => {
                     web_sys::console::error_1(&format!("Graph fetch failed: {}", e).into());
-                    state.last_error = Some(format!("Graph fetch failed: {}", e));
+                    set_error(async_state, format!("Graph fetch failed: {}", e));
                 }
             }
         }
 
         // Process scope graph fetch (multi-CBU session graph)
-        if let Some(result) = state.pending_scope_graph.take() {
+        if let Some(result) = pending.scope_graph {
             match result {
                 Ok(data) => {
                     web_sys::console::log_1(
                         &format!(
-                            "process_async_results: scope graph received for {} CBUs, {} affected entities",
-                            data.cbu_count,
-                            data.affected_entity_ids.len()
+                            "process_async_results: scope graph received for {} CBUs",
+                            data.cbu_count
                         )
                         .into(),
                     );
-                    // If we got a graph, use it like a regular graph
+
+                    if data.cbu_count > 1 {
+                        use ob_poc_types::galaxy::RiskRating;
+                        let manco = ManCoData {
+                            entity_id: Uuid::nil(),
+                            name: "Governance Controller".to_string(),
+                            short_name: "GC".to_string(),
+                            jurisdiction: None,
+                        };
+                        let cbus: Vec<ClusterCbuData> = data
+                            .cbu_ids
+                            .iter()
+                            .enumerate()
+                            .map(|(i, cbu_id)| ClusterCbuData {
+                                cbu_id: *cbu_id,
+                                name: format!("CBU {}", i + 1),
+                                short_name: format!("C{}", i + 1),
+                                jurisdiction: None,
+                                risk_rating: RiskRating::Medium,
+                                entity_count: 0,
+                            })
+                            .collect();
+                        self.cluster_view.load_data(manco, cbus);
+                        self.view_level = ob_poc_types::galaxy::ViewLevel::Cluster;
+                    }
+
                     if let Some(graph_data) = data.graph {
                         self.graph_widget.set_data(graph_data.clone());
                         self.graph_data = Some(graph_data);
 
-                        // Populate ontology counts from graph data
                         if let Some(layout_graph) = self.graph_widget.get_layout_graph() {
                             self.entity_ontology.populate_counts(layout_graph);
                         }
                     }
-                    // TODO: Could highlight affected_entity_ids in the viewport
                 }
                 Err(e) => {
                     web_sys::console::error_1(&format!("Scope graph fetch failed: {}", e).into());
-                    state.last_error = Some(format!("Scope graph fetch failed: {}", e));
+                    set_error(async_state, format!("Scope graph fetch failed: {}", e));
                 }
             }
         }
 
         // Process validation
-        if let Some(result) = state.pending_validation.take() {
+        if let Some(result) = pending.validation {
             match result {
                 Ok(response) => self.validation_result = Some(response),
-                Err(e) => state.last_error = Some(e),
+                Err(e) => set_error(async_state, e),
             }
         }
 
         // Process chat response
-        if let Some(result) = state.pending_chat.take() {
-            state.loading_chat = false;
-            state.chat_just_finished = true; // Trigger focus back to input
+        if let Some(result) = pending.chat {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_chat = false;
+                state.chat_just_finished = true;
+            }
             match result {
                 Ok(msg) => self.messages.push(msg),
-                Err(e) => state.last_error = Some(e),
+                Err(e) => set_error(async_state, e),
             }
         }
 
-        // If DSL source should be put back in chat input (for editing after error)
-        if let Some(dsl_source) = state.pending_chat_input.take() {
+        // Chat input restoration
+        if let Some(dsl_source) = pending.chat_input {
             self.buffers.chat_input = dsl_source;
         }
 
-        // Process pending disambiguation request - opens modal
-        if let Some(disambig) = state.pending_disambiguation.take() {
+        // Process disambiguation request
+        if let Some(disambig) = pending.disambiguation {
             web_sys::console::log_1(
                 &format!(
                     "process_async_results: opening disambiguation modal for {} items",
@@ -1167,11 +1371,10 @@ impl AppState {
                 .into(),
             );
 
-            // Create window entry for disambiguation modal
             let window = WindowEntry {
                 id: format!("disambig-{}", disambig.request_id),
                 window_type: WindowType::Resolution,
-                layer: 2, // Modal layer
+                layer: 2,
                 modal: true,
                 data: Some(WindowData::Disambiguation {
                     request: disambig.clone(),
@@ -1179,10 +1382,8 @@ impl AppState {
                     search_results: None,
                 }),
             };
-
             self.window_stack.push(window);
 
-            // Initialize search buffer with first item's search text
             if let Some(ob_poc_types::DisambiguationItem::EntityMatch {
                 ref search_text, ..
             }) = disambig.items.first()
@@ -1192,11 +1393,12 @@ impl AppState {
         }
 
         // Process disambiguation search results
-        if let Some(result) = state.pending_disambiguation_results.take() {
-            state.loading_disambiguation = false;
+        if let Some(result) = pending.disambiguation_results {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_disambiguation = false;
+            }
             match result {
                 Ok(matches) => {
-                    // Update the disambiguation window with search results
                     if let Some(window) = self.window_stack.find_by_type_mut(WindowType::Resolution)
                     {
                         if let Some(WindowData::Disambiguation {
@@ -1208,130 +1410,106 @@ impl AppState {
                         }
                     }
                 }
-                Err(e) => state.last_error = Some(format!("Disambiguation search failed: {}", e)),
+                Err(e) => set_error(async_state, format!("Disambiguation search failed: {}", e)),
             }
         }
 
-        // Process unresolved refs from ChatResponse - DIRECT FLOW (2 hops, not 5+)
-        // This is the new simplified resolution flow per ai-thoughts/036
-        if let Some(refs) = state.pending_unresolved_refs.take() {
-            let current_index = state.pending_current_ref_index.take().unwrap_or(0);
+        // Process unresolved refs from ChatResponse
+        if let Some(refs) = pending.unresolved_refs {
+            let current_index = pending.current_ref_index.unwrap_or(0);
 
             web_sys::console::log_1(
                 &format!(
-                    "process_async_results: opening resolution modal for {} refs (index {})",
-                    refs.len(),
-                    current_index
+                    "process_async_results: opening resolution modal for {} refs",
+                    refs.len()
                 )
                 .into(),
             );
 
-            // Set up resolution UI state
             self.resolution_ui.show_panel = true;
 
-            // Set current ref from the list
             if let Some(current_ref) = refs.get(current_index) {
                 self.resolution_ui.current_ref = Some(current_ref.clone());
                 self.resolution_ui.current_entity_type = Some(current_ref.entity_type.clone());
                 self.resolution_ui.search_keys = current_ref.search_keys.clone();
                 self.resolution_ui.discriminator_fields = current_ref.discriminator_fields.clone();
                 self.resolution_ui.resolution_mode = current_ref.resolution_mode.clone();
-
-                // Initialize search with the search value
                 self.resolution_ui.search_query = current_ref.search_value.clone();
-
-                // Clear previous search results
                 self.resolution_ui.search_results = None;
             }
         }
 
-        // Process CBU lookup result (from disambiguation name search)
-        if let Some(result) = state.pending_cbu_lookup.take() {
-            state.loading_cbu_lookup = false;
-            match result {
-                Ok((uuid, display_name)) => {
-                    // Need to drop the lock before calling select_cbu since it acquires the lock
-                    drop(state);
-                    self.select_cbu(uuid, &display_name);
-                    return; // Early return since we dropped the lock
-                }
-                Err(e) => {
-                    state.last_error = Some(e);
-                }
+        // Process session refetch flag
+        if pending.session_refetch_requested {
+            if let Ok(mut state) = async_state.lock() {
+                state.needs_session_refetch = true;
+                state.needs_graph_refetch = true;
+                state.needs_trading_matrix_refetch = true;
+                state.needs_context_refetch = true;
             }
         }
 
-        // Process session refetch flag (after entity bind)
-        if state.pending_session_refetch {
-            state.pending_session_refetch = false;
-            state.needs_session_refetch = true;
-            // Also trigger graph, matrix, and context refetch since CBU likely changed
-            state.needs_graph_refetch = true;
-            state.needs_trading_matrix_refetch = true;
-            state.needs_context_refetch = true;
-        }
-
-        // Process execution - triggers refetch of dependent data
-        if let Some(result) = state.pending_execution.take() {
-            state.executing = false;
+        // Process execution
+        if let Some(result) = pending.execution {
+            if let Ok(mut state) = async_state.lock() {
+                state.executing = false;
+            }
             match result {
-                Ok(execution) => {
-                    self.execution = Some(execution);
-                    // Note: graph refetch triggered via needs_graph_refetch flag
-                    // by the caller after this returns, since they need &mut self
-                }
-                Err(e) => state.last_error = Some(e),
+                Ok(execution) => self.execution = Some(execution),
+                Err(e) => set_error(async_state, e),
             }
         }
 
         // Process CBU list
-        if let Some(result) = state.pending_cbu_list.take() {
+        if let Some(result) = pending.cbu_list {
             match result {
                 Ok(list) => self.cbu_list = list,
-                Err(e) => state.last_error = Some(e),
+                Err(e) => set_error(async_state, e),
             }
         }
 
         // Process resolution session
-        if let Some(result) = state.pending_resolution.take() {
-            state.loading_resolution = false;
+        if let Some(result) = pending.resolution {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_resolution = false;
+            }
             match result {
                 Ok(resolution) => {
-                    // Auto-show panel when resolution starts
                     if !resolution.unresolved.is_empty() {
                         self.resolution_ui.show_panel = true;
                     }
                     self.resolution = Some(resolution);
                 }
-                Err(e) => state.last_error = Some(format!("Resolution failed: {}", e)),
+                Err(e) => set_error(async_state, format!("Resolution failed: {}", e)),
             }
         }
 
         // Process resolution search results
-        if let Some(result) = state.pending_resolution_search.take() {
-            state.searching_resolution = false;
+        if let Some(result) = pending.resolution_search {
+            if let Ok(mut state) = async_state.lock() {
+                state.searching_resolution = false;
+            }
             match result {
                 Ok(search_result) => {
                     self.resolution_ui.search_results = Some(search_result);
                 }
-                Err(e) => state.last_error = Some(format!("Resolution search failed: {}", e)),
+                Err(e) => set_error(async_state, format!("Resolution search failed: {}", e)),
             }
         }
 
         // Process CBU search results
-        if let Some(result) = state.pending_cbu_search.take() {
+        if let Some(result) = pending.cbu_search {
             self.cbu_search_ui.searching = false;
             match result {
                 Ok(search_result) => {
                     self.cbu_search_ui.results = Some(search_result);
                 }
-                Err(e) => state.last_error = Some(format!("CBU search failed: {}", e)),
+                Err(e) => set_error(async_state, format!("CBU search failed: {}", e)),
             }
         }
 
-        // Process pending CBU search popup request (from SearchCbu agent command)
-        // This handles typos in "show cbu <name>" - opens search popup so user can correct spelling
-        if let Some(query) = state.pending_search_cbu_query.take() {
+        // Process pending CBU search popup request
+        if let Some(query) = pending.search_cbu_query {
             #[cfg(target_arch = "wasm32")]
             web_sys::console::log_1(
                 &format!("Opening CBU search popup with query: {}", query).into(),
@@ -1340,90 +1518,91 @@ impl AppState {
             self.cbu_search_ui.query = query.clone();
             self.cbu_search_ui.open = true;
             self.cbu_search_ui.just_opened = true;
-            // Set flag to trigger search in update loop (where search_cbus is accessible)
-            state.needs_cbu_search_trigger = Some(query);
+            if let Ok(mut state) = async_state.lock() {
+                state.needs_cbu_search_trigger = Some(query);
+            }
         }
 
         // Process session context
-        if let Some(result) = state.pending_session_context.take() {
-            state.loading_session_context = false;
+        if let Some(result) = pending.session_context {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_session_context = false;
+            }
             match result {
                 Ok(context) => {
-                    // Apply viewport_state to graph widget if present
-                    // This syncs DSL-driven viewport state (from viewport.* verbs) to the UI
                     if let Some(ref viewport_state) = context.viewport_state {
                         self.graph_widget.apply_viewport_state(viewport_state);
-                        #[cfg(target_arch = "wasm32")]
-                        web_sys::console::log_1(
-                            &format!(
-                                "Applied viewport_state from session: focus={:?}",
-                                viewport_state.focus.state
-                            )
-                            .into(),
-                        );
                     }
                     self.session_context = Some(context);
                 }
-                Err(e) => state.last_error = Some(format!("Session context fetch failed: {}", e)),
+                Err(e) => set_error(async_state, format!("Session context fetch failed: {}", e)),
             }
         }
 
         // Process trading matrix
-        if let Some(result) = state.pending_trading_matrix.take() {
-            state.loading_trading_matrix = false;
+        if let Some(result) = pending.trading_matrix {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_trading_matrix = false;
+            }
             match result {
                 Ok(matrix) => {
-                    // Expand first level by default for better UX
                     self.trading_matrix_state.expand_first_level(&matrix);
                     self.trading_matrix = Some(matrix);
                 }
-                Err(e) => state.last_error = Some(format!("Trading matrix fetch failed: {}", e)),
+                Err(e) => set_error(async_state, format!("Trading matrix fetch failed: {}", e)),
             }
         }
 
         // Process service taxonomy
-        if let Some(result) = state.pending_service_taxonomy.take() {
-            state.loading_service_taxonomy = false;
+        if let Some(result) = pending.service_taxonomy {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_service_taxonomy = false;
+            }
             match result {
                 Ok(taxonomy) => {
-                    // Expand first level by default for better UX
                     self.service_taxonomy_state
                         .expand_to_depth(&taxonomy.root, 1);
                     self.service_taxonomy = Some(taxonomy);
                 }
-                Err(e) => state.last_error = Some(format!("Service taxonomy fetch failed: {}", e)),
+                Err(e) => set_error(async_state, format!("Service taxonomy fetch failed: {}", e)),
             }
         }
 
         // Process investor register
-        if let Some(result) = state.pending_investor_register.take() {
-            state.loading_investor_register = false;
+        if let Some(result) = pending.investor_register {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_investor_register = false;
+            }
             match result {
                 Ok(register) => {
-                    // Auto-show panel when investor register data arrives
                     if !register.control_holders.is_empty() || register.aggregate.is_some() {
                         self.investor_register_ui.show_panel = true;
                     }
                     self.investor_register = Some(register);
                 }
-                Err(e) => state.last_error = Some(format!("Investor register fetch failed: {}", e)),
+                Err(e) => set_error(
+                    async_state,
+                    format!("Investor register fetch failed: {}", e),
+                ),
             }
         }
 
-        // Process investor list (drill-down)
-        if let Some(result) = state.pending_investor_list.take() {
-            state.loading_investor_list = false;
+        // Process investor list
+        if let Some(result) = pending.investor_list {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_investor_list = false;
+            }
             match result {
-                Ok(list) => {
-                    self.investor_list = Some(list);
-                }
-                Err(e) => state.last_error = Some(format!("Investor list fetch failed: {}", e)),
+                Ok(list) => self.investor_list = Some(list),
+                Err(e) => set_error(async_state, format!("Investor list fetch failed: {}", e)),
             }
         }
 
         // Process taxonomy breadcrumbs response
-        if let Some(result) = state.pending_taxonomy_breadcrumbs_response.take() {
-            state.loading_taxonomy = false;
+        if let Some(result) = pending.taxonomy_breadcrumbs_response {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_taxonomy = false;
+            }
             match result {
                 Ok(response) => {
                     self.taxonomy_breadcrumbs = response
@@ -1432,15 +1611,18 @@ impl AppState {
                         .map(|b| (b.label, b.type_code))
                         .collect();
                 }
-                Err(e) => {
-                    state.last_error = Some(format!("Taxonomy breadcrumbs fetch failed: {}", e))
-                }
+                Err(e) => set_error(
+                    async_state,
+                    format!("Taxonomy breadcrumbs fetch failed: {}", e),
+                ),
             }
         }
 
         // Process taxonomy zoom response
-        if let Some(result) = state.pending_taxonomy_zoom_response.take() {
-            state.loading_taxonomy = false;
+        if let Some(result) = pending.taxonomy_zoom_response {
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_taxonomy = false;
+            }
             match result {
                 Ok(response) => {
                     if response.success {
@@ -1450,10 +1632,20 @@ impl AppState {
                             .map(|b| (b.label, b.type_code))
                             .collect();
                     } else if let Some(error) = response.error {
-                        state.last_error = Some(format!("Taxonomy navigation failed: {}", error));
+                        set_error(
+                            async_state,
+                            format!("Taxonomy navigation failed: {}", error),
+                        );
                     }
                 }
-                Err(e) => state.last_error = Some(format!("Taxonomy navigation failed: {}", e)),
+                Err(e) => set_error(async_state, format!("Taxonomy navigation failed: {}", e)),
+            }
+        }
+
+        // Set chat_just_finished flag
+        if pending.chat_just_finished {
+            if let Ok(mut state) = async_state.lock() {
+                state.chat_just_finished = true;
             }
         }
     }
@@ -2035,6 +2227,51 @@ impl AppState {
     pub fn take_pending_tilt(&self) -> Option<String> {
         if let Ok(mut state) = self.async_state.lock() {
             state.pending_tilt.take()
+        } else {
+            None
+        }
+    }
+
+    // Ring navigation (cluster view)
+    pub fn take_pending_ring_out(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_ring_out;
+            state.pending_ring_out = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_ring_in(&self) -> bool {
+        if let Ok(mut state) = self.async_state.lock() {
+            let pending = state.pending_ring_in;
+            state.pending_ring_in = false;
+            pending
+        } else {
+            false
+        }
+    }
+
+    pub fn take_pending_clockwise(&self) -> Option<u32> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_clockwise.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_counterclockwise(&self) -> Option<u32> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_counterclockwise.take()
+        } else {
+            None
+        }
+    }
+
+    pub fn take_pending_snap_to(&self) -> Option<String> {
+        if let Ok(mut state) = self.async_state.lock() {
+            state.pending_snap_to.take()
         } else {
             None
         }

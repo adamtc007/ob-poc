@@ -105,7 +105,50 @@ crossbeam-channel = "0.5"
 # Testing
 [dev-dependencies]
 
+# Build compute-heavy crates in release mode even during debug builds
+# This dramatically speeds up Candle embeddings (from 20+ min to ~10s)
+[profile.dev.package.candle-core]
+opt-level = 3
 
+[profile.dev.package.candle-nn]
+opt-level = 3
+
+[profile.dev.package.candle-transformers]
+opt-level = 3
+
+[profile.dev.package.half]
+opt-level = 3
+
+[profile.dev.package.gemm]
+opt-level = 3
+
+[profile.dev.package.gemm-common]
+opt-level = 3
+
+[profile.dev.package.gemm-f16]
+opt-level = 3
+
+[profile.dev.package.gemm-f32]
+opt-level = 3
+
+[profile.dev.package.gemm-f64]
+opt-level = 3
+
+[profile.dev.package.gemm-c32]
+opt-level = 3
+
+[profile.dev.package.gemm-c64]
+opt-level = 3
+
+[profile.dev.package.tokenizers]
+opt-level = 3
+
+[profile.dev.package.hf-hub]
+opt-level = 3
+
+# Also optimize the semantic matcher crate itself
+[profile.dev.package.ob-semantic-matcher]
+opt-level = 3
 
 # Binary configuration
 [[bin]]
@@ -143,9 +186,9 @@ required-features = ["database", "cli", "mcp"]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
 database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway"]  # Only enable database functionality when needed
-server = ["database", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with database
+server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
-mcp = ["database"]  # MCP server for Claude integration
+mcp = ["database"]  # MCP/intent pipeline for semantic verb search
 
 
 

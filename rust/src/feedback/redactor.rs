@@ -357,8 +357,8 @@ mod tests {
         let redacted = redactor.redact(&value, RedactionMode::Full);
 
         let obj = redacted.as_object().unwrap();
-        assert_eq!(obj["active"].as_bool().unwrap(), true);
-        assert_eq!(obj["deleted"].as_bool().unwrap(), false);
+        assert!(obj["active"].as_bool().unwrap());
+        assert!(!obj["deleted"].as_bool().unwrap());
     }
 
     #[test]

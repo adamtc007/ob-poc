@@ -2856,6 +2856,15 @@ pub enum DisambiguationItem {
         search_text: String,
         /// Matching entities to choose from
         matches: Vec<EntityMatchOption>,
+        /// Entity type for search (e.g., "entity", "cbu") - Fix K
+        #[serde(skip_serializing_if = "Option::is_none")]
+        entity_type: Option<String>,
+        /// Search column from lookup config (e.g., "name") - Fix K
+        #[serde(skip_serializing_if = "Option::is_none")]
+        search_column: Option<String>,
+        /// Unique ref_id for commit targeting (e.g., "0:15-30") - Fix K
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ref_id: Option<String>,
     },
     /// Ambiguous interpretation (e.g., "UK" = name part or jurisdiction?)
     InterpretationChoice {

@@ -1,6 +1,8 @@
 //! ManCo / Governance Controller Operations
 //!
 //! Operations for governance controller computation, group derivation, and data bridges.
+//!
+//! All operations use typed structs from `ob_poc_types::manco_group` for consistency.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -9,6 +11,13 @@ use super::helpers::{extract_int_opt, extract_string_opt, extract_uuid, extract_
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+
+// Re-export types for consistent use
+pub use ob_poc_types::manco_group::{
+    BridgeBodsResult, BridgeGleifResult, BridgeRolesResult, CbuMancoNotFound, CbuMancoResult,
+    ComputeControlLinksResult, ControlChainNode, ControlType, ControllerBasis, DeriveGroupsResult,
+    GroupCbuEntry, PrimaryGovernanceController,
+};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -53,10 +62,11 @@ impl CustomOperation for MancoBridgeRolesOp {
                 .fetch_one(pool)
                 .await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "rights_created": row.0,
-            "rights_updated": row.1,
-        })))
+        let result = BridgeRolesResult {
+            rights_created: row.0,
+            rights_updated: row.1,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(not(feature = "database"))]
@@ -65,10 +75,11 @@ impl CustomOperation for MancoBridgeRolesOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "rights_created": 0,
-            "rights_updated": 0,
-        })))
+        let result = BridgeRolesResult {
+            rights_created: 0,
+            rights_updated: 0,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -102,10 +113,11 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
                 .fetch_one(pool)
                 .await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "rights_created": row.0,
-            "rights_updated": row.1,
-        })))
+        let result = BridgeGleifResult {
+            rights_created: row.0,
+            rights_updated: row.1,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(not(feature = "database"))]
@@ -114,10 +126,11 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "rights_created": 0,
-            "rights_updated": 0,
-        })))
+        let result = BridgeGleifResult {
+            rights_created: 0,
+            rights_updated: 0,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -151,11 +164,12 @@ impl CustomOperation for MancoBridgeBodsOwnershipOp {
                 .fetch_one(pool)
                 .await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "holdings_created": row.0,
-            "holdings_updated": row.1,
-            "entities_linked": row.2,
-        })))
+        let result = BridgeBodsResult {
+            holdings_created: row.0,
+            holdings_updated: row.1,
+            entities_linked: row.2,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(not(feature = "database"))]
@@ -164,11 +178,12 @@ impl CustomOperation for MancoBridgeBodsOwnershipOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "holdings_created": 0,
-            "holdings_updated": 0,
-            "entities_linked": 0,
-        })))
+        let result = BridgeBodsResult {
+            holdings_created: 0,
+            holdings_updated: 0,
+            entities_linked: 0,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -205,10 +220,12 @@ impl CustomOperation for MancoGroupDeriveOp {
             .fetch_one(pool)
             .await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "groups_created": row.0,
-            "memberships_created": row.1,
-        })))
+        let result = DeriveGroupsResult {
+            groups_created: row.0,
+            memberships_created: row.1,
+        };
+
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(not(feature = "database"))]
@@ -217,10 +234,11 @@ impl CustomOperation for MancoGroupDeriveOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "groups_created": 0,
-            "memberships_created": 0,
-        })))
+        let result = DeriveGroupsResult {
+            groups_created: 0,
+            memberships_created: 0,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -273,15 +291,16 @@ impl CustomOperation for MancoGroupCbusOp {
                     fund_entity_name,
                     membership_source,
                 )| {
-                    serde_json::json!({
-                        "cbu_id": cbu_id,
-                        "cbu_name": cbu_name,
-                        "cbu_category": cbu_category,
-                        "jurisdiction": jurisdiction,
-                        "fund_entity_id": fund_entity_id,
-                        "fund_entity_name": fund_entity_name,
-                        "membership_source": membership_source,
-                    })
+                    let entry = GroupCbuEntry {
+                        cbu_id,
+                        cbu_name,
+                        cbu_category,
+                        jurisdiction,
+                        fund_entity_id,
+                        fund_entity_name,
+                        membership_source,
+                    };
+                    serde_json::to_value(entry).unwrap_or_default()
                 },
             )
             .collect();
@@ -345,18 +364,24 @@ impl CustomOperation for MancoGroupForCbuOp {
                 group_name,
                 group_type,
                 source,
-            )) => Ok(ExecutionResult::Record(serde_json::json!({
-                "manco_entity_id": manco_entity_id,
-                "manco_name": manco_name,
-                "manco_lei": manco_lei,
-                "group_id": group_id,
-                "group_name": group_name,
-                "group_type": group_type,
-                "source": source,
-            }))),
-            None => Ok(ExecutionResult::Record(serde_json::json!({
-                "message": "No governance controller found for this CBU"
-            }))),
+            )) => {
+                let result = CbuMancoResult {
+                    manco_entity_id,
+                    manco_name,
+                    manco_lei,
+                    group_id,
+                    group_name,
+                    group_type,
+                    source,
+                };
+                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+            }
+            None => {
+                let result = CbuMancoNotFound {
+                    message: "No governance controller found for this CBU".to_string(),
+                };
+                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+            }
         }
     }
 
@@ -366,7 +391,10 @@ impl CustomOperation for MancoGroupForCbuOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        let result = CbuMancoNotFound {
+            message: "Database not available".to_string(),
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -424,21 +452,35 @@ impl CustomOperation for MancoPrimaryControllerOp {
                 economic_pct,
                 has_control,
                 has_significant_influence,
-            )) => Ok(ExecutionResult::Record(serde_json::json!({
-                "issuer_entity_id": issuer_entity_id,
-                "primary_controller_entity_id": primary_controller,
-                "governance_controller_entity_id": governance_controller,
-                "basis": basis,
-                "board_seats": board_seats,
-                "voting_pct": voting_pct,
-                "economic_pct": economic_pct,
-                "has_control": has_control,
-                "has_significant_influence": has_significant_influence,
-            }))),
-            None => Ok(ExecutionResult::Record(serde_json::json!({
-                "issuer_entity_id": issuer_entity_id,
-                "message": "No governance controller found"
-            }))),
+            )) => {
+                let result = PrimaryGovernanceController {
+                    issuer_entity_id,
+                    primary_controller_entity_id: primary_controller.unwrap_or(uuid::Uuid::nil()),
+                    governance_controller_entity_id: governance_controller
+                        .unwrap_or(uuid::Uuid::nil()),
+                    basis: basis
+                        .as_deref()
+                        .map(|s| match s {
+                            "BOARD_APPOINTMENT" => ControllerBasis::BoardAppointment,
+                            "VOTING_CONTROL" => ControllerBasis::VotingControl,
+                            "SIGNIFICANT_INFLUENCE" => ControllerBasis::SignificantInfluence,
+                            _ => ControllerBasis::None,
+                        })
+                        .unwrap_or(ControllerBasis::None),
+                    board_seats: board_seats.unwrap_or(0),
+                    voting_pct,
+                    economic_pct,
+                    has_control: has_control.unwrap_or(false),
+                    has_significant_influence: has_significant_influence.unwrap_or(false),
+                };
+                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+            }
+            None => {
+                let result = CbuMancoNotFound {
+                    message: "No governance controller found".to_string(),
+                };
+                Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+            }
         }
     }
 
@@ -448,7 +490,10 @@ impl CustomOperation for MancoPrimaryControllerOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({})))
+        let result = CbuMancoNotFound {
+            message: "Database not available".to_string(),
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 
@@ -505,21 +550,30 @@ impl CustomOperation for MancoControlChainOp {
                     entity_type,
                     controlled_by_id,
                     controlled_by_name,
-                    control_type,
+                    control_type_str,
                     voting_pct,
                     is_ultimate,
                 )| {
-                    serde_json::json!({
-                        "depth": depth,
-                        "entity_id": entity_id,
-                        "entity_name": entity_name,
-                        "entity_type": entity_type,
-                        "controlled_by_entity_id": controlled_by_id,
-                        "controlled_by_name": controlled_by_name,
-                        "control_type": control_type,
-                        "voting_pct": voting_pct,
-                        "is_ultimate_controller": is_ultimate,
-                    })
+                    let control_type = control_type_str.as_deref().map(|s| match s {
+                        "CONTROLLING" => ControlType::Controlling,
+                        "SIGNIFICANT_INFLUENCE" => ControlType::SignificantInfluence,
+                        "MATERIAL" => ControlType::Material,
+                        "NOTIFIABLE" => ControlType::Notifiable,
+                        _ => ControlType::Minority,
+                    });
+
+                    let node = ControlChainNode {
+                        depth,
+                        entity_id,
+                        entity_name,
+                        entity_type,
+                        controlled_by_entity_id: controlled_by_id,
+                        controlled_by_name,
+                        control_type,
+                        voting_pct,
+                        is_ultimate_controller: is_ultimate,
+                    };
+                    serde_json::to_value(node).unwrap_or_default()
                 },
             )
             .collect();
@@ -572,9 +626,10 @@ impl CustomOperation for OwnershipComputeControlLinksOp {
             .fetch_one(pool)
             .await?;
 
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "links_computed": count,
-        })))
+        let result = ComputeControlLinksResult {
+            links_created: count,
+        };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 
     #[cfg(not(feature = "database"))]
@@ -583,9 +638,8 @@ impl CustomOperation for OwnershipComputeControlLinksOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "links_computed": 0,
-        })))
+        let result = ComputeControlLinksResult { links_created: 0 };
+        Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
 }
 

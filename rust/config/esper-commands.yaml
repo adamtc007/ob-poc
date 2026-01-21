@@ -89,7 +89,7 @@ commands:
         - "fit"
       contains:
         - "fit to screen"
-        - "show all"
+        - "fit all"
         - "bird"
         - "overview"
         - "30000 foot"
@@ -513,6 +513,107 @@ commands:
         - "angle"
 
   # ===========================================================================
+  # RING NAVIGATION (cluster view - CBUs orbiting ManCo)
+  # ===========================================================================
+  ring_out:
+    canonical: "ring out"
+    response: "Moving to outer ring..."
+    priority: 100
+    agent_command:
+      type: RingOut
+    aliases:
+      exact:
+        - "ring out"
+        - "outer ring"
+      contains:
+        - "move out"
+        - "expand ring"
+        - "outer orbit"
+        - "farther out"
+
+  ring_in:
+    canonical: "ring in"
+    response: "Moving to inner ring..."
+    priority: 100
+    agent_command:
+      type: RingIn
+    aliases:
+      exact:
+        - "ring in"
+        - "inner ring"
+      contains:
+        - "move in"
+        - "contract ring"
+        - "inner orbit"
+        - "closer in"
+
+  clockwise:
+    canonical: "clockwise"
+    response: "Rotating clockwise..."
+    priority: 100
+    agent_command:
+      type: Clockwise
+      params:
+        steps: extract
+    aliases:
+      exact:
+        - "clockwise"
+        - "cw"
+        - "next"
+      prefix:
+        - "clockwise "
+        - "cw "
+        - "next "
+      contains:
+        - "rotate clockwise"
+        - "forward"
+
+  counterclockwise:
+    canonical: "counterclockwise"
+    response: "Rotating counterclockwise..."
+    priority: 100
+    agent_command:
+      type: Counterclockwise
+      params:
+        steps: extract
+    aliases:
+      exact:
+        - "counterclockwise"
+        - "ccw"
+        - "anticlockwise"
+        - "previous"
+        - "prev"
+      prefix:
+        - "counterclockwise "
+        - "ccw "
+        - "previous "
+        - "prev "
+      contains:
+        - "rotate counterclockwise"
+        - "backward"
+        - "back"
+
+  snap_to:
+    canonical: "snap to"
+    response: "Snapping to target..."
+    priority: 100
+    agent_command:
+      type: SnapTo
+      params:
+        target: extract
+    aliases:
+      prefix:
+        - "snap to "
+        - "go to "
+        - "jump to "
+        - "focus on "
+        - "select "
+      contains:
+        - "snap to"
+        - "go to cbu"
+        - "focus cbu"
+
+  # ===========================================================================
   # TEMPORAL NAVIGATION (4th dimension - time)
   # ===========================================================================
   time_rewind:
@@ -539,7 +640,7 @@ commands:
   time_play:
     canonical: "play"
     response: "Playing timeline..."
-    priority: 90  # Lower to avoid "display" false positive
+    priority: 90 # Lower to avoid "display" false positive
     agent_command:
       type: TimePlay
       params:

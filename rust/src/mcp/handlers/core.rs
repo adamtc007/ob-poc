@@ -1215,7 +1215,7 @@ impl ToolHandlers {
         let result = pipeline.process(instruction, domain).await?;
 
         // Capture feedback for learning loop
-        let feedback_id = if let Some(ref feedback_svc) = self.feedback_service {
+        let _feedback_id = if let Some(ref feedback_svc) = self.feedback_service {
             let top_verb = result.verb_candidates.first();
             let match_result = top_verb.map(|v| ob_semantic_matcher::MatchResult {
                 verb_name: v.verb.clone(),
@@ -5916,7 +5916,7 @@ impl ToolHandlers {
             .filter(|(key, _)| {
                 args.category
                     .as_ref()
-                    .map_or(true, |cat| key.starts_with(cat))
+                    .is_none_or(|cat| key.starts_with(cat))
             })
             .map(|(key, def)| {
                 json!({
@@ -5951,8 +5951,11 @@ impl ToolHandlers {
 
         let args: Args = serde_json::from_value(args)?;
 
-        // Build registry from config + learned aliases
-        let warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
+        // Build registry from config + learned aliases + semantic index
+        let mut warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
+        if let Some(ref embedder) = self.embedder {
+            warmup = warmup.with_embedder(embedder.clone());
+        }
         let (registry, _stats) = warmup.warmup().await?;
 
         match registry.lookup(&args.phrase) {
@@ -6017,9 +6020,12 @@ impl ToolHandlers {
     async fn esper_reload(&self, _args: Value) -> Result<Value> {
         use crate::agent::esper::EsperWarmup;
 
-        // Rebuild registry from YAML + DB
-        let warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
-        let (registry, _warmup_stats) = warmup.warmup().await?;
+        // Rebuild registry from YAML + DB + semantic index
+        let mut warmup = EsperWarmup::from_pool(Some(self.pool.clone()));
+        if let Some(ref embedder) = self.embedder {
+            warmup = warmup.with_embedder(embedder.clone());
+        }
+        let (registry, warmup_stats) = warmup.warmup().await?;
 
         let stats = registry.stats();
 
@@ -6031,7 +6037,8 @@ impl ToolHandlers {
                 "exact_aliases": stats.exact_count,
                 "contains_patterns": stats.contains_count,
                 "prefix_patterns": stats.prefix_count,
-                "learned_aliases": stats.learned_count
+                "learned_aliases": stats.learned_count,
+                "semantic_embeddings": warmup_stats.embedded_count
             }
         }))
     }

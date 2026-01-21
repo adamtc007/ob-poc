@@ -1,10 +1,15 @@
-# Session Verbs - Simplified
+# Session Verbs - Astro Navigation Model
+#
+# Metaphor hierarchy:
+#   Universe  = All regions client operates in (global footprint)
+#   Galaxy    = Regional (LU, DE, IE) - may have multiple ManCos
+#   Cluster   = ManCo's controlled CBUs (gravitational grouping)
+#   System    = Single CBU (solar system container)
+#   Sun       = SPV/Fund entity at center
+#   Planets   = Products, ISDA, KYC, etc.
 #
 # Session state = HashSet<Uuid> of loaded CBUs
-# Everything else (clusters, galaxies, control spheres) is DERIVED from edges
-#
 # Focus/camera/viewport = CLIENT SIDE, not DSL verbs
-#
 # History: undo/redo stack of session states
 
 domains:
@@ -17,13 +22,105 @@ domains:
     verbs:
       # ============================================
       # Load CBUs into session (mutates state, pushes history)
+      # Organized by astro scale: Universe → Galaxy → Cluster → System
       # ============================================
 
-      load-cbu:
-        description: Add a single CBU to the session
+      load-universe:
+        description: Load all CBUs (optionally filtered by client)
         behavior: plugin
-        handler: SessionLoadCbuOp
+        handler: SessionLoadUniverseOp
         invocation_phrases:
+          - "load universe"
+          - "load all"
+          - "show everything"
+          - "load all CBUs"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [load, universe, bulk]
+        args:
+          - name: client-id
+            type: uuid
+            required: false
+            description: Optional client filter (defaults to all)
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record
+          fields: [count_added, total_loaded]
+
+      load-galaxy:
+        description: Load all CBUs in a region/jurisdiction (Galaxy = regional)
+        behavior: plugin
+        handler: SessionLoadGalaxyOp
+        invocation_phrases:
+          - "load galaxy"
+          - "load jurisdiction"
+          - "show all in"
+          - "load all CBUs in"
+          - "load region"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [load, galaxy, jurisdiction, bulk]
+        args:
+          - name: jurisdiction
+            type: string
+            required: true
+            description: ISO country code (LU, IE, DE, US, etc.)
+        returns:
+          type: record
+          fields: [jurisdiction, count_added, total_loaded]
+
+      load-cluster:
+        description: Load all CBUs under a ManCo/governance controller (e.g., "Allianz Lux book")
+        behavior: plugin
+        handler: SessionLoadClusterOp
+        invocation_phrases:
+          - "load cluster"
+          - "load book"
+          - "show book"
+          - "load all funds under"
+          - "show all CBUs for"
+          - "load manco"
+          - "load group"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_cbus
+          tags: [load, cluster, book, manco, bulk]
+        args:
+          - name: manco-entity-id
+            type: uuid
+            required: true
+            maps_to: manco_entity_id
+            description: The ManCo/governance controller entity
+            lookup:
+              table: entities
+              schema: ob-poc
+              entity_type: entity
+              search_key: name
+              primary_key: entity_id
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Filter to specific jurisdiction (LU, DE, IE, etc.)
+        returns:
+          type: record
+          fields: [manco_name, jurisdiction, count_added, total_loaded]
+
+      load-system:
+        description: Load a single CBU (Solar System = CBU container)
+        behavior: plugin
+        handler: SessionLoadSystemOp
+        invocation_phrases:
+          - "load system"
           - "load cbu"
           - "open cbu"
           - "load fund"
@@ -33,7 +130,7 @@ domains:
           tier: intent
           source_of_truth: session
           noun: session_cbus
-          tags: [load, cbu]
+          tags: [load, system, cbu]
         args:
           - name: cbu-id
             type: uuid
@@ -49,58 +146,6 @@ domains:
         returns:
           type: record
           fields: [cbu_id, name, jurisdiction, total_loaded]
-
-      load-jurisdiction:
-        description: Load all CBUs in a jurisdiction
-        behavior: plugin
-        handler: SessionLoadJurisdictionOp
-        invocation_phrases:
-          - "load jurisdiction"
-          - "show all in"
-          - "load all CBUs in"
-        metadata:
-          tier: intent
-          source_of_truth: session
-          noun: session_cbus
-          tags: [load, jurisdiction, bulk]
-        args:
-          - name: jurisdiction
-            type: string
-            required: true
-            description: ISO country code (LU, IE, DE, US, etc.)
-        returns:
-          type: record
-          fields: [jurisdiction, count_added, total_loaded]
-
-      load-galaxy:
-        description: Load all CBUs under an apex entity (e.g., Allianz SE)
-        behavior: plugin
-        handler: SessionLoadGalaxyOp
-        invocation_phrases:
-          - "load galaxy"
-          - "load all funds under"
-          - "show all CBUs for"
-          - "load group"
-        metadata:
-          tier: intent
-          source_of_truth: session
-          noun: session_cbus
-          tags: [load, galaxy, bulk]
-        args:
-          - name: apex-entity-id
-            type: uuid
-            required: true
-            maps_to: apex_entity_id
-            description: The apex/parent entity
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
-        returns:
-          type: record
-          fields: [apex_name, count_added, total_loaded]
 
       # ============================================
       # Filter/Narrow scope (removes CBUs not matching filter)
@@ -135,15 +180,20 @@ domains:
       # Unload CBUs from session
       # ============================================
 
-      unload-cbu:
+      unload-system:
         description: Remove a single CBU from the session
         behavior: plugin
-        handler: SessionUnloadCbuOp
+        handler: SessionUnloadSystemOp
+        invocation_phrases:
+          - "unload system"
+          - "unload cbu"
+          - "remove cbu"
+          - "close cbu"
         metadata:
           tier: intent
           source_of_truth: session
           noun: session_cbus
-          tags: [unload, cbu]
+          tags: [unload, system, cbu]
         args:
           - name: cbu-id
             type: uuid
@@ -158,12 +208,12 @@ domains:
               primary_key: cbu_id
         returns:
           type: record
-          fields: [cbu_id, name, total_loaded]
+          fields: [cbu_id, name, total_loaded, was_present]
 
       clear:
         description: Remove all CBUs from session
         behavior: plugin
-        handler: SessionClearOp2
+        handler: SessionClearOp
         metadata:
           tier: intent
           source_of_truth: session
@@ -213,7 +263,7 @@ domains:
       info:
         description: Get session summary
         behavior: plugin
-        handler: SessionInfoOp2
+        handler: SessionInfoOp
         metadata:
           tier: diagnostics
           source_of_truth: session

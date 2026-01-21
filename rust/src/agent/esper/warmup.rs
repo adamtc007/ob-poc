@@ -7,13 +7,13 @@ use super::registry::{EsperCommandRegistry, SemanticIndex};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+
 use tracing::{info, warn};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
-use crate::agent::learning::embedder::CandleEmbedder;
+use crate::agent::learning::embedder::SharedEmbedder;
 
 /// Statistics from ESPER warmup
 #[derive(Debug, Clone)]
@@ -36,7 +36,7 @@ pub struct EsperWarmup {
     #[cfg(feature = "database")]
     pool: Option<PgPool>,
     /// Embedder for semantic index (optional - skips semantic if None)
-    embedder: Option<Arc<CandleEmbedder>>,
+    embedder: Option<SharedEmbedder>,
 }
 
 impl EsperWarmup {
@@ -71,7 +71,7 @@ impl EsperWarmup {
     }
 
     /// Set embedder for semantic index computation
-    pub fn with_embedder(mut self, embedder: Arc<CandleEmbedder>) -> Self {
+    pub fn with_embedder(mut self, embedder: SharedEmbedder) -> Self {
         self.embedder = Some(embedder);
         self
     }
@@ -130,7 +130,10 @@ impl EsperWarmup {
         // 4. Build semantic index if embedder available (Phase 8)
         let (embedded_count, embed_ms) = if let Some(embedder) = &self.embedder {
             let embed_start = std::time::Instant::now();
-            match self.build_semantic_index(&registry, embedder) {
+            match self
+                .build_semantic_index(&registry, embedder.as_ref())
+                .await
+            {
                 Ok(index) => {
                     let count = index.len();
                     registry.set_semantic_index(index);
@@ -164,11 +167,75 @@ impl EsperWarmup {
         Ok((registry, stats))
     }
 
+    /// Load YAML config + learned aliases WITHOUT building semantic index.
+    ///
+    /// Use this when you need to build the semantic index in a spawn_blocking context
+    /// to avoid blocking the async runtime.
+    pub async fn warmup_without_semantic(
+        &self,
+    ) -> Result<(EsperCommandRegistry, EsperWarmupStats)> {
+        let start = std::time::Instant::now();
+
+        // 1. Load YAML config
+        let config = match EsperConfig::load(&self.config_path) {
+            Ok(c) => {
+                info!(
+                    "Loaded {} ESPER commands from {:?}",
+                    c.commands.len(),
+                    self.config_path
+                );
+                c
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to load ESPER config from {:?}: {}",
+                    self.config_path, e
+                );
+                return Err(e);
+            }
+        };
+
+        // 2. Load approved aliases from DB (if available)
+        #[cfg(feature = "database")]
+        let learned = if let Some(pool) = &self.pool {
+            self.load_learned_aliases(pool).await?
+        } else {
+            HashMap::new()
+        };
+
+        #[cfg(not(feature = "database"))]
+        let learned = HashMap::new();
+
+        let learned_count = learned.len();
+        if learned_count > 0 {
+            info!(
+                "Loaded {} learned ESPER aliases from database",
+                learned_count
+            );
+        }
+
+        // 3. Build registry (without semantic index)
+        let command_count = config.commands.len();
+        let registry = EsperCommandRegistry::new(config, learned);
+
+        let warmup_ms = start.elapsed().as_millis() as u64;
+
+        let stats = EsperWarmupStats {
+            command_count,
+            learned_count,
+            embedded_count: 0, // Will be filled in by caller
+            warmup_ms,
+            embed_ms: 0, // Will be filled in by caller
+        };
+
+        Ok((registry, stats))
+    }
+
     /// Build semantic index by computing embeddings for all aliases
-    fn build_semantic_index(
+    async fn build_semantic_index(
         &self,
         registry: &EsperCommandRegistry,
-        embedder: &CandleEmbedder,
+        embedder: &dyn crate::agent::learning::embedder::Embedder,
     ) -> Result<SemanticIndex> {
         let aliases = registry.all_aliases();
         if aliases.is_empty() {
@@ -178,8 +245,8 @@ impl EsperWarmup {
         // Extract just the alias texts for batch embedding
         let texts: Vec<&str> = aliases.iter().map(|(text, _)| text.as_str()).collect();
 
-        // Batch embed all aliases (blocking - this runs at startup)
-        let embeddings = embedder.embed_batch_blocking(&texts)?;
+        // Batch embed all aliases
+        let embeddings = embedder.embed_batch(&texts).await?;
 
         // Build the index
         let mut index = SemanticIndex::new();

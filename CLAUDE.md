@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-20
+> **Last reviewed:** 2026-01-21 (Intent Pipeline Fixes complete)
 > **Crates:** 14 Rust crates
 > **Verbs:** 923 verbs, 7334 intent patterns (DB-sourced)
 > **Migrations:** 37 schema migrations
@@ -12,6 +12,7 @@
 > **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
+> **Intent Pipeline Fixes (042):** ✅ Complete - Schema-based resolution, single embed, fail-early
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -34,6 +35,99 @@ cargo x deploy --skip-wasm  # Skip WASM rebuild
 
 # Run server directly
 DATABASE_URL="postgresql:///data_designer" cargo run -p ob-poc-web
+```
+
+---
+
+## Non-Negotiable Implementation Rules
+
+These rules are **mandatory** for all code changes. No exceptions.
+
+### 1. Type Safety First
+
+**Never use untyped JSON (`serde_json::json!`) for structured data.** Always define typed structs.
+
+```rust
+// ❌ WRONG - Untyped, no compile-time guarantees
+Ok(ExecutionResult::Record(serde_json::json!({
+    "groups_created": row.0,
+    "memberships_created": row.1,
+})))
+
+// ✅ CORRECT - Typed struct with Serialize/Deserialize
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeriveGroupsResult {
+    pub groups_created: i32,
+    pub memberships_created: i32,
+}
+
+let result = DeriveGroupsResult {
+    groups_created: row.0,
+    memberships_created: row.1,
+};
+Ok(ExecutionResult::Record(serde_json::to_value(result)?))
+```
+
+**Where to define types:**
+- Domain result types → `ob-poc-types` crate (e.g., `manco_group.rs`, `trading_matrix.rs`)
+- DSL config types → `dsl-core/src/config/types.rs`
+- API response types → Near the route handler or in a shared `types.rs`
+
+**Benefits:**
+- Compile-time field name checking
+- Refactoring safety (rename field → compiler finds all uses)
+- IDE autocomplete and documentation
+- Consistent serialization (snake_case via serde)
+
+### 2. Consistent Return Types
+
+YAML verb definitions use `ReturnTypeConfig` enum. Map these to typed Rust structs:
+
+| YAML `returns.type` | Rust Pattern |
+|---------------------|--------------|
+| `uuid` | `ExecutionResult::Uuid(uuid)` |
+| `record` | `ExecutionResult::Record(serde_json::to_value(typed_struct)?)` |
+| `record_set` | `ExecutionResult::RecordSet(vec_of_typed_structs.iter().map(serde_json::to_value).collect())` |
+| `affected` | `ExecutionResult::Affected(count)` |
+| `void` | `ExecutionResult::Void` |
+
+### 3. Option<T> for Nullable/Optional Values
+
+Use `Option<T>` consistently:
+
+```rust
+// ✅ CORRECT - Explicit optionality
+pub struct ControlChainNode {
+    pub entity_id: Uuid,                      // Required
+    pub controlled_by_entity_id: Option<Uuid>, // Optional (None for root)
+    pub voting_pct: Option<Decimal>,          // Optional
+}
+
+// ❌ WRONG - Sentinel values or silent nulls
+pub voting_pct: Decimal,  // What does 0.0 mean? Missing or zero?
+```
+
+### 4. Error Types over Panics
+
+Use `Result<T, E>` and `?` operator. Never `.unwrap()` in production code paths.
+
+```rust
+// ❌ WRONG
+let value = map.get("key").unwrap();
+
+// ✅ CORRECT
+let value = map.get("key").ok_or_else(|| anyhow!("Missing key"))?;
+```
+
+### 5. Re-export Types at Module Boundary
+
+When a module uses types from another crate, re-export them for consumers:
+
+```rust
+// In domain_ops/manco_ops.rs
+pub use ob_poc_types::manco_group::{
+    DeriveGroupsResult, BridgeRolesResult, ControlChainNode, // ...
+};
 ```
 
 ---
@@ -129,6 +223,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Solar navigation | `ai-thoughts/038-solar-navigation-unified-design.md` | ✅ Done |
 | Candle embeddings | `docs/TODO-CANDLE-MIGRATION.md` | ✅ Complete |
 | Candle pipeline | `docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | ✅ Complete |
+| Intent pipeline fixes | `ai-thoughts/Intent-Pipeline-Fixes-todo.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -206,6 +301,70 @@ User says: "spin up a fund for Acme"
 | LLM calls per query | 2 (discover + extract) | 1 (extract only) | **50% reduction** |
 
 > **Full details:** `docs/agent-semantic-pipeline.md`
+
+### Intent Pipeline Fixes (042)
+
+> ✅ **IMPLEMENTED (2026-01-21)**: Full correctness fixes for verb search, entity resolution, and ambiguity detection.
+
+**Issues Fixed:**
+
+| Issue | Problem | Fix |
+|-------|---------|-----|
+| **C** | Unresolved refs lacked metadata | Parse → enrich → canonical walker with `entity_type`, `search_column`, `ref_id` |
+| **K** | List/map commit broke (shared span) | Commit by `ref_id` (includes `:list_index` suffix), `dsl_hash` guard |
+| **J/D** | LIMIT 1 prevented ambiguity detection | Top-k semantic search + `normalize_candidates()` + `AMBIGUITY_MARGIN = 0.05` |
+| **I** | Two competing global sources | Union `agent.invocation_phrases` + `verb_pattern_embeddings`, dedupe by verb |
+| **G** | Embedding computed 4x per search | Compute once at top of `search()`, pass through |
+| **H** | Hardcoded 0.5 threshold | Added `fallback_threshold` (0.65), `semantic_threshold` (0.80) |
+
+**Search Priority (Updated):**
+
+```
+1. User-specific learned (exact) - score 1.0
+2. Global learned (exact) - score 1.0
+3. User-specific learned (semantic, top-k=3)
+4. [REMOVED] - merged into step 6
+5. Blocklist filter
+6. Global semantic - UNION of learned + cold-start patterns (top-k)
+   → normalize_candidates(): dedupe by verb, sort desc, truncate
+   → Final blocklist filter across all candidates
+```
+
+**Ambiguity Detection:**
+
+```rust
+const AMBIGUITY_MARGIN: f32 = 0.05;
+
+pub enum VerbSearchOutcome {
+    Matched(VerbSearchResult),           // Clear winner
+    Ambiguous { top, runner_up, margin }, // Need clarification
+    NoMatch,                              // Below threshold
+}
+
+// Pipeline returns NeedsClarification early, does NOT call LLM
+```
+
+**Entity Resolution (ref_id for Lists/Maps):**
+
+```rust
+// Each list item gets unique ref_id: "stmt_idx:start-end:list_index"
+// Commit endpoint uses ref_id, not span, to target exact EntityRef
+
+POST /api/dsl/resolve-by-ref-id
+{
+  "session_id": "...",
+  "ref_id": "0:40-80:0",        // First item in list
+  "resolved_key": "uuid-...",
+  "dsl_hash": "a1b2c3d4..."     // Optimistic concurrency
+}
+```
+
+**Key Files:**
+- `rust/src/mcp/intent_pipeline.rs` - Pipeline with `IntentArgValue`, fail-early
+- `rust/src/mcp/verb_search.rs` - `normalize_candidates()`, top-k, single embed
+- `rust/crates/dsl-core/src/ast.rs` - `find_unresolved_ref_locations()` uses stored `ref_id`
+- `rust/src/api/agent_routes.rs` - `resolve_by_ref_id` endpoint
+- `intent-pipeline-fixes-todo.md` - Full spec with 12-point PR review rubric
 
 ### Embeddings: Candle Local
 
@@ -983,6 +1142,7 @@ When you see these in a task, read the corresponding annex first:
 | "GROUP", "ownership graph" | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` |
 | "sheet", "phased execution", "DAG" | `ai-thoughts/035-repl-session-implementation-plan.md` |
 | "solar navigation", "ViewState", "orbit", "nav_history" | `ai-thoughts/038-solar-navigation-unified-design.md` |
+| "intent pipeline", "ambiguity", "normalize_candidates", "ref_id" | `intent-pipeline-fixes-todo.md` |
 
 ---
 
