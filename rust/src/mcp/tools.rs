@@ -2540,5 +2540,176 @@ If pending > 0, run: cargo run --release --bin populate_embeddings"#.into(),
                 "properties": {}
             }),
         },
+        // =====================================================================
+        // Promotion Pipeline Tools - Staged pattern learning with quality gates
+        // =====================================================================
+        Tool {
+            name: "promotion_run_cycle".into(),
+            description: r#"Run a full promotion cycle for learning candidates.
+
+Executes the staged promotion pipeline:
+1. Expires pending outcomes older than 30 minutes
+2. Gets candidates meeting promotion thresholds
+3. Runs collision checks (semantic similarity to other verbs)
+4. Auto-promotes qualified candidates
+
+Thresholds (configurable via background job, defaults here):
+- min_occurrences: 5
+- min_success_rate: 0.80 (80%)
+- min_age_hours: 24 (cool-down period)
+- collision_threshold: 0.92 (reject if matches another verb too closely)
+
+Returns a report with promoted patterns and any collisions detected."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
+        Tool {
+            name: "promotion_candidates".into(),
+            description: r#"Get candidates ready for automatic promotion.
+
+Lists learning candidates that meet all quality thresholds:
+- occurrence_count >= 5
+- success_rate >= 0.80
+- age >= 24 hours
+- No collision with other verbs
+- Not in blocklist
+
+Use this to preview what would be promoted before running promotion_run_cycle."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Max candidates to return"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "promotion_review_queue".into(),
+            description: r#"Get candidates needing manual review.
+
+Lists candidates that:
+- Have 3+ occurrences and are 7+ days old
+- Failed auto-promotion criteria (low success rate, collision detected, etc.)
+- Are worth reviewing but not confident enough for auto-promotion
+
+Use this for periodic manual review of borderline candidates."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "min_occurrences": {
+                        "type": "integer",
+                        "default": 3,
+                        "description": "Minimum occurrences to include"
+                    },
+                    "min_age_days": {
+                        "type": "integer",
+                        "default": 7,
+                        "description": "Minimum age in days"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Max candidates to return"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "promotion_approve".into(),
+            description: r#"Manually approve a learning candidate for promotion.
+
+Promotes the candidate to dsl_verbs.intent_patterns immediately.
+Creates an audit trail with the actor name.
+
+Use after reviewing a candidate from promotion_review_queue."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "candidate_id": {
+                        "type": "integer",
+                        "description": "Candidate ID from promotion_candidates or promotion_review_queue"
+                    },
+                    "actor": {
+                        "type": "string",
+                        "default": "manual_review",
+                        "description": "Actor name for audit trail"
+                    }
+                },
+                "required": ["candidate_id"]
+            }),
+        },
+        Tool {
+            name: "promotion_reject".into(),
+            description: r#"Reject a learning candidate and add to blocklist.
+
+Marks the candidate as rejected and adds the phrase->verb mapping to the blocklist
+to prevent it from being suggested again.
+
+Use when a candidate is clearly wrong or harmful."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "candidate_id": {
+                        "type": "integer",
+                        "description": "Candidate ID to reject"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for rejection (for audit trail)"
+                    },
+                    "actor": {
+                        "type": "string",
+                        "default": "manual_review",
+                        "description": "Actor name for audit trail"
+                    }
+                },
+                "required": ["candidate_id", "reason"]
+            }),
+        },
+        Tool {
+            name: "promotion_health".into(),
+            description: r#"Get learning pipeline health metrics.
+
+Returns weekly metrics for the last N weeks:
+- Total interactions
+- Success rate (top-1 hit rate)
+- Correction rate
+- No-match rate
+- Confidence distribution
+
+Use to monitor learning pipeline health and identify issues."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "weeks": {
+                        "type": "integer",
+                        "default": 8,
+                        "description": "Number of weeks of history"
+                    }
+                }
+            }),
+        },
+        Tool {
+            name: "promotion_pipeline_status".into(),
+            description: r#"Get summary of candidate pipeline status.
+
+Returns counts by status:
+- pending: Awaiting promotion or review
+- applied: Successfully promoted
+- rejected: Manually rejected
+- duplicate: Already exists as pattern
+- etc.
+
+Use to understand the overall pipeline state."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {}
+            }),
+        },
     ]
 }

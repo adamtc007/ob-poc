@@ -50,5 +50,6 @@ pub use types::*;
 // Re-export key feedback types for convenience
 pub use feedback::{
     AnalysisReport, FeedbackAnalyzer, FeedbackRepository, FeedbackService, InputSource,
-    MatchConfidence, Outcome, PatternLearner,
+    MatchConfidence, Outcome, PatternLearner, PipelineStatus, PromotableCandidate, PromotionReport,
+    PromotionService, ReviewCandidate, WeeklyHealthMetrics,
 };

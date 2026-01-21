@@ -224,6 +224,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Candle embeddings | `docs/TODO-CANDLE-MIGRATION.md` | ✅ Complete |
 | Candle pipeline | `docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | ✅ Complete |
 | Intent pipeline fixes | `ai-thoughts/Intent-Pipeline-Fixes-todo.md` | ✅ Complete |
+| Promotion pipeline | `TODO-feedback-loop-promotion.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -502,6 +503,99 @@ SELECT * FROM "ob-poc".v_verb_embedding_stats;
 -- total_embeddings: 7928
 -- unique_verbs_embedded: 977
 ```
+
+---
+
+## Promotion Pipeline (Staged Pattern Learning)
+
+The **PromotionService** provides quality-gated pattern promotion with collision detection. Runs as part of the background learning task (every 6 hours).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PROMOTION PIPELINE                                        │
+│                                                                              │
+│  User interaction → outcome recorded                                        │
+│      │                                                                       │
+│      ▼                                                                       │
+│  FeedbackService.record_outcome_with_dsl()                                  │
+│      │                                                                       │
+│      └── Triggers agent.record_learning_signal() for strong signals         │
+│              │                                                               │
+│              ▼                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  QUALITY GATES (SQL function)                                        │    │
+│  │  • Word count: 3-15 words                                            │    │
+│  │  • Stopword ratio: <70%                                              │    │
+│  │  • Not already in verb_pattern_embeddings                           │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│              │                                                               │
+│              ▼                                                               │
+│  agent.learning_candidates (tracks success_count, total_count)              │
+│              │                                                               │
+│              │ (background job every 6 hours)                               │
+│              ▼                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  PROMOTION THRESHOLDS                                                │    │
+│  │  • occurrence_count >= 5                                             │    │
+│  │  • success_rate >= 0.80                                              │    │
+│  │  • age >= 24 hours (cool-down)                                       │    │
+│  │  • collision_safe = true (semantic check)                            │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│              │                                                               │
+│              ▼                                                               │
+│  agent.apply_promotion() → dsl_verbs.intent_patterns                        │
+│              │                                                               │
+│              ▼                                                               │
+│  (Run populate_embeddings to enable semantic matching)                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/ob-semantic-matcher/src/feedback/promotion.rs` | PromotionService |
+| `rust/crates/ob-semantic-matcher/src/feedback/service.rs` | FeedbackService (triggers learning signals) |
+| `rust/src/agent/learning/background.rs` | Background job integration |
+| `migrations/043_feedback_loop_promotion.sql` | Schema, functions, views |
+
+**Database Tables:**
+
+| Table | Purpose |
+|-------|---------|
+| `agent.learning_candidates` | Staged candidates with success tracking |
+| `agent.stopwords` | Words filtered from patterns |
+| `agent.phrase_blocklist` | Rejected patterns |
+| `agent.learning_audit` | Audit trail of promotions/rejections |
+
+**Views:**
+
+| View | Purpose |
+|------|---------|
+| `agent.v_top_pending_candidates` | Top 100 pending by occurrence |
+| `agent.v_candidate_pipeline` | Pipeline status summary |
+| `agent.v_learning_health_weekly` | Weekly health metrics |
+
+**MCP Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `promotion_run_cycle` | Run full promotion pipeline manually |
+| `promotion_candidates` | List candidates ready for auto-promotion |
+| `promotion_review_queue` | List candidates needing manual review |
+| `promotion_approve` | Manually approve a candidate |
+| `promotion_reject` | Reject and add to blocklist |
+| `promotion_health` | Weekly health metrics |
+| `promotion_pipeline_status` | Pipeline summary by status |
+
+**Thresholds:**
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| `min_occurrences` | 5 | Enough signal, not one-off |
+| `min_success_rate` | 0.80 | 4/5 successful uses |
+| `min_age_hours` | 24 | Cool-down for burst patterns |
+| `collision_threshold` | 0.92 | Prevent verb confusion |
 
 ---
 

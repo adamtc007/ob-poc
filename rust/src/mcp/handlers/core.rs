@@ -405,6 +405,14 @@ impl ToolHandlers {
             "learning_analyze" => self.learning_analyze(args).await,
             "learning_apply" => self.learning_apply(args).await,
             "embeddings_status" => self.embeddings_status(args).await,
+            // Promotion pipeline tools
+            "promotion_run_cycle" => self.promotion_run_cycle(args).await,
+            "promotion_candidates" => self.promotion_candidates(args).await,
+            "promotion_review_queue" => self.promotion_review_queue(args).await,
+            "promotion_approve" => self.promotion_approve(args).await,
+            "promotion_reject" => self.promotion_reject(args).await,
+            "promotion_health" => self.promotion_health(args).await,
+            "promotion_pipeline_status" => self.promotion_pipeline_status(args).await,
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }
@@ -6145,6 +6153,244 @@ impl ToolHandlers {
             } else {
                 format!("All patterns embedded ({}% coverage)", coverage)
             }
+        }))
+    }
+
+    // =========================================================================
+    // Promotion Pipeline Tools
+    // =========================================================================
+
+    /// Run a full promotion cycle
+    async fn promotion_run_cycle(&self, _args: Value) -> Result<Value> {
+        use ob_semantic_matcher::{Embedder, PromotionService};
+
+        let mut service = PromotionService::new(self.pool.clone());
+
+        // Try to add embedder for collision checking
+        if let Ok(embedder) = Embedder::new() {
+            service = service.with_embedder(embedder);
+        }
+
+        let report = service.run_promotion_cycle().await?;
+
+        Ok(json!({
+            "success": true,
+            "expired_outcomes": report.expired_outcomes,
+            "promoted_count": report.promoted.len(),
+            "promoted_patterns": report.promoted,
+            "skipped": report.skipped,
+            "collisions": report.collisions,
+            "errors": report.errors,
+            "summary": report.summary()
+        }))
+    }
+
+    /// Get promotable candidates
+    async fn promotion_candidates(&self, args: Value) -> Result<Value> {
+        use ob_semantic_matcher::PromotionService;
+
+        let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(20) as i32;
+
+        let service = PromotionService::new(self.pool.clone());
+        let candidates = service.get_promotable_candidates().await?;
+
+        let candidates_json: Vec<_> = candidates
+            .iter()
+            .take(limit as usize)
+            .map(|c| {
+                json!({
+                    "id": c.id,
+                    "phrase": c.phrase,
+                    "verb": c.verb,
+                    "occurrence_count": c.occurrence_count,
+                    "success_count": c.success_count,
+                    "total_count": c.total_count,
+                    "success_rate": format!("{:.1}%", c.success_rate * 100.0),
+                    "domain_hint": c.domain_hint
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "success": true,
+            "count": candidates_json.len(),
+            "candidates": candidates_json
+        }))
+    }
+
+    /// Get candidates needing manual review
+    async fn promotion_review_queue(&self, args: Value) -> Result<Value> {
+        use ob_semantic_matcher::PromotionService;
+
+        let min_occurrences = args
+            .get("min_occurrences")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(3) as i32;
+        let min_age_days = args
+            .get("min_age_days")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(7) as i32;
+        let limit = args.get("limit").and_then(|v| v.as_i64()).unwrap_or(50) as i32;
+
+        let service = PromotionService::new(self.pool.clone());
+        let candidates = service
+            .get_review_candidates(min_occurrences, min_age_days, limit)
+            .await?;
+
+        let candidates_json: Vec<_> = candidates
+            .iter()
+            .map(|c| {
+                json!({
+                    "id": c.id,
+                    "phrase": c.phrase,
+                    "verb": c.verb,
+                    "occurrence_count": c.occurrence_count,
+                    "success_count": c.success_count,
+                    "total_count": c.total_count,
+                    "success_rate": format!("{:.1}%", c.success_rate * 100.0),
+                    "domain_hint": c.domain_hint,
+                    "first_seen": c.first_seen.to_rfc3339(),
+                    "last_seen": c.last_seen.to_rfc3339(),
+                    "collision_verb": c.collision_verb
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "success": true,
+            "count": candidates_json.len(),
+            "candidates": candidates_json
+        }))
+    }
+
+    /// Approve a candidate for promotion
+    async fn promotion_approve(&self, args: Value) -> Result<Value> {
+        use ob_semantic_matcher::PromotionService;
+
+        let candidate_id = args
+            .get("candidate_id")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| anyhow!("candidate_id required"))?;
+        let actor = args
+            .get("actor")
+            .and_then(|v| v.as_str())
+            .unwrap_or("manual_review");
+
+        let service = PromotionService::new(self.pool.clone());
+        let approved = service.approve_candidate(candidate_id, actor).await?;
+
+        if approved {
+            Ok(json!({
+                "success": true,
+                "message": format!("Candidate {} approved and promoted", candidate_id),
+                "needs_reembed": true,
+                "hint": "Run populate_embeddings to enable semantic matching for the new pattern"
+            }))
+        } else {
+            Ok(json!({
+                "success": false,
+                "message": format!("Candidate {} not found or already processed", candidate_id)
+            }))
+        }
+    }
+
+    /// Reject a candidate and add to blocklist
+    async fn promotion_reject(&self, args: Value) -> Result<Value> {
+        use ob_semantic_matcher::PromotionService;
+
+        let candidate_id = args
+            .get("candidate_id")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| anyhow!("candidate_id required"))?;
+        let reason = args
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("reason required"))?;
+        let actor = args
+            .get("actor")
+            .and_then(|v| v.as_str())
+            .unwrap_or("manual_review");
+
+        let service = PromotionService::new(self.pool.clone());
+        let rejected = service
+            .reject_candidate(candidate_id, reason, actor)
+            .await?;
+
+        if rejected {
+            Ok(json!({
+                "success": true,
+                "message": format!("Candidate {} rejected and added to blocklist", candidate_id)
+            }))
+        } else {
+            Ok(json!({
+                "success": false,
+                "message": format!("Candidate {} not found or already processed", candidate_id)
+            }))
+        }
+    }
+
+    /// Get learning pipeline health metrics
+    async fn promotion_health(&self, args: Value) -> Result<Value> {
+        use ob_semantic_matcher::PromotionService;
+
+        let weeks = args.get("weeks").and_then(|v| v.as_i64()).unwrap_or(8) as i32;
+
+        let service = PromotionService::new(self.pool.clone());
+        let metrics = service.get_health_metrics(weeks).await?;
+
+        let metrics_json: Vec<_> = metrics
+            .iter()
+            .map(|m| {
+                json!({
+                    "week": m.week.format("%Y-%m-%d").to_string(),
+                    "total_interactions": m.total_interactions,
+                    "successes": m.successes,
+                    "corrections": m.corrections,
+                    "no_matches": m.no_matches,
+                    "false_positives": m.false_positives,
+                    "top1_hit_rate_pct": m.top1_hit_rate_pct,
+                    "avg_success_score": m.avg_success_score,
+                    "confidence_distribution": {
+                        "high": m.high_confidence,
+                        "medium": m.medium_confidence,
+                        "low": m.low_confidence,
+                        "none": m.no_match_confidence
+                    }
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "success": true,
+            "weeks": metrics_json.len(),
+            "metrics": metrics_json
+        }))
+    }
+
+    /// Get candidate pipeline status summary
+    async fn promotion_pipeline_status(&self, _args: Value) -> Result<Value> {
+        use ob_semantic_matcher::PromotionService;
+
+        let service = PromotionService::new(self.pool.clone());
+        let status = service.get_pipeline_status().await?;
+
+        let status_json: Vec<_> = status
+            .iter()
+            .map(|s| {
+                json!({
+                    "status": s.status,
+                    "count": s.count,
+                    "avg_occurrences": s.avg_occurrences,
+                    "avg_success_rate": s.avg_success_rate.map(|r| format!("{:.1}%", r * 100.0)),
+                    "oldest": s.oldest.map(|t| t.to_rfc3339()),
+                    "newest": s.newest.map(|t| t.to_rfc3339())
+                })
+            })
+            .collect();
+
+        Ok(json!({
+            "success": true,
+            "pipeline": status_json
         }))
     }
 }

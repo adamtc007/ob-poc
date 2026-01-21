@@ -3,12 +3,13 @@
 //! Spawns after server startup to periodically:
 //! 1. Run feedback analysis
 //! 2. Auto-apply high-confidence patterns
-//! 3. Check embedding coverage (warn if stale)
+//! 3. Run promotion pipeline (staged pattern promotion with quality gates)
+//! 4. Check embedding coverage (warn if stale)
 //!
 //! Does NOT block startup - runs in background tokio task.
 
 use anyhow::Result;
-use ob_semantic_matcher::{FeedbackService, PatternLearner};
+use ob_semantic_matcher::{Embedder, FeedbackService, PatternLearner, PromotionService};
 use sqlx::PgPool;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -194,19 +195,44 @@ pub async fn run_learning_cycle(
         report.gaps.len()
     );
 
-    // 2. Auto-apply high-confidence patterns
+    // 2. Auto-apply high-confidence patterns (legacy path)
     let applied = pattern_learner
         .auto_apply_discoveries(&report.pattern_discoveries, config.min_occurrences)
         .await?;
 
-    // 3. Check embedding coverage
+    // 3. Run promotion pipeline (new staged promotion with quality gates)
+    let promotion_result = run_promotion_pipeline(pattern_learner.pool()).await;
+    match &promotion_result {
+        Ok(report) => {
+            if !report.promoted.is_empty() {
+                info!(
+                    "Promotion pipeline: {} patterns promoted, {} collisions, {} skipped",
+                    report.promoted.len(),
+                    report.collisions,
+                    report.skipped
+                );
+            }
+            if report.expired_outcomes > 0 {
+                info!("Expired {} pending outcomes", report.expired_outcomes);
+            }
+        }
+        Err(e) => {
+            warn!("Promotion pipeline failed: {}", e);
+        }
+    }
+
+    // 4. Check embedding coverage
     let pending = pattern_learner.count_pending_embeddings().await?;
 
-    // 4. Update status
+    // 5. Update status
+    let promoted_count = promotion_result
+        .as_ref()
+        .map(|r| r.promoted.len())
+        .unwrap_or(0);
     {
         let mut s = status.write().await;
         s.last_analysis = Some(chrono::Utc::now());
-        s.last_patterns_applied = applied.len();
+        s.last_patterns_applied = applied.len() + promoted_count;
         s.pending_embeddings = pending;
         s.embeddings_stale = pending > 0;
         s.last_error = None;
@@ -219,7 +245,21 @@ pub async fn run_learning_cycle(
         );
     }
 
-    Ok(applied.len())
+    Ok(applied.len() + promoted_count)
+}
+
+/// Run the staged promotion pipeline
+async fn run_promotion_pipeline(pool: &PgPool) -> Result<ob_semantic_matcher::PromotionReport> {
+    let mut service = PromotionService::new(pool.clone());
+
+    // Try to add embedder for collision checking
+    if let Ok(embedder) = Embedder::new() {
+        service = service.with_embedder(embedder);
+    } else {
+        warn!("Embedder not available for collision checking in promotion pipeline");
+    }
+
+    service.run_promotion_cycle().await
 }
 
 /// Check embedding coverage and update status

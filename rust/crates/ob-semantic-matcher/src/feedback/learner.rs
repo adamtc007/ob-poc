@@ -21,6 +21,11 @@ impl PatternLearner {
         Self { pool }
     }
 
+    /// Get reference to the database pool
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Apply high-confidence pattern discoveries
     /// Only auto-applies patterns seen 5+ times with clear verb association
     pub async fn auto_apply_discoveries(

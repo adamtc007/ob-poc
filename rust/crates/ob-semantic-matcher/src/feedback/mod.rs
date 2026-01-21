@@ -27,6 +27,7 @@
 
 mod analysis;
 mod learner;
+mod promotion;
 mod repository;
 mod sanitize;
 mod service;
@@ -34,6 +35,10 @@ mod types;
 
 pub use analysis::{AnalysisReport, FeedbackAnalyzer};
 pub use learner::PatternLearner;
+pub use promotion::{
+    PipelineStatus, PromotableCandidate, PromotionReport, PromotionService, ReviewCandidate,
+    WeeklyHealthMetrics,
+};
 pub use repository::FeedbackRepository;
 pub use sanitize::sanitize_input;
 pub use service::FeedbackService;
