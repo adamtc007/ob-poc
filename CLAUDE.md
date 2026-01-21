@@ -2,9 +2,9 @@
 
 > **Last reviewed:** 2026-01-21 (Intent Pipeline Fixes complete)
 > **Crates:** 14 Rust crates
-> **Verbs:** 923 verbs, 7334 intent patterns (DB-sourced)
+> **Verbs:** 938 verbs, 7397 intent patterns (DB-sourced)
 > **Migrations:** 37 schema migrations
-> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2) - 7500+ patterns vectorized
+> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2) - 7928 patterns vectorized
 > **ESPER Navigation:** ✅ Complete - 48 commands, trie + semantic fallback
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
@@ -447,15 +447,21 @@ On server startup (`ob-poc-web/src/main.rs`):
 
 **Populating Embeddings:**
 
+> ⚠️ **CRITICAL:** After adding/modifying verb YAML, you MUST run `populate_embeddings` or the new verbs won't be discoverable via semantic search. Server startup syncs YAML → DB but does NOT create embeddings.
+
 ```bash
 # Run after YAML changes or first setup
 DATABASE_URL="postgresql:///data_designer" \
   cargo run --release --package ob-semantic-matcher --bin populate_embeddings
+
+# Use --force if patterns exist but need re-embedding (e.g., after model change)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings -- --force
 ```
 
 Options:
 - `--bootstrap`: Generate patterns for verbs without intent_patterns (use sparingly)
-- `--force`: Re-embed all patterns even if already present
+- `--force`: Re-embed all patterns even if already present (use after adding new verbs)
 
 **Search Priority (HybridVerbSearcher):**
 
@@ -489,12 +495,12 @@ Automatic learning via background task (or MCP tools):
 
 ```sql
 SELECT * FROM "ob-poc".v_verb_embedding_stats;
--- total_verbs: 923
--- verbs_with_patterns: 923
--- verbs_with_yaml_patterns: 920   -- From YAML invocation_phrases
+-- total_verbs: 938
+-- verbs_with_patterns: 938
+-- verbs_with_yaml_patterns: 935   -- From YAML invocation_phrases
 -- verbs_with_learned_patterns: 15 -- From learning loop
--- total_embeddings: 7500+
--- unique_verbs_embedded: 962
+-- total_embeddings: 7928
+-- unique_verbs_embedded: 977
 ```
 
 ---

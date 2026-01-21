@@ -88,8 +88,13 @@ domains:
           - "show book"
           - "load all funds under"
           - "show all CBUs for"
+          - "show all cbus"
           - "load manco"
           - "load group"
+          - "show cbu book"
+          - "cbu book"
+          - "show funds for"
+          - "all cbus for"
         metadata:
           tier: intent
           source_of_truth: session
