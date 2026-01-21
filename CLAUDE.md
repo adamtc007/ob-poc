@@ -599,6 +599,97 @@ The **PromotionService** provides quality-gated pattern promotion with collision
 
 ---
 
+## Teaching Mechanism (Direct Pattern Learning)
+
+The **Teaching Tools** allow trusted sources (admin, Claude) to directly add phrase→verb mappings without going through the candidate promotion pipeline. This bypasses quality gates for immediate effect.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TEACHING vs PROMOTION                                     │
+│                                                                              │
+│  TEACHING (trusted, immediate)           PROMOTION (earned, gated)          │
+│  ─────────────────────────────           ──────────────────────────         │
+│  teach_phrase("spin up", "cbu.create")   User interactions → signals        │
+│      │                                       │                               │
+│      ▼                                       ▼                               │
+│  agent.teach_phrase() SQL function       learning_candidates (staged)       │
+│      │                                       │                               │
+│      ├── Validates verb exists               ├── Quality gates              │
+│      ├── Normalizes phrase                   ├── Success rate >= 80%        │
+│      ├── Adds to intent_patterns             ├── Age >= 24 hours            │
+│      └── Audits to teaching_audit            └── Collision check            │
+│      │                                       │                               │
+│      ▼                                       ▼                               │
+│  dsl_verbs.intent_patterns              dsl_verbs.intent_patterns           │
+│      │                                       │                               │
+│      └──────────────┬────────────────────────┘                              │
+│                     ▼                                                        │
+│           populate_embeddings                                                │
+│                     │                                                        │
+│                     ▼                                                        │
+│           verb_pattern_embeddings (semantic search enabled)                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**MCP Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `teach_phrase` | Directly add phrase→verb mapping |
+| `unteach_phrase` | Remove a taught mapping (with audit) |
+| `teaching_status` | View recently taught patterns and stats |
+
+**Usage Examples:**
+
+```json
+// Teach a new phrase
+{"tool": "teach_phrase", "phrase": "spin up a fund", "verb": "cbu.create"}
+
+// Teach with custom source
+{"tool": "teach_phrase", "phrase": "who owns this", "verb": "ubo.discover", "source": "admin_manual"}
+
+// Remove a taught phrase
+{"tool": "unteach_phrase", "phrase": "spin up a fund", "reason": "too_generic"}
+
+// Check teaching status
+{"tool": "teaching_status", "limit": 20, "include_stats": true}
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `migrations/044_agent_teaching.sql` | Schema, functions, views |
+| `rust/src/mcp/handlers/core.rs` | MCP tool handlers |
+| `rust/src/mcp/tools.rs` | Tool definitions |
+
+**Database Functions:**
+
+| Function | Purpose |
+|----------|---------|
+| `agent.teach_phrase(phrase, verb, source)` | Add pattern with validation |
+| `agent.teach_phrases_batch(json_array)` | Bulk teaching |
+| `agent.unteach_phrase(phrase, verb, reason)` | Remove with audit |
+| `agent.get_taught_pending_embeddings()` | Patterns needing embedding |
+
+**Views:**
+
+| View | Purpose |
+|------|---------|
+| `agent.v_recently_taught` | Recent patterns with source |
+| `agent.v_teaching_stats` | Totals, today, this week |
+
+**After Teaching:**
+
+Always run `populate_embeddings` after teaching to enable semantic matching:
+
+```bash
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings
+```
+
+---
+
 ## Session Verbs
 
 Session manages which CBUs are loaded. Focus/camera is client-side.

@@ -2711,5 +2711,97 @@ Use to understand the overall pipeline state."#.into(),
                 "properties": {}
             }),
         },
+        // =====================================================================
+        // Teaching Tools - Direct phrase→verb learning
+        // =====================================================================
+        Tool {
+            name: "teach_phrase".into(),
+            description: r#"Teach a phrase→verb mapping to improve intent recognition.
+
+This is the fastest way to improve verb matching: directly tell the system
+what phrases should trigger which verbs.
+
+Example:
+  teach_phrase("spin up a fund", "cbu.create")
+  teach_phrase("who owns this company", "ubo.discover")
+
+After teaching, patterns are added to dsl_verbs.intent_patterns but need
+`populate_embeddings` to be run to activate them for semantic search.
+
+Use this when:
+- A phrase isn't matching the right verb
+- You want to add domain-specific vocabulary
+- You're onboarding and want immediate coverage
+
+The pattern is stored permanently and survives server restarts."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "phrase": {
+                        "type": "string",
+                        "description": "The phrase to teach (will be normalized)"
+                    },
+                    "verb": {
+                        "type": "string",
+                        "description": "The DSL verb it should trigger (e.g., 'cbu.create')"
+                    }
+                },
+                "required": ["phrase", "verb"]
+            }),
+        },
+        Tool {
+            name: "unteach_phrase".into(),
+            description: r#"Remove a previously taught phrase→verb mapping.
+
+Use when a pattern is causing problems (wrong matches, confusion).
+The pattern is removed from both dsl_verbs.intent_patterns and
+verb_pattern_embeddings.
+
+An audit record is created with the reason for removal."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "phrase": {
+                        "type": "string",
+                        "description": "The phrase to remove"
+                    },
+                    "verb": {
+                        "type": "string",
+                        "description": "The verb it was mapped to"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why this mapping is being removed (for audit)"
+                    }
+                },
+                "required": ["phrase", "verb"]
+            }),
+        },
+        Tool {
+            name: "teaching_status".into(),
+            description: r#"Show recently taught patterns and their embedding status.
+
+Returns:
+- Recently taught patterns with their verbs
+- Whether each pattern has an embedding (active for search)
+- Count of patterns pending embeddings
+
+Use to check what's been taught and whether patterns are active."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "limit": {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "Max patterns to show"
+                    },
+                    "pending_only": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Only show patterns awaiting embeddings"
+                    }
+                }
+            }),
+        },
     ]
 }
