@@ -2029,127 +2029,278 @@ fn generate_commands_help() -> String {
     r#"# Available Commands
 
 ## DSL Operations
+
+**Commands:**
 | Command | Description |
 |---------|-------------|
 | `dsl_validate` | Parse and validate DSL syntax/semantics |
-| `dsl_execute` | Execute DSL against database (with dry_run option) |
+| `dsl_execute` | Execute DSL against database |
 | `dsl_plan` | Show execution plan without running |
-| `dsl_lookup` | Look up real database IDs (prevents UUID hallucination) |
-| `dsl_complete` | Get completions for verbs, domains, products, roles |
-| `dsl_signature` | Get verb signature with parameters and types |
 | `dsl_generate` | Generate DSL from natural language |
+| `dsl_lookup` | Look up database IDs (prevents hallucination) |
+| `dsl_complete` | Get completions for verbs, domains, products |
+| `dsl_signature` | Get verb signature with parameters |
+
+**Natural Language:**
+| Say | Effect |
+|-----|--------|
+| "create a CBU for Acme Corp" | → `dsl_generate` → `(cbu.create :name "Acme Corp")` |
+| "add John Smith as director" | → `dsl_generate` → `(cbu.assign-role ...)` |
+| "what verbs are there for kyc?" | → `dsl_complete` or `/verbs kyc` |
+
+**DSL Syntax:**
+```clojure
+(cbu.create :name "Acme Fund" :jurisdiction "LU" :as @cbu)
+(entity.create :name "John Smith" :type PERSON :as @person)
+(cbu.assign-role :cbu-id @cbu :entity-id @person :role DIRECTOR)
+```
+
+**Response:** `{"success": true, "bindings": {"@cbu": "uuid-..."}, "steps_executed": 1}`
+
+---
+
+## Session & Navigation
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `session_load_cbu` | Load single CBU into session |
+| `session_load_jurisdiction` | Load all CBUs in jurisdiction |
+| `session_load_galaxy` | Load all CBUs under apex entity |
+| `session_unload_cbu` | Remove CBU from session |
+| `session_clear` | Clear all CBUs |
+| `session_undo` / `session_redo` | History navigation |
+| `session_info` / `session_list` | Query session state |
+
+**Natural Language:**
+| Say | DSL |
+|-----|-----|
+| "load the Allianz book" | `(session.load-galaxy :apex-name "Allianz")` |
+| "show me Luxembourg CBUs" | `(session.load-jurisdiction :jurisdiction "LU")` |
+| "focus on Acme Fund" | `(session.load-cbu :cbu-name "Acme Fund")` |
+| "clear the session" | `(session.clear)` |
+| "undo" / "go back" | `(session.undo)` |
+
+**Response:** `{"loaded": true, "cbu_count": 15, "cbu_ids": [...], "scope_size": 15}`
+
+---
 
 ## CBU & Entity Operations
-| Command | Description |
-|---------|-------------|
-| `cbu_get` | Get CBU with entities, roles, documents, screenings |
-| `cbu_list` | List/search CBUs with filtering |
-| `entity_get` | Get entity details with relationships |
-| `entity_search` | Smart entity search with disambiguation |
 
-## Schema & Verbs
+**Commands:**
 | Command | Description |
 |---------|-------------|
-| `verbs_list` | List available DSL verbs (optionally by domain) |
-| `schema_info` | Get entity types, roles, document types |
+| `cbu_get` | Get CBU with entities, roles, documents |
+| `cbu_list` | List/search CBUs |
+| `entity_get` | Get entity details |
+| `entity_search` | Smart search with disambiguation |
 
-## Session Context
-| Command | Description |
-|---------|-------------|
-| `session_context` | Get current session context (bindings, active CBU) |
+**Natural Language:**
+| Say | DSL |
+|-----|-----|
+| "create a fund called Lux Alpha" | `(cbu.create :name "Lux Alpha" :type FUND)` |
+| "add custody product" | `(cbu.add-product :product "Custody")` |
+| "who are the directors?" | `(cbu.list-roles :role DIRECTOR)` |
+| "create person John Smith" | `(entity.create :name "John Smith" :type PERSON)` |
+| "find BlackRock" | `(entity.search :query "BlackRock")` |
 
-## Workflow Operations
-| Command | Description |
-|---------|-------------|
-| `workflow_status` | Get workflow instance status with blockers |
-| `workflow_advance` | Try to advance workflow (evaluates guards) |
-| `workflow_transition` | Manual state transition |
-| `workflow_start` | Start a new workflow instance |
-| `resolve_blocker` | Get resolution options for a blocker |
+**Response:** `{"cbu": {"cbu_id": "...", "name": "Lux Alpha"}, "entities": [...], "roles": [...]}`
 
-## Template Operations
-| Command | Description |
-|---------|-------------|
-| `template_list` | List/search templates by tag, blocker, or workflow state |
-| `template_get` | Get full template details with params and DSL body |
-| `template_expand` | Expand template to DSL with parameter substitution |
+---
 
-## Batch Operations
-| Command | Description |
-|---------|-------------|
-| `batch_start` | Start batch mode with a template |
-| `batch_add_entities` | Add entities to a parameter's key set |
-| `batch_confirm_keyset` | Mark a key set as complete |
-| `batch_set_scalar` | Set a scalar parameter value |
-| `batch_get_state` | Get current batch execution state |
-| `batch_expand_current` | Expand template for current batch item |
-| `batch_record_result` | Record success/failure for current item |
-| `batch_skip_current` | Skip current item |
-| `batch_cancel` | Cancel batch operation |
+## View & Zoom (ESPER Navigation)
+
+**Natural Language:**
+| Say | Effect |
+|-----|--------|
+| "enhance" / "zoom in" / "closer" | Zoom in on current view |
+| "zoom out" / "pull back" | Zoom out to wider view |
+| "universe" / "show everything" | View all CBUs |
+| "galaxy view" / "cluster" | View CBU groups |
+| "land on" / "system view" | Focus single CBU |
+| "drill through" / "go deeper" | Drill into entity |
+| "surface" / "come back up" | Return from drill |
+| "x-ray" / "show hidden" | Show hidden layers |
+| "follow the money" | Trace money flow |
+| "who controls this?" | Show control chain |
+
+**DSL Syntax:**
+```clojure
+(view.universe)
+(view.book :apex-name "Allianz")
+(view.cbu :cbu-id @cbu :mode trading)
+(view.drill :entity-id @entity)
+(view.surface)
+```
+
+---
+
+## KYC & UBO
+
+**Natural Language:**
+| Say | DSL |
+|-----|-----|
+| "start KYC for this CBU" | `(kyc.start-case :cbu-id @cbu)` |
+| "who owns this company?" | `(ubo.discover :entity-id @entity)` |
+| "show ownership chain" | `(ubo.trace :entity-id @entity)` |
+| "screen this person" | `(screening.run :entity-id @person)` |
+
+**DSL Syntax:**
+```clojure
+(kyc.start-case :cbu-id @cbu :case-type ONBOARDING :as @case)
+(kyc.add-document :case-id @case :doc-type PASSPORT :entity-id @person)
+(ubo.discover :entity-id @entity :threshold 0.25)
+(screening.run :entity-id @person :type PEP_SANCTIONS)
+```
+
+**Response:** `{"case_id": "...", "status": "IN_PROGRESS", "documents_required": [...]}`
+
+---
+
+## Trading Profile & Custody
+
+**Natural Language:**
+| Say | DSL |
+|-----|-----|
+| "set up trading for equities" | `(trading-profile.add-instrument-class :class EQUITY)` |
+| "add XLON market" | `(trading-profile.add-market :mic "XLON")` |
+| "create SSI for USD" | `(custody.create-ssi :currency "USD" ...)` |
+| "show trading matrix" | `trading_matrix_get` |
+
+**DSL Syntax:**
+```clojure
+(trading-profile.create :cbu-id @cbu :as @profile)
+(trading-profile.add-instrument-class :profile-id @profile :class EQUITY)
+(trading-profile.add-market :profile-id @profile :mic "XLON")
+(custody.create-ssi :cbu-id @cbu :currency "USD" :account "..." :as @ssi)
+```
+
+---
 
 ## Research Macros
+
+**Commands:**
 | Command | Description |
 |---------|-------------|
 | `research_list` | List available research macros |
-| `research_get` | Get research macro definition |
-| `research_execute` | Execute research with LLM + web search |
-| `research_approve` | Approve research results |
-| `research_reject` | Reject research results |
-| `research_status` | Get current research state |
+| `research_execute` | Execute research (LLM + web) |
+| `research_approve` / `research_reject` | Review results |
 
-## Taxonomy Navigation
-| Command | Description |
-|---------|-------------|
-| `taxonomy_get` | Get entity type taxonomy tree |
-| `taxonomy_drill_in` | Drill into a taxonomy node |
-| `taxonomy_zoom_out` | Zoom out one level |
-| `taxonomy_reset` | Reset to root level |
-| `taxonomy_position` | Get current position in taxonomy |
-| `taxonomy_entities` | List entities of focused type |
-
-## Trading Matrix
-| Command | Description |
-|---------|-------------|
-| `trading_matrix_get` | Get trading matrix summary for a CBU |
-
-## Learning & Feedback
-| Command | Description |
-|---------|-------------|
-| `verb_search` | Search for verbs matching natural language |
-| `intent_feedback` | Record user correction for learning loop |
-| `learning_analyze` | Analyze unmatched phrases for learning |
-| `learning_apply` | Apply a pattern→verb mapping |
-| `embeddings_status` | Check embedding coverage stats |
-
-## Promotion Pipeline (Quality-Gated Learning)
-| Command | Description |
-|---------|-------------|
-| `promotion_run_cycle` | Run full promotion pipeline manually |
-| `promotion_candidates` | List candidates ready for auto-promotion |
-| `promotion_review_queue` | List candidates needing manual review |
-| `promotion_approve` | Manually approve a candidate |
-| `promotion_reject` | Reject and add to blocklist |
-| `promotion_health` | Weekly health metrics |
-| `promotion_pipeline_status` | Pipeline summary by status |
-
-## Teaching (Direct Pattern Learning)
-| Command | Description |
-|---------|-------------|
-| `teach_phrase` | Directly add phrase→verb mapping |
-| `unteach_phrase` | Remove a taught mapping (with audit) |
-| `teaching_status` | View recently taught patterns and stats |
-
-## View Commands (Natural Language)
+**Natural Language:**
 | Say | Effect |
 |-----|--------|
-| "kyc view" / "ubo view" / "ownership view" | Switch to KYC/UBO view mode |
-| "service view" / "service delivery" | Switch to Service Delivery view mode |
-| "custody view" / "settlement view" / "ssi view" | Switch to Custody/Trading view mode |
-| "switch to kyc" / "switch to service" | Switch view modes |
+| "research Allianz group structure" | Execute GLEIF hierarchy lookup |
+| "find beneficial owners of Acme" | UBO research macro |
+| "approve the research" | Accept results, get DSL |
+
+**Response:** `{"results": {...}, "suggested_verbs": ["(entity.create ...)", "(ownership.link ...)"]}`
 
 ---
-*Type `/commands` or `/help` to see this list again.*
-*Type `/verbs` to see all DSL verbs, or `/verbs <domain>` for a specific domain.*"#
+
+## Learning & Feedback
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `verb_search` | Search verbs by natural language |
+| `intent_feedback` | Record correction for learning |
+| `learning_analyze` | Find patterns to learn |
+| `learning_apply` | Apply pattern→verb mapping |
+| `embeddings_status` | Check semantic coverage |
+
+**Natural Language:**
+| Say | Effect |
+|-----|--------|
+| "that should have been cbu.create" | Records correction → learning candidate |
+| "block this verb for this phrase" | Adds to blocklist |
+
+**Response:** `{"recorded": true, "occurrence_count": 3, "will_auto_apply_at": 5}`
+
+---
+
+## Promotion Pipeline (Quality-Gated Learning)
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `promotion_run_cycle` | Run full promotion pipeline |
+| `promotion_candidates` | List auto-promotable candidates |
+| `promotion_review_queue` | List manual review queue |
+| `promotion_approve` | Approve candidate |
+| `promotion_reject` | Reject and blocklist |
+| `promotion_health` | Weekly health metrics |
+
+**Thresholds:** 5+ occurrences, 80%+ success rate, 24h+ age, collision-safe
+
+**Response:** `{"promoted": ["spin up a fund → cbu.create"], "skipped": 2, "collisions": 0}`
+
+---
+
+## Teaching (Direct Pattern Learning)
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `teach_phrase` | Add phrase→verb mapping |
+| `unteach_phrase` | Remove mapping (with audit) |
+| `teaching_status` | View taught patterns |
+
+**Natural Language:**
+| Say | Maps To |
+|-----|---------|
+| "teach: 'spin up a fund' = cbu.create" | `agent.teach` |
+| "learn this phrase" / "remember this" | `agent.teach` |
+| "forget this phrase" / "unteach" | `agent.unteach` |
+| "what have I taught?" | `agent.teaching-status` |
+
+**DSL Syntax:**
+```clojure
+(agent.teach :phrase "spin up a fund" :verb "cbu.create")
+(agent.unteach :phrase "spin up a fund" :reason "too_generic")
+(agent.teaching-status :limit 20)
+```
+
+**Response:**
+```json
+{"taught": true, "phrase": "spin up a fund", "verb": "cbu.create",
+ "message": "Taught: 'spin up a fund' → cbu.create", "needs_reembed": true}
+```
+
+---
+
+## Workflow & Templates
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `workflow_start` | Start workflow instance |
+| `workflow_status` | Get status with blockers |
+| `workflow_advance` | Advance (evaluates guards) |
+| `template_list` | List templates |
+| `template_expand` | Expand to DSL |
+
+**Natural Language:**
+| Say | Effect |
+|-----|--------|
+| "start onboarding workflow" | Creates workflow instance |
+| "what's blocking?" | Shows blockers |
+| "advance the workflow" | Evaluates guards, moves state |
+
+---
+
+## Batch Operations
+
+**Commands:** `batch_start`, `batch_add_entities`, `batch_confirm_keyset`,
+`batch_set_scalar`, `batch_get_state`, `batch_expand_current`,
+`batch_record_result`, `batch_skip_current`, `batch_cancel`
+
+**Use case:** Apply same template to multiple entities (e.g., add role to 50 people)
+
+---
+
+*Type `/commands` or `/help` to see this list.*
+*Type `/verbs` to see all DSL verbs, `/verbs <domain>` for specific domain.*
+*Type `/verbs agent` for agent verbs, `/verbs session` for session verbs.*"#
         .to_string()
 }
 
