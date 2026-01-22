@@ -992,6 +992,39 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                             current_ref_index: None,
                             dsl_hash: None,
                         });
+                    } else if !result.missing_required.is_empty() {
+                        // Missing required arguments - ask user to clarify
+                        let verb = &result.intent.verb;
+                        let missing = result.missing_required.join(", ");
+
+                        tracing::info!(
+                            "Verb {} matched but missing required args: {}",
+                            verb,
+                            missing
+                        );
+
+                        session.add_user_message(request.message.clone());
+
+                        let clarification_msg = format!(
+                            "I understood you want to use `{}`, but I need more information.\n\nPlease specify: {}",
+                            verb, missing
+                        );
+                        session.add_agent_message(clarification_msg.clone(), None, None);
+
+                        return Ok(AgentChatResponse {
+                            message: clarification_msg,
+                            intents: vec![],
+                            validation_results: vec![],
+                            session_state: SessionState::New,
+                            can_execute: false,
+                            dsl_source: None,
+                            ast: None,
+                            disambiguation: None,
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                        });
                     } else {
                         // DSL validation failed - return error with details
                         let error_msg = result
