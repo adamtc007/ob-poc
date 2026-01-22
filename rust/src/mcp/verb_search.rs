@@ -31,10 +31,10 @@
 //! - MiniLM: scores distributed across [0.3, 1.0]
 //! - BGE: scores cluster in [0.6, 1.0] (even unrelated sentences score ~0.6)
 //!
-//! Thresholds were recalibrated for BGE:
-//! - semantic_threshold: 0.80 → 0.88 (+0.08)
-//! - fallback_threshold: 0.65 → 0.78 (+0.13)
-//! - blocklist_threshold: 0.75 → 0.85 (+0.10)
+//! Thresholds for BGE:
+//! - semantic_threshold: 0.78 (decision gate)
+//! - fallback_threshold: 0.70 (retrieval cutoff)
+//! - blocklist_threshold: 0.85 (collision detection)
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -209,10 +209,10 @@ impl HybridVerbSearcher {
             verb_service: Some(verb_service),
             learned_data,
             embedder: None, // Embedder added separately via with_embedder
-            // BGE-calibrated thresholds (higher than MiniLM)
-            semantic_threshold: 0.88,  // Was 0.80 for MiniLM
-            fallback_threshold: 0.78,  // Was 0.65 for MiniLM
-            blocklist_threshold: 0.85, // Was 0.75 for MiniLM
+            // BGE-calibrated thresholds
+            semantic_threshold: 0.78,  // Decision gate for accepting match
+            fallback_threshold: 0.70,  // Retrieval cutoff for DB queries
+            blocklist_threshold: 0.85, // Collision detection
         }
     }
 
@@ -223,8 +223,8 @@ impl HybridVerbSearcher {
             learned_data: Some(learned_data),
             embedder: None,
             // BGE-calibrated thresholds
-            semantic_threshold: 0.88,
-            fallback_threshold: 0.78,
+            semantic_threshold: 0.78,
+            fallback_threshold: 0.70,
             blocklist_threshold: 0.85,
         }
     }
@@ -236,8 +236,8 @@ impl HybridVerbSearcher {
             learned_data: None,
             embedder: None,
             // BGE-calibrated thresholds
-            semantic_threshold: 0.88,
-            fallback_threshold: 0.78,
+            semantic_threshold: 0.78,
+            fallback_threshold: 0.70,
             blocklist_threshold: 0.85,
         }
     }

@@ -123,7 +123,6 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 
 // ============================================================================
@@ -367,193 +366,63 @@ pub struct PreResolvedContext {
 /// - Intent extraction from natural language via LLM
 /// - Entity resolution via EntityGateway (with disambiguation)
 /// - DSL generation with semantic validation
-/// - Retry loop for fixing validation errors
-///
 /// Usage:
 /// ```ignore
-/// let service = AgentService::new(pool);
+/// let service = AgentService::new(pool, Some(embedder));
 /// let response = service.process_chat(&mut session, &request, llm_client).await?;
 /// ```
 pub struct AgentService {
-    /// Database pool for semantic validation
-    pool: Option<PgPool>,
-    /// Configuration
+    pool: PgPool,
     config: AgentServiceConfig,
-    /// Client scope (if operating in client portal mode)
     client_scope: Option<ClientScope>,
-    /// Lazy embedder for background initialization
-    /// Checked when creating verb searcher if embedder is None
-    lazy_embedder: Option<Arc<RwLock<Option<Arc<CandleEmbedder>>>>>,
-    /// Cached verb searcher for semantic intent matching
-    verb_searcher: tokio::sync::Mutex<Option<HybridVerbSearcher>>,
-    /// Whether verb searcher was created with embedder
-    verb_searcher_has_embedder: std::sync::atomic::AtomicBool,
+    /// Embedder for semantic verb search (None = exact match only)
+    embedder: Option<Arc<CandleEmbedder>>,
 }
 
 #[allow(dead_code)]
 impl AgentService {
-    /// Create a new agent service without database support
-    pub fn new() -> Self {
-        Self {
-            pool: None,
-            config: AgentServiceConfig::default(),
-            client_scope: None,
-            lazy_embedder: None,
-            verb_searcher: tokio::sync::Mutex::new(None),
-            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
-        }
-    }
-
-    /// Create with database pool for semantic validation
-    pub fn with_pool(pool: PgPool) -> Self {
-        Self {
-            pool: Some(pool),
-            config: AgentServiceConfig::default(),
-            client_scope: None,
-            lazy_embedder: None,
-            verb_searcher: tokio::sync::Mutex::new(None),
-            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
-        }
-    }
-
-    /// Create with custom configuration
-    pub fn with_config(pool: Option<PgPool>, config: AgentServiceConfig) -> Self {
+    /// Create agent service with pool and optional embedder
+    pub fn new(pool: PgPool, embedder: Option<Arc<CandleEmbedder>>) -> Self {
         Self {
             pool,
-            config,
+            config: AgentServiceConfig::default(),
             client_scope: None,
-            lazy_embedder: None,
-            verb_searcher: tokio::sync::Mutex::new(None),
-            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
+            embedder,
         }
     }
 
-    /// Set lazy embedder for background initialization
-    /// The embedder will be checked when creating verb searcher
-    pub fn with_lazy_embedder(
-        mut self,
-        lazy_embedder: Arc<RwLock<Option<Arc<CandleEmbedder>>>>,
-    ) -> Self {
-        self.lazy_embedder = Some(lazy_embedder);
-        self
+    /// Create with database pool only (no semantic search)
+    pub fn with_pool(pool: PgPool) -> Self {
+        Self::new(pool, None)
     }
 
-    /// Check if the semantic pipeline is ready to accept requests
-    /// Returns false if embedder is still initializing
-    pub async fn is_ready(&self) -> bool {
-        // Must have a database pool
-        if self.pool.is_none() {
-            return false;
-        }
-
-        // Must have embedder initialized (not lazy/pending)
-        if let Some(ref lazy) = self.lazy_embedder {
-            let guard = lazy.read().await;
-            guard.is_some()
-        } else {
-            // No lazy embedder configured - can't do semantic search
-            false
-        }
+    /// Check if semantic search is available
+    pub fn has_semantic_search(&self) -> bool {
+        self.embedder.is_some()
     }
 
-    /// Get or create verb searcher for semantic intent matching
-    async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher, String> {
-        let has_lazy = self.lazy_embedder.is_some();
-        let current_has_embedder = self
-            .verb_searcher_has_embedder
-            .load(std::sync::atomic::Ordering::Relaxed);
-
-        tracing::debug!(
-            "get_verb_searcher: has_lazy={}, current_has_embedder={}",
-            has_lazy,
-            current_has_embedder
-        );
-
-        // Check if lazy embedder became available and we need to rebuild
-        let embedder_now_available = if has_lazy && !current_has_embedder {
-            // Check if lazy embedder has been populated
-            if let Some(ref lazy) = self.lazy_embedder {
-                let is_some = lazy.read().await.is_some();
-                tracing::debug!("Lazy embedder populated: {}", is_some);
-                is_some
-            } else {
-                false
-            }
-        } else {
-            false
-        };
-
-        let mut guard = self.verb_searcher.lock().await;
-
-        // If embedder became available but searcher doesn't have it, rebuild
-        if embedder_now_available {
-            tracing::info!(
-                "Lazy embedder now available, rebuilding verb searcher with semantic support"
-            );
-            *guard = None; // Force rebuild
-        }
-
-        if let Some(searcher) = guard.as_ref() {
-            tracing::debug!("Returning cached verb searcher");
-            return Ok(searcher.clone());
-        }
-
-        tracing::info!("Creating new verb searcher...");
-
-        // Need pool to create searcher
-        let pool = self.pool.as_ref().ok_or("No database pool available")?;
-
-        // Create VerbService for centralized DB access
-        let verb_service = Arc::new(VerbService::new(pool.clone()));
-
-        // Create searcher with VerbService
+    /// Create IntentPipeline for processing user input
+    fn get_intent_pipeline(&self) -> Result<IntentPipeline, String> {
+        let verb_service = Arc::new(VerbService::new(self.pool.clone()));
         let mut searcher = HybridVerbSearcher::new(verb_service, None);
 
-        // Add embedder if available (for semantic fallback)
-        let mut has_embedder = false;
-        if let Some(ref lazy) = self.lazy_embedder {
-            if let Some(embedder) = lazy.read().await.clone() {
-                tracing::info!("Adding lazy embedder to verb searcher");
-                searcher = searcher.with_embedder(embedder);
-                has_embedder = true;
-            } else {
-                tracing::warn!(
-                    "Lazy embedder not yet available - verb search will use exact match only"
-                );
-            }
-        } else {
-            tracing::warn!("No embedder configured - verb search will use exact match only");
+        if let Some(ref embedder) = self.embedder {
+            // Cast Arc<CandleEmbedder> to Arc<dyn Embedder>
+            let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
+                embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
+            searcher = searcher.with_embedder(dyn_embedder);
         }
 
-        self.verb_searcher_has_embedder
-            .store(has_embedder, std::sync::atomic::Ordering::Relaxed);
-
-        tracing::info!("Verb searcher created with embedder: {}", has_embedder);
-
-        *guard = Some(searcher.clone());
-        Ok(searcher)
-    }
-
-    /// Get or create IntentPipeline for processing user input
-    async fn get_intent_pipeline(&self) -> Result<IntentPipeline, String> {
-        let searcher = self.get_verb_searcher().await?;
         Ok(IntentPipeline::new(searcher))
     }
 
-    /// Create a client-scoped agent service for the client portal
-    ///
-    /// Client mode restricts:
-    /// - Only accessible CBUs are visible
-    /// - Limited verb palette (read + respond operations only)
-    /// - Different system prompt (client-friendly, explains WHY)
+    /// Create a client-scoped agent service
     pub fn for_client(pool: PgPool, client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
         Self {
-            pool: Some(pool),
+            pool,
             config: AgentServiceConfig::default(),
             client_scope: Some(ClientScope::new(client_id, accessible_cbus)),
-            lazy_embedder: None,
-            verb_searcher: tokio::sync::Mutex::new(None),
-            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
+            embedder: None,
         }
     }
 
@@ -567,12 +436,10 @@ impl AgentService {
         let mut scope = ClientScope::new(client_id, accessible_cbus);
         scope.client_name = Some(client_name);
         Self {
-            pool: Some(pool),
+            pool,
             config: AgentServiceConfig::default(),
             client_scope: Some(scope),
-            lazy_embedder: None,
-            verb_searcher: tokio::sync::Mutex::new(None),
-            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
+            embedder: None,
         }
     }
 
@@ -720,7 +587,7 @@ impl AgentService {
     /// - What entities are missing
     /// - What the next actionable steps are
     async fn derive_semantic_context(&self, active_cbu_id: Uuid) -> Option<String> {
-        let pool = self.pool.as_ref()?;
+        let pool = &self.pool;
 
         // Load the semantic stage registry
         let registry = match SemanticStageRegistry::load_default() {
@@ -830,7 +697,7 @@ Breadcrumb: {}
     /// This implements the "Domain Coherence" principle: requests appear as child
     /// nodes of workstreams in `awaiting` arrays, not as a separate list.
     async fn derive_kyc_case_context(&self, kyc_case_id: Uuid) -> Option<String> {
-        let pool = self.pool.as_ref()?;
+        let pool = &self.pool;
 
         // Query case state with workstreams and embedded awaiting requests
         let case_row = sqlx::query!(
@@ -974,26 +841,6 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         tracing::info!("CBU ID: {:?}", request.cbu_id);
         tracing::info!("Session ID: {}", session.id);
 
-        // Check if semantic pipeline is ready
-        if !self.is_ready().await {
-            tracing::warn!("Semantic pipeline not ready - embedder still initializing");
-            return Ok(AgentChatResponse {
-                message: "System is still initializing. Please wait a moment and try again."
-                    .to_string(),
-                intents: vec![],
-                validation_results: vec![],
-                session_state: SessionState::New,
-                can_execute: false,
-                dsl_source: None,
-                ast: None,
-                disambiguation: None,
-                commands: None,
-                unresolved_refs: None,
-                current_ref_index: None,
-                dsl_hash: None,
-            });
-        }
-
         // If this is a disambiguation response, handle it
         if let Some(disambig_response) = &request.disambiguation_response {
             return self
@@ -1001,16 +848,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 .await;
         }
 
-        // =========================================================================
-        // PRIMARY PATH: IntentPipeline handles ALL natural language and direct DSL
-        // =========================================================================
-        // This is the unified entry point for:
-        // - Direct DSL: "(view.book :client <Allianz>)" → parse, validate, return
-        // - Natural language: "show all allianz lux cbu" → semantic search → LLM → DSL
-        //
-        // The pipeline uses semantic verb search to narrow candidates, then LLM
-        // extracts arguments (JSON only). LLM never writes DSL syntax.
-        if let Ok(pipeline) = self.get_intent_pipeline().await {
+        // Process via IntentPipeline: user input → semantic verb search → LLM arg extraction → DSL
+        if let Ok(pipeline) = self.get_intent_pipeline() {
             let pipeline_result = pipeline.process(&request.message, None).await;
 
             match pipeline_result {
@@ -1997,10 +1836,4 @@ pub struct VerbInfo {
     pub description: String,
     pub required_args: Vec<String>,
     pub optional_args: Vec<String>,
-}
-
-impl Default for AgentService {
-    fn default() -> Self {
-        Self::new()
-    }
 }

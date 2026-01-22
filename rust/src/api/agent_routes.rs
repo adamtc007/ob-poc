@@ -827,18 +827,12 @@ pub struct AgentState {
     pub pool: PgPool,
     pub dsl_v2_executor: Arc<DslExecutor>,
     pub sessions: SessionStore,
-    /// Session manager with watch channel support for reactive updates
     pub session_manager: crate::api::session_manager::SessionManager,
     pub generation_log: Arc<GenerationLogRepository>,
     pub session_repo: Arc<crate::database::SessionRepository>,
     pub dsl_repo: Arc<crate::database::DslRepository>,
-    /// Centralized agent service for chat/disambiguation
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
-    /// Feedback service for learning loop
     pub feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
-    /// Shared embedder for lazy initialization (populated by background task)
-    pub shared_embedder:
-        Arc<tokio::sync::RwLock<Option<Arc<crate::agent::learning::embedder::CandleEmbedder>>>>,
 }
 
 impl AgentState {
@@ -846,7 +840,7 @@ impl AgentState {
         Self::with_sessions(pool, create_session_store())
     }
 
-    /// Create with a shared session store (for integration with other routers)
+    /// Create with a shared session store (no semantic search)
     pub fn with_sessions(pool: PgPool, sessions: SessionStore) -> Self {
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
@@ -856,9 +850,7 @@ impl AgentState {
             pool.clone(),
         ));
         let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
-        // Create SessionManager wrapping the same session store
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
-        let shared_embedder = Arc::new(tokio::sync::RwLock::new(None));
         Self {
             pool,
             dsl_v2_executor,
@@ -869,22 +861,15 @@ impl AgentState {
             dsl_repo,
             agent_service,
             feedback_service,
-            shared_embedder,
         }
     }
 
-    /// Create with semantic verb search support (lazy embedder initialization)
+    /// Create with semantic verb search (blocks on embedder init ~3-5s)
     ///
-    /// Strategy:
-    /// 1. Server starts immediately
-    /// 2. Background task initializes Candle embedder (~3-5s)
-    /// 3. Requests return "not ready" until embedder is available
-    ///
-    /// All user input goes through the unified intent pipeline.
-    /// Navigation phrases match to view.* and session.* verbs via semantic search.
+    /// This is the primary constructor. Initializes Candle embedder synchronously
+    /// so semantic search is available immediately when server starts accepting requests.
     pub async fn with_semantic(pool: PgPool, sessions: SessionStore) -> Self {
         use crate::agent::learning::embedder::CandleEmbedder;
-        use tokio::sync::RwLock;
 
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
@@ -893,42 +878,28 @@ impl AgentState {
         let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
 
-        // Shared embedder - populated by background task
-        let shared_embedder: Arc<RwLock<Option<Arc<CandleEmbedder>>>> = Arc::new(RwLock::new(None));
+        // Initialize embedder synchronously (blocks ~3-5s, but only at startup)
+        tracing::info!("Initializing Candle embedder...");
+        let start = std::time::Instant::now();
 
-        // Build agent service with lazy embedder
-        let agent_service = crate::api::agent_service::AgentService::with_pool(pool.clone())
-            .with_lazy_embedder(shared_embedder.clone());
-
-        // Spawn background task to initialize Candle embedder
-        let shared_embedder_for_task = shared_embedder.clone();
-        tokio::spawn(async move {
-            tracing::info!("Starting Candle embedder initialization...");
-            let start = std::time::Instant::now();
-
-            let embedder = match tokio::task::spawn_blocking(CandleEmbedder::new).await {
+        let embedder: Option<Arc<CandleEmbedder>> =
+            match tokio::task::spawn_blocking(CandleEmbedder::new).await {
                 Ok(Ok(e)) => {
-                    let init_ms = start.elapsed().as_millis();
-                    tracing::info!("Candle embedder initialized in {}ms", init_ms);
-                    Arc::new(e)
+                    tracing::info!("Candle embedder ready in {}ms", start.elapsed().as_millis());
+                    Some(Arc::new(e))
                 }
                 Ok(Err(e)) => {
                     tracing::error!("Failed to initialize Candle embedder: {}", e);
-                    return;
+                    None
                 }
                 Err(e) => {
                     tracing::error!("Candle embedder task panicked: {}", e);
-                    return;
+                    None
                 }
             };
 
-            // Store embedder - AgentService will now return ready
-            {
-                let mut guard = shared_embedder_for_task.write().await;
-                *guard = Some(embedder);
-                tracing::info!("Semantic verb search now available");
-            }
-        });
+        // Build agent service with embedder
+        let agent_service = crate::api::agent_service::AgentService::new(pool.clone(), embedder);
 
         Self {
             pool,
@@ -940,7 +911,6 @@ impl AgentState {
             dsl_repo,
             agent_service: Arc::new(agent_service),
             feedback_service,
-            shared_embedder,
         }
     }
 }

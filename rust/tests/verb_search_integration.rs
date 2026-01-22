@@ -161,8 +161,11 @@ impl VerbSearchTestHarness {
 
         let verb_service = Arc::new(VerbService::new(pool.clone()));
 
+        // Cast Arc<CandleEmbedder> to Arc<dyn Embedder> for with_embedder
+        let dyn_embedder: Arc<dyn ob_poc::agent::learning::embedder::Embedder> =
+            embedder.clone() as Arc<dyn ob_poc::agent::learning::embedder::Embedder>;
         let searcher =
-            HybridVerbSearcher::new(verb_service.clone(), None).with_embedder(embedder.clone());
+            HybridVerbSearcher::new(verb_service.clone(), None).with_embedder(dyn_embedder);
 
         Ok(Self {
             pool,
@@ -196,10 +199,12 @@ impl VerbSearchTestHarness {
         semantic_threshold: f32,
         fallback_threshold: f32,
     ) -> HybridVerbSearcher {
+        let dyn_embedder: Arc<dyn ob_poc::agent::learning::embedder::Embedder> =
+            self.embedder.clone() as Arc<dyn ob_poc::agent::learning::embedder::Embedder>;
         HybridVerbSearcher::new(self.verb_service.clone(), None)
             .with_semantic_threshold(semantic_threshold)
             .with_fallback_threshold(fallback_threshold)
-            .with_embedder(self.embedder.clone())
+            .with_embedder(dyn_embedder)
     }
 
     /// Search using a temporary searcher with custom thresholds (full pipeline)
