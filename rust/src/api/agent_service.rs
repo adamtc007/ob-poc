@@ -937,7 +937,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                             dsl_hash: None,
                         });
                     } else if result.valid {
-                        // Valid DSL with all refs resolved - execute directly
+                        // Valid DSL with all refs resolved - ready to execute
                         session.add_user_message(request.message.clone());
 
                         // Parse to AST for response - extract statements
@@ -971,7 +971,14 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                             Some(vec![intent.clone()]),
                             Some(result.dsl.clone()),
                         );
-                        session.state = SessionState::ReadyToExecute;
+
+                        // Add DSL to run_sheet so /execute can find it
+                        session.set_pending_dsl(
+                            result.dsl.clone(),
+                            ast.clone().unwrap_or_default(),
+                            None, // No pre-compiled plan
+                            false,
+                        );
 
                         return Ok(AgentChatResponse {
                             message: response_msg,
