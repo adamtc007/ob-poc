@@ -248,15 +248,26 @@ impl HybridVerbSearcher {
         self
     }
 
-    /// Set custom similarity threshold
+    /// Set custom semantic threshold (decision gate for top match)
     pub fn with_semantic_threshold(mut self, threshold: f32) -> Self {
         self.semantic_threshold = threshold;
+        self
+    }
+
+    /// Set custom fallback threshold (retrieval cutoff for DB queries)
+    pub fn with_fallback_threshold(mut self, threshold: f32) -> Self {
+        self.fallback_threshold = threshold;
         self
     }
 
     /// Get the semantic threshold (for ambiguity checks in IntentPipeline)
     pub fn semantic_threshold(&self) -> f32 {
         self.semantic_threshold
+    }
+
+    /// Get the fallback threshold (retrieval cutoff)
+    pub fn fallback_threshold(&self) -> f32 {
+        self.fallback_threshold
     }
 
     /// Search for verbs matching user intent

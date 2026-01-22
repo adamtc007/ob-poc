@@ -88,21 +88,33 @@ pub fn check_ambiguity_with_margin(
 struct VerbSearchTestHarness {
     #[allow(dead_code)]
     pool: PgPool,
-    #[allow(dead_code)]
     verb_service: Arc<VerbService>,
-    #[allow(dead_code)]
-    embedder: Arc<CandleEmbedder>,
+    embedder: Option<Arc<CandleEmbedder>>,
     searcher: HybridVerbSearcher,
 }
 
 #[cfg(feature = "database")]
 impl VerbSearchTestHarness {
     /// Create a new test harness (connects to DB, initializes embedder)
+    ///
+    /// REQUIRES: DATABASE_URL environment variable must be set.
+    /// Panics with helpful message if not set (prevents silent wrong-DB bugs).
     async fn new() -> Result<Self> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+        let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+            panic!(
+                "\n\
+                ╔══════════════════════════════════════════════════════════════╗\n\
+                ║  DATABASE_URL not set!                                       ║\n\
+                ║                                                              ║\n\
+                ║  Set DATABASE_URL to your ob-poc database:                   ║\n\
+                ║    export DATABASE_URL=\"postgresql:///data_designer\"         ║\n\
+                ║                                                              ║\n\
+                ║  Refusing to guess - wrong DB causes misleading results.     ║\n\
+                ╚══════════════════════════════════════════════════════════════╝\n"
+            )
+        });
 
-        println!("Connecting to database...");
+        println!("Connecting to database: {}...", url);
         let pool = PgPool::connect(&url).await?;
 
         println!("Initializing verb service...");
@@ -120,19 +132,57 @@ impl VerbSearchTestHarness {
         Ok(Self {
             pool,
             verb_service,
-            embedder,
+            embedder: Some(embedder),
             searcher,
         })
     }
 
-    /// Search with custom threshold (for sweep tests)
-    async fn search_with_threshold(
+    /// Search with custom decision threshold (for sweep tests)
+    ///
+    /// NOTE: This only varies the decision gate, not the retrieval cutoff.
+    /// Use `search_with_full_thresholds` for full pipeline sweeps.
+    async fn search_with_decision_threshold(
         &self,
         query: &str,
-        threshold: f32,
+        decision_threshold: f32,
     ) -> Result<(VerbSearchOutcome, Vec<VerbSearchResult>)> {
         let results = self.searcher.search(query, None, None, 5).await?;
-        let outcome = check_ambiguity_with_margin(&results, threshold, AMBIGUITY_MARGIN);
+        let outcome = check_ambiguity_with_margin(&results, decision_threshold, AMBIGUITY_MARGIN);
+        Ok((outcome, results))
+    }
+
+    /// Create a temporary searcher with custom thresholds for full pipeline sweeps
+    ///
+    /// This allows sweeping both:
+    /// - `fallback_threshold`: retrieval cutoff (what candidates are fetched from DB)
+    /// - `semantic_threshold`: decision gate (what scores are accepted)
+    fn create_searcher_with_thresholds(
+        &self,
+        semantic_threshold: f32,
+        fallback_threshold: f32,
+    ) -> HybridVerbSearcher {
+        let mut searcher = HybridVerbSearcher::new(self.verb_service.clone(), None)
+            .with_semantic_threshold(semantic_threshold)
+            .with_fallback_threshold(fallback_threshold);
+
+        if let Some(ref embedder) = self.embedder {
+            searcher = searcher.with_embedder(embedder.clone());
+        }
+
+        searcher
+    }
+
+    /// Search using a temporary searcher with custom thresholds (full pipeline)
+    async fn search_with_full_thresholds(
+        &self,
+        query: &str,
+        semantic_threshold: f32,
+        fallback_threshold: f32,
+        margin: f32,
+    ) -> Result<(VerbSearchOutcome, Vec<VerbSearchResult>)> {
+        let searcher = self.create_searcher_with_thresholds(semantic_threshold, fallback_threshold);
+        let results = searcher.search(query, None, None, 5).await?;
+        let outcome = check_ambiguity_with_margin(&results, semantic_threshold, margin);
         Ok((outcome, results))
     }
 
@@ -168,6 +218,9 @@ pub enum ExpectedOutcome {
     Ambiguous,
     /// Should not match anything above threshold
     NoMatch,
+    /// Safety-first: Either Matched(correct) or Ambiguous is acceptable
+    /// Use for dangerous verbs where forcing clarification is preferable to guessing wrong
+    MatchedOrAmbiguous,
 }
 
 #[cfg(feature = "database")]
@@ -272,6 +325,25 @@ impl TestScenario {
     pub fn with_alternatives(mut self, alts: &[&'static str]) -> Self {
         self.allowed_verbs.extend(alts.iter().copied());
         self
+    }
+
+    /// Safety-first: either correct match OR ambiguity is acceptable
+    /// Use for dangerous verbs where forcing clarification is preferable to guessing wrong
+    pub fn safety_first(
+        name: &'static str,
+        query: &'static str,
+        preferred_verb: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            query,
+            expected_outcome: ExpectedOutcome::MatchedOrAmbiguous,
+            expected_verb: Some(preferred_verb),
+            allowed_verbs: vec![preferred_verb],
+            min_score: None,
+            is_hard_negative: true,
+            category: "safety_first",
+        }
     }
 }
 
@@ -503,6 +575,15 @@ impl TestReport {
             (ExpectedOutcome::Ambiguous, VerbSearchOutcome::Ambiguous { .. }) => true,
             // Expected NoMatch, got NoMatch
             (ExpectedOutcome::NoMatch, VerbSearchOutcome::NoMatch) => true,
+
+            // Safety-first policy: MatchedOrAmbiguous
+            // Matched(correct verb) is acceptable
+            (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Matched(r)) => {
+                scenario.allowed_verbs.contains(&r.verb.as_str())
+            }
+            // Ambiguous is also acceptable (forcing clarification is safe)
+            (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Ambiguous { .. }) => true,
+
             // Any other combination is wrong
             _ => false,
         }
@@ -612,84 +693,203 @@ impl TestReport {
 }
 
 // =============================================================================
-// THRESHOLD SWEEP
+// THRESHOLD SWEEP (Full Pipeline)
 // =============================================================================
 
 #[cfg(feature = "database")]
 #[derive(Debug)]
 pub struct SweepResult {
-    pub threshold: f32,
+    /// Decision threshold (gate for accepting top match)
+    pub semantic_threshold: f32,
+    /// Retrieval threshold (cutoff for DB queries)
+    pub fallback_threshold: f32,
+    /// Margin for ambiguity detection
     pub margin: f32,
+    /// Top-1 hit rate percentage
     pub top1_hit: f64,
+    /// Ambiguity trigger rate percentage
     pub ambiguity_rate: f64,
+    /// Count of confidently wrong matches
     pub confidently_wrong: usize,
+    /// Count of NoMatch results
+    pub no_match_count: usize,
+}
+
+#[cfg(feature = "database")]
+/// Configuration for a threshold sweep
+pub struct SweepConfig {
+    /// Decision thresholds to test (gate for accepting matches)
+    pub semantic_thresholds: Vec<f32>,
+    /// Retrieval thresholds to test (cutoff for DB queries)
+    pub fallback_thresholds: Vec<f32>,
+    /// Margins for ambiguity detection
+    pub margins: Vec<f32>,
+}
+
+#[cfg(feature = "database")]
+impl Default for SweepConfig {
+    fn default() -> Self {
+        Self {
+            semantic_thresholds: vec![0.80, 0.84, 0.88, 0.90, 0.92],
+            fallback_thresholds: vec![0.70, 0.75, 0.78, 0.80],
+            margins: vec![0.03, 0.05, 0.07],
+        }
+    }
+}
+
+#[cfg(feature = "database")]
+impl SweepConfig {
+    /// Quick sweep - fewer combinations for faster iteration
+    pub fn quick() -> Self {
+        Self {
+            semantic_thresholds: vec![0.85, 0.88, 0.90],
+            fallback_thresholds: vec![0.78],
+            margins: vec![0.05],
+        }
+    }
+
+    /// Full sweep - comprehensive threshold exploration
+    pub fn full() -> Self {
+        Self {
+            semantic_thresholds: vec![0.75, 0.78, 0.80, 0.82, 0.84, 0.86, 0.88, 0.90, 0.92],
+            fallback_thresholds: vec![0.65, 0.70, 0.75, 0.78, 0.80],
+            margins: vec![0.03, 0.05, 0.07, 0.10],
+        }
+    }
 }
 
 #[cfg(feature = "database")]
 async fn run_threshold_sweep(
     harness: &VerbSearchTestHarness,
     scenarios: &[TestScenario],
-    thresholds: &[f32],
-    margins: &[f32],
+    config: &SweepConfig,
 ) -> Vec<SweepResult> {
     let mut results = Vec::new();
+    let total_combos =
+        config.semantic_thresholds.len() * config.fallback_thresholds.len() * config.margins.len();
+    let mut combo_num = 0;
 
-    for &threshold in thresholds {
-        for &margin in margins {
-            let mut top1_correct = 0;
-            let mut ambiguity_count = 0;
-            let mut confidently_wrong = 0;
-            let total = scenarios.len();
+    for &semantic_threshold in &config.semantic_thresholds {
+        for &fallback_threshold in &config.fallback_thresholds {
+            for &margin in &config.margins {
+                combo_num += 1;
+                print!(
+                    "\r  Sweep {}/{}: semantic={:.2} fallback={:.2} margin={:.2}   ",
+                    combo_num, total_combos, semantic_threshold, fallback_threshold, margin
+                );
 
-            for scenario in scenarios {
-                // Get raw candidates from search
-                if let Ok(candidates) = harness.search_raw(scenario.query, 5).await {
-                    // Apply check_ambiguity_with_margin to actually vary margin
-                    let outcome = check_ambiguity_with_margin(&candidates, threshold, margin);
+                let mut top1_correct = 0;
+                let mut ambiguity_count = 0;
+                let mut confidently_wrong = 0;
+                let mut no_match_count = 0;
+                let total = scenarios.len();
 
-                    match &outcome {
-                        VerbSearchOutcome::Matched(r) => {
-                            if scenario.allowed_verbs.contains(&r.verb.as_str()) {
-                                top1_correct += 1;
-                            } else if scenario.expected_outcome == ExpectedOutcome::Matched {
-                                confidently_wrong += 1;
+                for scenario in scenarios {
+                    // Use full pipeline search with both thresholds
+                    if let Ok((outcome, _results)) = harness
+                        .search_with_full_thresholds(
+                            scenario.query,
+                            semantic_threshold,
+                            fallback_threshold,
+                            margin,
+                        )
+                        .await
+                    {
+                        match &outcome {
+                            VerbSearchOutcome::Matched(r) => {
+                                if scenario.allowed_verbs.contains(&r.verb.as_str()) {
+                                    top1_correct += 1;
+                                } else if scenario.expected_outcome == ExpectedOutcome::Matched {
+                                    confidently_wrong += 1;
+                                }
+                            }
+                            VerbSearchOutcome::Ambiguous { .. } => {
+                                ambiguity_count += 1;
+                            }
+                            VerbSearchOutcome::NoMatch => {
+                                no_match_count += 1;
                             }
                         }
-                        VerbSearchOutcome::Ambiguous { .. } => {
-                            ambiguity_count += 1;
-                        }
-                        VerbSearchOutcome::NoMatch => {}
                     }
                 }
-            }
 
-            results.push(SweepResult {
-                threshold,
-                margin,
-                top1_hit: 100.0 * top1_correct as f64 / total as f64,
-                ambiguity_rate: 100.0 * ambiguity_count as f64 / total as f64,
-                confidently_wrong,
-            });
+                results.push(SweepResult {
+                    semantic_threshold,
+                    fallback_threshold,
+                    margin,
+                    top1_hit: 100.0 * top1_correct as f64 / total as f64,
+                    ambiguity_rate: 100.0 * ambiguity_count as f64 / total as f64,
+                    confidently_wrong,
+                    no_match_count,
+                });
+            }
         }
     }
+    println!(); // Clear the progress line
 
     results
 }
 
 #[cfg(feature = "database")]
 fn print_sweep_results(results: &[SweepResult]) {
-    println!("\nTHRESHOLD SWEEP RESULTS:");
+    println!("\nTHRESHOLD SWEEP RESULTS (Full Pipeline):");
     println!(
-        "{:>10} {:>8} {:>10} {:>12} {:>10}",
-        "threshold", "margin", "top1_hit%", "ambiguity%", "conf_wrong"
+        "{:>8} {:>8} {:>6} {:>9} {:>9} {:>8} {:>8}",
+        "sem_thr", "fall_thr", "margin", "top1_hit%", "ambig%", "wrong", "no_match"
     );
-    println!("{}", "-".repeat(52));
+    println!("{}", "-".repeat(68));
 
     for r in results {
+        let wrong_marker = if r.confidently_wrong > 0 {
+            " ⚠️"
+        } else {
+            ""
+        };
         println!(
-            "{:>10.2} {:>8.2} {:>10.1} {:>12.1} {:>10}",
-            r.threshold, r.margin, r.top1_hit, r.ambiguity_rate, r.confidently_wrong
+            "{:>8.2} {:>8.2} {:>6.2} {:>9.1} {:>9.1} {:>8}{} {:>8}",
+            r.semantic_threshold,
+            r.fallback_threshold,
+            r.margin,
+            r.top1_hit,
+            r.ambiguity_rate,
+            r.confidently_wrong,
+            wrong_marker,
+            r.no_match_count
         );
+    }
+
+    // Find best configuration (maximize top1_hit, minimize confidently_wrong)
+    let best = results
+        .iter()
+        .filter(|r| r.confidently_wrong == 0)
+        .max_by(|a, b| a.top1_hit.partial_cmp(&b.top1_hit).unwrap());
+
+    if let Some(best) = best {
+        println!(
+            "\n✓ BEST (0 wrong): semantic={:.2} fallback={:.2} margin={:.2} → {:.1}% top-1",
+            best.semantic_threshold, best.fallback_threshold, best.margin, best.top1_hit
+        );
+    } else {
+        // All configs have some wrong - find minimum wrong
+        let min_wrong = results
+            .iter()
+            .map(|r| r.confidently_wrong)
+            .min()
+            .unwrap_or(0);
+        let best = results
+            .iter()
+            .filter(|r| r.confidently_wrong == min_wrong)
+            .max_by(|a, b| a.top1_hit.partial_cmp(&b.top1_hit).unwrap());
+        if let Some(best) = best {
+            println!(
+                "\n⚠️ BEST ({} wrong): semantic={:.2} fallback={:.2} margin={:.2} → {:.1}% top-1",
+                min_wrong,
+                best.semantic_threshold,
+                best.fallback_threshold,
+                best.margin,
+                best.top1_hit
+            );
+        }
     }
 }
 
@@ -869,27 +1069,22 @@ fn view_scenarios() -> Vec<TestScenario> {
 
 #[cfg(feature = "database")]
 /// Hard negative pairs - dangerous confusions that MUST NOT happen
+///
+/// Two categories:
+/// 1. MUST match correctly (create vs update - clear semantic difference)
+/// 2. Safety-first (delete vs archive - ambiguity acceptable, wrong match dangerous)
 fn hard_negative_scenarios() -> Vec<TestScenario> {
     vec![
-        // create vs update
+        // =====================================================================
+        // MUST MATCH CORRECTLY - clear semantic difference
+        // =====================================================================
+
+        // create vs update - distinct actions
         TestScenario::matched("create not update", "create a new cbu", "cbu.create")
             .hard_negative(),
         TestScenario::matched("update not create", "update cbu details", "cbu.update")
             .hard_negative(),
-        // delete vs disable/archive
-        TestScenario::matched("delete entity", "delete this entity", "entity.delete")
-            .hard_negative()
-            .with_alternatives(&["entity.archive"]), // archive also acceptable
-        // approve vs submit
-        TestScenario::matched("approve case", "approve the kyc case", "kyc.approve-case")
-            .hard_negative(),
-        TestScenario::matched(
-            "submit case",
-            "submit the kyc case for review",
-            "kyc.submit-case",
-        )
-        .hard_negative(),
-        // load vs unload
+        // load vs unload - opposite actions
         TestScenario::matched("load cbu", "load cbu into session", "session.load-cbu")
             .hard_negative(),
         TestScenario::matched(
@@ -898,7 +1093,7 @@ fn hard_negative_scenarios() -> Vec<TestScenario> {
             "session.unload-cbu",
         )
         .hard_negative(),
-        // add vs remove
+        // add vs remove - opposite actions
         TestScenario::matched(
             "add instrument",
             "add equity instruments",
@@ -911,6 +1106,34 @@ fn hard_negative_scenarios() -> Vec<TestScenario> {
             "trading-profile.remove-instruments",
         )
         .hard_negative(),
+        // =====================================================================
+        // SAFETY-FIRST - ambiguity acceptable, wrong match dangerous
+        // For these, triggering disambiguation UI is SAFER than guessing wrong
+        // =====================================================================
+
+        // delete vs archive - both destructive-ish, wrong choice is bad
+        // If system is unsure, better to ask than delete when user meant archive
+        TestScenario::safety_first(
+            "delete entity (safety)",
+            "delete this entity",
+            "entity.delete",
+        )
+        .with_alternatives(&["entity.archive"]),
+        // approve vs submit - workflow state transitions
+        // Approving when user meant submit (or vice versa) is a workflow error
+        TestScenario::safety_first(
+            "approve case (safety)",
+            "approve the kyc case",
+            "kyc.approve-case",
+        ),
+        TestScenario::safety_first(
+            "submit case (safety)",
+            "submit the kyc case for review",
+            "kyc.submit-case",
+        ),
+        // disable vs delete - disable is reversible, delete is not
+        // If unsure, better to ask than accidentally delete
+        TestScenario::safety_first("disable cbu (safety)", "disable this cbu", "cbu.disable"),
     ]
 }
 
@@ -931,17 +1154,17 @@ fn edge_case_scenarios() -> Vec<TestScenario> {
 #[cfg(feature = "database")]
 async fn run_scenarios(harness: &VerbSearchTestHarness, scenarios: &[TestScenario]) -> TestReport {
     let mut report = TestReport::new();
-    let threshold = harness.searcher.semantic_threshold();
+    let decision_threshold = harness.searcher.semantic_threshold();
 
     for scenario in scenarios {
         let start = std::time::Instant::now();
         match harness
-            .search_with_threshold(scenario.query, threshold)
+            .search_with_decision_threshold(scenario.query, decision_threshold)
             .await
         {
             Ok((outcome, results)) => {
                 let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
-                report.record(scenario, &outcome, &results, elapsed_ms, threshold);
+                report.record(scenario, &outcome, &results, elapsed_ms, decision_threshold);
             }
             Err(e) => {
                 report.errors += 1;
@@ -1034,10 +1257,57 @@ async fn test_threshold_sweep() {
     scenarios.extend(session_scenarios());
     scenarios.extend(cbu_scenarios());
 
-    let thresholds = vec![0.75, 0.80, 0.85, 0.88, 0.90, 0.92];
-    let margins = vec![0.05]; // Keep margin constant for this sweep
+    // Use quick sweep by default (faster iteration)
+    // Change to SweepConfig::full() for comprehensive exploration
+    let config = SweepConfig::quick();
 
-    let results = run_threshold_sweep(&harness, &scenarios, &thresholds, &margins).await;
+    println!(
+        "Running threshold sweep with {} scenarios...",
+        scenarios.len()
+    );
+    println!(
+        "  Testing {} semantic × {} fallback × {} margin = {} combinations",
+        config.semantic_thresholds.len(),
+        config.fallback_thresholds.len(),
+        config.margins.len(),
+        config.semantic_thresholds.len() * config.fallback_thresholds.len() * config.margins.len()
+    );
+
+    let results = run_threshold_sweep(&harness, &scenarios, &config).await;
+    print_sweep_results(&results);
+}
+
+#[cfg(feature = "database")]
+#[tokio::test]
+#[ignore]
+async fn test_threshold_sweep_full() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    let mut scenarios = Vec::new();
+    scenarios.extend(taught_phrase_scenarios());
+    scenarios.extend(session_scenarios());
+    scenarios.extend(cbu_scenarios());
+    scenarios.extend(hard_negative_scenarios());
+
+    // Full sweep - comprehensive exploration
+    let config = SweepConfig::full();
+
+    println!(
+        "Running FULL threshold sweep with {} scenarios...",
+        scenarios.len()
+    );
+    println!(
+        "  Testing {} semantic × {} fallback × {} margin = {} combinations",
+        config.semantic_thresholds.len(),
+        config.fallback_thresholds.len(),
+        config.margins.len(),
+        config.semantic_thresholds.len() * config.fallback_thresholds.len() * config.margins.len()
+    );
+    println!("  (This may take a few minutes...)\n");
+
+    let results = run_threshold_sweep(&harness, &scenarios, &config).await;
     print_sweep_results(&results);
 }
 
@@ -1112,7 +1382,7 @@ fn test_ambiguity_detection() {
         other => panic!("Expected Matched, got {:?}", other),
     }
 
-    // Ambiguous (margin = 0.02 < AMBIGUITY_MARGIN = 0.05)
+    // Ambiguous - top two scores are within AMBIGUITY_MARGIN of each other
     let ambiguous = vec![
         VerbSearchResult {
             verb: "cbu.create".to_string(),
