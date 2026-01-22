@@ -417,13 +417,21 @@ impl IntentPipeline {
         let llm = self.get_llm()?;
 
         // Build parameter schema for LLM
+        // For uuid/entity parameters with lookup config, show as "entity name" not "Uuid"
+        // This helps the LLM understand it should extract names, not UUIDs
         let params_desc: Vec<String> = verb_def
             .args
             .iter()
             .map(|p| {
                 let req = if p.required { "REQUIRED" } else { "optional" };
                 let desc = p.description.as_deref().unwrap_or("");
-                format!("- {}: {:?} ({}) - {}", p.name, p.arg_type, req, desc)
+                // If this has lookup config, it's an entity reference - extract name not UUID
+                let type_hint = if p.lookup.is_some() {
+                    "entity name (will be resolved to UUID)".to_string()
+                } else {
+                    format!("{:?}", p.arg_type)
+                };
+                format!("- {}: {} ({}) - {}", p.name, type_hint, req, desc)
             })
             .collect();
 
@@ -436,12 +444,14 @@ VERB PARAMETERS:
 {params}
 
 RULES:
-1. Extract ONLY the values mentioned - do not invent data
-2. For entity references (people, companies, CBUs), extract the name as given
+1. Extract values mentioned in the instruction - look for names, identifiers, and references
+2. For "entity name" parameters, extract the name/identifier as a string (e.g., "Allianz", "BlackRock") - the system will resolve it to a UUID
 3. For dates, use ISO format (YYYY-MM-DD)
 4. For enums, match to closest valid value
-5. If a required parameter cannot be extracted, set value to null
+5. If a required parameter cannot be found in the instruction, set value to null
 6. Do NOT write DSL syntax - only extract values
+
+IMPORTANT: When a phrase like "show allianz universe" contains an entity name like "allianz", extract it as the entity parameter value.
 
 Respond with ONLY valid JSON:
 {{
@@ -456,6 +466,8 @@ Respond with ONLY valid JSON:
         );
 
         let response = llm.chat(&system_prompt, instruction).await?;
+
+        tracing::debug!(verb = verb, "LLM extraction complete");
 
         // Parse LLM response - handle potential markdown code blocks
         let json_str = extract_json_from_response(&response);
