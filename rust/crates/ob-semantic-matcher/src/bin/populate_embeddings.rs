@@ -233,11 +233,12 @@ async fn bulk_insert_batch(
     let query = if force {
         // Force update: overwrite existing embeddings
         // Note: string_to_array converts space-joined phonetic codes back to text[]
+        // Use DISTINCT ON to dedupe within batch (prevents "cannot affect row a second time")
         r#"
         INSERT INTO "ob-poc".verb_pattern_embeddings
             (verb_name, pattern_phrase, pattern_normalized, phonetic_codes,
              embedding, category, is_agent_bound, priority)
-        SELECT
+        SELECT DISTINCT ON (verb_name, pattern_normalized)
             u.verb_name, u.pattern_phrase, u.pattern_normalized,
             CASE WHEN u.phonetic_str = '' THEN ARRAY[]::text[]
                  ELSE string_to_array(u.phonetic_str, ' ') END,
@@ -258,11 +259,12 @@ async fn bulk_insert_batch(
         "#
     } else {
         // Normal: skip if already has embedding
+        // Use DISTINCT ON to dedupe within batch
         r#"
         INSERT INTO "ob-poc".verb_pattern_embeddings
             (verb_name, pattern_phrase, pattern_normalized, phonetic_codes,
              embedding, category, is_agent_bound, priority)
-        SELECT
+        SELECT DISTINCT ON (verb_name, pattern_normalized)
             u.verb_name, u.pattern_phrase, u.pattern_normalized,
             CASE WHEN u.phonetic_str = '' THEN ARRAY[]::text[]
                  ELSE string_to_array(u.phonetic_str, ' ') END,
