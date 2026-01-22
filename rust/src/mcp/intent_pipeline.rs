@@ -742,8 +742,8 @@ fn format_intent_value_string_only(value: &IntentArgValue) -> String {
         IntentArgValue::Reference(r) => format!("@{}", r),
         IntentArgValue::Uuid(u) => format!("\"{}\"", u),
         IntentArgValue::Unresolved { value, .. } => {
-            // Just emit as string - enrichment will convert to EntityRef
-            // with proper span-based ref_id and search_column
+            // Emit as quoted string - enrichment pass will convert to EntityRef
+            // based on verb arg's lookup config
             format!("\"{}\"", value.replace('"', "\\\""))
         }
         IntentArgValue::Missing { .. } => "nil".to_string(),

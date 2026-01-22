@@ -4761,9 +4761,16 @@ async fn resolve_by_ref_id(
 
             let fully_resolved = remaining.is_empty();
 
-            // Update session state if ready to execute
+            // Update session state and run_sheet if ready to execute
             if fully_resolved && !session.context.ast.is_empty() {
                 session.state = SessionState::ReadyToExecute;
+                // Add resolved DSL to run_sheet so /execute can find it
+                session.set_pending_dsl(
+                    updated_dsl.clone(),
+                    session.context.ast.clone(),
+                    None,
+                    false,
+                );
             }
 
             Ok(Json(ResolveByRefIdResponse {

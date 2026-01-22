@@ -919,6 +919,28 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         // Store intent in session for after disambiguation
                         session.pending_intents = vec![intent.clone()];
 
+                        // Parse and ENRICH DSL to AST - enrichment converts strings to EntityRef
+                        // based on verb arg lookup config. Without enrichment, resolve-by-ref-id
+                        // won't find any EntityRef nodes to update.
+                        let dsl_hash = if let Ok(program) =
+                            dsl_core::parser::parse_program(&result.dsl)
+                        {
+                            // Enrich to convert String literals to EntityRef where lookup config exists
+                            let registry = crate::dsl_v2::runtime_registry::runtime_registry_arc();
+                            let enriched =
+                                crate::dsl_v2::enrichment::enrich_program(program, &registry);
+                            session.context.ast = enriched.program.statements;
+                            tracing::info!(
+                                    "Stored {} statements in session.context.ast for disambiguation (enriched)",
+                                    session.context.ast.len()
+                                );
+                            // Hash the re-serialized DSL to ensure consistency
+                            Some(compute_dsl_hash(&session.context.to_dsl_source()))
+                        } else {
+                            // Fallback to pipeline DSL if parsing fails
+                            Some(compute_dsl_hash(&result.dsl))
+                        };
+
                         let disambig = DisambiguationRequest {
                             request_id: Uuid::new_v4(),
                             items: disambig_items,
@@ -948,7 +970,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                             commands: None,
                             unresolved_refs: None,
                             current_ref_index: None,
-                            dsl_hash: None,
+                            dsl_hash,
                         });
                     } else if result.valid {
                         // Valid DSL with all refs resolved - ready to execute
