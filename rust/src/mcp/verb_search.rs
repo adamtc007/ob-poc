@@ -270,6 +270,11 @@ impl HybridVerbSearcher {
         self.fallback_threshold
     }
 
+    /// Check if semantic search is available (embedder configured)
+    pub fn has_semantic_search(&self) -> bool {
+        self.embedder.is_some()
+    }
+
     /// Search for verbs matching user intent
     ///
     /// Priority order:

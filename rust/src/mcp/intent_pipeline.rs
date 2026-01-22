@@ -220,13 +220,22 @@ impl IntentPipeline {
             .await?;
 
         if candidates.is_empty() {
+            // Provide helpful message indicating if semantic search is available
+            let semantic_status = if self.verb_searcher.has_semantic_search() {
+                "" // Semantic is available, just no match
+            } else {
+                " (semantic search still initializing - try again in a moment)"
+            };
             return Ok(PipelineResult {
                 intent: StructuredIntent::empty(),
                 verb_candidates: vec![],
                 dsl: String::new(),
                 dsl_hash: None,
                 valid: false,
-                validation_error: Some(format!("No matching verbs found for: {}", instruction)),
+                validation_error: Some(format!(
+                    "No matching verbs found for: {}{}",
+                    instruction, semantic_status
+                )),
                 unresolved_refs: vec![],
                 missing_required: vec![],
                 outcome: PipelineOutcome::NoMatch,

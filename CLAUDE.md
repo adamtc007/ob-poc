@@ -5,7 +5,7 @@
 > **Verbs:** 938 verbs, 7414 intent patterns (DB-sourced)
 > **Migrations:** 44 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7414 patterns vectorized
-> **ESPER Navigation:** ✅ Complete - 48 commands, trie + semantic fallback
+> **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
@@ -870,63 +870,52 @@ Session manages which CBUs are loaded. Focus/camera is client-side.
 
 ---
 
-## ESPER Navigation System
+## Navigation (Unified Intent Pipeline)
 
-Blade Runner-inspired voice/chat navigation with trie-based instant lookup and semantic fallback.
+All user input—including navigation commands—goes through the unified `IntentPipeline`. Navigation phrases match to `view.*` and `session.*` verbs via semantic search. There is no separate ESPER path.
 
 ### Architecture
 
 ```
-User: "make it bigger"
-    │
-    ├─ Trie Lookup (O(k)) ──► HIT → Execute instantly (<1μs)
-    │       │
-    │       └─ MISS + Semantic Ready?
-    │               │
-    │               └─ embed_blocking() ~10ms
-    │                       │
-    │                       └─ SemanticIndex.search()
-    │                               │
-    │                               ├─ confidence ≥ 0.80 → Auto-execute + Learn
-    │                               ├─ 0.50-0.80 → Disambiguation UI
-    │                               └─ < 0.50 → Fall through to DSL
+User: "zoom in" / "load the allianz book" / "show ownership"
     │
     ▼
-AgentCommand::ZoomIn { factor: Some(2.0) }
+IntentPipeline.process()
+    │
+    ├─ HybridVerbSearcher.search()
+    │       │
+    │       ├─ Exact match (learned phrases)
+    │       └─ Semantic search (BGE embeddings)
+    │
+    ├─ Top match: view.drill / session.load-galaxy / control.build-graph
+    │
+    └─ LLM extracts args → DSL generated → Execute
 ```
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `rust/config/esper-commands.yaml` | 48 command definitions with aliases |
-| `rust/src/agent/esper/registry.rs` | Trie + semantic index + lookup |
-| `rust/src/agent/esper/warmup.rs` | Pre-compute embeddings at startup |
-| `rust/src/agent/esper/config.rs` | YAML schema types |
-| `rust/src/api/agent_service.rs` | `handle_esper_command()` integration |
+| `rust/src/mcp/intent_pipeline.rs` | Unified intent processing |
+| `rust/src/mcp/verb_search.rs` | `HybridVerbSearcher` - semantic + exact match |
+| `rust/src/api/agent_service.rs` | `AgentService.process_chat()` entry point |
+| `rust/config/verbs/view.yaml` | Navigation verbs (view.drill, view.surface, etc.) |
+| `rust/config/verbs/session.yaml` | Session verbs (session.load-galaxy, etc.) |
 
-### Command Categories
+### Navigation Verbs
 
-| Category | Commands | Examples |
-|----------|----------|----------|
-| **Zoom** | `zoom_in`, `zoom_out`, `zoom_fit` | "enhance", "zoom in 2x", "fit to screen" |
-| **Scale Navigation** | `scale_universe` → `scale_core` | "universe", "galaxy", "land on", "core sample" |
-| **Depth Navigation** | `drill_through`, `surface_return`, `xray`, `peel` | "drill through", "x-ray", "peel back" |
-| **Temporal** | `time_rewind`, `time_play`, `time_slice` | "rewind to 2023", "show changes" |
-| **Investigation** | `follow_the_money`, `who_controls`, `red_flag_scan` | "follow the money", "red flag scan" |
-| **Context** | `context_review`, `context_investigation` | "board review", "investigation mode" |
+| Verb | Purpose | Example Phrases |
+|------|---------|-----------------|
+| `view.universe` | Show all CBUs | "show universe", "zoom out to all" |
+| `view.cbu` | Focus single CBU | "focus on this cbu", "show cbu details" |
+| `view.drill` | Drill into entity | "drill down", "go deeper" |
+| `view.surface` | Surface back up | "go back", "zoom out" |
+| `session.load-galaxy` | Load CBUs under apex | "load the allianz book" |
+| `session.load-cbu` | Load single CBU | "load cbu acme fund" |
+| `session.clear` | Clear session | "clear", "start fresh" |
+| `session.undo` / `session.redo` | History navigation | "undo", "redo" |
 
-### Semantic Fallback (Phase 8)
-
-On trie miss, falls back to BGE embeddings (query→target retrieval):
-
-| Threshold | Action |
-|-----------|--------|
-| ≥ 0.88 | Auto-execute + persist learned alias |
-| 0.50-0.88 | Show disambiguation UI |
-| < 0.50 | No match, fall through to DSL pipeline |
-
-**Verb Search Thresholds (BGE-calibrated):**
+### Verb Search Thresholds (BGE-calibrated)
 
 | Threshold | Value | Purpose |
 |-----------|-------|---------|
@@ -934,41 +923,25 @@ On trie miss, falls back to BGE embeddings (query→target retrieval):
 | `fallback_threshold` | 0.78 | Lower bar for suggestions |
 | `blocklist_threshold` | 0.85 | Collision detection |
 
-### Adding New Phrases
+### Adding Navigation Phrases
 
-Edit `rust/config/esper-commands.yaml`:
+Add to the verb's `invocation_phrases` in YAML, then run `populate_embeddings`:
 
 ```yaml
-zoom_in:
-  canonical: "enhance"
-  response: "Enhancing..."
-  agent_command:
-    type: ZoomIn
-    params: { factor: extract }
-  aliases:
-    exact: ["enhance", "closer"]      # Must match exactly
-    contains: ["make it bigger"]      # Substring match
-    prefix: ["zoom in "]              # Prefix + extract rest
+# rust/config/verbs/view.yaml
+drill:
+  description: "Drill into entity detail"
+  invocation_phrases:
+    - "drill down"
+    - "go deeper"
+    - "zoom into"
+    - "enhance"      # Add new phrase here
 ```
 
-No Rust code changes needed for new phrases.
-
-### MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `esper_list` | List all 48 commands with aliases |
-| `esper_lookup` | Test what command a phrase maps to |
-| `esper_add_alias` | Add learned alias (persists to DB) |
-| `esper_reload` | Reload config without restart |
-
-### Trigger Phrases (for Claude)
-
-When you see these in a task, you're working on ESPER:
-- "esper", "navigation command", "voice command"
-- "enhance", "zoom", "drill", "surface", "xray"
-- "semantic fallback", "trie lookup", "learned alias"
-- "AgentCommand", "EsperCommandRegistry"
+```bash
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings
+```
 
 ---
 

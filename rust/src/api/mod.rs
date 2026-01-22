@@ -77,7 +77,7 @@ pub use entity_routes::create_entity_router;
 
 #[cfg(feature = "server")]
 pub use agent_routes::{
-    create_agent_router, create_agent_router_with_esper, create_agent_router_with_sessions,
+    create_agent_router, create_agent_router_with_semantic, create_agent_router_with_sessions,
 };
 
 #[cfg(feature = "server")]

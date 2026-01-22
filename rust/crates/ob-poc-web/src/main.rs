@@ -24,7 +24,7 @@ use crate::state::AppState;
 
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
-    control_routes, create_agent_router_with_esper, create_attribute_router,
+    control_routes, create_agent_router_with_semantic, create_attribute_router,
     create_cbu_session_router_with_pool, create_client_router, create_dsl_viewer_router,
     create_entity_router, create_graph_router, create_resolution_router,
     create_session_graph_router, create_session_store, create_taxonomy_router,
@@ -337,8 +337,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .allow_headers(Any);
 
     // Build stateless API router (from main ob-poc crate) with SHARED session store
-    // Use async ESPER-enabled router for navigation command support
-    let agent_router = create_agent_router_with_esper(pool.clone(), sessions.clone()).await;
+    // Use async semantic-enabled router for Candle-based verb search
+    let agent_router = create_agent_router_with_semantic(pool.clone(), sessions.clone()).await;
 
     let api_router: Router<()> = Router::new()
         .merge(agent_router)
@@ -374,7 +374,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
     // Build main app router with state
-    // Session routes (including /bind) share session store via create_agent_router_with_esper
+    // Session routes (including /bind) share session store via create_agent_router_with_semantic
     // Note: CBU routes (/api/cbu, /api/cbu/:id, /api/cbu/:id/graph) are provided by create_graph_router in api_router
     let app = Router::new()
         // CBU search uses local AppState implementation

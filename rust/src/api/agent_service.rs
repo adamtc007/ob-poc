@@ -101,7 +101,6 @@
 //!
 //! Both `agentic_server` and `ob-poc-web` should use this service.
 
-use crate::agent::esper::{EsperCommandRegistry, LookupResult};
 use crate::agent::learning::embedder::CandleEmbedder;
 use crate::agentic::llm_client::LlmClient;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
@@ -382,11 +381,6 @@ pub struct AgentService {
     config: AgentServiceConfig,
     /// Client scope (if operating in client portal mode)
     client_scope: Option<ClientScope>,
-    /// ESPER command registry for instant navigation (optional)
-    /// Wrapped in RwLock to allow lazy semantic index updates
-    esper_registry: Option<Arc<RwLock<EsperCommandRegistry>>>,
-    /// Embedder for semantic fallback (ESPER + verb search)
-    embedder: Option<Arc<CandleEmbedder>>,
     /// Lazy embedder for background initialization
     /// Checked when creating verb searcher if embedder is None
     lazy_embedder: Option<Arc<RwLock<Option<Arc<CandleEmbedder>>>>>,
@@ -404,8 +398,6 @@ impl AgentService {
             pool: None,
             config: AgentServiceConfig::default(),
             client_scope: None,
-            esper_registry: None,
-            embedder: None,
             lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
             verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
@@ -418,8 +410,6 @@ impl AgentService {
             pool: Some(pool),
             config: AgentServiceConfig::default(),
             client_scope: None,
-            esper_registry: None,
-            embedder: None,
             lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
             verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
@@ -432,29 +422,10 @@ impl AgentService {
             pool,
             config,
             client_scope: None,
-            esper_registry: None,
-            embedder: None,
             lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
             verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
         }
-    }
-
-    /// Set ESPER registry for instant navigation commands
-    pub fn with_esper_registry(mut self, registry: Arc<RwLock<EsperCommandRegistry>>) -> Self {
-        self.esper_registry = Some(registry);
-        self
-    }
-
-    /// Get a reference to the ESPER registry (for lazy semantic index updates)
-    pub fn esper_registry(&self) -> Option<Arc<RwLock<EsperCommandRegistry>>> {
-        self.esper_registry.clone()
-    }
-
-    /// Set embedder for ESPER semantic fallback
-    pub fn with_embedder(mut self, embedder: Arc<CandleEmbedder>) -> Self {
-        self.embedder = Some(embedder);
-        self
     }
 
     /// Set lazy embedder for background initialization
@@ -467,17 +438,44 @@ impl AgentService {
         self
     }
 
+    /// Check if the semantic pipeline is ready to accept requests
+    /// Returns false if embedder is still initializing
+    pub async fn is_ready(&self) -> bool {
+        // Must have a database pool
+        if self.pool.is_none() {
+            return false;
+        }
+
+        // Must have embedder initialized (not lazy/pending)
+        if let Some(ref lazy) = self.lazy_embedder {
+            let guard = lazy.read().await;
+            guard.is_some()
+        } else {
+            // No lazy embedder configured - can't do semantic search
+            false
+        }
+    }
+
     /// Get or create verb searcher for semantic intent matching
     async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher, String> {
+        let has_lazy = self.lazy_embedder.is_some();
+        let current_has_embedder = self
+            .verb_searcher_has_embedder
+            .load(std::sync::atomic::Ordering::Relaxed);
+
+        tracing::debug!(
+            "get_verb_searcher: has_lazy={}, current_has_embedder={}",
+            has_lazy,
+            current_has_embedder
+        );
+
         // Check if lazy embedder became available and we need to rebuild
-        let embedder_now_available = if self.lazy_embedder.is_some()
-            && !self
-                .verb_searcher_has_embedder
-                .load(std::sync::atomic::Ordering::Relaxed)
-        {
+        let embedder_now_available = if has_lazy && !current_has_embedder {
             // Check if lazy embedder has been populated
             if let Some(ref lazy) = self.lazy_embedder {
-                lazy.read().await.is_some()
+                let is_some = lazy.read().await.is_some();
+                tracing::debug!("Lazy embedder populated: {}", is_some);
+                is_some
             } else {
                 false
             }
@@ -496,8 +494,11 @@ impl AgentService {
         }
 
         if let Some(searcher) = guard.as_ref() {
+            tracing::debug!("Returning cached verb searcher");
             return Ok(searcher.clone());
         }
+
+        tracing::info!("Creating new verb searcher...");
 
         // Need pool to create searcher
         let pool = self.pool.as_ref().ok_or("No database pool available")?;
@@ -509,20 +510,25 @@ impl AgentService {
         let mut searcher = HybridVerbSearcher::new(verb_service, None);
 
         // Add embedder if available (for semantic fallback)
-        // First check direct embedder, then lazy embedder
         let mut has_embedder = false;
-        if let Some(embedder) = &self.embedder {
-            searcher = searcher.with_embedder(embedder.clone());
-            has_embedder = true;
-        } else if let Some(ref lazy) = self.lazy_embedder {
+        if let Some(ref lazy) = self.lazy_embedder {
             if let Some(embedder) = lazy.read().await.clone() {
+                tracing::info!("Adding lazy embedder to verb searcher");
                 searcher = searcher.with_embedder(embedder);
                 has_embedder = true;
+            } else {
+                tracing::warn!(
+                    "Lazy embedder not yet available - verb search will use exact match only"
+                );
             }
+        } else {
+            tracing::warn!("No embedder configured - verb search will use exact match only");
         }
 
         self.verb_searcher_has_embedder
             .store(has_embedder, std::sync::atomic::Ordering::Relaxed);
+
+        tracing::info!("Verb searcher created with embedder: {}", has_embedder);
 
         *guard = Some(searcher.clone());
         Ok(searcher)
@@ -545,8 +551,6 @@ impl AgentService {
             pool: Some(pool),
             config: AgentServiceConfig::default(),
             client_scope: Some(ClientScope::new(client_id, accessible_cbus)),
-            esper_registry: None,
-            embedder: None,
             lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
             verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
@@ -566,8 +570,6 @@ impl AgentService {
             pool: Some(pool),
             config: AgentServiceConfig::default(),
             client_scope: Some(scope),
-            esper_registry: None,
-            embedder: None,
             lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
             verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
@@ -972,18 +974,24 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         tracing::info!("CBU ID: {:?}", request.cbu_id);
         tracing::info!("Session ID: {}", session.id);
 
-        // Handle ESPER navigation commands (bypass LLM)
-        // These are instant UI commands like "enhance", "zoom in 2x", "universe"
-        // ESPER is kept as fast-path because it's UI navigation, not DSL generation
-        if let Some(response) = self.handle_esper_command(&request.message).await {
-            return Ok(response);
-        }
-
-        // Handle REPL control commands (bypass LLM)
-        // These are session control commands like "run", "execute", "undo", "clear"
-        // They don't generate DSL - they control the REPL session state
-        if let Some(response) = self.handle_repl_command(&request.message, session) {
-            return Ok(response);
+        // Check if semantic pipeline is ready
+        if !self.is_ready().await {
+            tracing::warn!("Semantic pipeline not ready - embedder still initializing");
+            return Ok(AgentChatResponse {
+                message: "System is still initializing. Please wait a moment and try again."
+                    .to_string(),
+                intents: vec![],
+                validation_results: vec![],
+                session_state: SessionState::New,
+                can_execute: false,
+                dsl_source: None,
+                ast: None,
+                disambiguation: None,
+                commands: None,
+                unresolved_refs: None,
+                current_ref_index: None,
+                dsl_hash: None,
+            });
         }
 
         // If this is a disambiguation response, handle it
@@ -1352,172 +1360,20 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         .await
     }
 
-    /// Handle ESPER navigation commands (Blade Runner-style voice/chat navigation).
-    ///
-    /// Flow:
-    /// ```text
-    /// User phrase → Trie lookup → EsperMatch → AgentChatResponse
-    ///                    ↓
-    ///              Miss? → Semantic fallback (if ready)
-    ///                    ↓
-    ///              Miss? → Return None → Falls through to DSL pipeline
-    /// ```
-    async fn handle_esper_command(&self, message: &str) -> Option<AgentChatResponse> {
-        let registry_lock = self.esper_registry.as_ref()?;
-        let registry = registry_lock.read().await;
-
-        // Try fast path first (trie lookup)
-        // Only compute embedding on trie miss + semantic index ready
-        let query_embedding = if registry.lookup(message).is_none() && registry.semantic_ready() {
-            // Slow path: compute embedding for semantic search (~5-15ms)
-            self.embedder.as_ref().and_then(|e| {
-                e.embed_blocking(message)
-                    .map_err(|err| {
-                        tracing::warn!("ESPER semantic embed failed: {}", err);
-                        err
-                    })
-                    .ok()
-            })
-        } else {
-            None
-        };
-
-        // Lookup with semantic fallback
-        match registry.lookup_with_semantic(message, query_embedding.as_deref()) {
-            LookupResult::Matched(esper_match) => {
-                // Fast path hit - trie match
-                Some(AgentChatResponse {
-                    message: esper_match.response.clone(),
-                    intents: vec![],
-                    validation_results: vec![],
-                    session_state: SessionState::New,
-                    can_execute: false,
-                    dsl_source: None,
-                    ast: None,
-                    disambiguation: None,
-                    commands: Some(vec![esper_match.command.clone()]),
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                    dsl_hash: None,
-                })
-            }
-            LookupResult::SemanticMatch {
-                esper_match,
-                semantic,
-                should_learn,
-            } => {
-                // Semantic match with high confidence - auto-execute
-                tracing::info!(
-                    "ESPER semantic match: '{}' → {} (confidence: {:.2}, learn: {})",
-                    message,
-                    semantic.command_key,
-                    semantic.confidence,
-                    should_learn
-                );
-
-                // Self-healing: persist learned alias to DB (fire-and-forget)
-                if should_learn {
-                    if let Some(pool) = &self.pool {
-                        let pool = pool.clone();
-                        let phrase = message.to_lowercase();
-                        let command_key = semantic.command_key.clone();
-                        let confidence = semantic.confidence;
-
-                        tokio::spawn(async move {
-                            if let Err(e) = persist_learned_esper_alias(
-                                &pool,
-                                &phrase,
-                                &command_key,
-                                confidence,
-                            )
-                            .await
-                            {
-                                tracing::warn!("Failed to persist ESPER learned alias: {}", e);
-                            }
-                        });
-                    }
-                }
-
-                Some(AgentChatResponse {
-                    message: esper_match.response.clone(),
-                    intents: vec![],
-                    validation_results: vec![],
-                    session_state: SessionState::New,
-                    can_execute: false,
-                    dsl_source: None,
-                    ast: None,
-                    disambiguation: None,
-                    commands: Some(vec![esper_match.command.clone()]),
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                    dsl_hash: None,
-                })
-            }
-            LookupResult::NeedsDisambiguation {
-                candidates,
-                original_phrase,
-            } => {
-                // Medium confidence - show disambiguation UI
-                tracing::info!(
-                    "ESPER needs disambiguation for '{}': {:?}",
-                    original_phrase,
-                    candidates
-                        .iter()
-                        .map(|c| format!("{} ({:.2})", c.command_key, c.confidence))
-                        .collect::<Vec<_>>()
-                );
-
-                let options: Vec<String> = candidates
-                    .iter()
-                    .map(|c| format!("{} (matched: '{}')", c.command_key, c.matched_alias))
-                    .collect();
-
-                Some(AgentChatResponse {
-                    message: format!(
-                        "I'm not sure what you mean by '{}'. Did you mean one of these?\n{}",
-                        original_phrase,
-                        options.join("\n")
-                    ),
-                    intents: vec![],
-                    validation_results: vec![],
-                    session_state: SessionState::New,
-                    can_execute: false,
-                    dsl_source: None,
-                    ast: None,
-                    disambiguation: None,
-                    commands: None,
-                    unresolved_refs: None,
-                    current_ref_index: None,
-                    dsl_hash: None,
-                })
-            }
-            LookupResult::NoMatch => None,
-        }
-    }
-
     // =============================================================================
     // UNIFIED DSL PIPELINE - One Path, Same Path
     // =============================================================================
-    // The following special-case handlers were removed because ALL DSL-generating
-    // user input now goes through LLM intent extraction:
+    // ALL user input goes through the semantic intent pipeline (Candle embeddings).
+    // Navigation phrases ("enhance", "zoom in", "drill") are matched to view.* and
+    // session.* verbs just like any other DSL verb.
     //
-    // - handle_filter_command: "highlight shells", "clear filter" etc.
-    // - parse_view_mode: view mode parsing
-    // - parse_entity_types: entity type parsing for filters
-    // - handle_show_command: "show cbu Allianz" etc.
-    // - try_direct_dsl: direct DSL input parsing
-    //
-    // The LLM handles all these cases. Whether the user types:
+    // The LLM handles all cases. Whether the user types:
     // - "add custody to Allianz" (natural language)
-    // - "(product add custody)" (malformed DSL)
-    // - "(cbu.add-product :product CUSTODY)" (valid DSL)
+    // - "zoom in on that" (navigation)
+    // - "(cbu.add-product :product CUSTODY)" (direct DSL)
     //
     // The result is always: valid DSL ready for execution.
     // One path. Same path. Quality design.
-    //
-    // EXCEPTIONS (bypass LLM because they're not DSL-generating):
-    // - ESPER commands: UI navigation (zoom, pan, drill) → handle_esper_command()
-    // - REPL commands: session control (run, undo, clear) → handle_repl_command()
     // =============================================================================
 
     /// Handle REPL control commands (run, execute, undo, clear, etc.)
@@ -2147,46 +2003,4 @@ impl Default for AgentService {
     fn default() -> Self {
         Self::new()
     }
-}
-
-// ============================================================================
-// ESPER Learning Persistence
-// ============================================================================
-
-/// Persist a learned ESPER alias to the database (fire-and-forget)
-///
-/// Uses upsert to increment occurrence_count if alias already exists.
-/// Auto-approves aliases with confidence >= 0.80.
-async fn persist_learned_esper_alias(
-    pool: &PgPool,
-    phrase: &str,
-    command_key: &str,
-    confidence: f32,
-) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        r#"
-        INSERT INTO agent.esper_aliases (phrase, command_key, occurrence_count, confidence, auto_approved, source)
-        VALUES ($1, $2, 1, $3, $4, 'semantic_match')
-        ON CONFLICT (phrase, command_key) DO UPDATE SET
-            occurrence_count = agent.esper_aliases.occurrence_count + 1,
-            confidence = GREATEST(agent.esper_aliases.confidence, $3),
-            auto_approved = agent.esper_aliases.auto_approved OR $4,
-            updated_at = NOW()
-        "#,
-        phrase,
-        command_key,
-        confidence as f64,
-        confidence >= 0.80
-    )
-    .execute(pool)
-    .await?;
-
-    tracing::debug!(
-        "Persisted ESPER learned alias: '{}' → {} (confidence: {:.2})",
-        phrase,
-        command_key,
-        confidence
-    );
-
-    Ok(())
 }

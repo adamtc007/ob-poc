@@ -29,6 +29,10 @@ const QUERY_PREFIX: &str = "Represent this sentence for searching relevant passa
 /// Model repository on HuggingFace Hub
 const MODEL_REPO: &str = "BAAI/bge-small-en-v1.5";
 
+/// Pinned revision for reproducible builds (avoids re-downloads on model updates)
+/// This is the main branch commit as of 2024-01 - stable production version
+const MODEL_REVISION: &str = "main";
+
 /// Embedding dimension (same as MiniLM - no pgvector schema changes needed)
 pub const EMBEDDING_DIM: usize = 384;
 
@@ -54,13 +58,28 @@ impl Embedder {
 
     /// Create an embedder with a specific model name
     pub fn with_model(model_name: &str) -> Result<Self> {
-        info!("Loading embedding model: {}", model_name);
+        Self::with_model_and_revision(model_name, MODEL_REVISION)
+    }
+
+    /// Create an embedder with a specific model name and revision
+    ///
+    /// Pinning the revision avoids surprise re-downloads when HF updates the model.
+    pub fn with_model_and_revision(model_name: &str, revision: &str) -> Result<Self> {
+        info!(
+            "Loading embedding model: {} (revision: {})",
+            model_name, revision
+        );
+        let start = std::time::Instant::now();
 
         let device = Device::Cpu; // Use CPU for portability; GPU can be added later
 
-        // Download model files from HuggingFace Hub
+        // Download model files from HuggingFace Hub with pinned revision
         let api = Api::new().context("Failed to create HuggingFace API client")?;
-        let repo = api.repo(Repo::new(model_name.to_string(), RepoType::Model));
+        let repo = api.repo(Repo::with_revision(
+            model_name.to_string(),
+            RepoType::Model,
+            revision.to_string(),
+        ));
 
         let config_path = repo
             .get("config.json")
@@ -72,7 +91,10 @@ impl Embedder {
             .get("model.safetensors")
             .context("Failed to download model.safetensors")?;
 
-        debug!("Model files downloaded to cache");
+        debug!(
+            "Model files resolved from cache in {}ms",
+            start.elapsed().as_millis()
+        );
 
         // Load config
         let config: Config = serde_json::from_str(
@@ -88,7 +110,7 @@ impl Embedder {
 
         debug!("Tokenizer loaded");
 
-        // Load model weights
+        // Load model weights (mmap for fast loading)
         let vb = unsafe {
             VarBuilder::from_mmaped_safetensors(&[weights_path], DTYPE, &device)
                 .context("Failed to load model weights")?
@@ -96,13 +118,30 @@ impl Embedder {
 
         let model = BertModel::load(vb, &config).context("Failed to build BERT model")?;
 
-        info!("Embedding model loaded successfully (BGE-small-en-v1.5)");
+        let load_ms = start.elapsed().as_millis();
+        info!("Model loaded in {}ms, running warmup...", load_ms);
 
-        Ok(Self {
+        let embedder = Self {
             model,
             tokenizer,
             device,
-        })
+        };
+
+        // Warmup: single forward pass to trigger any lazy initialization
+        // (page faults for mmap, CPU cache warming, etc.)
+        let warmup_start = std::time::Instant::now();
+        let _ = embedder.forward("warmup sentence for initialization")?;
+        debug!(
+            "Warmup completed in {}ms",
+            warmup_start.elapsed().as_millis()
+        );
+
+        info!(
+            "Embedding model ready (BGE-small-en-v1.5) - total init: {}ms",
+            start.elapsed().as_millis()
+        );
+
+        Ok(embedder)
     }
 
     /// Internal: run forward pass and extract CLS embedding

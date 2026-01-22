@@ -34,6 +34,8 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 #[cfg(feature = "database")]
 use std::sync::Arc;
+#[cfg(feature = "database")]
+use tokio::sync::OnceCell;
 
 #[cfg(feature = "database")]
 use ob_poc::agent::learning::embedder::CandleEmbedder;
@@ -41,6 +43,57 @@ use ob_poc::agent::learning::embedder::CandleEmbedder;
 use ob_poc::database::VerbService;
 #[cfg(feature = "database")]
 use ob_poc::mcp::verb_search::HybridVerbSearcher;
+
+// =============================================================================
+// SINGLETON RESOURCES (initialized once per test binary)
+// =============================================================================
+
+#[cfg(feature = "database")]
+static SHARED_POOL: OnceCell<PgPool> = OnceCell::const_new();
+
+#[cfg(feature = "database")]
+static SHARED_EMBEDDER: OnceCell<Arc<CandleEmbedder>> = OnceCell::const_new();
+
+#[cfg(feature = "database")]
+async fn get_shared_pool() -> &'static PgPool {
+    SHARED_POOL
+        .get_or_init(|| async {
+            let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+                panic!(
+                    "\n\
+                    ╔══════════════════════════════════════════════════════════════╗\n\
+                    ║  DATABASE_URL not set!                                       ║\n\
+                    ║                                                              ║\n\
+                    ║  Set DATABASE_URL to your ob-poc database:                   ║\n\
+                    ║    export DATABASE_URL=\"postgresql:///data_designer\"         ║\n\
+                    ╚══════════════════════════════════════════════════════════════╝\n"
+                )
+            });
+            println!("Initializing shared database pool...");
+            PgPool::connect(&url)
+                .await
+                .expect("Failed to connect to database")
+        })
+        .await
+}
+
+#[cfg(feature = "database")]
+async fn get_shared_embedder() -> &'static Arc<CandleEmbedder> {
+    SHARED_EMBEDDER
+        .get_or_init(|| async {
+            println!("Initializing shared Candle embedder (one-time, ~3-5s)...");
+            let start = std::time::Instant::now();
+            // spawn_blocking to avoid blocking the async runtime during model load
+            let embedder = tokio::task::spawn_blocking(|| {
+                CandleEmbedder::new().expect("Failed to load Candle embedder")
+            })
+            .await
+            .expect("Embedder task panicked");
+            println!("Embedder ready in {}ms", start.elapsed().as_millis());
+            Arc::new(embedder)
+        })
+        .await
+}
 
 // =============================================================================
 // AMBIGUITY HELPERS (no DB required)
@@ -87,52 +140,34 @@ pub fn check_ambiguity_with_margin(
 #[cfg(feature = "database")]
 struct VerbSearchTestHarness {
     #[allow(dead_code)]
-    pool: PgPool,
+    pool: &'static PgPool,
     verb_service: Arc<VerbService>,
-    embedder: Option<Arc<CandleEmbedder>>,
+    embedder: &'static Arc<CandleEmbedder>,
     searcher: HybridVerbSearcher,
 }
 
 #[cfg(feature = "database")]
 impl VerbSearchTestHarness {
-    /// Create a new test harness (connects to DB, initializes embedder)
+    /// Create a new test harness using shared singleton resources
+    ///
+    /// Uses OnceCell singletons for pool and embedder - initialized once per test binary.
+    /// First test pays the ~3-5s initialization cost, subsequent tests are instant.
     ///
     /// REQUIRES: DATABASE_URL environment variable must be set.
-    /// Panics with helpful message if not set (prevents silent wrong-DB bugs).
     async fn new() -> Result<Self> {
-        let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-            panic!(
-                "\n\
-                ╔══════════════════════════════════════════════════════════════╗\n\
-                ║  DATABASE_URL not set!                                       ║\n\
-                ║                                                              ║\n\
-                ║  Set DATABASE_URL to your ob-poc database:                   ║\n\
-                ║    export DATABASE_URL=\"postgresql:///data_designer\"         ║\n\
-                ║                                                              ║\n\
-                ║  Refusing to guess - wrong DB causes misleading results.     ║\n\
-                ╚══════════════════════════════════════════════════════════════╝\n"
-            )
-        });
+        // Get shared resources (initialized once, reused across tests)
+        let pool = get_shared_pool().await;
+        let embedder = get_shared_embedder().await;
 
-        println!("Connecting to database: {}...", url);
-        let pool = PgPool::connect(&url).await?;
-
-        println!("Initializing verb service...");
         let verb_service = Arc::new(VerbService::new(pool.clone()));
 
-        println!("Loading Candle embedder (BGE-small-en-v1.5)...");
-        let embedder = Arc::new(CandleEmbedder::new()?);
-
-        println!("Creating searcher...");
         let searcher =
             HybridVerbSearcher::new(verb_service.clone(), None).with_embedder(embedder.clone());
-
-        println!("Test harness ready.\n");
 
         Ok(Self {
             pool,
             verb_service,
-            embedder: Some(embedder),
+            embedder,
             searcher,
         })
     }
@@ -161,15 +196,10 @@ impl VerbSearchTestHarness {
         semantic_threshold: f32,
         fallback_threshold: f32,
     ) -> HybridVerbSearcher {
-        let mut searcher = HybridVerbSearcher::new(self.verb_service.clone(), None)
+        HybridVerbSearcher::new(self.verb_service.clone(), None)
             .with_semantic_threshold(semantic_threshold)
-            .with_fallback_threshold(fallback_threshold);
-
-        if let Some(ref embedder) = self.embedder {
-            searcher = searcher.with_embedder(embedder.clone());
-        }
-
-        searcher
+            .with_fallback_threshold(fallback_threshold)
+            .with_embedder(self.embedder.clone())
     }
 
     /// Search using a temporary searcher with custom thresholds (full pipeline)

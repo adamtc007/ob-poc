@@ -873,19 +873,16 @@ impl AgentState {
         }
     }
 
-    /// Create with ESPER navigation support (fast startup + lazy semantic loading)
+    /// Create with semantic verb search support (lazy embedder initialization)
     ///
     /// Strategy:
-    /// 1. Server starts immediately with trie-only ESPER (~10ms)
+    /// 1. Server starts immediately
     /// 2. Background task initializes Candle embedder (~3-5s)
-    /// 3. Once ready, semantic index is built and injected into registry
-    /// 4. Semantic fallback becomes available without restart
-    /// 5. AgentService gets lazy embedder for verb search semantic matching
+    /// 3. Requests return "not ready" until embedder is available
     ///
-    /// Trie lookups handle exact/prefix/contains matches which cover 95%+ of use cases.
-    /// Semantic fallback handles novel phrases that don't match any pattern.
-    pub async fn with_esper(pool: PgPool, sessions: SessionStore) -> Self {
-        use crate::agent::esper::EsperWarmup;
+    /// All user input goes through the unified intent pipeline.
+    /// Navigation phrases match to view.* and session.* verbs via semantic search.
+    pub async fn with_semantic(pool: PgPool, sessions: SessionStore) -> Self {
         use crate::agent::learning::embedder::CandleEmbedder;
         use tokio::sync::RwLock;
 
@@ -896,155 +893,42 @@ impl AgentState {
         let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
 
-        // Shared embedder - populated by background task, used by AgentService for verb search
+        // Shared embedder - populated by background task
         let shared_embedder: Arc<RwLock<Option<Arc<CandleEmbedder>>>> = Arc::new(RwLock::new(None));
 
-        // Phase 1: Build ESPER registry with trie only (fast - ~10ms)
-        let esper_registry: Option<Arc<RwLock<crate::agent::esper::EsperCommandRegistry>>> = {
-            let warmup = EsperWarmup::from_pool(Some(pool.clone()));
-
-            match warmup.warmup_without_semantic().await {
-                Ok((registry, stats)) => {
-                    tracing::info!(
-                        "ESPER registry loaded (trie only): {} commands, {} learned aliases",
-                        stats.command_count,
-                        stats.learned_count
-                    );
-                    Some(Arc::new(RwLock::new(registry)))
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load ESPER registry: {}", e);
-                    tracing::warn!("ESPER navigation commands will be disabled");
-                    None
-                }
-            }
-        };
-
-        // Build agent service with ESPER support AND lazy embedder for verb search
-        let mut agent_service = crate::api::agent_service::AgentService::with_pool(pool.clone())
+        // Build agent service with lazy embedder
+        let agent_service = crate::api::agent_service::AgentService::with_pool(pool.clone())
             .with_lazy_embedder(shared_embedder.clone());
-        if let Some(ref reg) = esper_registry {
-            agent_service = agent_service.with_esper_registry(reg.clone());
-        }
 
-        // Phase 2: Spawn background task to initialize Candle and build semantic index
-        // This runs after server is ready to accept requests
-        // Clone shared_embedder for the background task
+        // Spawn background task to initialize Candle embedder
         let shared_embedder_for_task = shared_embedder.clone();
-        if let Some(registry) = esper_registry.clone() {
-            tokio::spawn(async move {
-                tracing::info!("Starting lazy Candle embedder initialization...");
-                let start = std::time::Instant::now();
+        tokio::spawn(async move {
+            tracing::info!("Starting Candle embedder initialization...");
+            let start = std::time::Instant::now();
 
-                // Initialize Candle embedder (blocking - runs in spawn_blocking internally)
-                let embedder = match tokio::task::spawn_blocking(CandleEmbedder::new).await {
-                    Ok(Ok(e)) => {
-                        let init_ms = start.elapsed().as_millis();
-                        tracing::info!("Candle embedder initialized in {}ms", init_ms);
-                        Arc::new(e)
-                    }
-                    Ok(Err(e)) => {
-                        tracing::warn!("Failed to initialize Candle embedder: {}", e);
-                        tracing::warn!("ESPER semantic fallback will be disabled");
-                        return;
-                    }
-                    Err(e) => {
-                        tracing::warn!("Candle embedder task panicked: {}", e);
-                        return;
-                    }
-                };
-
-                // Store embedder in shared state for AgentService to use
-                {
-                    let mut guard = shared_embedder_for_task.write().await;
-                    *guard = Some(embedder.clone());
-                    tracing::info!("Shared embedder now available for verb search");
+            let embedder = match tokio::task::spawn_blocking(CandleEmbedder::new).await {
+                Ok(Ok(e)) => {
+                    let init_ms = start.elapsed().as_millis();
+                    tracing::info!("Candle embedder initialized in {}ms", init_ms);
+                    Arc::new(e)
                 }
-
-                // Build semantic index from registry aliases
-                let embed_start = std::time::Instant::now();
-                tracing::info!("Building ESPER semantic index...");
-                let aliases = {
-                    let reg = registry.read().await;
-                    reg.all_aliases()
-                };
-                tracing::info!("Found {} ESPER aliases to embed", aliases.len());
-
-                if aliases.is_empty() {
-                    tracing::info!("No ESPER aliases to embed, semantic fallback ready (empty)");
+                Ok(Err(e)) => {
+                    tracing::error!("Failed to initialize Candle embedder: {}", e);
                     return;
                 }
-
-                // Batch embed all aliases using TARGET mode (they're search targets, not queries)
-                use crate::agent::learning::embedder::Embedder;
-                let texts: Vec<&str> = aliases.iter().map(|(text, _)| text.as_str()).collect();
-                tracing::info!("Starting batch embedding of {} texts...", texts.len());
-                let embeddings = match embedder.embed_batch_targets(&texts).await {
-                    Ok(e) => e,
-                    Err(e) => {
-                        tracing::warn!("Failed to embed ESPER aliases: {}", e);
-                        return;
-                    }
-                };
-
-                // Build semantic index
-                let mut index = crate::agent::esper::SemanticIndex::new();
-                for ((alias, command_key), embedding) in aliases.into_iter().zip(embeddings) {
-                    index.add_alias(alias, command_key, embedding);
+                Err(e) => {
+                    tracing::error!("Candle embedder task panicked: {}", e);
+                    return;
                 }
-                index.mark_ready();
+            };
 
-                let embed_ms = embed_start.elapsed().as_millis();
-                let total_ms = start.elapsed().as_millis();
-
-                // Inject into registry
-                {
-                    let mut reg = registry.write().await;
-                    let count = index.len();
-                    reg.set_semantic_index(index);
-                    tracing::info!(
-                        "ESPER semantic index ready: {} embeddings in {}ms (total: {}ms)",
-                        count,
-                        embed_ms,
-                        total_ms
-                    );
-                }
-            });
-        } else {
-            // No ESPER registry, but still spawn background task to initialize embedder
-            // for verb search semantic matching
-            tokio::spawn(async move {
-                tracing::info!("Starting lazy Candle embedder initialization (for verb search)...");
-                let start = std::time::Instant::now();
-
-                let embedder = match tokio::task::spawn_blocking(CandleEmbedder::new).await {
-                    Ok(Ok(e)) => {
-                        let init_ms = start.elapsed().as_millis();
-                        tracing::info!("Candle embedder initialized in {}ms", init_ms);
-                        Arc::new(e)
-                    }
-                    Ok(Err(e)) => {
-                        tracing::warn!("Failed to initialize Candle embedder: {}", e);
-                        tracing::warn!("Verb search semantic fallback will be disabled");
-                        return;
-                    }
-                    Err(e) => {
-                        tracing::warn!("Candle embedder task panicked: {}", e);
-                        return;
-                    }
-                };
-
-                // Store embedder in shared state for AgentService to use
-                {
-                    let mut guard = shared_embedder_for_task.write().await;
-                    *guard = Some(embedder);
-                    tracing::info!(
-                        "Shared embedder now available for verb search (total: {}ms)",
-                        start.elapsed().as_millis()
-                    );
-                }
-            });
-        }
+            // Store embedder - AgentService will now return ready
+            {
+                let mut guard = shared_embedder_for_task.write().await;
+                *guard = Some(embedder);
+                tracing::info!("Semantic verb search now available");
+            }
+        });
 
         Self {
             pool,
@@ -1075,12 +959,12 @@ pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -
     create_agent_router_with_state(state)
 }
 
-/// Create agent router with ESPER navigation support (async)
+/// Create agent router with semantic verb search (async)
 ///
-/// This is the preferred way to create the agent router - it initializes
-/// the Candle embedder and ESPER registry for semantic navigation fallback.
-pub async fn create_agent_router_with_esper(pool: PgPool, sessions: SessionStore) -> Router {
-    let state = AgentState::with_esper(pool, sessions).await;
+/// This is the recommended constructor - initializes Candle embedder in background
+/// for semantic verb matching. Server starts immediately, embedder ready in ~3-5s.
+pub async fn create_agent_router_with_semantic(pool: PgPool, sessions: SessionStore) -> Router {
+    let state = AgentState::with_semantic(pool, sessions).await;
     create_agent_router_with_state(state)
 }
 
