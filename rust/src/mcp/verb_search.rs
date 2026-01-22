@@ -19,11 +19,22 @@
 //!                                                       ↓
 //!   v_verb_intent_patterns (UNION of both) → populate_embeddings binary
 //!                                                       ↓
-//!   verb_pattern_embeddings (Candle 384-dim vectors)
+//!   verb_pattern_embeddings (BGE-small-en-v1.5 384-dim vectors)
 //!                                                       ↓
 //!   HybridVerbSearcher.search_global_semantic() ← PRIMARY SEMANTIC LOOKUP
 //!
 //! All DB access goes through VerbService (no direct sqlx calls).
+//!
+//! ## Threshold Calibration (BGE vs MiniLM)
+//!
+//! BGE scores are higher than MiniLM for the same match quality:
+//! - MiniLM: scores distributed across [0.3, 1.0]
+//! - BGE: scores cluster in [0.6, 1.0] (even unrelated sentences score ~0.6)
+//!
+//! Thresholds were recalibrated for BGE:
+//! - semantic_threshold: 0.80 → 0.88 (+0.08)
+//! - fallback_threshold: 0.65 → 0.78 (+0.13)
+//! - blocklist_threshold: 0.75 → 0.85 (+0.10)
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -186,14 +197,18 @@ impl Clone for HybridVerbSearcher {
 
 impl HybridVerbSearcher {
     /// Create searcher with full capabilities including pgvector semantic search
+    ///
+    /// Thresholds calibrated for BGE-small-en-v1.5 (retrieval-optimized model).
+    /// BGE scores cluster higher than MiniLM - adjust if switching models.
     pub fn new(verb_service: Arc<VerbService>, learned_data: Option<SharedLearnedData>) -> Self {
         Self {
             verb_service: Some(verb_service),
             learned_data,
             embedder: None, // Embedder added separately via with_embedder
-            semantic_threshold: 0.80,
-            fallback_threshold: 0.65,
-            blocklist_threshold: 0.75,
+            // BGE-calibrated thresholds (higher than MiniLM)
+            semantic_threshold: 0.88,  // Was 0.80 for MiniLM
+            fallback_threshold: 0.78,  // Was 0.65 for MiniLM
+            blocklist_threshold: 0.85, // Was 0.75 for MiniLM
         }
     }
 
@@ -203,9 +218,10 @@ impl HybridVerbSearcher {
             verb_service: None,
             learned_data: Some(learned_data),
             embedder: None,
-            semantic_threshold: 0.80,
-            fallback_threshold: 0.65,
-            blocklist_threshold: 0.75,
+            // BGE-calibrated thresholds
+            semantic_threshold: 0.88,
+            fallback_threshold: 0.78,
+            blocklist_threshold: 0.85,
         }
     }
 
@@ -215,9 +231,10 @@ impl HybridVerbSearcher {
             verb_service: None,
             learned_data: None,
             embedder: None,
-            semantic_threshold: 0.80,
-            fallback_threshold: 0.65,
-            blocklist_threshold: 0.75,
+            // BGE-calibrated thresholds
+            semantic_threshold: 0.88,
+            fallback_threshold: 0.78,
+            blocklist_threshold: 0.85,
         }
     }
 
@@ -263,8 +280,9 @@ impl HybridVerbSearcher {
         // Compute embedding ONCE at the start (used for all semantic lookups)
         // This avoids computing the same embedding 4 times (user semantic, learned semantic,
         // global semantic, blocklist) - saves ~15-30ms per search
+        // Use embed_query for user input (applies BGE instruction prefix)
         let query_embedding: Option<Vec<f32>> = if self.has_semantic_capability() {
-            match self.embedder.as_ref().unwrap().embed(query).await {
+            match self.embedder.as_ref().unwrap().embed_query(query).await {
                 Ok(emb) => Some(emb),
                 Err(e) => {
                     tracing::warn!(error = %e, "Failed to compute query embedding, falling back to exact matches only");

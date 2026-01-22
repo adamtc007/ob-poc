@@ -68,10 +68,10 @@ impl SemanticMatcher {
             return Err(MatcherError::NoMatch);
         }
 
-        // Get embedding for semantic search
+        // Get embedding for semantic search (query mode - user input searching patterns)
         let embedding = self
             .embedder
-            .embed(&normalized)
+            .embed_query(&normalized)
             .map_err(|e| MatcherError::Embedding(e.to_string()))?;
 
         // Get more candidates than needed to filter for alternatives
@@ -125,10 +125,10 @@ impl SemanticMatcher {
             return Ok(exact);
         }
 
-        // 3. Semantic similarity search
+        // 3. Semantic similarity search (query mode - user input searching patterns)
         let embedding = self
             .embedder
-            .embed(&normalized)
+            .embed_query(&normalized)
             .map_err(|e| MatcherError::Embedding(e.to_string()))?;
 
         let semantic_matches = self

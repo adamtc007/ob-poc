@@ -975,11 +975,11 @@ impl AgentState {
                     return;
                 }
 
-                // Batch embed all aliases using async method (avoids blocking_lock panic)
+                // Batch embed all aliases using TARGET mode (they're search targets, not queries)
                 use crate::agent::learning::embedder::Embedder;
                 let texts: Vec<&str> = aliases.iter().map(|(text, _)| text.as_str()).collect();
                 tracing::info!("Starting batch embedding of {} texts...", texts.len());
-                let embeddings = match embedder.embed_batch(&texts).await {
+                let embeddings = match embedder.embed_batch_targets(&texts).await {
                     Ok(e) => e,
                     Err(e) => {
                         tracing::warn!("Failed to embed ESPER aliases: {}", e);

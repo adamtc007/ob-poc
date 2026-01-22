@@ -245,8 +245,8 @@ impl EsperWarmup {
         // Extract just the alias texts for batch embedding
         let texts: Vec<&str> = aliases.iter().map(|(text, _)| text.as_str()).collect();
 
-        // Batch embed all aliases
-        let embeddings = embedder.embed_batch(&texts).await?;
+        // Batch embed all aliases (target mode - these are search targets)
+        let embeddings = embedder.embed_batch_targets(&texts).await?;
 
         // Build the index
         let mut index = SemanticIndex::new();

@@ -275,8 +275,8 @@ impl PromotionService {
         candidate: &PromotableCandidate,
         embedder: &Embedder,
     ) -> Result<CollisionResult> {
-        // Embed the candidate phrase
-        let embedding = embedder.embed(&candidate.phrase)?;
+        // Embed the candidate phrase (query mode - searching against stored patterns)
+        let embedding = embedder.embed_query(&candidate.phrase)?;
         let embedding_vec = pgvector::Vector::from(embedding);
 
         // Check if it matches another verb too closely

@@ -97,11 +97,15 @@ async fn main() -> Result<()> {
         info!("Bootstrapped patterns for {} verbs", bootstrapped.0);
     }
 
-    // Load embedding model
-    info!("Loading embedding model (this may download ~22MB on first run)...");
+    // Load embedding model (BGE-small-en-v1.5)
+    info!("Loading embedding model (this may download ~130MB on first run)...");
     let embedder = Embedder::new().context("Failed to load embedder")?;
     let phonetic = PhoneticMatcher::new();
-    info!("Model loaded successfully");
+    info!(
+        "Model loaded successfully: {} ({}-dim)",
+        embedder.model_name(),
+        embedder.embedding_dim()
+    );
 
     // DELTA LOAD: Only fetch patterns without embeddings (unless --force)
     // This is the key optimization - we skip patterns that already have embeddings
@@ -148,10 +152,11 @@ async fn main() -> Result<()> {
     let mut total_inserted = 0usize;
 
     for (batch_idx, chunk) in patterns.chunks(BATCH_SIZE).enumerate() {
-        // Embed this batch
+        // Embed this batch using TARGET mode (no instruction prefix)
+        // Verb patterns are targets, not queries
         let phrases: Vec<&str> = chunk.iter().map(|p| p.pattern.as_str()).collect();
         let embeddings = embedder
-            .embed_batch(&phrases)
+            .embed_batch_targets(&phrases)
             .context("Failed to embed batch")?;
 
         // Process into structs with phonetic codes

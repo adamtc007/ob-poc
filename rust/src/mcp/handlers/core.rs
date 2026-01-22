@@ -1554,9 +1554,9 @@ impl ToolHandlers {
 
         let pool = self.require_pool()?;
 
-        // Generate embedding if embedder available
+        // Generate embedding if embedder available (target mode - storing in DB)
         let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-            embedder.embed(phrase).await.ok()
+            embedder.embed_target(phrase).await.ok()
         } else {
             None
         };
@@ -1667,14 +1667,14 @@ impl ToolHandlers {
         let mut imported = 0;
         let mut errors = Vec::new();
 
-        // Batch embed if embedder available
+        // Batch embed if embedder available (target mode - storing in DB)
         let embeddings: Vec<Option<Vec<f32>>> = if let Some(embedder) = &self.embedder {
             let texts: Vec<&str> = import_data
                 .phrases
                 .iter()
                 .map(|p| p.phrase.as_str())
                 .collect();
-            match embedder.embed_batch(&texts).await {
+            match embedder.embed_batch_targets(&texts).await {
                 Ok(embs) => embs.into_iter().map(Some).collect(),
                 Err(_) => vec![None; import_data.phrases.len()],
             }
@@ -1838,9 +1838,9 @@ impl ToolHandlers {
 
         let mut applied = false;
         if apply_immediately {
-            // Generate embedding if available
+            // Generate embedding if available (target mode - storing in DB)
             let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-                embedder.embed(&candidate.input_pattern).await.ok()
+                embedder.embed_target(&candidate.input_pattern).await.ok()
             } else {
                 None
             };
@@ -1932,10 +1932,10 @@ impl ToolHandlers {
         .execute(pool)
         .await?;
 
-        // Optionally add to blocklist
+        // Optionally add to blocklist (target mode - storing in DB)
         let blocked = if add_to_blocklist && candidate.learning_type.contains("phrase") {
             let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-                embedder.embed(&candidate.input_pattern).await.ok()
+                embedder.embed_target(&candidate.input_pattern).await.ok()
             } else {
                 None
             };
