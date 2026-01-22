@@ -15,26 +15,76 @@
 //! Quick smoke test (no DB required):
 //!   cargo test --test verb_search_integration test_ambiguity_detection
 
-#![cfg(feature = "database")]
+// NOTE: We do NOT use #![cfg(feature = "database")] at file level
+// so that unit tests (test_ambiguity_detection, test_normalize_candidates)
+// can run without the database feature enabled.
 
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use ob_poc::agent::learning::embedder::CandleEmbedder;
-use ob_poc::database::VerbService;
 use ob_poc::mcp::verb_search::{
-    check_ambiguity, normalize_candidates, HybridVerbSearcher, VerbSearchOutcome, VerbSearchResult,
-    VerbSearchSource, AMBIGUITY_MARGIN,
+    normalize_candidates, VerbSearchOutcome, VerbSearchResult, VerbSearchSource, AMBIGUITY_MARGIN,
 };
 
+// Database-dependent imports (only used in #[cfg(feature = "database")] tests)
+#[cfg(feature = "database")]
+use anyhow::Result;
+#[cfg(feature = "database")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "database")]
+use sqlx::PgPool;
+#[cfg(feature = "database")]
+use std::collections::HashMap;
+#[cfg(feature = "database")]
+use std::sync::Arc;
+
+#[cfg(feature = "database")]
+use ob_poc::agent::learning::embedder::CandleEmbedder;
+#[cfg(feature = "database")]
+use ob_poc::database::VerbService;
+#[cfg(feature = "database")]
+use ob_poc::mcp::verb_search::HybridVerbSearcher;
+
 // =============================================================================
-// TEST INFRASTRUCTURE
+// AMBIGUITY HELPERS (no DB required)
+// =============================================================================
+
+/// Check for ambiguity with custom threshold and margin
+///
+/// This is a local helper that mirrors the logic in verb_search.rs but allows
+/// varying the margin for threshold sweeps.
+pub fn check_ambiguity_with_margin(
+    candidates: &[VerbSearchResult],
+    threshold: f32,
+    margin: f32,
+) -> VerbSearchOutcome {
+    match candidates.first() {
+        None => VerbSearchOutcome::NoMatch,
+        Some(top) if top.score < threshold => VerbSearchOutcome::NoMatch,
+        Some(top) => match candidates.get(1) {
+            None => VerbSearchOutcome::Matched(top.clone()),
+            Some(runner_up) if runner_up.score < threshold => {
+                VerbSearchOutcome::Matched(top.clone())
+            }
+            Some(runner_up) => {
+                let actual_margin = top.score - runner_up.score;
+                if actual_margin < margin {
+                    VerbSearchOutcome::Ambiguous {
+                        top: top.clone(),
+                        runner_up: runner_up.clone(),
+                        margin: actual_margin,
+                    }
+                } else {
+                    VerbSearchOutcome::Matched(top.clone())
+                }
+            }
+        },
+    }
+}
+
+// =============================================================================
+// TEST INFRASTRUCTURE (DB required)
 // =============================================================================
 
 /// Test harness for verb search integration tests
+#[cfg(feature = "database")]
 struct VerbSearchTestHarness {
     #[allow(dead_code)]
     pool: PgPool,
@@ -45,6 +95,7 @@ struct VerbSearchTestHarness {
     searcher: HybridVerbSearcher,
 }
 
+#[cfg(feature = "database")]
 impl VerbSearchTestHarness {
     /// Create a new test harness (connects to DB, initializes embedder)
     async fn new() -> Result<Self> {
@@ -81,15 +132,20 @@ impl VerbSearchTestHarness {
         threshold: f32,
     ) -> Result<(VerbSearchOutcome, Vec<VerbSearchResult>)> {
         let results = self.searcher.search(query, None, None, 5).await?;
-        let outcome = check_ambiguity(&results, threshold);
+        let outcome = check_ambiguity_with_margin(&results, threshold, AMBIGUITY_MARGIN);
         Ok((outcome, results))
     }
 
     /// Search and return outcome with default threshold
+    #[allow(dead_code)]
     async fn search_with_outcome(&self, query: &str) -> Result<VerbSearchOutcome> {
         let results = self.searcher.search(query, None, None, 5).await?;
         let threshold = self.searcher.semantic_threshold();
-        Ok(check_ambiguity(&results, threshold))
+        Ok(check_ambiguity_with_margin(
+            &results,
+            threshold,
+            AMBIGUITY_MARGIN,
+        ))
     }
 
     /// Search and return raw results (for inspection)
@@ -102,6 +158,7 @@ impl VerbSearchTestHarness {
 // ENHANCED TEST SCENARIOS (ChatGPT suggestions)
 // =============================================================================
 
+#[cfg(feature = "database")]
 /// Expected outcome type for a test scenario
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExpectedOutcome {
@@ -113,6 +170,7 @@ pub enum ExpectedOutcome {
     NoMatch,
 }
 
+#[cfg(feature = "database")]
 /// Enhanced test scenario with outcome type and allowed alternatives
 #[derive(Debug, Clone)]
 pub struct TestScenario {
@@ -134,6 +192,7 @@ pub struct TestScenario {
     pub category: &'static str,
 }
 
+#[cfg(feature = "database")]
 impl TestScenario {
     /// Expect a specific verb match
     pub fn matched(name: &'static str, query: &'static str, verb: &'static str) -> Self {
@@ -220,6 +279,7 @@ impl TestScenario {
 // DECISION TRACE (for regression tracking)
 // =============================================================================
 
+#[cfg(feature = "database")]
 /// Full decision trace for a single query
 #[derive(Debug, Clone, Serialize)]
 pub struct DecisionTrace {
@@ -233,6 +293,7 @@ pub struct DecisionTrace {
     pub elapsed_ms: f64,
 }
 
+#[cfg(feature = "database")]
 #[derive(Debug, Clone, Serialize)]
 pub struct CandidateTrace {
     pub rank: usize,
@@ -242,6 +303,7 @@ pub struct CandidateTrace {
     pub matched_phrase: String,
 }
 
+#[cfg(feature = "database")]
 impl DecisionTrace {
     fn from_results(
         query: &str,
@@ -289,6 +351,7 @@ impl DecisionTrace {
 // TEST REPORT (enhanced metrics)
 // =============================================================================
 
+#[cfg(feature = "database")]
 #[derive(Debug, Default)]
 pub struct TestReport {
     // Basic counts
@@ -316,6 +379,7 @@ pub struct TestReport {
     pub by_category: HashMap<String, CategoryStats>,
 }
 
+#[cfg(feature = "database")]
 #[derive(Debug, Default, Clone)]
 pub struct CategoryStats {
     pub total: usize,
@@ -323,6 +387,7 @@ pub struct CategoryStats {
     pub failed: usize,
 }
 
+#[cfg(feature = "database")]
 impl TestReport {
     pub fn new() -> Self {
         Self::default()
@@ -351,12 +416,14 @@ impl TestReport {
         // Update retrieval quality metrics
         match outcome {
             VerbSearchOutcome::Matched(r) => {
-                if let Some(expected) = scenario.expected_verb {
-                    if r.verb == expected {
-                        self.top1_correct += 1;
-                    } else if scenario.expected_outcome == ExpectedOutcome::Matched {
-                        self.confidently_wrong += 1;
-                    }
+                // Check if verb is in allowed_verbs (respects alternatives)
+                let is_allowed = scenario.allowed_verbs.contains(&r.verb.as_str());
+                if is_allowed {
+                    self.top1_correct += 1;
+                } else if scenario.expected_outcome == ExpectedOutcome::Matched {
+                    // Matched a verb NOT in allowed_verbs when we expected a match
+                    // This is "confidently wrong" - the dangerous case
+                    self.confidently_wrong += 1;
                 }
             }
             VerbSearchOutcome::Ambiguous { .. } => {
@@ -548,6 +615,7 @@ impl TestReport {
 // THRESHOLD SWEEP
 // =============================================================================
 
+#[cfg(feature = "database")]
 #[derive(Debug)]
 pub struct SweepResult {
     pub threshold: f32,
@@ -557,6 +625,7 @@ pub struct SweepResult {
     pub confidently_wrong: usize,
 }
 
+#[cfg(feature = "database")]
 async fn run_threshold_sweep(
     harness: &VerbSearchTestHarness,
     scenarios: &[TestScenario],
@@ -573,10 +642,11 @@ async fn run_threshold_sweep(
             let total = scenarios.len();
 
             for scenario in scenarios {
-                if let Ok((outcome, _candidates)) = harness
-                    .search_with_threshold(scenario.query, threshold)
-                    .await
-                {
+                // Get raw candidates from search
+                if let Ok(candidates) = harness.search_raw(scenario.query, 5).await {
+                    // Apply check_ambiguity_with_margin to actually vary margin
+                    let outcome = check_ambiguity_with_margin(&candidates, threshold, margin);
+
                     match &outcome {
                         VerbSearchOutcome::Matched(r) => {
                             if scenario.allowed_verbs.contains(&r.verb.as_str()) {
@@ -606,6 +676,7 @@ async fn run_threshold_sweep(
     results
 }
 
+#[cfg(feature = "database")]
 fn print_sweep_results(results: &[SweepResult]) {
     println!("\nTHRESHOLD SWEEP RESULTS:");
     println!(
@@ -626,6 +697,7 @@ fn print_sweep_results(results: &[SweepResult]) {
 // TEST SCENARIOS
 // =============================================================================
 
+#[cfg(feature = "database")]
 fn taught_phrase_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched_with_score(
@@ -679,6 +751,7 @@ fn taught_phrase_scenarios() -> Vec<TestScenario> {
     ]
 }
 
+#[cfg(feature = "database")]
 fn session_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched(
@@ -711,6 +784,7 @@ fn session_scenarios() -> Vec<TestScenario> {
     ]
 }
 
+#[cfg(feature = "database")]
 fn cbu_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched("create cbu", "create a new cbu", "cbu.create").with_category("cbu"),
@@ -736,6 +810,7 @@ fn cbu_scenarios() -> Vec<TestScenario> {
     ]
 }
 
+#[cfg(feature = "database")]
 fn entity_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched(
@@ -757,6 +832,7 @@ fn entity_scenarios() -> Vec<TestScenario> {
     ]
 }
 
+#[cfg(feature = "database")]
 fn kyc_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched(
@@ -778,6 +854,7 @@ fn kyc_scenarios() -> Vec<TestScenario> {
     ]
 }
 
+#[cfg(feature = "database")]
 fn view_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::matched("view universe", "show the universe", "view.universe")
@@ -790,6 +867,7 @@ fn view_scenarios() -> Vec<TestScenario> {
     ]
 }
 
+#[cfg(feature = "database")]
 /// Hard negative pairs - dangerous confusions that MUST NOT happen
 fn hard_negative_scenarios() -> Vec<TestScenario> {
     vec![
@@ -836,6 +914,7 @@ fn hard_negative_scenarios() -> Vec<TestScenario> {
     ]
 }
 
+#[cfg(feature = "database")]
 fn edge_case_scenarios() -> Vec<TestScenario> {
     vec![
         TestScenario::no_match("garbage input", "asdfghjkl qwerty").with_category("edge"),
@@ -849,6 +928,7 @@ fn edge_case_scenarios() -> Vec<TestScenario> {
 // TEST RUNNER
 // =============================================================================
 
+#[cfg(feature = "database")]
 async fn run_scenarios(harness: &VerbSearchTestHarness, scenarios: &[TestScenario]) -> TestReport {
     let mut report = TestReport::new();
     let threshold = harness.searcher.semantic_threshold();
@@ -878,6 +958,7 @@ async fn run_scenarios(harness: &VerbSearchTestHarness, scenarios: &[TestScenari
 // INTEGRATION TESTS
 // =============================================================================
 
+#[cfg(feature = "database")]
 #[tokio::test]
 #[ignore]
 async fn test_taught_phrases() {
@@ -889,6 +970,7 @@ async fn test_taught_phrases() {
     assert!(report.all_passed(), "Some taught phrase tests failed");
 }
 
+#[cfg(feature = "database")]
 #[tokio::test]
 #[ignore]
 async fn test_session_verbs() {
@@ -900,6 +982,7 @@ async fn test_session_verbs() {
     assert!(report.all_passed(), "Some session verb tests failed");
 }
 
+#[cfg(feature = "database")]
 #[tokio::test]
 #[ignore]
 async fn test_hard_negatives() {
@@ -916,6 +999,7 @@ async fn test_hard_negatives() {
     );
 }
 
+#[cfg(feature = "database")]
 #[tokio::test]
 #[ignore]
 async fn test_all_scenarios() {
@@ -937,6 +1021,7 @@ async fn test_all_scenarios() {
     report.print_summary();
 }
 
+#[cfg(feature = "database")]
 #[tokio::test]
 #[ignore]
 async fn test_threshold_sweep() {
@@ -956,6 +1041,7 @@ async fn test_threshold_sweep() {
     print_sweep_results(&results);
 }
 
+#[cfg(feature = "database")]
 /// Interactive exploration - search and show top-5 results
 #[tokio::test]
 #[ignore]
@@ -987,7 +1073,11 @@ async fn explore_query() {
         }
     }
 
-    let outcome = check_ambiguity(&results, harness.searcher.semantic_threshold());
+    let outcome = check_ambiguity_with_margin(
+        &results,
+        harness.searcher.semantic_threshold(),
+        AMBIGUITY_MARGIN,
+    );
     println!("\nOutcome: {:?}", outcome);
 }
 
@@ -1017,12 +1107,12 @@ fn test_ambiguity_detection() {
         },
     ];
 
-    match check_ambiguity(&clear_winner, threshold) {
+    match check_ambiguity_with_margin(&clear_winner, threshold, AMBIGUITY_MARGIN) {
         VerbSearchOutcome::Matched(r) => assert_eq!(r.verb, "cbu.create"),
         other => panic!("Expected Matched, got {:?}", other),
     }
 
-    // Ambiguous
+    // Ambiguous (margin = 0.02 < AMBIGUITY_MARGIN = 0.05)
     let ambiguous = vec![
         VerbSearchResult {
             verb: "cbu.create".to_string(),
@@ -1040,12 +1130,12 @@ fn test_ambiguity_detection() {
         },
     ];
 
-    match check_ambiguity(&ambiguous, threshold) {
+    match check_ambiguity_with_margin(&ambiguous, threshold, AMBIGUITY_MARGIN) {
         VerbSearchOutcome::Ambiguous { .. } => {}
         other => panic!("Expected Ambiguous, got {:?}", other),
     }
 
-    // No match
+    // No match (below threshold)
     let below = vec![VerbSearchResult {
         verb: "cbu.create".to_string(),
         score: 0.80,
@@ -1055,7 +1145,7 @@ fn test_ambiguity_detection() {
     }];
 
     assert!(matches!(
-        check_ambiguity(&below, threshold),
+        check_ambiguity_with_margin(&below, threshold, AMBIGUITY_MARGIN),
         VerbSearchOutcome::NoMatch
     ));
 }
