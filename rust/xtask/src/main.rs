@@ -318,6 +318,32 @@ enum Command {
         action: VerbsAction,
     },
 
+    /// Test verb search and semantic matching
+    ///
+    /// Runs the verb search integration tests to verify semantic matching
+    /// after teaching new phrases or tuning thresholds.
+    TestVerbs {
+        /// Run all scenarios (default)
+        #[arg(long)]
+        all: bool,
+
+        /// Run only taught phrase tests
+        #[arg(long)]
+        taught: bool,
+
+        /// Run threshold sweep to find optimal settings
+        #[arg(long)]
+        sweep: bool,
+
+        /// Run hard negative tests (dangerous confusion detection)
+        #[arg(long)]
+        hard_negatives: bool,
+
+        /// Explore a specific query interactively
+        #[arg(long)]
+        explore: Option<String>,
+    },
+
     /// Lexicon test harness - stress test tokenizer and intent parser
     LexiconHarness {
         /// Load test cases from YAML file
@@ -599,7 +625,71 @@ fn main() -> Result<()> {
             json,
             interactive,
         } => run_lexicon_harness(&sh, prompts, standard, filter, json, interactive),
+        Command::TestVerbs {
+            all,
+            taught,
+            sweep,
+            hard_negatives,
+            explore,
+        } => test_verbs(&sh, all, taught, sweep, hard_negatives, explore),
     }
+}
+
+fn test_verbs(
+    sh: &Shell,
+    all: bool,
+    taught: bool,
+    sweep: bool,
+    hard_negatives: bool,
+    explore: Option<String>,
+) -> Result<()> {
+    println!("===========================================");
+    println!("  Verb Search Test Harness");
+    println!("===========================================\n");
+
+    // Build test filter based on flags
+    let mut filters: Vec<&str> = Vec::new();
+
+    if taught {
+        filters.push("taught_phrase");
+    }
+    if sweep {
+        filters.push("threshold_sweep");
+    }
+    if hard_negatives {
+        filters.push("hard_negative");
+    }
+
+    // If explore is specified, run interactive exploration
+    if let Some(query) = explore {
+        println!("Exploring query: \"{}\"\n", query);
+        filters.push("explore_query");
+        // Pass query via env var since cargo test doesn't support arbitrary args well
+        sh.set_var("VERB_SEARCH_EXPLORE_QUERY", &query);
+    }
+
+    // Default to all if no specific flags
+    let filter_arg = if filters.is_empty() || all {
+        "verb_search".to_string()
+    } else {
+        filters.join("|")
+    };
+
+    println!("Running tests matching: {}\n", filter_arg);
+
+    // Run the integration tests with database feature
+    cmd!(
+        sh,
+        "cargo test --features database --test verb_search_integration {filter_arg} -- --nocapture"
+    )
+    .run()
+    .context("Verb search tests failed")?;
+
+    println!("\n===========================================");
+    println!("  Tests complete");
+    println!("===========================================");
+
+    Ok(())
 }
 
 fn run_lexicon_harness(
