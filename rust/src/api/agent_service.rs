@@ -874,18 +874,32 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         session.add_user_message(request.message.clone());
 
                         // Convert pipeline unresolved refs to disambiguation items (Fix K)
-                        let disambig_items: Vec<DisambiguationItem> = result
-                            .unresolved_refs
-                            .iter()
-                            .map(|r| DisambiguationItem::EntityMatch {
+                        // Pre-populate matches with actual entity search results
+                        let mut disambig_items: Vec<DisambiguationItem> = Vec::new();
+                        for r in &result.unresolved_refs {
+                            // Search for matching entities using the search text
+                            let entity_type_str = r.entity_type.as_deref().unwrap_or("entity");
+                            let matches = self
+                                .search_entities(entity_type_str, &r.search_value, 10)
+                                .await
+                                .unwrap_or_default();
+
+                            tracing::info!(
+                                "Pre-populated {} matches for '{}' (type: {})",
+                                matches.len(),
+                                r.search_value,
+                                entity_type_str
+                            );
+
+                            disambig_items.push(DisambiguationItem::EntityMatch {
                                 param: r.param_name.clone(),
                                 search_text: r.search_value.clone(),
-                                matches: vec![], // Will be populated by UI via entity search
+                                matches,
                                 entity_type: r.entity_type.clone(),
                                 search_column: r.search_column.clone(),
                                 ref_id: r.ref_id.clone(),
-                            })
-                            .collect();
+                            });
+                        }
 
                         // Build VerbIntent from pipeline result
                         let mut params: HashMap<String, ParamValue> = HashMap::new();
