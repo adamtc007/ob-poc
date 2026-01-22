@@ -20,6 +20,25 @@ use sqlx::PgPool;
 use super::helpers::get_required_uuid;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
+// ============================================================================
+// Row Structs (replacing anonymous tuples for FromRow)
+// ============================================================================
+
+/// Row struct for share class supply query results
+#[cfg(feature = "database")]
+#[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)] // Fields required by FromRow derive
+struct ShareClassSupplyRow {
+    share_class_id: Uuid,
+    authorized_units: Option<rust_decimal::Decimal>,
+    issued_units: rust_decimal::Decimal,
+    outstanding_units: rust_decimal::Decimal,
+    treasury_units: rust_decimal::Decimal,
+    total_votes: rust_decimal::Decimal,
+    total_economic: rust_decimal::Decimal,
+    as_of_date: chrono::NaiveDate,
+}
+
 /// Transfer shares between shareholders
 pub struct CapitalTransferOp;
 
@@ -829,34 +848,24 @@ impl CustomOperation for CapitalShareClassGetSupplyOp {
             .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
-        let supply: Option<(
-            Uuid,
-            Option<rust_decimal::Decimal>,
-            rust_decimal::Decimal,
-            rust_decimal::Decimal,
-            rust_decimal::Decimal,
-            rust_decimal::Decimal,
-            rust_decimal::Decimal,
-            NaiveDate,
-        )> = sqlx::query_as(r#"SELECT * FROM kyc.fn_share_class_supply_at($1, $2)"#)
-            .bind(share_class_id)
-            .bind(as_of)
-            .fetch_optional(pool)
-            .await?;
+        let supply: Option<ShareClassSupplyRow> =
+            sqlx::query_as(r#"SELECT * FROM kyc.fn_share_class_supply_at($1, $2)"#)
+                .bind(share_class_id)
+                .bind(as_of)
+                .fetch_optional(pool)
+                .await?;
 
         match supply {
-            Some((_, authorized, issued, outstanding, treasury, votes, economic, date)) => {
-                Ok(ExecutionResult::Record(json!({
-                    "share_class_id": share_class_id,
-                    "authorized_units": authorized.map(|d| d.to_string()),
-                    "issued_units": issued.to_string(),
-                    "outstanding_units": outstanding.to_string(),
-                    "treasury_units": treasury.to_string(),
-                    "total_votes": votes.to_string(),
-                    "total_economic": economic.to_string(),
-                    "as_of_date": date.to_string()
-                })))
-            }
+            Some(row) => Ok(ExecutionResult::Record(json!({
+                "share_class_id": share_class_id,
+                "authorized_units": row.authorized_units.map(|d| d.to_string()),
+                "issued_units": row.issued_units.to_string(),
+                "outstanding_units": row.outstanding_units.to_string(),
+                "treasury_units": row.treasury_units.to_string(),
+                "total_votes": row.total_votes.to_string(),
+                "total_economic": row.total_economic.to_string(),
+                "as_of_date": row.as_of_date.to_string()
+            }))),
             None => Err(anyhow!("Share class {} not found", share_class_id)),
         }
     }

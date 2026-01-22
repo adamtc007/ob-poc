@@ -200,8 +200,19 @@ impl IntentPipeline {
             return self.process_direct_dsl(trimmed).await;
         }
 
-        // Natural language path: semantic search → LLM extraction → DSL assembly
+        // Natural language path
+        self.process_as_natural_language(instruction, domain_hint)
+            .await
+    }
 
+    /// Process input as natural language (semantic search → LLM extraction → DSL)
+    ///
+    /// This is the main NL processing path, also called when direct DSL parsing fails.
+    async fn process_as_natural_language(
+        &self,
+        instruction: &str,
+        domain_hint: Option<&str>,
+    ) -> Result<PipelineResult> {
         // Step 1: Find verb candidates via semantic search
         let candidates = self
             .verb_searcher
@@ -526,8 +537,20 @@ Respond with ONLY valid JSON:
 
         tracing::info!("Processing direct DSL input: {}", dsl);
 
-        // Parse the DSL
-        let ast = parse_program(dsl).map_err(|e| anyhow!("DSL parse error: {:?}", e))?;
+        // Parse the DSL - on failure, re-route through natural language pipeline
+        // This lets the LLM interpret malformed DSL as user intent
+        let ast = match parse_program(dsl) {
+            Ok(ast) => ast,
+            Err(parse_error) => {
+                tracing::info!(
+                    "DSL parse failed, re-routing to NL pipeline: {}",
+                    parse_error
+                );
+                // Recursively call process() but skip the DSL detection
+                // by treating the malformed DSL as natural language
+                return self.process_as_natural_language(dsl, None).await;
+            }
+        };
 
         // Extract verb from first statement
         let verb = if let Some(stmt) = ast.statements.first() {

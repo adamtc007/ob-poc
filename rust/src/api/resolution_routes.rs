@@ -241,7 +241,7 @@ async fn build_session_response_enriched(
     resolution: &ResolutionSubSession,
     gateway: &mut crate::dsl_v2::gateway_resolver::GatewayRefResolver,
 ) -> ResolutionSessionResponse {
-    let (resolved_count, total_count) = resolution.progress();
+    let progress = resolution.progress();
 
     // Build unresolved refs and enrich with entity config
     let mut unresolved: Vec<UnresolvedRefResponse> = resolution
@@ -296,10 +296,10 @@ async fn build_session_response_enriched(
         auto_resolved: vec![],
         resolved,
         summary: ResolutionSummary {
-            total_refs: total_count,
-            resolved_count,
+            total_refs: progress.total,
+            resolved_count: progress.resolved,
             warnings_count: 0,
-            required_review_count: total_count - resolved_count,
+            required_review_count: progress.total - progress.resolved,
             can_commit: resolution.is_complete(),
         },
     }
@@ -310,7 +310,7 @@ fn build_session_response(
     session_id: Uuid,
     resolution: &ResolutionSubSession,
 ) -> ResolutionSessionResponse {
-    let (resolved_count, total_count) = resolution.progress();
+    let progress = resolution.progress();
 
     // Split refs into unresolved and resolved (without entity config enrichment)
     let unresolved: Vec<UnresolvedRefResponse> = resolution
@@ -360,10 +360,10 @@ fn build_session_response(
         auto_resolved: vec![],
         resolved,
         summary: ResolutionSummary {
-            total_refs: total_count,
-            resolved_count,
+            total_refs: progress.total,
+            resolved_count: progress.resolved,
             warnings_count: 0,
-            required_review_count: total_count - resolved_count,
+            required_review_count: progress.total - progress.resolved,
             can_commit: resolution.is_complete(),
         },
     }
@@ -790,12 +790,12 @@ pub async fn commit_resolution(
 
     // Check all refs are resolved
     if !resolution.is_complete() {
-        let (resolved, total) = resolution.progress();
+        let progress = resolution.progress();
         return Err((
             StatusCode::BAD_REQUEST,
             format!(
                 "Cannot commit: only {}/{} references resolved",
-                resolved, total
+                progress.resolved, progress.total
             ),
         ));
     }

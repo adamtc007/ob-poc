@@ -30,6 +30,36 @@ use crate::mcp::verb_search::HybridVerbSearcher;
 
 use crate::mcp::protocol::ToolCallResult;
 
+// ============================================================================
+// Row Structs (replacing anonymous tuples for FromRow)
+// ============================================================================
+
+/// Row struct for learning candidate upsert result
+#[derive(Debug, sqlx::FromRow)]
+struct LearningCandidateUpsertRow {
+    id: i64,
+    occurrence_count: i32,
+    was_created: bool,
+}
+
+/// Row struct for learning candidate queries
+#[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)] // Fields required by FromRow derive
+struct LearningCandidateRow {
+    id: i64,
+    learning_type: String,
+    input_pattern: String,
+    suggested_output: String,
+}
+
+/// Row struct for top corrections queries
+#[derive(Debug, sqlx::FromRow)]
+struct TopCorrectionRow {
+    input_pattern: String,
+    suggested_output: String,
+    occurrence_count: i32,
+}
+
 /// Configuration for ToolHandlers construction
 ///
 /// Use the builder pattern: `ToolHandlersConfig::new(pool).with_sessions(s).build()`
@@ -1358,7 +1388,7 @@ impl ToolHandlers {
         );
 
         // Insert or increment learning candidate
-        let row = sqlx::query_as::<_, (i64, i32, bool)>(
+        let row = sqlx::query_as::<_, LearningCandidateUpsertRow>(
             r#"
             INSERT INTO agent.learning_candidates (
                 fingerprint, learning_type, input_pattern, suggested_output,
@@ -1369,7 +1399,7 @@ impl ToolHandlers {
                 occurrence_count = agent.learning_candidates.occurrence_count + 1,
                 last_seen = NOW(),
                 updated_at = NOW()
-            RETURNING id, occurrence_count, (xmax = 0)
+            RETURNING id, occurrence_count, (xmax = 0) as was_created
             "#,
         )
         .bind(&fingerprint)
@@ -1382,7 +1412,8 @@ impl ToolHandlers {
         .await
         .map_err(|e| anyhow!("Failed to record learning: {}", e))?;
 
-        let (candidate_id, occurrence_count, was_created) = row;
+        let (candidate_id, occurrence_count, was_created) =
+            (row.id, row.occurrence_count, row.was_created);
 
         // For low-risk corrections (entity aliases), apply immediately
         let auto_applied = if risk_level == "low" {
@@ -1791,7 +1822,7 @@ impl ToolHandlers {
         let apply_immediately = args["apply_immediately"].as_bool().unwrap_or(true);
 
         // Get candidate
-        let candidate = sqlx::query_as::<_, (i64, String, String, String)>(
+        let candidate = sqlx::query_as::<_, LearningCandidateRow>(
             "SELECT id, learning_type, input_pattern, suggested_output FROM agent.learning_candidates WHERE id = $1",
         )
         .bind(candidate_id)
@@ -1809,12 +1840,12 @@ impl ToolHandlers {
         if apply_immediately {
             // Generate embedding if available
             let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-                embedder.embed(&candidate.2).await.ok()
+                embedder.embed(&candidate.input_pattern).await.ok()
             } else {
                 None
             };
 
-            let result = match candidate.1.as_str() {
+            let result = match candidate.learning_type.as_str() {
                 "invocation_phrase" => {
                     sqlx::query(
                         r#"
@@ -1824,8 +1855,8 @@ impl ToolHandlers {
                         SET verb = $2, embedding = COALESCE($3::vector, agent.invocation_phrases.embedding), updated_at = now()
                         "#,
                     )
-                    .bind(&candidate.2)
-                    .bind(&candidate.3)
+                    .bind(&candidate.input_pattern)
+                    .bind(&candidate.suggested_output)
                     .bind(embedding.as_ref())
                     .execute(pool)
                     .await
@@ -1839,8 +1870,8 @@ impl ToolHandlers {
                         SET canonical_name = $2, embedding = COALESCE($3::vector, agent.entity_aliases.embedding), updated_at = now()
                         "#,
                     )
-                    .bind(&candidate.2)
-                    .bind(&candidate.3)
+                    .bind(&candidate.input_pattern)
+                    .bind(&candidate.suggested_output)
                     .bind(embedding.as_ref())
                     .execute(pool)
                     .await
@@ -1861,7 +1892,7 @@ impl ToolHandlers {
             "approved": true,
             "applied": applied,
             "candidate_id": candidate_id,
-            "mapping": format!("'{}' → {}", candidate.2, candidate.3)
+            "mapping": format!("'{}' → {}", candidate.input_pattern, candidate.suggested_output)
         }))
     }
 
@@ -1884,7 +1915,7 @@ impl ToolHandlers {
         let add_to_blocklist = args["add_to_blocklist"].as_bool().unwrap_or(false);
 
         // Get candidate
-        let candidate = sqlx::query_as::<_, (i64, String, String, String)>(
+        let candidate = sqlx::query_as::<_, LearningCandidateRow>(
             "SELECT id, learning_type, input_pattern, suggested_output FROM agent.learning_candidates WHERE id = $1",
         )
         .bind(candidate_id)
@@ -1902,9 +1933,9 @@ impl ToolHandlers {
         .await?;
 
         // Optionally add to blocklist
-        let blocked = if add_to_blocklist && candidate.1.contains("phrase") {
+        let blocked = if add_to_blocklist && candidate.learning_type.contains("phrase") {
             let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-                embedder.embed(&candidate.2).await.ok()
+                embedder.embed(&candidate.input_pattern).await.ok()
             } else {
                 None
             };
@@ -1916,8 +1947,8 @@ impl ToolHandlers {
                 ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) DO NOTHING
                 "#,
             )
-            .bind(&candidate.2)
-            .bind(&candidate.3)
+            .bind(&candidate.input_pattern)
+            .bind(&candidate.suggested_output)
             .bind(embedding.as_ref())
             .bind(reason.unwrap_or("Rejected learning candidate"))
             .execute(pool)
@@ -1982,7 +2013,7 @@ impl ToolHandlers {
 
         // Top corrections (if requested)
         let top_corrections: Vec<Value> = if include_top {
-            let rows = sqlx::query_as::<_, (String, String, i32)>(&format!(
+            let rows = sqlx::query_as::<_, TopCorrectionRow>(&format!(
                 r#"
                     SELECT input_pattern, suggested_output, occurrence_count
                     FROM agent.learning_candidates
@@ -1997,7 +2028,7 @@ impl ToolHandlers {
             .unwrap_or_default();
 
             rows.iter()
-                .map(|r| json!({"input": r.0, "output": r.1, "count": r.2}))
+                .map(|r| json!({"input": r.input_pattern, "output": r.suggested_output, "count": r.occurrence_count}))
                 .collect()
         } else {
             Vec::new()

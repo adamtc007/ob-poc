@@ -28,6 +28,30 @@ use uuid::Uuid;
 
 use crate::services::BoardControlRulesEngine;
 
+// ============================================================================
+// ROW STRUCTS (replacing anonymous tuples)
+// ============================================================================
+
+/// Row struct for control anchor queries
+#[derive(Debug, sqlx::FromRow)]
+struct ControlAnchorRow {
+    id: Uuid,
+    cbu_id: Uuid,
+    entity_id: Uuid,
+    anchor_role: String,
+    display_name: Option<String>,
+    jurisdiction: Option<String>,
+}
+
+/// Row struct for entity info lookups (P2.4)
+#[derive(Debug, sqlx::FromRow)]
+struct EntityInfoRow {
+    entity_id: Uuid,
+    name: String,
+    entity_type: String,
+    jurisdiction: Option<String>,
+}
+
 /// Application state for control routes
 #[derive(Clone)]
 pub struct ControlAppState {
@@ -164,7 +188,7 @@ async fn get_control_anchors(
     State(state): State<ControlAppState>,
     Path(cbu_id): Path<Uuid>,
 ) -> Result<Json<GetControlAnchorsResponse>, (StatusCode, String)> {
-    let anchors = sqlx::query_as::<_, (Uuid, Uuid, Uuid, String, Option<String>, Option<String>)>(
+    let rows = sqlx::query_as::<_, ControlAnchorRow>(
         r#"SELECT id, cbu_id, entity_id, anchor_role, display_name, jurisdiction
            FROM "ob-poc".cbu_control_anchors
            WHERE cbu_id = $1
@@ -180,17 +204,17 @@ async fn get_control_anchors(
         )
     })?;
 
-    let anchors: Vec<ControlAnchor> = anchors
+    let anchors: Vec<ControlAnchor> = rows
         .into_iter()
-        .filter_map(|(id, cbu_id, entity_id, role, name, jurisdiction)| {
-            let anchor_role = AnchorRole::from_db_str(&role)?;
+        .filter_map(|row| {
+            let anchor_role = AnchorRole::from_db_str(&row.anchor_role)?;
             Some(ControlAnchor {
-                id,
-                cbu_id,
-                entity_id,
-                entity_name: name,
+                id: row.id,
+                cbu_id: row.cbu_id,
+                entity_id: row.entity_id,
+                entity_name: row.display_name,
                 anchor_role,
-                jurisdiction,
+                jurisdiction: row.jurisdiction,
             })
         })
         .collect();
@@ -348,7 +372,7 @@ async fn get_control_sphere(
 
 /// Get basic entity info
 async fn get_entity_info(pool: &PgPool, entity_id: Uuid) -> Result<ControlEntityRef, String> {
-    let row = sqlx::query_as::<_, (Uuid, String, String, Option<String>)>(
+    let row = sqlx::query_as::<_, EntityInfoRow>(
         r#"SELECT
             e.entity_id,
             COALESCE(ep.search_name, elc.company_name, 'Unknown') as name,
@@ -370,10 +394,10 @@ async fn get_entity_info(pool: &PgPool, entity_id: Uuid) -> Result<ControlEntity
     .ok_or_else(|| format!("Entity {} not found", entity_id))?;
 
     Ok(ControlEntityRef {
-        id: row.0,
-        name: row.1,
-        entity_type: row.2,
-        jurisdiction: row.3,
+        id: row.entity_id,
+        name: row.name,
+        entity_type: row.entity_type,
+        jurisdiction: row.jurisdiction,
         is_ubo: false, // Will be set based on analysis
     })
 }

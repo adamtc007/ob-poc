@@ -398,3 +398,23 @@ domains:
         returns:
           type: record
           capture: false
+
+      learn:
+        description: Activate taught patterns by generating embeddings for semantic search
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: phrase_embedding
+        behavior: plugin
+        handler: AgentLearnOp
+        invocation_phrases:
+          - "learn"
+          - "learn new prompts"
+          - "activate taught patterns"
+          - "embed taught phrases"
+          - "done teaching"
+        args: []
+        returns:
+          type: record
+          capture: false

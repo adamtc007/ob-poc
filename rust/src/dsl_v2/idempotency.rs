@@ -29,6 +29,29 @@ use sqlx::PgPool;
 
 use super::executor::ExecutionResult;
 
+// ============================================================================
+// Row Structs (replacing anonymous tuples for FromRow)
+// ============================================================================
+
+/// Row struct for idempotency check queries
+#[cfg(feature = "database")]
+#[derive(Debug, sqlx::FromRow)]
+struct IdempotencyCheckRow {
+    result_type: String,
+    result_id: Option<Uuid>,
+    result_json: Option<JsonValue>,
+    result_affected: Option<i64>,
+}
+
+/// Row struct for atomic view state recording results
+#[cfg(feature = "database")]
+#[derive(Debug, sqlx::FromRow)]
+struct ViewStateRecordRow {
+    idempotency_key: String,
+    view_state_change_id: Option<Uuid>,
+    was_cached: bool,
+}
+
 /// Source of an execution - where did this request originate?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -226,7 +249,7 @@ impl IdempotencyManager {
     ) -> Result<Option<CachedResult>> {
         let key = compute_idempotency_key(execution_id, statement_index, verb, args);
 
-        let row = sqlx::query_as::<_, (String, Option<Uuid>, Option<JsonValue>, Option<i64>)>(
+        let row = sqlx::query_as::<_, IdempotencyCheckRow>(
             r#"SELECT result_type, result_id, result_json, result_affected
                FROM "ob-poc".dsl_idempotency
                WHERE idempotency_key = $1"#,
@@ -235,14 +258,12 @@ impl IdempotencyManager {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(
-            |(result_type, result_id, result_json, result_affected)| CachedResult {
-                result_type,
-                result_id,
-                result_json,
-                result_affected,
-            },
-        ))
+        Ok(row.map(|r| CachedResult {
+            result_type: r.result_type,
+            result_id: r.result_id,
+            result_json: r.result_json,
+            result_affected: r.result_affected,
+        }))
     }
 
     /// Record a successful execution for future idempotency checks
@@ -403,7 +424,7 @@ impl IdempotencyManager {
             };
 
         // Call atomic PostgreSQL function
-        let row = sqlx::query_as::<_, (String, Option<Uuid>, bool)>(
+        let row = sqlx::query_as::<_, ViewStateRecordRow>(
             r#"SELECT * FROM "ob-poc".record_execution_with_view_state(
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 $11, $12, $13, $14,
@@ -436,9 +457,9 @@ impl IdempotencyManager {
         .await?;
 
         Ok(AtomicRecordResult {
-            idempotency_key: row.0,
-            view_state_change_id: row.1,
-            was_cached: row.2,
+            idempotency_key: row.idempotency_key,
+            view_state_change_id: row.view_state_change_id,
+            was_cached: row.was_cached,
         })
     }
 

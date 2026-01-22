@@ -12,7 +12,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 // ============================================================================
-// Types
+// Public Types
 // ============================================================================
 
 /// A user-learned phrase match (exact)
@@ -34,10 +34,48 @@ pub struct SemanticMatch {
 }
 
 /// Verb description from dsl_verbs table
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct VerbDescription {
     pub full_name: String,
     pub description: Option<String>,
+}
+
+// ============================================================================
+// Row Structs (replacing anonymous tuples for FromRow)
+// ============================================================================
+
+/// Row struct for user learned exact match queries
+#[derive(Debug, sqlx::FromRow)]
+struct UserLearnedExactRow {
+    phrase: String,
+    verb: String,
+    confidence: f32,
+}
+
+/// Row struct for user learned semantic queries (includes confidence)
+#[derive(Debug, sqlx::FromRow)]
+struct UserLearnedSemanticRow {
+    phrase: String,
+    verb: String,
+    confidence: f32,
+    similarity: f64,
+}
+
+/// Row struct for global learned semantic queries (no confidence)
+#[derive(Debug, sqlx::FromRow)]
+struct GlobalLearnedSemanticRow {
+    phrase: String,
+    verb: String,
+    similarity: f64,
+}
+
+/// Row struct for verb pattern embedding queries (includes category)
+#[derive(Debug, sqlx::FromRow)]
+struct VerbPatternSemanticRow {
+    pattern_phrase: String,
+    verb_name: String,
+    similarity: f64,
+    category: Option<String>,
 }
 
 // ============================================================================
@@ -70,7 +108,7 @@ impl VerbService {
         user_id: Uuid,
         phrase: &str,
     ) -> Result<Option<UserLearnedExactMatch>, sqlx::Error> {
-        let row = sqlx::query_as::<_, (String, String, f32)>(
+        let row = sqlx::query_as::<_, UserLearnedExactRow>(
             r#"
             SELECT phrase, verb, confidence
             FROM agent.user_learned_phrases
@@ -82,10 +120,10 @@ impl VerbService {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.map(|(phrase, verb, confidence)| UserLearnedExactMatch {
-            phrase,
-            verb,
-            confidence,
+        Ok(row.map(|r| UserLearnedExactMatch {
+            phrase: r.phrase,
+            verb: r.verb,
+            confidence: r.confidence,
         }))
     }
 
@@ -96,7 +134,7 @@ impl VerbService {
         query_embedding: &[f32],
         threshold: f32,
     ) -> Result<Option<SemanticMatch>, sqlx::Error> {
-        let row = sqlx::query_as::<_, (String, String, f32, f64)>(
+        let row = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
             FROM agent.user_learned_phrases
@@ -112,15 +150,13 @@ impl VerbService {
         .await?;
 
         match row {
-            Some((phrase, verb, confidence, similarity)) if similarity as f32 > threshold => {
-                Ok(Some(SemanticMatch {
-                    phrase,
-                    verb,
-                    similarity,
-                    confidence: Some(confidence),
-                    category: None,
-                }))
-            }
+            Some(r) if r.similarity as f32 > threshold => Ok(Some(SemanticMatch {
+                phrase: r.phrase,
+                verb: r.verb,
+                similarity: r.similarity,
+                confidence: Some(r.confidence),
+                category: None,
+            })),
             _ => Ok(None),
         }
     }
@@ -133,7 +169,7 @@ impl VerbService {
         threshold: f32,
         limit: usize,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
-        let rows = sqlx::query_as::<_, (String, String, f32, f64)>(
+        let rows = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
             FROM agent.user_learned_phrases
@@ -153,11 +189,11 @@ impl VerbService {
 
         Ok(rows
             .into_iter()
-            .map(|(phrase, verb, confidence, similarity)| SemanticMatch {
-                phrase,
-                verb,
-                similarity,
-                confidence: Some(confidence),
+            .map(|r| SemanticMatch {
+                phrase: r.phrase,
+                verb: r.verb,
+                similarity: r.similarity,
+                confidence: Some(r.confidence),
                 category: None,
             })
             .collect())
@@ -173,7 +209,7 @@ impl VerbService {
         query_embedding: &[f32],
         threshold: f32,
     ) -> Result<Option<SemanticMatch>, sqlx::Error> {
-        let row = sqlx::query_as::<_, (String, String, f64)>(
+        let row = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
             FROM agent.invocation_phrases
@@ -187,15 +223,13 @@ impl VerbService {
         .await?;
 
         match row {
-            Some((phrase, verb, similarity)) if similarity as f32 > threshold => {
-                Ok(Some(SemanticMatch {
-                    phrase,
-                    verb,
-                    similarity,
-                    confidence: None,
-                    category: None,
-                }))
-            }
+            Some(r) if r.similarity as f32 > threshold => Ok(Some(SemanticMatch {
+                phrase: r.phrase,
+                verb: r.verb,
+                similarity: r.similarity,
+                confidence: None,
+                category: None,
+            })),
             _ => Ok(None),
         }
     }
@@ -207,7 +241,7 @@ impl VerbService {
         threshold: f32,
         limit: usize,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
-        let rows = sqlx::query_as::<_, (String, String, f64)>(
+        let rows = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
             FROM agent.invocation_phrases
@@ -225,10 +259,10 @@ impl VerbService {
 
         Ok(rows
             .into_iter()
-            .map(|(phrase, verb, similarity)| SemanticMatch {
-                phrase,
-                verb,
-                similarity,
+            .map(|r| SemanticMatch {
+                phrase: r.phrase,
+                verb: r.verb,
+                similarity: r.similarity,
                 confidence: None,
                 category: None,
             })
@@ -247,7 +281,7 @@ impl VerbService {
         limit: usize,
         min_similarity: f32,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
-        let rows = sqlx::query_as::<_, (String, String, f64, Option<String>)>(
+        let rows = sqlx::query_as::<_, VerbPatternSemanticRow>(
             r#"
             SELECT pattern_phrase, verb_name, 1 - (embedding <=> $1::vector) as similarity, category
             FROM "ob-poc".verb_pattern_embeddings
@@ -265,12 +299,12 @@ impl VerbService {
 
         Ok(rows
             .into_iter()
-            .map(|(phrase, verb, similarity, category)| SemanticMatch {
-                phrase,
-                verb,
-                similarity,
+            .map(|r| SemanticMatch {
+                phrase: r.pattern_phrase,
+                verb: r.verb_name,
+                similarity: r.similarity,
                 confidence: None,
-                category,
+                category: r.category,
             })
             .collect())
     }
@@ -318,7 +352,7 @@ impl VerbService {
         &self,
         full_name: &str,
     ) -> Result<Option<String>, sqlx::Error> {
-        let row = sqlx::query_as::<_, (Option<String>,)>(
+        let row = sqlx::query_scalar::<_, Option<String>>(
             r#"
             SELECT description
             FROM "ob-poc".dsl_verbs
@@ -329,7 +363,7 @@ impl VerbService {
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(row.and_then(|(desc,)| desc))
+        Ok(row.flatten())
     }
 
     /// Get multiple verb descriptions at once
@@ -341,7 +375,7 @@ impl VerbService {
             return Ok(Vec::new());
         }
 
-        let rows = sqlx::query_as::<_, (String, Option<String>)>(
+        sqlx::query_as::<_, VerbDescription>(
             r#"
             SELECT full_name, description
             FROM "ob-poc".dsl_verbs
@@ -350,15 +384,7 @@ impl VerbService {
         )
         .bind(full_names)
         .fetch_all(&self.pool)
-        .await?;
-
-        Ok(rows
-            .into_iter()
-            .map(|(full_name, description)| VerbDescription {
-                full_name,
-                description,
-            })
-            .collect())
+        .await
     }
 }
 

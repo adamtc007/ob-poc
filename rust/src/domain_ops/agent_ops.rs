@@ -923,9 +923,7 @@ impl CustomOperation for AgentTeachOp {
                 "phrase": phrase,
                 "verb": verb,
                 "source": source,
-                "message": format!("Taught: '{}' → {}", phrase, verb),
-                "needs_reembed": true,
-                "hint": "Run populate_embeddings to enable semantic matching for the new pattern"
+                "message": format!("Taught: '{}' → {}. Run (agent.learn) to activate.", phrase, verb)
             })))
         } else {
             Ok(ExecutionResult::Record(json!({
@@ -1124,6 +1122,120 @@ impl CustomOperation for AgentTeachingStatusOp {
 }
 
 // ============================================================================
+// AgentLearnOp - Activate taught patterns by running populate_embeddings
+// ============================================================================
+
+pub struct AgentLearnOp;
+
+#[async_trait]
+impl CustomOperation for AgentLearnOp {
+    fn domain(&self) -> &'static str {
+        "agent"
+    }
+
+    fn verb(&self) -> &'static str {
+        "learn"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Activates taught patterns by generating embeddings for semantic search"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Count pending patterns before
+        let pending_before: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM agent.v_recently_taught rt
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
+                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
+            )
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to count pending patterns: {}", e))?;
+
+        if pending_before.0 == 0 {
+            return Ok(ExecutionResult::Record(json!({
+                "success": true,
+                "message": "No pending patterns to embed",
+                "embedded_count": 0
+            })));
+        }
+
+        tracing::info!(
+            "Running populate_embeddings for {} pending patterns...",
+            pending_before.0
+        );
+
+        // Run populate_embeddings synchronously (it's fast for delta loads)
+        let output = tokio::process::Command::new("cargo")
+            .args([
+                "run",
+                "--release",
+                "-p",
+                "ob-semantic-matcher",
+                "--bin",
+                "populate_embeddings",
+            ])
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .output()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to run populate_embeddings: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Ok(ExecutionResult::Record(json!({
+                "success": false,
+                "error": format!("populate_embeddings failed: {}", stderr)
+            })));
+        }
+
+        // Count how many were actually embedded
+        let pending_after: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM agent.v_recently_taught rt
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "ob-poc".verb_pattern_embeddings vpe
+                WHERE vpe.phrase = rt.phrase AND vpe.verb_name = rt.verb
+            )
+            "#,
+        )
+        .fetch_one(pool)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to count remaining patterns: {}", e))?;
+
+        let embedded_count = pending_before.0 - pending_after.0;
+
+        Ok(ExecutionResult::Record(json!({
+            "success": true,
+            "message": format!("Activated {} new patterns for semantic search", embedded_count),
+            "embedded_count": embedded_count,
+            "pending_before": pending_before.0,
+            "pending_after": pending_after.0
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for learning operations"
+        ))
+    }
+}
+
+// ============================================================================
 // Registration
 // ============================================================================
 
@@ -1154,4 +1266,5 @@ pub fn register_agent_ops(registry: &mut crate::domain_ops::CustomOperationRegis
     registry.register(Arc::new(AgentTeachOp));
     registry.register(Arc::new(AgentUnteachOp));
     registry.register(Arc::new(AgentTeachingStatusOp));
+    registry.register(Arc::new(AgentLearnOp));
 }

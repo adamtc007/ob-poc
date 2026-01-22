@@ -71,6 +71,31 @@ struct ClusterAggregation {
     cbus: Vec<CbuRow>,
 }
 
+/// Row struct for CBU entity preview queries
+#[derive(Debug, sqlx::FromRow)]
+struct CbuEntityPreviewRow {
+    entity_id: Uuid,
+    name: String,
+    role_name: String,
+    entity_type: Option<String>,
+}
+
+/// Row struct for entity ownership relationship queries
+#[derive(Debug, sqlx::FromRow)]
+struct OwnershipRelationshipRow {
+    to_entity_id: Uuid,
+    name: String,
+    percentage: Option<rust_decimal::Decimal>,
+}
+
+/// Row struct for document preview queries
+#[derive(Debug, sqlx::FromRow)]
+struct DocumentPreviewRow {
+    doc_id: Uuid,
+    doc_name: String,
+    type_code: Option<String>,
+}
+
 // ============================================================================
 // GET /api/universe
 // ============================================================================
@@ -583,7 +608,7 @@ async fn fetch_cbu_preview(
     };
 
     // Fetch top entities by role importance
-    let rows = sqlx::query_as::<_, (Uuid, String, String, Option<String>)>(
+    let rows = sqlx::query_as::<_, CbuEntityPreviewRow>(
         r#"
         SELECT DISTINCT ON (e.entity_id)
             e.entity_id,
@@ -614,16 +639,16 @@ async fn fetch_cbu_preview(
 
     Ok(rows
         .into_iter()
-        .map(|(entity_id, name, role_name, entity_type)| PreviewItem {
-            id: entity_id.to_string(),
-            label: name.clone(),
+        .map(|row| PreviewItem {
+            id: row.entity_id.to_string(),
+            label: row.name.clone(),
             preview_type: PreviewType::Entity,
             count: None,
             risk: None,
-            description: Some(role_name),
-            visual_hint: entity_type,
+            description: Some(row.role_name),
+            visual_hint: row.entity_type,
             action: NavigationAction::DrillIntoEntity {
-                entity_id: entity_id.to_string(),
+                entity_id: row.entity_id.to_string(),
             },
         })
         .collect())
@@ -643,7 +668,7 @@ async fn fetch_entity_preview(
     let mut items = vec![];
 
     // Fetch ownership relationships
-    let ownership_rows = sqlx::query_as::<_, (Uuid, String, Option<rust_decimal::Decimal>)>(
+    let ownership_rows = sqlx::query_as::<_, OwnershipRelationshipRow>(
         r#"
         SELECT
             er.to_entity_id,
@@ -663,18 +688,18 @@ async fn fetch_entity_preview(
     .fetch_all(pool)
     .await?;
 
-    for (owned_id, owned_name, percentage) in ownership_rows {
-        let pct_str = percentage.map(|p| format!("{}%", p));
+    for row in ownership_rows {
+        let pct_str = row.percentage.map(|p| format!("{}%", p));
         items.push(PreviewItem {
-            id: owned_id.to_string(),
-            label: owned_name.clone(),
+            id: row.to_entity_id.to_string(),
+            label: row.name.clone(),
             preview_type: PreviewType::Entity,
             count: None,
             risk: None,
             description: pct_str,
             visual_hint: Some("ownership".to_string()),
             action: NavigationAction::Select {
-                node_id: owned_id.to_string(),
+                node_id: row.to_entity_id.to_string(),
                 node_type: "entity".to_string(),
             },
         });
@@ -684,7 +709,7 @@ async fn fetch_entity_preview(
     let doc_limit = limit.saturating_sub(items.len());
     if doc_limit > 0 {
         // Find documents linked to this entity via CBU
-        let doc_rows = sqlx::query_as::<_, (Uuid, String, Option<String>)>(
+        let doc_rows = sqlx::query_as::<_, DocumentPreviewRow>(
             r#"
             SELECT
                 dc.doc_id,
@@ -704,17 +729,17 @@ async fn fetch_entity_preview(
         .fetch_all(pool)
         .await?;
 
-        for (doc_id, doc_name, type_code) in doc_rows {
+        for row in doc_rows {
             items.push(PreviewItem {
-                id: doc_id.to_string(),
-                label: doc_name,
+                id: row.doc_id.to_string(),
+                label: row.doc_name,
                 preview_type: PreviewType::Document,
                 count: None,
                 risk: None,
-                description: type_code,
+                description: row.type_code,
                 visual_hint: Some("document".to_string()),
                 action: NavigationAction::Select {
-                    node_id: doc_id.to_string(),
+                    node_id: row.doc_id.to_string(),
                     node_type: "document".to_string(),
                 },
             });

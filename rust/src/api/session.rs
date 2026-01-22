@@ -442,13 +442,16 @@ impl ResolutionSubSession {
     }
 
     /// Get number of resolved vs total refs
-    pub fn progress(&self) -> (usize, usize) {
+    pub fn progress(&self) -> ResolutionProgress {
         let resolved = self
             .unresolved_refs
             .iter()
             .filter(|r| self.resolutions.contains_key(&r.ref_id))
             .count();
-        (resolved, self.unresolved_refs.len())
+        ResolutionProgress {
+            resolved,
+            total: self.unresolved_refs.len(),
+        }
     }
 
     /// Get the current unresolved ref being worked on
@@ -1334,6 +1337,35 @@ pub struct BoundEntity {
 // Batch Context - For bulk REPL operations
 // ============================================================================
 
+// ============================================================================
+// Progress Structs (replacing anonymous tuples for function returns)
+// ============================================================================
+
+/// Status counts for batch items: pending/completed/skipped/failed
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct BatchStatusCounts {
+    pub pending: usize,
+    pub completed: usize,
+    pub skipped: usize,
+    pub failed: usize,
+}
+
+/// Progress tracking for batch execution: processed/total/success/failed
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct BatchProgress {
+    pub processed: usize,
+    pub total: usize,
+    pub success: usize,
+    pub failed: usize,
+}
+
+/// Resolution progress: resolved/total
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct ResolutionProgress {
+    pub resolved: usize,
+    pub total: usize,
+}
+
 /// Status of a batch item
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
@@ -1601,32 +1633,35 @@ impl BatchContext {
     }
 
     /// Count items by status
-    pub fn count_by_status(&self) -> (usize, usize, usize, usize) {
-        let mut pending = 0;
-        let mut completed = 0;
-        let mut skipped = 0;
-        let mut failed = 0;
+    pub fn count_by_status(&self) -> BatchStatusCounts {
+        let mut counts = BatchStatusCounts::default();
         for item in &self.items {
             match item.status {
-                BatchItemStatus::Pending | BatchItemStatus::Active => pending += 1,
-                BatchItemStatus::Completed => completed += 1,
-                BatchItemStatus::Skipped => skipped += 1,
-                BatchItemStatus::Failed => failed += 1,
+                BatchItemStatus::Pending | BatchItemStatus::Active => counts.pending += 1,
+                BatchItemStatus::Completed => counts.completed += 1,
+                BatchItemStatus::Skipped => counts.skipped += 1,
+                BatchItemStatus::Failed => counts.failed += 1,
             }
         }
-        (pending, completed, skipped, failed)
+        counts
     }
 
     /// Get progress string like "5/15 complete"
     pub fn progress_string(&self) -> String {
-        let (_pending, completed, skipped, failed) = self.count_by_status();
+        let counts = self.count_by_status();
         let total = self.items.len();
-        if failed > 0 {
-            format!("{}/{} complete, {} failed", completed, total, failed)
-        } else if skipped > 0 {
-            format!("{}/{} complete, {} skipped", completed, total, skipped)
+        if counts.failed > 0 {
+            format!(
+                "{}/{} complete, {} failed",
+                counts.completed, total, counts.failed
+            )
+        } else if counts.skipped > 0 {
+            format!(
+                "{}/{} complete, {} skipped",
+                counts.completed, total, counts.skipped
+            )
         } else {
-            format!("{}/{} complete", completed, total)
+            format!("{}/{} complete", counts.completed, total)
         }
     }
 }
@@ -1822,26 +1857,26 @@ impl ActiveBatchState {
         )
     }
 
-    /// Get progress as (processed, total, success, failed)
-    pub fn progress(&self) -> (usize, usize, usize, usize) {
-        (
-            self.current_index,
-            self.total_items,
-            self.results.success_count,
-            self.results.failure_count,
-        )
+    /// Get progress as BatchProgress struct
+    pub fn progress(&self) -> BatchProgress {
+        BatchProgress {
+            processed: self.current_index,
+            total: self.total_items,
+            success: self.results.success_count,
+            failed: self.results.failure_count,
+        }
     }
 
     /// Get progress string like "47/205 (45 success, 2 failed)"
     pub fn progress_string(&self) -> String {
-        let (processed, total, success, failed) = self.progress();
-        if failed > 0 {
+        let p = self.progress();
+        if p.failed > 0 {
             format!(
                 "{}/{} ({} success, {} failed)",
-                processed, total, success, failed
+                p.processed, p.total, p.success, p.failed
             )
         } else {
-            format!("{}/{} complete", processed, total)
+            format!("{}/{} complete", p.processed, p.total)
         }
     }
 

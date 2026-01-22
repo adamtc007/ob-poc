@@ -19,6 +19,30 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 use sqlx::PgPool;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Shared Types
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Resolved document subject with all linked IDs
+#[derive(Debug, Default)]
+pub struct DocumentSubject {
+    pub subject_type: String,
+    pub subject_id: Uuid,
+    pub workstream_id: Option<Uuid>,
+    pub case_id: Option<Uuid>,
+    pub cbu_id: Option<Uuid>,
+    pub entity_id: Option<Uuid>,
+}
+
+/// Linked IDs derived from a subject
+#[derive(Debug, Default)]
+pub struct LinkedIds {
+    pub workstream_id: Option<Uuid>,
+    pub case_id: Option<Uuid>,
+    pub cbu_id: Option<Uuid>,
+    pub entity_id: Option<Uuid>,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Request Create Operation
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -161,8 +185,7 @@ impl CustomOperation for RequestCreateOp {
             .unwrap_or(json!({}));
 
         // Derive linked IDs based on subject_type
-        let (workstream_id, case_id, cbu_id, entity_id) =
-            derive_linked_ids(subject_type, subject_id, pool).await?;
+        let linked = derive_linked_ids(subject_type, subject_id, pool).await?;
 
         // Create the request
         let row = sqlx::query!(
@@ -190,10 +213,10 @@ impl CustomOperation for RequestCreateOp {
             "#,
             subject_type,
             subject_id,
-            workstream_id,
-            case_id,
-            cbu_id,
-            entity_id,
+            linked.workstream_id,
+            linked.case_id,
+            linked.cbu_id,
+            linked.entity_id,
             request_type,
             request_subtype,
             request_details,
@@ -211,7 +234,7 @@ impl CustomOperation for RequestCreateOp {
 
         // If blocking and attached to workstream, update workstream status
         if blocks {
-            if let Some(ws_id) = workstream_id {
+            if let Some(ws_id) = linked.workstream_id {
                 let blocker_msg = blocker_message
                     .clone()
                     .unwrap_or_else(|| format!("Awaiting {} {}", request_type, request_subtype));
@@ -980,8 +1003,7 @@ impl CustomOperation for DocumentRequestOp {
             .ok_or_else(|| anyhow!("type is required"))?;
 
         // Resolve subject (workstream > entity > case)
-        let (subject_type, subject_id, workstream_id, case_id, cbu_id, entity_id) =
-            resolve_document_subject(verb_call, ctx, pool).await?;
+        let subject = resolve_document_subject(verb_call, ctx, pool).await?;
 
         // Get defaults from request_types
         let config = sqlx::query!(
@@ -1064,12 +1086,12 @@ impl CustomOperation for DocumentRequestOp {
             )
             RETURNING request_id
             "#,
-            subject_type,
-            subject_id,
-            workstream_id,
-            case_id,
-            cbu_id,
-            entity_id,
+            subject.subject_type,
+            subject.subject_id,
+            subject.workstream_id,
+            subject.case_id,
+            subject.cbu_id,
+            subject.entity_id,
             doc_type,
             json!({"notes": notes}),
             requested_from,
@@ -1084,7 +1106,7 @@ impl CustomOperation for DocumentRequestOp {
 
         // If blocking and attached to workstream, update workstream status
         if blocks_by_default {
-            if let Some(ws_id) = workstream_id {
+            if let Some(ws_id) = subject.workstream_id {
                 sqlx::query!(
                     r#"
                     UPDATE kyc.entity_workstreams
@@ -1112,8 +1134,8 @@ impl CustomOperation for DocumentRequestOp {
             "due_date": due_date.to_string(),
             "blocks_subject": blocks_by_default,
             "subject": {
-                "type": subject_type,
-                "id": subject_id
+                "type": subject.subject_type,
+                "id": subject.subject_id
             }
         })))
     }
@@ -1178,8 +1200,7 @@ impl CustomOperation for DocumentUploadOp {
             .map(|s| s.to_string());
 
         // Resolve subject
-        let (subject_type, subject_id, workstream_id, case_id, cbu_id, entity_id) =
-            resolve_document_subject(verb_call, ctx, pool).await?;
+        let subject = resolve_document_subject(verb_call, ctx, pool).await?;
 
         // Store the document in catalog
         let document_id = sqlx::query_scalar!(
@@ -1201,7 +1222,7 @@ impl CustomOperation for DocumentUploadOp {
             )
             RETURNING doc_id
             "#,
-            cbu_id,
+            subject.cbu_id,
             doc_type,
             format!("{} - {}", doc_type, file_path),
             file_path,
@@ -1236,11 +1257,11 @@ impl CustomOperation for DocumentUploadOp {
             )
             RETURNING request_id, workstream_id, blocks_subject
             "#,
-            workstream_id,
+            subject.workstream_id,
             doc_type,
             document_id,
-            entity_id,
-            case_id
+            subject.entity_id,
+            subject.case_id
         )
         .fetch_optional(pool)
         .await?;
@@ -1262,8 +1283,8 @@ impl CustomOperation for DocumentUploadOp {
             "fulfilled_request_id": fulfilled_request.as_ref().map(|r| r.request_id),
             "workstream_unblocked": workstream_unblocked,
             "subject": {
-                "type": subject_type,
-                "id": subject_id
+                "type": subject.subject_type,
+                "id": subject.subject_id
             }
         })))
     }
@@ -1382,7 +1403,7 @@ async fn derive_linked_ids(
     subject_type: &str,
     subject_id: Uuid,
     pool: &PgPool,
-) -> Result<(Option<Uuid>, Option<Uuid>, Option<Uuid>, Option<Uuid>)> {
+) -> Result<LinkedIds> {
     match subject_type {
         "WORKSTREAM" => {
             let row = sqlx::query!(
@@ -1398,12 +1419,12 @@ async fn derive_linked_ids(
             .await?
             .ok_or_else(|| anyhow!("Workstream {} not found", subject_id))?;
 
-            Ok((
-                Some(row.workstream_id),
-                Some(row.case_id),
-                Some(row.cbu_id),
-                Some(row.entity_id),
-            ))
+            Ok(LinkedIds {
+                workstream_id: Some(row.workstream_id),
+                case_id: Some(row.case_id),
+                cbu_id: Some(row.cbu_id),
+                entity_id: Some(row.entity_id),
+            })
         }
         "KYC_CASE" => {
             let row = sqlx::query!(
@@ -1414,10 +1435,21 @@ async fn derive_linked_ids(
             .await?
             .ok_or_else(|| anyhow!("Case {} not found", subject_id))?;
 
-            Ok((None, Some(row.case_id), Some(row.cbu_id), None))
+            Ok(LinkedIds {
+                workstream_id: None,
+                case_id: Some(row.case_id),
+                cbu_id: Some(row.cbu_id),
+                entity_id: None,
+            })
         }
-        "ENTITY" => Ok((None, None, None, Some(subject_id))),
-        "CBU" => Ok((None, None, Some(subject_id), None)),
+        "ENTITY" => Ok(LinkedIds {
+            entity_id: Some(subject_id),
+            ..Default::default()
+        }),
+        "CBU" => Ok(LinkedIds {
+            cbu_id: Some(subject_id),
+            ..Default::default()
+        }),
         _ => Err(anyhow!("Unknown subject_type: {}", subject_type)),
     }
 }
@@ -1427,14 +1459,7 @@ async fn resolve_document_subject(
     verb_call: &VerbCall,
     ctx: &ExecutionContext,
     pool: &PgPool,
-) -> Result<(
-    String,
-    Uuid,
-    Option<Uuid>,
-    Option<Uuid>,
-    Option<Uuid>,
-    Option<Uuid>,
-)> {
+) -> Result<DocumentSubject> {
     // Try workstream first
     if let Some(ws_id) = extract_uuid_opt(verb_call, ctx, "workstream-id") {
         let row = sqlx::query!(
@@ -1450,26 +1475,24 @@ async fn resolve_document_subject(
         .await?
         .ok_or_else(|| anyhow!("Workstream {} not found", ws_id))?;
 
-        return Ok((
-            "WORKSTREAM".to_string(),
-            ws_id,
-            Some(row.workstream_id),
-            Some(row.case_id),
-            Some(row.cbu_id),
-            Some(row.entity_id),
-        ));
+        return Ok(DocumentSubject {
+            subject_type: "WORKSTREAM".to_string(),
+            subject_id: ws_id,
+            workstream_id: Some(row.workstream_id),
+            case_id: Some(row.case_id),
+            cbu_id: Some(row.cbu_id),
+            entity_id: Some(row.entity_id),
+        });
     }
 
     // Try entity
     if let Some(entity_id) = extract_uuid_opt(verb_call, ctx, "entity-id") {
-        return Ok((
-            "ENTITY".to_string(),
-            entity_id,
-            None,
-            None,
-            None,
-            Some(entity_id),
-        ));
+        return Ok(DocumentSubject {
+            subject_type: "ENTITY".to_string(),
+            subject_id: entity_id,
+            entity_id: Some(entity_id),
+            ..Default::default()
+        });
     }
 
     // Try case
@@ -1482,14 +1505,13 @@ async fn resolve_document_subject(
         .await?
         .ok_or_else(|| anyhow!("Case {} not found", case_id))?;
 
-        return Ok((
-            "KYC_CASE".to_string(),
-            case_id,
-            None,
-            Some(row.case_id),
-            Some(row.cbu_id),
-            None,
-        ));
+        return Ok(DocumentSubject {
+            subject_type: "KYC_CASE".to_string(),
+            subject_id: case_id,
+            case_id: Some(row.case_id),
+            cbu_id: Some(row.cbu_id),
+            ..Default::default()
+        });
     }
 
     Err(anyhow!(

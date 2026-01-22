@@ -36,7 +36,7 @@ pub struct RoleRow {
 }
 
 /// Expanded view of CBU entity role with resolved names
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct CbuEntityRoleExpanded {
     pub cbu_entity_role_id: Uuid,
     pub cbu_id: Uuid,
@@ -153,9 +153,9 @@ impl CbuEntityRolesService {
 
     /// Get all entities attached to a CBU with expanded info
     pub async fn get_entities_for_cbu(&self, cbu_id: Uuid) -> Result<Vec<CbuEntityRoleExpanded>> {
-        let rows = sqlx::query_as::<_, (Uuid, Uuid, Uuid, String, Uuid, String)>(
+        let rows: Vec<CbuEntityRoleExpanded> = sqlx::query_as(
             r#"
-            SELECT cer.cbu_entity_role_id, cer.cbu_id, cer.entity_id, e.name, cer.role_id, r.name
+            SELECT cer.cbu_entity_role_id, cer.cbu_id, cer.entity_id, e.name as entity_name, cer.role_id, r.name as role_name
             FROM "ob-poc".cbu_entity_roles cer
             JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
             JOIN "ob-poc".roles r ON cer.role_id = r.role_id
@@ -168,21 +168,7 @@ impl CbuEntityRolesService {
         .await
         .context("Failed to get entities for CBU")?;
 
-        Ok(rows
-            .into_iter()
-            .map(
-                |(cbu_entity_role_id, cbu_id, entity_id, entity_name, role_id, role_name)| {
-                    CbuEntityRoleExpanded {
-                        cbu_entity_role_id,
-                        cbu_id,
-                        entity_id,
-                        entity_name,
-                        role_id,
-                        role_name,
-                    }
-                },
-            )
-            .collect())
+        Ok(rows)
     }
 
     /// Get entities for a CBU with a specific role
@@ -193,9 +179,9 @@ impl CbuEntityRolesService {
     ) -> Result<Vec<CbuEntityRoleExpanded>> {
         let role_id = self.resolve_role_id(role_name).await?;
 
-        let rows = sqlx::query_as::<_, (Uuid, Uuid, Uuid, String, Uuid, String)>(
+        let rows: Vec<CbuEntityRoleExpanded> = sqlx::query_as(
             r#"
-            SELECT cer.cbu_entity_role_id, cer.cbu_id, cer.entity_id, e.name, cer.role_id, r.name
+            SELECT cer.cbu_entity_role_id, cer.cbu_id, cer.entity_id, e.name as entity_name, cer.role_id, r.name as role_name
             FROM "ob-poc".cbu_entity_roles cer
             JOIN "ob-poc".entities e ON cer.entity_id = e.entity_id
             JOIN "ob-poc".roles r ON cer.role_id = r.role_id
@@ -209,21 +195,7 @@ impl CbuEntityRolesService {
         .await
         .context("Failed to get entities for CBU by role")?;
 
-        Ok(rows
-            .into_iter()
-            .map(
-                |(cbu_entity_role_id, cbu_id, entity_id, entity_name, role_id, role_name)| {
-                    CbuEntityRoleExpanded {
-                        cbu_entity_role_id,
-                        cbu_id,
-                        entity_id,
-                        entity_name,
-                        role_id,
-                        role_name,
-                    }
-                },
-            )
-            .collect())
+        Ok(rows)
     }
 
     /// Detach an entity from a CBU (all roles)

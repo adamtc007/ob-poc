@@ -23,9 +23,24 @@ use ob_poc_types::control::{
     BoardControlExplanation, BoardControlMethod, BoardControllerEdge, ControlCandidate,
     ControlConfidence, ControlEdgeType, ControlScore, EvidenceRef, EvidenceSource,
 };
+use rust_decimal::Decimal;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
+
+/// Row struct for board controller DB queries
+#[derive(Debug, sqlx::FromRow)]
+struct BoardControllerRow {
+    id: Uuid,
+    cbu_id: Uuid,
+    controller_entity_id: Option<Uuid>,
+    controller_name: Option<String>,
+    method: String,
+    confidence: String,
+    score: Decimal,
+    as_of: NaiveDate,
+    explanation: serde_json::Value,
+}
 
 /// Configuration for the rules engine
 #[derive(Debug, Clone)]
@@ -542,7 +557,7 @@ impl BoardControlRulesEngine {
 
     /// Load existing board controller for a CBU
     pub async fn load_for_cbu(&self, cbu_id: Uuid) -> Result<Option<BoardControllerEdge>, String> {
-        let row = sqlx::query_as::<_, (Uuid, Uuid, Option<Uuid>, Option<String>, String, String, rust_decimal::Decimal, NaiveDate, serde_json::Value)>(
+        let row: Option<BoardControllerRow> = sqlx::query_as(
             r#"SELECT id, cbu_id, controller_entity_id, controller_name, method, confidence, score, as_of, explanation
                FROM "ob-poc".cbu_board_controller
                WHERE cbu_id = $1"#,
@@ -553,31 +568,21 @@ impl BoardControlRulesEngine {
         .map_err(|e| format!("Failed to load board controller: {}", e))?;
 
         match row {
-            Some((
-                id,
-                cbu_id,
-                controller_id,
-                controller_name,
-                method,
-                confidence,
-                score,
-                as_of,
-                explanation,
-            )) => {
+            Some(r) => {
                 let explanation: BoardControlExplanation =
-                    serde_json::from_value(explanation).unwrap_or_default();
+                    serde_json::from_value(r.explanation).unwrap_or_default();
 
                 Ok(Some(BoardControllerEdge {
-                    id,
-                    cbu_id,
-                    controller_entity_id: controller_id,
-                    controller_name,
-                    method: BoardControlMethod::from_db_str(&method)
+                    id: r.id,
+                    cbu_id: r.cbu_id,
+                    controller_entity_id: r.controller_entity_id,
+                    controller_name: r.controller_name,
+                    method: BoardControlMethod::from_db_str(&r.method)
                         .unwrap_or(BoardControlMethod::NoSingleController),
-                    confidence: ControlConfidence::from_db_str(&confidence)
+                    confidence: ControlConfidence::from_db_str(&r.confidence)
                         .unwrap_or(ControlConfidence::Low),
-                    score: score.to_string().parse().unwrap_or(0.0),
-                    as_of,
+                    score: r.score.to_string().parse().unwrap_or(0.0),
+                    as_of: r.as_of,
                     explanation,
                 }))
             }
