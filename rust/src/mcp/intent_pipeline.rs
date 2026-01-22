@@ -445,13 +445,15 @@ VERB PARAMETERS:
 
 RULES:
 1. Extract values mentioned in the instruction - look for names, identifiers, and references
-2. For "entity name" parameters, extract the name/identifier as a string (e.g., "Allianz", "BlackRock") - the system will resolve it to a UUID
+2. For "entity name" parameters:
+   - Extract ONLY the proper noun/entity name (e.g., "Allianz", "BlackRock", "Goldman Sachs")
+   - Do NOT include descriptive words like "cbu", "universe", "fund", "book", "system" in the entity name
+   - Example: "show allianz cbu universe" → entity name is "Allianz" (not "allianz cbu")
+   - Example: "load blackrock fund book" → entity name is "BlackRock" (not "blackrock fund")
 3. For dates, use ISO format (YYYY-MM-DD)
 4. For enums, match to closest valid value
 5. If a required parameter cannot be found in the instruction, set value to null
 6. Do NOT write DSL syntax - only extract values
-
-IMPORTANT: When a phrase like "show allianz universe" contains an entity name like "allianz", extract it as the entity parameter value.
 
 Respond with ONLY valid JSON:
 {{
