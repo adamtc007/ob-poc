@@ -126,12 +126,14 @@ impl Embedder {
             .encode_batch(texts.to_vec(), true)
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
 
-        // Find max length for padding
+        // Find max length for padding, clamped to model's max position embeddings (512)
+        // User prompts could exceed 512 tokens; this prevents index-out-of-bounds
         let max_len = encodings
             .iter()
             .map(|e| e.get_ids().len())
             .max()
-            .unwrap_or(0);
+            .unwrap_or(0)
+            .min(512);
 
         // Prepare input tensors
         let mut all_input_ids = Vec::new();
@@ -143,11 +145,13 @@ impl Embedder {
             let attention = encoding.get_attention_mask();
             let type_ids = encoding.get_type_ids();
 
-            // Pad to max length
-            let mut padded_ids = ids.to_vec();
-            let mut padded_attention = attention.to_vec();
-            let mut padded_type_ids = type_ids.to_vec();
+            // Truncate to max_len if needed (for inputs exceeding 512 tokens)
+            let len = ids.len().min(max_len);
+            let mut padded_ids: Vec<u32> = ids[..len].to_vec();
+            let mut padded_attention: Vec<u32> = attention[..len].to_vec();
+            let mut padded_type_ids: Vec<u32> = type_ids[..len].to_vec();
 
+            // Pad to max length
             padded_ids.resize(max_len, 0);
             padded_attention.resize(max_len, 0);
             padded_type_ids.resize(max_len, 0);

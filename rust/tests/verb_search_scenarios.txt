@@ -1,0 +1,78 @@
+# Verb Search Test Scenarios
+# Format: query [-> expected_verb]
+# Lines starting with # are comments
+
+# =============================================================================
+# TAUGHT PHRASES (should match with high confidence)
+# =============================================================================
+
+spin up a fund -> cbu.create
+stand up a new client -> cbu.create
+load the allianz book -> session.load-galaxy
+show me the ownership -> control.build-graph
+who controls this entity -> control.build-graph
+find the ultimate beneficial owners -> control.identify-ubos
+
+# =============================================================================
+# SESSION VERBS
+# =============================================================================
+
+load the allianz galaxy -> session.load-galaxy
+load the blackrock book -> session.load-galaxy
+load cbu acme fund -> session.load-cbu
+load all luxembourg cbus -> session.load-jurisdiction
+clear the session -> session.clear
+undo the last action -> session.undo
+redo -> session.redo
+show session info -> session.info
+
+# =============================================================================
+# CBU VERBS
+# =============================================================================
+
+create a new cbu -> cbu.create
+create a fund called Alpha Growth -> cbu.create
+onboard new client Acme Corp -> cbu.create
+assign custody role to BNY -> cbu.assign-role
+list all cbus -> cbu.list
+
+# =============================================================================
+# ENTITY VERBS
+# =============================================================================
+
+create a limited company -> entity.create-limited-company
+add a natural person -> entity.create-person
+find entity BlackRock -> entity.search
+show entity details -> entity.get
+
+# =============================================================================
+# KYC / UBO VERBS
+# =============================================================================
+
+discover ultimate beneficial owners -> ubo.discover
+who owns this company -> ubo.discover
+show the ownership chain -> control.build-graph
+open a kyc case -> kyc.create-case
+
+# =============================================================================
+# VIEW / NAVIGATION
+# =============================================================================
+
+show the universe -> view.universe
+focus on this cbu -> view.cbu
+drill into entity -> view.drill
+surface back up -> view.surface
+
+# =============================================================================
+# TRADING
+# =============================================================================
+
+add equity instruments -> trading-profile.add-instruments
+show trading matrix -> trading-profile.get-matrix
+
+# =============================================================================
+# CUSTODY
+# =============================================================================
+
+set up custody account -> custody.create-account
+configure settlement instructions -> custody.create-ssi

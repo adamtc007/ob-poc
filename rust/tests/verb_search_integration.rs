@@ -1,0 +1,1094 @@
+//! Integration tests for verb search and semantic matching
+//!
+//! Tests the full verb discovery pipeline with real database and embeddings.
+//! Use this to verify semantic matching after teaching new phrases.
+//!
+//! Run all tests:
+//!   cargo test --features database --test verb_search_integration -- --ignored --nocapture
+//!
+//! Run specific scenario:
+//!   cargo test --features database --test verb_search_integration test_taught_phrases -- --ignored --nocapture
+//!
+//! Run threshold sweep:
+//!   cargo test --features database --test verb_search_integration test_threshold_sweep -- --ignored --nocapture
+//!
+//! Quick smoke test (no DB required):
+//!   cargo test --test verb_search_integration test_ambiguity_detection
+
+#![cfg(feature = "database")]
+
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use ob_poc::agent::learning::embedder::CandleEmbedder;
+use ob_poc::database::VerbService;
+use ob_poc::mcp::verb_search::{
+    check_ambiguity, normalize_candidates, HybridVerbSearcher, VerbSearchOutcome, VerbSearchResult,
+    VerbSearchSource, AMBIGUITY_MARGIN,
+};
+
+// =============================================================================
+// TEST INFRASTRUCTURE
+// =============================================================================
+
+/// Test harness for verb search integration tests
+struct VerbSearchTestHarness {
+    #[allow(dead_code)]
+    pool: PgPool,
+    #[allow(dead_code)]
+    verb_service: Arc<VerbService>,
+    #[allow(dead_code)]
+    embedder: Arc<CandleEmbedder>,
+    searcher: HybridVerbSearcher,
+}
+
+impl VerbSearchTestHarness {
+    /// Create a new test harness (connects to DB, initializes embedder)
+    async fn new() -> Result<Self> {
+        let url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+
+        println!("Connecting to database...");
+        let pool = PgPool::connect(&url).await?;
+
+        println!("Initializing verb service...");
+        let verb_service = Arc::new(VerbService::new(pool.clone()));
+
+        println!("Loading Candle embedder (BGE-small-en-v1.5)...");
+        let embedder = Arc::new(CandleEmbedder::new()?);
+
+        println!("Creating searcher...");
+        let searcher =
+            HybridVerbSearcher::new(verb_service.clone(), None).with_embedder(embedder.clone());
+
+        println!("Test harness ready.\n");
+
+        Ok(Self {
+            pool,
+            verb_service,
+            embedder,
+            searcher,
+        })
+    }
+
+    /// Search with custom threshold (for sweep tests)
+    async fn search_with_threshold(
+        &self,
+        query: &str,
+        threshold: f32,
+    ) -> Result<(VerbSearchOutcome, Vec<VerbSearchResult>)> {
+        let results = self.searcher.search(query, None, None, 5).await?;
+        let outcome = check_ambiguity(&results, threshold);
+        Ok((outcome, results))
+    }
+
+    /// Search and return outcome with default threshold
+    async fn search_with_outcome(&self, query: &str) -> Result<VerbSearchOutcome> {
+        let results = self.searcher.search(query, None, None, 5).await?;
+        let threshold = self.searcher.semantic_threshold();
+        Ok(check_ambiguity(&results, threshold))
+    }
+
+    /// Search and return raw results (for inspection)
+    async fn search_raw(&self, query: &str, limit: usize) -> Result<Vec<VerbSearchResult>> {
+        self.searcher.search(query, None, None, limit).await
+    }
+}
+
+// =============================================================================
+// ENHANCED TEST SCENARIOS (ChatGPT suggestions)
+// =============================================================================
+
+/// Expected outcome type for a test scenario
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExpectedOutcome {
+    /// Should match a specific verb with high confidence
+    Matched,
+    /// Should trigger ambiguity (multiple close candidates)
+    Ambiguous,
+    /// Should not match anything above threshold
+    NoMatch,
+}
+
+/// Enhanced test scenario with outcome type and allowed alternatives
+#[derive(Debug, Clone)]
+pub struct TestScenario {
+    /// Human-readable name
+    pub name: &'static str,
+    /// Input phrase to search
+    pub query: &'static str,
+    /// Expected outcome type
+    pub expected_outcome: ExpectedOutcome,
+    /// Expected verb (for Matched scenarios)
+    pub expected_verb: Option<&'static str>,
+    /// Alternative acceptable verbs (top-3 should contain one of these)
+    pub allowed_verbs: Vec<&'static str>,
+    /// Minimum acceptable score (if matched)
+    pub min_score: Option<f32>,
+    /// Is this a "hard negative" pair? (dangerous confusion test)
+    pub is_hard_negative: bool,
+    /// Category for grouping in reports
+    pub category: &'static str,
+}
+
+impl TestScenario {
+    /// Expect a specific verb match
+    pub fn matched(name: &'static str, query: &'static str, verb: &'static str) -> Self {
+        Self {
+            name,
+            query,
+            expected_outcome: ExpectedOutcome::Matched,
+            expected_verb: Some(verb),
+            allowed_verbs: vec![verb],
+            min_score: None,
+            is_hard_negative: false,
+            category: "general",
+        }
+    }
+
+    /// Expect a match with minimum score
+    pub fn matched_with_score(
+        name: &'static str,
+        query: &'static str,
+        verb: &'static str,
+        min_score: f32,
+    ) -> Self {
+        Self {
+            name,
+            query,
+            expected_outcome: ExpectedOutcome::Matched,
+            expected_verb: Some(verb),
+            allowed_verbs: vec![verb],
+            min_score: Some(min_score),
+            is_hard_negative: false,
+            category: "general",
+        }
+    }
+
+    /// Expect ambiguity (multiple close candidates)
+    pub fn ambiguous(name: &'static str, query: &'static str) -> Self {
+        Self {
+            name,
+            query,
+            expected_outcome: ExpectedOutcome::Ambiguous,
+            expected_verb: None,
+            allowed_verbs: vec![],
+            min_score: None,
+            is_hard_negative: false,
+            category: "general",
+        }
+    }
+
+    /// Expect no match (below threshold)
+    pub fn no_match(name: &'static str, query: &'static str) -> Self {
+        Self {
+            name,
+            query,
+            expected_outcome: ExpectedOutcome::NoMatch,
+            expected_verb: None,
+            allowed_verbs: vec![],
+            min_score: None,
+            is_hard_negative: false,
+            category: "general",
+        }
+    }
+
+    /// Mark as hard negative (dangerous confusion test)
+    pub fn hard_negative(mut self) -> Self {
+        self.is_hard_negative = true;
+        self.category = "hard_negative";
+        self
+    }
+
+    /// Set category
+    pub fn with_category(mut self, category: &'static str) -> Self {
+        self.category = category;
+        self
+    }
+
+    /// Add alternative acceptable verbs
+    pub fn with_alternatives(mut self, alts: &[&'static str]) -> Self {
+        self.allowed_verbs.extend(alts.iter().copied());
+        self
+    }
+}
+
+// =============================================================================
+// DECISION TRACE (for regression tracking)
+// =============================================================================
+
+/// Full decision trace for a single query
+#[derive(Debug, Clone, Serialize)]
+pub struct DecisionTrace {
+    pub query: String,
+    pub threshold: f32,
+    pub margin: f32,
+    pub top_k_candidates: Vec<CandidateTrace>,
+    pub outcome: String,
+    pub selected_verb: Option<String>,
+    pub correct: bool,
+    pub elapsed_ms: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CandidateTrace {
+    pub rank: usize,
+    pub verb: String,
+    pub score: f32,
+    pub source: String,
+    pub matched_phrase: String,
+}
+
+impl DecisionTrace {
+    fn from_results(
+        query: &str,
+        results: &[VerbSearchResult],
+        outcome: &VerbSearchOutcome,
+        threshold: f32,
+        correct: bool,
+        elapsed_ms: f64,
+    ) -> Self {
+        let top_k_candidates: Vec<CandidateTrace> = results
+            .iter()
+            .enumerate()
+            .map(|(i, r)| CandidateTrace {
+                rank: i + 1,
+                verb: r.verb.clone(),
+                score: r.score,
+                source: format!("{:?}", r.source),
+                matched_phrase: r.matched_phrase.clone(),
+            })
+            .collect();
+
+        let (outcome_str, selected_verb) = match outcome {
+            VerbSearchOutcome::Matched(r) => ("Matched".to_string(), Some(r.verb.clone())),
+            VerbSearchOutcome::Ambiguous { top, runner_up, .. } => (
+                format!("Ambiguous({} vs {})", top.verb, runner_up.verb),
+                None,
+            ),
+            VerbSearchOutcome::NoMatch => ("NoMatch".to_string(), None),
+        };
+
+        Self {
+            query: query.to_string(),
+            threshold,
+            margin: AMBIGUITY_MARGIN,
+            top_k_candidates,
+            outcome: outcome_str,
+            selected_verb,
+            correct,
+            elapsed_ms,
+        }
+    }
+}
+
+// =============================================================================
+// TEST REPORT (enhanced metrics)
+// =============================================================================
+
+#[derive(Debug, Default)]
+pub struct TestReport {
+    // Basic counts
+    pub total: usize,
+    pub passed: usize,
+    pub failed: usize,
+    pub errors: usize,
+
+    // Retrieval quality metrics
+    pub top1_correct: usize,
+    pub top3_contains_correct: usize,
+    pub ambiguity_triggered: usize,
+    pub no_match_count: usize,
+    pub confidently_wrong: usize, // Matched wrong verb with high confidence
+
+    // Hard negative metrics
+    pub hard_negative_total: usize,
+    pub hard_negative_correct: usize,
+    pub dangerous_confusions: Vec<(String, String, String)>, // (query, expected, got)
+
+    // Decision traces for regression tracking
+    pub traces: Vec<DecisionTrace>,
+
+    // Results by category
+    pub by_category: HashMap<String, CategoryStats>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CategoryStats {
+    pub total: usize,
+    pub passed: usize,
+    pub failed: usize,
+}
+
+impl TestReport {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn record(
+        &mut self,
+        scenario: &TestScenario,
+        outcome: &VerbSearchOutcome,
+        results: &[VerbSearchResult],
+        elapsed_ms: f64,
+        threshold: f32,
+    ) {
+        self.total += 1;
+
+        // Check if correct
+        let correct = self.check_correct(scenario, outcome, results);
+
+        // Update basic counts
+        if correct {
+            self.passed += 1;
+        } else {
+            self.failed += 1;
+        }
+
+        // Update retrieval quality metrics
+        match outcome {
+            VerbSearchOutcome::Matched(r) => {
+                if let Some(expected) = scenario.expected_verb {
+                    if r.verb == expected {
+                        self.top1_correct += 1;
+                    } else if scenario.expected_outcome == ExpectedOutcome::Matched {
+                        self.confidently_wrong += 1;
+                    }
+                }
+            }
+            VerbSearchOutcome::Ambiguous { .. } => {
+                self.ambiguity_triggered += 1;
+            }
+            VerbSearchOutcome::NoMatch => {
+                self.no_match_count += 1;
+            }
+        }
+
+        // Check top-3 contains correct
+        if let Some(expected) = scenario.expected_verb {
+            let top3_verbs: Vec<&str> = results.iter().take(3).map(|r| r.verb.as_str()).collect();
+            if top3_verbs.contains(&expected)
+                || scenario
+                    .allowed_verbs
+                    .iter()
+                    .any(|v| top3_verbs.contains(v))
+            {
+                self.top3_contains_correct += 1;
+            }
+        }
+
+        // Hard negative tracking
+        if scenario.is_hard_negative {
+            self.hard_negative_total += 1;
+            if correct {
+                self.hard_negative_correct += 1;
+            } else if let VerbSearchOutcome::Matched(r) = outcome {
+                self.dangerous_confusions.push((
+                    scenario.query.to_string(),
+                    scenario.expected_verb.unwrap_or("?").to_string(),
+                    r.verb.clone(),
+                ));
+            }
+        }
+
+        // Category stats
+        let cat = self
+            .by_category
+            .entry(scenario.category.to_string())
+            .or_default();
+        cat.total += 1;
+        if correct {
+            cat.passed += 1;
+        } else {
+            cat.failed += 1;
+        }
+
+        // Record trace
+        self.traces.push(DecisionTrace::from_results(
+            scenario.query,
+            results,
+            outcome,
+            threshold,
+            correct,
+            elapsed_ms,
+        ));
+    }
+
+    fn check_correct(
+        &self,
+        scenario: &TestScenario,
+        outcome: &VerbSearchOutcome,
+        _results: &[VerbSearchResult],
+    ) -> bool {
+        match (scenario.expected_outcome, outcome) {
+            // Expected Matched, got Matched
+            (ExpectedOutcome::Matched, VerbSearchOutcome::Matched(r)) => {
+                // Check verb matches expected or allowed
+                let verb_ok = scenario.allowed_verbs.contains(&r.verb.as_str());
+                // Check score meets minimum
+                let score_ok = scenario.min_score.map_or(true, |min| r.score >= min);
+                verb_ok && score_ok
+            }
+            // Expected Ambiguous, got Ambiguous
+            (ExpectedOutcome::Ambiguous, VerbSearchOutcome::Ambiguous { .. }) => true,
+            // Expected NoMatch, got NoMatch
+            (ExpectedOutcome::NoMatch, VerbSearchOutcome::NoMatch) => true,
+            // Any other combination is wrong
+            _ => false,
+        }
+    }
+
+    pub fn print_summary(&self) {
+        println!("\n============================================================");
+        println!("                    TEST REPORT");
+        println!("============================================================\n");
+
+        // Basic stats
+        println!(
+            "OVERALL: {}/{} passed ({:.1}%)",
+            self.passed,
+            self.total,
+            100.0 * self.passed as f64 / self.total.max(1) as f64
+        );
+        println!();
+
+        // Retrieval quality
+        println!("RETRIEVAL QUALITY:");
+        println!(
+            "  Top-1 correct:      {}/{} ({:.1}%)",
+            self.top1_correct,
+            self.total,
+            100.0 * self.top1_correct as f64 / self.total.max(1) as f64
+        );
+        println!(
+            "  Top-3 contains:     {}/{} ({:.1}%)",
+            self.top3_contains_correct,
+            self.total,
+            100.0 * self.top3_contains_correct as f64 / self.total.max(1) as f64
+        );
+        println!(
+            "  Ambiguity rate:     {}/{} ({:.1}%)",
+            self.ambiguity_triggered,
+            self.total,
+            100.0 * self.ambiguity_triggered as f64 / self.total.max(1) as f64
+        );
+        println!(
+            "  NoMatch rate:       {}/{} ({:.1}%)",
+            self.no_match_count,
+            self.total,
+            100.0 * self.no_match_count as f64 / self.total.max(1) as f64
+        );
+        println!("  Confidently wrong:  {} ⚠️", self.confidently_wrong);
+        println!();
+
+        // Hard negatives
+        if self.hard_negative_total > 0 {
+            println!("HARD NEGATIVES (dangerous confusion):");
+            println!(
+                "  Correct: {}/{} ({:.1}%)",
+                self.hard_negative_correct,
+                self.hard_negative_total,
+                100.0 * self.hard_negative_correct as f64 / self.hard_negative_total as f64
+            );
+            if !self.dangerous_confusions.is_empty() {
+                println!("  Dangerous confusions:");
+                for (query, expected, got) in &self.dangerous_confusions {
+                    println!("    \"{}\" → expected {}, got {}", query, expected, got);
+                }
+            }
+            println!();
+        }
+
+        // By category
+        if self.by_category.len() > 1 {
+            println!("BY CATEGORY:");
+            let mut cats: Vec<_> = self.by_category.iter().collect();
+            cats.sort_by_key(|(k, _)| *k);
+            for (cat, stats) in cats {
+                println!(
+                    "  {}: {}/{} ({:.1}%)",
+                    cat,
+                    stats.passed,
+                    stats.total,
+                    100.0 * stats.passed as f64 / stats.total.max(1) as f64
+                );
+            }
+            println!();
+        }
+
+        // Failed scenarios
+        let failed_traces: Vec<_> = self.traces.iter().filter(|t| !t.correct).collect();
+        if !failed_traces.is_empty() {
+            println!("FAILED SCENARIOS:");
+            for trace in failed_traces.iter().take(10) {
+                println!("  ✗ \"{}\"", trace.query);
+                println!("    outcome: {}", trace.outcome);
+                if !trace.top_k_candidates.is_empty() {
+                    println!(
+                        "    top candidate: {} ({:.3})",
+                        trace.top_k_candidates[0].verb, trace.top_k_candidates[0].score
+                    );
+                }
+            }
+            if failed_traces.len() > 10 {
+                println!("  ... and {} more", failed_traces.len() - 10);
+            }
+        }
+    }
+
+    pub fn all_passed(&self) -> bool {
+        self.failed == 0 && self.errors == 0
+    }
+}
+
+// =============================================================================
+// THRESHOLD SWEEP
+// =============================================================================
+
+#[derive(Debug)]
+pub struct SweepResult {
+    pub threshold: f32,
+    pub margin: f32,
+    pub top1_hit: f64,
+    pub ambiguity_rate: f64,
+    pub confidently_wrong: usize,
+}
+
+async fn run_threshold_sweep(
+    harness: &VerbSearchTestHarness,
+    scenarios: &[TestScenario],
+    thresholds: &[f32],
+    margins: &[f32],
+) -> Vec<SweepResult> {
+    let mut results = Vec::new();
+
+    for &threshold in thresholds {
+        for &margin in margins {
+            let mut top1_correct = 0;
+            let mut ambiguity_count = 0;
+            let mut confidently_wrong = 0;
+            let total = scenarios.len();
+
+            for scenario in scenarios {
+                if let Ok((outcome, _candidates)) = harness
+                    .search_with_threshold(scenario.query, threshold)
+                    .await
+                {
+                    match &outcome {
+                        VerbSearchOutcome::Matched(r) => {
+                            if scenario.allowed_verbs.contains(&r.verb.as_str()) {
+                                top1_correct += 1;
+                            } else if scenario.expected_outcome == ExpectedOutcome::Matched {
+                                confidently_wrong += 1;
+                            }
+                        }
+                        VerbSearchOutcome::Ambiguous { .. } => {
+                            ambiguity_count += 1;
+                        }
+                        VerbSearchOutcome::NoMatch => {}
+                    }
+                }
+            }
+
+            results.push(SweepResult {
+                threshold,
+                margin,
+                top1_hit: 100.0 * top1_correct as f64 / total as f64,
+                ambiguity_rate: 100.0 * ambiguity_count as f64 / total as f64,
+                confidently_wrong,
+            });
+        }
+    }
+
+    results
+}
+
+fn print_sweep_results(results: &[SweepResult]) {
+    println!("\nTHRESHOLD SWEEP RESULTS:");
+    println!(
+        "{:>10} {:>8} {:>10} {:>12} {:>10}",
+        "threshold", "margin", "top1_hit%", "ambiguity%", "conf_wrong"
+    );
+    println!("{}", "-".repeat(52));
+
+    for r in results {
+        println!(
+            "{:>10.2} {:>8.2} {:>10.1} {:>12.1} {:>10}",
+            r.threshold, r.margin, r.top1_hit, r.ambiguity_rate, r.confidently_wrong
+        );
+    }
+}
+
+// =============================================================================
+// TEST SCENARIOS
+// =============================================================================
+
+fn taught_phrase_scenarios() -> Vec<TestScenario> {
+    vec![
+        TestScenario::matched_with_score(
+            "spin up a fund (taught)",
+            "spin up a fund",
+            "cbu.create",
+            0.90,
+        )
+        .with_category("taught"),
+        TestScenario::matched_with_score(
+            "load the allianz book (taught)",
+            "load the allianz book",
+            "session.load-galaxy",
+            0.90,
+        )
+        .with_category("taught"),
+        TestScenario::matched_with_score(
+            "show me the ownership (taught)",
+            "show me the ownership",
+            "control.build-graph",
+            0.90,
+        )
+        .with_category("taught"),
+        TestScenario::matched_with_score(
+            "who controls this entity (taught)",
+            "who controls this entity",
+            "control.build-graph",
+            0.90,
+        )
+        .with_category("taught"),
+        TestScenario::matched_with_score(
+            "find the ultimate beneficial owners (taught)",
+            "find the ultimate beneficial owners",
+            "control.identify-ubos",
+            0.90,
+        )
+        .with_category("taught"),
+        // Variations
+        TestScenario::matched(
+            "spin up a new fund (variation)",
+            "spin up a new fund called Alpha",
+            "cbu.create",
+        )
+        .with_category("taught"),
+        TestScenario::matched(
+            "load allianz (shorter)",
+            "load allianz",
+            "session.load-galaxy",
+        )
+        .with_category("taught"),
+    ]
+}
+
+fn session_scenarios() -> Vec<TestScenario> {
+    vec![
+        TestScenario::matched(
+            "load galaxy",
+            "load the allianz galaxy",
+            "session.load-galaxy",
+        )
+        .with_category("session"),
+        TestScenario::matched(
+            "load book",
+            "load the blackrock book",
+            "session.load-galaxy",
+        )
+        .with_category("session"),
+        TestScenario::matched("load cbu", "load cbu acme fund", "session.load-cbu")
+            .with_category("session"),
+        TestScenario::matched(
+            "load jurisdiction",
+            "load all luxembourg cbus",
+            "session.load-jurisdiction",
+        )
+        .with_category("session"),
+        TestScenario::matched("clear session", "clear the session", "session.clear")
+            .with_category("session"),
+        TestScenario::matched("undo", "undo the last action", "session.undo")
+            .with_category("session"),
+        TestScenario::matched("redo", "redo", "session.redo").with_category("session"),
+        TestScenario::matched("session info", "show session info", "session.info")
+            .with_category("session"),
+    ]
+}
+
+fn cbu_scenarios() -> Vec<TestScenario> {
+    vec![
+        TestScenario::matched("create cbu", "create a new cbu", "cbu.create").with_category("cbu"),
+        TestScenario::matched(
+            "create fund",
+            "create a fund called Alpha Growth",
+            "cbu.create",
+        )
+        .with_category("cbu"),
+        TestScenario::matched(
+            "onboard client",
+            "onboard new client Acme Corp",
+            "cbu.create",
+        )
+        .with_category("cbu"),
+        TestScenario::matched(
+            "assign role",
+            "assign custody role to BNY",
+            "cbu.assign-role",
+        )
+        .with_category("cbu"),
+        TestScenario::matched("list cbus", "list all cbus", "cbu.list").with_category("cbu"),
+    ]
+}
+
+fn entity_scenarios() -> Vec<TestScenario> {
+    vec![
+        TestScenario::matched(
+            "create company",
+            "create a limited company",
+            "entity.create-limited-company",
+        )
+        .with_category("entity"),
+        TestScenario::matched(
+            "create person",
+            "add a natural person",
+            "entity.create-person",
+        )
+        .with_category("entity"),
+        TestScenario::matched("search entity", "find entity BlackRock", "entity.search")
+            .with_category("entity"),
+        TestScenario::matched("entity details", "show entity details", "entity.get")
+            .with_category("entity"),
+    ]
+}
+
+fn kyc_scenarios() -> Vec<TestScenario> {
+    vec![
+        TestScenario::matched(
+            "discover ubo",
+            "discover ultimate beneficial owners",
+            "ubo.discover",
+        )
+        .with_category("kyc"),
+        TestScenario::matched("who owns", "who owns this company", "ubo.discover")
+            .with_category("kyc"),
+        TestScenario::matched(
+            "ownership chain",
+            "show the ownership chain",
+            "control.build-graph",
+        )
+        .with_category("kyc"),
+        TestScenario::matched("create kyc case", "open a kyc case", "kyc.create-case")
+            .with_category("kyc"),
+    ]
+}
+
+fn view_scenarios() -> Vec<TestScenario> {
+    vec![
+        TestScenario::matched("view universe", "show the universe", "view.universe")
+            .with_category("view"),
+        TestScenario::matched("view cbu", "focus on this cbu", "view.cbu").with_category("view"),
+        TestScenario::matched("drill down", "drill into entity", "view.drill")
+            .with_category("view"),
+        TestScenario::matched("surface up", "surface back up", "view.surface")
+            .with_category("view"),
+    ]
+}
+
+/// Hard negative pairs - dangerous confusions that MUST NOT happen
+fn hard_negative_scenarios() -> Vec<TestScenario> {
+    vec![
+        // create vs update
+        TestScenario::matched("create not update", "create a new cbu", "cbu.create")
+            .hard_negative(),
+        TestScenario::matched("update not create", "update cbu details", "cbu.update")
+            .hard_negative(),
+        // delete vs disable/archive
+        TestScenario::matched("delete entity", "delete this entity", "entity.delete")
+            .hard_negative()
+            .with_alternatives(&["entity.archive"]), // archive also acceptable
+        // approve vs submit
+        TestScenario::matched("approve case", "approve the kyc case", "kyc.approve-case")
+            .hard_negative(),
+        TestScenario::matched(
+            "submit case",
+            "submit the kyc case for review",
+            "kyc.submit-case",
+        )
+        .hard_negative(),
+        // load vs unload
+        TestScenario::matched("load cbu", "load cbu into session", "session.load-cbu")
+            .hard_negative(),
+        TestScenario::matched(
+            "unload cbu",
+            "unload cbu from session",
+            "session.unload-cbu",
+        )
+        .hard_negative(),
+        // add vs remove
+        TestScenario::matched(
+            "add instrument",
+            "add equity instruments",
+            "trading-profile.add-instruments",
+        )
+        .hard_negative(),
+        TestScenario::matched(
+            "remove instrument",
+            "remove equity instruments",
+            "trading-profile.remove-instruments",
+        )
+        .hard_negative(),
+    ]
+}
+
+fn edge_case_scenarios() -> Vec<TestScenario> {
+    vec![
+        TestScenario::no_match("garbage input", "asdfghjkl qwerty").with_category("edge"),
+        TestScenario::no_match("random words", "purple elephant dancing").with_category("edge"),
+        TestScenario::no_match("single word nonsense", "xyz").with_category("edge"),
+        TestScenario::ambiguous("ambiguous create", "create something").with_category("edge"),
+    ]
+}
+
+// =============================================================================
+// TEST RUNNER
+// =============================================================================
+
+async fn run_scenarios(harness: &VerbSearchTestHarness, scenarios: &[TestScenario]) -> TestReport {
+    let mut report = TestReport::new();
+    let threshold = harness.searcher.semantic_threshold();
+
+    for scenario in scenarios {
+        let start = std::time::Instant::now();
+        match harness
+            .search_with_threshold(scenario.query, threshold)
+            .await
+        {
+            Ok((outcome, results)) => {
+                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+                report.record(scenario, &outcome, &results, elapsed_ms, threshold);
+            }
+            Err(e) => {
+                report.errors += 1;
+                report.total += 1;
+                eprintln!("Error for \"{}\": {}", scenario.query, e);
+            }
+        }
+    }
+
+    report
+}
+
+// =============================================================================
+// INTEGRATION TESTS
+// =============================================================================
+
+#[tokio::test]
+#[ignore]
+async fn test_taught_phrases() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+    let report = run_scenarios(&harness, &taught_phrase_scenarios()).await;
+    report.print_summary();
+    assert!(report.all_passed(), "Some taught phrase tests failed");
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_session_verbs() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+    let report = run_scenarios(&harness, &session_scenarios()).await;
+    report.print_summary();
+    assert!(report.all_passed(), "Some session verb tests failed");
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_hard_negatives() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+    let report = run_scenarios(&harness, &hard_negative_scenarios()).await;
+    report.print_summary();
+
+    // Hard negatives are critical - fail if ANY dangerous confusions
+    assert!(
+        report.dangerous_confusions.is_empty(),
+        "CRITICAL: Dangerous confusions detected! These could cause data loss."
+    );
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_all_scenarios() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    let mut all_scenarios = Vec::new();
+    all_scenarios.extend(taught_phrase_scenarios());
+    all_scenarios.extend(session_scenarios());
+    all_scenarios.extend(cbu_scenarios());
+    all_scenarios.extend(entity_scenarios());
+    all_scenarios.extend(kyc_scenarios());
+    all_scenarios.extend(view_scenarios());
+    all_scenarios.extend(hard_negative_scenarios());
+    all_scenarios.extend(edge_case_scenarios());
+
+    let report = run_scenarios(&harness, &all_scenarios).await;
+    report.print_summary();
+}
+
+#[tokio::test]
+#[ignore]
+async fn test_threshold_sweep() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    let mut scenarios = Vec::new();
+    scenarios.extend(taught_phrase_scenarios());
+    scenarios.extend(session_scenarios());
+    scenarios.extend(cbu_scenarios());
+
+    let thresholds = vec![0.75, 0.80, 0.85, 0.88, 0.90, 0.92];
+    let margins = vec![0.05]; // Keep margin constant for this sweep
+
+    let results = run_threshold_sweep(&harness, &scenarios, &thresholds, &margins).await;
+    print_sweep_results(&results);
+}
+
+/// Interactive exploration - search and show top-5 results
+#[tokio::test]
+#[ignore]
+async fn explore_query() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    // Change this query to explore different inputs
+    let query = "load the allianz book";
+
+    println!("Query: \"{}\"\n", query);
+
+    let results = harness.search_raw(query, 5).await.unwrap();
+
+    if results.is_empty() {
+        println!("No results found (below threshold)");
+    } else {
+        println!("Top {} results:", results.len());
+        for (i, r) in results.iter().enumerate() {
+            println!(
+                "  {}. {} ({:.3}) via {:?}",
+                i + 1,
+                r.verb,
+                r.score,
+                r.source
+            );
+            println!("     matched: \"{}\"", r.matched_phrase);
+        }
+    }
+
+    let outcome = check_ambiguity(&results, harness.searcher.semantic_threshold());
+    println!("\nOutcome: {:?}", outcome);
+}
+
+// =============================================================================
+// UNIT TESTS (no DB required)
+// =============================================================================
+
+#[test]
+fn test_ambiguity_detection() {
+    let threshold = 0.88;
+
+    // Clear winner
+    let clear_winner = vec![
+        VerbSearchResult {
+            verb: "cbu.create".to_string(),
+            score: 0.95,
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create cbu".to_string(),
+            description: None,
+        },
+        VerbSearchResult {
+            verb: "entity.create-limited-company".to_string(),
+            score: 0.85,
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create company".to_string(),
+            description: None,
+        },
+    ];
+
+    match check_ambiguity(&clear_winner, threshold) {
+        VerbSearchOutcome::Matched(r) => assert_eq!(r.verb, "cbu.create"),
+        other => panic!("Expected Matched, got {:?}", other),
+    }
+
+    // Ambiguous
+    let ambiguous = vec![
+        VerbSearchResult {
+            verb: "cbu.create".to_string(),
+            score: 0.92,
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create cbu".to_string(),
+            description: None,
+        },
+        VerbSearchResult {
+            verb: "entity.create-limited-company".to_string(),
+            score: 0.90,
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create company".to_string(),
+            description: None,
+        },
+    ];
+
+    match check_ambiguity(&ambiguous, threshold) {
+        VerbSearchOutcome::Ambiguous { .. } => {}
+        other => panic!("Expected Ambiguous, got {:?}", other),
+    }
+
+    // No match
+    let below = vec![VerbSearchResult {
+        verb: "cbu.create".to_string(),
+        score: 0.80,
+        source: VerbSearchSource::Semantic,
+        matched_phrase: "create cbu".to_string(),
+        description: None,
+    }];
+
+    assert!(matches!(
+        check_ambiguity(&below, threshold),
+        VerbSearchOutcome::NoMatch
+    ));
+}
+
+#[test]
+fn test_normalize_candidates() {
+    let candidates = vec![
+        VerbSearchResult {
+            verb: "cbu.create".to_string(),
+            score: 0.80,
+            source: VerbSearchSource::LearnedSemantic,
+            matched_phrase: "make a cbu".to_string(),
+            description: None,
+        },
+        VerbSearchResult {
+            verb: "cbu.create".to_string(),
+            score: 0.95,
+            source: VerbSearchSource::PatternEmbedding,
+            matched_phrase: "create cbu".to_string(),
+            description: None,
+        },
+        VerbSearchResult {
+            verb: "entity.create-limited-company".to_string(),
+            score: 0.85,
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create company".to_string(),
+            description: None,
+        },
+    ];
+
+    let normalized = normalize_candidates(candidates, 10);
+
+    assert_eq!(normalized.len(), 2);
+    assert_eq!(normalized[0].verb, "cbu.create");
+    assert!((normalized[0].score - 0.95).abs() < 0.001);
+}

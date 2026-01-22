@@ -138,6 +138,10 @@ pub fn check_ambiguity(candidates: &[VerbSearchResult], threshold: f32) -> VerbS
 ///
 /// Essential for J/D correctness — candidates are appended tier-by-tier during search,
 /// so without this, candidates[0] is not guaranteed to be the best match.
+///
+/// INVARIANT: When same verb appears from multiple sources (trie, semantic, phonetic),
+/// we keep the BEST score, not first-seen. This ensures the final ranking reflects
+/// true match quality across all discovery methods.
 pub fn normalize_candidates(
     mut results: Vec<VerbSearchResult>,
     limit: usize,
