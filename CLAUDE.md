@@ -14,6 +14,7 @@
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
 > **Teaching Mechanism (044):** ✅ Complete - Direct phrase→verb mapping for trusted sources
+> **Verb Search Test Harness:** ✅ Complete - Full pipeline sweep, safety-first policy, `cargo x test-verbs`
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -766,6 +767,77 @@ Always run `populate_embeddings` after teaching to enable semantic matching:
 DATABASE_URL="postgresql:///data_designer" \
   cargo run --release --package ob-semantic-matcher --bin populate_embeddings
 ```
+
+---
+
+## Verb Search Test Harness
+
+Comprehensive test harness for verifying semantic matching after teaching new phrases or tuning thresholds.
+
+### Quick Start
+
+```bash
+# Run all verb search tests
+cargo x test-verbs
+
+# Specific test categories
+cargo x test-verbs --taught       # Only taught phrase tests
+cargo x test-verbs --hard-negatives  # Dangerous confusion detection
+cargo x test-verbs --sweep        # Threshold calibration sweep
+
+# Explore a specific query
+cargo x test-verbs --explore "load the allianz book"
+```
+
+### Test Categories
+
+| Category | Purpose |
+|----------|---------|
+| `taught` | Verify taught phrases match expected verbs |
+| `session` | Session management verbs (load, unload, undo) |
+| `cbu` | CBU lifecycle verbs |
+| `hard_negative` | Dangerous confusions (delete vs archive) |
+| `safety_first` | Verbs where ambiguity is acceptable |
+| `edge` | Edge cases (garbage input, ambiguous queries) |
+
+### Threshold Sweep (Full Pipeline)
+
+The sweep tests both retrieval AND decision thresholds:
+
+```bash
+# Quick sweep (3 combinations)
+cargo x test-verbs --sweep
+
+# Full sweep (180 combinations) - comprehensive exploration
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test verb_search_integration test_threshold_sweep_full -- --ignored --nocapture
+```
+
+**Output:**
+```
+sem_thr  fall_thr margin top1_hit%   ambig%    wrong no_match
+   0.85     0.78   0.05      85.0       5.0        0        2
+   0.88     0.78   0.05      80.0       8.0        0        4
+   ...
+✓ BEST (0 wrong): semantic=0.85 fallback=0.78 margin=0.05 → 85.0% top-1
+```
+
+### Safety-First Policy
+
+For dangerous verb pairs (delete/archive, approve/submit), the harness uses `ExpectedOutcome::MatchedOrAmbiguous`:
+
+- **Matched(correct)** → Pass (correct verb selected)
+- **Ambiguous** → Pass (disambiguation UI triggered - safe)
+- **Matched(wrong)** → FAIL (dangerous confusion)
+
+This prevents optimizing for overconfident behavior on safety-critical verbs.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/tests/verb_search_integration.rs` | Test harness implementation |
+| `rust/xtask/src/main.rs` | `cargo x test-verbs` command |
 
 ---
 
