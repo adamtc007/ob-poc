@@ -368,7 +368,7 @@ User says: "spin up a fund for Acme"
 | **J/D** | LIMIT 1 prevented ambiguity detection | Top-k semantic search + `normalize_candidates()` + `AMBIGUITY_MARGIN = 0.05` |
 | **I** | Two competing global sources | Union `agent.invocation_phrases` + `verb_pattern_embeddings`, dedupe by verb |
 | **G** | Embedding computed 4x per search | Compute once at top of `search()`, pass through |
-| **H** | Hardcoded 0.5 threshold | Added `fallback_threshold` (0.65), `semantic_threshold` (0.80) |
+| **H** | Hardcoded 0.5 threshold | Added `fallback_threshold` (0.70), `semantic_threshold` (0.78) |
 
 **Search Priority (Updated):**
 
@@ -919,8 +919,8 @@ IntentPipeline.process()
 
 | Threshold | Value | Purpose |
 |-----------|-------|---------|
-| `semantic_threshold` | 0.88 | High-confidence auto-match |
-| `fallback_threshold` | 0.78 | Lower bar for suggestions |
+| `semantic_threshold` | 0.78 | Decision gate for accepting match |
+| `fallback_threshold` | 0.70 | Retrieval cutoff for DB queries |
 | `blocklist_threshold` | 0.85 | Collision detection |
 
 ### Adding Navigation Phrases
