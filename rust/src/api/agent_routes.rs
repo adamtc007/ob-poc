@@ -836,6 +836,9 @@ pub struct AgentState {
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
     /// Feedback service for learning loop
     pub feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
+    /// Shared embedder for lazy initialization (populated by background task)
+    pub shared_embedder:
+        Arc<tokio::sync::RwLock<Option<Arc<crate::agent::learning::embedder::CandleEmbedder>>>>,
 }
 
 impl AgentState {
@@ -855,6 +858,7 @@ impl AgentState {
         let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
         // Create SessionManager wrapping the same session store
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
+        let shared_embedder = Arc::new(tokio::sync::RwLock::new(None));
         Self {
             pool,
             dsl_v2_executor,
@@ -865,6 +869,7 @@ impl AgentState {
             dsl_repo,
             agent_service,
             feedback_service,
+            shared_embedder,
         }
     }
 
@@ -875,6 +880,7 @@ impl AgentState {
     /// 2. Background task initializes Candle embedder (~3-5s)
     /// 3. Once ready, semantic index is built and injected into registry
     /// 4. Semantic fallback becomes available without restart
+    /// 5. AgentService gets lazy embedder for verb search semantic matching
     ///
     /// Trie lookups handle exact/prefix/contains matches which cover 95%+ of use cases.
     /// Semantic fallback handles novel phrases that don't match any pattern.
@@ -889,6 +895,9 @@ impl AgentState {
         let dsl_repo = Arc::new(crate::database::DslRepository::new(pool.clone()));
         let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
+
+        // Shared embedder - populated by background task, used by AgentService for verb search
+        let shared_embedder: Arc<RwLock<Option<Arc<CandleEmbedder>>>> = Arc::new(RwLock::new(None));
 
         // Phase 1: Build ESPER registry with trie only (fast - ~10ms)
         let esper_registry: Option<Arc<RwLock<crate::agent::esper::EsperCommandRegistry>>> = {
@@ -911,14 +920,17 @@ impl AgentState {
             }
         };
 
-        // Build agent service with ESPER support
-        let mut agent_service = crate::api::agent_service::AgentService::with_pool(pool.clone());
+        // Build agent service with ESPER support AND lazy embedder for verb search
+        let mut agent_service = crate::api::agent_service::AgentService::with_pool(pool.clone())
+            .with_lazy_embedder(shared_embedder.clone());
         if let Some(ref reg) = esper_registry {
             agent_service = agent_service.with_esper_registry(reg.clone());
         }
 
         // Phase 2: Spawn background task to initialize Candle and build semantic index
         // This runs after server is ready to accept requests
+        // Clone shared_embedder for the background task
+        let shared_embedder_for_task = shared_embedder.clone();
         if let Some(registry) = esper_registry.clone() {
             tokio::spawn(async move {
                 tracing::info!("Starting lazy Candle embedder initialization...");
@@ -941,6 +953,13 @@ impl AgentState {
                         return;
                     }
                 };
+
+                // Store embedder in shared state for AgentService to use
+                {
+                    let mut guard = shared_embedder_for_task.write().await;
+                    *guard = Some(embedder.clone());
+                    tracing::info!("Shared embedder now available for verb search");
+                }
 
                 // Build semantic index from registry aliases
                 let embed_start = std::time::Instant::now();
@@ -991,6 +1010,40 @@ impl AgentState {
                     );
                 }
             });
+        } else {
+            // No ESPER registry, but still spawn background task to initialize embedder
+            // for verb search semantic matching
+            tokio::spawn(async move {
+                tracing::info!("Starting lazy Candle embedder initialization (for verb search)...");
+                let start = std::time::Instant::now();
+
+                let embedder = match tokio::task::spawn_blocking(CandleEmbedder::new).await {
+                    Ok(Ok(e)) => {
+                        let init_ms = start.elapsed().as_millis();
+                        tracing::info!("Candle embedder initialized in {}ms", init_ms);
+                        Arc::new(e)
+                    }
+                    Ok(Err(e)) => {
+                        tracing::warn!("Failed to initialize Candle embedder: {}", e);
+                        tracing::warn!("Verb search semantic fallback will be disabled");
+                        return;
+                    }
+                    Err(e) => {
+                        tracing::warn!("Candle embedder task panicked: {}", e);
+                        return;
+                    }
+                };
+
+                // Store embedder in shared state for AgentService to use
+                {
+                    let mut guard = shared_embedder_for_task.write().await;
+                    *guard = Some(embedder);
+                    tracing::info!(
+                        "Shared embedder now available for verb search (total: {}ms)",
+                        start.elapsed().as_millis()
+                    );
+                }
+            });
         }
 
         Self {
@@ -1003,6 +1056,7 @@ impl AgentState {
             dsl_repo,
             agent_service: Arc::new(agent_service),
             feedback_service,
+            shared_embedder,
         }
     }
 }
@@ -1580,6 +1634,7 @@ async fn chat_subsession(
                 disambiguation_request: None,
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             }
         }
         SubSessionType::Review(_) => {
@@ -1592,6 +1647,7 @@ async fn chat_subsession(
                 disambiguation_request: None,
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             }
         }
         _ => {
@@ -1679,6 +1735,7 @@ async fn process_resolution_message(
         disambiguation_request: None,
         unresolved_refs: None,
         current_ref_index: None,
+        dsl_hash: None,
     })
 }
 
@@ -1760,6 +1817,7 @@ fn handle_resolution_selection(
             disambiguation_request: None,
             unresolved_refs: None,
             current_ref_index: None,
+            dsl_hash: None,
         });
     }
 
@@ -1829,6 +1887,7 @@ fn handle_resolution_selection(
         disambiguation_request: None,
         unresolved_refs: None,
         current_ref_index: None,
+        dsl_hash: None,
     })
 }
 
@@ -1877,6 +1936,7 @@ fn handle_resolution_skip(
         disambiguation_request: None,
         unresolved_refs: None,
         current_ref_index: None,
+        dsl_hash: None,
     })
 }
 
@@ -2521,6 +2581,7 @@ async fn chat_session(
                 disambiguation_request: None,
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             }));
         }
         // /commands <domain> or /verbs <domain> - show verbs for domain
@@ -2533,6 +2594,7 @@ async fn chat_session(
                 disambiguation_request: None,
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             }));
         }
         // /verbs (no args) - show all verbs
@@ -2545,6 +2607,7 @@ async fn chat_session(
                 disambiguation_request: None,
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             }));
         }
         _ => {} // Not a slash command, continue to LLM
@@ -2566,6 +2629,7 @@ async fn chat_session(
                 disambiguation_request: None,
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             }));
         }
     };
@@ -2601,6 +2665,7 @@ async fn chat_session(
                 disambiguation_request: None,
                 unresolved_refs: None,
                 current_ref_index: None,
+                dsl_hash: None,
             }));
         }
     };
@@ -2718,6 +2783,7 @@ async fn chat_session(
             .as_ref()
             .map(|refs| to_api_unresolved_refs(refs)),
         current_ref_index: response.current_ref_index,
+        dsl_hash: response.dsl_hash,
     }))
 }
 

@@ -649,12 +649,14 @@ pub async fn select_resolution(
     session_id: Uuid,
     ref_id: &str,
     resolved_key: &str,
+    dsl_hash: Option<String>,
 ) -> Result<SelectResolutionResponse, String> {
     post(
         &format!("/api/session/{}/resolution/select", session_id),
         &SelectResolutionRequest {
             ref_id: ref_id.to_string(),
             resolved_key: resolved_key.to_string(),
+            dsl_hash,
         },
     )
     .await

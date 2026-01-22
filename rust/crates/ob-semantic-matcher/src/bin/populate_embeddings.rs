@@ -136,7 +136,7 @@ async fn main() -> Result<()> {
     info!("Found {} patterns to process", patterns.len());
 
     let start_time = std::time::Instant::now();
-    let total_batches = (patterns.len() + BATCH_SIZE - 1) / BATCH_SIZE;
+    let total_batches = patterns.len().div_ceil(BATCH_SIZE);
 
     info!(
         "Processing {} patterns in {} batches of {}...",

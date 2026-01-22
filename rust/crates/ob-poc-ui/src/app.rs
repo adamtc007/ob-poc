@@ -1582,28 +1582,9 @@ impl eframe::App for App {
         // Process Galaxy Navigation Commands (universe/cluster drill-down)
         // =================================================================
 
-        // Handle universe graph result (from GET /api/universe)
-        if let Some(result) = self.state.take_pending_universe_graph() {
-            match result {
-                Ok(universe) => {
-                    web_sys::console::log_1(
-                        &format!(
-                            "update: received universe graph with {} clusters",
-                            universe.clusters.len()
-                        )
-                        .into(),
-                    );
-                    // Update galaxy view with new data
-                    self.state.galaxy_view.set_universe_data(&universe);
-                    self.state.universe_graph = Some(universe);
-                }
-                Err(e) => {
-                    web_sys::console::error_1(
-                        &format!("update: failed to fetch universe: {}", e).into(),
-                    );
-                }
-            }
-        }
+        // NOTE: Universe graph processing moved to state.rs::process_async_results()
+        // to avoid race condition where extract_pending() takes the value before
+        // take_pending_universe_graph() can access it.
 
         // Handle universe refetch flag
         if self.state.take_pending_universe_refetch() {
@@ -4696,13 +4677,16 @@ impl AppState {
                             if !refs.is_empty() {
                                 web_sys::console::log_1(
                                     &format!(
-                                        "send_chat: {} unresolved refs, opening resolution modal directly",
-                                        refs.len()
+                                        "send_chat: {} unresolved refs, opening resolution modal directly, dsl_hash={:?}",
+                                        refs.len(),
+                                        chat_response.dsl_hash
                                     )
                                     .into(),
                                 );
                                 state.pending_unresolved_refs = Some(refs);
                                 state.pending_current_ref_index = chat_response.current_ref_index;
+                                // Store dsl_hash for resolution commit verification (Issue K)
+                                state.pending_dsl_hash = chat_response.dsl_hash.clone();
                             }
                         }
                     }
@@ -4898,6 +4882,8 @@ impl AppState {
 
         let ref_id = ref_id.to_string();
         let resolved_key = resolved_key.to_string();
+        // Get dsl_hash for commit verification (Issue K)
+        let dsl_hash = self.resolution_ui.dsl_hash.clone();
 
         {
             let mut state = self.async_state.lock().unwrap();
@@ -4908,7 +4894,7 @@ impl AppState {
         let ctx = self.ctx.clone();
 
         spawn_local(async move {
-            let result = api::select_resolution(session_id, &ref_id, &resolved_key).await;
+            let result = api::select_resolution(session_id, &ref_id, &resolved_key, dsl_hash).await;
             if let Ok(mut state) = async_state.lock() {
                 match result {
                     Ok(response) => {

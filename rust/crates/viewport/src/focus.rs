@@ -88,10 +88,10 @@ pub enum FocusTransition {
 /// Apply a focus transition to a FocusManager
 ///
 /// Returns a reference to the new state after applying the transition.
-pub fn apply_transition<'a>(
-    manager: &'a mut FocusManager,
+pub fn apply_transition(
+    manager: &mut FocusManager,
     transition: FocusTransition,
-) -> &'a ViewportFocusState {
+) -> &ViewportFocusState {
     match transition {
         FocusTransition::Clear => {
             manager.focus_stack.clear();

@@ -723,6 +723,11 @@ pub struct ChatResponse {
     /// Index of current ref being resolved (if in resolution state)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_ref_index: Option<usize>,
+
+    /// Hash of current DSL for resolution commit verification (Issue K)
+    /// UI must pass this back when resolving refs to prevent stale commits
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dsl_hash: Option<String>,
 }
 
 /// Session state enum for typed responses - matches server's SessionState

@@ -651,6 +651,9 @@ pub struct ResolutionPanelUi {
     pub current_ref: Option<UnresolvedRefResponse>,
     /// Debounce: pending search trigger time (for 300ms delay)
     pub pending_search_trigger: Option<f64>,
+    /// DSL hash for resolution commit verification (Issue K)
+    /// Stored from ChatResponse, must be passed to select_resolution
+    pub dsl_hash: Option<String>,
 }
 
 /// CBU search modal UI state
@@ -779,6 +782,8 @@ pub struct PendingResults {
     // Unresolved refs (direct from ChatResponse)
     pub unresolved_refs: Option<Vec<UnresolvedRefResponse>>,
     pub current_ref_index: Option<usize>,
+    /// DSL hash for resolution commit verification (Issue K)
+    pub dsl_hash: Option<String>,
 
     // Command triggers
     pub search_cbu_query: Option<String>,
@@ -868,6 +873,8 @@ pub struct AsyncState {
     pub pending_unresolved_refs: Option<Vec<UnresolvedRefResponse>>,
     /// Current ref index from chat response
     pub pending_current_ref_index: Option<usize>,
+    /// DSL hash for resolution commit verification (Issue K)
+    pub pending_dsl_hash: Option<String>,
 
     // Command triggers (from agent commands)
     pub pending_execute: Option<Uuid>, // Session ID to execute
@@ -1060,6 +1067,7 @@ impl AsyncState {
             // Unresolved refs
             unresolved_refs: self.pending_unresolved_refs.take(),
             current_ref_index: self.pending_current_ref_index.take(),
+            dsl_hash: self.pending_dsl_hash.take(),
 
             // Command triggers
             search_cbu_query: self.pending_search_cbu_query.take(),
@@ -1232,8 +1240,26 @@ impl AppState {
                                 state.needs_graph_refetch = true;
                                 state.pending_cbu_id = watch_response.active_cbu_id;
                             }
-                            if watch_response.scope_type.is_some() {
-                                state.needs_graph_refetch = true;
+                            // Differentiate scope types: single-CBU triggers graph refetch,
+                            // multi-CBU scopes (book, jurisdiction, neighborhood) trigger scope_graph refetch
+                            if let Some(ref scope_type) = watch_response.scope_type {
+                                match scope_type.as_str() {
+                                    "cbu" => {
+                                        // Single CBU - use regular graph fetch
+                                        state.needs_graph_refetch = true;
+                                    }
+                                    "book" | "jurisdiction" | "neighborhood" | "custom" => {
+                                        // Multi-CBU scopes - use scope graph fetch
+                                        state.needs_scope_graph_refetch = true;
+                                    }
+                                    "empty" => {
+                                        // No scope set, nothing to fetch
+                                    }
+                                    _ => {
+                                        // Unknown scope type, default to scope graph
+                                        state.needs_scope_graph_refetch = true;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1295,7 +1321,9 @@ impl AppState {
                         .into(),
                     );
 
+                    // Handle view level based on CBU count
                     if data.cbu_count > 1 {
+                        // Multi-CBU: show cluster view
                         use ob_poc_types::galaxy::RiskRating;
                         let manco = ManCoData {
                             entity_id: Uuid::nil(),
@@ -1318,6 +1346,24 @@ impl AppState {
                             .collect();
                         self.cluster_view.load_data(manco, cbus);
                         self.view_level = ob_poc_types::galaxy::ViewLevel::Cluster;
+                    } else if data.cbu_count == 1 {
+                        // Single CBU: show system view (CBU graph)
+                        // Graph data is already in data.graph - just set the view level
+                        if let Some(cbu_id) = data.cbu_ids.first() {
+                            web_sys::console::log_1(
+                                &format!(
+                                    "process_async_results: single CBU {}, setting System view",
+                                    cbu_id
+                                )
+                                .into(),
+                            );
+                            // Queue CBU selection for the update loop to process
+                            if let Ok(mut async_state) = self.async_state.lock() {
+                                async_state.pending_cbu_id = Some(*cbu_id);
+                                async_state.needs_graph_refetch = false; // Graph already in response
+                            }
+                            self.view_level = ob_poc_types::galaxy::ViewLevel::System;
+                        }
                     }
 
                     if let Some(graph_data) = data.graph {
@@ -1332,6 +1378,30 @@ impl AppState {
                 Err(e) => {
                     web_sys::console::error_1(&format!("Scope graph fetch failed: {}", e).into());
                     set_error(async_state, format!("Scope graph fetch failed: {}", e));
+                }
+            }
+        }
+
+        // Process universe graph fetch (galaxy view data)
+        if let Some(result) = pending.universe_graph {
+            match result {
+                Ok(universe) => {
+                    web_sys::console::log_1(
+                        &format!(
+                            "process_async_results: universe graph received with {} clusters",
+                            universe.clusters.len()
+                        )
+                        .into(),
+                    );
+                    // Update galaxy view with new data
+                    self.galaxy_view.set_universe_data(&universe);
+                    self.universe_graph = Some(universe);
+                }
+                Err(e) => {
+                    web_sys::console::error_1(
+                        &format!("process_async_results: universe fetch failed: {}", e).into(),
+                    );
+                    set_error(async_state, format!("Universe fetch failed: {}", e));
                 }
             }
         }
@@ -1420,13 +1490,16 @@ impl AppState {
 
             web_sys::console::log_1(
                 &format!(
-                    "process_async_results: opening resolution modal for {} refs",
-                    refs.len()
+                    "process_async_results: opening resolution modal for {} refs, dsl_hash={:?}",
+                    refs.len(),
+                    pending.dsl_hash
                 )
                 .into(),
             );
 
             self.resolution_ui.show_panel = true;
+            // Store dsl_hash for resolution commit verification (Issue K)
+            self.resolution_ui.dsl_hash = pending.dsl_hash.clone();
 
             if let Some(current_ref) = refs.get(current_index) {
                 self.resolution_ui.current_ref = Some(current_ref.clone());
@@ -2461,14 +2534,8 @@ impl AppState {
 
     // === Galaxy Navigation take_pending_* methods ===
 
-    /// Take pending universe graph result (from GET /api/universe)
-    pub fn take_pending_universe_graph(&self) -> Option<Result<UniverseGraph, String>> {
-        if let Ok(mut state) = self.async_state.lock() {
-            state.pending_universe_graph.take()
-        } else {
-            None
-        }
-    }
+    // NOTE: take_pending_universe_graph() removed - universe_graph is now processed
+    // in process_async_results() to avoid race condition with extract_pending().
 
     /// Take pending drill into cluster action
     pub fn take_pending_drill_cluster(&self) -> Option<String> {

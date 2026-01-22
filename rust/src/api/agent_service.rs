@@ -387,8 +387,13 @@ pub struct AgentService {
     esper_registry: Option<Arc<RwLock<EsperCommandRegistry>>>,
     /// Embedder for semantic fallback (ESPER + verb search)
     embedder: Option<Arc<CandleEmbedder>>,
+    /// Lazy embedder for background initialization
+    /// Checked when creating verb searcher if embedder is None
+    lazy_embedder: Option<Arc<RwLock<Option<Arc<CandleEmbedder>>>>>,
     /// Cached verb searcher for semantic intent matching
     verb_searcher: tokio::sync::Mutex<Option<HybridVerbSearcher>>,
+    /// Whether verb searcher was created with embedder
+    verb_searcher_has_embedder: std::sync::atomic::AtomicBool,
 }
 
 #[allow(dead_code)]
@@ -401,7 +406,9 @@ impl AgentService {
             client_scope: None,
             esper_registry: None,
             embedder: None,
+            lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
+            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -413,7 +420,9 @@ impl AgentService {
             client_scope: None,
             esper_registry: None,
             embedder: None,
+            lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
+            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -425,7 +434,9 @@ impl AgentService {
             client_scope: None,
             esper_registry: None,
             embedder: None,
+            lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
+            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -446,9 +457,44 @@ impl AgentService {
         self
     }
 
+    /// Set lazy embedder for background initialization
+    /// The embedder will be checked when creating verb searcher
+    pub fn with_lazy_embedder(
+        mut self,
+        lazy_embedder: Arc<RwLock<Option<Arc<CandleEmbedder>>>>,
+    ) -> Self {
+        self.lazy_embedder = Some(lazy_embedder);
+        self
+    }
+
     /// Get or create verb searcher for semantic intent matching
     async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher, String> {
+        // Check if lazy embedder became available and we need to rebuild
+        let embedder_now_available = if self.lazy_embedder.is_some()
+            && !self
+                .verb_searcher_has_embedder
+                .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            // Check if lazy embedder has been populated
+            if let Some(ref lazy) = self.lazy_embedder {
+                lazy.read().await.is_some()
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         let mut guard = self.verb_searcher.lock().await;
+
+        // If embedder became available but searcher doesn't have it, rebuild
+        if embedder_now_available {
+            tracing::info!(
+                "Lazy embedder now available, rebuilding verb searcher with semantic support"
+            );
+            *guard = None; // Force rebuild
+        }
+
         if let Some(searcher) = guard.as_ref() {
             return Ok(searcher.clone());
         }
@@ -463,9 +509,20 @@ impl AgentService {
         let mut searcher = HybridVerbSearcher::new(verb_service, None);
 
         // Add embedder if available (for semantic fallback)
+        // First check direct embedder, then lazy embedder
+        let mut has_embedder = false;
         if let Some(embedder) = &self.embedder {
             searcher = searcher.with_embedder(embedder.clone());
+            has_embedder = true;
+        } else if let Some(ref lazy) = self.lazy_embedder {
+            if let Some(embedder) = lazy.read().await.clone() {
+                searcher = searcher.with_embedder(embedder);
+                has_embedder = true;
+            }
         }
+
+        self.verb_searcher_has_embedder
+            .store(has_embedder, std::sync::atomic::Ordering::Relaxed);
 
         *guard = Some(searcher.clone());
         Ok(searcher)
@@ -490,7 +547,9 @@ impl AgentService {
             client_scope: Some(ClientScope::new(client_id, accessible_cbus)),
             esper_registry: None,
             embedder: None,
+            lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
+            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -509,7 +568,9 @@ impl AgentService {
             client_scope: Some(scope),
             esper_registry: None,
             embedder: None,
+            lazy_embedder: None,
             verb_searcher: tokio::sync::Mutex::new(None),
+            verb_searcher_has_embedder: std::sync::atomic::AtomicBool::new(false),
         }
     }
 

@@ -420,6 +420,10 @@ pub struct SelectResolutionRequest {
     pub ref_id: String,
     /// Selected entity key (UUID as string)
     pub resolved_key: String,
+    /// DSL hash for commit verification (Issue K - prevents stale commits)
+    /// Optional for backwards compatibility
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dsl_hash: Option<String>,
 }
 
 /// Response from selecting a resolution

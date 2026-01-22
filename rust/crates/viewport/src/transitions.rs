@@ -131,13 +131,13 @@ impl TransitionValidator {
                 matrix,
                 instrument_type,
                 ..
-            } => Ok((cbu.clone(), matrix.clone(), instrument_type.clone())),
+            } => Ok((cbu.clone(), matrix.clone(), *instrument_type)),
             ViewportFocusState::ConfigNode {
                 cbu,
                 matrix,
                 instrument_type,
                 ..
-            } => Ok((cbu.clone(), matrix.clone(), instrument_type.clone())),
+            } => Ok((cbu.clone(), matrix.clone(), *instrument_type)),
             ViewportFocusState::BoardControl { .. } => Err(TransitionError::NoMatrixContext),
         }
     }

@@ -150,7 +150,7 @@ impl ReferenceResolver for SimpleResolver {
             .get(entity_ref)
             .map(|(id, entity_type)| ConcreteEntityRef {
                 id: *id,
-                entity_type: entity_type.clone(),
+                entity_type: *entity_type,
             })
             .ok_or_else(|| {
                 ExecutorError::ResolutionFailed(format!("Entity not found: {}", entity_ref))
@@ -398,9 +398,7 @@ impl<R: ReferenceResolver> ViewportExecutor<R> {
     ) -> ExecutorResult<ExecutionOutcome> {
         // Export is a query operation - doesn't mutate state
         ctx.record_command(format!("export {:?}", format));
-        Ok(ExecutionOutcome::ExportRequested {
-            format: format.clone(),
-        })
+        Ok(ExecutionOutcome::ExportRequested { format: *format })
     }
 
     /// Convert a FocusTarget AST node to a FocusTransition
@@ -586,12 +584,12 @@ impl<R: ReferenceResolver> ViewportExecutor<R> {
                 matrix,
                 instrument_type,
                 ..
-            } => Ok((matrix.clone(), instrument_type.clone())),
+            } => Ok((matrix.clone(), *instrument_type)),
             ViewportFocusState::ConfigNode {
                 matrix,
                 instrument_type,
                 ..
-            } => Ok((matrix.clone(), instrument_type.clone())),
+            } => Ok((matrix.clone(), *instrument_type)),
             _ => Err(ExecutorError::InvalidTarget(
                 "No instrument type context".to_string(),
             )),
