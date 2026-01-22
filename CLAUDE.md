@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-21
+> **Last reviewed:** 2026-01-22
 > **Crates:** 14 Rust crates
-> **Verbs:** 938 verbs, 7397 intent patterns (DB-sourced)
+> **Verbs:** 938 verbs, 7414 intent patterns (DB-sourced)
 > **Migrations:** 44 schema migrations
-> **Embeddings:** Candle local (384-dim, all-MiniLM-L6-v2) - 7397 patterns vectorized
+> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7414 patterns vectorized
 > **ESPER Navigation:** ✅ Complete - 48 commands, trie + semantic fallback
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
@@ -418,16 +418,33 @@ POST /api/dsl/resolve-by-ref-id
 - `rust/src/api/agent_routes.rs` - `resolve_by_ref_id` endpoint
 - `intent-pipeline-fixes-todo.md` - Full spec with 12-point PR review rubric
 
-### Embeddings: Candle Local
+### Embeddings: Candle Local (BGE Retrieval Model)
 
 | Component | Value |
 |-----------|-------|
 | Framework | HuggingFace Candle (pure Rust) |
-| Model | all-MiniLM-L6-v2 |
+| Model | BAAI/bge-small-en-v1.5 |
 | Dimensions | 384 |
 | Latency | 5-15ms |
 | Storage | pgvector (IVFFlat) |
 | API Key | Not required |
+| Mode | Asymmetric retrieval (query→target) |
+
+**BGE vs MiniLM:**
+- **BGE** is retrieval-optimized: user queries search against stored verb patterns
+- Uses CLS token pooling (not mean pooling)
+- Queries prefixed with instruction: `"Represent this sentence for searching relevant passages: "`
+- Targets (verb patterns) stored without prefix
+- Scores cluster higher (0.6-1.0) than MiniLM (0.3-1.0), thresholds recalibrated
+
+**API Distinction:**
+```rust
+// User input - searching for verbs
+embedder.embed_query("load the allianz book")
+
+// Verb patterns - stored in DB
+embedder.embed_target("load galaxy by apex name")
+```
 
 ### Candle Semantic Pipeline - DB as Source of Truth
 
@@ -450,7 +467,7 @@ POST /api/dsl/resolve-by-ref-id
 │         ▼                                                                    │
 │   populate_embeddings [binary]                                               │
 │   - Reads from v_verb_intent_patterns view                                  │
-│   - Candle embeds each pattern (384-dim, all-MiniLM-L6-v2)                  │
+│   - BGE embeds each pattern (384-dim, embed_target mode)                    │
 │   - Inserts to verb_pattern_embeddings with phonetic codes                  │
 │         │                                                                    │
 │         ▼                                                                    │
@@ -513,7 +530,18 @@ DATABASE_URL="postgresql:///data_designer" \
 
 Options:
 - `--bootstrap`: Generate patterns for verbs without intent_patterns (use sparingly)
-- `--force`: Re-embed all patterns even if already present (use after adding new verbs)
+- `--force`: Re-embed all patterns even if already present (use after model change)
+
+**Delta Loading (Fast Incremental):**
+
+`populate_embeddings` uses delta loading by default - only processes patterns WHERE embedding IS NULL. This makes teaching and incremental updates very fast:
+
+```
+Full re-embed (7,414 patterns): ~74 seconds
+Delta embed (6 new patterns):   ~0.07 seconds
+```
+
+After teaching new phrases, just run `populate_embeddings` without `--force` to pick up only the new patterns.
 
 **Search Priority (HybridVerbSearcher):**
 
@@ -818,13 +846,21 @@ AgentCommand::ZoomIn { factor: Some(2.0) }
 
 ### Semantic Fallback (Phase 8)
 
-On trie miss, falls back to Candle embeddings (all-MiniLM-L6-v2):
+On trie miss, falls back to BGE embeddings (query→target retrieval):
 
 | Threshold | Action |
 |-----------|--------|
-| ≥ 0.80 | Auto-execute + persist learned alias |
-| 0.50-0.80 | Show disambiguation UI |
+| ≥ 0.88 | Auto-execute + persist learned alias |
+| 0.50-0.88 | Show disambiguation UI |
 | < 0.50 | No match, fall through to DSL pipeline |
+
+**Verb Search Thresholds (BGE-calibrated):**
+
+| Threshold | Value | Purpose |
+|-----------|-------|---------|
+| `semantic_threshold` | 0.88 | High-confidence auto-match |
+| `fallback_threshold` | 0.78 | Lower bar for suggestions |
+| `blocklist_threshold` | 0.85 | Collision detection |
 
 ### Adding New Phrases
 
@@ -1394,6 +1430,8 @@ When you see these in a task, read the corresponding annex first:
 |---------|-------------|
 | `ViewMode` enum (5 modes) | Unit struct (always TRADING) |
 | `OpenAIEmbedder` | `CandleEmbedder` (local) |
+| `all-MiniLM-L6-v2` model | `bge-small-en-v1.5` (retrieval-optimized) |
+| `embed()` / `embed_batch()` | `embed_query()` / `embed_target()` (asymmetric) |
 | `IntentExtractor` | MCP `verb_search` + `dsl_generate` |
 | `AgentOrchestrator` | MCP pipeline |
 | `verb_rag_metadata.rs` | YAML `invocation_phrases` + pgvector |
