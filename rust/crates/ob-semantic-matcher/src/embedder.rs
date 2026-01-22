@@ -29,9 +29,10 @@ const QUERY_PREFIX: &str = "Represent this sentence for searching relevant passa
 /// Model repository on HuggingFace Hub
 const MODEL_REPO: &str = "BAAI/bge-small-en-v1.5";
 
-/// Pinned revision for reproducible builds (avoids re-downloads on model updates)
-/// This is the main branch commit as of 2024-01 - stable production version
-const MODEL_REVISION: &str = "main";
+/// Pinned revision (commit SHA) for reproducible builds
+/// Using commit hash ensures immutability - branch/tag names can move
+/// SHA from: https://huggingface.co/BAAI/bge-small-en-v1.5/commits/main (2023-09-11)
+const MODEL_REVISION: &str = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a";
 
 /// Embedding dimension (same as MiniLM - no pgvector schema changes needed)
 pub const EMBEDDING_DIM: usize = 384;
@@ -127,17 +128,24 @@ impl Embedder {
             device,
         };
 
-        // Warmup: single forward pass to trigger any lazy initialization
-        // (page faults for mmap, CPU cache warming, etc.)
+        // Warmup: forward pass with representative-length text to trigger lazy initialization
+        // (page faults for mmap, CPU cache warming, kernel activation, etc.)
+        // Using ~30 tokens to exercise typical code paths
         let warmup_start = std::time::Instant::now();
-        let _ = embedder.forward("warmup sentence for initialization")?;
+        let warmup_text = "This is a warmup sentence to initialize the embedding model and trigger \
+                           any lazy loading of weights and computation kernels for optimal performance.";
+        let _ = embedder.forward(warmup_text)?;
         debug!(
             "Warmup completed in {}ms",
             warmup_start.elapsed().as_millis()
         );
 
+        // Log embedder metadata for debugging/regression tracking
         info!(
-            "Embedding model ready (BGE-small-en-v1.5) - total init: {}ms",
+            "Embedder ready: model={} revision={} dim={} pooling=CLS normalize=L2 init_ms={}",
+            MODEL_REPO,
+            &MODEL_REVISION[..8], // First 8 chars of SHA for brevity
+            EMBEDDING_DIM,
             start.elapsed().as_millis()
         );
 
