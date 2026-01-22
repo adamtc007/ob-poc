@@ -136,9 +136,11 @@ entities:
     display_template: "{display_name} ({entity_type})"
     index_mode: trigram # Entity names need fuzzy search
     search_keys:
+      - name: "client_label"
+        column: "client_label"
+        default: true # Search client_label FIRST (e.g., "allianz" → Allianz Global Investors)
       - name: "name"
         column: "search_text"
-        default: true
       - name: "type"
         column: "entity_type"
     shard:

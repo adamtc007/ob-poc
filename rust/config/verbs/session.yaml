@@ -79,7 +79,7 @@ domains:
           fields: [jurisdiction, count_added, total_loaded]
 
       load-cluster:
-        description: Load all CBUs under a ManCo/governance controller (e.g., "Allianz Lux book")
+        description: Load all CBUs for a client (e.g., "show allianz lux cbu")
         behavior: plugin
         handler: SessionLoadClusterOp
         invocation_phrases:
@@ -95,30 +95,25 @@ domains:
           - "cbu book"
           - "show funds for"
           - "all cbus for"
+          - "show cbu universe"
+          - "cbu universe"
         metadata:
           tier: intent
           source_of_truth: session
           noun: session_cbus
-          tags: [load, cluster, book, manco, bulk]
+          tags: [load, cluster, book, client, bulk]
         args:
-          - name: manco-entity-id
-            type: uuid
+          - name: client
+            type: string
             required: true
-            maps_to: manco_entity_id
-            description: The ManCo/governance controller entity
-            lookup:
-              table: entities
-              schema: ob-poc
-              entity_type: entity
-              search_key: name
-              primary_key: entity_id
+            description: Client shorthand (e.g., "allianz", "blackrock") - matches client_label on entities
           - name: jurisdiction
             type: string
             required: false
             description: Filter to specific jurisdiction (LU, DE, IE, etc.)
         returns:
           type: record
-          fields: [manco_name, jurisdiction, count_added, total_loaded]
+          fields: [client, jurisdiction, count_added, total_loaded]
 
       load-system:
         description: Load a single CBU (Solar System = CBU container)

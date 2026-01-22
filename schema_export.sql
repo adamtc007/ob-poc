@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fNiMtAYkEoCFiDyqddK9IjvfcKlwGxECSrcOl3lP6upzsoivRO8i6BFhgzxjmAF
+\restrict EgiieaKPhaO57iHoQik0kPHHy2tg1rHP13U6ev9z6fIq1Vz8QhJ7UYpGG4FVEJM
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -8969,7 +8969,8 @@ CREATE TABLE "ob-poc".entities (
     bods_entity_subtype character varying(30),
     founding_date date,
     dissolution_date date,
-    is_publicly_listed boolean DEFAULT false
+    is_publicly_listed boolean DEFAULT false,
+    client_label character varying(100)
 );
 
 
@@ -11930,6 +11931,7 @@ CREATE TABLE "ob-poc".cbus (
     product_id uuid,
     status character varying(30) DEFAULT 'DISCOVERED'::character varying,
     kyc_scope_template character varying(50),
+    client_label character varying(100),
     CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying, 'INTERNAL_TEST'::character varying])::text[])))),
     CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
 );
@@ -13212,6 +13214,22 @@ and ISDA/CSA agreements to measurable SLA targets.';
 
 
 --
+-- Name: cbu_subscriptions; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".cbu_subscriptions (
+    cbu_id uuid NOT NULL,
+    contract_id uuid NOT NULL,
+    product_code character varying(50) NOT NULL,
+    subscribed_at timestamp with time zone DEFAULT now(),
+    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT cbu_subscriptions_status_check CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'ACTIVE'::character varying, 'SUSPENDED'::character varying, 'TERMINATED'::character varying])::text[])))
+);
+
+
+--
 -- Name: cbu_trading_profiles; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -13358,6 +13376,21 @@ CREATE TABLE "ob-poc".client_types (
     is_active boolean DEFAULT true,
     display_order integer DEFAULT 0,
     CONSTRAINT client_type_code_uppercase CHECK (((code)::text = upper((code)::text)))
+);
+
+
+--
+-- Name: contract_products; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".contract_products (
+    contract_id uuid NOT NULL,
+    product_code character varying(50) NOT NULL,
+    rate_card_id uuid,
+    effective_date date,
+    termination_date date,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -15027,34 +15060,40 @@ CREATE VIEW "ob-poc".entity_search_view AS
     (((COALESCE(entity_proper_persons.first_name, ''::character varying))::text || ' '::text) || (COALESCE(entity_proper_persons.last_name, ''::character varying))::text) AS display_name,
     entity_proper_persons.nationality AS subtitle_1,
     (entity_proper_persons.date_of_birth)::text AS subtitle_2,
-    (((COALESCE(entity_proper_persons.first_name, ''::character varying))::text || ' '::text) || (COALESCE(entity_proper_persons.last_name, ''::character varying))::text) AS search_text
+    (((COALESCE(entity_proper_persons.first_name, ''::character varying))::text || ' '::text) || (COALESCE(entity_proper_persons.last_name, ''::character varying))::text) AS search_text,
+    NULL::character varying(100) AS client_label
    FROM "ob-poc".entity_proper_persons
   WHERE (entity_proper_persons.proper_person_id IS NOT NULL)
 UNION ALL
- SELECT entity_limited_companies.limited_company_id AS id,
+ SELECT lc.limited_company_id AS id,
     'COMPANY'::text AS entity_type,
-    entity_limited_companies.company_name AS display_name,
-    entity_limited_companies.jurisdiction AS subtitle_1,
-    entity_limited_companies.registration_number AS subtitle_2,
-    entity_limited_companies.company_name AS search_text
-   FROM "ob-poc".entity_limited_companies
-  WHERE (entity_limited_companies.limited_company_id IS NOT NULL)
+    lc.company_name AS display_name,
+    lc.jurisdiction AS subtitle_1,
+    lc.registration_number AS subtitle_2,
+    lc.company_name AS search_text,
+    e.client_label
+   FROM ("ob-poc".entity_limited_companies lc
+     LEFT JOIN "ob-poc".entities e ON ((e.entity_id = lc.limited_company_id)))
+  WHERE (lc.limited_company_id IS NOT NULL)
 UNION ALL
- SELECT cbus.cbu_id AS id,
+ SELECT c.cbu_id AS id,
     'CBU'::text AS entity_type,
-    cbus.name AS display_name,
-    cbus.client_type AS subtitle_1,
-    cbus.jurisdiction AS subtitle_2,
-    cbus.name AS search_text
-   FROM "ob-poc".cbus
-  WHERE (cbus.cbu_id IS NOT NULL)
+    c.name AS display_name,
+    c.client_type AS subtitle_1,
+    c.jurisdiction AS subtitle_2,
+    c.name AS search_text,
+    ce.client_label
+   FROM ("ob-poc".cbus c
+     LEFT JOIN "ob-poc".entities ce ON ((ce.entity_id = c.commercial_client_entity_id)))
+  WHERE (c.cbu_id IS NOT NULL)
 UNION ALL
  SELECT entity_trusts.trust_id AS id,
     'TRUST'::text AS entity_type,
     entity_trusts.trust_name AS display_name,
     entity_trusts.jurisdiction AS subtitle_1,
     NULL::text AS subtitle_2,
-    entity_trusts.trust_name AS search_text
+    entity_trusts.trust_name AS search_text,
+    NULL::character varying(100) AS client_label
    FROM "ob-poc".entity_trusts
   WHERE (entity_trusts.trust_id IS NOT NULL)
 UNION ALL
@@ -15063,7 +15102,8 @@ UNION ALL
     e.name AS display_name,
     ef.jurisdiction AS subtitle_1,
     ef.fund_structure_type AS subtitle_2,
-    e.name AS search_text
+    e.name AS search_text,
+    e.client_label
    FROM (("ob-poc".entity_funds ef
      JOIN "ob-poc".entities e ON ((ef.entity_id = e.entity_id)))
      LEFT JOIN "ob-poc".entity_types et ON ((e.entity_type_id = et.entity_type_id)))
@@ -15616,6 +15656,23 @@ CREATE TABLE "ob-poc".layout_config (
 --
 
 COMMENT ON TABLE "ob-poc".layout_config IS 'Global layout configuration settings. Key-value store with JSONB values.';
+
+
+--
+-- Name: legal_contracts; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".legal_contracts (
+    contract_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    client_label character varying(100) NOT NULL,
+    contract_reference character varying(100),
+    effective_date date NOT NULL,
+    termination_date date,
+    status character varying(20) DEFAULT 'ACTIVE'::character varying,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT legal_contracts_status_check CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'ACTIVE'::character varying, 'TERMINATED'::character varying, 'EXPIRED'::character varying])::text[])))
+);
 
 
 --
@@ -16178,6 +16235,21 @@ COMMENT ON COLUMN "ob-poc".provisioning_requests.request_payload IS 'Full reques
 --
 
 COMMENT ON COLUMN "ob-poc".provisioning_requests.owner_system IS 'Owner app mnemonic: CUSTODY, SWIFT, IAM, TRADING, etc.';
+
+
+--
+-- Name: rate_cards; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".rate_cards (
+    rate_card_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(100) NOT NULL,
+    description text,
+    currency character varying(3) DEFAULT 'USD'::character varying,
+    effective_date date,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
 
 
 --
@@ -18583,6 +18655,26 @@ COMMENT ON VIEW "ob-poc".v_cbu_service_gaps IS 'Shows missing required service r
 
 
 --
+-- Name: v_cbu_subscriptions; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cbu_subscriptions AS
+ SELECT s.cbu_id,
+    c.name AS cbu_name,
+    c.client_label,
+    lc.contract_id,
+    lc.contract_reference,
+    s.product_code,
+    cp.rate_card_id,
+    s.status AS subscription_status,
+    s.subscribed_at
+   FROM ((("ob-poc".cbu_subscriptions s
+     JOIN "ob-poc".cbus c ON ((c.cbu_id = s.cbu_id)))
+     JOIN "ob-poc".legal_contracts lc ON ((lc.contract_id = s.contract_id)))
+     JOIN "ob-poc".contract_products cp ON (((cp.contract_id = s.contract_id) AND ((cp.product_code)::text = (s.product_code)::text))));
+
+
+--
 -- Name: v_cbu_unified_gaps; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -18682,6 +18774,23 @@ CREATE VIEW "ob-poc".v_cbus_by_manco AS
 --
 
 COMMENT ON VIEW "ob-poc".v_cbus_by_manco IS 'All CBUs grouped by governance controller with controlling shareholder information.';
+
+
+--
+-- Name: v_contract_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_contract_summary AS
+ SELECT c.contract_id,
+    c.client_label,
+    c.contract_reference,
+    c.effective_date,
+    c.status,
+    count(cp.product_code) AS product_count,
+    array_agg(cp.product_code ORDER BY cp.product_code) FILTER (WHERE (cp.product_code IS NOT NULL)) AS products
+   FROM ("ob-poc".legal_contracts c
+     LEFT JOIN "ob-poc".contract_products cp ON ((cp.contract_id = c.contract_id)))
+  GROUP BY c.contract_id, c.client_label, c.contract_reference, c.effective_date, c.status;
 
 
 --
@@ -22390,6 +22499,14 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
+-- Name: cbu_subscriptions cbu_subscriptions_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_subscriptions
+    ADD CONSTRAINT cbu_subscriptions_pkey PRIMARY KEY (cbu_id, contract_id, product_code);
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_version_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22443,6 +22560,14 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 ALTER TABLE ONLY "ob-poc".client_types
     ADD CONSTRAINT client_types_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: contract_products contract_products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".contract_products
+    ADD CONSTRAINT contract_products_pkey PRIMARY KEY (contract_id, product_code);
 
 
 --
@@ -23270,6 +23395,14 @@ ALTER TABLE ONLY "ob-poc".layout_config
 
 
 --
+-- Name: legal_contracts legal_contracts_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".legal_contracts
+    ADD CONSTRAINT legal_contracts_pkey PRIMARY KEY (contract_id);
+
+
+--
 -- Name: lifecycle_resource_capabilities lifecycle_resource_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23483,6 +23616,14 @@ ALTER TABLE ONLY "ob-poc".provisioning_events
 
 ALTER TABLE ONLY "ob-poc".provisioning_requests
     ADD CONSTRAINT provisioning_requests_pkey PRIMARY KEY (request_id);
+
+
+--
+-- Name: rate_cards rate_cards_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".rate_cards
+    ADD CONSTRAINT rate_cards_pkey PRIMARY KEY (rate_card_id);
 
 
 --
@@ -26508,6 +26649,13 @@ CREATE INDEX idx_cbu_sla_resource ON "ob-poc".cbu_sla_commitments USING btree (b
 
 
 --
+-- Name: idx_cbu_subscriptions_contract; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbu_subscriptions_contract ON "ob-poc".cbu_subscriptions USING btree (contract_id, product_code);
+
+
+--
 -- Name: idx_cbu_unified_attr_cbu; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -26526,6 +26674,13 @@ CREATE INDEX idx_cbu_unified_attr_conflicts ON "ob-poc".cbu_unified_attr_require
 --
 
 CREATE INDEX idx_cbu_unified_attr_required ON "ob-poc".cbu_unified_attr_requirements USING btree (cbu_id, requirement_strength) WHERE (requirement_strength = 'required'::text);
+
+
+--
+-- Name: idx_cbus_client_label; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cbus_client_label ON "ob-poc".cbus USING btree (client_label);
 
 
 --
@@ -26603,6 +26758,13 @@ CREATE INDEX idx_companies_name_trgm ON "ob-poc".entity_limited_companies USING 
 --
 
 CREATE INDEX idx_companies_reg_number ON "ob-poc".entity_limited_companies USING btree (registration_number);
+
+
+--
+-- Name: idx_contract_products_product_code; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_contract_products_product_code ON "ob-poc".contract_products USING btree (product_code);
 
 
 --
@@ -27282,6 +27444,13 @@ CREATE INDEX idx_edge_types_ubo ON "ob-poc".edge_types USING btree (show_in_ubo_
 --
 
 CREATE INDEX idx_entities_bods_type ON "ob-poc".entities USING btree (bods_entity_type);
+
+
+--
+-- Name: idx_entities_client_label; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entities_client_label ON "ob-poc".entities USING btree (client_label);
 
 
 --
@@ -27982,6 +28151,20 @@ CREATE INDEX idx_layout_cache_lookup ON "ob-poc".layout_cache USING btree (cbu_i
 --
 
 CREATE UNIQUE INDEX idx_layout_cache_unique ON "ob-poc".layout_cache USING btree (cbu_id, view_mode, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+
+--
+-- Name: idx_legal_contracts_client_label; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_legal_contracts_client_label ON "ob-poc".legal_contracts USING btree (client_label);
+
+
+--
+-- Name: idx_legal_contracts_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_legal_contracts_status ON "ob-poc".legal_contracts USING btree (status);
 
 
 --
@@ -31883,6 +32066,22 @@ ALTER TABLE ONLY "ob-poc".cbu_sla_commitments
 
 
 --
+-- Name: cbu_subscriptions cbu_subscriptions_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_subscriptions
+    ADD CONSTRAINT cbu_subscriptions_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cbu_subscriptions cbu_subscriptions_contract_id_product_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".cbu_subscriptions
+    ADD CONSTRAINT cbu_subscriptions_contract_id_product_code_fkey FOREIGN KEY (contract_id, product_code) REFERENCES "ob-poc".contract_products(contract_id, product_code) ON DELETE CASCADE;
+
+
+--
 -- Name: cbu_trading_profiles cbu_trading_profiles_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -31976,6 +32175,14 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 ALTER TABLE ONLY "ob-poc".client_allegations
     ADD CONSTRAINT client_allegations_workstream_id_fkey FOREIGN KEY (workstream_id) REFERENCES kyc.entity_workstreams(workstream_id);
+
+
+--
+-- Name: contract_products contract_products_contract_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".contract_products
+    ADD CONSTRAINT contract_products_contract_id_fkey FOREIGN KEY (contract_id) REFERENCES "ob-poc".legal_contracts(contract_id) ON DELETE CASCADE;
 
 
 --
@@ -33670,5 +33877,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fNiMtAYkEoCFiDyqddK9IjvfcKlwGxECSrcOl3lP6upzsoivRO8i6BFhgzxjmAF
+\unrestrict EgiieaKPhaO57iHoQik0kPHHy2tg1rHP13U6ev9z6fIq1Vz8QhJ7UYpGG4FVEJM
 

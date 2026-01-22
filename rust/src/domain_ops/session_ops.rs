@@ -313,7 +313,7 @@ impl CustomOperation for SessionLoadClusterOp {
     }
 
     fn rationale(&self) -> &'static str {
-        "Loads all CBUs under a ManCo/governance controller (Cluster = ManCo's sphere)"
+        "Loads all CBUs for a client by client_label (e.g., 'allianz', 'blackrock')"
     }
 
     #[cfg(feature = "database")]
@@ -323,56 +323,43 @@ impl CustomOperation for SessionLoadClusterOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let manco_entity_id = get_required_uuid(verb_call, "manco-entity-id", ctx)?;
+        let client = get_required_string(verb_call, "client")?;
         let jurisdiction = get_optional_string(verb_call, "jurisdiction");
 
-        // Get ManCo name
-        let manco_name: String = sqlx::query_scalar!(
-            r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#,
-            manco_entity_id
-        )
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("ManCo entity not found: {}", manco_entity_id))?;
+        // Normalize client label to lowercase for matching
+        let client_label = client.to_lowercase();
 
-        // Find all CBUs under this governance controller via cbu_groups
-        // Falls back to commercial_client_entity_id if no group exists
+        // Query directly on cbus.client_label (no join needed)
         let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
             r#"
-            SELECT DISTINCT gm.cbu_id as "cbu_id!"
-            FROM "ob-poc".cbu_groups g
-            JOIN "ob-poc".cbu_group_members gm ON gm.group_id = g.group_id
-            WHERE g.manco_entity_id = $1
-              AND g.effective_to IS NULL
-              AND gm.effective_to IS NULL
-              AND ($2::text IS NULL OR g.jurisdiction = $2)
-            UNION
-            -- Fallback: direct commercial_client_entity_id link (for CBUs not yet in groups)
-            SELECT c.cbu_id as "cbu_id!"
-            FROM "ob-poc".cbus c
-            WHERE c.commercial_client_entity_id = $1
-              AND ($2::text IS NULL OR c.jurisdiction = $2)
-              AND NOT EXISTS (
-                  SELECT 1 FROM "ob-poc".cbu_group_members gm2
-                  JOIN "ob-poc".cbu_groups g2 ON g2.group_id = gm2.group_id
-                  WHERE gm2.cbu_id = c.cbu_id
-                    AND g2.manco_entity_id = $1
-                    AND g2.effective_to IS NULL
-                    AND gm2.effective_to IS NULL
-              )
+            SELECT cbu_id as "cbu_id!"
+            FROM "ob-poc".cbus
+            WHERE LOWER(client_label) = $1
+              AND ($2::text IS NULL OR jurisdiction = $2)
             "#,
-            manco_entity_id,
+            client_label,
             jurisdiction.as_deref()
         )
         .fetch_all(pool)
         .await?;
 
+        if cbu_ids.is_empty() {
+            return Err(anyhow::anyhow!(
+                "No CBUs found for client '{}'{}",
+                client,
+                jurisdiction
+                    .as_ref()
+                    .map(|j| format!(" in jurisdiction {}", j))
+                    .unwrap_or_default()
+            ));
+        }
+
         let session = ctx.get_or_create_cbu_session_mut();
         let count_added = session.load_many(cbu_ids);
 
         let result = LoadClusterResult {
-            manco_name,
-            manco_entity_id,
+            manco_name: client.clone(),   // Use client label as the name
+            manco_entity_id: Uuid::nil(), // No single entity ID anymore
             jurisdiction,
             count_added,
             total_loaded: session.count(),

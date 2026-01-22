@@ -2,9 +2,9 @@
 
 > **Last reviewed:** 2026-01-22
 > **Crates:** 14 Rust crates
-> **Verbs:** 938 verbs, 7414 intent patterns (DB-sourced)
-> **Migrations:** 44 schema migrations
-> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7414 patterns vectorized
+> **Verbs:** 956 verbs, 7481 intent patterns (DB-sourced)
+> **Migrations:** 45 schema migrations
+> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7481 patterns vectorized
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
@@ -770,6 +770,76 @@ DATABASE_URL="postgresql:///data_designer" \
 
 ---
 
+## Legal Contracts & Onboarding Gate (045)
+
+> ✅ **IMPLEMENTED (2026-01-22)**: Legal contracts with product-level rate cards and CBU subscription gate.
+
+**Data Model:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     legal_contracts                                  │
+│  contract_id, client_label, effective_date, status                  │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ 1:N
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                contract_products                                     │
+│  (contract_id, product_code) = PK                                    │
+│  rate_card_id                                                        │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              │ 1:N (FK enforced onboarding gate)
+                              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                cbu_subscriptions                                     │
+│  (cbu_id, contract_id, product_code) = PK                           │
+│  CBU can only subscribe if contract covers that product             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Concept:** CBU onboarding requires contract+product subscription. No contract = no onboarding.
+
+**client_label:**
+- Added to `entities` and `cbus` tables as searchable client shorthand
+- "allianz" → all Allianz entities/CBUs, "blackrock" → all BlackRock entities/CBUs
+- Used by `session.load-cluster :client "allianz"` for client-scoped loading
+
+**Contract Verbs:**
+
+| Verb | Purpose |
+|------|---------|
+| `contract.create` | Create legal contract for client |
+| `contract.add-product` | Add product with rate card |
+| `contract.subscribe` | Subscribe CBU to contract+product (onboarding gate) |
+| `contract.list-subscriptions` | List CBU subscriptions |
+| `contract.for-client` | Get active contract by client label |
+
+**DSL Examples:**
+
+```clojure
+;; Create contract with products
+(contract.create :client "allianz" :reference "MSA-2024-001" :effective-date "2024-01-01" :as @contract)
+(contract.add-product :contract-id @contract :product "CUSTODY" :rate-card-id @rate)
+
+;; Subscribe CBU (onboarding)
+(contract.subscribe :cbu-id @cbu :contract-id @contract :product "CUSTODY")
+
+;; Load client's CBUs
+(session.load-cluster :client "allianz" :jurisdiction "LU")
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `migrations/045_legal_contracts.sql` | Schema, views, seed data |
+| `rust/config/verbs/contract.yaml` | 14 contract verbs |
+| `rust/src/domain_ops/session_ops.rs` | `load-cluster` uses client_label |
+
+---
+
 ## Verb Search Test Harness
 
 Comprehensive test harness for verifying semantic matching after teaching new phrases or tuning thresholds.
@@ -1500,3 +1570,4 @@ When you see these in a task, read the corresponding annex first:
 | `custody` | 40 | Settlement, safekeeping |
 | `gleif` | 15 | LEI lookup, hierarchy import |
 | `research.*` | 30+ | External source workflows |
+| `contract` | 14 | Legal contracts, rate cards, CBU subscriptions |

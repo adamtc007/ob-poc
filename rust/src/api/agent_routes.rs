@@ -2182,6 +2182,55 @@ fn generate_commands_help() -> String {
 
 ---
 
+## Contracts & Onboarding
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `contract_create` | Create legal contract for client |
+| `contract_get` | Get contract details |
+| `contract_list` | List contracts (filter by client) |
+| `contract_terminate` | Terminate contract |
+| `contract_add_product` | Add product with rate card |
+| `contract_subscribe` | Subscribe CBU to contract+product |
+| `contract_can_onboard` | Check onboarding eligibility |
+
+**Natural Language:**
+| Say | DSL |
+|-----|-----|
+| "create contract for allianz" | `(contract.create :client "allianz" :effective-date "2024-01-01")` |
+| "add custody to contract" | `(contract.add-product :contract-id @contract :product "CUSTODY")` |
+| "subscribe CBU to custody" | `(contract.subscribe :cbu-id @cbu :contract-id @contract :product "CUSTODY")` |
+| "can this CBU onboard to custody?" | `(contract.can-onboard :cbu-id @cbu :product "CUSTODY")` |
+| "show allianz contract" | `(contract.for-client :client "allianz")` |
+| "list subscriptions for client" | `(contract.list-subscriptions :client "allianz")` |
+
+**Key Concept:** CBU onboarding requires contract+product subscription. No contract = no onboarding.
+
+```
+legal_contracts (client_label: "allianz")
+    └── contract_products (product_code, rate_card_id)
+         └── cbu_subscriptions (cbu_id) ← Onboarding gate
+```
+
+**DSL Syntax:**
+```clojure
+;; Create contract with products
+(contract.create :client "allianz" :reference "MSA-2024-001" :effective-date "2024-01-01" :as @contract)
+(contract.add-product :contract-id @contract :product "CUSTODY" :rate-card-id @rate)
+(contract.add-product :contract-id @contract :product "FUND_ADMIN")
+
+;; Subscribe CBU (onboarding)
+(contract.subscribe :cbu-id @cbu :contract-id @contract :product "CUSTODY")
+
+;; Check eligibility
+(contract.can-onboard :cbu-id @cbu :product "CUSTODY")
+```
+
+**Response:** `{"contract_id": "...", "client_label": "allianz", "products": ["CUSTODY", "FUND_ADMIN"]}`
+
+---
+
 ## Workflow & Templates
 
 **Commands:**
