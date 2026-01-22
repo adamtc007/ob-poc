@@ -3277,16 +3277,48 @@ async fn execute_session_dsl(
             // SessionContext.cbu_ids so the scope-graph endpoint can build the multi-CBU view.
             if let Some(cbu_session) = exec_ctx.take_pending_cbu_session() {
                 let loaded_cbu_ids = cbu_session.cbu_ids_vec();
+                let cbu_count = loaded_cbu_ids.len();
                 tracing::info!(
                     "[EXEC] Propagating {} CBU IDs from CbuSession to context.cbu_ids",
-                    loaded_cbu_ids.len()
+                    cbu_count
                 );
                 // Merge loaded CBUs into context (avoid duplicates)
-                for cbu_id in loaded_cbu_ids {
-                    if !context.cbu_ids.contains(&cbu_id) {
-                        context.cbu_ids.push(cbu_id);
+                for cbu_id in &loaded_cbu_ids {
+                    if !context.cbu_ids.contains(cbu_id) {
+                        context.cbu_ids.push(*cbu_id);
                     }
                 }
+
+                // Set scope definition so UI knows to trigger scope_graph refetch
+                // Use Custom scope for client-scoped loads, Book for single CBU
+                let scope_def = if cbu_count == 1 {
+                    crate::graph::GraphScope::SingleCbu {
+                        cbu_id: loaded_cbu_ids[0],
+                        cbu_name: cbu_session.name.clone().unwrap_or_default(),
+                    }
+                } else {
+                    // Multi-CBU scope - use Custom with session name or description
+                    crate::graph::GraphScope::Custom {
+                        description: cbu_session
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
+                    }
+                };
+
+                context.scope = Some(crate::session::SessionScope {
+                    definition: scope_def,
+                    stats: crate::session::ScopeSummary {
+                        total_cbus: cbu_count,
+                        ..Default::default()
+                    },
+                    load_status: crate::session::LoadStatus::Full,
+                });
+                tracing::info!(
+                    "[EXEC] Set context.scope with {} CBUs, scope_type={:?}",
+                    cbu_count,
+                    context.scope.as_ref().map(|s| &s.definition)
+                );
             }
 
             // =========================================================================

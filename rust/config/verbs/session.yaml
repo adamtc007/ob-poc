@@ -97,6 +97,12 @@ domains:
           - "all cbus for"
           - "show cbu universe"
           - "cbu universe"
+          - "show allianz cbu"
+          - "show blackrock cbu"
+          - "load allianz"
+          - "load blackrock"
+          - "allianz cbus"
+          - "blackrock cbus"
         metadata:
           tier: intent
           source_of_truth: session
