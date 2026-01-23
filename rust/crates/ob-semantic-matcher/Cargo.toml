@@ -44,7 +44,10 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # UUID for database IDs
-uuid = { version = "1.4", features = ["v4"] }
+uuid = { version = "1.4", features = ["v4", "serde"] }
+
+# Async trait for trait async methods
+async-trait = "0.1"
 
 # Regex for input sanitization
 regex = "1.10"

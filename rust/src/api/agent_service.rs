@@ -366,6 +366,7 @@ pub struct PreResolvedContext {
 /// - Intent extraction from natural language via LLM
 /// - Entity resolution via EntityGateway (with disambiguation)
 /// - DSL generation with semantic validation
+///
 /// Usage:
 /// ```ignore
 /// let service = AgentService::new(pool, Some(embedder));
@@ -1430,6 +1431,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         Some("company") | Some("limited_company") | Some("legal_entity") => {
                             RefType::Entity
                         }
+                        // "group" = apex entity in ownership hierarchy (e.g., Allianz SE, BlackRock Inc)
+                        // These are regular entities used as roots of control_edges
+                        Some("group") | Some("apex") | Some("holding") => RefType::Entity,
+                        // "client_group" = virtual client brand/nickname (e.g., "Allianz", "BlackRock")
+                        // Resolution: two-stage - nickname → group_id → anchor_entity_id
+                        Some("client_group") | Some("client") => RefType::ClientGroup,
                         Some("cbu") => RefType::Cbu,
                         Some("product") => RefType::Product,
                         Some("role") => RefType::Role,
@@ -1844,9 +1851,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             "role" => RefType::Role,
             "jurisdiction" => RefType::Jurisdiction,
             "currency" => RefType::Currency,
+            "client_group" | "client" => RefType::ClientGroup,
             _ => RefType::Entity,
         };
 
+        // TODO: For ClientGroup, use PgClientGroupResolver instead of Gateway
+        // For now, fall through to Gateway (will return no matches)
         let mut resolver = GatewayRefResolver::connect(&self.config.gateway_addr)
             .await
             .map_err(|e| format!("Gateway connection failed: {}", e))?;
@@ -1887,9 +1897,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             "role" => RefType::Role,
             "jurisdiction" => RefType::Jurisdiction,
             "currency" => RefType::Currency,
+            "client_group" | "client" => RefType::ClientGroup,
             _ => RefType::Entity,
         };
 
+        // TODO: For ClientGroup, use PgClientGroupResolver instead of Gateway
+        // For now, fall through to Gateway (will return not found)
         let mut resolver = GatewayRefResolver::connect(&self.config.gateway_addr)
             .await
             .map_err(|e| format!("Gateway connection failed: {}", e))?;

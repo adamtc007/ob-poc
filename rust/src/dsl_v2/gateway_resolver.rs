@@ -572,6 +572,7 @@ impl GatewayRefResolver {
             RefType::Service => (DiagnosticCode::InvalidValue, "service"),
             RefType::Currency => (DiagnosticCode::InvalidValue, "currency"),
             RefType::ClientType => (DiagnosticCode::InvalidValue, "client type"),
+            RefType::ClientGroup => (DiagnosticCode::InvalidValue, "client group"),
         };
 
         Diagnostic {
@@ -630,6 +631,9 @@ fn ref_type_to_nickname(ref_type: RefType) -> &'static str {
         RefType::Service => "SERVICE",
         RefType::Currency => "CURRENCY",
         RefType::ClientType => "CLIENT_TYPE",
+        // ClientGroup uses separate resolver (PgClientGroupResolver), not Gateway
+        // This is a placeholder - Gateway won't have CLIENT_GROUP index
+        RefType::ClientGroup => "CLIENT_GROUP",
     }
 }
 

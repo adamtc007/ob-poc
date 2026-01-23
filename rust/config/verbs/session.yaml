@@ -79,47 +79,94 @@ domains:
           fields: [jurisdiction, count_added, total_loaded]
 
       load-cluster:
-        description: Load all CBUs for a client (e.g., "show allianz lux cbu")
+        description: Load all CBUs under a GROUP entity (apex of ownership hierarchy)
         behavior: plugin
         handler: SessionLoadClusterOp
         invocation_phrases:
+          # Scope-setting trigger phrases (signal intent to set working scope)
+          - "work on"
+          - "focus on"
+          - "set scope to"
+          - "switch to"
+          - "load book for"
+          - "load all funds under"
+          - "show all CBUs for"
+          - "load group"
           - "load cluster"
           - "load book"
           - "show book"
-          - "load all funds under"
-          - "show all CBUs for"
+          # Group-level triggers
           - "show all cbus"
-          - "load manco"
-          - "load group"
           - "show cbu book"
           - "cbu book"
           - "show funds for"
           - "all cbus for"
           - "show cbu universe"
           - "cbu universe"
-          - "show allianz cbu"
-          - "show blackrock cbu"
+          - "load manco"
+          # Bare client names - direct scope selection (triggers entity resolution)
+          # When user says just "allianz", treat as scope selection intent
+          - "allianz"
+          - "blackrock"
+          - "aviva"
+          - "axa"
+          - "generali"
+          # Client name with context
+          - "work on allianz"
+          - "work on blackrock"
+          - "work on aviva"
+          - "focus on allianz"
+          - "focus on blackrock"
+          - "allianz book"
+          - "blackrock book"
+          - "allianz group"
+          - "blackrock group"
+          - "aviva group"
+          # Load patterns with client names
           - "load allianz"
           - "load blackrock"
-          - "allianz cbus"
-          - "blackrock cbus"
+          - "load aviva"
+          - "load the allianz book"
+          - "load the blackrock book"
+          - "load the aviva book"
         metadata:
           tier: intent
           source_of_truth: session
           noun: session_cbus
-          tags: [load, cluster, book, client, bulk]
+          tags: [load, cluster, book, client, bulk, scope]
         args:
+          # Primary: client nickname (e.g., "Allianz", "BlackRock")
+          # Two-stage resolution: nickname → client_group_id → anchor_entity_id
           - name: client
             type: string
-            required: true
-            description: Client shorthand (e.g., "allianz", "blackrock") - matches client_label on entities
+            required: false
+            description: Client group nickname (e.g., "Allianz", "AGI", "BlackRock")
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: alias
+              primary_key: id
+          # Alternative: direct apex entity UUID (for programmatic use)
+          - name: apex-entity-id
+            type: uuid
+            required: false
+            description: UUID of the GROUP apex entity (alternative to client)
+            lookup:
+              table: entities
+              entity_type: group
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
           - name: jurisdiction
             type: string
             required: false
             description: Filter to specific jurisdiction (LU, DE, IE, etc.)
+        validation:
+          one_of_required: [client, apex-entity-id]
         returns:
           type: record
-          fields: [client, jurisdiction, count_added, total_loaded]
+          fields: [apex_name, jurisdiction, count_added, total_loaded]
 
       load-system:
         description: Load a single CBU (Solar System = CBU container)

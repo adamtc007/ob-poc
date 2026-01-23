@@ -291,6 +291,10 @@ pub enum RefType {
     Service,
     Currency,
     ClientType,
+    /// Virtual client brand/nickname - two-stage resolution:
+    /// Stage 1: nickname → client_group_id
+    /// Stage 2: client_group_id → anchor_entity_id (based on role policy)
+    ClientGroup,
 }
 
 /// Info about a symbol binding

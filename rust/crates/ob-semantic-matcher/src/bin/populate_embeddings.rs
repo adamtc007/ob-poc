@@ -3,6 +3,8 @@
 //! This binary reads patterns from the database (source of truth) and populates the
 //! verb_pattern_embeddings table with Candle embeddings and phonetic codes.
 //!
+//! It also supports populating client_group_alias_embedding for client group resolution.
+//!
 //! Architecture:
 //!   dsl_verbs.intent_patterns (source of truth, synced from YAML)
 //!       ↓
@@ -11,6 +13,8 @@
 //!   populate_embeddings (this binary)
 //!       ↓
 //!   verb_pattern_embeddings (lookup cache with embeddings)
+//!
+//!   client_group_alias → client_group_alias_embedding
 //!
 //! Performance (optimized):
 //!   - Parallel processing: Uses Rayon to embed batches in parallel across CPU cores
@@ -22,8 +26,9 @@
 //!   DATABASE_URL="postgresql:///data_designer" cargo run --bin populate_embeddings
 //!
 //! Options:
-//!   --bootstrap    Also bootstrap patterns for verbs without any intent_patterns
-//!   --force        Re-embed all patterns even if already present
+//!   --bootstrap        Also bootstrap patterns for verbs without any intent_patterns
+//!   --force            Re-embed all patterns even if already present
+//!   --client-groups    Also populate client group alias embeddings
 
 use anyhow::{Context, Result};
 use ob_semantic_matcher::{Embedder, PhoneticMatcher};
@@ -67,6 +72,7 @@ async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let bootstrap = args.contains(&"--bootstrap".to_string());
     let force = args.contains(&"--force".to_string());
+    let client_groups = args.contains(&"--client-groups".to_string());
 
     info!("Starting embedding population (optimized)...");
     if bootstrap {
@@ -74,6 +80,9 @@ async fn main() -> Result<()> {
     }
     if force {
         info!("--force: Will re-embed all patterns");
+    }
+    if client_groups {
+        info!("--client-groups: Will also embed client group aliases");
     }
 
     // Connect to database
@@ -132,8 +141,13 @@ async fn main() -> Result<()> {
     .context("Failed to fetch patterns from view")?;
 
     if patterns.is_empty() {
-        info!("All patterns already have embeddings. Nothing to do.");
+        info!("All verb patterns already have embeddings. Nothing to do for verbs.");
         print_stats(&pool).await?;
+
+        // Still process client groups if requested
+        if client_groups {
+            populate_client_group_embeddings(&pool, &embedder, force).await?;
+        }
         return Ok(());
     }
 
@@ -203,6 +217,12 @@ async fn main() -> Result<()> {
     );
 
     print_stats(&pool).await?;
+
+    // Optionally populate client group alias embeddings
+    if client_groups {
+        populate_client_group_embeddings(&pool, &embedder, force).await?;
+    }
+
     Ok(())
 }
 
@@ -333,4 +353,129 @@ async fn print_stats(pool: &PgPool) -> Result<()> {
     );
 
     Ok(())
+}
+
+// ============================================================================
+// Client Group Alias Embeddings
+// ============================================================================
+
+/// Client group alias needing embedding
+#[derive(Debug, sqlx::FromRow)]
+struct ClientGroupAlias {
+    id: uuid::Uuid,
+    alias: String,
+}
+
+/// Populate client group alias embeddings
+/// Uses delta loading - only embeds aliases without embeddings for current embedder
+async fn populate_client_group_embeddings(
+    pool: &PgPool,
+    embedder: &Embedder,
+    force: bool,
+) -> Result<usize> {
+    let embedder_id = embedder.model_name();
+    let dimension = embedder.embedding_dim() as i32;
+
+    info!(
+        "Populating client group alias embeddings (embedder: {})...",
+        embedder_id
+    );
+
+    // Fetch aliases needing embeddings
+    let aliases: Vec<ClientGroupAlias> = sqlx::query_as(
+        r#"
+        SELECT cga.id, cga.alias
+        FROM "ob-poc".client_group_alias cga
+        WHERE NOT EXISTS (
+            SELECT 1 FROM "ob-poc".client_group_alias_embedding cgae
+            WHERE cgae.alias_id = cga.id AND cgae.embedder_id = $1
+        ) OR $2
+        "#,
+    )
+    .bind(embedder_id)
+    .bind(force)
+    .fetch_all(pool)
+    .await
+    .context("Failed to fetch client group aliases")?;
+
+    if aliases.is_empty() {
+        info!("All client group aliases already have embeddings.");
+        return Ok(0);
+    }
+
+    info!("Found {} client group aliases to embed", aliases.len());
+
+    // Embed all aliases as TARGETS (not queries - these are corpus items)
+    let texts: Vec<&str> = aliases.iter().map(|a| a.alias.as_str()).collect();
+    let embeddings = embedder
+        .embed_batch_targets(&texts)
+        .context("Failed to embed client group aliases")?;
+
+    // Bulk insert
+    let alias_ids: Vec<uuid::Uuid> = aliases.iter().map(|a| a.id).collect();
+    let vectors: Vec<Vector> = embeddings.into_iter().map(Vector::from).collect();
+
+    let query = if force {
+        r#"
+        INSERT INTO "ob-poc".client_group_alias_embedding
+            (alias_id, embedder_id, pooling, normalize, dimension, embedding)
+        SELECT u.alias_id, $2, 'cls', true, $3, u.embedding
+        FROM UNNEST($1::uuid[], $4::vector[]) AS u(alias_id, embedding)
+        ON CONFLICT (alias_id, embedder_id) DO UPDATE SET
+            embedding = EXCLUDED.embedding,
+            pooling = EXCLUDED.pooling,
+            dimension = EXCLUDED.dimension,
+            created_at = now()
+        "#
+    } else {
+        r#"
+        INSERT INTO "ob-poc".client_group_alias_embedding
+            (alias_id, embedder_id, pooling, normalize, dimension, embedding)
+        SELECT u.alias_id, $2, 'cls', true, $3, u.embedding
+        FROM UNNEST($1::uuid[], $4::vector[]) AS u(alias_id, embedding)
+        ON CONFLICT (alias_id, embedder_id) DO NOTHING
+        "#
+    };
+
+    let result = sqlx::query(query)
+        .bind(&alias_ids)
+        .bind(embedder_id)
+        .bind(dimension)
+        .bind(&vectors)
+        .execute(pool)
+        .await
+        .context("Failed to insert client group alias embeddings")?;
+
+    let inserted = result.rows_affected() as usize;
+    info!("Inserted {} client group alias embeddings", inserted);
+
+    // Print stats
+    let stats: (i64, i64) = sqlx::query_as(
+        r#"
+        SELECT
+            (SELECT COUNT(*) FROM "ob-poc".client_group_alias) as total_aliases,
+            (SELECT COUNT(DISTINCT alias_id) FROM "ob-poc".client_group_alias_embedding) as with_embeddings
+        "#,
+    )
+    .fetch_one(pool)
+    .await?;
+
+    info!(
+        "Client group coverage: {}/{} aliases have embeddings ({:.1}%)",
+        stats.1,
+        stats.0,
+        if stats.0 > 0 {
+            (stats.1 as f64 / stats.0 as f64) * 100.0
+        } else {
+            0.0
+        }
+    );
+
+    // Refresh index stats for good recall
+    sqlx::query(r#"ANALYZE "ob-poc".client_group_alias_embedding"#)
+        .execute(pool)
+        .await
+        .context("Failed to analyze client_group_alias_embedding")?;
+
+    Ok(inserted)
 }

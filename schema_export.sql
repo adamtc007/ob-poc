@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict EgiieaKPhaO57iHoQik0kPHHy2tg1rHP13U6ev9z6fIq1Vz8QhJ7UYpGG4FVEJM
+\restrict X3NfyVlYnL0oK6fC8MqYWAVdjrkplifnlrZgkJm0i5OKFuxLUF1G9fy6dn8G1CQ
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -6437,6 +6437,53 @@ COMMENT ON FUNCTION "ob-poc".reset_layout_overrides(p_cbu_id uuid, p_view_mode c
 
 
 --
+-- Name: resolve_client_group_anchor(uuid, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".resolve_client_group_anchor(p_group_id uuid, p_anchor_role text, p_jurisdiction text DEFAULT ''::text) RETURNS TABLE(anchor_entity_id uuid, entity_name text, jurisdiction text, confidence double precision, match_type text)
+    LANGUAGE plpgsql STABLE
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        cga.anchor_entity_id,
+        e.name::TEXT AS entity_name,
+        cga.jurisdiction,
+        cga.confidence,
+        CASE
+            WHEN cga.jurisdiction = p_jurisdiction AND p_jurisdiction != '' THEN 'exact_jurisdiction'
+            WHEN cga.jurisdiction = '' THEN 'global_fallback'
+            ELSE 'other'
+        END AS match_type
+    FROM "ob-poc".client_group_anchor cga
+    JOIN "ob-poc".entities e ON e.entity_id = cga.anchor_entity_id
+    WHERE cga.group_id = p_group_id
+      AND cga.anchor_role = p_anchor_role
+      AND (cga.valid_from IS NULL OR cga.valid_from <= CURRENT_DATE)
+      AND (cga.valid_to IS NULL OR cga.valid_to >= CURRENT_DATE)
+      AND (
+          cga.jurisdiction = p_jurisdiction  -- exact match
+          OR (p_jurisdiction = '' AND cga.jurisdiction = '')  -- no jurisdiction requested, match global
+          OR (p_jurisdiction != '' AND cga.jurisdiction = '')  -- specific requested, fallback to global
+      )
+    ORDER BY
+        CASE WHEN cga.jurisdiction = p_jurisdiction AND p_jurisdiction != '' THEN 0 ELSE 1 END,  -- exact jurisdiction first
+        cga.priority DESC,                                    -- then priority
+        cga.confidence DESC,                                  -- then confidence
+        cga.anchor_entity_id                                  -- stable tie-breaker
+    LIMIT 1;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION resolve_client_group_anchor(p_group_id uuid, p_anchor_role text, p_jurisdiction text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".resolve_client_group_anchor(p_group_id uuid, p_anchor_role text, p_jurisdiction text) IS 'Resolve client group to anchor entity with deterministic ordering';
+
+
+--
 -- Name: resolve_semantic_to_uuid(text); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -8969,9 +9016,15 @@ CREATE TABLE "ob-poc".entities (
     bods_entity_subtype character varying(30),
     founding_date date,
     dissolution_date date,
-    is_publicly_listed boolean DEFAULT false,
-    client_label character varying(100)
+    is_publicly_listed boolean DEFAULT false
 );
+
+
+--
+-- Name: TABLE entities; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".entities IS 'Entities use GROUP taxonomy for client hierarchy. Resolution via EntityGateway.';
 
 
 --
@@ -11931,10 +11984,16 @@ CREATE TABLE "ob-poc".cbus (
     product_id uuid,
     status character varying(30) DEFAULT 'DISCOVERED'::character varying,
     kyc_scope_template character varying(50),
-    client_label character varying(100),
     CONSTRAINT chk_cbu_category CHECK (((cbu_category IS NULL) OR ((cbu_category)::text = ANY ((ARRAY['FUND_MANDATE'::character varying, 'CORPORATE_GROUP'::character varying, 'INSTITUTIONAL_ACCOUNT'::character varying, 'RETAIL_CLIENT'::character varying, 'FAMILY_TRUST'::character varying, 'CORRESPONDENT_BANK'::character varying, 'INTERNAL_TEST'::character varying])::text[])))),
     CONSTRAINT chk_cbu_status CHECK (((status)::text = ANY ((ARRAY['DISCOVERED'::character varying, 'VALIDATION_PENDING'::character varying, 'VALIDATED'::character varying, 'UPDATE_PENDING_PROOF'::character varying, 'VALIDATION_FAILED'::character varying])::text[])))
 );
+
+
+--
+-- Name: TABLE cbus; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".cbus IS 'CBUs link to ManCo entities via share_links. Scope via GROUP apex entity.';
 
 
 --
@@ -13363,6 +13422,102 @@ CREATE TABLE "ob-poc".client_allegations (
 --
 
 COMMENT ON TABLE "ob-poc".client_allegations IS 'Client allegations - the unverified claims that form the starting point of KYC verification.';
+
+
+--
+-- Name: client_group; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    canonical_name text NOT NULL,
+    short_code text,
+    description text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE client_group; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group IS 'Virtual entity representing client brand/nickname groups';
+
+
+--
+-- Name: client_group_alias; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_alias (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    group_id uuid NOT NULL,
+    alias text NOT NULL,
+    alias_norm text NOT NULL,
+    source text DEFAULT 'manual'::text,
+    confidence double precision DEFAULT 1.0,
+    is_primary boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: client_group_alias_embedding; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_alias_embedding (
+    alias_id uuid NOT NULL,
+    embedder_id text NOT NULL,
+    pooling text NOT NULL,
+    "normalize" boolean NOT NULL,
+    dimension integer NOT NULL,
+    embedding public.vector(384) NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE client_group_alias_embedding; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group_alias_embedding IS 'Embeddings must be L2-normalized. Query embeddings must also be normalized for correct cosine distance.';
+
+
+--
+-- Name: client_group_anchor; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_anchor (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    group_id uuid NOT NULL,
+    anchor_entity_id uuid NOT NULL,
+    anchor_role text NOT NULL,
+    jurisdiction text DEFAULT ''::text NOT NULL,
+    confidence double precision DEFAULT 1.0,
+    priority integer DEFAULT 0,
+    valid_from date,
+    valid_to date,
+    notes text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: COLUMN client_group_anchor.jurisdiction; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group_anchor.jurisdiction IS 'Empty string means "applies to all jurisdictions". Specific jurisdiction takes precedence over empty.';
+
+
+--
+-- Name: client_group_anchor_role; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_anchor_role (
+    role_code text NOT NULL,
+    description text NOT NULL,
+    default_for_domains text[]
+);
 
 
 --
@@ -15032,82 +15187,23 @@ CREATE TABLE "ob-poc".entity_relationships_history (
 
 
 --
--- Name: entity_trusts; Type: TABLE; Schema: ob-poc; Owner: -
---
-
-CREATE TABLE "ob-poc".entity_trusts (
-    trust_id uuid DEFAULT gen_random_uuid() NOT NULL,
-    trust_name character varying(255) NOT NULL,
-    trust_type character varying(100),
-    jurisdiction character varying(100) NOT NULL,
-    establishment_date date,
-    trust_deed_date date,
-    trust_purpose text,
-    governing_law character varying(100),
-    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
-    entity_id uuid
-);
-
-
---
 -- Name: entity_search_view; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
 CREATE VIEW "ob-poc".entity_search_view AS
- SELECT entity_proper_persons.proper_person_id AS id,
-    'PERSON'::text AS entity_type,
-    (((COALESCE(entity_proper_persons.first_name, ''::character varying))::text || ' '::text) || (COALESCE(entity_proper_persons.last_name, ''::character varying))::text) AS display_name,
-    entity_proper_persons.nationality AS subtitle_1,
-    (entity_proper_persons.date_of_birth)::text AS subtitle_2,
-    (((COALESCE(entity_proper_persons.first_name, ''::character varying))::text || ' '::text) || (COALESCE(entity_proper_persons.last_name, ''::character varying))::text) AS search_text,
-    NULL::character varying(100) AS client_label
-   FROM "ob-poc".entity_proper_persons
-  WHERE (entity_proper_persons.proper_person_id IS NOT NULL)
-UNION ALL
- SELECT lc.limited_company_id AS id,
-    'COMPANY'::text AS entity_type,
-    lc.company_name AS display_name,
-    lc.jurisdiction AS subtitle_1,
-    lc.registration_number AS subtitle_2,
-    lc.company_name AS search_text,
-    e.client_label
-   FROM ("ob-poc".entity_limited_companies lc
-     LEFT JOIN "ob-poc".entities e ON ((e.entity_id = lc.limited_company_id)))
-  WHERE (lc.limited_company_id IS NOT NULL)
-UNION ALL
- SELECT c.cbu_id AS id,
-    'CBU'::text AS entity_type,
-    c.name AS display_name,
-    c.client_type AS subtitle_1,
-    c.jurisdiction AS subtitle_2,
-    c.name AS search_text,
-    ce.client_label
-   FROM ("ob-poc".cbus c
-     LEFT JOIN "ob-poc".entities ce ON ((ce.entity_id = c.commercial_client_entity_id)))
-  WHERE (c.cbu_id IS NOT NULL)
-UNION ALL
- SELECT entity_trusts.trust_id AS id,
-    'TRUST'::text AS entity_type,
-    entity_trusts.trust_name AS display_name,
-    entity_trusts.jurisdiction AS subtitle_1,
-    NULL::text AS subtitle_2,
-    entity_trusts.trust_name AS search_text,
-    NULL::character varying(100) AS client_label
-   FROM "ob-poc".entity_trusts
-  WHERE (entity_trusts.trust_id IS NOT NULL)
-UNION ALL
- SELECT ef.entity_id AS id,
-    (COALESCE(et.type_code, 'FUND'::character varying))::text AS entity_type,
-    e.name AS display_name,
-    ef.jurisdiction AS subtitle_1,
-    ef.fund_structure_type AS subtitle_2,
-    e.name AS search_text,
-    e.client_label
-   FROM (("ob-poc".entity_funds ef
-     JOIN "ob-poc".entities e ON ((ef.entity_id = e.entity_id)))
-     LEFT JOIN "ob-poc".entity_types et ON ((e.entity_type_id = et.entity_type_id)))
-  WHERE (ef.entity_id IS NOT NULL);
+ SELECT entity_id,
+    name,
+    entity_type_id,
+    external_id,
+    bods_entity_type,
+    bods_entity_subtype,
+    founding_date,
+    dissolution_date,
+    is_publicly_listed,
+    created_at,
+    updated_at,
+    to_tsvector('english'::regconfig, (((COALESCE(name, ''::character varying))::text || ' '::text) || (COALESCE(external_id, ''::character varying))::text)) AS search_vector
+   FROM "ob-poc".entities;
 
 
 --
@@ -15131,6 +15227,25 @@ CREATE TABLE "ob-poc".entity_share_classes (
     hard_close_date date,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: entity_trusts; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".entity_trusts (
+    trust_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    trust_name character varying(255) NOT NULL,
+    trust_type character varying(100),
+    jurisdiction character varying(100) NOT NULL,
+    establishment_date date,
+    trust_deed_date date,
+    trust_purpose text,
+    governing_law character varying(100),
+    created_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    updated_at timestamp with time zone DEFAULT (now() AT TIME ZONE 'utc'::text),
+    entity_id uuid
 );
 
 
@@ -18661,17 +18776,18 @@ COMMENT ON VIEW "ob-poc".v_cbu_service_gaps IS 'Shows missing required service r
 CREATE VIEW "ob-poc".v_cbu_subscriptions AS
  SELECT s.cbu_id,
     c.name AS cbu_name,
-    c.client_label,
+    lc.client_label AS contract_client,
     lc.contract_id,
-    lc.contract_reference,
     s.product_code,
+    s.subscribed_at,
     cp.rate_card_id,
-    s.status AS subscription_status,
-    s.subscribed_at
-   FROM ((("ob-poc".cbu_subscriptions s
-     JOIN "ob-poc".cbus c ON ((c.cbu_id = s.cbu_id)))
-     JOIN "ob-poc".legal_contracts lc ON ((lc.contract_id = s.contract_id)))
-     JOIN "ob-poc".contract_products cp ON (((cp.contract_id = s.contract_id) AND ((cp.product_code)::text = (s.product_code)::text))));
+    rc.name AS rate_card_name,
+    rc.currency AS rate_card_currency
+   FROM (((("ob-poc".cbu_subscriptions s
+     JOIN "ob-poc".cbus c ON ((s.cbu_id = c.cbu_id)))
+     JOIN "ob-poc".legal_contracts lc ON ((s.contract_id = lc.contract_id)))
+     JOIN "ob-poc".contract_products cp ON (((s.contract_id = cp.contract_id) AND ((s.product_code)::text = (cp.product_code)::text))))
+     LEFT JOIN "ob-poc".rate_cards rc ON ((cp.rate_card_id = rc.rate_card_id)));
 
 
 --
@@ -18774,6 +18890,43 @@ CREATE VIEW "ob-poc".v_cbus_by_manco AS
 --
 
 COMMENT ON VIEW "ob-poc".v_cbus_by_manco IS 'All CBUs grouped by governance controller with controlling shareholder information.';
+
+
+--
+-- Name: v_client_group_aliases; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_client_group_aliases AS
+ SELECT cga.id AS alias_id,
+    cga.alias,
+    cga.alias_norm,
+    cga.is_primary,
+    cga.confidence AS alias_confidence,
+    cg.id AS group_id,
+    cg.canonical_name,
+    cg.short_code
+   FROM ("ob-poc".client_group_alias cga
+     JOIN "ob-poc".client_group cg ON ((cg.id = cga.group_id)));
+
+
+--
+-- Name: v_client_group_anchors; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_client_group_anchors AS
+ SELECT cga.group_id,
+    cga.anchor_role,
+    cga.anchor_entity_id,
+    cga.jurisdiction,
+    cga.confidence,
+    cga.priority,
+    cga.valid_from,
+    cga.valid_to,
+    e.name AS entity_name,
+    e.entity_type_id
+   FROM ("ob-poc".client_group_anchor cga
+     JOIN "ob-poc".entities e ON ((e.entity_id = cga.anchor_entity_id)))
+  WHERE (((cga.valid_from IS NULL) OR (cga.valid_from <= CURRENT_DATE)) AND ((cga.valid_to IS NULL) OR (cga.valid_to >= CURRENT_DATE)));
 
 
 --
@@ -22552,6 +22705,70 @@ ALTER TABLE ONLY "ob-poc".cbus
 
 ALTER TABLE ONLY "ob-poc".client_allegations
     ADD CONSTRAINT client_allegations_pkey PRIMARY KEY (allegation_id);
+
+
+--
+-- Name: client_group_alias_embedding client_group_alias_embedding_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_alias_embedding
+    ADD CONSTRAINT client_group_alias_embedding_pkey PRIMARY KEY (alias_id, embedder_id);
+
+
+--
+-- Name: client_group_alias client_group_alias_group_id_alias_norm_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_alias
+    ADD CONSTRAINT client_group_alias_group_id_alias_norm_key UNIQUE (group_id, alias_norm);
+
+
+--
+-- Name: client_group_alias client_group_alias_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_alias
+    ADD CONSTRAINT client_group_alias_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_group_anchor client_group_anchor_group_id_anchor_role_anchor_entity_id_j_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_anchor
+    ADD CONSTRAINT client_group_anchor_group_id_anchor_role_anchor_entity_id_j_key UNIQUE (group_id, anchor_role, anchor_entity_id, jurisdiction);
+
+
+--
+-- Name: client_group_anchor client_group_anchor_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_anchor
+    ADD CONSTRAINT client_group_anchor_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_group_anchor_role client_group_anchor_role_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_anchor_role
+    ADD CONSTRAINT client_group_anchor_role_pkey PRIMARY KEY (role_code);
+
+
+--
+-- Name: client_group client_group_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group
+    ADD CONSTRAINT client_group_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_group client_group_short_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group
+    ADD CONSTRAINT client_group_short_code_key UNIQUE (short_code);
 
 
 --
@@ -26677,13 +26894,6 @@ CREATE INDEX idx_cbu_unified_attr_required ON "ob-poc".cbu_unified_attr_requirem
 
 
 --
--- Name: idx_cbus_client_label; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_cbus_client_label ON "ob-poc".cbus USING btree (client_label);
-
-
---
 -- Name: idx_cbus_embedding; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -26744,6 +26954,41 @@ CREATE INDEX idx_cer_history_changed_at ON "ob-poc".cbu_entity_roles_history USI
 --
 
 CREATE INDEX idx_cer_history_entity ON "ob-poc".cbu_entity_roles_history USING btree (entity_id);
+
+
+--
+-- Name: idx_cga_alias_norm; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cga_alias_norm ON "ob-poc".client_group_alias USING btree (alias_norm);
+
+
+--
+-- Name: idx_cga_anchor_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cga_anchor_entity ON "ob-poc".client_group_anchor USING btree (anchor_entity_id);
+
+
+--
+-- Name: idx_cga_anchor_group_role; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cga_anchor_group_role ON "ob-poc".client_group_anchor USING btree (group_id, anchor_role);
+
+
+--
+-- Name: idx_cga_group_id; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cga_group_id ON "ob-poc".client_group_alias USING btree (group_id);
+
+
+--
+-- Name: idx_cgae_embedding; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgae_embedding ON "ob-poc".client_group_alias_embedding USING ivfflat (embedding public.vector_cosine_ops) WITH (lists='10');
 
 
 --
@@ -27444,13 +27689,6 @@ CREATE INDEX idx_edge_types_ubo ON "ob-poc".edge_types USING btree (show_in_ubo_
 --
 
 CREATE INDEX idx_entities_bods_type ON "ob-poc".entities USING btree (bods_entity_type);
-
-
---
--- Name: idx_entities_client_label; Type: INDEX; Schema: ob-poc; Owner: -
---
-
-CREATE INDEX idx_entities_client_label ON "ob-poc".entities USING btree (client_label);
 
 
 --
@@ -32178,6 +32416,38 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
+-- Name: client_group_alias_embedding client_group_alias_embedding_alias_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_alias_embedding
+    ADD CONSTRAINT client_group_alias_embedding_alias_id_fkey FOREIGN KEY (alias_id) REFERENCES "ob-poc".client_group_alias(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_alias client_group_alias_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_alias
+    ADD CONSTRAINT client_group_alias_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_anchor client_group_anchor_anchor_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_anchor
+    ADD CONSTRAINT client_group_anchor_anchor_entity_id_fkey FOREIGN KEY (anchor_entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_anchor client_group_anchor_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_anchor
+    ADD CONSTRAINT client_group_anchor_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id) ON DELETE CASCADE;
+
+
+--
 -- Name: contract_products contract_products_contract_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -33877,5 +34147,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict EgiieaKPhaO57iHoQik0kPHHy2tg1rHP13U6ev9z6fIq1Vz8QhJ7UYpGG4FVEJM
+\unrestrict X3NfyVlYnL0oK6fC8MqYWAVdjrkplifnlrZgkJm0i5OKFuxLUF1G9fy6dn8G1CQ
 

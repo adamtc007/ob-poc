@@ -606,9 +606,12 @@ pub struct CorrectionSubSession {
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
 pub enum SessionState {
-    /// Just created, no intents yet
+    /// Just created, awaiting scope selection (client/CBU set)
+    /// This is the initial state - nothing else can happen until scope is set
     #[default]
     New,
+    /// Scope is set (client/CBU set selected), ready for operations
+    Scoped,
     /// Has pending intents awaiting validation
     PendingValidation,
     /// Intents validated, DSL assembled, ready to execute
@@ -619,6 +622,27 @@ pub enum SessionState {
     Executed,
     /// Session ended
     Closed,
+}
+
+/// Event that triggers a session state transition
+///
+/// Use with `AgentSession::transition()` - the single entry point for all state changes.
+#[derive(Debug, Clone)]
+pub enum SessionEvent {
+    /// Scope has been set (CBUs loaded via session.load-*)
+    ScopeSet,
+    /// DSL is pending validation (unresolved refs, needs user input)
+    DslPendingValidation,
+    /// DSL is validated and ready to execute
+    DslReady,
+    /// Execution started
+    ExecutionStarted,
+    /// Execution completed (success or failure)
+    ExecutionCompleted,
+    /// User cancelled pending operation
+    Cancelled,
+    /// Session closed
+    Close,
 }
 
 /// Status of a DSL/AST pair in the pipeline
@@ -1117,6 +1141,127 @@ impl AgentSession {
         self.updated_at = Utc::now();
     }
 
+    // ========================================================================
+    // State Machine - Single Entry Point for All State Transitions
+    // ========================================================================
+
+    /// Transition session state based on an event.
+    ///
+    /// This is the SINGLE entry point for all session state changes.
+    /// All state transition logic lives here to ensure consistency.
+    ///
+    /// # State Machine
+    /// ```text
+    /// New ──[ScopeSet]──► Scoped ──[DslPendingValidation]──► PendingValidation
+    ///                        │                                      │
+    ///                        │◄─────────[Cancelled]─────────────────┘
+    ///                        │
+    ///                        └──[DslReady]──► ReadyToExecute ──[ExecutionStarted]──► Executing
+    ///                                                │                                   │
+    ///                                                │◄──[ExecutionCompleted]────────────┘
+    ///                                                │
+    ///                                                └──► (back to Scoped if has_scope, else Executed)
+    /// ```
+    pub fn transition(&mut self, event: SessionEvent) {
+        use SessionEvent::*;
+        use SessionState::*;
+
+        let new_state = match (&self.state, event) {
+            // Scope setting - from New or re-scoping from Scoped/Executed
+            (New, ScopeSet) => Scoped,
+            (Scoped, ScopeSet) => Scoped, // Re-scoping
+            (Executed, ScopeSet) => Scoped,
+
+            // DSL pending validation (unresolved refs)
+            (New, DslPendingValidation) => PendingValidation, // Before scope set
+            (Scoped, DslPendingValidation) => PendingValidation,
+            (Executed, DslPendingValidation) => PendingValidation,
+
+            // DSL ready to execute
+            (New, DslReady) => ReadyToExecute, // Before scope set (e.g., session.load-*)
+            (Scoped, DslReady) => ReadyToExecute,
+            (PendingValidation, DslReady) => ReadyToExecute,
+            (Executed, DslReady) => ReadyToExecute,
+
+            // Execution lifecycle
+            (ReadyToExecute, ExecutionStarted) => Executing,
+            (Executing, ExecutionCompleted) => self.compute_post_execution_state(),
+
+            // Cancellation returns to appropriate state
+            (New, Cancelled) => New,       // No-op if nothing to cancel
+            (Scoped, Cancelled) => Scoped, // Stay scoped
+            (PendingValidation, Cancelled) => self.compute_idle_state(),
+            (ReadyToExecute, Cancelled) => self.compute_idle_state(),
+            (Executed, Cancelled) => self.compute_idle_state(),
+
+            // Close from any state
+            (_, Close) => Closed,
+
+            // Invalid transitions - log and keep current state
+            (current, event) => {
+                tracing::warn!(
+                    "Invalid session state transition: {:?} + {:?} (session {})",
+                    current,
+                    event,
+                    self.id
+                );
+                return; // Don't update timestamp for invalid transitions
+            }
+        };
+
+        tracing::debug!(
+            "Session {} state transition: {:?} -> {:?}",
+            self.id,
+            self.state,
+            new_state
+        );
+        self.state = new_state;
+        self.updated_at = Utc::now();
+    }
+
+    /// Compute the appropriate idle state based on whether scope is set
+    fn compute_idle_state(&self) -> SessionState {
+        if self.has_scope_set() {
+            SessionState::Scoped
+        } else {
+            SessionState::New
+        }
+    }
+
+    /// Compute state after execution completes
+    fn compute_post_execution_state(&self) -> SessionState {
+        if self.has_scope_set() {
+            SessionState::Scoped
+        } else {
+            SessionState::Executed
+        }
+    }
+
+    /// Check if session has scope set (CBUs loaded)
+    pub fn has_scope_set(&self) -> bool {
+        !self.context.cbu_ids.is_empty() || self.context.has_scope()
+    }
+
+    /// Convenience: update state after operations complete
+    /// Determines appropriate state based on current session context
+    pub fn update_state(&mut self) {
+        // Determine what just happened and transition appropriately
+        if self.has_scope_set() && self.state == SessionState::New {
+            self.transition(SessionEvent::ScopeSet);
+        } else if self.run_sheet.has_runnable() {
+            // Has pending DSL ready to run
+            self.transition(SessionEvent::DslReady);
+        } else if self.state == SessionState::Executing {
+            self.transition(SessionEvent::ExecutionCompleted);
+        }
+        // Otherwise keep current state
+        self.updated_at = Utc::now();
+    }
+
+    // ========================================================================
+    // DSL Management
+    // ========================================================================
+
     /// Set pending DSL (parsed, validated, and planned - ready for user confirmation)
     pub fn set_pending_dsl(
         &mut self,
@@ -1131,16 +1276,14 @@ impl AgentSession {
         if let Some(entry) = self.run_sheet.get_mut(id) {
             entry.plan = plan;
         }
-        self.state = SessionState::ReadyToExecute;
-        self.updated_at = Utc::now();
+        self.transition(SessionEvent::DslReady);
     }
 
     /// Cancel pending DSL (user declined)
     pub fn cancel_pending(&mut self) {
         // Cancel last draft entry
         self.run_sheet.undo_last();
-        self.state = SessionState::Executed; // Ready for next command
-        self.updated_at = Utc::now();
+        self.transition(SessionEvent::Cancelled);
     }
 
     /// Mark pending DSL as ready to execute (user confirmed)
@@ -1158,8 +1301,7 @@ impl AgentSession {
             entry.status = DslStatus::Executed;
             entry.executed_at = Some(Utc::now());
         }
-        self.state = SessionState::Executed;
-        self.updated_at = Utc::now();
+        self.update_state();
     }
 
     /// Mark current run sheet entry as failed (execution error)
@@ -1168,8 +1310,8 @@ impl AgentSession {
             entry.status = DslStatus::Failed;
             entry.error = Some(error);
         }
-        self.state = SessionState::Executed; // Can try again
-        self.updated_at = Utc::now();
+        // Execution completed (with failure) - return to idle state
+        self.transition(SessionEvent::ExecutionCompleted);
     }
 
     /// Get current runnable entry from run sheet
@@ -1220,8 +1362,7 @@ impl AgentSession {
     /// Add intents and transition state
     pub fn add_intents(&mut self, intents: Vec<VerbIntent>) {
         self.pending_intents.extend(intents);
-        self.state = SessionState::PendingValidation;
-        self.updated_at = Utc::now();
+        self.transition(SessionEvent::DslPendingValidation);
     }
 
     /// Set assembled DSL after validation (keep intents for execution-time resolution)
@@ -1232,19 +1373,13 @@ impl AgentSession {
             self.run_sheet.add_draft(source, Vec::new());
         }
         // NOTE: Don't clear pending_intents - we need them for execution-time ref resolution
-        self.state = SessionState::ReadyToExecute;
-        self.updated_at = Utc::now();
+        self.transition(SessionEvent::DslReady);
     }
 
     /// Clear draft DSL entries
     pub fn clear_assembled_dsl(&mut self) {
         self.run_sheet.clear_drafts();
-        self.state = if self.pending_intents.is_empty() {
-            SessionState::New
-        } else {
-            SessionState::PendingValidation
-        };
-        self.updated_at = Utc::now();
+        self.transition(SessionEvent::Cancelled);
     }
 
     /// Record execution results and update context
@@ -1271,7 +1406,9 @@ impl AgentSession {
         // Mark executed entries in run sheet (execution results are now per-entry)
         // For now, just update session state
         let _ = results; // Results stored per-entry via run_sheet.mark_executed()
-        self.state = SessionState::Executed;
+
+        // Use centralized state transition
+        self.transition(SessionEvent::ExecutionCompleted);
         self.updated_at = Utc::now();
     }
 
@@ -2744,6 +2881,9 @@ pub struct CreateSessionRequest {
     pub domain_hint: Option<String>,
 }
 
+/// Welcome message constant - agent's opening question
+pub const WELCOME_MESSAGE: &str = "Which client or CBU set would you like to work on?";
+
 /// Response after creating a session
 #[derive(Debug, Serialize)]
 pub struct CreateSessionResponse {
@@ -2751,8 +2891,10 @@ pub struct CreateSessionResponse {
     pub session_id: Uuid,
     /// When the session was created
     pub created_at: DateTime<Utc>,
-    /// Initial state
+    /// Initial state (always AwaitingScope until client/CBU set selected)
     pub state: SessionState,
+    /// Welcome message from agent - asks for scope selection
+    pub welcome_message: String,
 }
 
 /// Request to send a chat message
@@ -3045,7 +3187,8 @@ mod tests {
             entity_type: Some("CBU".to_string()),
             result: None,
         }]);
-        assert_eq!(session.state, SessionState::Executed);
+        // After execution with CBU created, state transitions to Scoped (has scope)
+        assert_eq!(session.state, SessionState::Scoped);
         // After execution, there should be no more runnable entries
         // (entries remain in run_sheet with Executed status but none are Draft/Ready)
         assert!(!session.run_sheet.has_runnable());

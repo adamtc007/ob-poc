@@ -66,6 +66,7 @@ use uuid::Uuid;
 fn to_session_state_enum(state: &SessionState) -> SessionStateEnum {
     match state {
         SessionState::New => SessionStateEnum::New,
+        SessionState::Scoped => SessionStateEnum::Scoped,
         SessionState::PendingValidation => SessionStateEnum::PendingValidation,
         SessionState::ReadyToExecute => SessionStateEnum::ReadyToExecute,
         SessionState::Executing => SessionStateEnum::Executing,
@@ -1044,11 +1045,13 @@ async fn create_session(
         session_id,
         created_at,
         state: SessionState::New,
+        welcome_message: crate::api::session::WELCOME_MESSAGE.to_string(),
     };
     tracing::info!(
-        "Returning CreateSessionResponse: session_id={}, state={:?}",
+        "Returning CreateSessionResponse: session_id={}, state={:?}, welcome_message={}",
         response.session_id,
-        response.state
+        response.state,
+        response.welcome_message
     );
     Ok(Json(response))
 }
@@ -1386,6 +1389,7 @@ impl SubSessionStateResponse {
 
         let state = match session.state {
             SessionState::New => "new",
+            SessionState::Scoped => "scoped",
             SessionState::PendingValidation => "pending_validation",
             SessionState::ReadyToExecute => "ready_to_execute",
             SessionState::Executing => "executing",

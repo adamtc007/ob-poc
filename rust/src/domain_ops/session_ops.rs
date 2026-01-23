@@ -297,8 +297,16 @@ impl CustomOperation for SessionLoadGalaxyOp {
 }
 
 // =============================================================================
-// LOAD-CLUSTER (all CBUs under a ManCo/governance controller)
+// LOAD-CLUSTER (all CBUs under a GROUP apex entity)
 // =============================================================================
+// Loads CBUs via ownership hierarchy:
+//   GROUP (apex) → ManCo → CBU (via share_links or manco_entity_id)
+//
+// Two resolution paths:
+//   1. :client "Allianz" → client_group_id → anchor_entity_id (via resolve_client_group_anchor)
+//   2. :apex-entity-id UUID → direct entity lookup
+//
+// The validation rule `one_of_required: [client, apex-entity-id]` ensures exactly one is provided.
 
 pub struct SessionLoadClusterOp;
 
@@ -313,7 +321,7 @@ impl CustomOperation for SessionLoadClusterOp {
     }
 
     fn rationale(&self) -> &'static str {
-        "Loads all CBUs for a client by client_label (e.g., 'allianz', 'blackrock')"
+        "Loads all CBUs under a GROUP apex entity via ownership hierarchy"
     }
 
     #[cfg(feature = "database")]
@@ -323,21 +331,88 @@ impl CustomOperation for SessionLoadClusterOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let client = get_required_string(verb_call, "client")?;
         let jurisdiction = get_optional_string(verb_call, "jurisdiction");
 
-        // Normalize client label to lowercase for matching
-        let client_label = client.to_lowercase();
+        // Two-stage resolution: :client → client_group_id → anchor_entity_id
+        // OR direct :apex-entity-id
+        let apex_entity_id: Uuid = if let Some(client_group_id) =
+            get_optional_uuid(verb_call, "client", ctx)
+        {
+            // Resolve client_group_id → anchor_entity_id via DB function
+            // The function applies deterministic ordering:
+            //   1. Exact jurisdiction match (if provided)
+            //   2. Global fallback (jurisdiction = '')
+            //   3. Priority (higher = preferred)
+            //   4. Confidence (higher = preferred)
+            //   5. UUID (tie-breaker)
+            //
+            // anchor_role = 'governance_controller' for session.load-cluster
+            let anchor: Option<Uuid> = sqlx::query_scalar!(
+                    r#"
+                SELECT anchor_entity_id as "anchor_entity_id!"
+                FROM "ob-poc".resolve_client_group_anchor($1, 'governance_controller', COALESCE($2, ''))
+                "#,
+                    client_group_id,
+                    jurisdiction.as_deref()
+                )
+                .fetch_optional(pool)
+                .await?;
 
-        // Query directly on cbus.client_label (no join needed)
+            anchor.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No anchor entity found for client group {} (jurisdiction: {:?})",
+                    client_group_id,
+                    jurisdiction
+                )
+            })?
+        } else {
+            // Direct apex-entity-id (validated by one_of_required)
+            get_required_uuid(verb_call, "apex-entity-id", ctx)?
+        };
+
+        // Get apex entity name for response
+        let apex_name: String = sqlx::query_scalar!(
+            r#"SELECT name as "name!" FROM "ob-poc".entities WHERE entity_id = $1"#,
+            apex_entity_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .unwrap_or_else(|| "Unknown".to_string());
+
+        // Find all CBUs under this apex entity via ownership hierarchy:
+        // 1. Traverse control_edges to find all subsidiaries (including ManCos)
+        // 2. Find cbu_groups where manco_entity_id is in that tree
+        // 3. Find CBUs via cbu_group_members
+        //
+        // Path: apex → control_edges → ManCo → cbu_groups → cbu_group_members → CBUs
         let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
             r#"
-            SELECT cbu_id as "cbu_id!"
-            FROM "ob-poc".cbus
-            WHERE LOWER(client_label) = $1
-              AND ($2::text IS NULL OR jurisdiction = $2)
+            WITH RECURSIVE entity_tree AS (
+                -- Start with the apex entity
+                SELECT entity_id
+                FROM "ob-poc".entities
+                WHERE entity_id = $1
+
+                UNION ALL
+
+                -- Find entities controlled by entities in our tree
+                -- via control_edges: from_entity_id (owner) → to_entity_id (owned)
+                SELECT ce.to_entity_id
+                FROM "ob-poc".control_edges ce
+                JOIN entity_tree et ON ce.from_entity_id = et.entity_id
+                WHERE (ce.percentage IS NULL OR ce.percentage >= 50)  -- Majority-controlled or unknown %
+                  AND ce.end_date IS NULL  -- Only active edges
+            )
+            SELECT DISTINCT c.cbu_id as "cbu_id!"
+            FROM "ob-poc".cbus c
+            JOIN "ob-poc".cbu_group_members gm ON gm.cbu_id = c.cbu_id
+                AND (gm.effective_to IS NULL OR gm.effective_to > CURRENT_DATE)
+            JOIN "ob-poc".cbu_groups g ON g.group_id = gm.group_id
+                AND g.effective_to IS NULL
+            WHERE g.manco_entity_id IN (SELECT entity_id FROM entity_tree)
+              AND ($2::text IS NULL OR c.jurisdiction = $2)
             "#,
-            client_label,
+            apex_entity_id,
             jurisdiction.as_deref()
         )
         .fetch_all(pool)
@@ -345,21 +420,19 @@ impl CustomOperation for SessionLoadClusterOp {
 
         if cbu_ids.is_empty() {
             return Err(anyhow::anyhow!(
-                "No CBUs found for client '{}'{}",
-                client,
-                jurisdiction
-                    .as_ref()
-                    .map(|j| format!(" in jurisdiction {}", j))
-                    .unwrap_or_default()
+                "No CBUs found under '{}' ({})",
+                apex_name,
+                apex_entity_id
             ));
         }
 
         let session = ctx.get_or_create_cbu_session_mut();
+        session.name = Some(format!("{} Book", apex_name));
         let count_added = session.load_many(cbu_ids);
 
         let result = LoadClusterResult {
-            manco_name: client.clone(),   // Use client label as the name
-            manco_entity_id: Uuid::nil(), // No single entity ID anymore
+            manco_name: apex_name,
+            manco_entity_id: apex_entity_id,
             jurisdiction,
             count_added,
             total_loaded: session.count(),

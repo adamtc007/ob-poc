@@ -632,7 +632,7 @@ domains:
           type: record_set
 
       trace-chains:
-        description: Trace all ownership and control chains to natural persons for a CBU
+        description: Trace all ownership and control chains to natural persons for a CBU or client
         metadata:
           tier: intent
           source_of_truth: operational
@@ -640,9 +640,21 @@ domains:
           noun: ubo
         behavior: plugin
         args:
+          # Primary: client nickname for group-level tracing
+          - name: client
+            type: string
+            required: false
+            description: Client group nickname (e.g., "Allianz") - traces all CBUs under client
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: alias
+              primary_key: id
+          # Alternative: specific CBU
           - name: cbu-id
             type: uuid
-            required: true
+            required: false
             description: CBU to trace ownership chains for
             lookup:
               table: cbus
@@ -669,6 +681,8 @@ domains:
             type: date
             required: false
             description: Point-in-time date for temporal query (defaults to today)
+        validation:
+          one_of_required: [client, cbu-id]
         returns:
           type: record
 

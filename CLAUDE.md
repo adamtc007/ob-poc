@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-22
+> **Last reviewed:** 2026-01-23
 > **Crates:** 14 Rust crates
-> **Verbs:** 956 verbs, 7481 intent patterns (DB-sourced)
-> **Migrations:** 45 schema migrations
-> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7481 patterns vectorized
+> **Verbs:** 956 verbs, 7505 intent patterns (DB-sourced)
+> **Migrations:** 48 schema migrations
+> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7505 patterns vectorized
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
@@ -15,6 +15,7 @@
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
 > **Teaching Mechanism (044):** ✅ Complete - Direct phrase→verb mapping for trusted sources
 > **Verb Search Test Harness:** ✅ Complete - Full pipeline sweep, safety-first policy, `cargo x test-verbs`
+> **Client Group Resolver (048):** ✅ Complete - Two-stage alias→group→anchor resolution for session scope
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -277,6 +278,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Candle pipeline | `docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | ✅ Complete |
 | Intent pipeline fixes | `ai-thoughts/Intent-Pipeline-Fixes-todo.md` | ✅ Complete |
 | Promotion pipeline | `TODO-feedback-loop-promotion.md` | ✅ Complete |
+| Client group resolver | `TODO-CLIENT-GROUP-IMPL.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -837,6 +839,96 @@ DATABASE_URL="postgresql:///data_designer" \
 | `migrations/045_legal_contracts.sql` | Schema, views, seed data |
 | `rust/config/verbs/contract.yaml` | 14 contract verbs |
 | `rust/src/domain_ops/session_ops.rs` | `load-cluster` uses client_label |
+
+---
+
+## Client Group Resolver (048)
+
+> ✅ **IMPLEMENTED (2026-01-23)**: Two-stage alias→group→anchor resolution for session scope selection.
+
+The Client Group Resolver enables natural language scope selection (e.g., "allianz" → load all Allianz CBUs) through a two-stage resolution process:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    TWO-STAGE RESOLUTION                                      │
+│                                                                              │
+│  User: "allianz"                                                            │
+│      │                                                                       │
+│      ▼                                                                       │
+│  Stage 1: Alias → ClientGroupId                                             │
+│      │   "allianz" → exact/semantic match → Allianz Global Investors        │
+│      │   (group_id: 11111111-1111-1111-1111-111111111111)                   │
+│      │                                                                       │
+│      ▼                                                                       │
+│  Stage 2: ClientGroupId → AnchorEntityId                                    │
+│      │   group_id + role (governance_controller) + jurisdiction (optional) │
+│      │   → Allianz Global Investors Holdings GmbH (entity_id)              │
+│      │                                                                       │
+│      ▼                                                                       │
+│  session.load-cluster uses anchor_entity_id to find all CBUs               │
+│  under the client's ownership hierarchy                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Data Model:**
+
+| Table | Purpose |
+|-------|---------|
+| `client_group` | Virtual client groups (Allianz, Aviva, BlackRock) |
+| `client_group_alias` | Searchable aliases with embeddings |
+| `client_group_alias_embedding` | Versioned embeddings per alias |
+| `client_group_anchor` | Role-based anchors per jurisdiction |
+
+**Anchor Roles:**
+
+| Role | Use Case | Default For |
+|------|----------|-------------|
+| `ultimate_parent` | UBO discovery, ownership tracing | `ubo.*` verbs |
+| `governance_controller` | Session scope, CBU loading | `session.*`, `cbu.*` verbs |
+| `book_controller` | Regional operations | - |
+| `operating_controller` | Day-to-day operations | `contract.*` verbs |
+| `regulatory_anchor` | Compliance, KYC | `kyc.*` verbs |
+
+**DSL Usage:**
+
+```clojure
+;; Load by client name (two-stage resolution)
+(session.load-cluster :client <Allianz>)
+
+;; With jurisdiction filter
+(session.load-cluster :client <Allianz> :jurisdiction "LU")
+
+;; Direct entity (bypasses client group resolution)
+(session.load-cluster :apex-entity-id "uuid-...")
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `migrations/048_client_group_seed.sql` | Schema + bootstrap data |
+| `rust/crates/ob-semantic-matcher/src/client_group_resolver.rs` | Resolution logic |
+| `rust/src/domain_ops/session_ops.rs` | `SessionLoadClusterOp` handler |
+| `rust/config/verbs/session.yaml` | `:client` arg with lookup config |
+| `rust/tests/client_group_integration.rs` | Full integration tests |
+
+**Bootstrap Data:**
+
+| Group | Canonical Name | Anchors |
+|-------|----------------|---------|
+| Allianz | Allianz Global Investors | Allianz SE (UP), AGI Holdings GmbH (GC) |
+| Aviva | Aviva Investors | Aviva plc (UP), Aviva Investors Global (GC) |
+| BlackRock | BlackRock | BlackRock Inc (UP), BLK Fund Advisors (GC) |
+| Aberdeen | Aberdeen Standard Investments | abrdn plc (UP, GC) |
+
+**Populate Embeddings:**
+
+After adding client groups or aliases:
+
+```bash
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings -- --client-groups
+```
 
 ---
 

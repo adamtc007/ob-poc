@@ -734,8 +734,11 @@ pub struct ChatResponse {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SessionStateEnum {
+    /// Just created, awaiting scope selection (client/CBU set)
     #[default]
     New,
+    /// Scope is set (client/CBU set selected), ready for operations
+    Scoped,
     PendingValidation,
     ReadyToExecute,
     Executing,
