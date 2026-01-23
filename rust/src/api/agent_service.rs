@@ -1016,6 +1016,16 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                             false,
                         );
 
+                        // Auto-execute safe navigation commands (session.*, view.* verbs)
+                        // These don't modify data, just change what the user is viewing
+                        let domain = result.intent.verb.split('.').next().unwrap_or("");
+                        let should_auto_execute = matches!(domain, "session" | "view");
+                        let commands = if should_auto_execute {
+                            Some(vec![AgentCommand::Execute])
+                        } else {
+                            None
+                        };
+
                         return Ok(AgentChatResponse {
                             message: response_msg,
                             intents: vec![intent.clone()],
@@ -1030,7 +1040,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                             dsl_source: Some(result.dsl),
                             ast,
                             disambiguation: None,
-                            commands: None,
+                            commands,
                             unresolved_refs: None,
                             current_ref_index: None,
                             dsl_hash: None,
@@ -1768,11 +1778,24 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             (None, None)
         };
 
-        // Set can_execute flag but do NOT auto-execute
-        // User must explicitly type "run"/"execute" or click Execute button
+        // Set can_execute flag
         // Can't execute if there are unresolved refs
         let can_execute = session.can_execute() && all_valid && unresolved_refs.is_none();
-        let commands: Option<Vec<AgentCommand>> = None;
+
+        // Auto-execute safe navigation commands (session.*, view.* verbs)
+        // These don't modify data, just change what the user is viewing
+        let should_auto_execute = can_execute
+            && intents.iter().all(|intent| {
+                let domain = intent.verb.split('.').next().unwrap_or("");
+                matches!(domain, "session" | "view")
+            })
+            && !intents.is_empty();
+
+        let commands: Option<Vec<AgentCommand>> = if should_auto_execute {
+            Some(vec![AgentCommand::Execute])
+        } else {
+            None
+        };
 
         // Compute dsl_hash for resolution commits (Issue K)
         // Only needed when there are unresolved refs
