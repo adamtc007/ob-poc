@@ -1,0 +1,386 @@
+domains:
+  requirement:
+    description: Document requirement management - what we need from entities
+    invocation_hints:
+      - requirement
+      - required document
+      - evidence needed
+      - collection status
+    verbs:
+      # ========================================================================
+      # Requirement Creation
+      # ========================================================================
+      create:
+        description: Create a document requirement for an entity
+        behavior: crud
+        invocation_phrases:
+          - create requirement
+          - add document requirement
+          - require document
+          - set up document requirement
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: entity
+          noun: document_requirement
+          tags: [workflow, write]
+        crud:
+          operation: insert
+          table: document_requirements
+          schema: ob-poc
+          returning: requirement_id
+        args:
+          - name: subject-entity-id
+            type: uuid
+            required: true
+            maps_to: subject_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: doc-type
+            type: string
+            required: true
+            maps_to: doc_type
+            description: Document type required
+            valid_values:
+              - passport
+              - proof_of_address
+              - articles_of_incorporation
+              - certificate_of_incumbency
+              - board_resolution
+              - tax_form
+              - financial_statement
+              - identity_card
+              - utility_bill
+              - bank_statement
+          - name: workflow-instance-id
+            type: uuid
+            required: false
+            maps_to: workflow_instance_id
+          - name: subject-cbu-id
+            type: uuid
+            required: false
+            maps_to: subject_cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: required-state
+            type: string
+            required: false
+            default: verified
+            maps_to: required_state
+            valid_values:
+              - received
+              - verified
+          - name: due-date
+            type: string
+            required: false
+            maps_to: due_date
+            description: Due date (YYYY-MM-DD)
+          - name: max-attempts
+            type: integer
+            required: false
+            default: 3
+            maps_to: max_attempts
+        returns:
+          type: uuid
+          name: requirement_id
+          capture: true
+
+      create-set:
+        description: Create multiple document requirements for an entity
+        behavior: plugin
+        invocation_phrases:
+          - create requirements
+          - add document requirements
+          - require documents
+          - set up KYC requirements
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: entity
+          noun: document_requirements
+          tags: [workflow, write, batch]
+        args:
+          - name: subject-entity-id
+            type: uuid
+            required: true
+            description: Entity that needs to provide documents
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: doc-types
+            type: list
+            required: true
+            description: List of document types required
+          - name: workflow-instance-id
+            type: uuid
+            required: false
+            description: Workflow instance for tracking
+          - name: required-state
+            type: string
+            required: false
+            default: verified
+            valid_values:
+              - received
+              - verified
+          - name: due-date
+            type: string
+            required: false
+            description: Due date for all requirements (YYYY-MM-DD)
+        returns:
+          type: record
+          fields:
+            requirement_ids: list
+            count: integer
+
+      # ========================================================================
+      # Status Management
+      # ========================================================================
+      waive:
+        description: Waive a document requirement (manual override)
+        behavior: crud
+        invocation_phrases:
+          - waive requirement
+          - skip document requirement
+          - override document requirement
+          - exempt from document
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: requirement
+          noun: requirement_waiver
+          tags: [workflow, write, override]
+        crud:
+          operation: update
+          table: document_requirements
+          schema: ob-poc
+        args:
+          - name: requirement-id
+            type: uuid
+            required: true
+            maps_to: requirement_id
+          - name: reason
+            type: string
+            required: true
+            description: Reason for waiver (for audit)
+        set:
+          - column: status
+            value: "'waived'"
+          - column: satisfied_at
+            value: "now()"
+          - column: updated_at
+            value: "now()"
+        returns:
+          type: affected
+
+      mark-expired:
+        description: Mark a requirement as expired (document validity lapsed)
+        behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: requirement
+          noun: requirement_expiry
+          tags: [workflow, write]
+        crud:
+          operation: update
+          table: document_requirements
+          schema: ob-poc
+        args:
+          - name: requirement-id
+            type: uuid
+            required: true
+            maps_to: requirement_id
+        set:
+          - column: status
+            value: "'expired'"
+          - column: satisfied_at
+            value: "NULL"
+          - column: updated_at
+            value: "now()"
+        returns:
+          type: affected
+
+      reset:
+        description: Reset a requirement to missing (for re-collection)
+        behavior: crud
+        invocation_phrases:
+          - reset requirement
+          - restart document collection
+          - re-request document
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: requirement
+          noun: requirement_reset
+          tags: [workflow, write]
+        crud:
+          operation: update
+          table: document_requirements
+          schema: ob-poc
+        args:
+          - name: requirement-id
+            type: uuid
+            required: true
+            maps_to: requirement_id
+        set:
+          - column: status
+            value: "'missing'"
+          - column: satisfied_at
+            value: "NULL"
+          - column: current_task_id
+            value: "NULL"
+          - column: latest_document_id
+            value: "NULL"
+          - column: latest_version_id
+            value: "NULL"
+          - column: updated_at
+            value: "now()"
+        returns:
+          type: affected
+
+      # ========================================================================
+      # Queries
+      # ========================================================================
+      get:
+        description: Get a requirement by ID
+        behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: requirement
+          noun: document_requirement
+          tags: [read]
+        crud:
+          operation: select
+          table: document_requirements
+          schema: ob-poc
+        args:
+          - name: requirement-id
+            type: uuid
+            required: true
+            maps_to: requirement_id
+        returns:
+          type: record
+
+      for-entity:
+        description: List all requirements for an entity
+        behavior: crud
+        invocation_phrases:
+          - show requirements for entity
+          - list entity requirements
+          - what does entity need to provide
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: entity
+          noun: entity_requirements
+          tags: [read, query]
+        crud:
+          operation: select
+          table: document_requirements
+          schema: ob-poc
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: subject_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+        returns:
+          type: record_set
+
+      for-workflow:
+        description: List all requirements for a workflow instance
+        behavior: crud
+        invocation_phrases:
+          - show workflow requirements
+          - list requirements for workflow
+          - what documents needed for workflow
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: workflow
+          noun: workflow_requirements
+          tags: [read, query]
+        crud:
+          operation: select
+          table: document_requirements
+          schema: ob-poc
+        args:
+          - name: workflow-instance-id
+            type: uuid
+            required: true
+            maps_to: workflow_instance_id
+        returns:
+          type: record_set
+
+      unsatisfied:
+        description: List unsatisfied requirements for a workflow
+        behavior: plugin
+        invocation_phrases:
+          - show missing requirements
+          - list unsatisfied requirements
+          - what requirements are not met
+          - incomplete requirements
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: workflow
+          noun: unsatisfied_requirements
+          tags: [read, query, workflow]
+        args:
+          - name: workflow-instance-id
+            type: uuid
+            required: true
+            description: Workflow instance to check
+        returns:
+          type: record_set
+          fields:
+            requirement_id: uuid
+            doc_type: string
+            subject_entity_id: uuid
+            status: string
+            required_state: string
+            attempt_count: integer
+            last_rejection_code: string
+            last_rejection_reason: string
+
+      with-status:
+        description: Get requirements with latest version status (joined view)
+        behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: workflow
+          noun: requirements_with_status
+          tags: [read, query]
+        crud:
+          operation: select
+          table: v_requirements_with_latest_version
+          schema: ob-poc
+        args:
+          - name: workflow-instance-id
+            type: uuid
+            required: false
+            maps_to: workflow_instance_id
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: subject_entity_id
+        returns:
+          type: record_set

@@ -70,6 +70,9 @@ pub mod cbu_session_routes;
 pub mod service_resource_routes;
 
 #[cfg(feature = "server")]
+pub mod workflow_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -132,3 +135,6 @@ pub use cbu_session_routes::{
 
 #[cfg(feature = "server")]
 pub use service_resource_routes::{service_resource_router, ServiceResourceState};
+
+#[cfg(feature = "server")]
+pub use workflow_routes::{create_workflow_router, WorkflowState};

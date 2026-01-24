@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-23
+> **Last reviewed:** 2026-01-24
 > **Crates:** 14 Rust crates
-> **Verbs:** 956 verbs, 7505 intent patterns (DB-sourced)
-> **Migrations:** 48 schema migrations
+> **Verbs:** 968 verbs, 7505 intent patterns (DB-sourced)
+> **Migrations:** 49 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7505 patterns vectorized
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
@@ -16,6 +16,7 @@
 > **Teaching Mechanism (044):** ✅ Complete - Direct phrase→verb mapping for trusted sources
 > **Verb Search Test Harness:** ✅ Complete - Full pipeline sweep, safety-first policy, `cargo x test-verbs`
 > **Client Group Resolver (048):** ✅ Complete - Two-stage alias→group→anchor resolution for session scope
+> **Workflow Task Queue (049):** ✅ Complete - Async task return path, document entity, requirement guards
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -279,6 +280,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Intent pipeline fixes | `ai-thoughts/Intent-Pipeline-Fixes-todo.md` | ✅ Complete |
 | Promotion pipeline | `TODO-feedback-loop-promotion.md` | ✅ Complete |
 | Client group resolver | `TODO-CLIENT-GROUP-IMPL.md` | ✅ Complete |
+| Workflow task queue | `TODO-WORKFLOW-TASK-QUEUE.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -929,6 +931,113 @@ After adding client groups or aliases:
 DATABASE_URL="postgresql:///data_designer" \
   cargo run --release --package ob-semantic-matcher --bin populate_embeddings -- --client-groups
 ```
+
+---
+
+## Workflow Task Queue & Document Entity (049)
+
+> ✅ **IMPLEMENTED (2026-01-24)**: Queue-based async task return path with document as first-class entity.
+
+**Problem Solved:** Workflows can emit tasks (e.g., "solicit passport") but had no mechanism to receive results and resume. The task queue provides the return path.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  OUTBOUND: Workflow emits task                                              │
+│  Blocker detected → resolution DSL → workflow_pending_tasks                 │
+│  → External system (Camunda, portal, email) receives task_id + callback URL │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                    External system works...
+                              │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  INBOUND: Task completion webhook                                           │
+│  POST /api/workflow/task-complete → task_result_queue                       │
+│  TaskQueueListener → try_advance(workflow_instance)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Three-Layer Document Model
+
+| Layer | Table | Purpose |
+|-------|-------|---------|
+| A: Requirement | `document_requirements` | What we NEED from entity (exists before upload) |
+| B: Document | `documents` | Logical identity (stable reference) |
+| C: Version | `document_versions` | Each submission (immutable, verification status) |
+
+### Requirement State Machine
+
+```
+missing → requested → received → in_qa → verified
+                                    ↓
+                               rejected → (retry with new version)
+                                    
+waived (manual override)    expired (validity lapsed)
+```
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| `rejection_reason_codes` | Reference data for QA rejection reasons |
+| `document_requirements` | What documents are needed per entity/workflow |
+| `documents` | Logical document identity |
+| `document_versions` | Immutable submissions with verification status |
+| `workflow_pending_tasks` | Outbound task tracking |
+| `task_result_queue` | Inbound results (ephemeral, deleted after processing) |
+| `task_result_dlq` | Dead letter queue for failed processing |
+| `workflow_task_events` | Permanent audit trail |
+
+### API Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/workflow/task-complete` | External callback webhook (bundle payload) |
+| `POST /api/documents` | Create document |
+| `POST /api/documents/:id/versions` | Upload version, returns `cargo_ref` |
+| `GET /api/documents/:id` | Get document with status |
+| `POST /api/documents/:doc_id/versions/:version_id/verify` | QA approve |
+| `POST /api/documents/:doc_id/versions/:version_id/reject` | QA reject with code |
+| `GET /api/requirements` | List requirements (with filters) |
+
+### DSL Verbs
+
+| Verb | Purpose |
+|------|---------|
+| `document.solicit` | Request document from entity |
+| `document.solicit-set` | Request multiple documents |
+| `document.verify` | QA approves version |
+| `document.reject` | QA rejects with reason code |
+| `requirement.create` | Initialize requirement |
+| `requirement.waive` | Manual override (skip requirement) |
+
+### Workflow Guard Integration
+
+Guards check **requirement status**, not raw document existence:
+
+```yaml
+states:
+  awaiting_identity:
+    requirements:
+      - type: requirement_satisfied
+        doc_type: passport
+        min_state: verified       # Must be QA-approved
+        subject: $entity_id
+        max_age_days: 90          # Recency check on satisfied_at
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/049_workflow_task_queue_documents.sql` | Schema (all tables) |
+| `rust/crates/ob-workflow/src/listener.rs` | Queue listener with retry/DLQ |
+| `rust/crates/ob-workflow/src/cargo_ref.rs` | CargoRef URI scheme |
+| `rust/crates/ob-workflow/src/document.rs` | Document types, RequirementState |
+| `rust/src/api/workflow_routes.rs` | HTTP endpoints |
+| `rust/config/verbs/document.yaml` | 7 document verbs |
+| `rust/config/verbs/requirement.yaml` | 5 requirement verbs |
 
 ---
 
@@ -1663,3 +1772,5 @@ When you see these in a task, read the corresponding annex first:
 | `gleif` | 15 | LEI lookup, hierarchy import |
 | `research.*` | 30+ | External source workflows |
 | `contract` | 14 | Legal contracts, rate cards, CBU subscriptions |
+| `document` | 7 | Document solicitation, verification, rejection |
+| `requirement` | 5 | Document requirements, waiver, status |

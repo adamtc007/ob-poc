@@ -46,22 +46,46 @@
 //! ```
 
 mod definition;
-mod requirements;
 mod state;
+
+// Task queue and document modules
+pub mod blob_store;
+pub mod cargo_ref;
+pub mod document;
+pub mod task_queue;
 
 #[cfg(feature = "database")]
 mod engine;
 #[cfg(feature = "database")]
 mod guards;
 #[cfg(feature = "database")]
+pub mod listener;
+#[cfg(feature = "database")]
 mod repository;
+#[cfg(feature = "database")]
+mod requirements;
 
 pub use definition::{
     ActionDef, RequirementDef, StateDef, TransitionDef, TriggerDef, WorkflowDefinition,
     WorkflowLoader,
 };
-pub use requirements::RequirementEvaluator;
 pub use state::{Blocker, BlockerType, StateTransition, WorkflowInstance};
+
+#[cfg(feature = "database")]
+pub use requirements::RequirementEvaluator;
+
+// Re-export key types from new modules
+pub use blob_store::{BlobStore, BlobStoreError, LocalBlobStore};
+pub use cargo_ref::{CargoRef, CargoRefParseError};
+pub use document::{
+    Document, DocumentEvent, DocumentEventType, DocumentRequirement, DocumentVersion,
+    DocumentWithStatus, RejectionCode, RequirementState, RequirementStateError,
+    UnsatisfiedRequirement, VerificationStatus,
+};
+pub use task_queue::{
+    BundleItem, PendingTask, PendingTaskStatus, TaskCompleteRequest, TaskEvent, TaskEventType,
+    TaskResult, TaskResultRow, TaskStatus,
+};
 
 #[cfg(feature = "database")]
 pub use engine::{
@@ -69,6 +93,8 @@ pub use engine::{
 };
 #[cfg(feature = "database")]
 pub use guards::{GuardEvaluator, GuardResult};
+#[cfg(feature = "database")]
+pub use listener::{ListenerError, TaskQueueListener};
 #[cfg(feature = "database")]
 pub use repository::WorkflowRepository;
 

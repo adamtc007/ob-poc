@@ -17,7 +17,12 @@ thiserror = "2.0"
 chrono = { version = "0.4", features = ["serde"] }
 sha2 = "0.10"
 tracing = "0.1"
+async-trait = "0.1"
+tokio = { version = "1.43", features = ["fs", "sync", "time", "macros"] }
 
 # Optional database support
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "rust_decimal"], optional = true }
 rust_decimal = { version = "1.33", optional = true }
+
+[dev-dependencies]
+tempfile = "3.14"

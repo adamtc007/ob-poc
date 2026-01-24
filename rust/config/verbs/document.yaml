@@ -1,597 +1,457 @@
 domains:
   document:
-    description: Document catalog and extraction operations
+    description: Document management - solicitation, upload, verification, and lifecycle
+    invocation_hints:
+      - document
+      - passport
+      - proof
+      - upload
+      - verify
+      - evidence
+      - KYC document
     verbs:
-      catalog:
-        description: Catalog a document for an entity within a CBU
+      # ========================================================================
+      # Document Solicitation (outbound tasks)
+      # ========================================================================
+      solicit:
+        description: Solicit a single document from an entity (creates pending task)
+        behavior: plugin
+        invocation_phrases:
+          - request document
+          - solicit document
+          - ask for passport
+          - request proof of address
+          - get document from entity
         metadata:
           tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: plugin
+          source_of_truth: operational
+          scope: entity
+          noun: document_request
+          tags: [workflow, outbound, write]
         args:
-          - name: cbu-id
+          - name: subject-entity-id
             type: uuid
             required: true
-            lookup:
-              table: cbus
-              entity_type: cbu
-              schema: ob-poc
-              search_key: name
-              primary_key: cbu_id
-          - name: entity-id
-            type: uuid
-            required: true
+            description: Entity to request document from
             lookup:
               table: entities
               entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-          - name: document-type
-            type: lookup
-            required: true
-            lookup:
-              table: document_types
-              entity_type: document_type
-              code_column: type_code
-              id_column: type_id
-          - name: file-path
-            type: string
-            required: false
-          - name: metadata
-            type: json
-            required: false
-        returns:
-          type: uuid
-          name: doc_id
-          capture: true
-      extract:
-        description: Extract attributes from a cataloged document
-        metadata:
-          tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: plugin
-        args:
-          - name: document-id
-            type: uuid
-            required: true
-            lookup:
-              table: document_catalog
-              entity_type: document
-              schema: ob-poc
-              search_key: document_name
-              primary_key: doc_id
-          - name: attributes
-            type: string_list
-            required: false
-          - name: use-ocr
-            type: boolean
-            required: false
-            default: false
-        returns:
-          type: record
-      extract-to-observations:
-        description: Extract document data and create observations
-        metadata:
-          tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: plugin
-        handler: document_extract_observations
-        args:
-          - name: document-id
-            type: uuid
-            required: true
-            lookup:
-              table: document_catalog
-              entity_type: document
-              schema: ob-poc
-              search_key: document_name
-              primary_key: doc_id
-          - name: entity-id
-            type: uuid
-            required: true
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: auto-verify-allegations
-            type: boolean
-            required: false
-            default: true
-        returns:
-          type: record_set
-
-      # ═══════════════════════════════════════════════════════════════════════════
-      # Outstanding Request Integration (fire-and-forget pattern)
-      # ═══════════════════════════════════════════════════════════════════════════
-
-      request:
-        description: Request a document (creates outstanding request, fire-and-forget)
-        metadata:
-          tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: plugin
-        plugin:
-          handler: DocumentRequestOp
-        args:
-          - name: workstream-id
-            type: uuid
-            required: false
-            lookup:
-              table: entity_workstreams
-              entity_type: entity_workstream
-              schema: kyc
-              search_key: workstream_id
-              primary_key: workstream_id
-          - name: entity-id
-            type: uuid
-            required: false
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
-          - name: case-id
-            type: uuid
-            required: false
-            lookup:
-              table: cases
-              entity_type: kyc_case
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
-          - name: type
+          - name: doc-type
             type: string
             required: true
-            description: Document type code
+            description: Document type to solicit
             valid_values:
-              - ID_DOCUMENT
-              - PROOF_OF_ADDRESS
-              - SOURCE_OF_WEALTH
-              - SOURCE_OF_FUNDS
-              - CERTIFICATE_OF_INCORPORATION
-              - ARTICLES_OF_ASSOCIATION
-              - REGISTER_OF_MEMBERS
-              - REGISTER_OF_DIRECTORS
-              - FINANCIAL_STATEMENTS
-              - OWNERSHIP_STRUCTURE
-              - BOARD_RESOLUTION
-              - POWER_OF_ATTORNEY
-              - TAX_FORMS
-              - REGULATORY_LICENSE
-              - OTHER
-          - name: from
+              - passport
+              - proof_of_address
+              - articles_of_incorporation
+              - certificate_of_incumbency
+              - board_resolution
+              - tax_form
+              - financial_statement
+              - identity_card
+              - utility_bill
+              - bank_statement
+          - name: workflow-instance-id
+            type: uuid
+            required: false
+            description: Workflow instance for requirement tracking
+          - name: due-date
             type: string
             required: false
-            default: client
-          - name: due-in-days
-            type: integer
-            required: false
-          - name: notes
+            description: Due date (YYYY-MM-DD)
+          - name: required-state
             type: string
             required: false
+            default: verified
+            valid_values:
+              - received
+              - verified
         returns:
           type: record
-        example: |
-          (document.request :workstream-id @ws-003 :type "SOURCE_OF_WEALTH" :from "client" :due-in-days 14)
+          fields:
+            task_id: uuid
+            requirement_id: uuid
 
-      upload:
-        description: Upload a document (auto-fulfills matching outstanding request)
+      solicit-set:
+        description: Solicit multiple documents from an entity (creates single multi-result task)
+        behavior: plugin
+        invocation_phrases:
+          - request documents
+          - solicit document set
+          - ask for passport and proof of address
+          - get KYC documents
+          - request identity documents
         metadata:
           tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: plugin
-        plugin:
-          handler: DocumentUploadOp
+          source_of_truth: operational
+          scope: entity
+          noun: document_request_set
+          tags: [workflow, outbound, write, batch]
         args:
-          - name: workstream-id
+          - name: subject-entity-id
             type: uuid
-            required: false
-            lookup:
-              table: entity_workstreams
-              entity_type: entity_workstream
-              schema: kyc
-              search_key: workstream_id
-              primary_key: workstream_id
-          - name: entity-id
-            type: uuid
-            required: false
+            required: true
+            description: Entity to request documents from
             lookup:
               table: entities
               entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-          - name: case-id
+          - name: doc-types
+            type: list
+            required: true
+            description: List of document types to solicit
+          - name: workflow-instance-id
             type: uuid
             required: false
-            lookup:
-              table: cases
-              entity_type: kyc_case
-              schema: kyc
-              search_key: case_id
-              primary_key: case_id
-          - name: type
-            type: string
-            required: true
-            description: Document type code
-          - name: file-path
-            type: string
-            required: true
-          - name: notes
+            description: Workflow instance for requirement tracking
+          - name: due-date
             type: string
             required: false
+            description: Due date (YYYY-MM-DD)
         returns:
           type: record
-          description: |
-            Returns document_id, fulfilled_request_id (if matched), workstream_unblocked (boolean)
+          fields:
+            task_id: uuid
+            expected_count: integer
+            requirement_ids: list
 
-      waive-request:
-        description: Waive document requirement (for outstanding requests)
-        metadata:
-          tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: plugin
-        plugin:
-          handler: DocumentWaiveOp
-        args:
-          - name: workstream-id
-            type: uuid
-            required: true
-            lookup:
-              table: entity_workstreams
-              entity_type: entity_workstream
-              schema: kyc
-              search_key: workstream_id
-              primary_key: workstream_id
-          - name: type
-            type: string
-            required: true
-            description: Document type to waive
-          - name: reason
-            type: string
-            required: true
-          - name: approved-by
-            type: uuid
-            required: true
-            description: Senior user approving waiver
-        returns:
-          type: affected
-        example: |
-          (document.waive-request :workstream-id @ws-003 :type "SOURCE_OF_WEALTH"
-             :reason "Low value account, low risk" :approved-by @senior-analyst)
-
-      # ═══════════════════════════════════════════════════════════════════════════
-      # Document-Attribute Catalogue Operations
-      # ═══════════════════════════════════════════════════════════════════════════
-
-      list-attributes:
-        description: List all attributes linked to a document type with extraction/requirement details
-        metadata:
-          tier: reference
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: plugin
-        handler: document_list_attributes
-        args:
-          - name: document-type
-            type: string
-            required: true
-            description: Document type code (e.g., PASSPORT, CERT_OF_INCORPORATION)
-          - name: direction
-            type: string
-            required: false
-            valid_values: [SOURCE, SINK, BOTH]
-            description: Filter by direction - SOURCE (provides), SINK (requires), or BOTH
-        returns:
-          type: record_set
-          description: List of attributes with direction, extraction_method, is_authoritative, proof_strength
-        example: |
-          (document.list-attributes :document-type "PASSPORT")
-          (document.list-attributes :document-type "UBO_DECLARATION" :direction "SINK")
-
-      set-required-attributes:
-        description: Set required_attributes JSONB for a document type (validation rules)
-        metadata:
-          tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
+      # ========================================================================
+      # Document Creation (for internal/API sources)
+      # ========================================================================
+      create:
+        description: Create a document record (Layer B - logical identity)
         behavior: crud
-        crud:
-          operation: update
-          table: document_types
-          schema: ob-poc
-          code_column: type_code
-        args:
-          - name: document-type
-            type: string
-            required: true
-            description: Document type code
-            maps_to: type_code
-          - name: required-attributes
-            type: json
-            required: true
-            description: |
-              JSONB object defining validation rules. Structure:
-              {
-                "mandatory": ["attr.identity.full_name", "attr.identity.date_of_birth"],
-                "conditional": {
-                  "if_jurisdiction_in": ["US", "CA"],
-                  "then_require": ["attr.tax.ssn_itin"]
-                },
-                "at_least_one": [["attr.identity.passport_number", "attr.identity.national_id_number"]]
-              }
-            maps_to: required_attributes
-        example: |
-          (document.set-required-attributes
-            :document-type "PASSPORT"
-            :required-attributes {
-              "mandatory": ["attr.identity.full_name", "attr.identity.date_of_birth",
-                           "attr.identity.passport_number", "attr.identity.nationality"],
-              "conditional": {},
-              "at_least_one": []
-            })
-
-      get-type:
-        description: Get document type details including required_attributes and applicability
-        metadata:
-          tier: reference
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: crud
-        crud:
-          operation: select
-          table: document_types
-          schema: ob-poc
-          code_column: type_code
-        args:
-          - name: document-type
-            type: string
-            required: true
-            maps_to: type_code
-        returns:
-          type: record
-
-      list-types:
-        description: List document types, optionally filtered by category or domain
-        metadata:
-          tier: reference
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: crud
-        crud:
-          operation: select
-          table: document_types
-          schema: ob-poc
-        args:
-          - name: category
-            type: string
-            required: false
-            description: Filter by category (IDENTITY, CORPORATE, FINANCIAL, ADDRESS_PROOF, TAX, UBO, REGULATORY)
-            maps_to: category
-          - name: domain
-            type: string
-            required: false
-            description: Filter by domain
-            maps_to: domain
-        returns:
-          type: record_set
-
-      check-extraction-coverage:
-        description: Check what percentage of attributes can be extracted from available documents for an entity
+        invocation_phrases:
+          - create document
+          - add document record
+          - register document
         metadata:
           tier: diagnostics
-          source_of_truth: document
-          scope: cbu
+          source_of_truth: operational
+          scope: entity
           noun: document
-        behavior: plugin
-        handler: document_check_extraction_coverage
+          tags: [write]
+        crud:
+          operation: insert
+          table: documents
+          schema: ob-poc
+          returning: document_id
         args:
-          - name: entity-id
-            type: uuid
+          - name: document-type
+            type: string
             required: true
+            maps_to: document_type
+          - name: subject-entity-id
+            type: uuid
+            required: false
+            maps_to: subject_entity_id
             lookup:
               table: entities
               entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-          - name: cbu-id
+          - name: subject-cbu-id
             type: uuid
             required: false
+            maps_to: subject_cbu_id
             lookup:
               table: cbus
               entity_type: cbu
               schema: ob-poc
               search_key: name
               primary_key: cbu_id
-        returns:
-          type: record
-          description: |
-            Returns coverage stats: total_required, total_sourced, coverage_percentage,
-            missing_attributes, available_documents
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # Document Type Reference Data Management
-  # ═══════════════════════════════════════════════════════════════════════════
-  document-type:
-    description: Document type reference data management (for catalogue population)
-    verbs:
-      ensure:
-        description: Create or update a document type in the catalogue (upsert by type_code)
-        metadata:
-          tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: crud
-        crud:
-          operation: upsert
-          table: document_types
-          schema: ob-poc
-          code_column: type_code
-          conflict_keys: [type_code]
-          returning: type_id
-        args:
-          - name: type-code
+          - name: requirement-id
+            type: uuid
+            required: false
+            maps_to: requirement_id
+          - name: source
             type: string
             required: true
-            description: Unique document type code (e.g., PASSPORT, CERT_OF_INCORPORATION)
-            maps_to: type_code
-          - name: display-name
-            type: string
-            required: true
-            description: Human-readable name
-            maps_to: display_name
-          - name: category
-            type: string
-            required: true
-            description: Document category
-            valid_values:
-              [
-                IDENTITY,
-                CORPORATE,
-                FINANCIAL,
-                ADDRESS_PROOF,
-                TAX,
-                UBO,
-                REGULATORY,
-                CONTRACT,
-                COMPLIANCE,
-                SCREENING,
-                FUND,
-                TRUST,
-                PARTNERSHIP,
-              ]
-            maps_to: category
-          - name: domain
+            maps_to: source
+            description: Source of document (upload, ocr, api, gleif, workflow)
+          - name: source-ref
             type: string
             required: false
-            description: Domain grouping (e.g., kyc, custody, fund)
-            maps_to: domain
-          - name: description
-            type: string
-            required: false
-            description: Detailed description of the document type
-            maps_to: description
-          - name: applicability
-            type: json
-            required: false
-            description: |
-              CSG applicability rules as JSONB:
-              {
-                "entity_types": ["PROPER_PERSON", "LIMITED_COMPANY"],
-                "jurisdictions": ["US", "GB"],
-                "client_types": ["FUND", "CORPORATE"],
-                "required_for": ["KYC_ONBOARDING"],
-                "excludes": []
-              }
-            maps_to: applicability
-          - name: required-attributes
-            type: json
-            required: false
-            description: |
-              Required attributes for document validation:
-              {
-                "mandatory": ["attr.identity.full_name"],
-                "conditional": {},
-                "at_least_one": []
-              }
-            maps_to: required_attributes
+            maps_to: source_ref
+            description: External system reference ID
         returns:
           type: uuid
-          name: type_id
+          name: document_id
           capture: true
-        example: |
-          (document-type.ensure
-            :type-code "PASSPORT"
-            :display-name "Passport"
-            :category "IDENTITY"
-            :domain "kyc"
-            :description "Government-issued passport document"
-            :applicability {"entity_types": ["PROPER_PERSON"]})
 
-      read:
-        description: Read a document type by code
+      upload-version:
+        description: Upload a new version of a document (Layer C - immutable submission)
+        behavior: plugin
+        invocation_phrases:
+          - upload document
+          - upload version
+          - add document version
+          - submit document
         metadata:
-          tier: reference
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: crud
-        crud:
-          operation: select
-          table: document_types
-          schema: ob-poc
-          code_column: type_code
+          tier: diagnostics
+          source_of_truth: operational
+          scope: document
+          noun: document_version
+          tags: [write]
         args:
-          - name: type-code
+          - name: document-id
+            type: uuid
+            required: true
+            description: Document to add version to
+          - name: content-type
             type: string
             required: true
-            maps_to: type_code
+            description: MIME type (application/pdf, image/jpeg, etc.)
+          - name: blob-ref
+            type: string
+            required: false
+            description: Storage reference (s3://bucket/key or file:///path)
+          - name: structured-data
+            type: json
+            required: false
+            description: Structured content (for JSON documents)
+          - name: valid-from
+            type: string
+            required: false
+            description: Document validity start (YYYY-MM-DD)
+          - name: valid-to
+            type: string
+            required: false
+            description: Document validity end (YYYY-MM-DD)
+        returns:
+          type: record
+          fields:
+            version_id: uuid
+            version_no: integer
+            cargo_ref: string
+
+      # ========================================================================
+      # QA / Verification
+      # ========================================================================
+      verify:
+        description: QA approves a document version
+        behavior: plugin
+        invocation_phrases:
+          - verify document
+          - approve document
+          - QA approve
+          - mark document verified
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: document
+          noun: document_verification
+          tags: [workflow, qa, write]
+        args:
+          - name: version-id
+            type: uuid
+            required: true
+            description: Document version to verify
+          - name: verified-by
+            type: string
+            required: true
+            description: QA operator identifier
+        returns:
+          type: affected
+
+      reject:
+        description: QA rejects a document version with reason code
+        behavior: plugin
+        invocation_phrases:
+          - reject document
+          - QA reject
+          - mark document rejected
+          - fail document verification
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: document
+          noun: document_rejection
+          tags: [workflow, qa, write]
+        args:
+          - name: version-id
+            type: uuid
+            required: true
+            description: Document version to reject
+          - name: rejection-code
+            type: string
+            required: true
+            description: Standardized rejection code
+            valid_values:
+              - UNREADABLE
+              - CUTOFF
+              - GLARE
+              - LOW_RESOLUTION
+              - WRONG_DOC_TYPE
+              - WRONG_PERSON
+              - SAMPLE_DOC
+              - EXPIRED
+              - NOT_YET_VALID
+              - UNDATED
+              - DOB_MISMATCH
+              - NAME_MISMATCH
+              - ADDRESS_MISMATCH
+              - UNSUPPORTED_FORMAT
+              - PASSWORD_PROTECTED
+              - CORRUPTED
+              - SUSPECTED_ALTERATION
+              - INCONSISTENT_FONTS
+          - name: rejection-reason
+            type: string
+            required: false
+            description: Optional free-text reason detail
+          - name: verified-by
+            type: string
+            required: true
+            description: QA operator identifier
+        returns:
+          type: affected
+
+      start-qa:
+        description: Move document version to QA queue
+        behavior: crud
+        invocation_phrases:
+          - start QA
+          - begin verification
+          - queue for QA
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: document
+          noun: document_qa
+          tags: [workflow, write]
+        crud:
+          operation: update
+          table: document_versions
+          schema: ob-poc
+        args:
+          - name: version-id
+            type: uuid
+            required: true
+            maps_to: version_id
+        set:
+          - column: verification_status
+            value: "'in_qa'"
+        returns:
+          type: affected
+
+      # ========================================================================
+      # Queries
+      # ========================================================================
+      get:
+        description: Get document with latest version status
+        behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: document
+          noun: document
+          tags: [read]
+        crud:
+          operation: select
+          table: v_documents_with_status
+          schema: ob-poc
+        args:
+          - name: document-id
+            type: uuid
+            required: true
+            maps_to: document_id
         returns:
           type: record
 
-      list:
-        description: List document types with optional filters
-        metadata:
-          tier: reference
-          source_of_truth: document
-          scope: cbu
-          noun: document
+      list-versions:
+        description: List all versions of a document
         behavior: crud
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: document
+          noun: document_versions
+          tags: [read]
         crud:
           operation: select
-          table: document_types
+          table: document_versions
           schema: ob-poc
         args:
-          - name: category
-            type: string
-            required: false
-            maps_to: category
-          - name: domain
-            type: string
-            required: false
-            maps_to: domain
+          - name: document-id
+            type: uuid
+            required: true
+            maps_to: document_id
         returns:
           type: record_set
 
-      delete:
-        description: Delete a document type (will fail if documents exist)
+      for-entity:
+        description: List all documents for an entity
+        behavior: crud
+        invocation_phrases:
+          - show documents for entity
+          - list entity documents
+          - what documents does entity have
         metadata:
           tier: intent
-          source_of_truth: document
-          scope: cbu
-          noun: document
-        behavior: crud
+          source_of_truth: operational
+          scope: entity
+          noun: entity_documents
+          tags: [read, query]
         crud:
-          operation: delete
-          table: document_types
+          operation: select
+          table: v_documents_with_status
           schema: ob-poc
-          code_column: type_code
         args:
-          - name: type-code
-            type: string
+          - name: entity-id
+            type: uuid
             required: true
-            maps_to: type_code
+            maps_to: subject_entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
         returns:
-          type: affected
+          type: record_set
+
+      missing-for-entity:
+        description: List missing document requirements for an entity
+        behavior: plugin
+        invocation_phrases:
+          - what documents are missing
+          - missing documents for entity
+          - outstanding documents
+          - incomplete document collection
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: entity
+          noun: missing_documents
+          tags: [read, query, workflow]
+        args:
+          - name: entity-id
+            type: uuid
+            required: true
+            description: Entity to check requirements for
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: workflow-instance-id
+            type: uuid
+            required: false
+            description: Filter by workflow instance
+        returns:
+          type: record_set
+          fields:
+            requirement_id: uuid
+            doc_type: string
+            status: string
+            required_state: string
+            attempt_count: integer
+            last_rejection_code: string

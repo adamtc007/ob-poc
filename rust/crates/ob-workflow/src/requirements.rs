@@ -291,6 +291,46 @@ impl RequirementEvaluator {
             }
 
             // ─────────────────────────────────────────────────────────────────────────────
+            // Document Requirements (new 3-layer model)
+            // ─────────────────────────────────────────────────────────────────────────────
+            RequirementDef::RequirementSatisfied {
+                doc_type,
+                min_state,
+                subject,
+                max_age_days,
+                description,
+            } => {
+                self.check_requirement_satisfied(
+                    subject_id,
+                    doc_type,
+                    min_state,
+                    subject,
+                    *max_age_days,
+                    description,
+                )
+                .await
+            }
+
+            RequirementDef::DocumentExists {
+                document_type,
+                status,
+                subject,
+                max_age_days,
+                description,
+            } => {
+                // Legacy support - maps to requirement check
+                self.check_requirement_satisfied(
+                    subject_id,
+                    document_type,
+                    status,
+                    subject,
+                    *max_age_days,
+                    description,
+                )
+                .await
+            }
+
+            // ─────────────────────────────────────────────────────────────────────────────
             // Custom
             // ─────────────────────────────────────────────────────────────────────────────
             RequirementDef::Custom {
@@ -1560,6 +1600,152 @@ impl RequirementEvaluator {
                 .with_detail("entity_id", serde_json::json!(entity_id))
             })
             .collect())
+    }
+
+    /// Check if a document requirement is satisfied to at least min_state.
+    /// Uses the document_requirements table from the task queue system.
+    ///
+    /// Subject can be:
+    /// - A variable like "$entity_id" (resolved from workflow context - uses subject_id)
+    /// - A literal UUID string
+    async fn check_requirement_satisfied(
+        &self,
+        subject_id: Uuid,
+        doc_type: &str,
+        min_state: &str,
+        subject: &str,
+        max_age_days: Option<u32>,
+        description: &str,
+    ) -> Result<Vec<Blocker>, WorkflowError> {
+        // Resolve subject - if it's a variable ($entity_id), use subject_id
+        // Otherwise try to parse as UUID
+        let entity_id = if subject.starts_with('$') {
+            subject_id
+        } else {
+            Uuid::parse_str(subject).unwrap_or(subject_id)
+        };
+
+        // Query requirement status
+        let row: Option<(String, Option<chrono::DateTime<chrono::Utc>>)> = sqlx::query_as(
+            r#"
+            SELECT status, satisfied_at
+            FROM "ob-poc".document_requirements
+            WHERE subject_entity_id = $1
+              AND doc_type = $2
+            "#,
+        )
+        .bind(entity_id)
+        .bind(doc_type)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(WorkflowError::Database)?;
+
+        match row {
+            None => {
+                // No requirement exists = not satisfied
+                Ok(vec![Blocker::new(
+                    BlockerType::MissingDocument {
+                        document_type: doc_type.to_string(),
+                        for_entity: Some(entity_id),
+                    },
+                    if description.is_empty() {
+                        format!("{} requirement not created for entity", doc_type)
+                    } else {
+                        description.to_string()
+                    },
+                )
+                .with_resolution("requirement.create")
+                .with_detail("doc_type", serde_json::json!(doc_type))
+                .with_detail("entity_id", serde_json::json!(entity_id))])
+            }
+            Some((status, satisfied_at)) => {
+                // Check if current state satisfies threshold
+                let satisfied = self.state_satisfies(&status, min_state);
+
+                if !satisfied {
+                    return Ok(vec![Blocker::new(
+                        BlockerType::MissingDocument {
+                            document_type: doc_type.to_string(),
+                            for_entity: Some(entity_id),
+                        },
+                        if description.is_empty() {
+                            format!(
+                                "{} requirement status '{}' does not satisfy '{}'",
+                                doc_type, status, min_state
+                            )
+                        } else {
+                            description.to_string()
+                        },
+                    )
+                    .with_resolution("document.solicit")
+                    .with_detail("doc_type", serde_json::json!(doc_type))
+                    .with_detail("entity_id", serde_json::json!(entity_id))
+                    .with_detail("current_status", serde_json::json!(status))
+                    .with_detail("required_status", serde_json::json!(min_state))]);
+                }
+
+                // Check recency if specified
+                if let (Some(days), Some(satisfied)) = (max_age_days, satisfied_at) {
+                    let cutoff = chrono::Utc::now() - chrono::Duration::days(days as i64);
+                    if satisfied < cutoff {
+                        return Ok(vec![Blocker::new(
+                            BlockerType::MissingDocument {
+                                document_type: doc_type.to_string(),
+                                for_entity: Some(entity_id),
+                            },
+                            if description.is_empty() {
+                                format!(
+                                    "{} requirement satisfied too long ago (>{} days)",
+                                    doc_type, days
+                                )
+                            } else {
+                                description.to_string()
+                            },
+                        )
+                        .with_resolution("document.solicit")
+                        .with_detail("doc_type", serde_json::json!(doc_type))
+                        .with_detail("entity_id", serde_json::json!(entity_id))
+                        .with_detail("satisfied_at", serde_json::json!(satisfied))
+                        .with_detail("max_age_days", serde_json::json!(days))]);
+                    }
+                }
+
+                Ok(vec![])
+            }
+        }
+    }
+
+    /// Check if a status satisfies a minimum threshold.
+    /// State ordering: missing < requested < received < in_qa < verified
+    /// rejected/expired never satisfy any requirement.
+    /// waived satisfies everything.
+    fn state_satisfies(&self, current: &str, min_state: &str) -> bool {
+        // Failure states never satisfy
+        if current == "rejected" || current == "expired" {
+            return false;
+        }
+        // Waived satisfies anything
+        if current == "waived" {
+            return true;
+        }
+        // Verified satisfies anything
+        if current == "verified" {
+            return true;
+        }
+
+        let order = |s: &str| -> u8 {
+            match s {
+                "missing" => 0,
+                "requested" => 1,
+                "received" => 2,
+                "in_qa" => 3,
+                "verified" => 4,
+                "waived" => 5,
+                _ => 0,
+            }
+        };
+
+        order(current) >= order(min_state)
     }
 }
 

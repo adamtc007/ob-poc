@@ -4,10 +4,13 @@
 //! Definitions are also cached to the database for fast querying.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use sqlx::PgPool;
 use std::collections::HashMap;
 use std::path::Path;
+
+#[cfg(feature = "database")]
+use sha2::{Digest, Sha256};
+#[cfg(feature = "database")]
+use sqlx::PgPool;
 
 use super::WorkflowError;
 
@@ -57,6 +60,10 @@ fn default_ubo_threshold() -> f64 {
 
 fn default_max_age_days() -> u32 {
     90
+}
+
+fn default_min_state() -> String {
+    "verified".to_string()
 }
 
 impl WorkflowDefinition {
@@ -463,6 +470,39 @@ pub enum RequirementDef {
         description: String,
     },
 
+    // --- Document Requirements (new 3-layer model) ---
+    /// Check if a document requirement is satisfied to at least min_state.
+    /// Uses the document_requirements table from the task queue system.
+    /// This is the preferred way to check document collection status.
+    RequirementSatisfied {
+        /// Document type to check (e.g., "passport", "proof_of_address")
+        doc_type: String,
+        /// Minimum state required: "received" (allegation) or "verified" (QA passed)
+        #[serde(default = "default_min_state")]
+        min_state: String,
+        /// Subject reference (variable like "$entity_id" or literal UUID)
+        subject: String,
+        /// Optional: max age in days since satisfied_at (for recency checks)
+        #[serde(default)]
+        max_age_days: Option<u32>,
+        #[serde(default)]
+        description: String,
+    },
+
+    /// Check if a document exists with specific status (legacy - prefer RequirementSatisfied)
+    DocumentExists {
+        document_type: String,
+        /// Status to check for
+        #[serde(default = "default_min_state")]
+        status: String,
+        /// Subject reference
+        subject: String,
+        #[serde(default)]
+        max_age_days: Option<u32>,
+        #[serde(default)]
+        description: String,
+    },
+
     /// Custom requirement
     Custom {
         code: String,
@@ -519,6 +559,7 @@ impl WorkflowLoader {
     }
 
     /// Load workflows from YAML and sync to database
+    #[cfg(feature = "database")]
     pub async fn load_and_sync(
         dir: &Path,
         pool: &PgPool,
@@ -533,6 +574,7 @@ impl WorkflowLoader {
     }
 
     /// Sync a single workflow definition to database
+    #[cfg(feature = "database")]
     async fn sync_to_db(
         pool: &PgPool,
         workflow_id: &str,
@@ -568,6 +610,7 @@ impl WorkflowLoader {
     }
 
     /// Compute SHA-256 hash of JSON content
+    #[cfg(feature = "database")]
     fn content_hash(json: &serde_json::Value) -> String {
         let content = serde_json::to_string(json).unwrap_or_default();
         let hash = Sha256::digest(content.as_bytes());
