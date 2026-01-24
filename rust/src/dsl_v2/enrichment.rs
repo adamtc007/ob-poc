@@ -356,6 +356,7 @@ mod tests {
                 returns: None,
                 metadata: None,
                 invocation_phrases: vec![],
+                policy: None,
             },
         );
 
@@ -451,6 +452,7 @@ mod tests {
                 returns: None,
                 metadata: None,
                 invocation_phrases: vec![],
+                policy: None,
             },
         );
 

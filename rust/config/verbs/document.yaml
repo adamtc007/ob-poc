@@ -25,7 +25,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: entity
+          scope: cbu
           noun: document_request
           tags: [workflow, outbound, write]
         args:
@@ -87,7 +87,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: entity
+          scope: cbu
           noun: document_request_set
           tags: [workflow, outbound, write, batch]
         args:
@@ -102,7 +102,7 @@ domains:
               search_key: name
               primary_key: entity_id
           - name: doc-types
-            type: list
+            type: string_list
             required: true
             description: List of document types to solicit
           - name: workflow-instance-id
@@ -133,7 +133,7 @@ domains:
         metadata:
           tier: diagnostics
           source_of_truth: operational
-          scope: entity
+          scope: cbu
           noun: document
           tags: [write]
         crud:
@@ -196,7 +196,7 @@ domains:
         metadata:
           tier: diagnostics
           source_of_truth: operational
-          scope: document
+          scope: cbu
           noun: document_version
           tags: [write]
         args:
@@ -245,7 +245,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: document
+          scope: cbu
           noun: document_verification
           tags: [workflow, qa, write]
         args:
@@ -271,7 +271,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: document
+          scope: cbu
           noun: document_rejection
           tags: [workflow, qa, write]
         args:
@@ -323,7 +323,7 @@ domains:
         metadata:
           tier: diagnostics
           source_of_truth: operational
-          scope: document
+          scope: cbu
           noun: document_qa
           tags: [workflow, write]
         crud:
@@ -350,7 +350,7 @@ domains:
         metadata:
           tier: diagnostics
           source_of_truth: operational
-          scope: document
+          scope: cbu
           noun: document
           tags: [read]
         crud:
@@ -371,7 +371,7 @@ domains:
         metadata:
           tier: diagnostics
           source_of_truth: operational
-          scope: document
+          scope: cbu
           noun: document_versions
           tags: [read]
         crud:
@@ -396,7 +396,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: entity
+          scope: cbu
           noun: entity_documents
           tags: [read, query]
         crud:
@@ -428,7 +428,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: entity
+          scope: cbu
           noun: missing_documents
           tags: [read, query, workflow]
         args:

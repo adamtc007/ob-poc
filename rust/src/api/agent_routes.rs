@@ -31,7 +31,8 @@ use crate::database::generation_log_repository::{
     ParseResult,
 };
 use crate::dsl_v2::{
-    compile, parse_program, verb_registry::registry, DslExecutor, ExecutionContext,
+    compile, expand_templates_simple, parse_program, runtime_registry, verb_registry::registry,
+    AtomicExecutionResult, BatchPolicy, BestEffortExecutionResult, DslExecutor, ExecutionContext,
     ExecutionResult as DslV2Result, SemanticValidator,
 };
 use crate::ontology::SemanticStageRegistry;
@@ -819,6 +820,18 @@ pub struct OnboardingExecutionResult {
     pub errors: Vec<String>,
 }
 
+/// Outcome of DSL execution - either atomic (all-or-nothing) or best-effort (partial success)
+///
+/// This enum captures the execution strategy result, allowing the caller to handle
+/// different outcomes appropriately (e.g., rollback vs partial success).
+#[derive(Debug)]
+enum ExecutionOutcome {
+    /// Atomic execution result (all steps in single transaction)
+    Atomic(AtomicExecutionResult),
+    /// Best-effort execution result (continues on failure)
+    BestEffort(BestEffortExecutionResult),
+}
+
 // ============================================================================
 // State
 // ============================================================================
@@ -834,6 +847,7 @@ pub struct AgentState {
     pub dsl_repo: Arc<crate::database::DslRepository>,
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
     pub feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
+    pub expansion_audit: Arc<crate::database::ExpansionAuditRepository>,
 }
 
 impl AgentState {
@@ -851,6 +865,8 @@ impl AgentState {
             pool.clone(),
         ));
         let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
+        let expansion_audit =
+            Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
         Self {
             pool,
@@ -862,6 +878,7 @@ impl AgentState {
             dsl_repo,
             agent_service,
             feedback_service,
+            expansion_audit,
         }
     }
 
@@ -901,6 +918,8 @@ impl AgentState {
 
         // Build agent service with embedder
         let agent_service = crate::api::agent_service::AgentService::new(pool.clone(), embedder);
+        let expansion_audit =
+            Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
 
         Self {
             pool,
@@ -912,6 +931,7 @@ impl AgentState {
             dsl_repo,
             agent_service: Arc::new(agent_service),
             feedback_service,
+            expansion_audit,
         }
     }
 }
@@ -3035,18 +3055,131 @@ async fn execute_session_dsl(
     };
 
     // =========================================================================
-    // EXECUTE
+    // EXPANSION STAGE - Determine batch policy and derive locks
+    // =========================================================================
+    let templates = runtime_registry().templates();
+    let expansion_result = expand_templates_simple(&dsl, templates);
+
+    let expansion_report = match expansion_result {
+        Ok(output) => {
+            tracing::debug!(
+                "[EXEC] Expansion complete: batch_policy={:?}, locks={}, statements={}",
+                output.report.batch_policy,
+                output.report.derived_lock_set.len(),
+                output.report.expanded_statement_count
+            );
+            Some(output.report)
+        }
+        Err(e) => {
+            tracing::warn!(
+                "[EXEC] Expansion failed (continuing with best-effort): {}",
+                e
+            );
+            None
+        }
+    };
+
+    // Persist expansion report for audit trail (async, non-blocking)
+    if let Some(ref report) = expansion_report {
+        let expansion_audit = state.expansion_audit.clone();
+        let report_clone = report.clone();
+        tokio::spawn(async move {
+            if let Err(e) = expansion_audit.save(session_id, &report_clone).await {
+                tracing::error!(
+                    session_id = %session_id,
+                    expansion_id = %report_clone.expansion_id,
+                    "Failed to persist expansion report: {}",
+                    e
+                );
+            }
+        });
+    }
+
+    // Determine batch policy from expansion report (default: BestEffort)
+    let batch_policy = expansion_report
+        .as_ref()
+        .map(|r| r.batch_policy)
+        .unwrap_or(BatchPolicy::BestEffort);
+
+    // =========================================================================
+    // EXECUTE - Route based on batch policy
     // =========================================================================
     let mut results = Vec::new();
     let mut all_success = true;
     let mut errors = Vec::new();
 
-    match state
-        .dsl_v2_executor
-        .execute_plan(&plan, &mut exec_ctx)
-        .await
-    {
-        Ok(exec_results) => {
+    // Execute based on batch policy
+    let execution_outcome = match batch_policy {
+        BatchPolicy::Atomic => {
+            tracing::info!(
+                "[EXEC] Using atomic execution with locks (policy=atomic, locks={})",
+                expansion_report
+                    .as_ref()
+                    .map(|r| r.derived_lock_set.len())
+                    .unwrap_or(0)
+            );
+            state
+                .dsl_v2_executor
+                .execute_plan_atomic_with_locks(&plan, &mut exec_ctx, expansion_report.as_ref())
+                .await
+                .map(ExecutionOutcome::Atomic)
+        }
+        BatchPolicy::BestEffort => {
+            tracing::info!("[EXEC] Using best-effort execution (policy=best_effort)");
+            state
+                .dsl_v2_executor
+                .execute_plan_best_effort(&plan, &mut exec_ctx)
+                .await
+                .map(ExecutionOutcome::BestEffort)
+        }
+    };
+
+    match execution_outcome {
+        Ok(outcome) => {
+            // Extract results based on outcome type
+            let exec_results: Vec<DslV2Result> = match &outcome {
+                ExecutionOutcome::Atomic(atomic) => match atomic {
+                    AtomicExecutionResult::Committed { step_results, .. } => step_results.clone(),
+                    AtomicExecutionResult::RolledBack {
+                        failed_at_step,
+                        error,
+                        ..
+                    } => {
+                        all_success = false;
+                        errors.push(format!(
+                            "Atomic execution rolled back at step {}: {}",
+                            failed_at_step, error
+                        ));
+                        Vec::new()
+                    }
+                    AtomicExecutionResult::LockContention {
+                        entity_type,
+                        entity_id,
+                        ..
+                    } => {
+                        all_success = false;
+                        errors.push(format!(
+                            "Lock contention on {}:{} - another session is modifying this entity",
+                            entity_type, entity_id
+                        ));
+                        Vec::new()
+                    }
+                },
+                ExecutionOutcome::BestEffort(best_effort) => {
+                    // Check for partial failures
+                    if !best_effort.errors.is_empty() {
+                        all_success = false;
+                        errors.push(best_effort.errors.summary());
+                    }
+                    // Convert Option<ExecutionResult> to ExecutionResult, filtering None
+                    best_effort
+                        .verb_results
+                        .iter()
+                        .filter_map(|r| r.clone())
+                        .collect()
+                }
+            };
+
             for (idx, exec_result) in exec_results.iter().enumerate() {
                 let mut entity_id: Option<Uuid> = None;
                 let mut result_data: Option<serde_json::Value> = None;

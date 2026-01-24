@@ -718,6 +718,7 @@ mod tests {
             lifecycle: None,
             metadata: None,
             invocation_phrases: vec![],
+            policy: None,
         }
     }
 
@@ -760,6 +761,7 @@ mod tests {
             lifecycle: None,
             metadata: None,
             invocation_phrases: vec![],
+            policy: None,
         }
     }
 
@@ -777,6 +779,7 @@ mod tests {
             lifecycle: None,
             metadata: None,
             invocation_phrases: vec![],
+            policy: None,
         }
     }
 

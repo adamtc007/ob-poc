@@ -294,6 +294,34 @@ pub trait CustomOperation: Send + Sync {
         verb_call: &VerbCall,
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult>;
+
+    /// Execute within an existing transaction
+    ///
+    /// Default implementation logs a warning and falls back to pool-based execution
+    /// which does NOT participate in the transaction (auto-commit semantics).
+    /// Override this method for true transactional behavior.
+    #[cfg(feature = "database")]
+    async fn execute_in_tx(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        _tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    ) -> Result<ExecutionResult> {
+        // WARNING: Default implementation does not participate in the caller's transaction.
+        // This means if the batch fails, this operation will NOT be rolled back.
+        // Implementors should override this method for transactional operations.
+        tracing::warn!(
+            "CustomOperation {}.{} does not implement execute_in_tx, using pool (non-transactional)",
+            self.domain(),
+            self.verb()
+        );
+        Err(anyhow::anyhow!(
+            "Operation {}.{} does not support transactional execution. \
+             Override execute_in_tx() for transaction support.",
+            self.domain(),
+            self.verb()
+        ))
+    }
 }
 
 /// Registry for custom operations

@@ -24,7 +24,8 @@ use crate::database::generation_log_repository::{
 };
 use crate::database::{VerbService, VisualizationRepository};
 use crate::dsl_v2::{
-    compile, gateway_resolver, parse_program, registry, DslExecutor, ExecutionContext,
+    compile, expand_templates_simple, gateway_resolver, parse_program, registry, runtime_registry,
+    AtomicExecutionResult, BatchPolicy, BestEffortExecutionResult, DslExecutor, ExecutionContext,
 };
 use crate::mcp::verb_search::HybridVerbSearcher;
 
@@ -58,6 +59,15 @@ struct TopCorrectionRow {
     input_pattern: String,
     suggested_output: String,
     occurrence_count: i32,
+}
+
+/// Outcome of MCP DSL execution - either atomic (all-or-nothing) or best-effort (partial success)
+#[derive(Debug)]
+enum MpcExecutionOutcome {
+    /// Atomic execution result (all steps in single transaction)
+    Atomic(AtomicExecutionResult),
+    /// Best-effort execution result (continues on failure)
+    BestEffort(BestEffortExecutionResult),
 }
 
 /// Configuration for ToolHandlers construction
@@ -782,11 +792,154 @@ impl ToolHandlers {
             }));
         }
 
+        // =====================================================================
+        // EXPANSION STAGE - Determine batch policy and derive locks
+        // =====================================================================
+        let templates = runtime_registry().templates();
+        let expansion_result = expand_templates_simple(source, templates);
+
+        let expansion_report = match expansion_result {
+            Ok(output) => {
+                tracing::debug!(
+                    "[MCP] Expansion complete: batch_policy={:?}, locks={}, statements={}",
+                    output.report.batch_policy,
+                    output.report.derived_lock_set.len(),
+                    output.report.expanded_statement_count
+                );
+                Some(output.report)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "[MCP] Expansion failed (continuing with best-effort): {}",
+                    e
+                );
+                None
+            }
+        };
+
+        // Determine batch policy from expansion report (default: BestEffort)
+        let batch_policy = expansion_report
+            .as_ref()
+            .map(|r| r.batch_policy)
+            .unwrap_or(BatchPolicy::BestEffort);
+
+        // =====================================================================
+        // EXECUTE - Route based on batch policy
+        // =====================================================================
         let executor = DslExecutor::new(self.pool.clone());
         let mut ctx = ExecutionContext::new();
 
-        match executor.execute_plan(&plan, &mut ctx).await {
-            Ok(results) => {
+        // Execute based on batch policy
+        let execution_outcome = match batch_policy {
+            BatchPolicy::Atomic => {
+                tracing::info!(
+                    "[MCP] Using atomic execution with locks (policy=atomic, locks={})",
+                    expansion_report
+                        .as_ref()
+                        .map(|r| r.derived_lock_set.len())
+                        .unwrap_or(0)
+                );
+                executor
+                    .execute_plan_atomic_with_locks(&plan, &mut ctx, expansion_report.as_ref())
+                    .await
+                    .map(MpcExecutionOutcome::Atomic)
+            }
+            BatchPolicy::BestEffort => {
+                tracing::info!("[MCP] Using best-effort execution (policy=best_effort)");
+                executor
+                    .execute_plan_best_effort(&plan, &mut ctx)
+                    .await
+                    .map(MpcExecutionOutcome::BestEffort)
+            }
+        };
+
+        match execution_outcome {
+            Ok(outcome) => {
+                // Extract results based on outcome type
+                let (steps_executed, execution_error) = match &outcome {
+                    MpcExecutionOutcome::Atomic(atomic) => match atomic {
+                        AtomicExecutionResult::Committed { step_results, .. } => {
+                            (step_results.len(), None)
+                        }
+                        AtomicExecutionResult::RolledBack {
+                            failed_at_step,
+                            error,
+                            ..
+                        } => (
+                            0,
+                            Some(format!(
+                                "Atomic execution rolled back at step {}: {}",
+                                failed_at_step, error
+                            )),
+                        ),
+                        AtomicExecutionResult::LockContention {
+                            entity_type,
+                            entity_id,
+                            ..
+                        } => (
+                            0,
+                            Some(format!(
+                                "Lock contention on {}:{} - another session is modifying this entity",
+                                entity_type, entity_id
+                            )),
+                        ),
+                    },
+                    MpcExecutionOutcome::BestEffort(best_effort) => {
+                        let success_count = best_effort
+                            .verb_results
+                            .iter()
+                            .filter(|r| r.is_some())
+                            .count();
+                        let error_summary = if !best_effort.errors.is_empty() {
+                            Some(best_effort.errors.summary())
+                        } else {
+                            None
+                        };
+                        (success_count, error_summary)
+                    }
+                };
+
+                // Check if execution succeeded
+                if let Some(error_msg) = execution_error {
+                    // Log execution failure
+                    if let Some(lid) = log_id {
+                        let attempt = GenerationAttempt {
+                            attempt: 1,
+                            timestamp: chrono::Utc::now(),
+                            prompt_template: None,
+                            prompt_text: String::new(),
+                            raw_response: String::new(),
+                            extracted_dsl: Some(source.to_string()),
+                            parse_result: ParseResult {
+                                success: true,
+                                error: None,
+                            },
+                            lint_result: LintResult {
+                                valid: true,
+                                errors: vec![],
+                                warnings: vec![],
+                            },
+                            compile_result: CompileResult {
+                                success: true,
+                                error: None,
+                                step_count: plan.len() as i32,
+                            },
+                            latency_ms: Some(start_time.elapsed().as_millis() as i32),
+                            input_tokens: None,
+                            output_tokens: None,
+                        };
+                        let _ = self.generation_log.add_attempt(lid, &attempt).await;
+                        let _ = self.generation_log.mark_failed(lid).await;
+                    }
+
+                    return Ok(json!({
+                        "success": false,
+                        "error": error_msg,
+                        "batch_policy": format!("{:?}", batch_policy),
+                        "completed": ctx.symbols.len()
+                    }));
+                }
+
                 // Log success
                 if let Some(lid) = log_id {
                     let attempt = GenerationAttempt {
@@ -875,7 +1028,8 @@ impl ToolHandlers {
 
                 Ok(json!({
                     "success": true,
-                    "steps_executed": results.len(),
+                    "steps_executed": steps_executed,
+                    "batch_policy": format!("{:?}", batch_policy),
                     "bindings": bindings,
                     "view_state": view_state,
                     "viewport_state": viewport_state,

@@ -1006,6 +1006,7 @@ mod tests {
             produces: None,
             consumes: vec![],
             lifecycle: None,
+            policy: None,
         };
 
         let hash1 = test_compute_hash(&verb);

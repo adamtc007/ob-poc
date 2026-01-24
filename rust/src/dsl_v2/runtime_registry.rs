@@ -40,6 +40,67 @@ pub struct RuntimeVerb {
     pub consumes: Vec<VerbConsumes>,
     /// Lifecycle constraints and transitions for this verb
     pub lifecycle: Option<VerbLifecycle>,
+    /// Execution policy for batch operations and entity locking
+    pub policy: Option<RuntimePolicyConfig>,
+}
+
+/// Runtime policy configuration (built from YAML)
+#[derive(Debug, Clone, Default)]
+pub struct RuntimePolicyConfig {
+    /// Batch execution policy: atomic or best_effort
+    pub batch: RuntimeBatchPolicy,
+    /// Locking configuration
+    pub locking: Option<RuntimeLockingConfig>,
+}
+
+/// Batch execution policy (runtime representation)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeBatchPolicy {
+    /// All statements succeed or all are rolled back
+    Atomic,
+    /// Continue on failure, aggregate errors (default)
+    #[default]
+    BestEffort,
+}
+
+/// Locking configuration (runtime representation)
+#[derive(Debug, Clone)]
+pub struct RuntimeLockingConfig {
+    /// Lock acquisition mode
+    pub mode: RuntimeLockMode,
+    /// Timeout in milliseconds
+    pub timeout_ms: Option<u64>,
+    /// Lock targets
+    pub targets: Vec<RuntimeLockTarget>,
+}
+
+/// Lock acquisition mode (runtime representation)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeLockMode {
+    /// Non-blocking
+    #[default]
+    Try,
+    /// Blocking with optional timeout
+    Block,
+}
+
+/// Lock target specification (runtime representation)
+#[derive(Debug, Clone)]
+pub struct RuntimeLockTarget {
+    /// Argument name
+    pub arg: String,
+    /// Entity type
+    pub entity_type: String,
+    /// Access type (read or write)
+    pub access: RuntimeLockAccess,
+}
+
+/// Lock access type (runtime representation)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RuntimeLockAccess {
+    Read,
+    #[default]
+    Write,
 }
 
 #[derive(Debug, Clone)]
@@ -313,6 +374,7 @@ impl RuntimeVerbRegistry {
                 }),
                 consumes: vec![],
                 lifecycle: None, // Dynamic verbs don't have lifecycle constraints by default
+                policy: None,    // Dynamic verbs don't have policy by default
             };
 
             self.verbs.insert(full_name.clone(), runtime_verb);
@@ -455,6 +517,36 @@ impl RuntimeVerbRegistry {
             produces: config.produces.clone(),
             consumes: config.consumes.clone(),
             lifecycle: config.lifecycle.clone(),
+            policy: config.policy.as_ref().map(Self::convert_policy),
+        }
+    }
+
+    /// Convert YAML policy config to runtime representation
+    fn convert_policy(config: &PolicyConfig) -> RuntimePolicyConfig {
+        RuntimePolicyConfig {
+            batch: match config.batch {
+                BatchPolicyConfig::Atomic => RuntimeBatchPolicy::Atomic,
+                BatchPolicyConfig::BestEffort => RuntimeBatchPolicy::BestEffort,
+            },
+            locking: config.locking.as_ref().map(|l| RuntimeLockingConfig {
+                mode: match l.mode {
+                    LockModeConfig::Try => RuntimeLockMode::Try,
+                    LockModeConfig::Block => RuntimeLockMode::Block,
+                },
+                timeout_ms: l.timeout_ms,
+                targets: l
+                    .targets
+                    .iter()
+                    .map(|t| RuntimeLockTarget {
+                        arg: t.arg.clone(),
+                        entity_type: t.entity_type.clone(),
+                        access: match t.access {
+                            LockAccessConfig::Read => RuntimeLockAccess::Read,
+                            LockAccessConfig::Write => RuntimeLockAccess::Write,
+                        },
+                    })
+                    .collect(),
+            }),
         }
     }
 
@@ -820,6 +912,7 @@ mod tests {
                 }),
                 metadata: None,
                 invocation_phrases: vec![],
+                policy: None,
             },
         );
 

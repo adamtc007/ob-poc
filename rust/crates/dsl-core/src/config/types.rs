@@ -83,6 +83,105 @@ pub struct VerbConfig {
     /// Example: ["add counterparty", "create counterparty", "onboard counterparty"]
     #[serde(default)]
     pub invocation_phrases: Vec<String>,
+    /// Execution policy for batch operations and entity locking.
+    /// Controls atomic vs best-effort execution and advisory locks.
+    #[serde(default)]
+    pub policy: Option<PolicyConfig>,
+}
+
+// =============================================================================
+// POLICY CONFIG (Batch Execution & Locking)
+// =============================================================================
+
+/// Execution policy for batch operations and entity locking
+///
+/// Controls how multi-statement batches are executed:
+/// - `atomic`: All-or-nothing semantics (rollback on any failure)
+/// - `best_effort`: Continue on failure, aggregate errors
+///
+/// Also controls advisory locking to prevent concurrent modification.
+///
+/// Example YAML:
+/// ```yaml
+/// policy:
+///   batch: atomic
+///   locking:
+///     mode: try
+///     targets:
+///       - arg: entity-id
+///         entity_type: entity
+///         access: write
+/// ```
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct PolicyConfig {
+    /// Batch execution policy: `atomic` or `best_effort` (default)
+    #[serde(default)]
+    pub batch: BatchPolicyConfig,
+    /// Locking configuration for concurrent access control
+    #[serde(default)]
+    pub locking: Option<LockingConfig>,
+}
+
+/// Batch execution policy
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchPolicyConfig {
+    /// All statements succeed or all are rolled back
+    Atomic,
+    /// Continue on failure, aggregate errors (default)
+    #[default]
+    BestEffort,
+}
+
+/// Locking configuration for concurrent access control
+///
+/// Uses PostgreSQL advisory locks within transactions to prevent
+/// concurrent modification of entities during batch execution.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LockingConfig {
+    /// Lock acquisition mode
+    #[serde(default)]
+    pub mode: LockModeConfig,
+    /// Timeout in milliseconds (only used with `mode: block`)
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+    /// Which arguments to lock
+    #[serde(default)]
+    pub targets: Vec<LockTargetConfig>,
+}
+
+/// Lock acquisition mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LockModeConfig {
+    /// Non-blocking: fail immediately if lock unavailable (default)
+    #[default]
+    Try,
+    /// Blocking: wait for lock (with optional timeout)
+    Block,
+}
+
+/// Specifies which argument to lock
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LockTargetConfig {
+    /// Argument name in verb call (e.g., "entity-id", "person-id")
+    pub arg: String,
+    /// Entity type for lock key (e.g., "person", "entity", "cbu")
+    pub entity_type: String,
+    /// Access type: `read` or `write` (default)
+    #[serde(default)]
+    pub access: LockAccessConfig,
+}
+
+/// Lock access type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LockAccessConfig {
+    /// Read lock - allows concurrent readers, blocks writers
+    Read,
+    /// Write lock - exclusive access (default)
+    #[default]
+    Write,
 }
 
 // =============================================================================
@@ -1529,5 +1628,134 @@ primary_key: entity_id
         } else {
             panic!("Expected nested list");
         }
+    }
+
+    // =========================================================================
+    // Policy Config Tests
+    // =========================================================================
+
+    #[test]
+    fn test_policy_config_defaults() {
+        // Empty policy should use defaults
+        let yaml = r#"
+batch: best_effort
+"#;
+        let config: PolicyConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.batch, BatchPolicyConfig::BestEffort);
+        assert!(config.locking.is_none());
+    }
+
+    #[test]
+    fn test_policy_config_atomic() {
+        let yaml = r#"
+batch: atomic
+"#;
+        let config: PolicyConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.batch, BatchPolicyConfig::Atomic);
+    }
+
+    #[test]
+    fn test_policy_config_full() {
+        let yaml = r#"
+batch: atomic
+locking:
+  mode: try
+  timeout_ms: 200
+  targets:
+    - arg: entity-id
+      entity_type: entity
+      access: write
+    - arg: person-id
+      entity_type: person
+      access: read
+"#;
+        let config: PolicyConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.batch, BatchPolicyConfig::Atomic);
+
+        let locking = config.locking.unwrap();
+        assert_eq!(locking.mode, LockModeConfig::Try);
+        assert_eq!(locking.timeout_ms, Some(200));
+        assert_eq!(locking.targets.len(), 2);
+
+        assert_eq!(locking.targets[0].arg, "entity-id");
+        assert_eq!(locking.targets[0].entity_type, "entity");
+        assert_eq!(locking.targets[0].access, LockAccessConfig::Write);
+
+        assert_eq!(locking.targets[1].arg, "person-id");
+        assert_eq!(locking.targets[1].entity_type, "person");
+        assert_eq!(locking.targets[1].access, LockAccessConfig::Read);
+    }
+
+    #[test]
+    fn test_policy_config_block_mode() {
+        let yaml = r#"
+batch: best_effort
+locking:
+  mode: block
+  timeout_ms: 5000
+  targets:
+    - arg: cbu-id
+      entity_type: cbu
+"#;
+        let config: PolicyConfig = serde_yaml::from_str(yaml).unwrap();
+
+        let locking = config.locking.unwrap();
+        assert_eq!(locking.mode, LockModeConfig::Block);
+        assert_eq!(locking.timeout_ms, Some(5000));
+
+        // Default access is write
+        assert_eq!(locking.targets[0].access, LockAccessConfig::Write);
+    }
+
+    #[test]
+    fn test_verb_config_with_policy() {
+        let yaml = r#"
+description: "Link person to entity as director"
+behavior: crud
+crud:
+  operation: role_link
+  table: entity_roles
+  schema: ob-poc
+args:
+  - name: entity-id
+    type: uuid
+    required: true
+  - name: person-id
+    type: uuid
+    required: true
+policy:
+  batch: atomic
+  locking:
+    mode: try
+    targets:
+      - arg: entity-id
+        entity_type: entity
+        access: write
+      - arg: person-id
+        entity_type: person
+        access: write
+"#;
+        let config: VerbConfig = serde_yaml::from_str(yaml).unwrap();
+        assert!(config.policy.is_some());
+
+        let policy = config.policy.unwrap();
+        assert_eq!(policy.batch, BatchPolicyConfig::Atomic);
+        assert!(policy.locking.is_some());
+    }
+
+    #[test]
+    fn test_verb_config_without_policy() {
+        // Existing verbs without policy should still work (backward compatible)
+        let yaml = r#"
+description: "Simple verb"
+behavior: crud
+crud:
+  operation: select
+  table: test
+  schema: ob-poc
+args: []
+"#;
+        let config: VerbConfig = serde_yaml::from_str(yaml).unwrap();
+        assert!(config.policy.is_none());
     }
 }

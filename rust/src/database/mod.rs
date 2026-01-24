@@ -21,11 +21,13 @@ pub mod document_service;
 pub mod dsl_repository;
 pub mod entity_service;
 pub mod execution_audit;
+pub mod expansion_audit;
 pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
 pub mod generation_log_repository;
 pub mod graph_repository;
+pub mod locks;
 pub mod product_service;
 pub mod resource_instance_service;
 pub mod service_resource_service;
@@ -92,9 +94,16 @@ pub use session_repository::{
 
 pub use graph_repository::{DerivedBook, GraphRepository, PgGraphRepository};
 
+pub use locks::{
+    acquire_locks, advisory_xact_lock, lock_key, lock_key_from_struct, try_advisory_xact_lock,
+    LockAcquisitionResult, LockError,
+};
+
 pub use execution_audit::{
     ExecutionAuditRepository, ExecutionByVerbHash, ExecutionVerbAudit, VerbConfigAtExecution,
 };
+
+pub use expansion_audit::{ExpansionAuditRepository, ExpansionReportRow};
 
 pub use context_discovery_service::{
     CbuContextRow, ContextDiscoveryService, DiscoveredContext, LinkedContextRow,

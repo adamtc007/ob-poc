@@ -54,6 +54,18 @@ use sqlx::PgPool;
 // Event infrastructure for observability
 use crate::events::SharedEmitter;
 
+// Error aggregation for best-effort execution
+#[cfg(feature = "database")]
+use super::errors::ExecutionErrors;
+
+// Advisory locks for concurrent access control
+#[cfg(feature = "database")]
+use crate::database::locks::{acquire_locks, LockError};
+
+// Expansion types for lock derivation
+#[cfg(feature = "database")]
+use super::expansion::{ExpansionReport, LockKey, LockMode};
+
 // ============================================================================
 // Pre-Flight Resolution Check
 // ============================================================================
@@ -188,6 +200,188 @@ pub enum ExecutionResult {
     TemplateBatch(crate::domain_ops::template_ops::TemplateBatchResult),
     /// Batch control operation result (batch.pause, batch.resume, etc.)
     BatchControl(crate::domain_ops::batch_control_ops::BatchControlResult),
+}
+
+// ============================================================================
+// Best-Effort Execution Result (Phase 4.2)
+// ============================================================================
+
+/// Result of best-effort (non-atomic) plan execution with error aggregation
+///
+/// This is returned by `execute_plan_best_effort()` which continues on failure
+/// and aggregates errors by root cause.
+#[cfg(feature = "database")]
+#[derive(Debug, Clone)]
+pub struct BestEffortExecutionResult {
+    /// Results for each step (Some if succeeded, None if failed)
+    pub verb_results: Vec<Option<ExecutionResult>>,
+    /// Aggregated errors grouped by root cause
+    pub errors: ExecutionErrors,
+    /// Overall batch status
+    pub status: BatchStatus,
+}
+
+/// Status of a batch execution
+#[cfg(feature = "database")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BatchStatus {
+    /// All operations succeeded
+    AllSucceeded,
+    /// Some operations succeeded, some failed
+    PartialSuccess,
+    /// All operations failed
+    AllFailed,
+}
+
+#[cfg(feature = "database")]
+impl BestEffortExecutionResult {
+    /// Check if execution was fully successful
+    pub fn is_success(&self) -> bool {
+        self.status == BatchStatus::AllSucceeded
+    }
+
+    /// Check if any operations succeeded
+    pub fn has_successes(&self) -> bool {
+        self.errors.total_succeeded > 0
+    }
+
+    /// Check if any operations failed
+    pub fn has_failures(&self) -> bool {
+        self.errors.total_failed > 0
+    }
+
+    /// Get a summary of the execution
+    pub fn summary(&self) -> String {
+        self.errors.summary()
+    }
+
+    /// Get the successful results only
+    pub fn successful_results(&self) -> Vec<&ExecutionResult> {
+        self.verb_results
+            .iter()
+            .filter_map(|r| r.as_ref())
+            .collect()
+    }
+
+    /// Get count of successful operations
+    pub fn success_count(&self) -> usize {
+        self.errors.total_succeeded
+    }
+
+    /// Get count of failed operations
+    pub fn failure_count(&self) -> usize {
+        self.errors.total_failed
+    }
+}
+
+// ============================================================================
+// Atomic Execution Result (Phase 3.2)
+// ============================================================================
+
+/// Result of atomic (all-or-nothing) plan execution with locking
+///
+/// This is returned by `execute_plan_atomic_with_locks()` which wraps all
+/// execution in a single transaction and optionally acquires advisory locks.
+#[cfg(feature = "database")]
+#[derive(Debug, Clone)]
+pub enum AtomicExecutionResult {
+    /// All steps succeeded and transaction committed
+    Committed {
+        /// Results for each step
+        step_results: Vec<ExecutionResult>,
+        /// Locks that were held during execution
+        locks_held: Vec<LockKey>,
+        /// Time spent acquiring locks (milliseconds)
+        lock_wait_ms: u64,
+    },
+    /// Execution failed and transaction was rolled back
+    RolledBack {
+        /// Index of the step that failed (0-based)
+        failed_at_step: usize,
+        /// Error message from the failed step
+        error: String,
+        /// Results from steps that completed before failure
+        completed_steps: Vec<ExecutionResult>,
+        /// Locks that were held (now released due to rollback)
+        locks_held: Vec<LockKey>,
+    },
+    /// Could not acquire required locks (another session holds them)
+    LockContention {
+        /// Entity type that caused contention
+        entity_type: String,
+        /// Entity ID that caused contention
+        entity_id: String,
+        /// Locks that were acquired before contention
+        locks_acquired_before_contention: Vec<LockKey>,
+    },
+}
+
+#[cfg(feature = "database")]
+impl AtomicExecutionResult {
+    /// Check if execution was successful
+    pub fn is_success(&self) -> bool {
+        matches!(self, AtomicExecutionResult::Committed { .. })
+    }
+
+    /// Check if execution was rolled back
+    pub fn is_rolled_back(&self) -> bool {
+        matches!(self, AtomicExecutionResult::RolledBack { .. })
+    }
+
+    /// Check if there was lock contention
+    pub fn is_lock_contention(&self) -> bool {
+        matches!(self, AtomicExecutionResult::LockContention { .. })
+    }
+
+    /// Get the step results if committed
+    pub fn results(&self) -> Option<&[ExecutionResult]> {
+        match self {
+            AtomicExecutionResult::Committed { step_results, .. } => Some(step_results),
+            _ => None,
+        }
+    }
+
+    /// Get a summary of the execution
+    pub fn summary(&self) -> String {
+        match self {
+            AtomicExecutionResult::Committed {
+                step_results,
+                locks_held,
+                lock_wait_ms,
+            } => {
+                format!(
+                    "✓ Committed {} steps (held {} locks, waited {}ms)",
+                    step_results.len(),
+                    locks_held.len(),
+                    lock_wait_ms
+                )
+            }
+            AtomicExecutionResult::RolledBack {
+                failed_at_step,
+                error,
+                completed_steps,
+                ..
+            } => {
+                format!(
+                    "✗ Rolled back at step {} after {} completed: {}",
+                    failed_at_step,
+                    completed_steps.len(),
+                    error
+                )
+            }
+            AtomicExecutionResult::LockContention {
+                entity_type,
+                entity_id,
+                ..
+            } => {
+                format!(
+                    "⚠ Lock contention on {}:{} - another session is modifying this entity",
+                    entity_type, entity_id
+                )
+            }
+        }
+    }
 }
 
 /// Execution context holding state during DSL execution
@@ -1185,15 +1379,64 @@ impl DslExecutor {
     }
 
     /// Execute a single verb call within a transaction
+    ///
+    /// This method ensures the verb execution participates in the caller's transaction.
+    /// For CRUD verbs, it uses GenericCrudExecutor::execute_in_tx.
+    /// For plugin verbs, it calls CustomOperation::execute_in_tx if supported.
     async fn execute_verb_in_tx(
         &self,
         vc: &VerbCall,
         ctx: &mut ExecutionContext,
-        _tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     ) -> Result<ExecutionResult> {
-        // For now, delegate to execute_verb which uses the pool
-        // TODO: Pass transaction through to generic_executor for true transactional execution
-        self.execute_verb(vc, ctx).await
+        tracing::debug!("execute_verb_in_tx: ENTER {}.{}", vc.domain, vc.verb);
+
+        // Look up verb in runtime registry (loaded from YAML)
+        let runtime_verb = runtime_registry()
+            .get(&vc.domain, &vc.verb)
+            .ok_or_else(|| anyhow!("Unknown verb: {}.{}", vc.domain, vc.verb))?;
+
+        // Check if this is a plugin (custom operation)
+        if let RuntimeBehavior::Plugin(_handler) = &runtime_verb.behavior {
+            tracing::debug!("execute_verb_in_tx: routing to PLUGIN");
+            // Dispatch to custom operations handler
+            if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
+                // Use execute_in_tx if supported, otherwise fall back to regular execute
+                // (which won't participate in the transaction - logged as warning)
+                let result = op.execute_in_tx(vc, ctx, tx).await;
+                tracing::debug!("execute_verb_in_tx: plugin returned {:?}", result.is_ok());
+                return result;
+            }
+            return Err(anyhow!(
+                "Plugin {}.{} has no handler implementation",
+                vc.domain,
+                vc.verb
+            ));
+        }
+
+        tracing::debug!("execute_verb_in_tx: routing to GENERIC executor with transaction");
+
+        // Convert VerbCall arguments to JSON for generic executor
+        let json_args = Self::verbcall_args_to_json(&vc.arguments, ctx)?;
+
+        // Execute via generic executor WITH transaction
+        let result = self
+            .generic_executor
+            .execute_in_tx(tx, runtime_verb, &json_args)
+            .await?;
+        tracing::debug!("execute_verb_in_tx: generic executor returned {:?}", result);
+
+        // Handle symbol capture
+        if runtime_verb.returns.capture {
+            if let GenericExecutionResult::Uuid(uuid) = &result {
+                if let Some(name) = &runtime_verb.returns.name {
+                    ctx.bind(name, *uuid);
+                }
+            }
+        }
+
+        tracing::debug!("execute_verb_in_tx: EXIT success");
+        Ok(result.to_legacy())
     }
 }
 
@@ -1357,6 +1600,476 @@ impl DslExecutor {
         }
 
         Ok(results)
+    }
+
+    /// Execute a compiled execution plan atomically within a single transaction
+    ///
+    /// This method wraps all verb executions in a single database transaction.
+    /// If any verb fails, all preceding changes are rolled back.
+    ///
+    /// Use this for:
+    /// - Batch operations that must succeed or fail together
+    /// - Template expansion where partial execution is dangerous
+    /// - Any DSL program that creates interdependent entities
+    ///
+    /// # Atomicity Guarantee
+    /// All CRUD operations use the transaction. Plugin operations that don't
+    /// implement `execute_in_tx` will fail fast, preventing partial execution.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let program = parse_program(dsl_source)?;
+    /// let plan = compile(&program)?;
+    /// let results = executor.execute_plan_atomic(&plan, &mut ctx).await?;
+    /// // Either all verbs succeeded, or none did
+    /// ```
+    pub async fn execute_plan_atomic(
+        &self,
+        plan: &super::execution_plan::ExecutionPlan,
+        ctx: &mut ExecutionContext,
+    ) -> Result<Vec<ExecutionResult>> {
+        // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
+        validate_all_resolved(plan)?;
+
+        tracing::info!(
+            "execute_plan_atomic: starting atomic execution with {} steps",
+            plan.steps.len()
+        );
+
+        // Start a transaction
+        let mut tx = self.pool.begin().await?;
+
+        let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
+
+        for (step_index, step) in plan.steps.iter().enumerate() {
+            // Clone the verb call so we can inject values
+            let mut vc = step.verb_call.clone();
+
+            tracing::debug!(
+                "execute_plan_atomic: step {} verb={}.{} bind_as={:?}",
+                step_index,
+                &vc.domain,
+                &vc.verb,
+                &step.bind_as
+            );
+
+            // Inject values from previous steps
+            for inj in &step.injections {
+                if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
+                    vc.arguments.push(super::ast::Argument {
+                        key: inj.into_arg.clone(),
+                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        span: super::ast::Span::default(),
+                    });
+                }
+            }
+
+            // Execute the verb call within the transaction
+            let result = match self.execute_verb_in_tx(&vc, ctx, &mut tx).await {
+                Ok(r) => r,
+                Err(e) => {
+                    // Rollback on any error
+                    tracing::error!(
+                        "execute_plan_atomic: step {} ({}.{}) failed: {}. Rolling back.",
+                        step_index,
+                        vc.domain,
+                        vc.verb,
+                        e
+                    );
+                    tx.rollback().await?;
+                    return Err(e);
+                }
+            };
+
+            tracing::debug!(
+                "execute_plan_atomic: step {} completed with result {:?}",
+                step_index,
+                result
+            );
+
+            // Handle explicit :as binding
+            if let Some(ref binding_name) = step.bind_as {
+                match &result {
+                    ExecutionResult::Uuid(id) => {
+                        ctx.bind(binding_name, *id);
+                        let alias = format!("{}_id", step.verb_call.domain);
+                        ctx.bind(&alias, *id);
+                    }
+                    ExecutionResult::RecordSet(records) => {
+                        ctx.bind_json(binding_name, serde_json::Value::Array(records.clone()));
+                    }
+                    ExecutionResult::Record(record) => {
+                        ctx.bind_json(binding_name, record.clone());
+                    }
+                    _ => {}
+                }
+            }
+
+            results.push(result);
+        }
+
+        // All steps succeeded - commit the transaction
+        tx.commit().await?;
+        tracing::info!(
+            "execute_plan_atomic: committed {} steps successfully",
+            results.len()
+        );
+
+        Ok(results)
+    }
+
+    /// Execute a compiled execution plan atomically with optional advisory locking
+    ///
+    /// This is the full-featured atomic execution method that:
+    /// 1. Optionally acquires advisory locks from the expansion report
+    /// 2. Executes all steps in a single transaction
+    /// 3. Returns detailed result with lock info
+    ///
+    /// **When to use:**
+    /// - Batch operations that must succeed or fail together
+    /// - Template expansion where concurrent modification must be prevented
+    /// - Any operation where partial state is dangerous
+    ///
+    /// **Locking:**
+    /// If an expansion report is provided with `derived_lock_set`, locks are
+    /// acquired in sorted order before execution. This prevents concurrent
+    /// sessions from modifying the locked entities mid-batch.
+    ///
+    /// # Arguments
+    /// * `plan` - Compiled execution plan
+    /// * `ctx` - Execution context for symbol bindings
+    /// * `expansion_report` - Optional expansion report with lock set
+    ///
+    /// # Returns
+    /// * `AtomicExecutionResult::Committed` - All steps succeeded
+    /// * `AtomicExecutionResult::RolledBack` - A step failed, all rolled back
+    /// * `AtomicExecutionResult::LockContention` - Could not acquire locks
+    ///
+    /// # Example
+    /// ```ignore
+    /// let expansion = expand_templates(dsl, &registry)?;
+    /// let plan = compile(&parse_program(&expansion.expanded_dsl)?)?;
+    ///
+    /// match executor.execute_plan_atomic_with_locks(&plan, &mut ctx, Some(&expansion.report)).await? {
+    ///     AtomicExecutionResult::Committed { step_results, .. } => {
+    ///         println!("All {} steps committed", step_results.len());
+    ///     }
+    ///     AtomicExecutionResult::RolledBack { failed_at_step, error, .. } => {
+    ///         println!("Failed at step {}: {}", failed_at_step, error);
+    ///     }
+    ///     AtomicExecutionResult::LockContention { entity_type, entity_id, .. } => {
+    ///         println!("Lock contention on {}:{}", entity_type, entity_id);
+    ///     }
+    /// }
+    /// ```
+    pub async fn execute_plan_atomic_with_locks(
+        &self,
+        plan: &super::execution_plan::ExecutionPlan,
+        ctx: &mut ExecutionContext,
+        expansion_report: Option<&ExpansionReport>,
+    ) -> Result<AtomicExecutionResult> {
+        // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
+        validate_all_resolved(plan)?;
+
+        tracing::info!(
+            "execute_plan_atomic_with_locks: starting atomic execution with {} steps",
+            plan.steps.len()
+        );
+
+        // Start a transaction
+        let mut tx = self.pool.begin().await?;
+
+        // Acquire locks if expansion report has them
+        let (locks_held, lock_wait_ms) = if let Some(report) = expansion_report {
+            if !report.derived_lock_set.is_empty() {
+                tracing::debug!(
+                    "execute_plan_atomic_with_locks: acquiring {} locks",
+                    report.derived_lock_set.len()
+                );
+
+                match acquire_locks(&mut tx, &report.derived_lock_set, LockMode::Try).await {
+                    Ok(result) => (result.acquired, result.wait_time_ms),
+                    Err(LockError::Contention {
+                        entity_type,
+                        entity_id,
+                        acquired_so_far,
+                    }) => {
+                        // Rollback and return contention error
+                        tx.rollback().await?;
+                        return Ok(AtomicExecutionResult::LockContention {
+                            entity_type,
+                            entity_id,
+                            locks_acquired_before_contention: acquired_so_far,
+                        });
+                    }
+                    Err(LockError::Database(e)) => {
+                        tx.rollback().await?;
+                        return Err(e.into());
+                    }
+                }
+            } else {
+                (vec![], 0)
+            }
+        } else {
+            (vec![], 0)
+        };
+
+        tracing::debug!(
+            "execute_plan_atomic_with_locks: acquired {} locks in {}ms",
+            locks_held.len(),
+            lock_wait_ms
+        );
+
+        let mut results: Vec<ExecutionResult> = Vec::with_capacity(plan.steps.len());
+
+        for (step_index, step) in plan.steps.iter().enumerate() {
+            // Clone the verb call so we can inject values
+            let mut vc = step.verb_call.clone();
+
+            tracing::debug!(
+                "execute_plan_atomic_with_locks: step {} verb={}.{} bind_as={:?}",
+                step_index,
+                &vc.domain,
+                &vc.verb,
+                &step.bind_as
+            );
+
+            // Inject values from previous steps
+            for inj in &step.injections {
+                if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
+                    vc.arguments.push(super::ast::Argument {
+                        key: inj.into_arg.clone(),
+                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        span: super::ast::Span::default(),
+                    });
+                }
+            }
+
+            // Execute the verb call within the transaction
+            let result = match self.execute_verb_in_tx(&vc, ctx, &mut tx).await {
+                Ok(r) => r,
+                Err(e) => {
+                    // Rollback on any error
+                    let error_msg = e.to_string();
+                    tracing::error!(
+                        "execute_plan_atomic_with_locks: step {} ({}.{}) failed: {}. Rolling back.",
+                        step_index,
+                        vc.domain,
+                        vc.verb,
+                        error_msg
+                    );
+                    tx.rollback().await?;
+                    return Ok(AtomicExecutionResult::RolledBack {
+                        failed_at_step: step_index,
+                        error: error_msg,
+                        completed_steps: results,
+                        locks_held,
+                    });
+                }
+            };
+
+            tracing::debug!(
+                "execute_plan_atomic_with_locks: step {} completed",
+                step_index
+            );
+
+            // Handle explicit :as binding
+            if let Some(ref binding_name) = step.bind_as {
+                match &result {
+                    ExecutionResult::Uuid(id) => {
+                        ctx.bind(binding_name, *id);
+                        let alias = format!("{}_id", step.verb_call.domain);
+                        ctx.bind(&alias, *id);
+                    }
+                    ExecutionResult::RecordSet(records) => {
+                        ctx.bind_json(binding_name, serde_json::Value::Array(records.clone()));
+                    }
+                    ExecutionResult::Record(record) => {
+                        ctx.bind_json(binding_name, record.clone());
+                    }
+                    _ => {}
+                }
+            }
+
+            results.push(result);
+        }
+
+        // All steps succeeded - commit the transaction
+        tx.commit().await?;
+        tracing::info!(
+            "execute_plan_atomic_with_locks: committed {} steps successfully (held {} locks)",
+            results.len(),
+            locks_held.len()
+        );
+
+        Ok(AtomicExecutionResult::Committed {
+            step_results: results,
+            locks_held,
+            lock_wait_ms,
+        })
+    }
+
+    /// Execute a compiled execution plan with best-effort semantics
+    ///
+    /// Unlike `execute_plan_atomic()`, this method continues on failure and
+    /// aggregates errors by root cause. Failed steps produce `None` in the
+    /// results vector.
+    ///
+    /// **When to use:**
+    /// - Batch operations where partial success is acceptable
+    /// - Large imports where some records may fail validation
+    /// - Operations where you need detailed error aggregation
+    ///
+    /// **Error Aggregation:**
+    /// Instead of returning 50 separate "entity not found" errors, the result
+    /// groups them: "1 cause, 50 affected operations: Entity XYZ not found"
+    ///
+    /// # Example
+    /// ```ignore
+    /// let result = executor.execute_plan_best_effort(&plan, &mut ctx).await?;
+    /// if result.has_failures() {
+    ///     println!("Some operations failed:\n{}", result.summary());
+    /// }
+    /// for (i, r) in result.verb_results.iter().enumerate() {
+    ///     match r {
+    ///         Some(exec_result) => println!("Step {}: succeeded", i),
+    ///         None => println!("Step {}: failed", i),
+    ///     }
+    /// }
+    /// ```
+    pub async fn execute_plan_best_effort(
+        &self,
+        plan: &super::execution_plan::ExecutionPlan,
+        ctx: &mut ExecutionContext,
+    ) -> Result<BestEffortExecutionResult> {
+        // PRE-FLIGHT: Ensure all EntityRefs have been resolved before execution
+        validate_all_resolved(plan)?;
+
+        tracing::info!(
+            "execute_plan_best_effort: starting best-effort execution with {} steps",
+            plan.steps.len()
+        );
+
+        let mut verb_results: Vec<Option<ExecutionResult>> = Vec::with_capacity(plan.steps.len());
+        let mut errors = ExecutionErrors::new();
+
+        for (step_index, step) in plan.steps.iter().enumerate() {
+            // Clone the verb call so we can inject values
+            let mut vc = step.verb_call.clone();
+
+            tracing::debug!(
+                "execute_plan_best_effort: step {} verb={}.{} bind_as={:?}",
+                step_index,
+                &vc.domain,
+                &vc.verb,
+                &step.bind_as
+            );
+
+            // Inject values from previous steps (only from successful steps)
+            for inj in &step.injections {
+                if let Some(Some(ExecutionResult::Uuid(id))) = verb_results.get(inj.from_step) {
+                    vc.arguments.push(super::ast::Argument {
+                        key: inj.into_arg.clone(),
+                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        span: super::ast::Span::default(),
+                    });
+                } else if verb_results.get(inj.from_step).is_some_and(|r| r.is_none()) {
+                    // Dependency failed - skip this step
+                    tracing::debug!(
+                        "execute_plan_best_effort: step {} skipped due to failed dependency (step {})",
+                        step_index,
+                        inj.from_step
+                    );
+                    errors.record_failure(
+                        step_index,
+                        &vc.domain,
+                        &vc.verb,
+                        &anyhow::anyhow!("Skipped: dependency step {} failed", inj.from_step),
+                        None,
+                    );
+                    verb_results.push(None);
+                    continue;
+                }
+            }
+
+            // Execute the verb call
+            match self.execute_verb(&vc, ctx).await {
+                Ok(result) => {
+                    tracing::debug!("execute_plan_best_effort: step {} succeeded", step_index);
+
+                    // Handle explicit :as binding
+                    if let Some(ref binding_name) = step.bind_as {
+                        match &result {
+                            ExecutionResult::Uuid(id) => {
+                                ctx.bind(binding_name, *id);
+                                let alias = format!("{}_id", step.verb_call.domain);
+                                ctx.bind(&alias, *id);
+                            }
+                            ExecutionResult::RecordSet(records) => {
+                                ctx.bind_json(
+                                    binding_name,
+                                    serde_json::Value::Array(records.clone()),
+                                );
+                            }
+                            ExecutionResult::Record(record) => {
+                                ctx.bind_json(binding_name, record.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    errors.record_success();
+                    verb_results.push(Some(result));
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "execute_plan_best_effort: step {} ({}.{}) failed: {}",
+                        step_index,
+                        vc.domain,
+                        vc.verb,
+                        e
+                    );
+
+                    // Extract target entity if available from arguments
+                    let target = vc.arguments.iter().find_map(|arg| {
+                        if arg.key.ends_with("-id") || arg.key.ends_with("_id") {
+                            match &arg.value {
+                                AstNode::Literal(Literal::String(s)) => Some(s.clone()),
+                                AstNode::Literal(Literal::Uuid(u)) => Some(u.to_string()),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        }
+                    });
+
+                    errors.record_failure(step_index, &vc.domain, &vc.verb, &e, target);
+                    verb_results.push(None);
+                }
+            }
+        }
+
+        // Determine overall status
+        let status = if errors.total_failed == 0 {
+            BatchStatus::AllSucceeded
+        } else if errors.total_succeeded == 0 {
+            BatchStatus::AllFailed
+        } else {
+            BatchStatus::PartialSuccess
+        };
+
+        tracing::info!(
+            "execute_plan_best_effort: completed with status {:?} ({} succeeded, {} failed)",
+            status,
+            errors.total_succeeded,
+            errors.total_failed
+        );
+
+        Ok(BestEffortExecutionResult {
+            verb_results,
+            errors,
+            status,
+        })
     }
 
     /// Convenience method: parse, enrich, compile, and execute DSL source

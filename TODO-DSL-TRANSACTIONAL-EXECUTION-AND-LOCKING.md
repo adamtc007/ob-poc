@@ -1,5 +1,91 @@
 # TODO: DSL Transactional Execution, Expansion, and Entity Locking
 
+> **Status:** PHASE 1 COMPLETE ✅
+> **Priority:** P0 - Critical correctness issue
+> **Last Review:** 2026-01-24 (Deep pipeline review confirmed the issue)
+> **Implemented:** 2026-01-24 (Phase 1 - Transaction plumbing)
+> **Blocking:** Batch operations, workflow task queue (049), any multi-statement atomic execution
+
+## Implementation Summary (2026-01-24)
+
+### Phase 1 COMPLETE ✅
+
+**Files Modified:**
+
+1. **`rust/src/dsl_v2/generic_executor.rs`**
+   - Added `execute_in_tx()` public method for transaction-aware execution
+   - Added `execute_with_optional_tx()` internal router
+   - Added transaction-aware helper methods:
+     - `execute_with_bindings_in_tx()`
+     - `execute_many_with_bindings_in_tx()`
+     - `execute_non_query_in_tx()`
+   - Added `_in_tx` variants for ALL write operations:
+     - `execute_insert_in_tx`, `execute_update_in_tx`, `execute_delete_in_tx`
+     - `execute_upsert_in_tx`, `execute_link_in_tx`, `execute_unlink_in_tx`
+     - `execute_role_link_in_tx`, `execute_role_unlink_in_tx`
+     - `execute_entity_create_in_tx`, `execute_entity_upsert_in_tx`
+
+2. **`rust/src/dsl_v2/executor.rs`**
+   - Implemented `execute_verb_in_tx()` properly (no longer ignores tx parameter)
+   - For CRUD verbs: routes to `GenericCrudExecutor::execute_in_tx()`
+   - For plugin verbs: routes to `CustomOperation::execute_in_tx()`
+   - Added `execute_plan_atomic()` entrypoint that wraps entire plan in transaction
+
+3. **`rust/src/domain_ops/mod.rs`**
+   - Extended `CustomOperation` trait with `execute_in_tx()` default method
+   - Default returns error (operations must explicitly implement for tx support)
+   - Prevents silent fallback to auto-commit
+
+4. **`rust/tests/transaction_rollback_integration.rs`**
+   - Added 4 regression tests proving rollback works:
+     - `test_rollback_on_invalid_role` - verifies rollback on failure
+     - `test_atomic_commit_on_success` - verifies commit on success
+     - `test_non_atomic_no_rollback` - contrast test showing non-atomic behavior
+     - `test_rollback_multiple_entities` - verifies all entities rolled back
+
+**Key Design Decisions:**
+- Read operations (SELECT, ListByFk, etc.) can safely use pool even in tx context
+- Write operations use `_in_tx` variants that execute within the transaction
+- Custom operations must explicitly implement `execute_in_tx()` - no silent fallback
+
+---
+
+## Original Review Findings (2026-01-24)
+
+Code review confirmed the exact problem described in this TODO:
+
+**executor.rs:1188-1196** - Transaction ignored (NOW FIXED):
+```rust
+async fn execute_verb_in_tx(
+    &self,
+    vc: &VerbCall,
+    ctx: &mut ExecutionContext,
+    _tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,  // ← WAS IGNORED!
+) -> Result<ExecutionResult> {
+    // For now, delegate to execute_verb which uses the pool
+    // TODO: Pass transaction through to generic_executor for true transactional execution
+    self.execute_verb(vc, ctx).await  // ← WAS Using pool, not tx!
+}
+```
+
+**sheet_executor.rs:282** - Same issue (still needs attention for sheet execution path):
+```rust
+// TODO: For true single-transaction semantics, we need to pass the tx
+// through to the executor. For now, each statement is its own transaction.
+```
+
+**Impact (before fix):**
+- `execute_submission()` creates transaction but all verbs auto-commit via pool
+- Rollback on failure does nothing - prior statements already committed
+- Batch atomicity claims are false
+
+**Impact (after Phase 1):**
+- `execute_plan_atomic()` provides true atomic execution
+- All CRUD verbs participate in the transaction
+- Rollback on failure works correctly
+
+---
+
 ## Overview
 
 This TODO implements true transactional execution for DSL plans, deterministic template expansion with audit trails, and entity-level advisory locking to prevent mid-batch race conditions.

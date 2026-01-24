@@ -80,9 +80,11 @@ pub mod csg_linter;
 pub mod domain_context;
 pub mod enrichment;
 pub mod entity_deps;
+pub mod errors;
 pub mod execution_plan;
 pub mod execution_result;
 pub mod executor;
+pub mod expansion;
 #[cfg(feature = "database")]
 pub mod gateway_resolver;
 #[cfg(feature = "database")]
@@ -130,12 +132,15 @@ pub use execution_plan::{
     SyntheticStep,
 };
 pub use execution_result::{ExecutionResults, StepResult};
+#[cfg(feature = "database")]
+pub use executor::{
+    AtomicExecutionResult, BatchStatus, BestEffortExecutionResult, IterationResult,
+    SubmissionResult,
+};
 pub use executor::{
     DagExecutionResult, DslExecutor, ExecutionContext, ExecutionResult, OpExecutionResult,
     ReturnType,
 };
-#[cfg(feature = "database")]
-pub use executor::{IterationResult, SubmissionResult};
 #[cfg(feature = "database")]
 pub use gateway_resolver::GatewayRefResolver;
 #[cfg(feature = "database")]
@@ -168,4 +173,16 @@ pub use topo_sort::{
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
     VerbBehavior,
+};
+
+// Re-export expansion module types
+pub use expansion::{
+    expand_templates, expand_templates_simple, BatchPolicy, ExpansionDiagnostic, ExpansionError,
+    ExpansionOutput, ExpansionReport, LockAccess, LockKey, LockMode, LockTarget, LockingPolicy,
+    PerItemOrigin, RuntimePolicy, TemplateDigest, TemplateInvocationReport, TemplatePolicy,
+};
+
+// Re-export error aggregation types
+pub use errors::{
+    AffectedVerb, CauseDetails, CausedErrors, ErrorCause, ExecutionErrors, FailureTiming,
 };

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict X3NfyVlYnL0oK6fC8MqYWAVdjrkplifnlrZgkJm0i5OKFuxLUF1G9fy6dn8G1CQ
+\restrict AeacjYBrtUVlVVp42l9Z0bVcYU9P0bEJS8YBbbPIy8LTfIAye7yaNMafXRjsm9s
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -15412,6 +15412,69 @@ COMMENT ON COLUMN "ob-poc".entity_validation_rules.validation_rule IS 'JSON obje
 
 
 --
+-- Name: expansion_reports; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".expansion_reports (
+    expansion_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    source_digest character varying(64) NOT NULL,
+    expanded_dsl_digest character varying(64) NOT NULL,
+    expanded_statement_count integer NOT NULL,
+    batch_policy character varying(20) NOT NULL,
+    derived_lock_set jsonb DEFAULT '[]'::jsonb NOT NULL,
+    template_digests jsonb DEFAULT '[]'::jsonb NOT NULL,
+    invocations jsonb DEFAULT '[]'::jsonb NOT NULL,
+    diagnostics jsonb DEFAULT '[]'::jsonb NOT NULL,
+    expanded_at timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT expansion_reports_batch_policy_check CHECK (((batch_policy)::text = ANY ((ARRAY['atomic'::character varying, 'best_effort'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE expansion_reports; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".expansion_reports IS 'Audit trail for DSL template expansion. Captures deterministic expansion details for replay/debugging.';
+
+
+--
+-- Name: COLUMN expansion_reports.source_digest; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".expansion_reports.source_digest IS 'SHA-256 hash of canonicalized source DSL (whitespace normalized)';
+
+
+--
+-- Name: COLUMN expansion_reports.expanded_dsl_digest; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".expansion_reports.expanded_dsl_digest IS 'SHA-256 hash of canonicalized expanded DSL (whitespace normalized)';
+
+
+--
+-- Name: COLUMN expansion_reports.derived_lock_set; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".expansion_reports.derived_lock_set IS 'Advisory locks derived from template policy + runtime args. Array of {entity_type, entity_id, access}';
+
+
+--
+-- Name: COLUMN expansion_reports.template_digests; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".expansion_reports.template_digests IS 'Templates used in expansion. Array of {name, version, digest}';
+
+
+--
+-- Name: COLUMN expansion_reports.invocations; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".expansion_reports.invocations IS 'Template invocation details. Array of TemplateInvocationReport';
+
+
+--
 -- Name: fund_investments; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -23468,6 +23531,14 @@ ALTER TABLE ONLY "ob-poc".entity_validation_rules
 
 
 --
+-- Name: expansion_reports expansion_reports_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".expansion_reports
+    ADD CONSTRAINT expansion_reports_pkey PRIMARY KEY (expansion_id);
+
+
+--
 -- Name: fund_investments fund_investments_investor_entity_id_investee_entity_id_inve_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -28046,6 +28117,41 @@ CREATE INDEX idx_entity_validation_field ON "ob-poc".entity_validation_rules USI
 --
 
 CREATE INDEX idx_entity_validation_type ON "ob-poc".entity_validation_rules USING btree (entity_type);
+
+
+--
+-- Name: idx_expansion_reports_batch_policy; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_expansion_reports_batch_policy ON "ob-poc".expansion_reports USING btree (batch_policy);
+
+
+--
+-- Name: idx_expansion_reports_created; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_expansion_reports_created ON "ob-poc".expansion_reports USING btree (created_at DESC);
+
+
+--
+-- Name: idx_expansion_reports_expanded_digest; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_expansion_reports_expanded_digest ON "ob-poc".expansion_reports USING btree (expanded_dsl_digest);
+
+
+--
+-- Name: idx_expansion_reports_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_expansion_reports_session ON "ob-poc".expansion_reports USING btree (session_id);
+
+
+--
+-- Name: idx_expansion_reports_source_digest; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_expansion_reports_source_digest ON "ob-poc".expansion_reports USING btree (source_digest);
 
 
 --
@@ -34147,5 +34253,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict X3NfyVlYnL0oK6fC8MqYWAVdjrkplifnlrZgkJm0i5OKFuxLUF1G9fy6dn8G1CQ
+\unrestrict AeacjYBrtUVlVVp42l9Z0bVcYU9P0bEJS8YBbbPIy8LTfIAye7yaNMafXRjsm9s
 

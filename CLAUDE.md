@@ -3,7 +3,7 @@
 > **Last reviewed:** 2026-01-24
 > **Crates:** 14 Rust crates
 > **Verbs:** 968 verbs, 7505 intent patterns (DB-sourced)
-> **Migrations:** 49 schema migrations
+> **Migrations:** 50 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7505 patterns vectorized
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
@@ -17,6 +17,7 @@
 > **Verb Search Test Harness:** ✅ Complete - Full pipeline sweep, safety-first policy, `cargo x test-verbs`
 > **Client Group Resolver (048):** ✅ Complete - Two-stage alias→group→anchor resolution for session scope
 > **Workflow Task Queue (049):** ✅ Complete - Async task return path, document entity, requirement guards
+> **Transactional Execution (050):** ✅ Complete - Atomic execution, advisory locks, expansion audit
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -281,6 +282,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Promotion pipeline | `TODO-feedback-loop-promotion.md` | ✅ Complete |
 | Client group resolver | `TODO-CLIENT-GROUP-IMPL.md` | ✅ Complete |
 | Workflow task queue | `TODO-WORKFLOW-TASK-QUEUE.md` | ✅ Complete |
+| Transactional execution | `TODO-DSL-TRANSACTIONAL-EXECUTION-AND-LOCKING.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -1038,6 +1040,152 @@ states:
 | `rust/src/api/workflow_routes.rs` | HTTP endpoints |
 | `rust/config/verbs/document.yaml` | 7 document verbs |
 | `rust/config/verbs/requirement.yaml` | 5 requirement verbs |
+
+---
+
+## Transactional Execution & Advisory Locking (050)
+
+> ✅ **IMPLEMENTED (2026-01-24)**: Atomic execution with PostgreSQL advisory locks, deterministic template expansion, and audit trail.
+
+**Problem Solved:** Multi-statement DSL batches need transactional guarantees. Without locking, concurrent sessions can corrupt shared entities. The expansion stage derives locks deterministically from DSL structure.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  DSL EXECUTION PIPELINE WITH EXPANSION                                       │
+│                                                                              │
+│  Source DSL: (cbu.create ...) (entity.create ...) (trading-profile.create)  │
+│      │                                                                       │
+│      ▼                                                                       │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  EXPANSION STAGE (deterministic)                                     │    │
+│  │  • Expand template verbs (behavior: template)                        │    │
+│  │  • Derive lock set from entity references                            │    │
+│  │  • Determine batch_policy: atomic vs best_effort                     │    │
+│  │  • Generate ExpansionReport for audit                                │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│      │                                                                       │
+│      ├─── batch_policy = atomic ──────────────────────────┐                 │
+│      │                                                     ▼                 │
+│      │    ┌───────────────────────────────────────────────────────────┐     │
+│      │    │  ATOMIC EXECUTOR                                          │     │
+│      │    │  • Acquire advisory locks (sorted, no deadlock)           │     │
+│      │    │  • Single transaction wraps all statements                │     │
+│      │    │  • Any failure → full rollback                            │     │
+│      │    │  • Result: Committed | RolledBack | LockContention        │     │
+│      │    └───────────────────────────────────────────────────────────┘     │
+│      │                                                                       │
+│      └─── batch_policy = best_effort ─────────────────────┐                 │
+│                                                            ▼                 │
+│           ┌───────────────────────────────────────────────────────────┐     │
+│           │  BEST-EFFORT EXECUTOR                                     │     │
+│           │  • No locking required                                    │     │
+│           │  • Execute statements independently                       │     │
+│           │  • Continue on failure, aggregate errors                  │     │
+│           │  • Result: { succeeded: [...], failed: [...] }            │     │
+│           └───────────────────────────────────────────────────────────┘     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Batch Policy
+
+| Policy | Lock Acquisition | Failure Behavior | Use Case |
+|--------|------------------|------------------|----------|
+| `atomic` | Advisory locks (sorted by entity_id) | Full rollback | Multi-entity operations needing consistency |
+| `best_effort` | None | Continue, aggregate errors | Independent operations, bulk imports |
+
+**Policy Determination:**
+- `atomic`: Template verbs with `batch_policy: atomic`, or DSL touching multiple related entities
+- `best_effort`: Independent statements, bulk operations, read-only queries
+
+### Advisory Locks
+
+PostgreSQL `pg_advisory_xact_lock` provides session-scoped locking:
+
+```rust
+pub struct DerivedLock {
+    pub entity_type: String,  // "cbu", "entity", "trading_profile"
+    pub entity_id: Uuid,      // Target entity
+    pub access: LockAccess,   // Read or Write
+}
+
+// Locks acquired in sorted order (entity_id) to prevent deadlocks
+// Released automatically when transaction commits/rolls back
+```
+
+### Execution Results
+
+```rust
+pub enum AtomicExecutionResult {
+    Committed {
+        results: Vec<ExecutionResult>,
+        lock_stats: LockStats,
+    },
+    RolledBack {
+        cause: RollbackCause,
+        partial_results: Vec<ExecutionResult>,
+    },
+    LockContention {
+        contested_locks: Vec<DerivedLock>,
+        retry_after_ms: Option<u64>,
+    },
+}
+
+pub struct BestEffortExecutionResult {
+    pub succeeded: Vec<(usize, ExecutionResult)>,  // (statement_index, result)
+    pub failed: Vec<(usize, ExecutionError)>,       // (statement_index, error)
+    pub skipped: Vec<usize>,                        // Skipped due to dependency
+}
+```
+
+### Expansion Report (Audit Trail)
+
+Every DSL execution produces an `ExpansionReport` persisted to `ob-poc.expansion_reports`:
+
+| Field | Description |
+|-------|-------------|
+| `expansion_id` | Unique ID for this expansion |
+| `session_id` | Session that triggered execution |
+| `source_digest` | SHA-256 of canonical source DSL |
+| `expanded_dsl_digest` | SHA-256 of expanded DSL |
+| `batch_policy` | `atomic` or `best_effort` |
+| `derived_lock_set` | JSON array of locks derived |
+| `template_digests` | Templates used (name, version, hash) |
+| `invocations` | Template invocation details |
+| `diagnostics` | Warnings/errors during expansion |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/050_expansion_audit.sql` | Schema for expansion_reports |
+| `rust/src/dsl_v2/expansion/engine.rs` | Template expansion, lock derivation |
+| `rust/src/dsl_v2/expansion/policy.rs` | Batch policy determination |
+| `rust/src/dsl_v2/executor.rs` | `execute_plan_atomic_with_locks`, `execute_plan_best_effort` |
+| `rust/src/dsl_v2/locking.rs` | Advisory lock acquisition/release |
+| `rust/src/database/expansion_audit.rs` | ExpansionAuditRepository |
+| `rust/src/api/agent_routes.rs` | Session execution with expansion |
+| `rust/src/mcp/handlers/core.rs` | MCP dsl_execute with expansion |
+
+### Database Table
+
+```sql
+CREATE TABLE "ob-poc".expansion_reports (
+    expansion_id UUID PRIMARY KEY,
+    session_id UUID NOT NULL,
+    source_digest VARCHAR(64) NOT NULL,
+    expanded_dsl_digest VARCHAR(64) NOT NULL,
+    expanded_statement_count INTEGER NOT NULL,
+    batch_policy VARCHAR(20) NOT NULL CHECK (batch_policy IN ('atomic', 'best_effort')),
+    derived_lock_set JSONB NOT NULL DEFAULT '[]',
+    template_digests JSONB NOT NULL DEFAULT '[]',
+    invocations JSONB NOT NULL DEFAULT '[]',
+    diagnostics JSONB NOT NULL DEFAULT '[]',
+    expanded_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
 
 ---
 
