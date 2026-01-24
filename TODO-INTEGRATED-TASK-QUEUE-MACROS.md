@@ -58,7 +58,18 @@ The task queue document ops (`DocumentSolicitOp`, `DocumentVerifyOp`, `DocumentR
 | **Database migrations** | 4 | ✅ `049_workflow_task_queue_documents.sql` (617 lines) |
 | **Queue listener** | 6 | ✅ `ob-workflow/src/listener.rs` - claim-then-process pattern |
 | **API endpoints** | 7 | ✅ `workflow_routes.rs` - all endpoints implemented |
-| **Integration tests** | 8 | ⚠️ Pending - needs integration test suite |
+| **Integration tests** | 8 | ✅ Done - see below |
+
+### ✅ Phase 8 Tests (Complete)
+
+| Test | Location | Status |
+|------|----------|--------|
+| `test_registry_creation` | `domain_ops/mod.rs` | ✅ Verifies specific ops registered |
+| `test_registry_list` | `domain_ops/mod.rs` | ✅ Verifies minimum op count |
+| `test_plugin_verb_coverage` | `domain_ops/mod.rs` | ✅ YAML↔op coverage validation |
+| `test_registry_list_is_sorted` | `domain_ops/mod.rs` | ✅ Deterministic ordering |
+| `test_registry_has_inventory_ops` | `domain_ops/mod.rs` | ✅ Macro-registered ops present |
+| trybuild compile-fail | `ob-poc-macros/tests/` | ✅ `register_op_non_unit.rs`, `id_type_non_tuple.rs` |
 
 ---
 

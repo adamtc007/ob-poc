@@ -894,4 +894,44 @@ mod tests {
             result.yaml_missing_op
         );
     }
+
+    #[test]
+    fn test_registry_list_is_sorted() {
+        // Verify deterministic ordering (sorted by domain, verb)
+        let registry = CustomOperationRegistry::new();
+        let list = registry.list();
+
+        for i in 1..list.len() {
+            let prev = (list[i - 1].0, list[i - 1].1);
+            let curr = (list[i].0, list[i].1);
+            assert!(
+                prev <= curr,
+                "Registry list not sorted: ({}, {}) > ({}, {})",
+                prev.0,
+                prev.1,
+                curr.0,
+                curr.1
+            );
+        }
+    }
+
+    #[test]
+    fn test_registry_has_inventory_ops() {
+        // Verify ops registered via #[register_custom_op] macro are present
+        let registry = CustomOperationRegistry::new();
+
+        // Document ops (use macro)
+        assert!(registry.has("document", "solicit"));
+        assert!(registry.has("document", "verify"));
+        assert!(registry.has("document", "reject"));
+
+        // Investor role ops (convenience verbs added in PR1)
+        assert!(registry.has("investor-role", "mark-as-nominee"));
+        assert!(registry.has("investor-role", "mark-as-fof"));
+        assert!(registry.has("investor-role", "mark-as-master-pool"));
+        assert!(registry.has("investor-role", "mark-as-end-investor"));
+
+        // Manco ops
+        assert!(registry.has("manco", "book.summary"));
+    }
 }
