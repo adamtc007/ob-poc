@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -18,6 +19,7 @@ use sqlx::PgPool;
 // ============================================================================
 
 /// Record an observation from a document
+#[register_custom_op]
 pub struct ObservationFromDocumentOp;
 
 #[async_trait]
@@ -164,6 +166,7 @@ impl CustomOperation for ObservationFromDocumentOp {
 }
 
 /// Get current best observation for an attribute
+#[register_custom_op]
 pub struct ObservationGetCurrentOp;
 
 #[async_trait]
@@ -284,6 +287,7 @@ impl CustomOperation for ObservationGetCurrentOp {
 ///
 /// Rationale: Compares all active observations for an entity+attribute,
 /// identifies conflicts, and optionally creates discrepancy records.
+#[register_custom_op]
 pub struct ObservationReconcileOp;
 
 #[async_trait]
@@ -439,6 +443,7 @@ impl CustomOperation for ObservationReconcileOp {
 ///
 /// Rationale: Compares pending allegations with authoritative observations
 /// and auto-updates verification status.
+#[register_custom_op]
 pub struct ObservationVerifyAllegationsOp;
 
 #[async_trait]
@@ -592,6 +597,7 @@ impl CustomOperation for ObservationVerifyAllegationsOp {
 ///
 /// Rationale: Uses document_attribute_links to determine what attributes
 /// a document can provide, extracts values, and creates observations.
+#[register_custom_op]
 pub struct DocumentExtractObservationsOp;
 
 #[async_trait]

@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -55,6 +56,7 @@ async fn save_ca_section(
 // =============================================================================
 
 /// Enable CA event types for this trading profile
+#[register_custom_op]
 pub struct TradingProfileCaEnableEventTypesOp;
 
 #[async_trait]
@@ -135,6 +137,7 @@ impl CustomOperation for TradingProfileCaEnableEventTypesOp {
 // =============================================================================
 
 /// Disable CA event types for this trading profile
+#[register_custom_op]
 pub struct TradingProfileCaDisableEventTypesOp;
 
 #[async_trait]
@@ -208,6 +211,7 @@ impl CustomOperation for TradingProfileCaDisableEventTypesOp {
 // =============================================================================
 
 /// Configure CA notification settings
+#[register_custom_op]
 pub struct TradingProfileCaSetNotificationOp;
 
 #[async_trait]
@@ -297,6 +301,7 @@ impl CustomOperation for TradingProfileCaSetNotificationOp {
 // =============================================================================
 
 /// Configure who makes CA elections and requirements
+#[register_custom_op]
 pub struct TradingProfileCaSetElectionOp;
 
 #[async_trait]
@@ -386,6 +391,7 @@ impl CustomOperation for TradingProfileCaSetElectionOp {
 // =============================================================================
 
 /// Set default election for specific event type
+#[register_custom_op]
 pub struct TradingProfileCaSetDefaultOp;
 
 #[async_trait]
@@ -472,6 +478,7 @@ impl CustomOperation for TradingProfileCaSetDefaultOp {
 // =============================================================================
 
 /// Remove default election for specific event type
+#[register_custom_op]
 pub struct TradingProfileCaRemoveDefaultOp;
 
 #[async_trait]
@@ -537,6 +544,7 @@ impl CustomOperation for TradingProfileCaRemoveDefaultOp {
 // =============================================================================
 
 /// Add deadline cutoff rule for market/depository
+#[register_custom_op]
 pub struct TradingProfileCaAddCutoffOp;
 
 #[async_trait]
@@ -647,6 +655,7 @@ impl CustomOperation for TradingProfileCaAddCutoffOp {
 // =============================================================================
 
 /// Remove cutoff rule by market/depository
+#[register_custom_op]
 pub struct TradingProfileCaRemoveCutoffOp;
 
 #[async_trait]
@@ -720,6 +729,7 @@ impl CustomOperation for TradingProfileCaRemoveCutoffOp {
 // =============================================================================
 
 /// Map CA proceeds to settlement instruction
+#[register_custom_op]
 pub struct TradingProfileCaLinkSsiOp;
 
 #[async_trait]
@@ -823,6 +833,7 @@ impl CustomOperation for TradingProfileCaLinkSsiOp {
 // =============================================================================
 
 /// Remove CA proceeds SSI mapping
+#[register_custom_op]
 pub struct TradingProfileCaRemoveSsiOp;
 
 #[async_trait]
@@ -908,6 +919,7 @@ impl CustomOperation for TradingProfileCaRemoveSsiOp {
 // =============================================================================
 
 /// Get current CA policy configuration from trading profile
+#[register_custom_op]
 pub struct TradingProfileCaGetPolicyOp;
 
 #[async_trait]

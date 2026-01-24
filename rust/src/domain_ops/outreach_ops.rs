@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -23,6 +24,7 @@ use sqlx::PgPool;
 /// Record response to an outreach request
 ///
 /// Rationale: Updates multiple fields and may trigger follow-up actions
+#[register_custom_op]
 pub struct OutreachRecordResponseOp;
 
 #[async_trait]
@@ -132,6 +134,7 @@ impl CustomOperation for OutreachRecordResponseOp {
 /// List overdue outreach requests
 ///
 /// Rationale: Calculates overdue based on deadline_date and current date
+#[register_custom_op]
 pub struct OutreachListOverdueOp;
 
 #[async_trait]

@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 
 use super::CustomOperation;
@@ -18,6 +19,7 @@ use sqlx::PgPool;
 ///
 /// Rationale: Requires join across document_attribute_links and document_types
 /// with filtering by direction and ordering by proof strength.
+#[register_custom_op]
 pub struct AttributeListSourcesOp;
 
 #[async_trait]
@@ -105,6 +107,7 @@ impl CustomOperation for AttributeListSourcesOp {
 ///
 /// Rationale: Requires join across document_attribute_links and document_types
 /// with filtering by direction.
+#[register_custom_op]
 pub struct AttributeListSinksOp;
 
 #[async_trait]
@@ -182,6 +185,7 @@ impl CustomOperation for AttributeListSinksOp {
 /// Rationale: Requires multiple queries across attribute_registry,
 /// document_attribute_links, document_types, and resource_attribute_requirements
 /// to build a complete lineage view.
+#[register_custom_op]
 pub struct AttributeTraceLineageOp;
 
 #[async_trait]
@@ -370,6 +374,7 @@ impl CustomOperation for AttributeTraceLineageOp {
 ///
 /// Rationale: Requires join across document_attribute_links and attribute_registry
 /// with direction filtering.
+#[register_custom_op]
 pub struct AttributeListByDocumentOp;
 
 #[async_trait]
@@ -472,6 +477,7 @@ impl CustomOperation for AttributeListByDocumentOp {
 ///
 /// Rationale: Compares required_attributes JSONB against document_attribute_links
 /// to identify gaps in coverage.
+#[register_custom_op]
 pub struct AttributeCheckCoverageOp;
 
 #[async_trait]
@@ -589,6 +595,7 @@ impl CustomOperation for AttributeCheckCoverageOp {
 /// List all attributes for a document type (document.list-attributes handler)
 ///
 /// This is the handler for document.list-attributes verb.
+#[register_custom_op]
 pub struct DocumentListAttributesOp;
 
 #[async_trait]
@@ -630,6 +637,7 @@ impl CustomOperation for DocumentListAttributesOp {
 ///
 /// Rationale: Analyzes what attributes are required for an entity vs what
 /// documents are available and what can be extracted.
+#[register_custom_op]
 pub struct DocumentCheckExtractionCoverageOp;
 
 #[async_trait]

@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, extract_uuid_opt};
 
@@ -30,6 +31,7 @@ use {
 /// Enrich entity from GLEIF by LEI
 ///
 /// Rationale: Requires external GLEIF API call to fetch LEI data.
+#[register_custom_op]
 pub struct GleifEnrichOp;
 
 #[async_trait]
@@ -189,6 +191,7 @@ impl CustomOperation for GleifEnrichOp {
 /// Search GLEIF for entities
 ///
 /// Rationale: Requires external GLEIF API search call.
+#[register_custom_op]
 pub struct GleifSearchOp;
 
 #[async_trait]
@@ -254,6 +257,7 @@ impl CustomOperation for GleifSearchOp {
 /// Import corporate tree from GLEIF
 ///
 /// Rationale: Requires multiple GLEIF API calls to traverse the corporate structure.
+#[register_custom_op]
 pub struct GleifImportTreeOp;
 
 #[async_trait]
@@ -330,6 +334,7 @@ impl CustomOperation for GleifImportTreeOp {
 /// Refresh stale GLEIF data
 ///
 /// Rationale: Requires GLEIF API calls to update entity data.
+#[register_custom_op]
 pub struct GleifRefreshOp;
 
 #[async_trait]
@@ -441,6 +446,7 @@ impl CustomOperation for GleifRefreshOp {
 /// Get raw GLEIF record (does not persist)
 ///
 /// Rationale: Direct GLEIF API call for inspection.
+#[register_custom_op]
 pub struct GleifGetRecordOp;
 
 #[async_trait]
@@ -493,6 +499,7 @@ impl CustomOperation for GleifGetRecordOp {
 /// Get direct parent from GLEIF
 ///
 /// Rationale: Direct GLEIF API call for parent relationship.
+#[register_custom_op]
 pub struct GleifGetParentOp;
 
 #[async_trait]
@@ -548,6 +555,7 @@ impl CustomOperation for GleifGetParentOp {
 /// Import managed funds from GLEIF with full CBU structure
 ///
 /// Rationale: Fetches funds from GLEIF API and creates entities + CBUs with role assignments.
+#[register_custom_op]
 pub struct GleifImportManagedFundsOp;
 
 #[async_trait]
@@ -948,6 +956,7 @@ async fn assign_role(pool: &PgPool, cbu_id: Uuid, entity_id: Uuid, role_name: &s
 /// Get direct children from GLEIF
 ///
 /// Rationale: Direct GLEIF API call for child entities.
+#[register_custom_op]
 pub struct GleifGetChildrenOp;
 
 #[async_trait]
@@ -1000,6 +1009,7 @@ impl CustomOperation for GleifGetChildrenOp {
 }
 
 /// Trace ownership chain to UBO terminus
+#[register_custom_op]
 pub struct GleifTraceOwnershipOp;
 
 #[async_trait]
@@ -1109,6 +1119,7 @@ impl CustomOperation for GleifTraceOwnershipOp {
 }
 
 /// Get all funds managed by an investment manager
+#[register_custom_op]
 pub struct GleifGetManagedFundsOp;
 
 #[async_trait]
@@ -1195,6 +1206,7 @@ impl CustomOperation for GleifGetManagedFundsOp {
 }
 
 /// Resolve merged/inactive LEI to current successor
+#[register_custom_op]
 pub struct GleifResolveSuccessorOp;
 
 #[async_trait]
@@ -1290,6 +1302,7 @@ impl CustomOperation for GleifResolveSuccessorOp {
 ///
 /// Single deterministic lookup - returns the umbrella fund that a sub-fund belongs to.
 /// SICAVs are self-governed and have no umbrella - use get-manager to find ManCo instead.
+#[register_custom_op]
 pub struct GleifGetUmbrellaOp;
 
 #[async_trait]
@@ -1379,6 +1392,7 @@ impl CustomOperation for GleifGetUmbrellaOp {
 ///
 /// Single deterministic lookup - returns the ManCo/AIFM/IM that manages the fund.
 /// This is the correct starting point for SICAVs which have no umbrella above them.
+#[register_custom_op]
 pub struct GleifGetManagerOp;
 
 #[async_trait]
@@ -1468,6 +1482,7 @@ impl CustomOperation for GleifGetManagerOp {
 /// Get master fund for a feeder fund (IS_FEEDER_TO relationship)
 ///
 /// Single deterministic lookup - returns the master fund that a feeder invests in.
+#[register_custom_op]
 pub struct GleifGetMasterFundOp;
 
 #[async_trait]
@@ -1556,6 +1571,7 @@ impl CustomOperation for GleifGetMasterFundOp {
 /// Look up entity LEI by ISIN
 ///
 /// Single deterministic lookup - given an ISIN, returns the issuing entity's LEI.
+#[register_custom_op]
 pub struct GleifLookupByIsinOp;
 
 #[async_trait]

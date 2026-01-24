@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -30,6 +31,7 @@ use super::helpers;
 /// - Have person_state = 'GHOST'
 /// - Cannot proceed to KYC screening until identified
 /// - Display with 👻 indicator in visualization
+#[register_custom_op]
 pub struct EntityGhostOp;
 
 #[async_trait]
@@ -154,6 +156,7 @@ impl CustomOperation for EntityGhostOp {
 /// - ID document details (passport, SSN, etc.)
 ///
 /// Once identified, the entity can proceed to KYC screening.
+#[register_custom_op]
 pub struct EntityIdentifyOp;
 
 #[async_trait]

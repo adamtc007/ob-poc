@@ -9,6 +9,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -23,6 +24,7 @@ use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 // ControlAnalyzeOp - Comprehensive control analysis for any entity type
 // ============================================================================
 
+#[register_custom_op]
 pub struct ControlAnalyzeOp;
 
 #[async_trait]
@@ -437,6 +439,7 @@ impl CustomOperation for ControlAnalyzeOp {
 // ControlBuildGraphOp - Build full control graph for a CBU
 // ============================================================================
 
+#[register_custom_op]
 pub struct ControlBuildGraphOp;
 
 #[async_trait]
@@ -644,6 +647,7 @@ impl CustomOperation for ControlBuildGraphOp {
 // ControlIdentifyUbosOp - Identify all UBOs across all control vectors
 // ============================================================================
 
+#[register_custom_op]
 pub struct ControlIdentifyUbosOp;
 
 #[async_trait]
@@ -915,6 +919,7 @@ impl CustomOperation for ControlIdentifyUbosOp {
 // ControlTraceChainOp - Trace specific control chain between entities
 // ============================================================================
 
+#[register_custom_op]
 pub struct ControlTraceChainOp;
 
 #[async_trait]
@@ -1098,6 +1103,7 @@ impl CustomOperation for ControlTraceChainOp {
 // ControlReconcileOwnershipOp - Reconcile ownership percentages with control
 // ============================================================================
 
+#[register_custom_op]
 pub struct ControlReconcileOwnershipOp;
 
 #[async_trait]
@@ -1280,6 +1286,7 @@ impl CustomOperation for ControlReconcileOwnershipOp {
 // ShowBoardControllerOp - Show board controller for a CBU
 // ============================================================================
 
+#[register_custom_op]
 pub struct ShowBoardControllerOp;
 
 #[async_trait]
@@ -1631,6 +1638,7 @@ impl CustomOperation for ShowBoardControllerOp {
 // RecomputeBoardControllerOp - Recompute board controller for a CBU
 // ============================================================================
 
+#[register_custom_op]
 pub struct RecomputeBoardControllerOp;
 
 #[async_trait]
@@ -1757,6 +1765,7 @@ impl CustomOperation for RecomputeBoardControllerOp {
 // SetBoardControllerOp - Manually set board controller
 // ============================================================================
 
+#[register_custom_op]
 pub struct SetBoardControllerOp;
 
 #[async_trait]
@@ -1856,6 +1865,7 @@ impl CustomOperation for SetBoardControllerOp {
 // ClearBoardControllerOverrideOp - Clear manual override
 // ============================================================================
 
+#[register_custom_op]
 pub struct ClearBoardControllerOverrideOp;
 
 #[async_trait]
@@ -1931,6 +1941,7 @@ impl CustomOperation for ClearBoardControllerOverrideOp {
 // ImportPscRegisterOp - Import PSC register data
 // ============================================================================
 
+#[register_custom_op]
 pub struct ImportPscRegisterOp;
 
 #[async_trait]
@@ -2017,6 +2028,7 @@ impl CustomOperation for ImportPscRegisterOp {
 // ImportGleifControlOp - Import GLEIF control data
 // ============================================================================
 
+#[register_custom_op]
 pub struct ImportGleifControlOp;
 
 #[async_trait]

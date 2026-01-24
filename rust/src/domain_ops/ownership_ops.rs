@@ -16,6 +16,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::NaiveDate;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -30,6 +31,7 @@ use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 // ============================================================================
 
 /// Derive ownership snapshots from register holdings
+#[register_custom_op]
 pub struct OwnershipComputeOp;
 
 #[async_trait]
@@ -93,6 +95,7 @@ impl CustomOperation for OwnershipComputeOp {
 }
 
 /// List ownership snapshots for an issuer
+#[register_custom_op]
 pub struct OwnershipSnapshotListOp;
 
 #[async_trait]
@@ -236,6 +239,7 @@ impl CustomOperation for OwnershipSnapshotListOp {
 }
 
 /// Get control positions for an issuer
+#[register_custom_op]
 pub struct OwnershipControlPositionsOp;
 
 #[async_trait]
@@ -316,6 +320,7 @@ impl CustomOperation for OwnershipControlPositionsOp {
 }
 
 /// Find who controls an issuer
+#[register_custom_op]
 pub struct OwnershipWhoControlsOp;
 
 #[async_trait]
@@ -413,6 +418,7 @@ impl CustomOperation for OwnershipWhoControlsOp {
 // ============================================================================
 
 /// Compare ownership from different sources
+#[register_custom_op]
 pub struct OwnershipReconcileOp;
 
 #[async_trait]
@@ -638,6 +644,7 @@ impl CustomOperation for OwnershipReconcileOp {
 }
 
 /// List findings from a reconciliation run
+#[register_custom_op]
 pub struct OwnershipReconcileFindingsOp;
 
 #[async_trait]
@@ -789,6 +796,7 @@ impl CustomOperation for OwnershipReconcileFindingsOp {
 // ============================================================================
 
 /// Analyze ownership gaps for an issuer
+#[register_custom_op]
 pub struct OwnershipAnalyzeGapsOp;
 
 #[async_trait]
@@ -859,6 +867,7 @@ impl CustomOperation for OwnershipAnalyzeGapsOp {
 }
 
 /// Trace ownership chain from one entity to another
+#[register_custom_op]
 pub struct OwnershipTraceChainOp;
 
 #[async_trait]
@@ -962,21 +971,4 @@ impl CustomOperation for OwnershipTraceChainOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
-}
-
-// ============================================================================
-// Registration function for mod.rs
-// ============================================================================
-
-pub fn register_ownership_ops(registry: &mut super::CustomOperationRegistry) {
-    use std::sync::Arc;
-
-    registry.register(Arc::new(OwnershipComputeOp));
-    registry.register(Arc::new(OwnershipSnapshotListOp));
-    registry.register(Arc::new(OwnershipControlPositionsOp));
-    registry.register(Arc::new(OwnershipWhoControlsOp));
-    registry.register(Arc::new(OwnershipReconcileOp));
-    registry.register(Arc::new(OwnershipReconcileFindingsOp));
-    registry.register(Arc::new(OwnershipAnalyzeGapsOp));
-    registry.register(Arc::new(OwnershipTraceChainOp));
 }

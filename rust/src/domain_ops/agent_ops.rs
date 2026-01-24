@@ -10,6 +10,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -117,6 +118,7 @@ fn get_session_id(ctx: &ExecutionContext) -> Uuid {
 // ============================================================================
 
 /// Start agent mode with a specific task
+#[register_custom_op]
 pub struct AgentStartOp;
 
 #[async_trait]
@@ -219,6 +221,7 @@ impl CustomOperation for AgentStartOp {
 }
 
 /// Pause the running agent loop
+#[register_custom_op]
 pub struct AgentPauseOp;
 
 #[async_trait]
@@ -261,6 +264,7 @@ impl CustomOperation for AgentPauseOp {
 }
 
 /// Resume a paused agent loop
+#[register_custom_op]
 pub struct AgentResumeOp;
 
 #[async_trait]
@@ -303,6 +307,7 @@ impl CustomOperation for AgentResumeOp {
 }
 
 /// Stop the agent loop completely
+#[register_custom_op]
 pub struct AgentStopOp;
 
 #[async_trait]
@@ -349,6 +354,7 @@ impl CustomOperation for AgentStopOp {
 // ============================================================================
 
 /// Confirm a checkpoint decision
+#[register_custom_op]
 pub struct AgentConfirmOp;
 
 #[async_trait]
@@ -411,6 +417,7 @@ impl CustomOperation for AgentConfirmOp {
 }
 
 /// Reject a checkpoint and skip this decision
+#[register_custom_op]
 pub struct AgentRejectOp;
 
 #[async_trait]
@@ -473,6 +480,7 @@ impl CustomOperation for AgentRejectOp {
 }
 
 /// Select a specific candidate from checkpoint options
+#[register_custom_op]
 pub struct AgentSelectOp;
 
 #[async_trait]
@@ -540,6 +548,7 @@ impl CustomOperation for AgentSelectOp {
 // ============================================================================
 
 /// Get current agent status
+#[register_custom_op]
 pub struct AgentStatusOp;
 
 #[async_trait]
@@ -643,6 +652,7 @@ impl CustomOperation for AgentStatusOp {
 }
 
 /// Get agent decision and action history for current session
+#[register_custom_op]
 pub struct AgentHistoryOp;
 
 #[async_trait]
@@ -755,6 +765,7 @@ impl CustomOperation for AgentHistoryOp {
 // ============================================================================
 
 /// Set confidence thresholds for auto-selection
+#[register_custom_op]
 pub struct AgentSetThresholdOp;
 
 #[async_trait]
@@ -818,6 +829,7 @@ impl CustomOperation for AgentSetThresholdOp {
 }
 
 /// Switch between agent and hybrid modes
+#[register_custom_op]
 pub struct AgentSetModeOp;
 
 #[async_trait]
@@ -879,6 +891,7 @@ impl CustomOperation for AgentSetModeOp {
 // ============================================================================
 
 /// Teach a phrase→verb mapping to improve intent recognition
+#[register_custom_op]
 pub struct AgentTeachOp;
 
 #[async_trait]
@@ -949,6 +962,7 @@ impl CustomOperation for AgentTeachOp {
 }
 
 /// Remove a previously taught phrase→verb mapping
+#[register_custom_op]
 pub struct AgentUnteachOp;
 
 #[async_trait]
@@ -1015,6 +1029,7 @@ impl CustomOperation for AgentUnteachOp {
 }
 
 /// Show recently taught patterns and their embedding status
+#[register_custom_op]
 pub struct AgentTeachingStatusOp;
 
 #[async_trait]
@@ -1125,6 +1140,7 @@ impl CustomOperation for AgentTeachingStatusOp {
 // AgentLearnOp - Activate taught patterns by running populate_embeddings
 // ============================================================================
 
+#[register_custom_op]
 pub struct AgentLearnOp;
 
 #[async_trait]
@@ -1233,38 +1249,4 @@ impl CustomOperation for AgentLearnOp {
             "Database feature required for learning operations"
         ))
     }
-}
-
-// ============================================================================
-// Registration
-// ============================================================================
-
-/// Register all agent operations with the registry
-pub fn register_agent_ops(registry: &mut crate::domain_ops::CustomOperationRegistry) {
-    use std::sync::Arc;
-
-    // Lifecycle
-    registry.register(Arc::new(AgentStartOp));
-    registry.register(Arc::new(AgentPauseOp));
-    registry.register(Arc::new(AgentResumeOp));
-    registry.register(Arc::new(AgentStopOp));
-
-    // Checkpoints
-    registry.register(Arc::new(AgentConfirmOp));
-    registry.register(Arc::new(AgentRejectOp));
-    registry.register(Arc::new(AgentSelectOp));
-
-    // Status
-    registry.register(Arc::new(AgentStatusOp));
-    registry.register(Arc::new(AgentHistoryOp));
-
-    // Configuration
-    registry.register(Arc::new(AgentSetThresholdOp));
-    registry.register(Arc::new(AgentSetModeOp));
-
-    // Teaching
-    registry.register(Arc::new(AgentTeachOp));
-    registry.register(Arc::new(AgentUnteachOp));
-    registry.register(Arc::new(AgentTeachingStatusOp));
-    registry.register(Arc::new(AgentLearnOp));
 }

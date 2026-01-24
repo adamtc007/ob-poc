@@ -8,6 +8,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -49,6 +50,7 @@ struct SlaBreachRow {
 /// Rationale: Complex scope matching - must check scope_all, scope_markets,
 /// scope_instrument_classes, scope_currencies, scope_isda_asset_classes with
 /// NULL = any semantics, priority ordering, and return instruction method.
+#[register_custom_op]
 pub struct FindImForTradeOp;
 
 #[async_trait]
@@ -201,6 +203,7 @@ impl CustomOperation for FindImForTradeOp {
 ///
 /// Rationale: Priority-based lookup with fallback chain and NULL=any semantics
 /// for market and currency fields.
+#[register_custom_op]
 pub struct FindPricingForInstrumentOp;
 
 #[async_trait]
@@ -362,6 +365,7 @@ impl CustomOperation for FindPricingForInstrumentOp {
 ///
 /// Rationale: Multi-table join across commitments, measurements, breaches
 /// with template details, filtering by status and optional severity.
+#[register_custom_op]
 pub struct ListOpenSlaBreachesOp;
 
 #[async_trait]

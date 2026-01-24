@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -21,6 +22,7 @@ use sqlx::PgPool;
 ///
 /// Rationale: Queries v_cbu_matrix_effective view to get trading matrix entries
 /// with all applicable product overlays aggregated.
+#[register_custom_op]
 pub struct MatrixEffectiveOp;
 
 #[async_trait]
@@ -138,6 +140,7 @@ impl CustomOperation for MatrixEffectiveOp {
 ///
 /// Rationale: Queries v_cbu_unified_gaps view to show missing resources
 /// from both the trading matrix (lifecycle) and product (service) domains.
+#[register_custom_op]
 pub struct MatrixUnifiedGapsOp;
 
 #[async_trait]
@@ -272,6 +275,7 @@ impl CustomOperation for MatrixUnifiedGapsOp {
 ///
 /// Rationale: Shows the delta between products - what's unique to each,
 /// what overlaps, helping with product selection.
+#[register_custom_op]
 pub struct MatrixCompareProductsOp;
 
 #[async_trait]

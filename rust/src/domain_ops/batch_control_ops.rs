@@ -9,6 +9,7 @@
 //! - `batch.status` - Get batch status
 
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -45,6 +46,7 @@ pub struct BatchControlResult {
 /// Pause the current batch execution
 ///
 /// DSL: `(batch.pause)`
+#[register_custom_op]
 pub struct BatchPauseOp;
 
 #[async_trait]
@@ -93,6 +95,7 @@ impl CustomOperation for BatchPauseOp {
 /// Resume a paused batch execution
 ///
 /// DSL: `(batch.resume)`
+#[register_custom_op]
 pub struct BatchResumeOp;
 
 #[async_trait]
@@ -134,6 +137,7 @@ impl CustomOperation for BatchResumeOp {
 /// Continue batch execution for N more items
 ///
 /// DSL: `(batch.continue :count 10)`
+#[register_custom_op]
 pub struct BatchContinueOp;
 
 #[async_trait]
@@ -185,6 +189,7 @@ impl CustomOperation for BatchContinueOp {
 ///
 /// DSL: `(batch.skip)`
 /// DSL: `(batch.skip :reason "Invalid data")`
+#[register_custom_op]
 pub struct BatchSkipOp;
 
 #[async_trait]
@@ -234,6 +239,7 @@ impl CustomOperation for BatchSkipOp {
 ///
 /// DSL: `(batch.abort)`
 /// DSL: `(batch.abort :reason "User requested")`
+#[register_custom_op]
 pub struct BatchAbortOp;
 
 #[async_trait]
@@ -293,6 +299,7 @@ impl CustomOperation for BatchAbortOp {
 ///   "elapsed": "00:02:34"
 /// }
 /// ```
+#[register_custom_op]
 pub struct BatchStatusOp;
 
 #[async_trait]
@@ -342,6 +349,7 @@ impl CustomOperation for BatchStatusOp {
 ///
 /// This is a convenience verb for post-batch operations that applies products
 /// to all CBUs created during a batch execution.
+#[register_custom_op]
 pub struct BatchAddProductsOp;
 
 #[async_trait]

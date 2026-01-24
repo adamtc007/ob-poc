@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -23,6 +24,7 @@ use sqlx::PgPool;
 /// Rationale: Requires lookup of resource_type_id from lifecycle_resource_types,
 /// context scoping (market, currency, counterparty), and auto-generation of
 /// instance URLs for dependency tracking.
+#[register_custom_op]
 pub struct LifecycleProvisionOp;
 
 #[async_trait]
@@ -280,6 +282,7 @@ impl CustomOperation for LifecycleProvisionOp {
 ///
 /// Rationale: Complex query against v_cbu_lifecycle_gaps view that identifies
 /// missing lifecycle resources based on the CBU's instrument universe.
+#[register_custom_op]
 pub struct LifecycleAnalyzeGapsOp;
 
 #[async_trait]
@@ -391,6 +394,7 @@ impl CustomOperation for LifecycleAnalyzeGapsOp {
 ///
 /// Rationale: Combines gap analysis with readiness decision logic,
 /// separating blocking gaps from warnings.
+#[register_custom_op]
 pub struct LifecycleCheckReadinessOp;
 
 #[async_trait]
@@ -509,6 +513,7 @@ impl CustomOperation for LifecycleCheckReadinessOp {
 ///
 /// Rationale: Multi-join query to discover the full lifecycle tree for
 /// an instrument class, including ISDA requirements.
+#[register_custom_op]
 pub struct LifecycleDiscoverOp;
 
 #[async_trait]
@@ -629,6 +634,7 @@ impl CustomOperation for LifecycleDiscoverOp {
 ///
 /// Rationale: Generates DSL statements from gaps, incorporating user responses
 /// to prompts for provider selection.
+#[register_custom_op]
 pub struct LifecycleGeneratePlanOp;
 
 #[async_trait]
@@ -795,6 +801,7 @@ impl CustomOperation for LifecycleGeneratePlanOp {
 /// Execute a provisioning plan
 ///
 /// Rationale: Executes generated DSL statements, with dry-run support.
+#[register_custom_op]
 pub struct LifecycleExecutePlanOp;
 
 #[async_trait]

@@ -11,6 +11,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -40,6 +41,7 @@ struct ShareClassSupplyRow {
 }
 
 /// Transfer shares between shareholders
+#[register_custom_op]
 pub struct CapitalTransferOp;
 
 #[async_trait]
@@ -221,6 +223,7 @@ impl CustomOperation for CapitalTransferOp {
 }
 
 /// Reconcile capital structure - verify SUM(holdings) = issued_shares
+#[register_custom_op]
 pub struct CapitalReconcileOp;
 
 #[async_trait]
@@ -365,6 +368,7 @@ struct ShareholderInfo {
 }
 
 /// Get ownership chain with multiplicative percentages
+#[register_custom_op]
 pub struct CapitalOwnershipChainOp;
 
 #[async_trait]
@@ -468,6 +472,7 @@ impl CustomOperation for CapitalOwnershipChainOp {
 }
 
 /// Issue additional shares
+#[register_custom_op]
 pub struct CapitalIssueSharesOp;
 
 #[async_trait]
@@ -561,6 +566,7 @@ impl CustomOperation for CapitalIssueSharesOp {
 }
 
 /// Cancel/buyback shares
+#[register_custom_op]
 pub struct CapitalCancelSharesOp;
 
 #[async_trait]
@@ -677,6 +683,7 @@ use super::helpers::{extract_string, extract_string_opt, extract_uuid, extract_u
 use chrono::NaiveDate;
 
 /// Create a new share class for an issuer
+#[register_custom_op]
 pub struct CapitalShareClassCreateOp;
 
 #[async_trait]
@@ -818,6 +825,7 @@ impl CustomOperation for CapitalShareClassCreateOp {
 }
 
 /// Get current supply state for a share class
+#[register_custom_op]
 pub struct CapitalShareClassGetSupplyOp;
 
 #[async_trait]
@@ -881,6 +889,7 @@ impl CustomOperation for CapitalShareClassGetSupplyOp {
 }
 
 /// Initial issuance of shares (incorporation/fund launch)
+#[register_custom_op]
 pub struct CapitalIssueInitialOp;
 
 #[async_trait]
@@ -1024,6 +1033,7 @@ impl CustomOperation for CapitalIssueInitialOp {
 }
 
 /// Subsequent issuance (capital raise)
+#[register_custom_op]
 pub struct CapitalIssueNewOp;
 
 #[async_trait]
@@ -1152,6 +1162,7 @@ impl CustomOperation for CapitalIssueNewOp {
 /// 2. Advisory lock on share_class_id - serializes all splits on same class
 /// 3. Idempotency key - prevents duplicate application on retry
 /// 4. Single transaction - all-or-nothing for holdings, supply, and dilution instruments
+#[register_custom_op]
 pub struct CapitalSplitOp;
 
 #[async_trait]
@@ -1382,6 +1393,7 @@ impl CustomOperation for CapitalSplitOp {
 }
 
 /// Share buyback into treasury
+#[register_custom_op]
 pub struct CapitalBuybackOp;
 
 #[async_trait]
@@ -1489,6 +1501,7 @@ impl CustomOperation for CapitalBuybackOp {
 }
 
 /// Permanent share cancellation
+#[register_custom_op]
 pub struct CapitalCancelOp;
 
 #[async_trait]
@@ -1589,6 +1602,7 @@ impl CustomOperation for CapitalCancelOp {
 }
 
 /// Get full cap table for an issuer
+#[register_custom_op]
 pub struct CapitalCapTableOp;
 
 #[async_trait]
@@ -1760,6 +1774,7 @@ impl CustomOperation for CapitalCapTableOp {
 }
 
 /// List all holders for an issuer with ownership percentages
+#[register_custom_op]
 pub struct CapitalHoldersOp;
 
 #[async_trait]

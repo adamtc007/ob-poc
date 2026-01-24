@@ -9,6 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 
 use super::helpers::extract_uuid;
@@ -24,6 +25,7 @@ use sqlx::PgPool;
 // =============================================================================
 
 /// Populate campaign with review items based on scope
+#[register_custom_op]
 pub struct AccessReviewPopulateOp;
 
 #[async_trait]
@@ -173,6 +175,7 @@ impl CustomOperation for AccessReviewPopulateOp {
 }
 
 /// Launch campaign and set to ACTIVE
+#[register_custom_op]
 pub struct AccessReviewLaunchOp;
 
 #[async_trait]
@@ -239,6 +242,7 @@ impl CustomOperation for AccessReviewLaunchOp {
 // =============================================================================
 
 /// Revoke access - ends the membership
+#[register_custom_op]
 pub struct AccessReviewRevokeOp;
 
 #[async_trait]
@@ -351,6 +355,7 @@ impl CustomOperation for AccessReviewRevokeOp {
 // =============================================================================
 
 /// Bulk confirm multiple items
+#[register_custom_op]
 pub struct AccessReviewBulkConfirmOp;
 
 #[async_trait]
@@ -455,6 +460,7 @@ impl CustomOperation for AccessReviewBulkConfirmOp {
 }
 
 /// Confirm all unflagged items for a reviewer
+#[register_custom_op]
 pub struct AccessReviewConfirmCleanOp;
 
 #[async_trait]
@@ -549,6 +555,7 @@ impl CustomOperation for AccessReviewConfirmCleanOp {
 // =============================================================================
 
 /// Formal attestation with digital signature
+#[register_custom_op]
 pub struct AccessReviewAttestOp;
 
 #[async_trait]
@@ -658,6 +665,7 @@ impl CustomOperation for AccessReviewAttestOp {
 // =============================================================================
 
 /// Process items past deadline
+#[register_custom_op]
 pub struct AccessReviewProcessDeadlineOp;
 
 #[async_trait]
@@ -786,6 +794,7 @@ impl CustomOperation for AccessReviewProcessDeadlineOp {
 }
 
 /// Send reminder notifications
+#[register_custom_op]
 pub struct AccessReviewSendRemindersOp;
 
 #[async_trait]

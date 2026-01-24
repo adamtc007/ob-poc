@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-24
-> **Crates:** 14 Rust crates
+> **Crates:** 15 Rust crates (includes ob-poc-macros)
 > **Verbs:** 968 verbs, 7505 intent patterns (DB-sourced)
 > **Migrations:** 50 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7505 patterns vectorized
@@ -18,6 +18,7 @@
 > **Client Group Resolver (048):** ✅ Complete - Two-stage alias→group→anchor resolution for session scope
 > **Workflow Task Queue (049):** ✅ Complete - Async task return path, document entity, requirement guards
 > **Transactional Execution (050):** ✅ Complete - Atomic execution, advisory locks, expansion audit
+> **CustomOp Auto-Registration (051):** ✅ Complete - `#[register_custom_op]` macro, inventory-based registration
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -283,6 +284,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Client group resolver | `TODO-CLIENT-GROUP-IMPL.md` | ✅ Complete |
 | Workflow task queue | `TODO-WORKFLOW-TASK-QUEUE.md` | ✅ Complete |
 | Transactional execution | `TODO-DSL-TRANSACTIONAL-EXECUTION-AND-LOCKING.md` | ✅ Complete |
+| CustomOp auto-registration | `TODO-INTEGRATED-TASK-QUEUE-MACROS.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -1377,6 +1379,45 @@ DATABASE_URL="postgresql:///data_designer" \
 | `plugin` | Custom Rust handler | Complex logic |
 | `template` | Expands to multi-statement DSL | Workflows, macros |
 
+### Plugin Verb Implementation (CustomOperation)
+
+Plugin verbs require a Rust `CustomOperation` implementation. Use the `#[register_custom_op]` macro for automatic registration via the inventory crate.
+
+```rust
+use ob_poc_macros::register_custom_op;
+
+#[register_custom_op]
+pub struct MyDomainCreateOp;
+
+#[async_trait]
+impl CustomOperation for MyDomainCreateOp {
+    fn domain(&self) -> &'static str { "my-domain" }
+    fn verb(&self) -> &'static str { "create" }
+    fn rationale(&self) -> &'static str { "Complex validation logic" }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Implementation
+    }
+}
+```
+
+**Key points:**
+- Macro generates `inventory::submit!` for automatic registration at startup
+- Domain/verb must match YAML definition with `behavior: plugin`
+- `rationale()` documents why plugin (not CRUD) is needed
+- Test coverage: `test_plugin_verb_coverage` verifies all YAML plugin verbs have ops
+
+**Verify coverage:**
+```bash
+cargo test --lib -- test_plugin_verb_coverage
+```
+
 ### Quick Example (CRUD)
 
 ```yaml
@@ -1801,12 +1842,14 @@ ob-poc/
 │   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
 │   │   ├── dsl-lsp/            # Language Server for DSL
 │   │   ├── ob-agentic/         # LLM agent
+│   │   ├── ob-poc-macros/      # Proc macros (#[register_custom_op], #[derive(IdType)])
 │   │   ├── ob-poc-ui/          # egui/WASM UI
 │   │   └── ob-poc-graph/       # Graph visualization
 │   └── src/
 │       ├── dsl_v2/             # DSL execution
 │       │   ├── custom_ops/     # Plugin handlers
 │       │   └── generic_executor.rs
+│       ├── domain_ops/         # CustomOperation implementations (~300+ ops)
 │       ├── session/            # Session state
 │       ├── graph/              # Graph builders
 │       └── api/                # REST routes

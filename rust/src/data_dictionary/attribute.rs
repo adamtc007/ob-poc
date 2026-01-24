@@ -1,61 +1,13 @@
 //! Attribute definition with complete metadata
 
 use super::*;
-use std::str::FromStr;
+use ob_poc_macros::IdType;
 use uuid::Uuid;
 
 /// Unique identifier for attributes in the data dictionary
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(IdType)]
+#[id(new_v4)]
 pub struct AttributeId(Uuid);
-
-impl Default for AttributeId {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl AttributeId {
-    /// Create from an existing UUID
-    pub fn from_uuid(uuid: Uuid) -> Self {
-        Self(uuid)
-    }
-
-    /// Get the inner UUID
-    pub fn as_uuid(&self) -> Uuid {
-        self.0
-    }
-
-    /// Create a new attribute ID with a fresh UUID
-    pub fn new() -> Self {
-        Self(Uuid::new_v4())
-    }
-}
-
-impl FromStr for AttributeId {
-    type Err = uuid::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(Uuid::parse_str(s)?))
-    }
-}
-
-impl std::fmt::Display for AttributeId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl From<Uuid> for AttributeId {
-    fn from(uuid: Uuid) -> Self {
-        Self(uuid)
-    }
-}
-
-impl From<AttributeId> for Uuid {
-    fn from(attr_id: AttributeId) -> Self {
-        attr_id.0
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttributeDefinition {

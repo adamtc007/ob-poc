@@ -3171,6 +3171,10 @@ mod tests {
         // Get the entry ID to mark as executed
         let entry_id = session.run_sheet.entries[0].id;
 
+        // Transition to Executing state before execution
+        session.transition(SessionEvent::ExecutionStarted);
+        assert_eq!(session.state, SessionState::Executing);
+
         // Mark entry as executed via run_sheet (new approach)
         let cbu_id = Uuid::new_v4();
         session

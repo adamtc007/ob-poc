@@ -8,6 +8,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, extract_uuid_opt};
 use super::CustomOperation;
@@ -34,6 +35,7 @@ use {
 // =============================================================================
 
 /// List all available research sources
+#[register_custom_op]
 pub struct SourceListOp;
 
 #[async_trait]
@@ -89,6 +91,7 @@ impl CustomOperation for SourceListOp {
 }
 
 /// Get information about a specific research source
+#[register_custom_op]
 pub struct SourceInfoOp;
 
 #[async_trait]
@@ -145,6 +148,7 @@ impl CustomOperation for SourceInfoOp {
 }
 
 /// Search a specific source for entities
+#[register_custom_op]
 pub struct SourceSearchOp;
 
 #[async_trait]
@@ -225,6 +229,7 @@ impl CustomOperation for SourceSearchOp {
 }
 
 /// Fetch entity data from a source by key
+#[register_custom_op]
 pub struct SourceFetchOp;
 
 #[async_trait]
@@ -304,6 +309,7 @@ impl CustomOperation for SourceFetchOp {
 }
 
 /// Find the best source for a jurisdiction and data type
+#[register_custom_op]
 pub struct SourceFindForJurisdictionOp;
 
 #[async_trait]
@@ -378,6 +384,7 @@ impl CustomOperation for SourceFindForJurisdictionOp {
 // =============================================================================
 
 /// Search Companies House for UK companies
+#[register_custom_op]
 pub struct ChSearchOp;
 
 #[async_trait]
@@ -447,6 +454,7 @@ impl CustomOperation for ChSearchOp {
 }
 
 /// Fetch company profile from Companies House
+#[register_custom_op]
 pub struct ChFetchCompanyOp;
 
 #[async_trait]
@@ -506,6 +514,7 @@ impl CustomOperation for ChFetchCompanyOp {
 }
 
 /// Fetch PSC (Persons with Significant Control) from Companies House
+#[register_custom_op]
 pub struct ChFetchPscOp;
 
 #[async_trait]
@@ -595,6 +604,7 @@ impl CustomOperation for ChFetchPscOp {
 }
 
 /// Fetch officers (directors, secretaries) from Companies House
+#[register_custom_op]
 pub struct ChFetchOfficersOp;
 
 #[async_trait]
@@ -664,6 +674,7 @@ impl CustomOperation for ChFetchOfficersOp {
 }
 
 /// Import company (and optionally PSC/officers) from Companies House to database
+#[register_custom_op]
 pub struct ChImportCompanyOp;
 
 #[async_trait]
@@ -771,6 +782,7 @@ impl CustomOperation for ChImportCompanyOp {
 // =============================================================================
 
 /// Search SEC EDGAR for US public companies
+#[register_custom_op]
 pub struct SecSearchOp;
 
 #[async_trait]
@@ -835,6 +847,7 @@ impl CustomOperation for SecSearchOp {
 }
 
 /// Fetch company from SEC EDGAR
+#[register_custom_op]
 pub struct SecFetchCompanyOp;
 
 #[async_trait]
@@ -893,6 +906,7 @@ impl CustomOperation for SecFetchCompanyOp {
 }
 
 /// Fetch 13D/13G beneficial ownership filings from SEC EDGAR
+#[register_custom_op]
 pub struct SecFetchBeneficialOwnersOp;
 
 #[async_trait]
@@ -974,6 +988,7 @@ impl CustomOperation for SecFetchBeneficialOwnersOp {
 }
 
 /// Fetch recent SEC filings
+#[register_custom_op]
 pub struct SecFetchFilingsOp;
 
 #[async_trait]
@@ -1035,6 +1050,7 @@ impl CustomOperation for SecFetchFilingsOp {
 }
 
 /// Import SEC company to database
+#[register_custom_op]
 pub struct SecImportCompanyOp;
 
 #[async_trait]
@@ -1249,30 +1265,4 @@ async fn log_research_action(
     .await?;
 
     Ok(())
-}
-
-/// Registration function for all source loader operations
-pub fn register_source_loader_ops(registry: &mut super::CustomOperationRegistry) {
-    use std::sync::Arc;
-
-    // Generic source operations
-    registry.register(Arc::new(SourceListOp));
-    registry.register(Arc::new(SourceInfoOp));
-    registry.register(Arc::new(SourceSearchOp));
-    registry.register(Arc::new(SourceFetchOp));
-    registry.register(Arc::new(SourceFindForJurisdictionOp));
-
-    // Companies House operations
-    registry.register(Arc::new(ChSearchOp));
-    registry.register(Arc::new(ChFetchCompanyOp));
-    registry.register(Arc::new(ChFetchPscOp));
-    registry.register(Arc::new(ChFetchOfficersOp));
-    registry.register(Arc::new(ChImportCompanyOp));
-
-    // SEC EDGAR operations
-    registry.register(Arc::new(SecSearchOp));
-    registry.register(Arc::new(SecFetchCompanyOp));
-    registry.register(Arc::new(SecFetchBeneficialOwnersOp));
-    registry.register(Arc::new(SecFetchFilingsOp));
-    registry.register(Arc::new(SecImportCompanyOp));
 }

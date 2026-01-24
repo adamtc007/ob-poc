@@ -5,6 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::{json, Value};
 use sqlx::PgPool;
 
@@ -21,6 +22,7 @@ use super::CustomOperation;
 /// Returns the full KYC case state with workstreams containing embedded
 /// `awaiting` arrays. This is the domain-coherent view where requests are
 /// child nodes of workstreams, not a separate list.
+#[register_custom_op]
 pub struct KycCaseStateOp;
 
 #[async_trait]
@@ -280,6 +282,7 @@ impl CustomOperation for KycCaseStateOp {
 // ============================================================================
 
 /// Returns a single workstream with its embedded awaiting requests.
+#[register_custom_op]
 pub struct WorkstreamStateOp;
 
 #[async_trait]

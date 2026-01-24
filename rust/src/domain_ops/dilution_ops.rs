@@ -13,6 +13,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -27,6 +28,7 @@ use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 // ============================================================================
 
 /// Grant stock options to an employee/advisor
+#[register_custom_op]
 pub struct DilutionGrantOptionsOp;
 
 #[async_trait]
@@ -147,6 +149,7 @@ impl CustomOperation for DilutionGrantOptionsOp {
 // ============================================================================
 
 /// Issue warrants
+#[register_custom_op]
 pub struct DilutionIssueWarrantOp;
 
 #[async_trait]
@@ -251,6 +254,7 @@ impl CustomOperation for DilutionIssueWarrantOp {
 // ============================================================================
 
 /// Create a SAFE (Simple Agreement for Future Equity)
+#[register_custom_op]
 pub struct DilutionCreateSafeOp;
 
 #[async_trait]
@@ -348,6 +352,7 @@ impl CustomOperation for DilutionCreateSafeOp {
 // ============================================================================
 
 /// Create a convertible note
+#[register_custom_op]
 pub struct DilutionCreateConvertibleNoteOp;
 
 #[async_trait]
@@ -459,6 +464,7 @@ impl CustomOperation for DilutionCreateConvertibleNoteOp {
 /// 3. Retry loop (3 attempts) for serialization conflicts
 /// 4. Idempotency key - prevents double exercise on retry
 /// 5. Single transaction - all-or-nothing for instrument, holding, and supply
+#[register_custom_op]
 pub struct DilutionExerciseOp;
 
 /// Parameters for exercise operation
@@ -838,6 +844,7 @@ impl DilutionExerciseOp {
 }
 
 /// Forfeit unvested or cancelled dilution instruments
+#[register_custom_op]
 pub struct DilutionForfeitOp;
 
 #[async_trait]
@@ -967,6 +974,7 @@ impl CustomOperation for DilutionForfeitOp {
 // ============================================================================
 
 /// List dilution instruments for an issuer
+#[register_custom_op]
 pub struct DilutionListOp;
 
 #[async_trait]
@@ -1111,6 +1119,7 @@ impl CustomOperation for DilutionListOp {
 }
 
 /// Get dilution summary for an issuer
+#[register_custom_op]
 pub struct DilutionGetSummaryOp;
 
 #[async_trait]
@@ -1227,32 +1236,4 @@ impl CustomOperation for DilutionGetSummaryOp {
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Void)
     }
-}
-
-// ============================================================================
-// Registration function for mod.rs
-// ============================================================================
-
-pub fn register_dilution_ops(registry: &mut super::CustomOperationRegistry) {
-    use std::sync::Arc;
-
-    // Option grants
-    registry.register(Arc::new(DilutionGrantOptionsOp));
-
-    // Warrants
-    registry.register(Arc::new(DilutionIssueWarrantOp));
-
-    // SAFEs
-    registry.register(Arc::new(DilutionCreateSafeOp));
-
-    // Convertible notes
-    registry.register(Arc::new(DilutionCreateConvertibleNoteOp));
-
-    // Exercise & forfeit
-    registry.register(Arc::new(DilutionExerciseOp));
-    registry.register(Arc::new(DilutionForfeitOp));
-
-    // Query operations
-    registry.register(Arc::new(DilutionListOp));
-    registry.register(Arc::new(DilutionGetSummaryOp));
 }

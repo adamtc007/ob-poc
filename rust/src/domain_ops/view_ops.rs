@@ -17,6 +17,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
@@ -229,6 +230,7 @@ impl ViewOpResult {
 // =============================================================================
 
 /// view.universe handler - View all CBUs with optional filters
+#[register_custom_op]
 pub struct ViewUniverseOp;
 
 #[async_trait]
@@ -324,6 +326,7 @@ impl CustomOperation for ViewUniverseOp {
 // =============================================================================
 
 /// view.book handler - View all CBUs for a commercial client
+#[register_custom_op]
 pub struct ViewBookOp;
 
 #[async_trait]
@@ -382,6 +385,7 @@ impl CustomOperation for ViewBookOp {
 // =============================================================================
 
 /// view.cbu handler - Focus on a single CBU with specified view mode
+#[register_custom_op]
 pub struct ViewCbuOp;
 
 #[async_trait]
@@ -446,6 +450,7 @@ impl CustomOperation for ViewCbuOp {
 // =============================================================================
 
 /// view.entity-forest handler - View entities filtered by type, jurisdiction, role
+#[register_custom_op]
 pub struct ViewEntityForestOp;
 
 #[async_trait]
@@ -514,6 +519,7 @@ impl CustomOperation for ViewEntityForestOp {
 // =============================================================================
 
 /// view.refine handler - Apply refinement to current view
+#[register_custom_op]
 pub struct ViewRefineOp;
 
 #[async_trait]
@@ -599,6 +605,7 @@ impl CustomOperation for ViewRefineOp {
 // =============================================================================
 
 /// view.clear handler - Clear all refinements, return to base view
+#[register_custom_op]
 pub struct ViewClearOp;
 
 #[async_trait]
@@ -645,6 +652,7 @@ impl CustomOperation for ViewClearOp {
 // =============================================================================
 
 /// view.select handler - Explicitly set selection within current view
+#[register_custom_op]
 pub struct ViewSelectOp;
 
 #[async_trait]
@@ -716,6 +724,7 @@ impl CustomOperation for ViewSelectOp {
 // =============================================================================
 
 /// view.layout handler - Change layout strategy for current view
+#[register_custom_op]
 pub struct ViewLayoutOp;
 
 #[async_trait]
@@ -779,6 +788,7 @@ impl CustomOperation for ViewLayoutOp {
 // =============================================================================
 
 /// view.status handler - Get current view state summary
+#[register_custom_op]
 pub struct ViewStatusOp;
 
 #[async_trait]
@@ -833,6 +843,7 @@ impl CustomOperation for ViewStatusOp {
 // =============================================================================
 
 /// view.selection-info handler - Get detailed info about current selection
+#[register_custom_op]
 pub struct ViewSelectionInfoOp;
 
 #[async_trait]
@@ -893,6 +904,7 @@ impl CustomOperation for ViewSelectionInfoOp {
 // =============================================================================
 
 /// view.zoom-in handler - Zoom into a node using its expansion rule
+#[register_custom_op]
 pub struct ViewZoomInOp;
 
 #[async_trait]
@@ -946,6 +958,7 @@ impl CustomOperation for ViewZoomInOp {
 // =============================================================================
 
 /// view.zoom-out handler - Pop the current frame and return to parent view
+#[register_custom_op]
 pub struct ViewZoomOutOp;
 
 #[async_trait]
@@ -994,6 +1007,7 @@ impl CustomOperation for ViewZoomOutOp {
 // =============================================================================
 
 /// view.back-to handler - Pop frames until reaching a target level
+#[register_custom_op]
 pub struct ViewBackToOp;
 
 #[async_trait]
@@ -1052,6 +1066,7 @@ impl CustomOperation for ViewBackToOp {
 // =============================================================================
 
 /// view.breadcrumbs handler - Returns the current navigation path
+#[register_custom_op]
 pub struct ViewBreadcrumbsOp;
 
 #[async_trait]
@@ -1101,6 +1116,7 @@ impl CustomOperation for ViewBreadcrumbsOp {
 // =============================================================================
 
 /// view.drill handler - Drill into an entity (subsidiaries or parent chain)
+#[register_custom_op]
 pub struct ViewDrillOp;
 
 #[async_trait]
@@ -1190,6 +1206,7 @@ impl CustomOperation for ViewDrillOp {
 // =============================================================================
 
 /// view.surface handler - Surface up from drill (pop navigation stack)
+#[register_custom_op]
 pub struct ViewSurfaceOp;
 
 #[async_trait]
@@ -1272,6 +1289,7 @@ impl CustomOperation for ViewSurfaceOp {
 // =============================================================================
 
 /// view.trace handler - Follow money, control, or risk threads
+#[register_custom_op]
 pub struct ViewTraceOp;
 
 #[async_trait]
@@ -1364,6 +1382,7 @@ impl CustomOperation for ViewTraceOp {
 // =============================================================================
 
 /// view.xray handler - Show hidden layers transparently
+#[register_custom_op]
 pub struct ViewXrayOp;
 
 #[async_trait]
@@ -1439,6 +1458,7 @@ impl CustomOperation for ViewXrayOp {
 // =============================================================================
 
 /// view.peel handler - Remove outer layer to reveal inner structure
+#[register_custom_op]
 pub struct ViewPeelOp;
 
 #[async_trait]
@@ -1527,6 +1547,7 @@ impl CustomOperation for ViewPeelOp {
 // =============================================================================
 
 /// view.illuminate handler - Highlight specific aspect across all entities
+#[register_custom_op]
 pub struct ViewIlluminateOp;
 
 #[async_trait]
@@ -1623,6 +1644,7 @@ impl CustomOperation for ViewIlluminateOp {
 // =============================================================================
 
 /// view.shadow handler - Dim non-risk items to emphasize risk
+#[register_custom_op]
 pub struct ViewShadowOp;
 
 #[async_trait]
@@ -1710,6 +1732,7 @@ impl CustomOperation for ViewShadowOp {
 // =============================================================================
 
 /// view.red-flag handler - Scan and highlight red flags
+#[register_custom_op]
 pub struct ViewRedFlagOp;
 
 #[async_trait]
@@ -1798,6 +1821,7 @@ impl CustomOperation for ViewRedFlagOp {
 // =============================================================================
 
 /// view.black-holes handler - Show data gaps as 'black holes'
+#[register_custom_op]
 pub struct ViewBlackHolesOp;
 
 #[async_trait]
@@ -1887,6 +1911,7 @@ impl CustomOperation for ViewBlackHolesOp {
 // =============================================================================
 
 /// view.detail handler - Change detail level for current focus
+#[register_custom_op]
 pub struct ViewDetailOp;
 
 #[async_trait]
@@ -1963,6 +1988,7 @@ impl CustomOperation for ViewDetailOp {
 // =============================================================================
 
 /// view.context handler - Set UI context mode
+#[register_custom_op]
 pub struct ViewContextOp;
 
 #[async_trait]

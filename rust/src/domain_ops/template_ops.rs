@@ -6,6 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -50,6 +51,7 @@ pub struct TemplateInvokeResult {
 ///            :jurisdiction "LU"}
 ///   :as @result)
 /// ```
+#[register_custom_op]
 pub struct TemplateInvokeOp;
 
 #[async_trait]
@@ -349,6 +351,7 @@ impl TemplateBatchResult {
 ///   :limit 10                       ;; Optional limit
 ///   :as @batch_result)
 /// ```
+#[register_custom_op]
 pub struct TemplateBatchOp;
 
 #[async_trait]

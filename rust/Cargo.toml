@@ -19,6 +19,10 @@ ob-workflow = { path = "crates/ob-workflow", features = ["database"] }
 dsl_types = { path = "../dsl_types" }
 entity-gateway = { path = "crates/entity-gateway", optional = true }
 ob-poc-types = { path = "crates/ob-poc-types" }
+ob-poc-macros = { path = "crates/ob-poc-macros" }
+
+# Auto-registration for custom operations
+inventory = "0.3"
 
 # Core libraries
 anyhow = "1.0"
@@ -214,5 +218,6 @@ members = [
     "crates/entity-gateway",
     "crates/ob-semantic-matcher",
     "crates/viewport",
+    "crates/ob-poc-macros",
     "xtask",
 ]

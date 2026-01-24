@@ -298,8 +298,9 @@ mod tests {
     #[test]
     fn test_custom_op_exists() {
         let reg = registry();
-        let verb = reg.get("document", "catalog");
-        assert!(verb.is_some(), "document.catalog should exist");
+        // document.solicit is a plugin verb defined in document.yaml
+        let verb = reg.get("document", "solicit");
+        assert!(verb.is_some(), "document.solicit should exist");
         assert_eq!(verb.unwrap().behavior, VerbBehavior::CustomOp);
     }
 

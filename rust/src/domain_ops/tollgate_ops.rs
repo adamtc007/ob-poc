@@ -11,6 +11,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -21,6 +22,7 @@ use super::helpers::get_required_uuid;
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
 /// Evaluate tollgate for a KYC case
+#[register_custom_op]
 pub struct TollgateEvaluateOp;
 
 #[async_trait]
@@ -233,6 +235,7 @@ impl CustomOperation for TollgateEvaluateOp {
 }
 
 /// Get current metrics for a CBU
+#[register_custom_op]
 pub struct TollgateGetMetricsOp;
 
 #[async_trait]
@@ -289,6 +292,7 @@ impl CustomOperation for TollgateGetMetricsOp {
 }
 
 /// Record management override of tollgate failure
+#[register_custom_op]
 pub struct TollgateOverrideOp;
 
 #[async_trait]
@@ -378,6 +382,7 @@ impl CustomOperation for TollgateOverrideOp {
 }
 
 /// Get decision readiness summary
+#[register_custom_op]
 pub struct TollgateDecisionReadinessOp;
 
 #[async_trait]

@@ -11,6 +11,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use crate::domain_ops::helpers::{extract_cbu_id, extract_entity_ref};
 use crate::domain_ops::CustomOperation;
@@ -40,6 +41,7 @@ use uuid::Uuid;
 /// 4. Flag affected CBUs for UBO redetermination
 ///
 /// DSL: (ubo.mark-deceased :entity-id @person :date-of-death "2024-12-01" :reason "Death certificate received")
+#[register_custom_op]
 pub struct UboMarkDeceasedOp;
 
 #[async_trait]
@@ -260,6 +262,7 @@ impl CustomOperation for UboMarkDeceasedOp {
 /// Note: Named convergence-supersede to distinguish from deprecated ubo.supersede-ubo verb.
 ///
 /// DSL: (ubo.convergence-supersede :cbu @cbu :old-relationship @old :new-owner @new-person :percentage 100 :reason "Share transfer")
+#[register_custom_op]
 pub struct UboConvergenceSupersedeOp;
 
 #[async_trait]
@@ -472,6 +475,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
 /// Ends old control relationship and creates new one.
 ///
 /// DSL: (ubo.transfer-control :cbu @cbu :from @old-controller :to @new-controller :controlled-entity @entity :control-type "board_member" :reason "Board resignation")
+#[register_custom_op]
 pub struct UboTransferControlOp;
 
 #[async_trait]
@@ -687,6 +691,7 @@ impl CustomOperation for UboTransferControlOp {
 /// - Alternative verification method
 ///
 /// DSL: (ubo.waive-verification :cbu @cbu :relationship @rel :reason "Regulatory exemption for listed company" :approved-by "senior.analyst@example.com")
+#[register_custom_op]
 pub struct UboWaiveVerificationOp;
 
 #[async_trait]

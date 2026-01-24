@@ -26,6 +26,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -167,6 +168,7 @@ fn get_optional_integer(verb_call: &VerbCall, key: &str) -> Option<i64> {
 // LOAD-UNIVERSE (all CBUs, optionally filtered by client)
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionLoadUniverseOp;
 
 #[async_trait]
@@ -240,6 +242,7 @@ impl CustomOperation for SessionLoadUniverseOp {
 // LOAD-GALAXY (all CBUs in a jurisdiction/region)
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionLoadGalaxyOp;
 
 #[async_trait]
@@ -308,6 +311,7 @@ impl CustomOperation for SessionLoadGalaxyOp {
 //
 // The validation rule `one_of_required: [client, apex-entity-id]` ensures exactly one is provided.
 
+#[register_custom_op]
 pub struct SessionLoadClusterOp;
 
 #[async_trait]
@@ -457,6 +461,7 @@ impl CustomOperation for SessionLoadClusterOp {
 // LOAD-SYSTEM (single CBU)
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionLoadSystemOp;
 
 #[async_trait]
@@ -520,6 +525,7 @@ impl CustomOperation for SessionLoadSystemOp {
 // UNLOAD-SYSTEM (remove a CBU)
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionUnloadSystemOp;
 
 #[async_trait]
@@ -582,6 +588,7 @@ impl CustomOperation for SessionUnloadSystemOp {
 // FILTER-JURISDICTION (narrow scope)
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionFilterJurisdictionOp;
 
 #[async_trait]
@@ -658,6 +665,7 @@ impl CustomOperation for SessionFilterJurisdictionOp {
 // CLEAR
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionClearOp;
 
 #[async_trait]
@@ -704,6 +712,7 @@ impl CustomOperation for SessionClearOp {
 // UNDO
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionUndoOp;
 
 #[async_trait]
@@ -756,6 +765,7 @@ impl CustomOperation for SessionUndoOp {
 // REDO
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionRedoOp;
 
 #[async_trait]
@@ -808,6 +818,7 @@ impl CustomOperation for SessionRedoOp {
 // INFO
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionInfoOp;
 
 #[async_trait]
@@ -885,6 +896,7 @@ impl CustomOperation for SessionInfoOp {
 // LIST
 // =============================================================================
 
+#[register_custom_op]
 pub struct SessionListOp;
 
 #[async_trait]
@@ -957,27 +969,3 @@ impl CustomOperation for SessionListOp {
 // =============================================================================
 // REGISTRATION
 // =============================================================================
-
-/// Register all session operations with the registry (Astro model)
-pub fn register_session_ops_v2(registry: &mut crate::domain_ops::CustomOperationRegistry) {
-    use std::sync::Arc;
-
-    // Load verbs (Universe → Galaxy → Cluster → System)
-    registry.register(Arc::new(SessionLoadUniverseOp));
-    registry.register(Arc::new(SessionLoadGalaxyOp));
-    registry.register(Arc::new(SessionLoadClusterOp));
-    registry.register(Arc::new(SessionLoadSystemOp));
-
-    // Unload/filter
-    registry.register(Arc::new(SessionUnloadSystemOp));
-    registry.register(Arc::new(SessionFilterJurisdictionOp));
-    registry.register(Arc::new(SessionClearOp));
-
-    // History
-    registry.register(Arc::new(SessionUndoOp));
-    registry.register(Arc::new(SessionRedoOp));
-
-    // Query
-    registry.register(Arc::new(SessionInfoOp));
-    registry.register(Arc::new(SessionListOp));
-}

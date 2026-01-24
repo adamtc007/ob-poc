@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 
 use super::CustomOperation;
@@ -19,6 +20,7 @@ use sqlx::PgPool;
 // =============================================================================
 
 /// Create a service intent for a CBU
+#[register_custom_op]
 pub struct ServiceIntentCreateOp;
 
 #[async_trait]
@@ -127,6 +129,7 @@ impl CustomOperation for ServiceIntentCreateOp {
 }
 
 /// List service intents for a CBU
+#[register_custom_op]
 pub struct ServiceIntentListOp;
 
 #[async_trait]
@@ -196,6 +199,7 @@ impl CustomOperation for ServiceIntentListOp {
 }
 
 /// Supersede an existing service intent
+#[register_custom_op]
 pub struct ServiceIntentSupersedeOp;
 
 #[async_trait]
@@ -297,6 +301,7 @@ impl CustomOperation for ServiceIntentSupersedeOp {
 // =============================================================================
 
 /// Run resource discovery for a CBU
+#[register_custom_op]
 pub struct DiscoveryRunOp;
 
 #[async_trait]
@@ -357,6 +362,7 @@ impl CustomOperation for DiscoveryRunOp {
 }
 
 /// Explain why SRDEFs were discovered
+#[register_custom_op]
 pub struct DiscoveryExplainOp;
 
 #[async_trait]
@@ -466,6 +472,7 @@ struct DiscoveryReasonRow {
 // =============================================================================
 
 /// Roll up attribute requirements from discovered SRDEFs
+#[register_custom_op]
 pub struct AttributeRollupOp;
 
 #[async_trait]
@@ -525,6 +532,7 @@ impl CustomOperation for AttributeRollupOp {
 }
 
 /// Auto-populate attribute values from available sources
+#[register_custom_op]
 pub struct AttributePopulateOp;
 
 #[async_trait]
@@ -583,6 +591,7 @@ impl CustomOperation for AttributePopulateOp {
 }
 
 /// Show attribute gaps for a CBU
+#[register_custom_op]
 pub struct AttributeGapsOp;
 
 #[async_trait]
@@ -666,6 +675,7 @@ struct AttrGapRow {
 }
 
 /// Set an attribute value manually
+#[register_custom_op]
 pub struct AttributeSetOp;
 
 #[async_trait]
@@ -750,6 +760,7 @@ impl CustomOperation for AttributeSetOp {
 // =============================================================================
 
 /// Run provisioning orchestrator
+#[register_custom_op]
 pub struct ProvisioningRunOp;
 
 #[async_trait]
@@ -812,6 +823,7 @@ impl CustomOperation for ProvisioningRunOp {
 }
 
 /// Check provisioning request status
+#[register_custom_op]
 pub struct ProvisioningStatusOp;
 
 #[async_trait]
@@ -884,6 +896,7 @@ impl CustomOperation for ProvisioningStatusOp {
 // =============================================================================
 
 /// Compute service readiness
+#[register_custom_op]
 pub struct ReadinessComputeOp;
 
 #[async_trait]
@@ -944,6 +957,7 @@ impl CustomOperation for ReadinessComputeOp {
 }
 
 /// Explain blocking reasons for services
+#[register_custom_op]
 pub struct ReadinessExplainOp;
 
 #[async_trait]
@@ -1028,6 +1042,7 @@ impl CustomOperation for ReadinessExplainOp {
 // =============================================================================
 
 /// Run the entire service resource pipeline
+#[register_custom_op]
 pub struct PipelineFullOp;
 
 #[async_trait]

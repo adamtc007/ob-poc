@@ -7,7 +7,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::Arc;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -111,6 +111,7 @@ fn get_optional_date(verb_call: &VerbCall, key: &str) -> Option<chrono::NaiveDat
 
 /// Set or update a holder role profile with temporal versioning.
 /// Closes existing active profile and creates new version.
+#[register_custom_op]
 pub struct InvestorRoleSetOp;
 
 #[async_trait]
@@ -200,6 +201,7 @@ impl CustomOperation for InvestorRoleSetOp {
 // ============================================================================
 
 /// Read role profile as of a specific date.
+#[register_custom_op]
 pub struct InvestorRoleReadAsOfOp;
 
 #[async_trait]
@@ -325,11 +327,290 @@ impl From<RoleProfileRow> for serde_json::Value {
 }
 
 // ============================================================================
-// Registration
+// Convenience Verbs (delegate to set with hardcoded defaults)
 // ============================================================================
 
-/// Register investor role operations with the registry
-pub fn register_investor_role_ops(registry: &mut crate::domain_ops::CustomOperationRegistry) {
-    registry.register(Arc::new(InvestorRoleSetOp));
-    registry.register(Arc::new(InvestorRoleReadAsOfOp));
+/// Mark a holder as a nominee (custodian, nominee company, etc.).
+/// Sets role_type=NOMINEE, is_ubo_eligible=false, lookthrough_policy=NONE
+#[register_custom_op]
+pub struct InvestorRoleMarkAsNomineeOp;
+
+#[async_trait]
+impl CustomOperation for InvestorRoleMarkAsNomineeOp {
+    fn domain(&self) -> &'static str {
+        "investor-role"
+    }
+
+    fn verb(&self) -> &'static str {
+        "mark-as-nominee"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Convenience verb that sets nominee defaults (role_type=NOMINEE, is_ubo_eligible=false, lookthrough_policy=NONE)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let issuer_entity_id = get_required_uuid(verb_call, "issuer", ctx)?;
+        let holder_entity_id = get_required_uuid(verb_call, "holder", ctx)?;
+        let notes = get_optional_string(verb_call, "notes");
+
+        // Hardcoded defaults for nominee
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"
+            SELECT kyc.upsert_role_profile(
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
+            )
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(holder_entity_id)
+        .bind("NOMINEE") // role_type
+        .bind("NONE") // lookthrough_policy
+        .bind("UNKNOWN") // holder_affiliation
+        .bind(false) // bo_data_available
+        .bind(false) // is_ubo_eligible
+        .bind(None::<uuid::Uuid>) // share_class_id
+        .bind(None::<uuid::Uuid>) // group_container_entity_id
+        .bind(None::<String>) // group_label
+        .bind(None::<chrono::NaiveDate>) // effective_from
+        .bind("MANUAL") // source
+        .bind(None::<String>) // source_reference
+        .bind(notes.as_deref())
+        .fetch_one(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(result.0))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "investor-role.mark-as-nominee requires database feature"
+        ))
+    }
+}
+
+/// Mark a holder as a fund-of-funds intermediary.
+/// Sets role_type=INTERMEDIARY_FOF, is_ubo_eligible=false, lookthrough_policy=ON_DEMAND
+#[register_custom_op]
+pub struct InvestorRoleMarkAsFofOp;
+
+#[async_trait]
+impl CustomOperation for InvestorRoleMarkAsFofOp {
+    fn domain(&self) -> &'static str {
+        "investor-role"
+    }
+
+    fn verb(&self) -> &'static str {
+        "mark-as-fof"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Convenience verb that sets FoF defaults (role_type=INTERMEDIARY_FOF, is_ubo_eligible=false, lookthrough_policy=ON_DEMAND)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let issuer_entity_id = get_required_uuid(verb_call, "issuer", ctx)?;
+        let holder_entity_id = get_required_uuid(verb_call, "holder", ctx)?;
+        let bo_data_available = get_optional_bool(verb_call, "bo-data-available").unwrap_or(false);
+        let notes = get_optional_string(verb_call, "notes");
+
+        // Hardcoded defaults for FoF
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"
+            SELECT kyc.upsert_role_profile(
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
+            )
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(holder_entity_id)
+        .bind("INTERMEDIARY_FOF") // role_type
+        .bind("ON_DEMAND") // lookthrough_policy
+        .bind("UNKNOWN") // holder_affiliation
+        .bind(bo_data_available)
+        .bind(false) // is_ubo_eligible
+        .bind(None::<uuid::Uuid>) // share_class_id
+        .bind(None::<uuid::Uuid>) // group_container_entity_id
+        .bind(None::<String>) // group_label
+        .bind(None::<chrono::NaiveDate>) // effective_from
+        .bind("MANUAL") // source
+        .bind(None::<String>) // source_reference
+        .bind(notes.as_deref())
+        .fetch_one(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(result.0))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "investor-role.mark-as-fof requires database feature"
+        ))
+    }
+}
+
+/// Mark a holder as a master pooling vehicle.
+/// Sets role_type=MASTER_POOL, is_ubo_eligible=false, lookthrough_policy=AUTO_IF_DATA
+#[register_custom_op]
+pub struct InvestorRoleMarkAsMasterPoolOp;
+
+#[async_trait]
+impl CustomOperation for InvestorRoleMarkAsMasterPoolOp {
+    fn domain(&self) -> &'static str {
+        "investor-role"
+    }
+
+    fn verb(&self) -> &'static str {
+        "mark-as-master-pool"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Convenience verb that sets master pool defaults (role_type=MASTER_POOL, is_ubo_eligible=false, lookthrough_policy=AUTO_IF_DATA)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let issuer_entity_id = get_required_uuid(verb_call, "issuer", ctx)?;
+        let holder_entity_id = get_required_uuid(verb_call, "holder", ctx)?;
+        let holder_affiliation = get_optional_string(verb_call, "holder-affiliation")
+            .unwrap_or_else(|| "INTRA_GROUP".to_string());
+        let notes = get_optional_string(verb_call, "notes");
+
+        // Hardcoded defaults for master pool
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"
+            SELECT kyc.upsert_role_profile(
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
+            )
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(holder_entity_id)
+        .bind("MASTER_POOL") // role_type
+        .bind("AUTO_IF_DATA") // lookthrough_policy
+        .bind(&holder_affiliation)
+        .bind(false) // bo_data_available
+        .bind(false) // is_ubo_eligible
+        .bind(None::<uuid::Uuid>) // share_class_id
+        .bind(None::<uuid::Uuid>) // group_container_entity_id
+        .bind(None::<String>) // group_label
+        .bind(None::<chrono::NaiveDate>) // effective_from
+        .bind("MANUAL") // source
+        .bind(None::<String>) // source_reference
+        .bind(notes.as_deref())
+        .fetch_one(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(result.0))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "investor-role.mark-as-master-pool requires database feature"
+        ))
+    }
+}
+
+/// Mark a holder as an end investor (terminal beneficial owner).
+/// Sets role_type=END_INVESTOR, is_ubo_eligible=true, lookthrough_policy=NONE
+#[register_custom_op]
+pub struct InvestorRoleMarkAsEndInvestorOp;
+
+#[async_trait]
+impl CustomOperation for InvestorRoleMarkAsEndInvestorOp {
+    fn domain(&self) -> &'static str {
+        "investor-role"
+    }
+
+    fn verb(&self) -> &'static str {
+        "mark-as-end-investor"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Convenience verb that sets end investor defaults (role_type=END_INVESTOR, is_ubo_eligible=true, lookthrough_policy=NONE)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let issuer_entity_id = get_required_uuid(verb_call, "issuer", ctx)?;
+        let holder_entity_id = get_required_uuid(verb_call, "holder", ctx)?;
+        let holder_affiliation = get_optional_string(verb_call, "holder-affiliation")
+            .unwrap_or_else(|| "EXTERNAL".to_string());
+        let notes = get_optional_string(verb_call, "notes");
+
+        // Hardcoded defaults for end investor
+        let result: (uuid::Uuid,) = sqlx::query_as(
+            r#"
+            SELECT kyc.upsert_role_profile(
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NULL
+            )
+            "#,
+        )
+        .bind(issuer_entity_id)
+        .bind(holder_entity_id)
+        .bind("END_INVESTOR") // role_type
+        .bind("NONE") // lookthrough_policy
+        .bind(&holder_affiliation)
+        .bind(false) // bo_data_available
+        .bind(true) // is_ubo_eligible
+        .bind(None::<uuid::Uuid>) // share_class_id
+        .bind(None::<uuid::Uuid>) // group_container_entity_id
+        .bind(None::<String>) // group_label
+        .bind(None::<chrono::NaiveDate>) // effective_from
+        .bind("MANUAL") // source
+        .bind(None::<String>) // source_reference
+        .bind(notes.as_deref())
+        .fetch_one(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(result.0))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "investor-role.mark-as-end-investor requires database feature"
+        ))
+    }
 }

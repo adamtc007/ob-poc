@@ -16,6 +16,8 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::path::Path;
 
+use ob_poc_macros::register_custom_op;
+
 use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
@@ -198,6 +200,7 @@ fn default_true() -> bool {
 // Load Markets Operation
 // ============================================================================
 
+#[register_custom_op]
 pub struct LoadMarketsOp;
 
 #[async_trait]
@@ -334,6 +337,7 @@ impl CustomOperation for LoadMarketsOp {
 // Load Instrument Classes Operation
 // ============================================================================
 
+#[register_custom_op]
 pub struct LoadInstrumentClassesOp;
 
 #[async_trait]
@@ -504,6 +508,7 @@ impl CustomOperation for LoadInstrumentClassesOp {
 // Load Subcustodians Operation
 // ============================================================================
 
+#[register_custom_op]
 pub struct LoadSubcustodiansOp;
 
 #[async_trait]
@@ -660,6 +665,7 @@ impl CustomOperation for LoadSubcustodiansOp {
 // Load SLA Templates Operation
 // ============================================================================
 
+#[register_custom_op]
 pub struct LoadSlaTemplatesOp;
 
 #[async_trait]
@@ -936,6 +942,7 @@ async fn ensure_metric_type_exists(pool: &PgPool, metric_code: &str) -> Result<(
 // Load All Reference Data Operation
 // ============================================================================
 
+#[register_custom_op]
 pub struct LoadAllRefdataOp;
 
 #[async_trait]

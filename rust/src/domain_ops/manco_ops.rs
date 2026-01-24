@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::helpers::{extract_int_opt, extract_string_opt, extract_uuid, extract_uuid_opt};
 use super::CustomOperation;
@@ -33,6 +34,7 @@ fn extract_date_opt(verb_call: &VerbCall, arg_name: &str) -> Option<chrono::Naiv
 // =============================================================================
 
 /// Bridge MANAGEMENT_COMPANY roles to BOARD_APPOINTMENT special rights
+#[register_custom_op]
 pub struct MancoBridgeRolesOp;
 
 #[async_trait]
@@ -84,6 +86,7 @@ impl CustomOperation for MancoBridgeRolesOp {
 }
 
 /// Bridge GLEIF IS_FUND_MANAGED_BY relationships to BOARD_APPOINTMENT special rights
+#[register_custom_op]
 pub struct MancoBridgeGleifFundManagersOp;
 
 #[async_trait]
@@ -135,6 +138,7 @@ impl CustomOperation for MancoBridgeGleifFundManagersOp {
 }
 
 /// Bridge BODS ownership statements to kyc.holdings
+#[register_custom_op]
 pub struct MancoBridgeBodsOwnershipOp;
 
 #[async_trait]
@@ -192,6 +196,7 @@ impl CustomOperation for MancoBridgeBodsOwnershipOp {
 // =============================================================================
 
 /// Derive CBU groups from governance controller
+#[register_custom_op]
 pub struct MancoGroupDeriveOp;
 
 #[async_trait]
@@ -243,6 +248,7 @@ impl CustomOperation for MancoGroupDeriveOp {
 }
 
 /// Get CBUs for a governance controller group
+#[register_custom_op]
 pub struct MancoGroupCbusOp;
 
 #[async_trait]
@@ -319,6 +325,7 @@ impl CustomOperation for MancoGroupCbusOp {
 }
 
 /// Get governance controller for a CBU
+#[register_custom_op]
 pub struct MancoGroupForCbuOp;
 
 #[async_trait]
@@ -399,6 +406,7 @@ impl CustomOperation for MancoGroupForCbuOp {
 }
 
 /// Get primary governance controller for an issuer
+#[register_custom_op]
 pub struct MancoPrimaryControllerOp;
 
 #[async_trait]
@@ -498,6 +506,7 @@ impl CustomOperation for MancoPrimaryControllerOp {
 }
 
 /// Trace control chain upward from a governance controller
+#[register_custom_op]
 pub struct MancoControlChainOp;
 
 #[async_trait]
@@ -595,7 +604,197 @@ impl CustomOperation for MancoControlChainOp {
 // Ownership Operations
 // =============================================================================
 
+// =============================================================================
+// Book Summary (Composite Query)
+// =============================================================================
+
+/// Get a comprehensive summary of a governance controller "book".
+/// Includes group info, all CBUs, and control chain.
+#[register_custom_op]
+pub struct MancoBookSummaryOp;
+
+#[async_trait]
+impl CustomOperation for MancoBookSummaryOp {
+    fn domain(&self) -> &'static str {
+        "manco"
+    }
+    fn verb(&self) -> &'static str {
+        "book.summary"
+    }
+    fn rationale(&self) -> &'static str {
+        "Composite query returning group info, CBUs, and control chain in one call"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use rust_decimal::Decimal;
+
+        let manco_entity_id = extract_uuid(verb_call, ctx, "manco-entity-id")?;
+
+        // 1. Get group info
+        let group_row: Option<(
+            uuid::Uuid,         // group_id
+            uuid::Uuid,         // manco_entity_id
+            String,             // group_name
+            Option<String>,     // group_code
+            String,             // group_type
+            Option<String>,     // jurisdiction
+            Option<uuid::Uuid>, // ultimate_parent_entity_id
+            i64,                // cbu_count
+        )> = sqlx::query_as(
+            r#"
+            SELECT g.group_id, g.manco_entity_id, g.group_name, g.group_code,
+                   g.group_type, g.jurisdiction, g.ultimate_parent_entity_id,
+                   COUNT(DISTINCT m.cbu_id) as cbu_count
+            FROM "ob-poc".cbu_groups g
+            LEFT JOIN "ob-poc".cbu_group_members m ON g.group_id = m.group_id
+                AND m.effective_to IS NULL
+            WHERE g.manco_entity_id = $1
+            GROUP BY g.group_id
+            LIMIT 1
+            "#,
+        )
+        .bind(manco_entity_id)
+        .fetch_optional(pool)
+        .await?;
+
+        let group_info = match group_row {
+            Some((group_id, manco_id, name, code, gtype, jur, up_id, count)) => {
+                serde_json::json!({
+                    "group_id": group_id,
+                    "manco_entity_id": manco_id,
+                    "group_name": name,
+                    "group_code": code,
+                    "group_type": gtype,
+                    "jurisdiction": jur,
+                    "ultimate_parent_entity_id": up_id,
+                    "cbu_count": count
+                })
+            }
+            None => serde_json::json!(null),
+        };
+
+        // 2. Get CBUs
+        let cbu_rows: Vec<(
+            uuid::Uuid,
+            String,
+            String,
+            Option<String>,
+            Option<uuid::Uuid>,
+            Option<String>,
+            String,
+        )> = sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_get_manco_group_cbus($1)"#)
+            .bind(manco_entity_id)
+            .fetch_all(pool)
+            .await?;
+
+        let cbus: Vec<serde_json::Value> = cbu_rows
+            .into_iter()
+            .map(
+                |(
+                    cbu_id,
+                    cbu_name,
+                    cbu_category,
+                    jurisdiction,
+                    fund_entity_id,
+                    fund_entity_name,
+                    membership_source,
+                )| {
+                    serde_json::json!({
+                        "cbu_id": cbu_id,
+                        "cbu_name": cbu_name,
+                        "cbu_category": cbu_category,
+                        "jurisdiction": jurisdiction,
+                        "fund_entity_id": fund_entity_id,
+                        "fund_entity_name": fund_entity_name,
+                        "membership_source": membership_source
+                    })
+                },
+            )
+            .collect();
+
+        // 3. Get control chain (max depth 5)
+        let chain_rows: Vec<(
+            i32,
+            uuid::Uuid,
+            String,
+            Option<String>,
+            Option<uuid::Uuid>,
+            Option<String>,
+            Option<String>,
+            Option<Decimal>,
+            bool,
+        )> = sqlx::query_as(r#"SELECT * FROM "ob-poc".fn_manco_group_control_chain($1, $2)"#)
+            .bind(manco_entity_id)
+            .bind(5i32)
+            .fetch_all(pool)
+            .await?;
+
+        let control_chain: Vec<serde_json::Value> = chain_rows
+            .into_iter()
+            .map(
+                |(
+                    depth,
+                    entity_id,
+                    entity_name,
+                    entity_type,
+                    controlled_by_id,
+                    controlled_by_name,
+                    control_type,
+                    voting_pct,
+                    is_ultimate,
+                )| {
+                    serde_json::json!({
+                        "depth": depth,
+                        "entity_id": entity_id,
+                        "entity_name": entity_name,
+                        "entity_type": entity_type,
+                        "controlled_by_entity_id": controlled_by_id,
+                        "controlled_by_name": controlled_by_name,
+                        "control_type": control_type,
+                        "voting_pct": voting_pct,
+                        "is_ultimate_controller": is_ultimate
+                    })
+                },
+            )
+            .collect();
+
+        // Return composite result
+        let result = serde_json::json!({
+            "group": group_info,
+            "cbus": cbus,
+            "control_chain": control_chain
+        });
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        let result = serde_json::json!({
+            "group": null,
+            "cbus": [],
+            "control_chain": []
+        });
+        Ok(ExecutionResult::Record(result))
+    }
+}
+
+// =============================================================================
+// Ownership Operations
+// =============================================================================
+
 /// Compute control links from holdings
+#[register_custom_op]
 pub struct OwnershipComputeControlLinksOp;
 
 #[async_trait]
@@ -641,30 +840,4 @@ impl CustomOperation for OwnershipComputeControlLinksOp {
         let result = ComputeControlLinksResult { links_created: 0 };
         Ok(ExecutionResult::Record(serde_json::to_value(result)?))
     }
-}
-
-// =============================================================================
-// Registration Helper
-// =============================================================================
-
-use super::CustomOperationRegistry;
-use std::sync::Arc;
-
-pub fn register_manco_ops(registry: &mut CustomOperationRegistry) {
-    // Bridge operations
-    registry.register(Arc::new(MancoBridgeRolesOp));
-    registry.register(Arc::new(MancoBridgeGleifFundManagersOp));
-    registry.register(Arc::new(MancoBridgeBodsOwnershipOp));
-
-    // Group operations
-    registry.register(Arc::new(MancoGroupDeriveOp));
-    registry.register(Arc::new(MancoGroupCbusOp));
-    registry.register(Arc::new(MancoGroupForCbuOp));
-
-    // Governance controller operations
-    registry.register(Arc::new(MancoPrimaryControllerOp));
-    registry.register(Arc::new(MancoControlChainOp));
-
-    // Ownership operations
-    registry.register(Arc::new(OwnershipComputeControlLinksOp));
 }

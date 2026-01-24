@@ -50,6 +50,7 @@ mod partnership_ops;
 mod refdata_loader;
 mod regulatory_ops;
 mod request_ops;
+mod requirement_ops;
 mod research_workflow_ops;
 mod resource_ops;
 
@@ -156,11 +157,22 @@ pub use cbu_role_ops::{
     CbuRoleAssignServiceOp, CbuRoleAssignSignatoryOp, CbuRoleAssignTrustOp, CbuRoleValidateAllOp,
 };
 pub use document_ops::{DocumentCatalogOp, DocumentExtractOp};
+
+// Task queue document operations (Migration 049)
+#[cfg(feature = "database")]
+pub use document_ops::{
+    DocumentMissingForEntityOp, DocumentRejectOp, DocumentSolicitOp, DocumentSolicitSetOp,
+    DocumentUploadVersionOp, DocumentVerifyOp,
+};
+
+// Requirement operations (Migration 049)
 pub use entity_ops::{EntityGhostOp, EntityIdentifyOp};
 pub use observation_ops::{
     DocumentExtractObservationsOp, ObservationFromDocumentOp, ObservationGetCurrentOp,
     ObservationReconcileOp, ObservationVerifyAllegationsOp,
 };
+#[cfg(feature = "database")]
+pub use requirement_ops::{RequirementCreateSetOp, RequirementUnsatisfiedOp};
 pub use resource_ops::{
     ResourceActivateOp, ResourceCreateOp, ResourceDecommissionOp, ResourceSetAttrOp,
     ResourceSuspendOp, ResourceValidateAttrsOp,
@@ -266,6 +278,14 @@ pub use gleif_ops::{
 #[cfg(feature = "database")]
 use sqlx::PgPool;
 
+/// Factory for auto-registration of custom ops via inventory
+pub struct CustomOpFactory {
+    pub create: fn() -> Arc<dyn CustomOperation>,
+}
+
+// Tell inventory to collect these
+inventory::collect!(CustomOpFactory);
+
 /// Trait for custom operations that cannot be expressed as data-driven verbs
 #[async_trait]
 pub trait CustomOperation: Send + Sync {
@@ -330,417 +350,62 @@ pub struct CustomOperationRegistry {
 }
 
 impl CustomOperationRegistry {
+    /// Create a new registry with all custom operations.
+    ///
+    /// All operations are auto-registered via the `#[register_custom_op]` macro
+    /// and the `inventory` crate. This eliminates the need for manual registration.
     pub fn new() -> Self {
         let mut registry = Self {
             operations: HashMap::new(),
         };
 
-        // Register built-in custom operations
-        registry.register(Arc::new(EntityGhostOp));
-        registry.register(Arc::new(EntityIdentifyOp));
-        registry.register(Arc::new(DocumentCatalogOp));
-        registry.register(Arc::new(DocumentExtractOp));
-
-        // Attribute operations (document-attribute catalogue management)
-        registry.register(Arc::new(AttributeListSourcesOp));
-        registry.register(Arc::new(AttributeListSinksOp));
-        registry.register(Arc::new(AttributeTraceLineageOp));
-        registry.register(Arc::new(AttributeListByDocumentOp));
-        registry.register(Arc::new(AttributeCheckCoverageOp));
-        registry.register(Arc::new(DocumentListAttributesOp));
-        registry.register(Arc::new(DocumentCheckExtractionCoverageOp));
-
-        registry.register(Arc::new(UboCalculateOp));
-        registry.register(Arc::new(ScreeningPepOp));
-        registry.register(Arc::new(ScreeningSanctionsOp));
-        registry.register(Arc::new(ScreeningAdverseMediaOp));
-
-        // Research workflow operations
-        registry.register(Arc::new(research_workflow_ops::WorkflowConfirmDecisionOp));
-        registry.register(Arc::new(research_workflow_ops::WorkflowRejectDecisionOp));
-        registry.register(Arc::new(research_workflow_ops::WorkflowAuditTrailOp));
-
-        // Outreach operations
-        registry.register(Arc::new(outreach_ops::OutreachRecordResponseOp));
-        registry.register(Arc::new(outreach_ops::OutreachListOverdueOp));
-
-        // Resource instance operations
-        registry.register(Arc::new(ResourceCreateOp));
-        registry.register(Arc::new(ResourceSetAttrOp));
-        registry.register(Arc::new(ResourceActivateOp));
-        registry.register(Arc::new(ResourceSuspendOp));
-        registry.register(Arc::new(ResourceDecommissionOp));
-        registry.register(Arc::new(ResourceValidateAttrsOp));
-
-        // Service pipeline operations (intent → discovery → provision → readiness)
-        registry.register(Arc::new(ServiceIntentCreateOp));
-        registry.register(Arc::new(ServiceIntentListOp));
-        registry.register(Arc::new(ServiceIntentSupersedeOp));
-        registry.register(Arc::new(DiscoveryRunOp));
-        registry.register(Arc::new(DiscoveryExplainOp));
-        registry.register(Arc::new(AttributeRollupOp));
-        registry.register(Arc::new(AttributePopulateOp));
-        registry.register(Arc::new(AttributeGapsOp));
-        registry.register(Arc::new(AttributeSetOp));
-        registry.register(Arc::new(ProvisioningRunOp));
-        registry.register(Arc::new(ProvisioningStatusOp));
-        registry.register(Arc::new(ReadinessComputeOp));
-        registry.register(Arc::new(ReadinessExplainOp));
-        registry.register(Arc::new(PipelineFullOp));
-
-        // CBU operations
-        registry.register(Arc::new(CbuAddProductOp));
-        registry.register(Arc::new(CbuShowOp));
-        registry.register(Arc::new(CbuDecideOp));
-        registry.register(Arc::new(CbuDeleteCascadeOp));
-
-        // CBU Role operations (Role Taxonomy V2)
-        registry.register(Arc::new(CbuRoleAssignOp));
-        registry.register(Arc::new(CbuRoleAssignOwnershipOp));
-        registry.register(Arc::new(CbuRoleAssignControlOp));
-        registry.register(Arc::new(CbuRoleAssignTrustOp));
-        registry.register(Arc::new(CbuRoleAssignFundOp));
-        registry.register(Arc::new(CbuRoleAssignServiceOp));
-        registry.register(Arc::new(CbuRoleAssignSignatoryOp));
-        registry.register(Arc::new(CbuRoleValidateAllOp));
-
-        // NOTE: delivery.record, delivery.complete, delivery.fail are now CRUD verbs
-        // defined in config/verbs/delivery.yaml - no plugin needed
-
-        // Custody operations
-        registry.register(Arc::new(SubcustodianLookupOp));
-        registry.register(Arc::new(LookupSsiForTradeOp));
-        registry.register(Arc::new(ValidateBookingCoverageOp));
-        registry.register(Arc::new(DeriveRequiredCoverageOp));
-        registry.register(Arc::new(SetupSsiFromDocumentOp));
-
-        // Observation operations
-        registry.register(Arc::new(ObservationFromDocumentOp));
-        registry.register(Arc::new(ObservationGetCurrentOp));
-        registry.register(Arc::new(ObservationReconcileOp));
-        registry.register(Arc::new(ObservationVerifyAllegationsOp));
-
-        // Document extraction to observations
-        registry.register(Arc::new(DocumentExtractObservationsOp));
-
-        // Semantic stage operations (onboarding journey progress tracking)
-        registry.register(Arc::new(SemanticStateOp));
-        registry.register(Arc::new(SemanticListStagesOp));
-        registry.register(Arc::new(SemanticStagesForProductOp));
-        registry.register(Arc::new(SemanticNextActionsOp));
-        registry.register(Arc::new(SemanticMissingEntitiesOp));
-        registry.register(Arc::new(SemanticPromptContextOp));
-
-        // UBO Analysis operations
-        registry.register(Arc::new(UboTraceChainsOp));
-        registry.register(Arc::new(UboListOwnersOp));
-
-        // UBO lifecycle operations
-        registry.register(Arc::new(UboMarkDeceasedOp));
-        registry.register(Arc::new(UboConvergenceSupersedeOp));
-        registry.register(Arc::new(UboTransferControlOp));
-        registry.register(Arc::new(UboWaiveVerificationOp));
-
-        // Onboarding operations
-        registry.register(Arc::new(OnboardingAutoCompleteOp));
-
-        // Trading Profile operations
-        registry.register(Arc::new(TradingProfileImportOp));
-        registry.register(Arc::new(TradingProfileGetActiveOp));
-        registry.register(Arc::new(TradingProfileActivateOp));
-        registry.register(Arc::new(TradingProfileMaterializeOp));
-        // Document construction operations (Phase 1)
-        registry.register(Arc::new(TradingProfileCreateDraftOp));
-        registry.register(Arc::new(TradingProfileAddInstrumentClassOp));
-        registry.register(Arc::new(TradingProfileRemoveInstrumentClassOp));
-        registry.register(Arc::new(TradingProfileAddMarketOp));
-        registry.register(Arc::new(TradingProfileRemoveMarketOp));
-        registry.register(Arc::new(TradingProfileAddSsiOp));
-        registry.register(Arc::new(TradingProfileRemoveSsiOp));
-        registry.register(Arc::new(TradingProfileAddBookingRuleOp));
-        registry.register(Arc::new(TradingProfileRemoveBookingRuleOp));
-        // ISDA/CSA construction operations (Phase 2)
-        registry.register(Arc::new(TradingProfileAddIsdaConfigOp));
-        registry.register(Arc::new(TradingProfileAddIsdaCoverageOp));
-        registry.register(Arc::new(TradingProfileAddCsaConfigOp));
-        registry.register(Arc::new(TradingProfileAddCsaCollateralOp));
-        registry.register(Arc::new(TradingProfileLinkCsaSsiOp));
-        registry.register(Arc::new(TradingProfileRemoveIsdaConfigOp));
-        registry.register(Arc::new(TradingProfileRemoveCsaConfigOp));
-        // IM mandate and settlement config operations (Phase 3)
-        registry.register(Arc::new(TradingProfileAddImMandateOp));
-        registry.register(Arc::new(TradingProfileUpdateImScopeOp));
-        registry.register(Arc::new(TradingProfileRemoveImMandateOp));
-        registry.register(Arc::new(TradingProfileSetBaseCurrencyOp));
-        registry.register(Arc::new(TradingProfileAddAllowedCurrencyOp));
-        // Sync operations (Phase 4)
-        registry.register(Arc::new(TradingProfileDiffOp));
-        // Validation operations (Phase 5)
-        registry.register(Arc::new(TradingProfileValidateCoverageOp));
-        registry.register(Arc::new(TradingProfileValidateGoLiveReadyOp));
-
-        // Lifecycle operations (Phase 6)
-        registry.register(Arc::new(TradingProfileSubmitOp));
-        registry.register(Arc::new(TradingProfileApproveOp));
-        registry.register(Arc::new(TradingProfileRejectOp));
-        registry.register(Arc::new(TradingProfileArchiveOp));
-
-        // Versioned document lifecycle operations (Phase 7)
-        registry.register(Arc::new(TradingProfileCreateNewVersionOp));
-
-        // Clone operation
-        registry.register(Arc::new(TradingProfileCloneToOp));
-
-        // Corporate Actions policy operations
-        registry.register(Arc::new(TradingProfileCaEnableEventTypesOp));
-        registry.register(Arc::new(TradingProfileCaDisableEventTypesOp));
-        registry.register(Arc::new(TradingProfileCaSetNotificationOp));
-        registry.register(Arc::new(TradingProfileCaSetElectionOp));
-        registry.register(Arc::new(TradingProfileCaSetDefaultOp));
-        registry.register(Arc::new(TradingProfileCaRemoveDefaultOp));
-        registry.register(Arc::new(TradingProfileCaAddCutoffOp));
-        registry.register(Arc::new(TradingProfileCaRemoveCutoffOp));
-        registry.register(Arc::new(TradingProfileCaLinkSsiOp));
-        registry.register(Arc::new(TradingProfileCaRemoveSsiOp));
-        registry.register(Arc::new(TradingProfileCaGetPolicyOp));
-
-        // Entity query for batch template execution
-        registry.register(Arc::new(EntityQueryOp));
-
-        // Template operations
-        registry.register(Arc::new(TemplateInvokeOp));
-        registry.register(Arc::new(TemplateBatchOp));
-
-        // Batch control operations (pause/resume/status)
-        registry.register(Arc::new(BatchPauseOp));
-        registry.register(Arc::new(BatchResumeOp));
-        registry.register(Arc::new(BatchContinueOp));
-        registry.register(Arc::new(BatchSkipOp));
-        registry.register(Arc::new(BatchAbortOp));
-        registry.register(Arc::new(BatchStatusOp));
-        registry.register(Arc::new(BatchAddProductsOp));
-
-        // Verification operations (adversarial agent model)
-        registry.register(Arc::new(verify_ops::VerifyDetectPatternsOp));
-        registry.register(Arc::new(verify_ops::VerifyDetectEvasionOp));
-        registry.register(Arc::new(verify_ops::VerifyCalculateConfidenceOp));
-        registry.register(Arc::new(verify_ops::VerifyGetStatusOp));
-        registry.register(Arc::new(verify_ops::VerifyAgainstRegistryOp));
-        registry.register(Arc::new(verify_ops::VerifyAssertOp));
-
-        // Trading Matrix operations (IM assignment, pricing config, SLA)
-        registry.register(Arc::new(FindImForTradeOp));
-        registry.register(Arc::new(FindPricingForInstrumentOp));
-        registry.register(Arc::new(ListOpenSlaBreachesOp));
-
-        // Lifecycle operations (Instrument → Lifecycle → Resource taxonomy)
-        registry.register(Arc::new(LifecycleProvisionOp));
-        registry.register(Arc::new(LifecycleAnalyzeGapsOp));
-        registry.register(Arc::new(LifecycleCheckReadinessOp));
-        registry.register(Arc::new(LifecycleDiscoverOp));
-        registry.register(Arc::new(LifecycleGeneratePlanOp));
-        registry.register(Arc::new(LifecycleExecutePlanOp));
-
-        // Matrix-Overlay operations (Trading Matrix ↔ Product linkage)
-        registry.register(Arc::new(MatrixEffectiveOp));
-        registry.register(Arc::new(MatrixUnifiedGapsOp));
-        registry.register(Arc::new(MatrixCompareProductsOp));
-
-        // Regulatory operations (multi-regulator support)
-        registry.register(Arc::new(regulatory_ops::RegistrationVerifyOp));
-        registry.register(Arc::new(regulatory_ops::RegulatoryStatusCheckOp));
-
-        // Reference Data bulk loading operations
-        for op in get_refdata_operations() {
-            registry.register(Arc::from(op));
+        // Auto-register all ops annotated with #[register_custom_op]
+        // The inventory crate collects these at link time
+        for factory in inventory::iter::<CustomOpFactory> {
+            let op = (factory.create)();
+            registry.register_internal(op);
         }
 
-        // Outstanding Request operations (async fire-and-forget pattern)
-        registry.register(Arc::new(RequestCreateOp));
-        registry.register(Arc::new(RequestOverdueOp));
-        registry.register(Arc::new(RequestFulfillOp));
-        registry.register(Arc::new(RequestCancelOp));
-        registry.register(Arc::new(RequestExtendOp));
-        registry.register(Arc::new(RequestRemindOp));
-        registry.register(Arc::new(RequestEscalateOp));
-        registry.register(Arc::new(RequestWaiveOp));
-
-        // Document request operations (integrate with outstanding requests)
-        registry.register(Arc::new(DocumentRequestOp));
-        registry.register(Arc::new(DocumentUploadOp));
-        registry.register(Arc::new(DocumentWaiveOp));
-
-        // KYC case state operations (domain-embedded requests)
-        registry.register(Arc::new(KycCaseStateOp));
-        registry.register(Arc::new(WorkstreamStateOp));
-
-        // Team operations (only transfer-member needs plugin, others are CRUD)
-        registry.register(Arc::new(TeamTransferMemberOp));
-
-        // Access Review operations (complex multi-step transactional operations)
-        registry.register(Arc::new(AccessReviewPopulateOp));
-        registry.register(Arc::new(AccessReviewLaunchOp));
-        registry.register(Arc::new(AccessReviewRevokeOp));
-        registry.register(Arc::new(AccessReviewBulkConfirmOp));
-        registry.register(Arc::new(AccessReviewConfirmCleanOp));
-        registry.register(Arc::new(AccessReviewAttestOp));
-        registry.register(Arc::new(AccessReviewProcessDeadlineOp));
-        registry.register(Arc::new(AccessReviewSendRemindersOp));
-
-        // Temporal operations (point-in-time queries for regulatory lookback)
-        registry.register(Arc::new(TemporalOwnershipAsOfOp));
-        registry.register(Arc::new(TemporalUboChainAsOfOp));
-        registry.register(Arc::new(TemporalCbuRelationshipsAsOfOp));
-        registry.register(Arc::new(TemporalCbuRolesAsOfOp));
-        registry.register(Arc::new(TemporalCbuStateAtApprovalOp));
-        registry.register(Arc::new(TemporalRelationshipHistoryOp));
-        registry.register(Arc::new(TemporalEntityHistoryOp));
-        registry.register(Arc::new(TemporalCompareOwnershipOp));
-
-        // GLEIF operations (LEI data enrichment from GLEIF API)
-        registry.register(Arc::new(GleifEnrichOp));
-        registry.register(Arc::new(GleifSearchOp));
-        registry.register(Arc::new(GleifImportTreeOp));
-        registry.register(Arc::new(GleifImportManagedFundsOp));
-        registry.register(Arc::new(GleifRefreshOp));
-        registry.register(Arc::new(GleifGetRecordOp));
-        registry.register(Arc::new(GleifGetParentOp));
-        registry.register(Arc::new(GleifGetChildrenOp));
-        registry.register(Arc::new(GleifTraceOwnershipOp));
-        registry.register(Arc::new(GleifGetManagedFundsOp));
-        registry.register(Arc::new(GleifResolveSuccessorOp));
-        // Lean GLEIF fund structure relationship verbs
-        registry.register(Arc::new(GleifGetUmbrellaOp));
-        registry.register(Arc::new(GleifGetManagerOp));
-        registry.register(Arc::new(GleifGetMasterFundOp));
-        registry.register(Arc::new(GleifLookupByIsinOp));
-
-        // BODS operations (UBO discovery via GLEIF + BODS)
-        registry.register(Arc::new(BodsDiscoverUbosOp));
-        registry.register(Arc::new(BodsImportOp));
-        registry.register(Arc::new(BodsGetStatementOp));
-        registry.register(Arc::new(BodsFindByLeiOp));
-        registry.register(Arc::new(BodsListOwnershipOp));
-        registry.register(Arc::new(BodsSyncFromGleifOp));
-
-        // View operations (session scope and selection management)
-        registry.register(Arc::new(ViewUniverseOp));
-        registry.register(Arc::new(ViewBookOp));
-        registry.register(Arc::new(ViewCbuOp));
-        registry.register(Arc::new(ViewEntityForestOp));
-        registry.register(Arc::new(ViewRefineOp));
-        registry.register(Arc::new(ViewClearOp));
-        registry.register(Arc::new(ViewSelectOp));
-        registry.register(Arc::new(ViewLayoutOp));
-        registry.register(Arc::new(ViewStatusOp));
-        registry.register(Arc::new(ViewSelectionInfoOp));
-        // Zoom navigation (fractal taxonomy navigation)
-        registry.register(Arc::new(ViewZoomInOp));
-        registry.register(Arc::new(ViewZoomOutOp));
-        registry.register(Arc::new(ViewBackToOp));
-        registry.register(Arc::new(ViewBreadcrumbsOp));
-
-        // Esper navigation operations (Phase 1: Blade Runner-inspired navigation)
-        registry.register(Arc::new(ViewDrillOp));
-        registry.register(Arc::new(ViewSurfaceOp));
-        registry.register(Arc::new(ViewTraceOp));
-        registry.register(Arc::new(ViewXrayOp));
-        registry.register(Arc::new(ViewPeelOp));
-        registry.register(Arc::new(ViewIlluminateOp));
-        registry.register(Arc::new(ViewShadowOp));
-        registry.register(Arc::new(ViewRedFlagOp));
-        registry.register(Arc::new(ViewBlackHolesOp));
-        registry.register(Arc::new(ViewDetailOp));
-        registry.register(Arc::new(ViewContextOp));
-
-        // KYC Control Enhancement operations (capital, board, trust, partnership, tollgate, control)
-        // Capital operations (share class transfers, reconciliation, ownership chains)
-        registry.register(Arc::new(CapitalTransferOp));
-        registry.register(Arc::new(CapitalReconcileOp));
-        registry.register(Arc::new(CapitalOwnershipChainOp));
-        registry.register(Arc::new(CapitalIssueSharesOp));
-        registry.register(Arc::new(CapitalCancelSharesOp));
-
-        // Capital Structure & Ownership Model operations (Migration 013)
-        // Share class management
-        registry.register(Arc::new(CapitalShareClassCreateOp));
-        registry.register(Arc::new(CapitalShareClassGetSupplyOp));
-        // Issuance events
-        registry.register(Arc::new(CapitalIssueInitialOp));
-        registry.register(Arc::new(CapitalIssueNewOp));
-        registry.register(Arc::new(CapitalSplitOp));
-        registry.register(Arc::new(CapitalBuybackOp));
-        registry.register(Arc::new(CapitalCancelOp));
-        // Cap table queries
-        registry.register(Arc::new(CapitalCapTableOp));
-        registry.register(Arc::new(CapitalHoldersOp));
-
-        // Dilution instrument operations (options, warrants, SAFEs, convertibles)
-        dilution_ops::register_dilution_ops(&mut registry);
-
-        // Ownership computation and reconciliation operations
-        ownership_ops::register_ownership_ops(&mut registry);
-
-        // Board operations (board composition control analysis)
-        registry.register(Arc::new(BoardAnalyzeControlOp));
-
-        // Trust operations (trust control analysis, UBO identification)
-        registry.register(Arc::new(TrustAnalyzeControlOp));
-        registry.register(Arc::new(TrustIdentifyUbosOp));
-        registry.register(Arc::new(TrustClassifyOp));
-
-        // Partnership operations (capital contributions, distributions, GP/LP control)
-        registry.register(Arc::new(PartnershipContributionOp));
-        registry.register(Arc::new(PartnershipDistributionOp));
-        registry.register(Arc::new(PartnershipReconcileOp));
-        registry.register(Arc::new(PartnershipAnalyzeControlOp));
-
-        // Tollgate operations (decision gates with metrics and overrides)
-        registry.register(Arc::new(TollgateEvaluateOp));
-        registry.register(Arc::new(TollgateGetMetricsOp));
-        registry.register(Arc::new(TollgateOverrideOp));
-        registry.register(Arc::new(TollgateDecisionReadinessOp));
-
-        // Unified control operations (cross-vector control analysis)
-        registry.register(Arc::new(ControlAnalyzeOp));
-        registry.register(Arc::new(ControlBuildGraphOp));
-        registry.register(Arc::new(ControlIdentifyUbosOp));
-        registry.register(Arc::new(ControlTraceChainOp));
-        registry.register(Arc::new(ControlReconcileOwnershipOp));
-        registry.register(Arc::new(ShowBoardControllerOp));
-        registry.register(Arc::new(RecomputeBoardControllerOp));
-        registry.register(Arc::new(SetBoardControllerOp));
-        registry.register(Arc::new(ClearBoardControllerOverrideOp));
-        registry.register(Arc::new(ImportPscRegisterOp));
-        registry.register(Arc::new(ImportGleifControlOp));
-
-        // Investor lifecycle operations (TA KYC-as-a-Service)
-        investor_ops::register_investor_ops(&mut registry);
-
-        // Investor role profile operations (UBO eligibility, look-through policy)
-        investor_role_ops::register_investor_role_ops(&mut registry);
-
-        // Economic exposure look-through operations (bounded recursive computation)
-        economic_exposure_ops::register_economic_exposure_ops(&mut registry);
-
-        // Session v2 operations (Phase 6 - 9 verbs, memory-first)
-        session_ops::register_session_ops_v2(&mut registry);
-
-        // Agent control operations (agent mode lifecycle, checkpoints)
-        agent_ops::register_agent_ops(&mut registry);
-
-        // Research source loader operations (GLEIF, Companies House, SEC EDGAR)
-        source_loader_ops::register_source_loader_ops(&mut registry);
-
-        // ManCo / Governance Controller operations
-        manco_ops::register_manco_ops(&mut registry);
+        // Log the count for sanity checking
+        tracing::info!(
+            "CustomOperationRegistry initialized with {} ops from inventory",
+            registry.operations.len()
+        );
 
         registry
     }
 
-    /// Register a custom operation
+    /// Internal registration with duplicate detection.
+    /// Used by inventory auto-registration. Panics on duplicate to catch bugs early.
+    fn register_internal(&mut self, op: Arc<dyn CustomOperation>) {
+        let key = (op.domain().to_string(), op.verb().to_string());
+
+        if self.operations.contains_key(&key) {
+            panic!(
+                "Duplicate custom op registration: {}.{} — this is a bug. \
+                 Check for both #[register_custom_op] and manual registration.",
+                key.0, key.1
+            );
+        }
+        self.operations.insert(key, op);
+    }
+
+    /// Register a custom operation (manual registration, allows overwrite for migration)
     pub fn register(&mut self, op: Arc<dyn CustomOperation>) {
         let key = (op.domain().to_string(), op.verb().to_string());
+
+        // P1 FIX: Warn on overwrite during migration period
+        if self.operations.contains_key(&key) {
+            tracing::warn!(
+                "Manual registration overwriting existing op: {}.{} — \
+                 this is expected during migration but should be removed after",
+                key.0,
+                key.1
+            );
+        }
+
+        // During migration period, manual registration can overwrite inventory registration
+        // This allows gradual migration without breaking anything
         self.operations.insert(key, op);
     }
 
@@ -756,12 +421,15 @@ impl CustomOperationRegistry {
         self.operations.contains_key(&key)
     }
 
-    /// List all registered custom operations
+    /// List all registered custom operations (deterministically sorted by domain, verb)
     pub fn list(&self) -> Vec<(&str, &str, &str)> {
-        self.operations
+        let mut entries: Vec<_> = self
+            .operations
             .values()
             .map(|op| (op.domain(), op.verb(), op.rationale()))
-            .collect()
+            .collect();
+        entries.sort_by_key(|(d, v, _)| (*d, *v));
+        entries
     }
 }
 
@@ -769,6 +437,140 @@ impl Default for CustomOperationRegistry {
     fn default() -> Self {
         Self::new()
     }
+}
+
+// =============================================================================
+// YAML ↔ OP SANITY CHECK
+// =============================================================================
+
+/// Result of verifying plugin verb coverage
+#[derive(Debug, Default)]
+pub struct PluginVerbCoverageResult {
+    /// YAML plugin verbs that have a registered CustomOp
+    pub covered: Vec<(String, String)>,
+    /// YAML plugin verbs missing a registered CustomOp (FATAL)
+    pub yaml_missing_op: Vec<(String, String)>,
+    /// CustomOps without a corresponding YAML plugin verb (WARNING)
+    pub op_missing_yaml: Vec<(String, String)>,
+}
+
+impl PluginVerbCoverageResult {
+    /// Check if the verification passed (no missing ops for YAML verbs)
+    pub fn is_ok(&self) -> bool {
+        self.yaml_missing_op.is_empty()
+    }
+
+    /// Format a summary message
+    pub fn summary(&self) -> String {
+        format!(
+            "Plugin coverage: {} covered, {} YAML verbs missing ops, {} ops missing YAML definitions",
+            self.covered.len(),
+            self.yaml_missing_op.len(),
+            self.op_missing_yaml.len()
+        )
+    }
+}
+
+/// Verify all YAML plugin verbs have corresponding registered CustomOps.
+///
+/// This function ensures the system is consistent:
+/// - Every YAML verb with `behavior: plugin` MUST have a registered CustomOp
+/// - CustomOps without YAML definitions are warned about (orphaned ops)
+///
+/// # Arguments
+/// * `custom_ops` - The CustomOperationRegistry to verify against
+///
+/// # Returns
+/// A `PluginVerbCoverageResult` with coverage details
+///
+/// # Usage
+/// Call this at startup after both registries are initialized:
+/// ```ignore
+/// let registry = CustomOperationRegistry::new();
+/// let result = verify_plugin_verb_coverage(&registry);
+/// if !result.is_ok() {
+///     panic!("Plugin verb coverage check failed: {:?}", result.yaml_missing_op);
+/// }
+/// ```
+pub fn verify_plugin_verb_coverage(
+    custom_ops: &CustomOperationRegistry,
+) -> PluginVerbCoverageResult {
+    use crate::dsl_v2::runtime_registry::{runtime_registry, RuntimeBehavior};
+    use std::collections::HashSet;
+
+    let mut result = PluginVerbCoverageResult::default();
+
+    // Track which ops are referenced by YAML
+    let mut referenced_ops: HashSet<(String, String)> = HashSet::new();
+
+    // Check all YAML verbs with behavior: plugin
+    let runtime_reg = runtime_registry();
+    for verb in runtime_reg.all_verbs() {
+        if let RuntimeBehavior::Plugin(_handler) = &verb.behavior {
+            let key = (verb.domain.clone(), verb.verb.clone());
+
+            if custom_ops.has(&verb.domain, &verb.verb) {
+                result.covered.push(key.clone());
+                referenced_ops.insert(key);
+            } else {
+                result.yaml_missing_op.push(key);
+            }
+        }
+    }
+
+    // Find ops that aren't referenced by any YAML plugin verb
+    for (domain, verb, _rationale) in custom_ops.list() {
+        let key = (domain.to_string(), verb.to_string());
+        if !referenced_ops.contains(&key) {
+            result.op_missing_yaml.push(key);
+        }
+    }
+
+    // Sort results for deterministic output
+    result.covered.sort();
+    result.yaml_missing_op.sort();
+    result.op_missing_yaml.sort();
+
+    result
+}
+
+/// Verify plugin verb coverage and panic on fatal mismatches.
+///
+/// This is the strict version that should be called at startup.
+/// - Panics if any YAML plugin verb is missing a registered CustomOp
+/// - Logs warnings for orphaned CustomOps (ops without YAML definitions)
+///
+/// # Panics
+/// Panics if any YAML plugin verb has no corresponding registered CustomOp.
+pub fn verify_plugin_verb_coverage_strict(custom_ops: &CustomOperationRegistry) {
+    let result = verify_plugin_verb_coverage(custom_ops);
+
+    // Log warnings for orphaned ops (not fatal, but should be cleaned up)
+    for (domain, verb) in &result.op_missing_yaml {
+        tracing::warn!(
+            "CustomOp {}.{} registered but no YAML plugin verb defined — \
+             consider adding YAML definition or removing the op",
+            domain,
+            verb
+        );
+    }
+
+    // Panic on missing ops (fatal - YAML promises behavior we can't deliver)
+    if !result.yaml_missing_op.is_empty() {
+        let missing: Vec<String> = result
+            .yaml_missing_op
+            .iter()
+            .map(|(d, v)| format!("{}.{}", d, v))
+            .collect();
+
+        panic!(
+            "YAML plugin verb(s) missing registered CustomOp: [{}]. \
+             Either add #[register_custom_op] to the op struct or fix the YAML behavior.",
+            missing.join(", ")
+        );
+    }
+
+    tracing::info!("{}", result.summary());
 }
 
 #[cfg(test)]
@@ -1059,6 +861,37 @@ mod tests {
             ops.len() >= 80,
             "Expected at least 80 operations, got {}",
             ops.len()
+        );
+    }
+
+    #[test]
+    fn test_plugin_verb_coverage() {
+        // This test verifies that all YAML plugin verbs have registered CustomOps
+        let registry = CustomOperationRegistry::new();
+        let result = super::verify_plugin_verb_coverage(&registry);
+
+        // Print diagnostic info for debugging
+        if !result.yaml_missing_op.is_empty() {
+            eprintln!("YAML plugin verbs missing CustomOp:");
+            for (domain, verb) in &result.yaml_missing_op {
+                eprintln!("  - {}.{}", domain, verb);
+            }
+        }
+
+        if !result.op_missing_yaml.is_empty() {
+            eprintln!("CustomOps without YAML plugin definition:");
+            for (domain, verb) in &result.op_missing_yaml {
+                eprintln!("  - {}.{}", domain, verb);
+            }
+        }
+
+        eprintln!("{}", result.summary());
+
+        // The strict assertion: all YAML plugin verbs must have ops
+        assert!(
+            result.is_ok(),
+            "YAML plugin verbs missing CustomOps: {:?}",
+            result.yaml_missing_op
         );
     }
 }

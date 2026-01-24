@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -20,6 +21,7 @@ use sqlx::PgPool;
 ///
 /// Idempotency: Uses ON CONFLICT on (instance_url) or (cbu_id, resource_type_id, instance_identifier)
 /// to return existing instance if already created.
+#[register_custom_op]
 pub struct ResourceCreateOp;
 
 #[async_trait]
@@ -232,6 +234,7 @@ impl CustomOperation for ResourceCreateOp {
 ///
 /// Rationale: Requires lookup of attribute_id from dictionary by name,
 /// then upsert into resource_instance_attributes with typed value.
+#[register_custom_op]
 pub struct ResourceSetAttrOp;
 
 #[async_trait]
@@ -334,6 +337,7 @@ impl CustomOperation for ResourceSetAttrOp {
 /// Activate a resource instance
 ///
 /// Rationale: Validates required attributes are set before activation.
+#[register_custom_op]
 pub struct ResourceActivateOp;
 
 #[async_trait]
@@ -441,6 +445,7 @@ impl CustomOperation for ResourceActivateOp {
 }
 
 /// Suspend a resource instance
+#[register_custom_op]
 pub struct ResourceSuspendOp;
 
 #[async_trait]
@@ -500,6 +505,7 @@ impl CustomOperation for ResourceSuspendOp {
 }
 
 /// Decommission a resource instance
+#[register_custom_op]
 pub struct ResourceDecommissionOp;
 
 #[async_trait]
@@ -559,6 +565,7 @@ impl CustomOperation for ResourceDecommissionOp {
 }
 
 /// Validate that all required attributes are set for a resource instance
+#[register_custom_op]
 pub struct ResourceValidateAttrsOp;
 
 #[async_trait]

@@ -9,6 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -90,6 +91,7 @@ fn get_optional_uuid(
 // ============================================================================
 
 /// Request documents from an investor (ENQUIRY → PENDING_DOCUMENTS)
+#[register_custom_op]
 pub struct InvestorRequestDocumentsOp;
 
 #[async_trait]
@@ -149,6 +151,7 @@ impl CustomOperation for InvestorRequestDocumentsOp {
 }
 
 /// Start KYC process for an investor (PENDING_DOCUMENTS → KYC_IN_PROGRESS)
+#[register_custom_op]
 pub struct InvestorStartKycOp;
 
 #[async_trait]
@@ -211,6 +214,7 @@ impl CustomOperation for InvestorStartKycOp {
 }
 
 /// Approve KYC for an investor (KYC_IN_PROGRESS → KYC_APPROVED)
+#[register_custom_op]
 pub struct InvestorApproveKycOp;
 
 #[async_trait]
@@ -275,6 +279,7 @@ impl CustomOperation for InvestorApproveKycOp {
 }
 
 /// Reject KYC for an investor (KYC_IN_PROGRESS → REJECTED)
+#[register_custom_op]
 pub struct InvestorRejectKycOp;
 
 #[async_trait]
@@ -337,6 +342,7 @@ impl CustomOperation for InvestorRejectKycOp {
 }
 
 /// Mark investor as eligible to subscribe (KYC_APPROVED → ELIGIBLE_TO_SUBSCRIBE)
+#[register_custom_op]
 pub struct InvestorMarkEligibleOp;
 
 #[async_trait]
@@ -398,6 +404,7 @@ impl CustomOperation for InvestorMarkEligibleOp {
 }
 
 /// Record subscription for investor (ELIGIBLE_TO_SUBSCRIBE → SUBSCRIBED)
+#[register_custom_op]
 pub struct InvestorRecordSubscriptionOp;
 
 #[async_trait]
@@ -473,6 +480,7 @@ impl CustomOperation for InvestorRecordSubscriptionOp {
 }
 
 /// Activate investor as holder (SUBSCRIBED → ACTIVE_HOLDER)
+#[register_custom_op]
 pub struct InvestorActivateOp;
 
 #[async_trait]
@@ -531,6 +539,7 @@ impl CustomOperation for InvestorActivateOp {
 }
 
 /// Start redemption process (ACTIVE_HOLDER → REDEEMING)
+#[register_custom_op]
 pub struct InvestorStartRedemptionOp;
 
 #[async_trait]
@@ -592,6 +601,7 @@ impl CustomOperation for InvestorStartRedemptionOp {
 }
 
 /// Complete redemption and offboard (REDEEMING → OFFBOARDED)
+#[register_custom_op]
 pub struct InvestorCompleteRedemptionOp;
 
 #[async_trait]
@@ -665,6 +675,7 @@ impl CustomOperation for InvestorCompleteRedemptionOp {
 }
 
 /// Offboard investor directly (any active state → OFFBOARDED)
+#[register_custom_op]
 pub struct InvestorOffboardOp;
 
 #[async_trait]
@@ -740,6 +751,7 @@ impl CustomOperation for InvestorOffboardOp {
 }
 
 /// Suspend an investor (any active state → SUSPENDED)
+#[register_custom_op]
 pub struct InvestorSuspendOp;
 
 #[async_trait]
@@ -813,6 +825,7 @@ impl CustomOperation for InvestorSuspendOp {
 }
 
 /// Reinstate a suspended investor (SUSPENDED → previous state)
+#[register_custom_op]
 pub struct InvestorReinstateOp;
 
 #[async_trait]
@@ -889,6 +902,7 @@ impl CustomOperation for InvestorReinstateOp {
 // ============================================================================
 
 /// Count investors by lifecycle state for a CBU
+#[register_custom_op]
 pub struct InvestorCountByStateOp;
 
 #[async_trait]
@@ -946,27 +960,4 @@ impl CustomOperation for InvestorCountByStateOp {
             "Database feature required for investor operations"
         ))
     }
-}
-
-// ============================================================================
-// Registration
-// ============================================================================
-
-/// Register all investor operations with the registry
-pub fn register_investor_ops(registry: &mut crate::domain_ops::CustomOperationRegistry) {
-    use std::sync::Arc;
-
-    registry.register(Arc::new(InvestorRequestDocumentsOp));
-    registry.register(Arc::new(InvestorStartKycOp));
-    registry.register(Arc::new(InvestorApproveKycOp));
-    registry.register(Arc::new(InvestorRejectKycOp));
-    registry.register(Arc::new(InvestorMarkEligibleOp));
-    registry.register(Arc::new(InvestorRecordSubscriptionOp));
-    registry.register(Arc::new(InvestorActivateOp));
-    registry.register(Arc::new(InvestorStartRedemptionOp));
-    registry.register(Arc::new(InvestorCompleteRedemptionOp));
-    registry.register(Arc::new(InvestorOffboardOp));
-    registry.register(Arc::new(InvestorSuspendOp));
-    registry.register(Arc::new(InvestorReinstateOp));
-    registry.register(Arc::new(InvestorCountByStateOp));
 }

@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -17,6 +18,7 @@ use sqlx::PgPool;
 ///
 /// Rationale: Requires recursive graph traversal through ownership chains
 /// to identify beneficial owners above the specified threshold.
+#[register_custom_op]
 pub struct UboCalculateOp;
 
 #[async_trait]
@@ -161,6 +163,7 @@ impl CustomOperation for UboCalculateOp {
 ///
 /// Rationale: Orchestrates document extraction and registry lookups to identify
 /// potential beneficial owners, creating preliminary ownership records.
+#[register_custom_op]
 pub struct UboTraceChainsOp;
 
 #[async_trait]
@@ -324,6 +327,7 @@ impl CustomOperation for UboTraceChainsOp {
 ///
 /// Rationale: Returns ownership relationships for an entity with temporal filtering.
 /// This is the temporal-aware version of the CRUD list-owners.
+#[register_custom_op]
 pub struct UboListOwnersOp;
 
 #[async_trait]

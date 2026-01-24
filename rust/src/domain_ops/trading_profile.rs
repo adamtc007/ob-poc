@@ -14,6 +14,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -40,6 +41,7 @@ use sqlx::{PgPool, Row};
 ///
 /// Rationale: Requires file I/O, YAML parsing, hash computation, and
 /// document validation before storing to database.
+#[register_custom_op]
 pub struct TradingProfileImportOp;
 
 #[async_trait]
@@ -171,6 +173,7 @@ impl CustomOperation for TradingProfileImportOp {
 // =============================================================================
 
 /// Get the active trading profile for a CBU
+#[register_custom_op]
 pub struct TradingProfileGetActiveOp;
 
 #[async_trait]
@@ -245,6 +248,7 @@ impl CustomOperation for TradingProfileGetActiveOp {
 // =============================================================================
 
 /// Activate a trading profile (sets status to ACTIVE, supersedes previous)
+#[register_custom_op]
 pub struct TradingProfileActivateOp;
 
 #[async_trait]
@@ -348,6 +352,7 @@ impl CustomOperation for TradingProfileActivateOp {
 /// - custody.ssi_booking_rules (CRITICAL: specificity_score is GENERATED ALWAYS)
 /// - custody.isda_agreements
 /// - custody.csa_agreements
+#[register_custom_op]
 pub struct TradingProfileMaterializeOp;
 
 #[async_trait]
@@ -1297,6 +1302,7 @@ async fn materialize_corporate_actions(
 // =============================================================================
 
 /// Create a new draft trading profile for a CBU
+#[register_custom_op]
 pub struct TradingProfileCreateDraftOp;
 
 #[async_trait]
@@ -1360,6 +1366,7 @@ impl CustomOperation for TradingProfileCreateDraftOp {
 }
 
 /// Add instrument class to trading profile universe
+#[register_custom_op]
 pub struct TradingProfileAddInstrumentClassOp;
 
 #[async_trait]
@@ -1451,6 +1458,7 @@ impl CustomOperation for TradingProfileAddInstrumentClassOp {
 }
 
 /// Remove instrument class from trading profile universe
+#[register_custom_op]
 pub struct TradingProfileRemoveInstrumentClassOp;
 
 #[async_trait]
@@ -1522,6 +1530,7 @@ impl CustomOperation for TradingProfileRemoveInstrumentClassOp {
 }
 
 /// Add market to trading profile universe under an instrument class
+#[register_custom_op]
 pub struct TradingProfileAddMarketOp;
 
 #[async_trait]
@@ -1644,6 +1653,7 @@ impl CustomOperation for TradingProfileAddMarketOp {
 }
 
 /// Remove market from trading profile universe
+#[register_custom_op]
 pub struct TradingProfileRemoveMarketOp;
 
 #[async_trait]
@@ -1726,6 +1736,7 @@ impl CustomOperation for TradingProfileRemoveMarketOp {
 }
 
 /// Add standing instruction to trading profile
+#[register_custom_op]
 pub struct TradingProfileAddSsiOp;
 
 #[async_trait]
@@ -1859,6 +1870,7 @@ impl CustomOperation for TradingProfileAddSsiOp {
 }
 
 /// Remove standing instruction from trading profile
+#[register_custom_op]
 pub struct TradingProfileRemoveSsiOp;
 
 #[async_trait]
@@ -1930,6 +1942,7 @@ impl CustomOperation for TradingProfileRemoveSsiOp {
 }
 
 /// Add booking rule to trading profile
+#[register_custom_op]
 pub struct TradingProfileAddBookingRuleOp;
 
 #[async_trait]
@@ -2067,6 +2080,7 @@ impl CustomOperation for TradingProfileAddBookingRuleOp {
 }
 
 /// Remove booking rule from trading profile
+#[register_custom_op]
 pub struct TradingProfileRemoveBookingRuleOp;
 
 #[async_trait]
@@ -2153,6 +2167,7 @@ impl CustomOperation for TradingProfileRemoveBookingRuleOp {
 // =============================================================================
 
 /// Add ISDA configuration to a trading profile document
+#[register_custom_op]
 pub struct TradingProfileAddIsdaConfigOp;
 
 #[async_trait]
@@ -2265,6 +2280,7 @@ impl CustomOperation for TradingProfileAddIsdaConfigOp {
 }
 
 /// Add product coverage to an ISDA agreement
+#[register_custom_op]
 pub struct TradingProfileAddIsdaCoverageOp;
 
 #[async_trait]
@@ -2367,6 +2383,7 @@ impl CustomOperation for TradingProfileAddIsdaCoverageOp {
 }
 
 /// Add CSA configuration to an ISDA agreement
+#[register_custom_op]
 pub struct TradingProfileAddCsaConfigOp;
 
 #[async_trait]
@@ -2487,6 +2504,7 @@ impl CustomOperation for TradingProfileAddCsaConfigOp {
 }
 
 /// Add eligible collateral to a CSA
+#[register_custom_op]
 pub struct TradingProfileAddCsaCollateralOp;
 
 #[async_trait]
@@ -2636,6 +2654,7 @@ impl CustomOperation for TradingProfileAddCsaCollateralOp {
 }
 
 /// Link CSA to collateral SSI
+#[register_custom_op]
 pub struct TradingProfileLinkCsaSsiOp;
 
 #[async_trait]
@@ -2731,6 +2750,7 @@ impl CustomOperation for TradingProfileLinkCsaSsiOp {
 }
 
 /// Remove ISDA configuration from trading profile
+#[register_custom_op]
 pub struct TradingProfileRemoveIsdaConfigOp;
 
 #[async_trait]
@@ -2806,6 +2826,7 @@ impl CustomOperation for TradingProfileRemoveIsdaConfigOp {
 }
 
 /// Remove CSA configuration from trading profile
+#[register_custom_op]
 pub struct TradingProfileRemoveCsaConfigOp;
 
 #[async_trait]
@@ -2894,6 +2915,7 @@ impl CustomOperation for TradingProfileRemoveCsaConfigOp {
 // =============================================================================
 
 /// Add Investment Manager mandate to trading profile
+#[register_custom_op]
 pub struct TradingProfileAddImMandateOp;
 
 #[async_trait]
@@ -3075,6 +3097,7 @@ impl CustomOperation for TradingProfileAddImMandateOp {
 }
 
 /// Update Investment Manager scope
+#[register_custom_op]
 pub struct TradingProfileUpdateImScopeOp;
 
 #[async_trait]
@@ -3182,6 +3205,7 @@ impl CustomOperation for TradingProfileUpdateImScopeOp {
 }
 
 /// Remove Investment Manager mandate
+#[register_custom_op]
 pub struct TradingProfileRemoveImMandateOp;
 
 #[async_trait]
@@ -3258,6 +3282,7 @@ impl CustomOperation for TradingProfileRemoveImMandateOp {
 
 /// Set base currency for the trading profile
 /// Verb: trading-profile.set-base-currency
+#[register_custom_op]
 pub struct TradingProfileSetBaseCurrencyOp;
 
 #[async_trait]
@@ -3333,6 +3358,7 @@ impl CustomOperation for TradingProfileSetBaseCurrencyOp {
 
 /// Add allowed currency to the trading profile
 /// Verb: trading-profile.add-allowed-currency
+#[register_custom_op]
 pub struct TradingProfileAddAllowedCurrencyOp;
 
 #[async_trait]
@@ -3412,6 +3438,7 @@ impl CustomOperation for TradingProfileAddAllowedCurrencyOp {
 
 /// Compare document with operational tables to show differences
 /// Verb: trading-profile.diff
+#[register_custom_op]
 pub struct TradingProfileDiffOp;
 
 #[async_trait]
@@ -3469,6 +3496,7 @@ impl CustomOperation for TradingProfileDiffOp {
 // =============================================================================
 
 /// Validate that booking rules cover all universe combinations
+#[register_custom_op]
 pub struct TradingProfileValidateCoverageOp;
 
 #[async_trait]
@@ -3521,6 +3549,7 @@ impl CustomOperation for TradingProfileValidateCoverageOp {
 }
 
 /// Validate that a profile is ready for go-live
+#[register_custom_op]
 pub struct TradingProfileValidateGoLiveReadyOp;
 
 #[async_trait]
@@ -3576,6 +3605,7 @@ impl CustomOperation for TradingProfileValidateGoLiveReadyOp {
 
 /// Submit a draft profile for review
 /// Transitions: Draft → PendingReview
+#[register_custom_op]
 pub struct TradingProfileSubmitOp;
 
 #[async_trait]
@@ -3641,6 +3671,7 @@ impl CustomOperation for TradingProfileSubmitOp {
 
 /// Approve a profile pending review
 /// Transitions: PendingReview → Active
+#[register_custom_op]
 pub struct TradingProfileApproveOp;
 
 #[async_trait]
@@ -3761,6 +3792,7 @@ impl CustomOperation for TradingProfileApproveOp {
 
 /// Reject a profile pending review
 /// Transitions: PendingReview → Draft
+#[register_custom_op]
 pub struct TradingProfileRejectOp;
 
 #[async_trait]
@@ -3828,6 +3860,7 @@ impl CustomOperation for TradingProfileRejectOp {
 
 /// Archive an active or superseded profile
 /// Transitions: Active|Superseded → Archived
+#[register_custom_op]
 pub struct TradingProfileArchiveOp;
 
 #[async_trait]
@@ -3904,6 +3937,7 @@ impl CustomOperation for TradingProfileArchiveOp {
 /// - Migrating config during fund family restructuring
 ///
 /// DSL: (trading-profile.clone-to :profile-id @source :target-cbu-id @target-cbu)
+#[register_custom_op]
 pub struct TradingProfileCloneToOp;
 
 #[async_trait]
@@ -3998,6 +4032,7 @@ impl CustomOperation for TradingProfileCloneToOp {
 
 /// Create a new draft version from the current ACTIVE profile
 /// Used when modifications are needed to a live trading matrix
+#[register_custom_op]
 pub struct TradingProfileCreateNewVersionOp;
 
 #[async_trait]

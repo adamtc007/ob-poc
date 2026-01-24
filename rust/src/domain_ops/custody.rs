@@ -8,6 +8,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::{CustomOperation, ExecutionContext, ExecutionResult};
 use crate::dsl_v2::ast::VerbCall;
@@ -22,6 +23,7 @@ use sqlx::PgPool;
 /// Find sub-custodian for market/currency combination
 ///
 /// Rationale: Requires date-effective lookup with fallback logic
+#[register_custom_op]
 pub struct SubcustodianLookupOp;
 
 #[async_trait]
@@ -134,6 +136,7 @@ impl CustomOperation for SubcustodianLookupOp {
 /// Find SSI for given trade characteristics using ALERT-style priority matching
 ///
 /// Rationale: Requires complex rule matching with wildcards and priority ordering
+#[register_custom_op]
 pub struct LookupSsiForTradeOp;
 
 #[async_trait]
@@ -305,6 +308,7 @@ impl CustomOperation for LookupSsiForTradeOp {
 /// Validate that all universe entries have matching booking rules
 ///
 /// Rationale: Requires joining universe with booking rules and checking coverage
+#[register_custom_op]
 pub struct ValidateBookingCoverageOp;
 
 #[async_trait]
@@ -454,6 +458,7 @@ impl CustomOperation for ValidateBookingCoverageOp {
 /// Compare universe to booking rules and identify what coverage is needed
 ///
 /// Rationale: Requires analyzing universe and generating coverage requirements
+#[register_custom_op]
 pub struct DeriveRequiredCoverageOp;
 
 #[async_trait]
@@ -558,6 +563,7 @@ impl CustomOperation for DeriveRequiredCoverageOp {
 ///
 /// Rationale: Requires parsing JSON document, validating BICs, and creating
 /// multiple related records (SSIs, agent overrides, booking rules) in a transaction.
+#[register_custom_op]
 pub struct SetupSsiFromDocumentOp;
 
 #[async_trait]

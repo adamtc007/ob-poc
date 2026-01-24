@@ -9,6 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -27,6 +28,7 @@ use crate::ontology::SemanticStageRegistry;
 use crate::ontology::SemanticStageRegistry;
 
 /// Get full semantic state for a CBU - shows stage progress, gaps, and blockers
+#[register_custom_op]
 pub struct SemanticStateOp;
 
 #[async_trait]
@@ -89,6 +91,7 @@ impl CustomOperation for SemanticStateOp {
 }
 
 /// List all defined semantic stages with their dependencies
+#[register_custom_op]
 pub struct SemanticListStagesOp;
 
 #[async_trait]
@@ -162,6 +165,7 @@ impl CustomOperation for SemanticListStagesOp {
 }
 
 /// Get required stages for a specific product
+#[register_custom_op]
 pub struct SemanticStagesForProductOp;
 
 #[async_trait]
@@ -259,6 +263,7 @@ impl CustomOperation for SemanticStagesForProductOp {
 }
 
 /// Get next actionable stages for a CBU (unblocked, incomplete stages)
+#[register_custom_op]
 pub struct SemanticNextActionsOp;
 
 #[async_trait]
@@ -338,6 +343,7 @@ impl CustomOperation for SemanticNextActionsOp {
 }
 
 /// Get missing entities for stage completion
+#[register_custom_op]
 pub struct SemanticMissingEntitiesOp;
 
 #[async_trait]
@@ -431,6 +437,7 @@ impl CustomOperation for SemanticMissingEntitiesOp {
 }
 
 /// Get semantic state formatted for agent prompt injection
+#[register_custom_op]
 pub struct SemanticPromptContextOp;
 
 #[async_trait]

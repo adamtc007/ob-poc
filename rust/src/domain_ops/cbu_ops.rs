@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -33,6 +34,7 @@ use sqlx::PgPool;
 ///
 /// Idempotency: Safe to re-run - uses ON CONFLICT DO NOTHING for all entries
 /// Transaction: All operations wrapped in a transaction for atomicity
+#[register_custom_op]
 pub struct CbuAddProductOp;
 
 #[async_trait]
@@ -316,6 +318,7 @@ impl CustomOperation for CbuAddProductOp {
 ///
 /// Rationale: Requires multiple joins across CBU, entities, roles, documents,
 /// screenings, and service deliveries to build a complete picture.
+#[register_custom_op]
 pub struct CbuShowOp;
 
 #[async_trait]
@@ -591,6 +594,7 @@ impl CustomOperation for CbuShowOp {
 /// Rationale: This is the decision point verb. Its execution in DSL history
 /// IS the searchable snapshot boundary. Updates CBU status, case status,
 /// and creates evaluation snapshot.
+#[register_custom_op]
 pub struct CbuDecideOp;
 
 #[async_trait]
@@ -817,6 +821,7 @@ impl CustomOperation for CbuDecideOp {
 /// check - entities linked to multiple CBUs are preserved.
 ///
 /// WARNING: This is a destructive operation. Use with caution.
+#[register_custom_op]
 pub struct CbuDeleteCascadeOp;
 
 #[async_trait]

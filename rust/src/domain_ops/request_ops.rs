@@ -7,6 +7,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDate, Utc};
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -47,6 +48,7 @@ pub struct LinkedIds {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Create an outstanding request (generic)
+#[register_custom_op]
 pub struct RequestCreateOp;
 
 #[async_trait]
@@ -288,6 +290,7 @@ impl CustomOperation for RequestCreateOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// List overdue requests
+#[register_custom_op]
 pub struct RequestOverdueOp;
 
 #[async_trait]
@@ -404,6 +407,7 @@ impl CustomOperation for RequestOverdueOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Mark request as fulfilled
+#[register_custom_op]
 pub struct RequestFulfillOp;
 
 #[async_trait]
@@ -511,6 +515,7 @@ impl CustomOperation for RequestFulfillOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Cancel a pending request
+#[register_custom_op]
 pub struct RequestCancelOp;
 
 #[async_trait]
@@ -589,6 +594,7 @@ impl CustomOperation for RequestCancelOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Extend request due date
+#[register_custom_op]
 pub struct RequestExtendOp;
 
 #[async_trait]
@@ -713,6 +719,7 @@ impl CustomOperation for RequestExtendOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Send reminder for pending request
+#[register_custom_op]
 pub struct RequestRemindOp;
 
 #[async_trait]
@@ -812,6 +819,7 @@ impl CustomOperation for RequestRemindOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Escalate overdue request
+#[register_custom_op]
 pub struct RequestEscalateOp;
 
 #[async_trait]
@@ -888,6 +896,7 @@ impl CustomOperation for RequestEscalateOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Waive a request requirement
+#[register_custom_op]
 pub struct RequestWaiveOp;
 
 #[async_trait]
@@ -972,6 +981,7 @@ impl CustomOperation for RequestWaiveOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Request a document (creates outstanding request, fire-and-forget)
+#[register_custom_op]
 pub struct DocumentRequestOp;
 
 #[async_trait]
@@ -1155,6 +1165,7 @@ impl CustomOperation for DocumentRequestOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Upload a document (auto-fulfills matching outstanding request)
+#[register_custom_op]
 pub struct DocumentUploadOp;
 
 #[async_trait]
@@ -1304,6 +1315,7 @@ impl CustomOperation for DocumentUploadOp {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Waive document requirement (for outstanding requests)
+#[register_custom_op]
 pub struct DocumentWaiveOp;
 
 #[async_trait]

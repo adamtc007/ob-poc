@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -17,6 +18,7 @@ use sqlx::PgPool;
 ///
 /// Rationale: Requires external PEP database API call and result processing.
 /// Idempotency: Returns existing pending PEP screening for same entity if exists.
+#[register_custom_op]
 pub struct ScreeningPepOp;
 
 #[async_trait]
@@ -125,6 +127,7 @@ impl CustomOperation for ScreeningPepOp {
 ///
 /// Rationale: Requires external sanctions database API call and result processing.
 /// Idempotency: Returns existing pending sanctions screening for same entity if exists.
+#[register_custom_op]
 pub struct ScreeningSanctionsOp;
 
 #[async_trait]
@@ -230,6 +233,7 @@ impl CustomOperation for ScreeningSanctionsOp {
 ///
 /// Rationale: Requires external adverse media API call and result processing.
 /// Status: Stub - returns error indicating not implemented.
+#[register_custom_op]
 pub struct ScreeningAdverseMediaOp;
 
 #[async_trait]

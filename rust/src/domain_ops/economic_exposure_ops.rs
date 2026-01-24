@@ -8,7 +8,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use std::sync::Arc;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -109,6 +109,7 @@ fn get_optional_bool(verb_call: &VerbCall, key: &str) -> Option<bool> {
 
 /// Compute economic exposure from a root entity through ownership chains.
 /// Uses bounded recursion with configurable depth, min percentage, and stop conditions.
+#[register_custom_op]
 pub struct EconomicExposureComputeOp;
 
 #[async_trait]
@@ -195,6 +196,7 @@ impl CustomOperation for EconomicExposureComputeOp {
 
 /// Get aggregated economic exposure summary for an issuer.
 /// Shows both direct and look-through percentages with threshold filtering.
+#[register_custom_op]
 pub struct EconomicExposureSummaryOp;
 
 #[async_trait]
@@ -326,14 +328,4 @@ impl From<ExposureSummaryRow> for serde_json::Value {
             "stop_reason": row.stop_reason
         })
     }
-}
-
-// ============================================================================
-// Registration
-// ============================================================================
-
-/// Register economic exposure operations with the registry
-pub fn register_economic_exposure_ops(registry: &mut crate::domain_ops::CustomOperationRegistry) {
-    registry.register(Arc::new(EconomicExposureComputeOp));
-    registry.register(Arc::new(EconomicExposureSummaryOp));
 }

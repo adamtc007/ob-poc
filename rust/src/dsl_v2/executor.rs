@@ -1401,8 +1401,9 @@ impl DslExecutor {
             tracing::debug!("execute_verb_in_tx: routing to PLUGIN");
             // Dispatch to custom operations handler
             if let Some(op) = self.custom_ops.get(&vc.domain, &vc.verb) {
-                // Use execute_in_tx if supported, otherwise fall back to regular execute
-                // (which won't participate in the transaction - logged as warning)
+                // Call execute_in_tx - if op doesn't support it, it returns an error.
+                // This is intentional: in atomic execution, we fail fast rather than
+                // silently doing non-transactional work within an atomic batch.
                 let result = op.execute_in_tx(vc, ctx, tx).await;
                 tracing::debug!("execute_verb_in_tx: plugin returned {:?}", result.is_ok());
                 return result;

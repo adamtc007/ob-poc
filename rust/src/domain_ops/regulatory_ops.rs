@@ -5,6 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -17,6 +18,7 @@ use sqlx::PgPool;
 ///
 /// Updates the verification status of an existing registration.
 /// Requires: entity has registration with the specified regulator.
+#[register_custom_op]
 pub struct RegistrationVerifyOp;
 
 #[async_trait]
@@ -139,6 +141,7 @@ impl CustomOperation for RegistrationVerifyOp {
 ///
 /// Aggregates all registrations for an entity and returns a summary
 /// including whether simplified DD is allowed.
+#[register_custom_op]
 pub struct RegulatoryStatusCheckOp;
 
 #[async_trait]

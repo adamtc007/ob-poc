@@ -9,6 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
@@ -27,6 +28,7 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 /// Analyzes trust provisions to determine control vectors.
 /// Uses kyc.trust_provisions for granular power analysis.
+#[register_custom_op]
 pub struct TrustAnalyzeControlOp;
 
 #[cfg(feature = "database")]
@@ -281,6 +283,7 @@ impl CustomOperation for TrustAnalyzeControlOp {
 // ============================================================================
 
 /// Identifies beneficial owners from trust provisions using regulatory rules.
+#[register_custom_op]
 pub struct TrustIdentifyUbosOp;
 
 #[cfg(feature = "database")]
@@ -479,6 +482,7 @@ impl CustomOperation for TrustIdentifyUbosOp {
 // ============================================================================
 
 /// Classifies trust type based on its provisions (discretionary, fixed, hybrid).
+#[register_custom_op]
 pub struct TrustClassifyOp;
 
 #[cfg(feature = "database")]

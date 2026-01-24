@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::helpers::extract_string_opt;
 use super::CustomOperation;
@@ -17,6 +18,7 @@ use {crate::bods::UboDiscoveryService, sqlx::PgPool, std::sync::Arc, uuid::Uuid}
 /// Discover UBOs for an entity using GLEIF + BODS data
 ///
 /// Rationale: Requires querying GLEIF for reporting exceptions and BODS for person statements.
+#[register_custom_op]
 pub struct BodsDiscoverUbosOp;
 
 #[async_trait]
@@ -115,6 +117,7 @@ impl CustomOperation for BodsDiscoverUbosOp {
 /// Import BODS statements from data dump
 ///
 /// Rationale: Bulk import requires parsing BODS JSON and inserting into multiple tables.
+#[register_custom_op]
 pub struct BodsImportOp;
 
 #[async_trait]
@@ -175,6 +178,7 @@ impl CustomOperation for BodsImportOp {
 /// Get BODS statement by ID
 ///
 /// Rationale: Query BODS tables for specific statement.
+#[register_custom_op]
 pub struct BodsGetStatementOp;
 
 #[async_trait]
@@ -352,6 +356,7 @@ impl CustomOperation for BodsGetStatementOp {
 /// Find BODS entity statement by LEI
 ///
 /// Rationale: Query BODS entity statements table by LEI.
+#[register_custom_op]
 pub struct BodsFindByLeiOp;
 
 #[async_trait]
@@ -419,6 +424,7 @@ impl CustomOperation for BodsFindByLeiOp {
 /// List ownership statements for an entity
 ///
 /// Rationale: Query BODS ownership statements by entity.
+#[register_custom_op]
 pub struct BodsListOwnershipOp;
 
 #[async_trait]
@@ -569,6 +575,7 @@ impl CustomOperation for BodsListOwnershipOp {
 /// Sync BODS data from GLEIF reporting exceptions
 ///
 /// Rationale: Queries GLEIF exceptions and populates BODS tables.
+#[register_custom_op]
 pub struct BodsSyncFromGleifOp;
 
 #[async_trait]

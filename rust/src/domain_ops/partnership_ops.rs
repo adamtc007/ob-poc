@@ -5,6 +5,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -22,6 +23,7 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 /// Records a capital contribution to a partnership, updating capital accounts.
 /// Updates the capital_contributed column in kyc.partnership_capital.
+#[register_custom_op]
 pub struct PartnershipContributionOp;
 
 #[cfg(feature = "database")]
@@ -163,6 +165,7 @@ impl CustomOperation for PartnershipContributionOp {
 
 /// Records a capital return/distribution from partnership to partner.
 /// Updates the capital_returned column in kyc.partnership_capital.
+#[register_custom_op]
 pub struct PartnershipDistributionOp;
 
 #[async_trait]
@@ -295,6 +298,7 @@ impl CustomOperation for PartnershipDistributionOp {
 // ============================================================================
 
 /// Reconciles that profit share percentages sum to 100%.
+#[register_custom_op]
 pub struct PartnershipReconcileOp;
 
 #[cfg(feature = "database")]
@@ -458,6 +462,7 @@ impl CustomOperation for PartnershipReconcileOp {
 // ============================================================================
 
 /// Analyzes control in a partnership (GP has presumptive control).
+#[register_custom_op]
 pub struct PartnershipAnalyzeControlOp;
 
 #[cfg(feature = "database")]

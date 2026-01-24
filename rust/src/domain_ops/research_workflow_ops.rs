@@ -9,6 +9,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -26,6 +27,7 @@ use sqlx::PgPool;
 /// Confirm an ambiguous decision with user's selection
 ///
 /// Rationale: Updates decision record and may trigger follow-up import
+#[register_custom_op]
 pub struct WorkflowConfirmDecisionOp;
 
 #[async_trait]
@@ -128,6 +130,7 @@ impl CustomOperation for WorkflowConfirmDecisionOp {
 /// Reject a suggested decision
 ///
 /// Rationale: Marks decision as rejected with reason for audit
+#[register_custom_op]
 pub struct WorkflowRejectDecisionOp;
 
 #[async_trait]
@@ -218,6 +221,7 @@ impl CustomOperation for WorkflowRejectDecisionOp {
 /// Get complete research audit trail for an entity
 ///
 /// Rationale: Aggregates decisions, actions, corrections, and anomalies
+#[register_custom_op]
 pub struct WorkflowAuditTrailOp;
 
 #[async_trait]

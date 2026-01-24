@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -21,6 +22,7 @@ use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 /// Analyzes board composition to determine who controls an entity through
 /// board appointments, removal rights, and veto powers.
+#[register_custom_op]
 pub struct BoardAnalyzeControlOp;
 
 #[async_trait]

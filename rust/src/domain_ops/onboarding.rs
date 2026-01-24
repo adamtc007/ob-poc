@@ -10,6 +10,7 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use uuid::Uuid;
 
 use super::helpers::extract_uuid;
@@ -26,6 +27,7 @@ use sqlx::PgPool;
 ///
 /// This operation derives semantic state, finds missing entities, generates DSL
 /// to create them, and optionally executes. It's an "auto-pilot" for onboarding.
+#[register_custom_op]
 pub struct OnboardingAutoCompleteOp;
 
 /// Result of a single auto-complete step

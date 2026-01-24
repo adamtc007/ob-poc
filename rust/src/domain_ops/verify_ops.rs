@@ -13,6 +13,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::{CustomOperation, ExecutionContext, ExecutionResult, VerbCall};
 
@@ -27,6 +28,7 @@ use sqlx::PgPool;
 ///
 /// Rationale: Requires graph traversal for circular ownership, layering detection,
 /// and cross-entity analysis for nominee patterns and opacity jurisdictions.
+#[register_custom_op]
 pub struct VerifyDetectPatternsOp;
 
 #[async_trait]
@@ -139,6 +141,7 @@ impl CustomOperation for VerifyDetectPatternsOp {
 /// Analyze doc_request history for evasion signals
 ///
 /// Rationale: Requires behavioral analysis of doc_request timeline patterns.
+#[register_custom_op]
 pub struct VerifyDetectEvasionOp;
 
 #[async_trait]
@@ -235,6 +238,7 @@ impl CustomOperation for VerifyDetectEvasionOp {
 /// Calculate aggregate confidence for entity/attribute
 ///
 /// Rationale: Requires complex weighted aggregation with multiple modifiers.
+#[register_custom_op]
 pub struct VerifyCalculateConfidenceOp;
 
 #[async_trait]
@@ -459,6 +463,7 @@ impl CustomOperation for VerifyCalculateConfidenceOp {
 /// Get comprehensive verification status for CBU
 ///
 /// Rationale: Aggregates data from multiple tables for holistic view.
+#[register_custom_op]
 pub struct VerifyGetStatusOp;
 
 #[async_trait]
@@ -614,6 +619,7 @@ impl CustomOperation for VerifyGetStatusOp {
 /// Verify entity against external registry
 ///
 /// Rationale: Requires external API calls to GLEIF, Companies House, etc.
+#[register_custom_op]
 pub struct VerifyAgainstRegistryOp;
 
 #[async_trait]
@@ -744,6 +750,7 @@ impl CustomOperation for VerifyAgainstRegistryOp {
 /// Declarative confidence assertion gate
 ///
 /// Rationale: Combines confidence calculation with gate logic for workflow control.
+#[register_custom_op]
 pub struct VerifyAssertOp;
 
 #[async_trait]

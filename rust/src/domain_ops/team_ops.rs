@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use super::helpers::extract_uuid;
 use super::CustomOperation;
@@ -23,6 +24,7 @@ use sqlx::PgPool;
 /// 1. Delete from source team
 /// 2. Insert into target team
 /// 3. Log audit entries for both teams
+#[register_custom_op]
 pub struct TeamTransferMemberOp;
 
 #[async_trait]

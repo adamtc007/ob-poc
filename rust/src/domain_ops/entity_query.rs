@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 use uuid::Uuid;
 
 #[cfg(feature = "database")]
@@ -44,6 +45,7 @@ impl EntityQueryResult {
 /// (entity.query :type "fund" :name-like "Allianz%" :jurisdiction "LU" :limit 100 :as @funds)
 /// (template.batch :id "onboard-fund-cbu" :source @funds ...)
 /// ```
+#[register_custom_op]
 pub struct EntityQueryOp;
 
 #[async_trait]

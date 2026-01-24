@@ -13,6 +13,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use ob_poc_macros::register_custom_op;
 
 use crate::domain_ops::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
@@ -45,6 +46,7 @@ async fn get_role_id(pool: &PgPool, role_name: &str) -> Result<uuid::Uuid> {
 ///
 /// This is the base role assignment operation. For ownership, control, and trust
 /// roles, use the specialized variants that also create relationship edges.
+#[register_custom_op]
 pub struct CbuRoleAssignOp;
 
 #[async_trait]
@@ -200,6 +202,7 @@ impl CustomOperation for CbuRoleAssignOp {
 /// This creates both:
 /// 1. cbu_entity_roles entry (role assignment)
 /// 2. entity_relationships entry (ownership edge for UBO traversal)
+#[register_custom_op]
 pub struct CbuRoleAssignOwnershipOp;
 
 #[async_trait]
@@ -377,6 +380,7 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
 // =============================================================================
 
 /// Assign a control role and create the corresponding entity_relationships edge
+#[register_custom_op]
 pub struct CbuRoleAssignControlOp;
 
 #[async_trait]
@@ -537,6 +541,7 @@ impl CustomOperation for CbuRoleAssignControlOp {
 // =============================================================================
 
 /// Assign a trust role (settlor, trustee, beneficiary, protector, etc.)
+#[register_custom_op]
 pub struct CbuRoleAssignTrustOp;
 
 #[async_trait]
@@ -721,6 +726,7 @@ impl CustomOperation for CbuRoleAssignTrustOp {
 // =============================================================================
 
 /// Assign a fund-related role (ManCo, IM, fund investor, etc.)
+#[register_custom_op]
 pub struct CbuRoleAssignFundOp;
 
 #[async_trait]
@@ -902,6 +908,7 @@ impl CustomOperation for CbuRoleAssignFundOp {
 // =============================================================================
 
 /// Assign a service provider role (admin, custodian, auditor, etc.)
+#[register_custom_op]
 pub struct CbuRoleAssignServiceOp;
 
 #[async_trait]
@@ -1031,6 +1038,7 @@ impl CustomOperation for CbuRoleAssignServiceOp {
 // =============================================================================
 
 /// Assign a signatory role with authority limits
+#[register_custom_op]
 pub struct CbuRoleAssignSignatoryOp;
 
 #[async_trait]
@@ -1177,6 +1185,7 @@ impl CustomOperation for CbuRoleAssignSignatoryOp {
 // =============================================================================
 
 /// Validate that all required roles are assigned and relationships are complete
+#[register_custom_op]
 pub struct CbuRoleValidateAllOp;
 
 #[async_trait]

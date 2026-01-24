@@ -8,6 +8,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::NaiveDate;
+use ob_poc_macros::register_custom_op;
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -67,6 +68,7 @@ fn get_int_arg(verb_call: &VerbCall, arg_name: &str, default: i32) -> i32 {
 // temporal.ownership-as-of
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalOwnershipAsOfOp;
 
 #[async_trait]
@@ -148,6 +150,7 @@ impl CustomOperation for TemporalOwnershipAsOfOp {
 // temporal.ubo-chain-as-of
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalUboChainAsOfOp;
 
 #[async_trait]
@@ -228,6 +231,7 @@ impl CustomOperation for TemporalUboChainAsOfOp {
 // temporal.cbu-relationships-as-of
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalCbuRelationshipsAsOfOp;
 
 #[async_trait]
@@ -315,6 +319,7 @@ impl CustomOperation for TemporalCbuRelationshipsAsOfOp {
 // temporal.cbu-roles-as-of
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalCbuRolesAsOfOp;
 
 #[async_trait]
@@ -390,6 +395,7 @@ impl CustomOperation for TemporalCbuRolesAsOfOp {
 // temporal.cbu-state-at-approval
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalCbuStateAtApprovalOp;
 
 #[async_trait]
@@ -474,6 +480,7 @@ impl CustomOperation for TemporalCbuStateAtApprovalOp {
 // temporal.relationship-history
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalRelationshipHistoryOp;
 
 #[async_trait]
@@ -565,6 +572,7 @@ impl CustomOperation for TemporalRelationshipHistoryOp {
 // temporal.entity-history
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalEntityHistoryOp;
 
 #[async_trait]
@@ -667,6 +675,7 @@ impl CustomOperation for TemporalEntityHistoryOp {
 // temporal.compare-ownership
 // ============================================================================
 
+#[register_custom_op]
 pub struct TemporalCompareOwnershipOp;
 
 #[async_trait]
