@@ -59,6 +59,7 @@ pub fn ast_panel(ui: &mut Ui, state: &mut AppState) {
                 SessionStateEnum::Executing => ("executing", Color32::LIGHT_BLUE),
                 SessionStateEnum::Executed => ("executed", Color32::GREEN),
                 SessionStateEnum::Closed => ("closed", Color32::GRAY),
+                SessionStateEnum::Scoped => ("scoped", Color32::LIGHT_BLUE),
             };
             ui.label(RichText::new(state_str).small().color(color));
 
