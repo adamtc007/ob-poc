@@ -482,6 +482,11 @@ impl CustomOperation for TemplateBatchOp {
             session_id: ctx.session_id,
             pending_cbu_session: None, // Batch operations don't modify session
             session_cbu_ids: ctx.session_cbu_ids.clone(), // Inherit for bulk ops
+            // Inherit client group context for entity resolution
+            client_group_id: ctx.client_group_id,
+            client_group_name: ctx.client_group_name.clone(),
+            // Inherit persona for tag filtering
+            persona: ctx.persona.clone(),
         };
 
         // 10. Create and run BatchExecutor

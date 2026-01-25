@@ -37,9 +37,13 @@ use ob_agentic::{create_llm_client, LlmClient};
 use crate::dsl_v2::ast::find_unresolved_ref_locations;
 use crate::dsl_v2::runtime_registry::{RuntimeArg, RuntimeVerb};
 use crate::dsl_v2::{compile, enrich_program, parse_program, registry, runtime_registry_arc};
+use crate::mcp::scope_resolution::{ScopeContext, ScopeResolutionOutcome, ScopeResolver};
 use crate::mcp::verb_search::{
     check_ambiguity, HybridVerbSearcher, VerbSearchOutcome, VerbSearchResult,
 };
+
+#[cfg(feature = "database")]
+use sqlx::PgPool;
 
 // =============================================================================
 // PIPELINE-LOCAL TYPES (avoid cascading changes to shared DSL types)
@@ -119,6 +123,15 @@ pub enum PipelineOutcome {
     NeedsClarification,
     /// No matching verb found
     NoMatch,
+    /// Scope was resolved - session context set, no DSL generated
+    /// This is Stage 0: scope phrase consumed the input
+    ScopeResolved {
+        group_id: String,
+        group_name: String,
+        entity_count: i64,
+    },
+    /// Scope candidates need user selection
+    ScopeCandidates,
 }
 
 /// Pipeline result
@@ -136,6 +149,12 @@ pub struct PipelineResult {
     pub missing_required: Vec<String>,
     /// Pipeline outcome for clear status
     pub outcome: PipelineOutcome,
+    /// Scope resolution outcome (Stage 0) - if present, scope was attempted
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope_resolution: Option<ScopeResolutionOutcome>,
+    /// Scope context for downstream entity resolution
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope_context: Option<ScopeContext>,
 }
 
 /// An unresolved entity reference that needs lookup
@@ -154,6 +173,9 @@ pub struct UnresolvedRef {
 pub struct IntentPipeline {
     verb_searcher: HybridVerbSearcher,
     llm_client: Option<Arc<dyn LlmClient>>,
+    scope_resolver: ScopeResolver,
+    #[cfg(feature = "database")]
+    pool: Option<PgPool>,
 }
 
 impl IntentPipeline {
@@ -162,6 +184,9 @@ impl IntentPipeline {
         Self {
             verb_searcher,
             llm_client: None,
+            scope_resolver: ScopeResolver::new(),
+            #[cfg(feature = "database")]
+            pool: None,
         }
     }
 
@@ -170,6 +195,35 @@ impl IntentPipeline {
         Self {
             verb_searcher,
             llm_client: Some(llm_client),
+            scope_resolver: ScopeResolver::new(),
+            #[cfg(feature = "database")]
+            pool: None,
+        }
+    }
+
+    /// Create pipeline with database pool for scope resolution
+    #[cfg(feature = "database")]
+    pub fn with_pool(verb_searcher: HybridVerbSearcher, pool: PgPool) -> Self {
+        Self {
+            verb_searcher,
+            llm_client: None,
+            scope_resolver: ScopeResolver::new(),
+            pool: Some(pool),
+        }
+    }
+
+    /// Create pipeline with LLM client and database pool
+    #[cfg(feature = "database")]
+    pub fn with_llm_and_pool(
+        verb_searcher: HybridVerbSearcher,
+        llm_client: Arc<dyn LlmClient>,
+        pool: PgPool,
+    ) -> Self {
+        Self {
+            verb_searcher,
+            llm_client: Some(llm_client),
+            scope_resolver: ScopeResolver::new(),
+            pool: Some(pool),
         }
     }
 
@@ -187,21 +241,121 @@ impl IntentPipeline {
     /// Handles both:
     /// - Direct DSL input: `(view.book :client <Allianz>)` → parse, validate, return
     /// - Natural language: "show all allianz lux cbu" → semantic search → LLM → DSL
+    ///
+    /// ## Stage 0: Scope Resolution (HARD GATE)
+    ///
+    /// Before ANY verb discovery, we check if the input is a scope-setting phrase.
+    /// If scope resolution resolves or returns candidates, we return early and
+    /// do NOT proceed to Candle/LLM. This ensures:
+    /// 1. Scope is always established before entity resolution
+    /// 2. No spurious entity-search modals for client names
+    /// 3. Deterministic UX: Resolved → chip, Candidates → picker, else → continue
     pub async fn process(
         &self,
         instruction: &str,
         domain_hint: Option<&str>,
+    ) -> Result<PipelineResult> {
+        self.process_with_scope(instruction, domain_hint, None)
+            .await
+    }
+
+    /// Process with existing scope context (for subsequent commands after scope is set)
+    pub async fn process_with_scope(
+        &self,
+        instruction: &str,
+        domain_hint: Option<&str>,
+        existing_scope: Option<ScopeContext>,
     ) -> Result<PipelineResult> {
         let trimmed = instruction.trim();
 
         // Fast path: Direct DSL input (starts with "(")
         // Skip semantic search and LLM entirely
         if trimmed.starts_with('(') {
-            return self.process_direct_dsl(trimmed).await;
+            return self.process_direct_dsl(trimmed, existing_scope).await;
         }
 
-        // Natural language path
-        self.process_as_natural_language(instruction, domain_hint)
+        // =========================================================================
+        // STAGE 0: Scope Resolution (HARD GATE - runs BEFORE Candle)
+        // =========================================================================
+        #[cfg(feature = "database")]
+        if let Some(pool) = &self.pool {
+            let scope_outcome = self.scope_resolver.resolve(trimmed, pool).await?;
+
+            match &scope_outcome {
+                ScopeResolutionOutcome::Resolved {
+                    group_id,
+                    group_name,
+                    entity_count,
+                } => {
+                    // Scope phrase consumed the input - return early, do NOT call Candle
+                    tracing::info!(
+                        group_id = %group_id,
+                        group_name = %group_name,
+                        entity_count = %entity_count,
+                        "Stage 0: Scope resolved (hard gate - skipping Candle)"
+                    );
+
+                    let scope_ctx =
+                        ScopeContext::new().with_client_group(*group_id, group_name.clone());
+
+                    return Ok(PipelineResult {
+                        intent: StructuredIntent::empty(),
+                        verb_candidates: vec![],
+                        dsl: String::new(),
+                        dsl_hash: None,
+                        valid: true, // Scope resolution is a valid outcome
+                        validation_error: None,
+                        unresolved_refs: vec![],
+                        missing_required: vec![],
+                        outcome: PipelineOutcome::ScopeResolved {
+                            group_id: group_id.to_string(),
+                            group_name: group_name.clone(),
+                            entity_count: *entity_count,
+                        },
+                        scope_resolution: Some(scope_outcome),
+                        scope_context: Some(scope_ctx),
+                    });
+                }
+                ScopeResolutionOutcome::Candidates(candidates) => {
+                    // Multiple matches - return for user to pick (compact picker, not modal)
+                    tracing::info!(
+                        candidate_count = candidates.len(),
+                        "Stage 0: Scope candidates (hard gate - skipping Candle)"
+                    );
+
+                    return Ok(PipelineResult {
+                        intent: StructuredIntent::empty(),
+                        verb_candidates: vec![],
+                        dsl: String::new(),
+                        dsl_hash: None,
+                        valid: false,
+                        validation_error: Some(format!(
+                            "Multiple clients match. Did you mean {}?",
+                            candidates
+                                .iter()
+                                .map(|c| format!("'{}'", c.group_name))
+                                .collect::<Vec<_>>()
+                                .join(" or ")
+                        )),
+                        unresolved_refs: vec![],
+                        missing_required: vec![],
+                        outcome: PipelineOutcome::ScopeCandidates,
+                        scope_resolution: Some(scope_outcome),
+                        scope_context: None,
+                    });
+                }
+                ScopeResolutionOutcome::Unresolved | ScopeResolutionOutcome::NotScopePhrase => {
+                    // Not a scope phrase or no match - continue to verb discovery
+                    tracing::debug!("Stage 0: Not a scope phrase, continuing to Candle");
+                }
+            }
+        }
+
+        // Use existing scope or empty
+        let scope_ctx = existing_scope.unwrap_or_default();
+
+        // Natural language path (with scope context for entity resolution)
+        self.process_as_natural_language(instruction, domain_hint, scope_ctx)
             .await
     }
 
@@ -212,8 +366,10 @@ impl IntentPipeline {
         &self,
         instruction: &str,
         domain_hint: Option<&str>,
+        scope_ctx: ScopeContext,
     ) -> Result<PipelineResult> {
         // Step 1: Find verb candidates via semantic search
+        // TODO: Pass scope_ctx to verb_searcher.search() for scoped entity resolution
         let candidates = self
             .verb_searcher
             .search(instruction, None, domain_hint, 5)
@@ -239,6 +395,12 @@ impl IntentPipeline {
                 unresolved_refs: vec![],
                 missing_required: vec![],
                 outcome: PipelineOutcome::NoMatch,
+                scope_resolution: None,
+                scope_context: if scope_ctx.has_scope() {
+                    Some(scope_ctx)
+                } else {
+                    None
+                },
             });
         }
 
@@ -263,6 +425,12 @@ impl IntentPipeline {
                     unresolved_refs: vec![],
                     missing_required: vec![],
                     outcome: PipelineOutcome::NoMatch,
+                    scope_resolution: None,
+                    scope_context: if scope_ctx.has_scope() {
+                        Some(scope_ctx)
+                    } else {
+                        None
+                    },
                 });
             }
             VerbSearchOutcome::Ambiguous {
@@ -284,6 +452,12 @@ impl IntentPipeline {
                     unresolved_refs: vec![],
                     missing_required: vec![],
                     outcome: PipelineOutcome::NeedsClarification,
+                    scope_resolution: None,
+                    scope_context: if scope_ctx.has_scope() {
+                        Some(scope_ctx.clone())
+                    } else {
+                        None
+                    },
                 });
             }
             VerbSearchOutcome::Matched(matched_verb) => {
@@ -336,6 +510,12 @@ impl IntentPipeline {
                 unresolved_refs: vec![],
                 missing_required,
                 outcome: PipelineOutcome::NeedsUserInput,
+                scope_resolution: None,
+                scope_context: if scope_ctx.has_scope() {
+                    Some(scope_ctx)
+                } else {
+                    None
+                },
             });
         }
 
@@ -399,6 +579,12 @@ impl IntentPipeline {
                 PipelineOutcome::Ready
             } else {
                 PipelineOutcome::NeedsUserInput
+            },
+            scope_resolution: None,
+            scope_context: if scope_ctx.has_scope() {
+                Some(scope_ctx)
+            } else {
+                None
             },
         })
     }
@@ -554,9 +740,15 @@ Respond with ONLY valid JSON:
     ///
     /// When user types DSL directly like `(view.book :client <Allianz>)`,
     /// we parse and validate it without involving the LLM.
-    async fn process_direct_dsl(&self, dsl: &str) -> Result<PipelineResult> {
+    async fn process_direct_dsl(
+        &self,
+        dsl: &str,
+        scope: Option<ScopeContext>,
+    ) -> Result<PipelineResult> {
         use crate::mcp::verb_search::VerbSearchSource;
         use dsl_core::Statement;
+
+        let scope_ctx = scope.unwrap_or_default();
 
         tracing::info!("Processing direct DSL input: {}", dsl);
 
@@ -571,7 +763,7 @@ Respond with ONLY valid JSON:
                 );
                 // Recursively call process() but skip the DSL detection
                 // by treating the malformed DSL as natural language
-                return self.process_as_natural_language(dsl, None).await;
+                return self.process_as_natural_language(dsl, None, scope_ctx).await;
             }
         };
 
@@ -634,6 +826,12 @@ Respond with ONLY valid JSON:
                 PipelineOutcome::Ready
             } else {
                 PipelineOutcome::NeedsUserInput
+            },
+            scope_resolution: None,
+            scope_context: if scope_ctx.has_scope() {
+                Some(scope_ctx)
+            } else {
+                None
             },
         })
     }

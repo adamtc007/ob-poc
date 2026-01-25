@@ -26,6 +26,7 @@ mod board_ops;
 mod bods_ops;
 mod capital_ops;
 mod cbu_ops;
+mod client_group_ops;
 mod cbu_role_ops;
 mod control_ops;
 mod custody;

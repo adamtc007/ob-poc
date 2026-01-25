@@ -350,3 +350,63 @@ domains:
         returns:
           type: record_set
           fields: [cbu_id, name, jurisdiction, apex_entity]
+
+      # ============================================
+      # Client Context (entity resolution scope)
+      # ============================================
+
+      set-client:
+        description: "Set client group context for entity resolution"
+        behavior: plugin
+        handler: SessionSetClientOp
+        invocation_phrases:
+          - "work on"
+          - "switch to"
+          - "I'm working with"
+          - "client is"
+          - "set client to"
+          - "working on"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_context
+          tags: [context, client]
+        args:
+          - name: client
+            type: string
+            required: true
+            description: "Client nickname (resolved via client_group_alias)"
+        returns:
+          type: record
+          fields: [group_id, group_name, entity_count, candidates]
+        effects:
+          - "If exact match: sets client_group_id immediately"
+          - "If ambiguous (score gap < 0.10): returns top 3 candidates for user selection"
+          - "If no match above threshold: returns empty with suggestions"
+
+      set-persona:
+        description: "Set persona context for tag filtering"
+        behavior: plugin
+        handler: SessionSetPersonaOp
+        invocation_phrases:
+          - "I'm doing kyc"
+          - "trading view"
+          - "for kyc"
+          - "for trading"
+          - "kyc mode"
+          - "trading mode"
+          - "ops mode"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_context
+          tags: [context, persona]
+        args:
+          - name: persona
+            type: string
+            required: true
+            valid_values: ["kyc", "trading", "ops", "onboarding"]
+            description: "Persona for tag filtering"
+        returns:
+          type: boolean
+          description: "True if persona was set"

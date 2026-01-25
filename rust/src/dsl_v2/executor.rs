@@ -462,6 +462,18 @@ pub struct ExecutionContext {
     ///
     /// **Memory is truth, DB is backup.** All mutations are sync, in-memory, <1µs.
     pub pending_cbu_session: Option<CbuSession>,
+    /// Client group context for entity resolution (Phase 052)
+    ///
+    /// When set, entity resolution for shorthand tags will be scoped to this group.
+    /// Set via `session.set-client` verb.
+    pub client_group_id: Option<Uuid>,
+    /// Client group name (cached for display)
+    pub client_group_name: Option<String>,
+    /// Persona context for tag filtering (Phase 052)
+    ///
+    /// When set, tag search will be filtered by persona (kyc, trading, ops, onboarding).
+    /// Set via `session.set-persona` verb.
+    pub persona: Option<String>,
 }
 
 impl Default for ExecutionContext {
@@ -485,6 +497,9 @@ impl Default for ExecutionContext {
             session_id: None,
             session_cbu_ids: Vec::new(),
             pending_cbu_session: None,
+            client_group_id: None,
+            client_group_name: None,
+            persona: None,
         }
     }
 }
@@ -606,6 +621,11 @@ impl ExecutionContext {
             pending_cbu_session: None,
             // Inherit session CBU IDs for bulk operations
             session_cbu_ids: self.session_cbu_ids.clone(),
+            // Inherit client group context for entity resolution
+            client_group_id: self.client_group_id,
+            client_group_name: self.client_group_name.clone(),
+            // Inherit persona for tag filtering
+            persona: self.persona.clone(),
         }
     }
 
@@ -847,6 +867,40 @@ impl ExecutionContext {
     /// Check if there are any CBUs in session scope
     pub fn has_session_cbus(&self) -> bool {
         !self.session_cbu_ids.is_empty()
+    }
+
+    // =========================================================================
+    // CLIENT GROUP CONTEXT - For entity resolution scoping
+    // =========================================================================
+
+    /// Set the client group context for entity resolution
+    pub fn set_client_group_id(&mut self, group_id: Option<Uuid>) {
+        self.client_group_id = group_id;
+    }
+
+    /// Set the client group name (for display)
+    pub fn set_client_group_name(&mut self, name: Option<String>) {
+        self.client_group_name = name;
+    }
+
+    /// Get the client group ID
+    pub fn client_group_id(&self) -> Option<Uuid> {
+        self.client_group_id
+    }
+
+    /// Get the client group name
+    pub fn client_group_name(&self) -> Option<&str> {
+        self.client_group_name.as_deref()
+    }
+
+    /// Set the persona for tag filtering
+    pub fn set_persona(&mut self, persona: Option<String>) {
+        self.persona = persona;
+    }
+
+    /// Get the current persona
+    pub fn persona(&self) -> Option<&str> {
+        self.persona.as_deref()
     }
 
     // =========================================================================

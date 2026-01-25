@@ -967,5 +967,218 @@ impl CustomOperation for SessionListOp {
 }
 
 // =============================================================================
+// SET-CLIENT (Client Group Context for Entity Resolution)
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetClientResult {
+    pub group_id: Option<Uuid>,
+    pub group_name: Option<String>,
+    pub entity_count: i64,
+    pub candidates: Vec<ClientGroupCandidate>,
+    pub resolved: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientGroupCandidate {
+    pub group_id: Uuid,
+    pub group_name: String,
+    pub confidence: f64,
+}
+
+#[register_custom_op]
+pub struct SessionSetClientOp;
+
+#[async_trait]
+impl CustomOperation for SessionSetClientOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-client"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Sets client group context for entity resolution"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let client = get_required_string(verb_call, "client")?;
+        let client_norm = client.to_lowercase().trim().to_string();
+
+        // Search for matching client groups via aliases
+        let matches = sqlx::query!(
+            r#"
+            SELECT
+                cg.id as group_id,
+                cg.canonical_name as "group_name!",
+                cga.confidence as "confidence!",
+                (cga.alias_norm = $1) as "exact_match!"
+            FROM "ob-poc".client_group_alias cga
+            JOIN "ob-poc".client_group cg ON cg.id = cga.group_id
+            WHERE cga.alias_norm = $1
+               OR cga.alias_norm ILIKE '%' || $1 || '%'
+               OR similarity(cga.alias_norm, $1) > 0.3
+            ORDER BY
+                (cga.alias_norm = $1) DESC,
+                cga.confidence DESC,
+                similarity(cga.alias_norm, $1) DESC
+            LIMIT 5
+            "#,
+            client_norm
+        )
+        .fetch_all(pool)
+        .await?;
+
+        if matches.is_empty() {
+            // No match found
+            return Ok(ExecutionResult::Record(json!(SetClientResult {
+                group_id: None,
+                group_name: None,
+                entity_count: 0,
+                candidates: vec![],
+                resolved: false,
+            })));
+        }
+
+        // Check if we have a clear winner (exact match or high confidence with gap)
+        let top = &matches[0];
+        let has_clear_winner = top.exact_match
+            || (matches.len() == 1)
+            || (matches.len() > 1 && (top.confidence - matches[1].confidence) > 0.10);
+
+        if has_clear_winner {
+            // Set the client context in session
+            let group_id = top.group_id;
+            let group_name = top.group_name.clone();
+
+            // Get entity count for this group
+            let entity_count: i64 = sqlx::query_scalar!(
+                r#"
+                SELECT COUNT(*) as "count!"
+                FROM "ob-poc".client_group_entity
+                WHERE group_id = $1 AND membership_type != 'historical'
+                "#,
+                group_id
+            )
+            .fetch_one(pool)
+            .await?;
+
+            // Store in session context
+            ctx.set_client_group_id(Some(group_id));
+            ctx.set_client_group_name(Some(group_name.clone()));
+
+            return Ok(ExecutionResult::Record(json!(SetClientResult {
+                group_id: Some(group_id),
+                group_name: Some(group_name),
+                entity_count,
+                candidates: vec![],
+                resolved: true,
+            })));
+        }
+
+        // Ambiguous - return top 3 candidates for user selection
+        let candidates: Vec<ClientGroupCandidate> = matches
+            .into_iter()
+            .take(3)
+            .map(|m| ClientGroupCandidate {
+                group_id: m.group_id,
+                group_name: m.group_name,
+                confidence: m.confidence,
+            })
+            .collect();
+
+        Ok(ExecutionResult::Record(json!(SetClientResult {
+            group_id: None,
+            group_name: None,
+            entity_count: 0,
+            candidates,
+            resolved: false,
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
+// SET-PERSONA (Persona Context for Tag Filtering)
+// =============================================================================
+
+#[register_custom_op]
+pub struct SessionSetPersonaOp;
+
+#[async_trait]
+impl CustomOperation for SessionSetPersonaOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-persona"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Sets persona context for tag filtering (kyc, trading, ops, onboarding)"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let persona = get_required_string(verb_call, "persona")?;
+
+        // Validate persona
+        let valid_personas = ["kyc", "trading", "ops", "onboarding"];
+        let persona_lower = persona.to_lowercase();
+
+        if !valid_personas.contains(&persona_lower.as_str()) {
+            return Err(anyhow::anyhow!(
+                "Invalid persona '{}'. Valid options: {:?}",
+                persona,
+                valid_personas
+            ));
+        }
+
+        // Store in session context
+        ctx.set_persona(Some(persona_lower.clone()));
+
+        Ok(ExecutionResult::Record(json!({
+            "persona": persona_lower,
+            "set": true
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
 // REGISTRATION
 // =============================================================================

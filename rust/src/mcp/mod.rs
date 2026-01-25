@@ -46,6 +46,7 @@ pub mod handlers;
 pub mod intent_pipeline;
 pub mod protocol;
 pub mod resolution;
+pub mod scope_resolution;
 pub mod server;
 pub mod session;
 pub mod tools;
@@ -56,6 +57,9 @@ pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext
 pub use resolution::{
     ConversationContext, EnrichedMatch, ResolutionConfidence, ResolutionResult, ResolutionStrategy,
     SuggestedAction,
+};
+pub use scope_resolution::{
+    EntityMatch, ScopeCandidate, ScopeContext, ScopeResolutionOutcome, ScopeResolver,
 };
 pub use server::McpServer;
 pub use types::*;

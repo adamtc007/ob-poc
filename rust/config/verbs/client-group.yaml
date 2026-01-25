@@ -1,0 +1,438 @@
+# Client Group Verbs - Entity Context & Semantic Resolution
+#
+# These verbs manage:
+# 1. Entity membership: which entities belong to a client group
+# 2. Shorthand tags: human-readable labels for entity discovery
+# 3. Semantic search: Candle-assisted resolution of human language to entity_ids
+# 4. Discovery workflow: onboarding new client entity universes
+#
+# Architecture:
+#   client_group (existing) → aliases for GROUP resolution
+#   client_group_entity (new) → which entities belong to group
+#   client_group_entity_tag (new) → shorthand labels per entity
+#   client_group_entity_tag_embedding (new) → Candle semantic search
+#
+# Key insight: This is NOT formal taxonomy (UBO/ownership). This is
+# "how humans refer to entities" — a learned vocabulary for agent communication.
+
+domains:
+  client-group:
+    description: |
+      Manages client group entity membership and shorthand tags for semantic resolution.
+      Enables Candle-assisted fuzzy search from human language to entity_ids.
+
+    verbs:
+      # ============================================================================
+      # ENTITY MEMBERSHIP - Track which entities belong to client groups
+      # ============================================================================
+
+      entity-add:
+        description: "Add an entity to this client group's universe"
+        behavior: plugin
+        handler: ClientGroupEntityAddOp
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity
+          writes_operational: true
+          internal: false
+          noun: client_group_entity
+          tags: [membership, crud]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            description: "Client group ID"
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to add to group"
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: membership-type
+            type: string
+            required: false
+            default: "confirmed"
+            valid_values: ["confirmed", "suspected", "historical"]
+            description: "confirmed=verified, suspected=unconfirmed, historical=inactive"
+          - name: notes
+            type: string
+            required: false
+            description: "Optional notes about the membership"
+        returns:
+          type: uuid
+          description: "Membership record ID"
+
+      entity-remove:
+        description: "Remove an entity from this client group (or mark historical)"
+        behavior: plugin
+        handler: ClientGroupEntityRemoveOp
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity
+          writes_operational: true
+          internal: false
+          noun: client_group_entity
+          tags: [membership, crud]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: mark-historical
+            type: boolean
+            required: false
+            default: false
+            description: "If true, marks as historical instead of deleting"
+        returns:
+          type: boolean
+          description: "True if entity was removed/marked"
+
+      entity-list:
+        description: "List all entities in this client group"
+        behavior: plugin
+        handler: ClientGroupEntityListOp
+        invocation_phrases:
+          - "list entities in group"
+          - "show group entities"
+          - "who is in this group"
+          - "group members"
+        metadata:
+          tier: diagnostics
+          source_of_truth: client_group_entity
+          internal: false
+          noun: client_group_entity
+          tags: [membership, read]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: membership-type
+            type: string
+            required: false
+            description: "Filter by membership type (confirmed, suspected, historical)"
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+        returns:
+          type: record_set
+          fields: [entity_id, entity_name, membership_type, added_by, tags, created_at]
+
+      # ============================================================================
+      # SHORTHAND TAGS - Human-readable labels for entities
+      # ============================================================================
+
+      tag-add:
+        description: "Add a shorthand tag to an entity within client context"
+        behavior: plugin
+        handler: ClientGroupTagAddOp
+        invocation_phrases:
+          - "tag this as"
+          - "call this"
+          - "label this"
+          - "this is the"
+          - "mark as"
+          - "refer to this as"
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity_tag
+          writes_operational: true
+          internal: false
+          noun: entity_tag
+          tags: [tag, crud, learning]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: tag
+            type: string
+            required: true
+            description: "The shorthand label (e.g., 'main lux manco', 'irish fund')"
+          - name: persona
+            type: string
+            required: false
+            valid_values: ["kyc", "trading", "ops", "onboarding"]
+            description: "Scope to persona (null = universal)"
+        returns:
+          type: uuid
+          description: "Tag ID"
+        effects:
+          - "Computes tag_norm (normalized)"
+          - "Queues embedding computation"
+
+      tag-remove:
+        description: "Remove a shorthand tag"
+        behavior: plugin
+        handler: ClientGroupTagRemoveOp
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity_tag
+          writes_operational: true
+          internal: false
+          noun: entity_tag
+          tags: [tag, crud]
+        args:
+          - name: tag-id
+            type: uuid
+            required: true
+            description: "Tag ID to remove"
+        returns:
+          type: boolean
+
+      tag-list:
+        description: "List tags for entities in client group"
+        behavior: plugin
+        handler: ClientGroupTagListOp
+        invocation_phrases:
+          - "show tags"
+          - "list tags"
+          - "what do we call"
+        metadata:
+          tier: diagnostics
+          source_of_truth: client_group_entity_tag
+          internal: false
+          noun: entity_tag
+          tags: [tag, read]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: false
+            description: "Filter to specific entity"
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: persona
+            type: string
+            required: false
+            description: "Filter to persona"
+        returns:
+          type: record_set
+          fields: [tag_id, entity_id, entity_name, tag, persona, source, confidence]
+
+      # ============================================================================
+      # SEMANTIC SEARCH - The core capability
+      # ============================================================================
+
+      search:
+        description: "Search entities by shorthand tags (Candle-assisted fuzzy search)"
+        behavior: plugin
+        handler: ClientGroupSearchOp
+        invocation_phrases:
+          - "find"
+          - "show me the"
+          - "where is the"
+          - "get the"
+          - "which is the"
+          - "who is the"
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity_tag
+          internal: false
+          noun: entity_search
+          tags: [search, semantic, candle]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: query
+            type: string
+            required: true
+            description: "Human shorthand (e.g., 'the Irish funds', 'main ManCo')"
+          - name: persona
+            type: string
+            required: false
+            valid_values: ["kyc", "trading", "ops", "onboarding"]
+            description: "Scope search to persona"
+          - name: limit
+            type: integer
+            required: false
+            default: 10
+        returns:
+          type: record_set
+          fields: [entity_id, entity_name, matched_tag, confidence, match_type]
+        effects:
+          - "Tries exact match first"
+          - "Falls back to trigram fuzzy"
+          - "Falls back to embedding similarity"
+
+      # ============================================================================
+      # DISCOVERY WORKFLOW - Onboarding new client entity universes
+      # ============================================================================
+
+      discover-entities:
+        description: "Discover entities that might belong to this client (onboarding)"
+        behavior: plugin
+        handler: ClientGroupDiscoverEntitiesOp
+        invocation_phrases:
+          - "find all entities for"
+          - "discover entities for"
+          - "what entities belong to"
+          - "find related entities"
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity
+          writes_operational: true
+          internal: false
+          noun: discovery
+          tags: [onboarding, discovery, bulk]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: search-terms
+            type: string_array
+            required: false
+            description: "Additional terms to search (e.g., ['ireland', 'dublin'])"
+          - name: jurisdiction
+            type: string
+            required: false
+            description: "Filter to jurisdiction (e.g., 'IE', 'LU')"
+          - name: auto-add
+            type: boolean
+            required: false
+            default: false
+            description: "Automatically add as 'suspected' membership"
+        returns:
+          type: record_set
+          fields: [entity_id, entity_name, entity_type, match_reason, already_member]
+        effects:
+          - "Searches entities by name patterns"
+          - "Searches via GLEIF relationships if available"
+          - "If auto-add: creates membership with type='suspected'"
+
+      confirm-entity:
+        description: "Confirm a suspected entity as belonging to client"
+        behavior: plugin
+        handler: ClientGroupConfirmEntityOp
+        invocation_phrases:
+          - "confirm this entity"
+          - "yes this belongs"
+          - "add to group"
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity
+          writes_operational: true
+          internal: false
+          noun: membership
+          tags: [onboarding, confirmation]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: tags
+            type: string_array
+            required: false
+            description: "Initial shorthand tags to apply"
+        returns:
+          type: boolean
+        effects:
+          - "Updates membership_type to 'confirmed'"
+          - "If tags provided: creates shorthand tags"
+
+      reject-entity:
+        description: "Mark a suspected entity as NOT belonging to client"
+        behavior: plugin
+        handler: ClientGroupRejectEntityOp
+        metadata:
+          tier: intent
+          source_of_truth: client_group_entity
+          writes_operational: true
+          internal: false
+          noun: membership
+          tags: [onboarding, rejection]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: true
+            lookup:
+              table: entities
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: reason
+            type: string
+            required: false
+            description: "Reason for rejection"
+        returns:
+          type: boolean
+        effects:
+          - "Removes entity from group or marks as rejected"
