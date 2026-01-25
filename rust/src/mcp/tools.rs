@@ -2803,5 +2803,213 @@ Use to check what's been taught and whether patterns are active."#.into(),
                 }
             }),
         },
+        // =====================================================================
+        // Staged Runbook Tools - Anti-hallucination Execution Model
+        // =====================================================================
+        Tool {
+            name: "runbook_stage".into(),
+            description: r#"Stage a command in the runbook WITHOUT executing.
+
+This is the core anti-hallucination mechanism:
+- Commands are staged, never auto-executed
+- Entity references are resolved from DB, never invented
+- Ambiguous refs trigger picker (user must select)
+- Execution only on explicit runbook_run
+
+Example:
+  runbook_stage("Show me Irish funds")
+  → Stages: (entity.list :filter "jurisdiction=IE AND type=FUND")
+  → If "Irish funds" is ambiguous, returns candidates for picker
+
+Returns:
+- command_id: UUID of staged command
+- needs_pick: true if ambiguous (use runbook_pick)
+- candidates: entities to pick from if ambiguous
+- runbook: current runbook summary"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID (stable conversation key)"
+                    },
+                    "input": {
+                        "type": "string",
+                        "description": "DSL source or natural language command"
+                    },
+                    "client_group_id": {
+                        "type": "string",
+                        "description": "Client group UUID for entity resolution scope"
+                    },
+                    "persona": {
+                        "type": "string",
+                        "description": "Persona for tag filtering (e.g., 'trading', 'compliance')"
+                    },
+                    "source_prompt": {
+                        "type": "string",
+                        "description": "Original user utterance (for audit trail)"
+                    }
+                },
+                "required": ["session_id", "input"]
+            }),
+        },
+        Tool {
+            name: "runbook_pick".into(),
+            description: r#"Pick entities to resolve an ambiguous command.
+
+When runbook_stage returns needs_pick=true, use this to select entities.
+CRITICAL: entity_ids MUST come from the candidates returned by runbook_stage.
+The system validates against stored candidates - fabricated IDs will fail.
+
+This is where hallucination dies: all entity IDs come from DB searches,
+user confirms the selection, and only validated UUIDs enter the DSL.
+
+Example:
+  runbook_pick(command_id, "entity-id", ["uuid-1", "uuid-2"])"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID"
+                    },
+                    "command_id": {
+                        "type": "string",
+                        "description": "Command ID to pick for"
+                    },
+                    "arg_name": {
+                        "type": "string",
+                        "description": "Argument name being resolved (e.g., 'entity-id')"
+                    },
+                    "entity_ids": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Selected entity UUIDs (MUST be from candidates)"
+                    }
+                },
+                "required": ["session_id", "command_id", "arg_name", "entity_ids"]
+            }),
+        },
+        Tool {
+            name: "runbook_run".into(),
+            description: r#"Execute the staged runbook.
+
+ONLY executes when explicitly called. This is the bank-grade control:
+- User reviews the runbook (via runbook_show or runbook_preview)
+- User confirms with "run" / "execute" / "commit"
+- All commands execute in DAG order with advisory locks
+- Full audit trail for every operation
+
+Returns:
+- success: whether all commands succeeded
+- commands_executed: count of commands run
+- results: per-command execution results
+- events: audit trail"#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "If true, validate but don't execute"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "runbook_show".into(),
+            description: r#"Show current runbook state.
+
+Displays all staged commands with their resolution status:
+- Resolved: ready to execute
+- Ambiguous: needs picker
+- Failed: resolution error
+- Pending: not yet resolved
+
+Also shows blockers (what's preventing execution) and is_ready status."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID"
+                    },
+                    "include_entities": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include detailed entity footprint"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "runbook_preview".into(),
+            description: r#"Preview runbook execution without running.
+
+Shows:
+- Full entity footprint (all entities that will be touched)
+- DAG execution order
+- What each command will do
+
+Use before runbook_run to let user review the impact."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
+        Tool {
+            name: "runbook_remove".into(),
+            description: r#"Remove a staged command from the runbook.
+
+Use when user wants to remove a command before execution.
+Does NOT affect already-executed commands."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID"
+                    },
+                    "command_id": {
+                        "type": "string",
+                        "description": "Command ID to remove"
+                    }
+                },
+                "required": ["session_id", "command_id"]
+            }),
+        },
+        Tool {
+            name: "runbook_abort".into(),
+            description: r#"Abort and clear the runbook.
+
+Marks the runbook as aborted and clears all staged commands.
+Use when user wants to start fresh or cancel the operation."#.into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Reason for abort (for audit trail)"
+                    }
+                },
+                "required": ["session_id"]
+            }),
+        },
     ]
 }

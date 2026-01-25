@@ -47,6 +47,7 @@ use sqlx::PgPool;
 // RESULT TYPES
 // =============================================================================
 
+#[allow(dead_code)] // Future use for membership operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityMembershipResult {
     pub id: Uuid,
@@ -723,7 +724,7 @@ impl CustomOperation for ClientGroupSearchOp {
                 entity_id: r.entity_id,
                 entity_name: r.entity_name,
                 matched_tag: r.tag,
-                confidence: r.confidence as f64,
+                confidence: r.confidence,
                 match_type: r.match_type,
             })
             .collect();

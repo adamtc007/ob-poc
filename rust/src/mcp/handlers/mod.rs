@@ -14,7 +14,8 @@
 //!     ├── Workflow handlers (workflow_status, etc.)
 //!     ├── Template handlers (template_list, etc.)
 //!     ├── Batch handlers (batch_start, etc.)
-//!     └── Research handlers (research_list, etc.)
+//!     ├── Research handlers (research_list, etc.)
+//!     └── Runbook handlers (runbook_stage, runbook_pick, runbook_run, etc.)
 //! ```
 //!
 //! ## Future Refactoring
@@ -27,8 +28,11 @@
 //! - `template.rs` - Template list/get/expand handlers
 //! - `batch.rs` - Batch execution handlers
 //! - `research.rs` - Research macro handlers
+//! - `runbook.rs` - Staged runbook execution handlers
 
 mod core;
+pub mod runbook;
 
 // Re-export the main ToolHandlers struct
 pub use core::ToolHandlers;
+pub use runbook::RunbookHandlers;

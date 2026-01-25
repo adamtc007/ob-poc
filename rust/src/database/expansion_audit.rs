@@ -176,8 +176,6 @@ pub struct ExpansionReportRow {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_batch_policy_string_conversion() {
         // Verify the string conversion matches the CHECK constraint

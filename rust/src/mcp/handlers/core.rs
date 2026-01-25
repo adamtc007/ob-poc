@@ -452,6 +452,35 @@ impl ToolHandlers {
             "teach_phrase" => self.teach_phrase(args).await,
             "unteach_phrase" => self.unteach_phrase(args).await,
             "teaching_status" => self.teaching_status(args).await,
+            // Staged Runbook tools (anti-hallucination execution model)
+            "runbook_stage" => {
+                let handlers = super::runbook::RunbookHandlers::new(&self.pool);
+                handlers.runbook_stage(args).await
+            }
+            "runbook_pick" => {
+                let handlers = super::runbook::RunbookHandlers::new(&self.pool);
+                handlers.runbook_pick(args).await
+            }
+            "runbook_run" => {
+                let handlers = super::runbook::RunbookHandlers::new(&self.pool);
+                handlers.runbook_run(args).await
+            }
+            "runbook_show" => {
+                let handlers = super::runbook::RunbookHandlers::new(&self.pool);
+                handlers.runbook_show(args).await
+            }
+            "runbook_preview" => {
+                let handlers = super::runbook::RunbookHandlers::new(&self.pool);
+                handlers.runbook_preview(args).await
+            }
+            "runbook_remove" => {
+                let handlers = super::runbook::RunbookHandlers::new(&self.pool);
+                handlers.runbook_remove(args).await
+            }
+            "runbook_abort" => {
+                let handlers = super::runbook::RunbookHandlers::new(&self.pool);
+                handlers.runbook_abort(args).await
+            }
             _ => Err(anyhow!("Unknown tool: {}", name)),
         }
     }

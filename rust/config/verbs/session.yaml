@@ -408,5 +408,5 @@ domains:
             valid_values: ["kyc", "trading", "ops", "onboarding"]
             description: "Persona for tag filtering"
         returns:
-          type: boolean
-          description: "True if persona was set"
+          type: affected
+          description: "1 if persona was set"

@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn test_lock_key_ordering() {
-        let mut keys = vec![
+        let mut keys = [
             LockKey::write("person", "uuid-3"),
             LockKey::write("cbu", "uuid-1"),
             LockKey::read("person", "uuid-2"),

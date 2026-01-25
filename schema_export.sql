@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict AeacjYBrtUVlVVp42l9Z0bVcYU9P0bEJS8YBbbPIy8LTfIAye7yaNMafXRjsm9s
+\restrict YFUwJpaYeD4PPy0Ymvo7VaPcDo2mVv7i1X4fqvhwIgEPNraVuwOuaS6iPNUAvcV
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -3263,6 +3263,34 @@ $$;
 
 
 --
+-- Name: abort_runbook(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".abort_runbook(p_runbook_id uuid) RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Delete all commands (CASCADE handles children)
+    DELETE FROM "ob-poc".staged_command WHERE runbook_id = p_runbook_id;
+
+    -- Update status
+    UPDATE "ob-poc".staged_runbook
+    SET status = 'aborted', updated_at = now()
+    WHERE id = p_runbook_id;
+
+    RETURN FOUND;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION abort_runbook(p_runbook_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".abort_runbook(p_runbook_id uuid) IS 'Clear all staged commands and mark runbook as aborted.';
+
+
+--
 -- Name: session_scopes; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -4000,6 +4028,47 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".check_cbu_role_requirements(p_cbu_id uuid) IS 'Checks if all role requirements are satisfied for a CBU (e.g., feeder needs master).';
+
+
+--
+-- Name: check_runbook_ready(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".check_runbook_ready(p_runbook_id uuid) RETURNS TABLE(is_ready boolean, blocking_command_id uuid, blocking_source_order integer, blocking_status text, blocking_error text)
+    LANGUAGE plpgsql STABLE
+    AS $$
+BEGIN
+    -- Check for any non-resolved commands
+    RETURN QUERY
+    SELECT
+        NOT EXISTS (
+            SELECT 1 FROM "ob-poc".staged_command
+            WHERE runbook_id = p_runbook_id
+              AND resolution_status != 'resolved'
+        ) AS is_ready,
+        sc.id AS blocking_command_id,
+        sc.source_order AS blocking_source_order,
+        sc.resolution_status AS blocking_status,
+        sc.resolution_error AS blocking_error
+    FROM "ob-poc".staged_command sc
+    WHERE sc.runbook_id = p_runbook_id
+      AND sc.resolution_status != 'resolved'
+    ORDER BY sc.source_order;
+
+    -- If no blocking commands, return a single row with is_ready = true
+    IF NOT FOUND THEN
+        RETURN QUERY
+        SELECT TRUE, NULL::UUID, NULL::INT, NULL::TEXT, NULL::TEXT;
+    END IF;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION check_runbook_ready(p_runbook_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".check_runbook_ready(p_runbook_id uuid) IS 'Server-side readiness gate. Returns blocking commands if runbook cannot execute.';
 
 
 --
@@ -5169,6 +5238,43 @@ $$;
 
 
 --
+-- Name: get_or_create_runbook(text, uuid, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_or_create_runbook(p_session_id text, p_client_group_id uuid DEFAULT NULL::uuid, p_persona text DEFAULT NULL::text) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_runbook_id UUID;
+BEGIN
+    -- Try to get existing active runbook
+    SELECT id INTO v_runbook_id
+    FROM "ob-poc".staged_runbook
+    WHERE session_id = p_session_id
+      AND status = 'building'
+    ORDER BY created_at DESC
+    LIMIT 1;
+
+    -- If none exists, create one
+    IF v_runbook_id IS NULL THEN
+        INSERT INTO "ob-poc".staged_runbook (session_id, client_group_id, persona)
+        VALUES (p_session_id, p_client_group_id, p_persona)
+        RETURNING id INTO v_runbook_id;
+    END IF;
+
+    RETURN v_runbook_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION get_or_create_runbook(p_session_id text, p_client_group_id uuid, p_persona text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".get_or_create_runbook(p_session_id text, p_client_group_id uuid, p_persona text) IS 'Get existing active runbook or create new one. Ensures one active runbook per session.';
+
+
+--
 -- Name: get_or_create_session_scope(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -5954,6 +6060,26 @@ $$;
 
 
 --
+-- Name: normalize_tag(text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".normalize_tag(p_tag text) RETURNS text
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    RETURN lower(trim(regexp_replace(p_tag, '\s+', ' ', 'g')));
+END;
+$$;
+
+
+--
+-- Name: FUNCTION normalize_tag(p_tag text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".normalize_tag(p_tag text) IS 'Normalize tag for consistent matching: lowercase, trim, collapse spaces';
+
+
+--
 -- Name: ownership_as_of(uuid, date); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -6410,6 +6536,74 @@ COMMENT ON FUNCTION "ob-poc".remove_cbu_from_set(p_session_id uuid, p_cbu_id uui
 
 
 --
+-- Name: remove_command(uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".remove_command(p_command_id uuid) RETURNS TABLE(removed_id uuid, was_dependent boolean)
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_runbook_id UUID;
+BEGIN
+    -- Get runbook ID
+    SELECT runbook_id INTO v_runbook_id
+    FROM "ob-poc".staged_command
+    WHERE id = p_command_id;
+
+    IF v_runbook_id IS NULL THEN
+        RAISE EXCEPTION 'Command % not found', p_command_id;
+    END IF;
+
+    -- Return the command and all dependents
+    RETURN QUERY
+    WITH RECURSIVE dependents AS (
+        -- Base: the command being removed
+        SELECT id, FALSE AS was_dependent
+        FROM "ob-poc".staged_command
+        WHERE id = p_command_id
+
+        UNION ALL
+
+        -- Recursive: commands that depend on already-selected commands
+        SELECT sc.id, TRUE AS was_dependent
+        FROM "ob-poc".staged_command sc
+        JOIN dependents d ON p_command_id = ANY(sc.depends_on)
+        WHERE sc.runbook_id = v_runbook_id
+    )
+    SELECT d.id, d.was_dependent FROM dependents d;
+
+    -- Delete (CASCADE handles staged_command_entity and staged_command_candidate)
+    DELETE FROM "ob-poc".staged_command
+    WHERE id IN (
+        SELECT d.id FROM (
+            WITH RECURSIVE dependents AS (
+                SELECT id FROM "ob-poc".staged_command WHERE id = p_command_id
+                UNION ALL
+                SELECT sc.id
+                FROM "ob-poc".staged_command sc
+                JOIN dependents d ON p_command_id = ANY(sc.depends_on)
+                WHERE sc.runbook_id = v_runbook_id
+            )
+            SELECT id FROM dependents
+        ) d
+    );
+
+    -- Update runbook timestamp
+    UPDATE "ob-poc".staged_runbook
+    SET updated_at = now()
+    WHERE id = v_runbook_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION remove_command(p_command_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".remove_command(p_command_id uuid) IS 'Remove a command and cascade-remove all commands that depend on it.';
+
+
+--
 -- Name: reset_layout_overrides(uuid, character varying, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -6503,6 +6697,123 @@ CREATE FUNCTION "ob-poc".resolve_uuid_to_semantic(attr_uuid uuid) RETURNS text
     AS $$
     SELECT id FROM "ob-poc".attribute_registry WHERE uuid = attr_uuid;
 $$;
+
+
+--
+-- Name: search_entity_tags(uuid, text, text, integer, boolean); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".search_entity_tags(p_group_id uuid, p_query text, p_persona text DEFAULT NULL::text, p_limit integer DEFAULT 10, p_include_historical boolean DEFAULT false) RETURNS TABLE(entity_id uuid, entity_name text, tag text, confidence double precision, match_type text)
+    LANGUAGE plpgsql STABLE
+    AS $$
+DECLARE
+    v_query_norm TEXT;
+BEGIN
+    -- Normalize query
+    v_query_norm := lower(trim(regexp_replace(p_query, '\s+', ' ', 'g')));
+
+    RETURN QUERY
+    WITH matches AS (
+        -- Exact match (highest priority)
+        SELECT
+            cget.entity_id,
+            e.name::TEXT AS entity_name,  -- explicit cast for varchar(255)
+            cget.tag,
+            cget.confidence,
+            'exact'::TEXT AS match_type,
+            1 AS priority
+        FROM "ob-poc".client_group_entity_tag cget
+        -- MEMBERSHIP GATE: only return entities that are members of the group
+        JOIN "ob-poc".client_group_entity cge
+            ON cge.group_id = cget.group_id AND cge.entity_id = cget.entity_id
+        JOIN "ob-poc".entities e ON e.entity_id = cget.entity_id
+        WHERE cget.group_id = p_group_id
+          AND cget.tag_norm = v_query_norm
+          AND (p_persona IS NULL OR cget.persona IS NULL OR cget.persona = p_persona)
+          -- Exclude historical unless explicitly requested
+          AND (p_include_historical OR cge.membership_type != 'historical')
+
+        UNION ALL
+
+        -- Trigram fuzzy match
+        SELECT
+            cget.entity_id,
+            e.name::TEXT AS entity_name,  -- explicit cast for varchar(255)
+            cget.tag,
+            (similarity(cget.tag_norm, v_query_norm) * cget.confidence)::FLOAT,
+            'fuzzy'::TEXT AS match_type,
+            2 AS priority
+        FROM "ob-poc".client_group_entity_tag cget
+        -- MEMBERSHIP GATE: only return entities that are members of the group
+        JOIN "ob-poc".client_group_entity cge
+            ON cge.group_id = cget.group_id AND cge.entity_id = cget.entity_id
+        JOIN "ob-poc".entities e ON e.entity_id = cget.entity_id
+        WHERE cget.group_id = p_group_id
+          AND cget.tag_norm % v_query_norm
+          AND cget.tag_norm != v_query_norm  -- exclude exact matches
+          AND (p_persona IS NULL OR cget.persona IS NULL OR cget.persona = p_persona)
+          -- Exclude historical unless explicitly requested
+          AND (p_include_historical OR cge.membership_type != 'historical')
+    )
+    SELECT DISTINCT ON (m.entity_id)
+        m.entity_id,
+        m.entity_name,
+        m.tag,
+        m.confidence,
+        m.match_type
+    FROM matches m
+    ORDER BY m.entity_id, m.priority, m.confidence DESC
+    LIMIT p_limit;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION search_entity_tags(p_group_id uuid, p_query text, p_persona text, p_limit integer, p_include_historical boolean); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".search_entity_tags(p_group_id uuid, p_query text, p_persona text, p_limit integer, p_include_historical boolean) IS 'Search shorthand tags to resolve human language to entity_ids. Used by Candle intent pipeline.';
+
+
+--
+-- Name: search_entity_tags_semantic(uuid, public.vector, text, integer, double precision, boolean, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".search_entity_tags_semantic(p_group_id uuid, p_query_embedding public.vector, p_persona text DEFAULT NULL::text, p_limit integer DEFAULT 10, p_min_similarity double precision DEFAULT 0.5, p_include_historical boolean DEFAULT false, p_embedder_id text DEFAULT 'bge-small-en-v1.5'::text) RETURNS TABLE(entity_id uuid, entity_name text, tag text, similarity double precision, match_type text)
+    LANGUAGE plpgsql STABLE
+    AS $$
+BEGIN
+    RETURN QUERY
+    SELECT DISTINCT ON (cget.entity_id)
+        cget.entity_id,
+        e.name::TEXT AS entity_name,  -- explicit cast for varchar(255)
+        cget.tag,
+        (1.0 - (cgete.embedding <=> p_query_embedding))::FLOAT AS similarity,
+        'semantic'::TEXT AS match_type
+    FROM "ob-poc".client_group_entity_tag_embedding cgete
+    JOIN "ob-poc".client_group_entity_tag cget ON cget.id = cgete.tag_id
+    -- MEMBERSHIP GATE: only return entities that are members of the group
+    JOIN "ob-poc".client_group_entity cge
+        ON cge.group_id = cget.group_id AND cge.entity_id = cget.entity_id
+    JOIN "ob-poc".entities e ON e.entity_id = cget.entity_id
+    WHERE cget.group_id = p_group_id
+      -- Filter by embedder to avoid dimension/model mismatches
+      AND cgete.embedder_id = p_embedder_id
+      AND (p_persona IS NULL OR cget.persona IS NULL OR cget.persona = p_persona)
+      AND (1.0 - (cgete.embedding <=> p_query_embedding)) >= p_min_similarity
+      -- Exclude historical unless explicitly requested
+      AND (p_include_historical OR cge.membership_type != 'historical')
+    ORDER BY cget.entity_id, (cgete.embedding <=> p_query_embedding)
+    LIMIT p_limit;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION search_entity_tags_semantic(p_group_id uuid, p_query_embedding public.vector, p_persona text, p_limit integer, p_min_similarity double precision, p_include_historical boolean, p_embedder_id text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".search_entity_tags_semantic(p_group_id uuid, p_query_embedding public.vector, p_persona text, p_limit integer, p_min_similarity double precision, p_include_historical boolean, p_embedder_id text) IS 'Semantic search using Candle embeddings. Fallback when text search returns nothing.';
 
 
 --
@@ -7068,6 +7379,48 @@ $$;
 
 
 --
+-- Name: stage_command(uuid, text, text, text, text); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".stage_command(p_runbook_id uuid, p_dsl_raw text, p_verb text, p_description text DEFAULT NULL::text, p_source_prompt text DEFAULT NULL::text) RETURNS uuid
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_command_id UUID;
+    v_next_order INT;
+BEGIN
+    -- Get next source_order
+    SELECT COALESCE(MAX(source_order), 0) + 1 INTO v_next_order
+    FROM "ob-poc".staged_command
+    WHERE runbook_id = p_runbook_id;
+
+    -- Insert command
+    INSERT INTO "ob-poc".staged_command (
+        runbook_id, source_order, dsl_raw, verb, description, source_prompt
+    )
+    VALUES (
+        p_runbook_id, v_next_order, p_dsl_raw, p_verb, p_description, p_source_prompt
+    )
+    RETURNING id INTO v_command_id;
+
+    -- Update runbook timestamp
+    UPDATE "ob-poc".staged_runbook
+    SET updated_at = now()
+    WHERE id = p_runbook_id;
+
+    RETURN v_command_id;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION stage_command(p_runbook_id uuid, p_dsl_raw text, p_verb text, p_description text, p_source_prompt text); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".stage_command(p_runbook_id uuid, p_dsl_raw text, p_verb text, p_description text, p_source_prompt text) IS 'Stage a new command with automatic source_order assignment.';
+
+
+--
 -- Name: sync_commercial_client_role(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -7123,6 +7476,22 @@ BEGIN
         NEW.status_changed_at = NOW();
     END IF;
     RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: trg_update_runbook_timestamp(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".trg_update_runbook_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    UPDATE "ob-poc".staged_runbook
+    SET updated_at = now()
+    WHERE id = COALESCE(NEW.runbook_id, OLD.runbook_id);
+    RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
@@ -7413,6 +7782,52 @@ BEGIN
     RETURN v_role_id;
 END;
 $$;
+
+
+--
+-- Name: validate_picker_selection(uuid, uuid[]); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".validate_picker_selection(p_command_id uuid, p_entity_ids uuid[]) RETURNS TABLE(is_valid boolean, invalid_entity_id uuid, error_message text)
+    LANGUAGE plpgsql STABLE
+    AS $$
+DECLARE
+    v_invalid UUID;
+    v_valid_candidates UUID[];
+BEGIN
+    -- Get valid candidates for this command
+    SELECT array_agg(entity_id) INTO v_valid_candidates
+    FROM "ob-poc".staged_command_candidate
+    WHERE command_id = p_command_id;
+
+    IF v_valid_candidates IS NULL OR array_length(v_valid_candidates, 1) IS NULL THEN
+        RETURN QUERY SELECT FALSE, NULL::UUID, 'No candidates stored for this command'::TEXT;
+        RETURN;
+    END IF;
+
+    -- Check each selected entity_id is in the candidate set
+    FOREACH v_invalid IN ARRAY p_entity_ids
+    LOOP
+        IF NOT (v_invalid = ANY(v_valid_candidates)) THEN
+            RETURN QUERY SELECT
+                FALSE,
+                v_invalid,
+                format('Entity %s not in stored candidate set from ResolutionAmbiguous event', v_invalid)::TEXT;
+            RETURN;
+        END IF;
+    END LOOP;
+
+    -- All valid
+    RETURN QUERY SELECT TRUE, NULL::UUID, NULL::TEXT;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION validate_picker_selection(p_command_id uuid, p_entity_ids uuid[]); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".validate_picker_selection(p_command_id uuid, p_entity_ids uuid[]) IS 'CRITICAL: Validates picker entity_ids against stored candidates. Prevents agent from fabricating UUIDs.';
 
 
 --
@@ -13521,6 +13936,83 @@ CREATE TABLE "ob-poc".client_group_anchor_role (
 
 
 --
+-- Name: client_group_entity; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_entity (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    group_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    membership_type text DEFAULT 'confirmed'::text NOT NULL,
+    added_by text DEFAULT 'manual'::text NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE client_group_entity; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group_entity IS 'Entity membership in client groups. Tracks which entities belong to which client universe.';
+
+
+--
+-- Name: client_group_entity_tag; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_entity_tag (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    group_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    tag text NOT NULL,
+    tag_norm text NOT NULL,
+    persona text,
+    source text DEFAULT 'manual'::text NOT NULL,
+    confidence double precision DEFAULT 1.0,
+    created_at timestamp with time zone DEFAULT now(),
+    created_by text
+);
+
+
+--
+-- Name: TABLE client_group_entity_tag; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group_entity_tag IS 'Informal shorthand tags for entities within a client context. Persona-scoped, human-think labels.';
+
+
+--
+-- Name: COLUMN client_group_entity_tag.persona; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group_entity_tag.persona IS 'NULL = universal tag. Otherwise scoped to persona: kyc, trading, ops, onboarding, etc.';
+
+
+--
+-- Name: client_group_entity_tag_embedding; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_entity_tag_embedding (
+    tag_id uuid NOT NULL,
+    embedder_id text NOT NULL,
+    pooling text NOT NULL,
+    "normalize" boolean NOT NULL,
+    dimension integer NOT NULL,
+    embedding public.vector(384) NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE client_group_entity_tag_embedding; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group_entity_tag_embedding IS 'Embeddings for shorthand tags. Enables Candle semantic search: "irish funds" → entity_ids';
+
+
+--
 -- Name: client_types; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -17482,6 +17974,119 @@ CREATE TABLE "ob-poc".ssi_types (
 
 
 --
+-- Name: staged_command; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".staged_command (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    runbook_id uuid NOT NULL,
+    source_order integer NOT NULL,
+    dag_order integer,
+    dsl_raw text NOT NULL,
+    dsl_resolved text,
+    verb text NOT NULL,
+    description text,
+    source_prompt text,
+    resolution_status text DEFAULT 'pending'::text NOT NULL,
+    resolution_error text,
+    depends_on uuid[] DEFAULT '{}'::uuid[],
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT staged_command_resolution_status_check CHECK ((resolution_status = ANY (ARRAY['pending'::text, 'resolved'::text, 'ambiguous'::text, 'failed'::text, 'parse_failed'::text])))
+);
+
+
+--
+-- Name: TABLE staged_command; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".staged_command IS 'Individual DSL command staged for execution. Tracks resolution status and DAG dependencies.';
+
+
+--
+-- Name: COLUMN staged_command.resolution_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".staged_command.resolution_status IS 'pending: not yet resolved, resolved: all refs→UUIDs, ambiguous: needs picker, failed: no matches, parse_failed: syntax error';
+
+
+--
+-- Name: staged_command_candidate; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".staged_command_candidate (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    command_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    arg_name text NOT NULL,
+    matched_tag text,
+    confidence double precision,
+    match_type text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT staged_command_candidate_match_type_check CHECK ((match_type = ANY (ARRAY['tag_exact'::text, 'tag_fuzzy'::text, 'tag_semantic'::text])))
+);
+
+
+--
+-- Name: TABLE staged_command_candidate; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".staged_command_candidate IS 'Picker candidates for ambiguous resolution. runbook_pick MUST validate entity_ids against this set. Agent cannot fabricate UUIDs.';
+
+
+--
+-- Name: staged_command_entity; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".staged_command_entity (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    command_id uuid NOT NULL,
+    entity_id uuid NOT NULL,
+    arg_name text NOT NULL,
+    resolution_source text NOT NULL,
+    original_ref text,
+    confidence double precision,
+    CONSTRAINT staged_command_entity_resolution_source_check CHECK ((resolution_source = ANY (ARRAY['tag_exact'::text, 'tag_fuzzy'::text, 'tag_semantic'::text, 'direct_uuid'::text, 'picker'::text, 'output_ref'::text])))
+);
+
+
+--
+-- Name: TABLE staged_command_entity; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".staged_command_entity IS 'Entity footprint: which entities will be touched by each command. Shows pre-execution impact.';
+
+
+--
+-- Name: COLUMN staged_command_entity.resolution_source; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".staged_command_entity.resolution_source IS 'tag_exact: exact tag match, tag_fuzzy: trigram fuzzy, tag_semantic: Candle embedding, direct_uuid: user provided UUID, picker: user selected from candidates, output_ref: from previous command output ($N.result)';
+
+
+--
+-- Name: staged_runbook; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".staged_runbook (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id text NOT NULL,
+    client_group_id uuid,
+    persona text,
+    status text DEFAULT 'building'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT staged_runbook_status_check CHECK ((status = ANY (ARRAY['building'::text, 'ready'::text, 'executing'::text, 'completed'::text, 'aborted'::text])))
+);
+
+
+--
+-- Name: TABLE staged_runbook; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".staged_runbook IS 'Session-scoped staged runbook. Accumulates DSL commands for review before execution.';
+
+
+--
 -- Name: taxonomy_crud_log; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -18956,6 +19561,29 @@ COMMENT ON VIEW "ob-poc".v_cbus_by_manco IS 'All CBUs grouped by governance cont
 
 
 --
+-- Name: v_client_entity_tags; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_client_entity_tags AS
+ SELECT cget.id AS tag_id,
+    cget.tag,
+    cget.tag_norm,
+    cget.persona,
+    cget.confidence,
+    cget.source,
+    cget.group_id,
+    cg.canonical_name AS group_name,
+    cget.entity_id,
+    (e.name)::text AS entity_name,
+    e.entity_type_id,
+    cge.membership_type
+   FROM ((("ob-poc".client_group_entity_tag cget
+     JOIN "ob-poc".client_group cg ON ((cg.id = cget.group_id)))
+     JOIN "ob-poc".entities e ON ((e.entity_id = cget.entity_id)))
+     LEFT JOIN "ob-poc".client_group_entity cge ON (((cge.group_id = cget.group_id) AND (cge.entity_id = cget.entity_id))));
+
+
+--
 -- Name: v_client_group_aliases; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -19419,6 +20047,34 @@ COMMENT ON VIEW "ob-poc".v_role_taxonomy IS 'Complete role taxonomy reference wi
 
 
 --
+-- Name: v_runbook_summary; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_runbook_summary AS
+SELECT
+    NULL::uuid AS runbook_id,
+    NULL::text AS session_id,
+    NULL::text AS status,
+    NULL::uuid AS client_group_id,
+    NULL::text AS persona,
+    NULL::bigint AS command_count,
+    NULL::bigint AS resolved_count,
+    NULL::bigint AS pending_count,
+    NULL::bigint AS ambiguous_count,
+    NULL::bigint AS failed_count,
+    NULL::bigint AS entity_footprint_size,
+    NULL::timestamp with time zone AS created_at,
+    NULL::timestamp with time zone AS updated_at;
+
+
+--
+-- Name: VIEW v_runbook_summary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_runbook_summary IS 'Runbook statistics for MCP events and UI status bar.';
+
+
+--
 -- Name: v_service_intents_active; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -19509,6 +20165,49 @@ CREATE VIEW "ob-poc".v_session_view_history AS
 --
 
 COMMENT ON VIEW "ob-poc".v_session_view_history IS 'View state change history per session - shows navigation path through data';
+
+
+--
+-- Name: v_staged_runbook; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_staged_runbook AS
+ SELECT sr.id AS runbook_id,
+    sr.session_id,
+    sr.client_group_id,
+    sr.persona,
+    sr.status AS runbook_status,
+    sr.created_at AS runbook_created_at,
+    sr.updated_at AS runbook_updated_at,
+    sc.id AS command_id,
+    sc.source_order,
+    sc.dag_order,
+    sc.dsl_raw,
+    sc.dsl_resolved,
+    sc.verb,
+    sc.description,
+    sc.source_prompt,
+    sc.resolution_status,
+    sc.resolution_error,
+    sc.depends_on,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('entity_id', sce.entity_id, 'entity_name', e.name, 'arg_name', sce.arg_name, 'source', sce.resolution_source, 'original_ref', sce.original_ref, 'confidence', sce.confidence) ORDER BY sce.arg_name, e.name) AS jsonb_agg
+           FROM ("ob-poc".staged_command_entity sce
+             JOIN "ob-poc".entities e ON ((e.entity_id = sce.entity_id)))
+          WHERE (sce.command_id = sc.id)), '[]'::jsonb) AS entity_footprint,
+    COALESCE(( SELECT jsonb_agg(jsonb_build_object('entity_id', scc.entity_id, 'entity_name', e.name, 'arg_name', scc.arg_name, 'matched_tag', scc.matched_tag, 'confidence', scc.confidence, 'match_type', scc.match_type) ORDER BY scc.confidence DESC, e.name) AS jsonb_agg
+           FROM ("ob-poc".staged_command_candidate scc
+             JOIN "ob-poc".entities e ON ((e.entity_id = scc.entity_id)))
+          WHERE (scc.command_id = sc.id)), '[]'::jsonb) AS candidates
+   FROM ("ob-poc".staged_runbook sr
+     LEFT JOIN "ob-poc".staged_command sc ON ((sc.runbook_id = sr.id)))
+  ORDER BY sr.id, COALESCE(sc.dag_order, sc.source_order);
+
+
+--
+-- Name: VIEW v_staged_runbook; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_staged_runbook IS 'Full runbook state with commands, entity footprint, and picker candidates. Primary query for MCP runbook_show.';
 
 
 --
@@ -22819,6 +23518,38 @@ ALTER TABLE ONLY "ob-poc".client_group_anchor_role
 
 
 --
+-- Name: client_group_entity client_group_entity_group_id_entity_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity
+    ADD CONSTRAINT client_group_entity_group_id_entity_id_key UNIQUE (group_id, entity_id);
+
+
+--
+-- Name: client_group_entity client_group_entity_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity
+    ADD CONSTRAINT client_group_entity_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_group_entity_tag_embedding client_group_entity_tag_embedding_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_tag_embedding
+    ADD CONSTRAINT client_group_entity_tag_embedding_pkey PRIMARY KEY (tag_id, embedder_id);
+
+
+--
+-- Name: client_group_entity_tag client_group_entity_tag_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_tag
+    ADD CONSTRAINT client_group_entity_tag_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: client_group client_group_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -24376,6 +25107,62 @@ ALTER TABLE ONLY "ob-poc".srdef_discovery_reasons
 
 ALTER TABLE ONLY "ob-poc".ssi_types
     ADD CONSTRAINT ssi_types_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: staged_command_candidate staged_command_candidate_command_id_entity_id_arg_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_candidate
+    ADD CONSTRAINT staged_command_candidate_command_id_entity_id_arg_name_key UNIQUE (command_id, entity_id, arg_name);
+
+
+--
+-- Name: staged_command_candidate staged_command_candidate_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_candidate
+    ADD CONSTRAINT staged_command_candidate_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staged_command_entity staged_command_entity_command_id_entity_id_arg_name_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_entity
+    ADD CONSTRAINT staged_command_entity_command_id_entity_id_arg_name_key UNIQUE (command_id, entity_id, arg_name);
+
+
+--
+-- Name: staged_command_entity staged_command_entity_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_entity
+    ADD CONSTRAINT staged_command_entity_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staged_command staged_command_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command
+    ADD CONSTRAINT staged_command_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: staged_command staged_command_runbook_id_source_order_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command
+    ADD CONSTRAINT staged_command_runbook_id_source_order_key UNIQUE (runbook_id, source_order);
+
+
+--
+-- Name: staged_runbook staged_runbook_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_runbook
+    ADD CONSTRAINT staged_runbook_pkey PRIMARY KEY (id);
 
 
 --
@@ -27063,6 +27850,55 @@ CREATE INDEX idx_cgae_embedding ON "ob-poc".client_group_alias_embedding USING i
 
 
 --
+-- Name: idx_cge_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cge_entity ON "ob-poc".client_group_entity USING btree (entity_id);
+
+
+--
+-- Name: idx_cge_group; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cge_group ON "ob-poc".client_group_entity USING btree (group_id);
+
+
+--
+-- Name: idx_cge_membership; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cge_membership ON "ob-poc".client_group_entity USING btree (group_id, membership_type);
+
+
+--
+-- Name: idx_cget_group_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cget_group_entity ON "ob-poc".client_group_entity_tag USING btree (group_id, entity_id);
+
+
+--
+-- Name: idx_cget_persona; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cget_persona ON "ob-poc".client_group_entity_tag USING btree (group_id, persona) WHERE (persona IS NOT NULL);
+
+
+--
+-- Name: idx_cget_tag_norm; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cget_tag_norm ON "ob-poc".client_group_entity_tag USING btree (tag_norm);
+
+
+--
+-- Name: idx_cget_tag_norm_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cget_tag_norm_trgm ON "ob-poc".client_group_entity_tag USING gin (tag_norm public.gin_trgm_ops);
+
+
+--
 -- Name: idx_companies_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -29072,6 +29908,41 @@ CREATE INDEX idx_rps_profile ON "ob-poc".resource_profile_sources USING btree (p
 
 
 --
+-- Name: idx_sc_runbook; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sc_runbook ON "ob-poc".staged_command USING btree (runbook_id);
+
+
+--
+-- Name: idx_sc_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sc_status ON "ob-poc".staged_command USING btree (resolution_status);
+
+
+--
+-- Name: idx_scc_command; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_scc_command ON "ob-poc".staged_command_candidate USING btree (command_id);
+
+
+--
+-- Name: idx_sce_command; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sce_command ON "ob-poc".staged_command_entity USING btree (command_id);
+
+
+--
+-- Name: idx_sce_entity; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sce_entity ON "ob-poc".staged_command_entity USING btree (entity_id);
+
+
+--
 -- Name: idx_scope_history_session; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -29342,6 +30213,20 @@ CREATE INDEX idx_sla_meas_period ON "ob-poc".sla_measurements USING btree (perio
 --
 
 CREATE INDEX idx_sponsor_decision_case ON "ob-poc".kyc_case_sponsor_decisions USING btree (case_id);
+
+
+--
+-- Name: idx_sr_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sr_session ON "ob-poc".staged_runbook USING btree (session_id);
+
+
+--
+-- Name: idx_sr_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_sr_status ON "ob-poc".staged_runbook USING btree (status) WHERE (status = 'building'::text);
 
 
 --
@@ -29779,6 +30664,13 @@ CREATE INDEX ix_dsl_verbs_compiled_hash ON "ob-poc".dsl_verbs USING btree (compi
 
 
 --
+-- Name: uq_cget_tag; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_cget_tag ON "ob-poc".client_group_entity_tag USING btree (group_id, entity_id, tag_norm, COALESCE(persona, ''::text));
+
+
+--
 -- Name: idx_ereg_entity; Type: INDEX; Schema: ob_kyc; Owner: -
 --
 
@@ -30190,6 +31082,48 @@ CREATE OR REPLACE VIEW kyc.v_workstream_detail AS
 
 
 --
+-- Name: v_runbook_summary _RETURN; Type: RULE; Schema: ob-poc; Owner: -
+--
+
+CREATE OR REPLACE VIEW "ob-poc".v_runbook_summary AS
+ SELECT sr.id AS runbook_id,
+    sr.session_id,
+    sr.status,
+    sr.client_group_id,
+    sr.persona,
+    count(sc.id) AS command_count,
+    count(
+        CASE
+            WHEN (sc.resolution_status = 'resolved'::text) THEN 1
+            ELSE NULL::integer
+        END) AS resolved_count,
+    count(
+        CASE
+            WHEN (sc.resolution_status = 'pending'::text) THEN 1
+            ELSE NULL::integer
+        END) AS pending_count,
+    count(
+        CASE
+            WHEN (sc.resolution_status = 'ambiguous'::text) THEN 1
+            ELSE NULL::integer
+        END) AS ambiguous_count,
+    count(
+        CASE
+            WHEN (sc.resolution_status = ANY (ARRAY['failed'::text, 'parse_failed'::text])) THEN 1
+            ELSE NULL::integer
+        END) AS failed_count,
+    ( SELECT count(DISTINCT sce.entity_id) AS count
+           FROM ("ob-poc".staged_command sc2
+             JOIN "ob-poc".staged_command_entity sce ON ((sce.command_id = sc2.id)))
+          WHERE (sc2.runbook_id = sr.id)) AS entity_footprint_size,
+    sr.created_at,
+    sr.updated_at
+   FROM ("ob-poc".staged_runbook sr
+     LEFT JOIN "ob-poc".staged_command sc ON ((sc.runbook_id = sr.id)))
+  GROUP BY sr.id;
+
+
+--
 -- Name: cbu_instrument_universe sync_counterparty_key_trigger; Type: TRIGGER; Schema: custody; Owner: -
 --
 
@@ -30467,6 +31401,13 @@ CREATE TRIGGER trg_sdm_updated BEFORE UPDATE ON "ob-poc".service_delivery_map FO
 --
 
 CREATE TRIGGER trg_service_intents_updated BEFORE UPDATE ON "ob-poc".service_intents FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_service_intents_timestamp();
+
+
+--
+-- Name: staged_command trg_staged_command_update_runbook; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_staged_command_update_runbook AFTER INSERT OR DELETE OR UPDATE ON "ob-poc".staged_command FOR EACH ROW EXECUTE FUNCTION "ob-poc".trg_update_runbook_timestamp();
 
 
 --
@@ -32554,6 +33495,46 @@ ALTER TABLE ONLY "ob-poc".client_group_anchor
 
 
 --
+-- Name: client_group_entity client_group_entity_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity
+    ADD CONSTRAINT client_group_entity_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_entity client_group_entity_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity
+    ADD CONSTRAINT client_group_entity_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_entity_tag_embedding client_group_entity_tag_embedding_tag_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_tag_embedding
+    ADD CONSTRAINT client_group_entity_tag_embedding_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES "ob-poc".client_group_entity_tag(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_entity_tag client_group_entity_tag_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_tag
+    ADD CONSTRAINT client_group_entity_tag_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_entity_tag client_group_entity_tag_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_tag
+    ADD CONSTRAINT client_group_entity_tag_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id) ON DELETE CASCADE;
+
+
+--
 -- Name: contract_products contract_products_contract_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -33786,6 +34767,54 @@ ALTER TABLE ONLY "ob-poc".srdef_discovery_reasons
 
 
 --
+-- Name: staged_command_candidate staged_command_candidate_command_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_candidate
+    ADD CONSTRAINT staged_command_candidate_command_id_fkey FOREIGN KEY (command_id) REFERENCES "ob-poc".staged_command(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staged_command_candidate staged_command_candidate_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_candidate
+    ADD CONSTRAINT staged_command_candidate_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: staged_command_entity staged_command_entity_command_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_entity
+    ADD CONSTRAINT staged_command_entity_command_id_fkey FOREIGN KEY (command_id) REFERENCES "ob-poc".staged_command(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staged_command_entity staged_command_entity_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command_entity
+    ADD CONSTRAINT staged_command_entity_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: staged_command staged_command_runbook_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_command
+    ADD CONSTRAINT staged_command_runbook_id_fkey FOREIGN KEY (runbook_id) REFERENCES "ob-poc".staged_runbook(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staged_runbook staged_runbook_client_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".staged_runbook
+    ADD CONSTRAINT staged_runbook_client_group_id_fkey FOREIGN KEY (client_group_id) REFERENCES "ob-poc".client_group(id);
+
+
+--
 -- Name: threshold_requirements threshold_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -34253,5 +35282,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict AeacjYBrtUVlVVp42l9Z0bVcYU9P0bEJS8YBbbPIy8LTfIAye7yaNMafXRjsm9s
+\unrestrict YFUwJpaYeD4PPy0Ymvo7VaPcDo2mVv7i1X4fqvhwIgEPNraVuwOuaS6iPNUAvcV
 

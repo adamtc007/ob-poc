@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-24
+> **Last reviewed:** 2026-01-25
 > **Crates:** 15 Rust crates (includes ob-poc-macros)
 > **Verbs:** 968 verbs, 7505 intent patterns (DB-sourced)
-> **Migrations:** 50 schema migrations
+> **Migrations:** 54 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7505 patterns vectorized
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
@@ -19,6 +19,7 @@
 > **Workflow Task Queue (049):** ✅ Complete - Async task return path, document entity, requirement guards
 > **Transactional Execution (050):** ✅ Complete - Atomic execution, advisory locks, expansion audit
 > **CustomOp Auto-Registration (051):** ✅ Complete - `#[register_custom_op]` macro, inventory-based registration
+> **Staged Runbook REPL (054):** ✅ Complete - Anti-hallucination staging, entity resolution, DAG ordering
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -1188,6 +1189,84 @@ CREATE TABLE "ob-poc".expansion_reports (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
+
+---
+
+## Staged Runbook REPL (054)
+
+> ✅ **IMPLEMENTED (2026-01-25)**: Anti-hallucination execution model with staged commands, entity resolution, DAG ordering.
+
+**Problem Solved:** Agent could hallucinate entity UUIDs or execute commands without user confirmation. The staged runbook provides a deterministic bridge from natural language → resolved UUIDs → safe execution.
+
+### Architecture
+
+```
+User prompt: "Show me Irish funds"
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  STAGE (no execution)                                           │
+│  runbook_stage tool                                             │
+│  • Parse DSL                                                    │
+│  • Resolve entity arguments → UUIDs via DB search               │
+│  • Stage command in staged_runbook table                        │
+│  • Emit CommandStaged / ResolutionAmbiguous / StageFailed       │
+└─────────────────────────────────────────────────────────────────┘
+    │
+    ▼ (user reviews, may pick from ambiguous, may remove commands)
+    │
+    ▼ (explicit "run" / "execute" / "commit")
+┌─────────────────────────────────────────────────────────────────┐
+│  RUN (server-side ready gate)                                   │
+│  runbook_run tool                                               │
+│  • Validate all commands resolved                               │
+│  • Compute DAG order                                            │
+│  • Execute in order                                             │
+│  • Emit per-command results                                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Non-Negotiable Invariants
+
+1. **No side-effects** unless user explicitly says `run/execute/commit`
+2. **No invented UUIDs** - All UUIDs from DB resolution or picker validation
+3. **Picker validation** - `runbook_pick` entity_ids must match stored candidates
+4. **Server-side ready gate** - `runbook_run` rejects if not all resolved
+5. **DAG ordering** - Dependencies detected and reordered transparently
+
+### MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `runbook_stage` | Stage a command (parse + resolve, no execute) |
+| `runbook_pick` | Select from ambiguous candidates |
+| `runbook_show` | Show current runbook state |
+| `runbook_preview` | Preview with readiness check |
+| `runbook_remove` | Remove a staged command |
+| `runbook_run` | Execute (explicit user confirmation required) |
+| `runbook_abort` | Clear all staged commands |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/054_staged_runbook.sql` | Schema (staged_runbook, staged_command, etc.) |
+| `rust/src/repl/staged_runbook.rs` | Rust types (StagedRunbook, ResolutionStatus) |
+| `rust/src/repl/repository.rs` | DB access layer |
+| `rust/src/repl/resolver.rs` | EntityArgResolver (shorthand → UUID) |
+| `rust/src/repl/dag_analyzer.rs` | Dependency detection, topological sort |
+| `rust/src/repl/service.rs` | RunbookService (stage/pick/run/show/abort) |
+| `rust/src/mcp/handlers/runbook.rs` | MCP tool handlers |
+| `rust/config/verbs/runbook.yaml` | Verb definitions |
+
+### Database Tables
+
+| Table | Purpose |
+|-------|---------|
+| `staged_runbook` | Session-scoped runbook container |
+| `staged_command` | Individual DSL commands with resolution status |
+| `staged_command_entity` | Resolved entity footprint |
+| `staged_command_candidate` | Picker candidates for ambiguous resolution |
 
 ---
 

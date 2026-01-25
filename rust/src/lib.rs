@@ -111,6 +111,10 @@ pub mod feedback;
 #[cfg(feature = "database")]
 pub mod service_resources;
 
+// REPL module - Staged runbook with anti-hallucination guarantees
+#[cfg(feature = "database")]
+pub mod repl;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

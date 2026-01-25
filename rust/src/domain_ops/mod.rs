@@ -26,8 +26,8 @@ mod board_ops;
 mod bods_ops;
 mod capital_ops;
 mod cbu_ops;
-mod client_group_ops;
 mod cbu_role_ops;
+mod client_group_ops;
 mod control_ops;
 mod custody;
 mod dilution_ops;
@@ -54,6 +54,7 @@ mod request_ops;
 mod requirement_ops;
 mod research_workflow_ops;
 mod resource_ops;
+mod runbook_ops;
 
 mod screening_ops;
 mod semantic_ops;
@@ -934,5 +935,14 @@ mod tests {
 
         // Manco ops
         assert!(registry.has("manco", "book.summary"));
+
+        // Runbook ops (staged execution model)
+        assert!(registry.has("runbook", "stage"));
+        assert!(registry.has("runbook", "pick"));
+        assert!(registry.has("runbook", "run"));
+        assert!(registry.has("runbook", "show"));
+        assert!(registry.has("runbook", "preview"));
+        assert!(registry.has("runbook", "remove"));
+        assert!(registry.has("runbook", "abort"));
     }
 }

@@ -1,0 +1,255 @@
+# Runbook Verbs - Staged Execution Model (Anti-Hallucination)
+#
+# The runbook is a staged execution model that prevents LLM hallucination:
+# 1. Commands are STAGED, never auto-executed
+# 2. Entity references are RESOLVED from DB, never invented
+# 3. Ambiguous refs trigger PICKER (user must select)
+# 4. Execution only on explicit RUN command
+#
+# Flow:
+#   User: "Show me Irish funds"
+#   → runbook.stage stages the command
+#   → Entity resolution finds matching entities
+#   → If ambiguous, returns candidates for picker
+#   → User: "run"
+#   → runbook.run executes all staged commands
+#
+# Key guarantee: All entity IDs come from DB searches.
+# The agent cannot fabricate UUIDs.
+
+domains:
+  runbook:
+    description: |
+      Staged execution model for safe, auditable DSL operations.
+      Commands are staged first, then executed on explicit confirmation.
+      This is the anti-hallucination mechanism - all entity lookups
+      go through DB, and user confirms before any mutation.
+
+    invocation_hints:
+      - "stage"
+      - "pick"
+      - "run"
+      - "execute"
+      - "commit"
+      - "show runbook"
+      - "preview"
+      - "abort"
+      - "clear runbook"
+
+    verbs:
+      # ============================================
+      # Stage a command (NEVER executes)
+      # ============================================
+      stage:
+        description: Stage a DSL command for later execution
+        behavior: plugin
+        handler: RunbookStageOp
+        invocation_phrases:
+          - "stage"
+          - "add to runbook"
+          - "prepare"
+          - "queue"
+          - "line up"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: runbook_command
+          tags: [stage, runbook, safe]
+        args:
+          - name: input
+            type: string
+            required: true
+            description: DSL source or natural language command
+          - name: client-group-id
+            type: uuid
+            required: false
+            description: Client group for entity resolution scope
+            lookup:
+              table: client_group
+              schema: ob-poc
+              entity_type: client_group
+              search_key: canonical_name
+              primary_key: id
+          - name: persona
+            type: string
+            required: false
+            description: Persona for tag filtering (trading, compliance, etc.)
+          - name: description
+            type: string
+            required: false
+            description: Human-readable description
+          - name: source-prompt
+            type: string
+            required: false
+            description: Original user utterance (for audit)
+        returns:
+          type: record
+          fields:
+            [command_id, resolution_status, entity_count, needs_pick, dsl_hash]
+
+      # ============================================
+      # Pick entities for ambiguous resolution
+      # ============================================
+      pick:
+        description: Select entities to resolve an ambiguous command
+        behavior: plugin
+        handler: RunbookPickOp
+        invocation_phrases:
+          - "pick"
+          - "select"
+          - "choose"
+          - "resolve to"
+          - "use these"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: picker_selection
+          tags: [pick, resolve, runbook]
+        args:
+          - name: command-id
+            type: uuid
+            required: true
+            description: Command ID to pick for
+          - name: entity-ids
+            type: uuid_list
+            required: true
+            description: Selected entity UUIDs (MUST be from candidates)
+        returns:
+          type: record
+          fields: [resolution_status, selected_count]
+
+      # ============================================
+      # Run the staged runbook
+      # ============================================
+      run:
+        description: Execute all staged commands in the runbook
+        behavior: plugin
+        handler: RunbookRunOp
+        invocation_phrases:
+          - "run"
+          - "execute"
+          - "commit"
+          - "go"
+          - "do it"
+          - "execute runbook"
+          - "run all"
+          - "proceed"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: execution_result
+          tags: [execute, runbook, commit]
+        args:
+          - name: runbook-id
+            type: uuid
+            required: true
+            description: Runbook ID to execute
+        returns:
+          type: record
+          fields: [success, runbook_id]
+
+      # ============================================
+      # Show current runbook state
+      # ============================================
+      show:
+        description: Display the current runbook with all staged commands
+        behavior: plugin
+        handler: RunbookShowOp
+        invocation_phrases:
+          - "show runbook"
+          - "show staged"
+          - "list commands"
+          - "what's staged"
+          - "show pending"
+          - "runbook status"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: runbook_state
+          tags: [show, runbook, status]
+        args: []
+        returns:
+          type: record
+          fields: [exists, runbook, is_ready, blockers]
+
+      # ============================================
+      # Preview without execution
+      # ============================================
+      preview:
+        description: Preview what will happen when runbook is executed
+        behavior: plugin
+        handler: RunbookPreviewOp
+        invocation_phrases:
+          - "preview"
+          - "dry run"
+          - "what will happen"
+          - "show impact"
+          - "preview runbook"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: preview_result
+          tags: [preview, runbook, audit]
+        args:
+          - name: runbook-id
+            type: uuid
+            required: true
+            description: Runbook ID to preview
+        returns:
+          type: record
+          fields: [is_ready, command_count, entity_footprint, blockers]
+
+      # ============================================
+      # Remove a staged command
+      # ============================================
+      remove:
+        description: Remove a command from the runbook
+        behavior: plugin
+        handler: RunbookRemoveOp
+        invocation_phrases:
+          - "remove"
+          - "delete command"
+          - "unstage"
+          - "take out"
+          - "remove from runbook"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: removed_commands
+          tags: [remove, runbook, edit]
+        args:
+          - name: command-id
+            type: uuid
+            required: true
+            description: Command ID to remove
+        returns:
+          type: record
+          fields: [removed_command_ids]
+
+      # ============================================
+      # Abort and clear runbook
+      # ============================================
+      abort:
+        description: Abort the runbook and clear all staged commands
+        behavior: plugin
+        handler: RunbookAbortOp
+        invocation_phrases:
+          - "abort"
+          - "cancel"
+          - "clear runbook"
+          - "start over"
+          - "discard"
+          - "abort runbook"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: abort_result
+          tags: [abort, runbook, clear]
+        args:
+          - name: runbook-id
+            type: uuid
+            required: true
+            description: Runbook ID to abort
+        returns:
+          type: record
+          fields: [success]

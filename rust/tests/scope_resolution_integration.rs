@@ -408,10 +408,7 @@ mod tests {
         println!("\n=== Flywheel Recording Test ===\n");
 
         // Use a unique alias to test recording
-        let test_alias = format!(
-            "test_alias_{}",
-            uuid::Uuid::new_v4().to_string()[..8].to_string()
-        );
+        let test_alias = format!("test_alias_{}", &uuid::Uuid::new_v4().to_string()[..8]);
         let allianz_group_id: uuid::Uuid = "11111111-1111-1111-1111-111111111111".parse()?;
 
         // Record a selection (simulating user picking from candidates)

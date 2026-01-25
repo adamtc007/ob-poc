@@ -1,9 +1,31 @@
 # TODO — Staged Runbook REPL + Semantic Resolver + DAG Reorder (MCP-first, Anti-Hallucination)
 
-> **Status:** Peer reviewed ✅ — Ready for implementation  
+> **Status:** ✅ IMPLEMENTED  
 > **Date:** 2026-01-25  
 > **Depends on:** Client Group Scope Resolution ✅ IMPLEMENTED (migrations 052-053)  
 > **Reviewed by:** ChatGPT (2026-01-25) → then Claude Code implementation
+>
+> ## Implementation Summary
+>
+> | Component | Status | Key Files |
+> |-----------|--------|-----------|
+> | Migration 054 | ✅ Applied | `migrations/054_staged_runbook.sql` |
+> | Rust types | ✅ Complete | `rust/src/repl/staged_runbook.rs` |
+> | Repository | ✅ Complete | `rust/src/repl/repository.rs` |
+> | Resolver | ✅ Complete | `rust/src/repl/resolver.rs` |
+> | DAG analyzer | ✅ Complete | `rust/src/repl/dag_analyzer.rs` |
+> | Events | ✅ Complete | `rust/src/repl/events.rs` |
+> | Service | ✅ Complete | `rust/src/repl/service.rs` |
+> | MCP handlers | ✅ Complete | `rust/src/mcp/handlers/runbook.rs` |
+> | MCP tools | ✅ Registered | `rust/src/mcp/tools.rs` (lines 2810-3010) |
+> | Verb YAML | ✅ Complete | `rust/config/verbs/runbook.yaml` |
+> | Domain ops | ✅ Complete | `rust/src/domain_ops/runbook_ops.rs` |
+> | Integration tests | ✅ Passing | `rust/tests/staged_runbook_integration.rs` |
+>
+> **Test command:**
+> ```bash
+> DATABASE_URL="postgresql:///data_designer" cargo test --features database --test staged_runbook_integration -- --ignored
+> ```
 
 ---
 
@@ -16,10 +38,13 @@
 | **Agent Router Contract missing** | Added Section 1.5: mandatory tool usage, default stage path, run/edit/show/abort paths |
 | **Candle integration vague** | Added Section 1.6: `IntentQuery` and `IntentResponse` schemas with scoped context |
 | **No parse validation** | Added `ParseFailed` status + `StageFailed` event + server-side validation in `runbook_stage` |
-| **Picker could accept invented UUIDs** | Added candidate validation in `runbook_pick` — must match `ResolutionAmbiguous` event |
+| **Picker could accept invented UUIDs** | Added candidate validation in `runbook_pick` — must match stored `staged_command_candidate` set |
 | **Run gating client-side only** | Added server-side `RunbookNotReady` event + validation in `runbook_run` |
 | **output_ref redundant** | Removed from schema; $N refs parsed from `dsl_raw` during DAG analysis |
 | **session_id unclear** | Added note: "stable MCP conversation key" |
+| **"then/and" stage phrases fragile** | Removed from invocation_phrases; verb marked internal; router default handles staging |
+| **No refresh/preview tool** | Added `runbook_preview` tool for deterministic state refresh |
+| **Candidate set not stored** | Added `staged_command_candidate` table for picker validation |
 
 ### What Was Excellent (kept as-is)
 
@@ -326,33 +351,45 @@ pub async fn runbook_run(ctx: &SessionContext) -> Result<ExecutionId, RunError> 
 ### runbook_pick: Candidate validation
 
 ```rust
-/// Pick entities — validates entity_ids came from event candidates
+/// Pick entities — validates entity_ids came from stored candidate set
 pub async fn runbook_pick(
     command_id: Uuid,
     entity_ids: Vec<Uuid>,
     ctx: &SessionContext,
 ) -> Result<PickResult, PickError> {
-    let command = ctx.get_command(command_id).await?;
-    
-    // SAFETY: entity_ids must be subset of candidates from ResolutionAmbiguous event
-    let valid_candidates: HashSet<_> = command.entity_footprint.iter()
-        .map(|e| e.entity_id)
+    // SAFETY: entity_ids must be subset of staged_command_candidate table
+    // This is the STORED candidate set, not entity_footprint (which is "already attached")
+    let valid_candidates: HashSet<Uuid> = sqlx::query_scalar!(r#"
+        SELECT entity_id FROM "ob-poc".staged_command_candidate
+        WHERE command_id = $1
+    "#, command_id)
+        .fetch_all(ctx.pool())
+        .await?
+        .into_iter()
         .collect();
+    
+    if valid_candidates.is_empty() {
+        return Err(PickError::NoCandidates {
+            command_id,
+            message: "No candidates stored for this command".to_string(),
+        });
+    }
     
     for id in &entity_ids {
         if !valid_candidates.contains(id) {
             return Err(PickError::InvalidCandidate {
                 entity_id: *id,
-                message: "Entity ID not in candidates from ResolutionAmbiguous event".to_string(),
+                message: "Entity ID not in stored candidate set from ResolutionAmbiguous".to_string(),
             });
         }
     }
     
-    // Proceed with pick...
+    // Proceed with pick: move selected candidates to entity_footprint, clear candidates
+    // ...
 }
 ```
 
-**Agent cannot fabricate entity_ids for picker.**
+**Agent cannot fabricate entity_ids for picker — must match stored `staged_command_candidate` set.**
 
 ---
 
@@ -465,6 +502,33 @@ CREATE TABLE IF NOT EXISTS "ob-poc".staged_command_entity (
 
 CREATE INDEX idx_sce_command ON "ob-poc".staged_command_entity(command_id);
 CREATE INDEX idx_sce_entity ON "ob-poc".staged_command_entity(entity_id);
+
+-- ============================================================================
+-- Picker Candidates: Proposed entities for ambiguous resolution
+-- These are the ONLY valid choices for runbook_pick
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS "ob-poc".staged_command_candidate (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    command_id UUID NOT NULL REFERENCES "ob-poc".staged_command(id) ON DELETE CASCADE,
+    
+    -- The candidate entity
+    entity_id UUID NOT NULL REFERENCES "ob-poc".entities(entity_id),
+    
+    -- Match details (from resolution)
+    arg_name TEXT NOT NULL,                 -- which DSL argument this is for
+    matched_tag TEXT,                       -- tag that matched
+    confidence FLOAT,                       -- match confidence
+    match_type TEXT NOT NULL,               -- 'tag_exact' | 'tag_fuzzy' | 'tag_semantic'
+    
+    created_at TIMESTAMPTZ DEFAULT now(),
+    
+    UNIQUE(command_id, entity_id, arg_name)
+);
+
+CREATE INDEX idx_scc_command ON "ob-poc".staged_command_candidate(command_id);
+
+COMMENT ON TABLE "ob-poc".staged_command_candidate IS
+    'Picker candidates for ambiguous resolution. runbook_pick MUST validate against this set.';
 
 -- ============================================================================
 -- View: Full runbook with resolved DSL
@@ -1237,6 +1301,19 @@ tools:
       properties:
         aborted: boolean
 
+  # Preview/refresh runbook state (deterministic state sync)
+  - name: runbook_preview
+    description: "Recompute readiness, DAG order, and return full runbook state. Use after edits/picks to sync state."
+    returns:
+      type: object
+      properties:
+        summary: RunbookSummary
+        commands: array
+        entity_footprint: array
+        reorder_diff: ReorderDiff (if reordered)
+        blocking_commands: array (if not ready)
+        diagnostics: array (parse errors, resolution failures)
+
   # Execute the runbook
   - name: runbook_run
     description: "Execute all staged commands in DAG order"
@@ -1260,19 +1337,20 @@ verbs:
   # ============================================================================
   
   - verb: stage
-    description: "Stage a DSL command without executing"
+    description: "Stage a DSL command without executing (INTERNAL - router uses this)"
     behavior: plugin
     handler: ReplStageOp
+    # NOTE: No invocation_phrases like "then", "and", "also" - these are too common
+    # in natural language and cause misclassification. The Agent Router Contract
+    # (Section 1.5) handles default staging. This verb is for internal/explicit use.
     invocation_phrases:
-      - "then"
-      - "and"
-      - "also"
-      - "next"
-      - "add"
+      - "stage"
+      - "add a step"
+      - "queue this"
     metadata:
       tier: intent
       source_of_truth: staged_runbook
-      internal: false
+      internal: true   # Router handles staging; this is for explicit/testing use
       tags: [repl, stage]
     args:
       - name: dsl
@@ -1667,34 +1745,34 @@ impl RunbookPanel {
 
 ## 9) Implementation phases
 
-### Phase 1: Schema + basic staging
-- [ ] Migration 054: staged_runbook, staged_command, staged_command_entity
-- [ ] `ReplStageOp`: parse DSL, resolve entities, stage command
-- [ ] `ReplShowOp`: render staged commands
-- [ ] `ReplAbortOp`: clear staging
-- [ ] MCP events: CommandStaged, RunbookAborted
+### Phase 1: Schema + basic staging ✅
+- [x] Migration 054: staged_runbook, staged_command, staged_command_entity
+- [x] `ReplStageOp`: parse DSL, resolve entities, stage command
+- [x] `ReplShowOp`: render staged commands
+- [x] `ReplAbortOp`: clear staging
+- [x] MCP events: CommandStaged, RunbookAborted
 
-### Phase 2: Resolution pipeline
-- [ ] `EntityArgResolver`: parse → detect → search → evaluate → substitute
-- [ ] Integration with existing `search_entity_tags` functions
-- [ ] Ambiguous handling → PickerCandidate list
-- [ ] `ReplPickOp`: resolve ambiguous from selection
-- [ ] MCP events: ResolutionAmbiguous, ResolutionFailed
+### Phase 2: Resolution pipeline ✅
+- [x] `EntityArgResolver`: parse → detect → search → evaluate → substitute
+- [x] Integration with existing `search_entity_tags` functions
+- [x] Ambiguous handling → PickerCandidate list
+- [x] `ReplPickOp`: resolve ambiguous from selection
+- [x] MCP events: ResolutionAmbiguous, ResolutionFailed
 
-### Phase 3: DAG analysis
-- [ ] `DagAnalyzer`: build graph, detect dependencies
-- [ ] Output reference parsing ($N.result)
-- [ ] Topological sort
-- [ ] Reorder diff computation
-- [ ] MCP event: RunbookReady (with reorder_diff)
+### Phase 3: DAG analysis ✅
+- [x] `DagAnalyzer`: build graph, detect dependencies
+- [x] Output reference parsing ($N.result)
+- [x] Topological sort
+- [x] Reorder diff computation
+- [x] MCP event: RunbookReady (with reorder_diff)
 
-### Phase 4: Execution
-- [ ] `ReplRunOp`: validate → DAG sort → execute sequence
-- [ ] Per-command result capture
-- [ ] MCP events: ExecutionStarted, CommandExecuted, ExecutionCompleted
-- [ ] Learning: create user_confirmed tags from successful resolutions
+### Phase 4: Execution ✅
+- [x] `ReplRunOp`: validate → DAG sort → execute sequence
+- [x] Per-command result capture
+- [x] MCP events: ExecutionStarted, CommandExecuted, ExecutionCompleted
+- [x] Learning: create user_confirmed tags from successful resolutions
 
-### Phase 5: egui integration
+### Phase 5: egui integration (deferred)
 - [ ] RunbookPanel: status bar, command list, entity footprint
 - [ ] Picker modal for ambiguous resolution
 - [ ] Remove/edit command interactions
@@ -1817,40 +1895,40 @@ async fn test_abort_clears_staging() {
 
 ## 11) Acceptance criteria
 
-### Anti-hallucination
-- [ ] No DSL executes without explicit `run/execute/commit`
-- [ ] All entity UUIDs come from DB resolution (never invented)
-- [ ] Ambiguous resolutions surface picker (not auto-picked)
-- [ ] Failed resolutions block execution
+### Anti-hallucination ✅
+- [x] No DSL executes without explicit `run/execute/commit`
+- [x] All entity UUIDs come from DB resolution (never invented)
+- [x] Ambiguous resolutions surface picker (not auto-picked)
+- [x] Failed resolutions block execution
 
-### Staging
-- [ ] Commands accumulate in session-scoped runbook
-- [ ] Each command shows resolution status
-- [ ] Entity footprint visible before execution
-- [ ] Commands can be removed/edited before execution
+### Staging ✅
+- [x] Commands accumulate in session-scoped runbook
+- [x] Each command shows resolution status
+- [x] Entity footprint visible before execution
+- [x] Commands can be removed/edited before execution
 
-### Resolution
-- [ ] Shorthand resolved via client_group scope
-- [ ] Exact → fuzzy → semantic fallback
-- [ ] Output references ($N.result) detected and linked
-- [ ] Direct UUIDs pass through unchanged
+### Resolution ✅
+- [x] Shorthand resolved via client_group scope
+- [x] Exact → fuzzy → semantic fallback
+- [x] Output references ($N.result) detected and linked
+- [x] Direct UUIDs pass through unchanged
 
-### DAG
-- [ ] Dependencies detected from output refs
-- [ ] Topological sort produces valid order
-- [ ] Reorder diff shown to user
-- [ ] Cycles detected and reported
+### DAG ✅
+- [x] Dependencies detected from output refs
+- [x] Topological sort produces valid order
+- [x] Reorder diff shown to user
+- [x] Cycles detected and reported
 
-### Execution
-- [ ] Commands execute in DAG order
-- [ ] Per-command results reported via MCP
-- [ ] Successful resolutions create learned tags
-- [ ] Errors halt execution (or continue per config)
+### Execution ✅
+- [x] Commands execute in DAG order
+- [x] Per-command results reported via MCP
+- [x] Successful resolutions create learned tags
+- [x] Errors halt execution (or continue per config)
 
-### MCP
-- [ ] All tools are DB-backed (no guessing)
-- [ ] Events provide full context for UI rendering
-- [ ] Picker candidates come from search functions
+### MCP ✅
+- [x] All tools are DB-backed (no guessing)
+- [x] Events provide full context for UI rendering
+- [x] Picker candidates come from search functions
 
 ---
 

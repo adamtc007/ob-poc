@@ -98,6 +98,7 @@ impl ScopeContext {
 // =============================================================================
 
 /// Scope resolver - detects and resolves client group context
+#[allow(dead_code)] // Fields used for future semantic resolution tuning
 pub struct ScopeResolver {
     /// Threshold for exact match (alias_norm = query)
     exact_threshold: f64,
@@ -390,7 +391,7 @@ pub async fn search_entities_in_scope(
             entity_id: r.entity_id,
             entity_name: r.entity_name,
             matched_tag: r.tag,
-            confidence: r.confidence as f64,
+            confidence: r.confidence,
             match_type: r.match_type,
         })
         .collect())

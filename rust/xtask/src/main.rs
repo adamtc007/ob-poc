@@ -367,6 +367,39 @@ enum Command {
         interactive: bool,
     },
 
+    /// Test staged runbook REPL (anti-hallucination execution model)
+    ///
+    /// Runs integration tests for the staged runbook system:
+    /// - Commands staged, never auto-executed
+    /// - Entity resolution from DB
+    /// - Picker loop validation
+    /// - DAG ordering
+    TestRunbook {
+        /// Run all tests (default)
+        #[arg(long)]
+        all: bool,
+
+        /// Run only basic staging tests
+        #[arg(long)]
+        staging: bool,
+
+        /// Run only lifecycle tests (abort, remove)
+        #[arg(long)]
+        lifecycle: bool,
+
+        /// Run only DAG ordering tests
+        #[arg(long)]
+        dag: bool,
+
+        /// Run the full Irish funds flow test
+        #[arg(long)]
+        irish_funds: bool,
+
+        /// Filter by test name
+        #[arg(long, short = 'f')]
+        filter: Option<String>,
+    },
+
     /// Load fund programme from CSV using config-driven column mapping
     ///
     /// Generic loader that supports any fund programme (Allianz, BlackRock, Vanguard, etc.)
@@ -632,6 +665,14 @@ fn main() -> Result<()> {
             hard_negatives,
             explore,
         } => test_verbs(&sh, all, taught, sweep, hard_negatives, explore),
+        Command::TestRunbook {
+            all,
+            staging,
+            lifecycle,
+            dag,
+            irish_funds,
+            filter,
+        } => test_runbook(&sh, all, staging, lifecycle, dag, irish_funds, filter),
     }
 }
 
@@ -684,6 +725,60 @@ fn test_verbs(
     )
     .run()
     .context("Verb search tests failed")?;
+
+    println!("\n===========================================");
+    println!("  Tests complete");
+    println!("===========================================");
+
+    Ok(())
+}
+
+fn test_runbook(
+    sh: &Shell,
+    all: bool,
+    staging: bool,
+    lifecycle: bool,
+    dag: bool,
+    irish_funds: bool,
+    filter: Option<String>,
+) -> Result<()> {
+    println!("===========================================");
+    println!("  Staged Runbook Integration Tests");
+    println!("  (Anti-Hallucination Execution Model)");
+    println!("===========================================\n");
+
+    // Build test filter based on flags
+    let filter_arg = if let Some(f) = filter {
+        f
+    } else if all || (!staging && !lifecycle && !dag && !irish_funds) {
+        // Default: run all tests
+        "test_".to_string()
+    } else {
+        let mut filters: Vec<&str> = Vec::new();
+        if staging {
+            filters.push("test_stage");
+        }
+        if lifecycle {
+            filters.push("test_abort|test_remove");
+        }
+        if dag {
+            filters.push("test_dag");
+        }
+        if irish_funds {
+            filters.push("test_irish_funds");
+        }
+        filters.join("|")
+    };
+
+    println!("Running tests matching: {}\n", filter_arg);
+
+    // Run the integration tests with database feature
+    cmd!(
+        sh,
+        "cargo test --features database --test staged_runbook_integration {filter_arg} -- --ignored --nocapture"
+    )
+    .run()
+    .context("Staged runbook tests failed")?;
 
     println!("\n===========================================");
     println!("  Tests complete");
