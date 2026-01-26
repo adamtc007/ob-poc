@@ -19,8 +19,8 @@ use crate::gleif::client::extract_lei_from_url;
 use {
     crate::dsl_v2::DslExecutor,
     crate::gleif::{
-        ChainLink, DiscoveredEntity, FundListResult, GleifClient, GleifEnrichmentService,
-        LeiRecord, OwnershipChain, SuccessorResult, UboStatus,
+        client::TreeFetchOptions, ChainLink, DiscoveredEntity, FundListResult, GleifClient,
+        GleifEnrichmentService, LeiRecord, OwnershipChain, SuccessorResult, UboStatus,
     },
     sqlx::PgPool,
     std::collections::HashMap,
@@ -1729,6 +1729,11 @@ impl CustomOperation for GleifImportToClientGroupOp {
             .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
         let max_depth = extract_int_opt(verb_call, "max-depth").unwrap_or(3) as usize;
 
+        // New: fund inclusion options
+        let include_funds = extract_bool_opt(verb_call, "include-funds").unwrap_or(false);
+        let max_funds_per_manco =
+            extract_int_opt(verb_call, "max-funds-per-manco").map(|v| v as usize);
+
         // Start discovery status
         sqlx::query!(
             r#"
@@ -1748,7 +1753,24 @@ impl CustomOperation for GleifImportToClientGroupOp {
 
         // Import the GLEIF tree (creates/updates entities)
         let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
-        let tree_result = service.import_corporate_tree(&root_lei, max_depth).await?;
+
+        // Use enhanced traversal if including funds, otherwise basic traversal
+        let tree_result = if include_funds {
+            let options = TreeFetchOptions {
+                max_depth,
+                include_managed_funds: true,
+                include_fund_structures: true,
+                include_master_feeder: true,
+                fund_type_filter: vec![],
+                fund_jurisdiction_filter: vec![],
+                max_funds_per_manco: max_funds_per_manco.or(Some(500)),
+            };
+            service
+                .import_corporate_tree_with_options(&root_lei, options)
+                .await?
+        } else {
+            service.import_corporate_tree(&root_lei, max_depth).await?
+        };
 
         // Get all entities with LEIs that were part of this import
         // We use the imported_leis from tree_result to ensure we get exactly the entities
@@ -1778,8 +1800,38 @@ impl CustomOperation for GleifImportToClientGroupOp {
             };
 
         let mut entities_added = 0i64;
+        let mut funds_added = 0i64;
         let mut roles_assigned = 0i64;
         let mut relationships_created = 0i64;
+
+        // Build lookup of fund LEIs -> ManCo LEI from discovered relationships
+        // This tells us which funds are IM-related and who manages them
+        let mut fund_to_manco: HashMap<String, String> = HashMap::new();
+        let mut fund_leis: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        // Query entity_parent_relationships to find FUND_MANAGER relationships
+        let fund_manager_rels: Vec<(String, String)> = sqlx::query_as(
+            r#"
+            SELECT
+                COALESCE(elc_child.lei, ef_child.lei) as fund_lei,
+                pr.parent_lei as manco_lei
+            FROM "ob-poc".entity_parent_relationships pr
+            JOIN "ob-poc".entities e ON e.entity_id = pr.child_entity_id
+            LEFT JOIN "ob-poc".entity_limited_companies elc_child ON elc_child.entity_id = e.entity_id
+            LEFT JOIN "ob-poc".entity_funds ef_child ON ef_child.entity_id = e.entity_id
+            WHERE pr.relationship_type = 'FUND_MANAGER'
+              AND pr.relationship_status = 'ACTIVE'
+              AND COALESCE(elc_child.lei, ef_child.lei) = ANY($1)
+            "#,
+        )
+        .bind(imported_leis)
+        .fetch_all(pool)
+        .await?;
+
+        for (fund_lei, manco_lei) in fund_manager_rels {
+            fund_to_manco.insert(fund_lei.clone(), manco_lei);
+            fund_leis.insert(fund_lei);
+        }
 
         // Get role IDs we'll need
         let role_map: HashMap<String, Uuid> = sqlx::query_as::<_, (String, Uuid)>(
@@ -1798,23 +1850,141 @@ impl CustomOperation for GleifImportToClientGroupOp {
         .collect();
 
         for (entity_id, entity_name, lei, category_str) in &entities_with_lei {
-            // Add to client_group_entity (upsert)
+            let is_fund = category_str.as_deref() == Some("FUND");
+            let manco_lei = fund_to_manco.get(lei);
+
+            // Determine relationship category based on how this entity was discovered
+            let (relationship_category, added_by) = if is_fund && manco_lei.is_some() {
+                // Fund discovered via IM relationship
+                ("INVESTMENT_MANAGEMENT", "gleif_im")
+            } else {
+                // Ownership hierarchy
+                ("OWNERSHIP", "gleif")
+            };
+
+            // Add to client_group_entity (upsert) with new columns
             let cge_id: Uuid = sqlx::query_scalar(
                 r#"
-                INSERT INTO "ob-poc".client_group_entity (group_id, entity_id, membership_type, added_by, source_record_id)
-                VALUES ($1, $2, 'in_group', 'gleif', $3)
+                INSERT INTO "ob-poc".client_group_entity (
+                    group_id, entity_id, membership_type, added_by, source_record_id,
+                    relationship_category, is_fund, related_via_lei
+                )
+                VALUES ($1, $2, 'in_group', $3, $4, $5, $6, $7)
                 ON CONFLICT (group_id, entity_id)
-                DO UPDATE SET updated_at = NOW(), source_record_id = EXCLUDED.source_record_id
+                DO UPDATE SET
+                    updated_at = NOW(),
+                    source_record_id = EXCLUDED.source_record_id,
+                    relationship_category = EXCLUDED.relationship_category,
+                    is_fund = EXCLUDED.is_fund,
+                    related_via_lei = COALESCE(EXCLUDED.related_via_lei, "ob-poc".client_group_entity.related_via_lei)
                 RETURNING id
                 "#,
             )
             .bind(group_id)
             .bind(entity_id)
+            .bind(added_by)
             .bind(lei)
+            .bind(relationship_category)
+            .bind(is_fund)
+            .bind(manco_lei)
             .fetch_one(pool)
             .await?;
 
             entities_added += 1;
+            if is_fund {
+                funds_added += 1;
+
+                // Populate fund_metadata for fund entities
+                // Look up umbrella/master relationships from entity_parent_relationships
+                let umbrella_lei: Option<String> = sqlx::query_scalar(
+                    r#"
+                    SELECT parent_lei
+                    FROM "ob-poc".entity_parent_relationships
+                    WHERE child_entity_id = $1
+                      AND relationship_type = 'UMBRELLA_FUND'
+                      AND relationship_status = 'ACTIVE'
+                    LIMIT 1
+                    "#,
+                )
+                .bind(entity_id)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+
+                let master_fund_lei: Option<String> = sqlx::query_scalar(
+                    r#"
+                    SELECT parent_lei
+                    FROM "ob-poc".entity_parent_relationships
+                    WHERE child_entity_id = $1
+                      AND relationship_type = 'MASTER_FUND'
+                      AND relationship_status = 'ACTIVE'
+                    LIMIT 1
+                    "#,
+                )
+                .bind(entity_id)
+                .fetch_optional(pool)
+                .await?
+                .flatten();
+
+                // Look up ManCo entity_id if we have a ManCo LEI
+                let manco_entity_id: Option<Uuid> = if let Some(ref m_lei) = manco_lei {
+                    sqlx::query_scalar(
+                        r#"
+                        SELECT entity_id
+                        FROM "ob-poc".entity_limited_companies
+                        WHERE lei = $1
+                        LIMIT 1
+                        "#,
+                    )
+                    .bind(m_lei)
+                    .fetch_optional(pool)
+                    .await?
+                } else {
+                    None
+                };
+
+                // Get ManCo name for denormalized storage
+                let manco_name: Option<String> = if let Some(manco_eid) = manco_entity_id {
+                    sqlx::query_scalar(r#"SELECT name FROM "ob-poc".entities WHERE entity_id = $1"#)
+                        .bind(manco_eid)
+                        .fetch_optional(pool)
+                        .await?
+                } else {
+                    None
+                };
+
+                // Upsert fund_metadata
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".fund_metadata (
+                        entity_id, lei, umbrella_lei, is_umbrella,
+                        master_fund_lei, is_feeder, is_master,
+                        manco_lei, manco_name, manco_entity_id,
+                        source, updated_at
+                    )
+                    VALUES ($1, $2, $3, FALSE, $4, $5, FALSE, $6, $7, $8, 'gleif', NOW())
+                    ON CONFLICT (entity_id)
+                    DO UPDATE SET
+                        umbrella_lei = COALESCE(EXCLUDED.umbrella_lei, "ob-poc".fund_metadata.umbrella_lei),
+                        master_fund_lei = COALESCE(EXCLUDED.master_fund_lei, "ob-poc".fund_metadata.master_fund_lei),
+                        is_feeder = EXCLUDED.is_feeder,
+                        manco_lei = COALESCE(EXCLUDED.manco_lei, "ob-poc".fund_metadata.manco_lei),
+                        manco_name = COALESCE(EXCLUDED.manco_name, "ob-poc".fund_metadata.manco_name),
+                        manco_entity_id = COALESCE(EXCLUDED.manco_entity_id, "ob-poc".fund_metadata.manco_entity_id),
+                        updated_at = NOW()
+                    "#,
+                )
+                .bind(entity_id)
+                .bind(lei)
+                .bind(&umbrella_lei)
+                .bind(&master_fund_lei)
+                .bind(master_fund_lei.is_some()) // is_feeder = true if has master fund
+                .bind(manco_lei.as_ref())
+                .bind(&manco_name)
+                .bind(manco_entity_id)
+                .execute(pool)
+                .await?;
+            }
 
             // Auto-tag based on GLEIF category
             let roles_to_assign: Vec<&str> = match category_str.as_deref() {
@@ -1940,10 +2110,13 @@ impl CustomOperation for GleifImportToClientGroupOp {
         let result = serde_json::json!({
             "group_id": group_id,
             "root_lei": root_lei,
+            "include_funds": include_funds,
             "gleif_entities_created": tree_result.entities_created,
             "gleif_entities_updated": tree_result.entities_updated,
             "gleif_relationships_created": tree_result.relationships_created,
             "client_group_entities_added": entities_added,
+            "client_group_funds_added": funds_added,
+            "fund_metadata_populated": funds_added, // fund_metadata upserted for each fund
             "client_group_roles_assigned": roles_assigned,
             "client_group_relationships_created": relationships_created,
         });

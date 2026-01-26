@@ -83,6 +83,9 @@ pub fn disambiguation_modal(
         DisambiguationItem::InterpretationChoice { text, .. } => {
             (text.as_str(), "interpretation", &[][..])
         }
+        DisambiguationItem::ClientGroupMatch { search_text, .. } => {
+            (search_text.as_str(), "client_group", &[][..])
+        }
     };
 
     // Show matches from either search results or the item itself

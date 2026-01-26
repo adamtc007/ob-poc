@@ -482,6 +482,89 @@ impl Default for RelationshipType {
     }
 }
 
+/// Relationship category for filtering and display
+///
+/// Distinguishes ownership hierarchy (consolidation) from investment management
+/// and fund structure relationships. This enables filtering client_group_entity
+/// for specific use cases (e.g., UBO analysis uses only OWNERSHIP).
+///
+/// Uses resilience pattern - unknown values captured verbatim.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RelationshipCategory {
+    /// Corporate ownership - consolidation hierarchy (IS_DIRECTLY_CONSOLIDATED_BY, IS_ULTIMATELY_CONSOLIDATED_BY)
+    Ownership,
+    /// Investment management - ManCo manages fund (IS_FUND-MANAGED_BY)
+    InvestmentManagement,
+    /// Fund structure - umbrella/subfund, master/feeder (IS_SUBFUND_OF, IS_FEEDER_TO)
+    FundStructure,
+    /// Branch relationship
+    Branch,
+    /// Unknown category - captured verbatim
+    Unknown(String),
+}
+
+impl RelationshipCategory {
+    /// Derive category from relationship type
+    pub fn from_relationship_type(rel_type: &RelationshipType) -> Self {
+        match rel_type {
+            RelationshipType::IsDirectlyConsolidatedBy
+            | RelationshipType::IsUltimatelyConsolidatedBy => Self::Ownership,
+            RelationshipType::IsFundManagedBy => Self::InvestmentManagement,
+            RelationshipType::IsSubfundOf | RelationshipType::IsFeederTo => Self::FundStructure,
+            RelationshipType::Unknown(_) => Self::Unknown("UNKNOWN".to_string()),
+        }
+    }
+
+    /// Parse from string (for DB storage/retrieval)
+    pub fn parse(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "OWNERSHIP" => Self::Ownership,
+            "INVESTMENT_MANAGEMENT" | "IM" => Self::InvestmentManagement,
+            "FUND_STRUCTURE" => Self::FundStructure,
+            "BRANCH" => Self::Branch,
+            other => {
+                tracing::debug!(code = other, "Unknown relationship category");
+                Self::Unknown(s.to_string())
+            }
+        }
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Ownership => "OWNERSHIP",
+            Self::InvestmentManagement => "INVESTMENT_MANAGEMENT",
+            Self::FundStructure => "FUND_STRUCTURE",
+            Self::Branch => "BRANCH",
+            Self::Unknown(s) => s.as_str(),
+        }
+    }
+
+    /// Check if this is an ownership/consolidation relationship
+    pub fn is_ownership(&self) -> bool {
+        matches!(self, Self::Ownership)
+    }
+
+    /// Check if this is an investment management relationship
+    pub fn is_im_relationship(&self) -> bool {
+        matches!(self, Self::InvestmentManagement)
+    }
+
+    /// Check if this is a fund structure relationship
+    pub fn is_fund_structure(&self) -> bool {
+        matches!(self, Self::FundStructure)
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown(_))
+    }
+}
+
+impl Default for RelationshipCategory {
+    fn default() -> Self {
+        Self::Unknown("UNSPECIFIED".to_string())
+    }
+}
+
 /// Top-level API response wrapper
 #[derive(Debug, Clone, Deserialize)]
 pub struct GleifResponse<T> {

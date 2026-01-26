@@ -18,6 +18,10 @@ pub struct DiscoveredRelationship {
     pub child_lei: String,
     pub parent_lei: String,
     pub relationship_type: String,
+    /// Category for filtering (OWNERSHIP, INVESTMENT_MANAGEMENT, FUND_STRUCTURE)
+    pub relationship_category: super::types::RelationshipCategory,
+    /// Whether the child entity is a fund (quick filter for IM relationships)
+    pub is_fund: bool,
 }
 
 /// Result of fetching a corporate tree - includes both entities and relationships
@@ -25,6 +29,84 @@ pub struct DiscoveredRelationship {
 pub struct CorporateTreeResult {
     pub records: Vec<LeiRecord>,
     pub relationships: Vec<DiscoveredRelationship>,
+    /// Count of fund entities discovered (subset of records where is_fund=true)
+    pub fund_count: usize,
+    /// Count of ManCo entities that were expanded for managed funds
+    pub mancos_expanded: usize,
+}
+
+/// Options for controlling corporate tree traversal behavior
+#[derive(Debug, Clone)]
+pub struct TreeFetchOptions {
+    /// Maximum depth for consolidation hierarchy traversal
+    pub max_depth: usize,
+    /// Include funds managed by entities in the tree (IS_FUND-MANAGED_BY)
+    pub include_managed_funds: bool,
+    /// Include umbrella/subfund relationships (IS_SUBFUND_OF)
+    pub include_fund_structures: bool,
+    /// Include master/feeder relationships (IS_FEEDER_TO)
+    pub include_master_feeder: bool,
+    /// Filter funds by type (e.g., "UCITS", "AIF") - empty means all
+    pub fund_type_filter: Vec<String>,
+    /// Filter funds by jurisdiction (e.g., "LU", "IE") - empty means all
+    pub fund_jurisdiction_filter: Vec<String>,
+    /// Maximum funds to load per ManCo (safety limit to prevent runaway API calls)
+    pub max_funds_per_manco: Option<usize>,
+}
+
+impl Default for TreeFetchOptions {
+    fn default() -> Self {
+        Self {
+            max_depth: 10,
+            include_managed_funds: false,
+            include_fund_structures: false,
+            include_master_feeder: false,
+            fund_type_filter: vec![],
+            fund_jurisdiction_filter: vec![],
+            max_funds_per_manco: Some(500),
+        }
+    }
+}
+
+impl TreeFetchOptions {
+    /// Create options for ownership-only traversal (default, backwards compatible)
+    pub fn ownership_only() -> Self {
+        Self {
+            max_depth: 10,
+            include_managed_funds: false,
+            include_fund_structures: false,
+            include_master_feeder: false,
+            fund_type_filter: vec![],
+            fund_jurisdiction_filter: vec![],
+            max_funds_per_manco: None,
+        }
+    }
+
+    /// Create options for full traversal including all fund relationships
+    pub fn full_with_funds() -> Self {
+        Self {
+            max_depth: 10,
+            include_managed_funds: true,
+            include_fund_structures: true,
+            include_master_feeder: true,
+            fund_type_filter: vec![],
+            fund_jurisdiction_filter: vec![],
+            max_funds_per_manco: Some(500), // Safety limit
+        }
+    }
+
+    /// Create options with fund inclusion and custom limits
+    pub fn with_fund_limit(max_funds_per_manco: usize) -> Self {
+        Self {
+            max_depth: 10,
+            include_managed_funds: true,
+            include_fund_structures: true,
+            include_master_feeder: true,
+            fund_type_filter: vec![],
+            fund_jurisdiction_filter: vec![],
+            max_funds_per_manco: Some(max_funds_per_manco),
+        }
+    }
 }
 
 pub struct GleifClient {
@@ -312,6 +394,8 @@ impl GleifClient {
                     child_lei: lei.clone(),
                     parent_lei: parent.clone(),
                     relationship_type: "DIRECT_PARENT".to_string(),
+                    relationship_category: super::types::RelationshipCategory::Ownership,
+                    is_fund: false, // Will be updated when we fetch the record
                 });
             }
 
@@ -330,6 +414,9 @@ impl GleifClient {
                                             child_lei: lei.clone(),
                                             parent_lei: extracted_parent_lei.clone(),
                                             relationship_type: "DIRECT_PARENT".to_string(),
+                                            relationship_category:
+                                                super::types::RelationshipCategory::Ownership,
+                                            is_fund: record.is_fund(),
                                         });
                                         queue.push((extracted_parent_lei, depth + 1, None));
                                     }
@@ -363,9 +450,248 @@ impl GleifClient {
             seen_rels.insert(key)
         });
 
+        // Count funds in the result
+        let fund_count = all_records.iter().filter(|r| r.is_fund()).count();
+
         Ok(CorporateTreeResult {
             records: all_records,
             relationships: all_relationships,
+            fund_count,
+            mancos_expanded: 0, // No managed funds expansion in basic traversal
+        })
+    }
+
+    /// Fetch the full corporate tree with optional fund relationship expansion
+    ///
+    /// This enhanced traversal can optionally load funds managed by entities in the tree
+    /// (IS_FUND-MANAGED_BY relationships) and fund structure relationships (IS_SUBFUND_OF,
+    /// IS_FEEDER_TO).
+    ///
+    /// # Arguments
+    /// * `root_lei` - The LEI to start traversal from
+    /// * `options` - Controls fund loading behavior and limits
+    pub async fn fetch_corporate_tree_with_options(
+        &self,
+        root_lei: &str,
+        options: TreeFetchOptions,
+    ) -> Result<CorporateTreeResult> {
+        use super::types::RelationshipCategory;
+
+        let mut all_records = Vec::new();
+        let mut all_relationships = Vec::new();
+        let mut visited = std::collections::HashSet::new();
+        let mut mancos_expanded = 0usize;
+
+        // Queue contains (lei, depth, optional_parent_lei, is_from_fund_expansion)
+        // is_from_fund_expansion=true means we found this via managed-funds, don't re-expand
+        let mut queue = vec![(root_lei.to_string(), 0usize, None::<String>, false)];
+
+        while let Some((lei, depth, parent_lei, is_from_fund_expansion)) = queue.pop() {
+            if visited.contains(&lei) || depth > options.max_depth {
+                continue;
+            }
+            visited.insert(lei.clone());
+
+            // If we know the parent (from traversing children), record that relationship
+            if let Some(ref parent) = parent_lei {
+                all_relationships.push(DiscoveredRelationship {
+                    child_lei: lei.clone(),
+                    parent_lei: parent.clone(),
+                    relationship_type: "DIRECT_PARENT".to_string(),
+                    relationship_category: RelationshipCategory::Ownership,
+                    is_fund: false, // Will be updated when we fetch the record
+                });
+            }
+
+            // Fetch the record
+            match self.get_lei_record(&lei).await {
+                Ok(record) => {
+                    let record_is_fund = record.is_fund();
+
+                    // Queue parents if not at max depth (and record relationship)
+                    if depth < options.max_depth {
+                        if let Some(ref rels) = record.relationships {
+                            // Check direct parent
+                            if let Some(ref dp) = rels.direct_parent {
+                                if let Some(ref url) = dp.links.related {
+                                    if let Some(extracted_parent_lei) = extract_lei_from_url(url) {
+                                        all_relationships.push(DiscoveredRelationship {
+                                            child_lei: lei.clone(),
+                                            parent_lei: extracted_parent_lei.clone(),
+                                            relationship_type: "DIRECT_PARENT".to_string(),
+                                            relationship_category: RelationshipCategory::Ownership,
+                                            is_fund: record_is_fund,
+                                        });
+                                        queue.push((extracted_parent_lei, depth + 1, None, false));
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Queue children (pass current lei as their parent)
+                    if depth < options.max_depth {
+                        if let Ok(children) = self.get_direct_children(&lei).await {
+                            for child in children {
+                                let child_lei = child.lei().to_string();
+                                queue.push((child_lei, depth + 1, Some(lei.clone()), false));
+                            }
+                        }
+                    }
+
+                    // === FUND EXPANSION: Check if entity manages funds ===
+                    if options.include_managed_funds && !is_from_fund_expansion {
+                        if let Some(ref rels) = record.relationships {
+                            if rels.managed_funds.is_some() {
+                                match self.get_managed_funds(&lei).await {
+                                    Ok(funds) => {
+                                        let total_fund_count = funds.len();
+                                        tracing::info!(
+                                            lei = %lei,
+                                            fund_count = total_fund_count,
+                                            "Found ManCo with managed funds"
+                                        );
+                                        mancos_expanded += 1;
+
+                                        for (idx, fund) in funds.into_iter().enumerate() {
+                                            // Apply safety limit
+                                            if let Some(max) = options.max_funds_per_manco {
+                                                if idx >= max {
+                                                    tracing::warn!(
+                                                        lei = %lei,
+                                                        total = total_fund_count,
+                                                        loaded = max,
+                                                        "Truncated fund loading at limit"
+                                                    );
+                                                    break;
+                                                }
+                                            }
+
+                                            let fund_lei = fund.lei().to_string();
+
+                                            // Apply jurisdiction filter if set
+                                            if !options.fund_jurisdiction_filter.is_empty() {
+                                                if let Some(jur) = fund.jurisdiction() {
+                                                    if !options
+                                                        .fund_jurisdiction_filter
+                                                        .iter()
+                                                        .any(|f| f.eq_ignore_ascii_case(jur))
+                                                    {
+                                                        continue;
+                                                    }
+                                                }
+                                            }
+
+                                            // Record IM relationship (fund -> ManCo)
+                                            all_relationships.push(DiscoveredRelationship {
+                                                child_lei: fund_lei.clone(),
+                                                parent_lei: lei.clone(),
+                                                relationship_type: "IS_FUND-MANAGED_BY".to_string(),
+                                                relationship_category:
+                                                    RelationshipCategory::InvestmentManagement,
+                                                is_fund: true,
+                                            });
+
+                                            // Queue fund for structure discovery if not already visited
+                                            if options.include_fund_structures
+                                                && !visited.contains(&fund_lei)
+                                            {
+                                                // Don't increase depth for IM links - parallel dimension
+                                                queue.push((fund_lei.clone(), depth, None, true));
+                                            }
+
+                                            // Add fund record if not already visited
+                                            if !visited.contains(&fund_lei) {
+                                                visited.insert(fund_lei.clone());
+                                                all_records.push(fund);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            lei = %lei,
+                                            error = %e,
+                                            "Failed to fetch managed funds"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // === FUND STRUCTURE: Check for umbrella fund (IS_SUBFUND_OF) ===
+                    if options.include_fund_structures && record_is_fund {
+                        if let Some(ref rels) = record.relationships {
+                            if let Some(ref umbrella) = rels.umbrella_fund {
+                                if let Some(ref url) = umbrella.links.related {
+                                    if let Some(umbrella_lei) = extract_lei_from_url(url) {
+                                        all_relationships.push(DiscoveredRelationship {
+                                            child_lei: lei.clone(),
+                                            parent_lei: umbrella_lei.clone(),
+                                            relationship_type: "IS_SUBFUND_OF".to_string(),
+                                            relationship_category:
+                                                RelationshipCategory::FundStructure,
+                                            is_fund: true,
+                                        });
+
+                                        if !visited.contains(&umbrella_lei) {
+                                            queue.push((umbrella_lei, depth, None, true));
+                                        }
+                                    }
+                                }
+                            }
+
+                            // === MASTER-FEEDER: Check for master fund (IS_FEEDER_TO) ===
+                            if options.include_master_feeder {
+                                if let Some(ref master) = rels.master_fund {
+                                    if let Some(ref url) = master.links.related {
+                                        if let Some(master_lei) = extract_lei_from_url(url) {
+                                            all_relationships.push(DiscoveredRelationship {
+                                                child_lei: lei.clone(),
+                                                parent_lei: master_lei.clone(),
+                                                relationship_type: "IS_FEEDER_TO".to_string(),
+                                                relationship_category:
+                                                    RelationshipCategory::FundStructure,
+                                                is_fund: true,
+                                            });
+
+                                            if !visited.contains(&master_lei) {
+                                                queue.push((master_lei, depth, None, true));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    all_records.push(record);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to fetch LEI {}: {}", lei, e);
+                }
+            }
+        }
+
+        // Deduplicate relationships
+        let mut seen_rels = std::collections::HashSet::new();
+        all_relationships.retain(|r| {
+            let key = (
+                r.child_lei.clone(),
+                r.parent_lei.clone(),
+                r.relationship_type.clone(),
+            );
+            seen_rels.insert(key)
+        });
+
+        // Count funds in the result
+        let fund_count = all_records.iter().filter(|r| r.is_fund()).count();
+
+        Ok(CorporateTreeResult {
+            records: all_records,
+            relationships: all_relationships,
+            fund_count,
+            mancos_expanded,
         })
     }
 

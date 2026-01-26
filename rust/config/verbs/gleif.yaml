@@ -477,20 +477,22 @@ domains:
       # ==========================================================================
 
       import-to-client-group:
-        description: Import GLEIF tree and populate client_group tables with role tagging
+        description: Import GLEIF tree and populate client_group tables with role tagging. Optionally includes managed funds (IM relationships).
         invocation_phrases:
           - "research group from GLEIF"
           - "import corporate structure to client group"
           - "discover group entities"
           - "crawl GLEIF into client group"
           - "populate client group from LEI"
+          - "import group with funds"
+          - "discover funds for client group"
         behavior: plugin
         metadata:
           tier: composite
           source_of_truth: external
           scope: global
           noun: client_group
-          tags: [gleif, external-api, import, client-group, discovery]
+          tags: [gleif, external-api, import, client-group, discovery, funds]
         args:
           - name: group-id
             type: uuid
@@ -512,6 +514,16 @@ domains:
             required: false
             default: 3
             description: Maximum depth for tree traversal (default 3)
+          - name: include-funds
+            type: boolean
+            required: false
+            default: false
+            description: Include funds managed by entities in the tree (IS_FUND-MANAGED_BY). These are tagged with relationship_category=INVESTMENT_MANAGEMENT.
+          - name: max-funds-per-manco
+            type: integer
+            required: false
+            default: 500
+            description: Maximum funds to load per ManCo (safety limit to prevent runaway API calls)
           - name: decision-id
             type: uuid
             required: false
@@ -521,8 +533,12 @@ domains:
           fields:
             - group_id
             - root_lei
+            - include_funds
             - gleif_entities_created
             - gleif_entities_updated
+            - gleif_relationships_created
             - client_group_entities_added
+            - client_group_funds_added
+            - fund_metadata_populated
             - client_group_roles_assigned
             - client_group_relationships_created

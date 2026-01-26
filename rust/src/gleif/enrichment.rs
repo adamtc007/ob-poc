@@ -395,6 +395,147 @@ impl GleifEnrichmentService {
         })
     }
 
+    /// Import a corporate tree with optional fund relationship expansion
+    ///
+    /// This enhanced method can load funds managed by entities in the tree
+    /// (IS_FUND-MANAGED_BY) along with fund structure relationships.
+    ///
+    /// Returns an enhanced TreeImportResult with fund counts.
+    pub async fn import_corporate_tree_with_options(
+        &self,
+        root_lei: &str,
+        options: super::client::TreeFetchOptions,
+    ) -> Result<TreeImportResult> {
+        let mut entities_created = 0;
+        let mut entities_updated = 0;
+        let mut relationships_created = 0;
+        let mut terminal_entities = Vec::new();
+
+        // Fetch all records using enhanced traversal with fund support
+        let tree_result = self
+            .client
+            .fetch_corporate_tree_with_options(root_lei, options)
+            .await?;
+
+        let records = &tree_result.records;
+        let discovered_relationships = &tree_result.relationships;
+
+        tracing::info!(
+            root_lei = %root_lei,
+            total_records = records.len(),
+            fund_count = tree_result.fund_count,
+            mancos_expanded = tree_result.mancos_expanded,
+            relationships = discovered_relationships.len(),
+            "Corporate tree fetch complete"
+        );
+
+        for record in records {
+            let lei = record.lei();
+
+            // Check if entity exists
+            let existing_id = self.repository.find_entity_by_lei(lei).await?;
+
+            let entity_id = match existing_id {
+                Some(id) => {
+                    // Update existing entity
+                    self.repository.update_entity_from_gleif(id, record).await?;
+                    entities_updated += 1;
+                    id
+                }
+                None => {
+                    // Create new entity
+                    let id = self.repository.create_entity_from_gleif(record).await?;
+                    entities_created += 1;
+                    id
+                }
+            };
+
+            // Insert names, addresses, identifiers
+            self.repository
+                .insert_entity_names(entity_id, record)
+                .await?;
+            self.repository
+                .insert_entity_addresses(entity_id, record)
+                .await?;
+            self.repository
+                .insert_entity_identifiers(entity_id, record, &[])
+                .await?;
+
+            // Check if this is a terminal entity (no parent in ownership hierarchy)
+            // Note: funds with only IM relationships are NOT terminal for UBO purposes
+            if record.relationships.is_none()
+                || (record
+                    .relationships
+                    .as_ref()
+                    .map(|r| r.direct_parent.is_none() && r.ultimate_parent.is_none())
+                    .unwrap_or(true))
+            {
+                // Only add non-funds as terminal entities (funds have ManCo, not parent)
+                if !record.is_fund() {
+                    terminal_entities.push(TerminalEntity {
+                        lei: lei.to_string(),
+                        name: record.attributes.entity.legal_name.name.clone(),
+                        exception: None,
+                    });
+                }
+            }
+        }
+
+        // Now create parent relationships from discovered relationships
+        // This includes ownership AND IM relationships
+        for rel in discovered_relationships {
+            let child_id = self.repository.find_entity_by_lei(&rel.child_lei).await?;
+
+            if let Some(child_entity_id) = child_id {
+                // Find parent name from records if available
+                let parent_record = records.iter().find(|r| r.lei() == rel.parent_lei);
+                let parent_name =
+                    parent_record.map(|r| r.attributes.entity.legal_name.name.as_str());
+
+                // Map relationship type for DB storage
+                let db_rel_type = match rel.relationship_type.as_str() {
+                    "DIRECT_PARENT" => "DIRECT_PARENT",
+                    "IS_FUND-MANAGED_BY" => "FUND_MANAGER",
+                    "IS_SUBFUND_OF" => "UMBRELLA_FUND",
+                    "IS_FEEDER_TO" => "MASTER_FUND",
+                    other => other,
+                };
+
+                self.repository
+                    .insert_parent_relationship(
+                        child_entity_id,
+                        &rel.parent_lei,
+                        parent_name,
+                        db_rel_type,
+                        None,
+                    )
+                    .await?;
+                relationships_created += 1;
+            }
+        }
+
+        // Collect all LEIs from the imported records
+        let imported_leis: Vec<String> = records.iter().map(|r| r.lei().to_string()).collect();
+
+        tracing::info!(
+            root_lei = %root_lei,
+            entities_created = entities_created,
+            entities_updated = entities_updated,
+            relationships_created = relationships_created,
+            total_leis = imported_leis.len(),
+            "Corporate tree import complete"
+        );
+
+        Ok(TreeImportResult {
+            root_lei: root_lei.to_string(),
+            entities_created,
+            entities_updated,
+            relationships_created,
+            terminal_entities,
+            imported_leis,
+        })
+    }
+
     /// Refresh GLEIF data for an entity
     pub async fn refresh_entity(&self, entity_id: Uuid) -> Result<EnrichmentResult> {
         // Get the LEI for this entity

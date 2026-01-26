@@ -2118,35 +2118,46 @@ impl eframe::App for App {
         };
         self.handle_investor_register_action(investor_register_action);
 
-        // For Simplified layout: Chat on left side, skip context panel
+        // For Simplified layout: Chat prompt (25%) + Runbook (75%) on left side
         // For other layouts: Context panel on left side
         if self.state.panels.layout == LayoutMode::Simplified {
-            // Chat panel (left side) for simplified layout
+            // Left panel: Agent prompt (top 25%) + Runbook (bottom 75%)
             egui::SidePanel::left("chat_side_panel")
-                .default_width(280.0)
-                .min_width(200.0)
-                .max_width(400.0)
+                .default_width(340.0)
+                .min_width(280.0)
+                .max_width(500.0)
                 .resizable(true)
                 .show(ctx, |ui| {
-                    chat_panel(ui, &mut self.state);
+                    let available_height = ui.available_height();
+                    let prompt_height = available_height * 0.25;
+                    let runbook_height = available_height * 0.75;
+
+                    // === TOP 25%: Agent Prompt ===
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(ui.available_width(), prompt_height),
+                        egui::Layout::top_down(egui::Align::LEFT),
+                        |ui| {
+                            self.render_agent_prompt(ui);
+                        },
+                    );
+
+                    ui.separator();
+
+                    // === BOTTOM 75%: Runbook ===
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(ui.available_width(), runbook_height - 8.0),
+                        egui::Layout::top_down(egui::Align::LEFT),
+                        |ui| {
+                            self.render_runbook(ui);
+                        },
+                    );
                 });
 
             // Main content area - just the graph viewport
-            egui::CentralPanel::default().show(ctx, |ui| {
-                // Debug: log view_level on each frame (temporary)
-                web_sys::console::log_1(
-                    &format!(
-                        "render: view_level={:?}, session_id={:?}",
-                        self.state.view_level, self.state.session_id
-                    )
-                    .into(),
-                );
-
-                match self.state.view_level {
-                    ViewLevel::Universe => self.render_galaxy_view(ui),
-                    ViewLevel::Cluster => self.render_cluster_view(ui),
-                    _ => self.state.graph_widget.ui(ui),
-                }
+            egui::CentralPanel::default().show(ctx, |ui| match self.state.view_level {
+                ViewLevel::Universe => self.render_galaxy_view(ui),
+                ViewLevel::Cluster => self.render_cluster_view(ui),
+                _ => self.state.graph_widget.ui(ui),
             });
         } else {
             // Context panel (left side) - shows session context and semantic stages
@@ -3180,6 +3191,303 @@ impl App {
                     chat_panel(ui, &mut self.state);
                 });
         });
+    }
+
+    /// Render agent prompt input with larger font (for Simplified layout top section)
+    fn render_agent_prompt(&mut self, ui: &mut egui::Ui) {
+        use egui::{Color32, RichText, TextEdit};
+
+        // Extract async state (Rule 3: lock, extract, drop, then render)
+        let (loading_chat, should_focus) = {
+            let mut guard = match self.state.async_state.lock() {
+                Ok(g) => g,
+                Err(_) => return,
+            };
+            let loading = guard.loading_chat;
+            let focus =
+                !guard.loading_chat && (guard.chat_just_finished || guard.needs_initial_focus);
+            if guard.chat_just_finished {
+                guard.chat_just_finished = false;
+            }
+            if guard.needs_initial_focus {
+                guard.needs_initial_focus = false;
+            }
+            (loading, focus)
+        };
+
+        ui.vertical(|ui| {
+            // Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("Agent").strong().size(14.0));
+                if loading_chat {
+                    ui.spinner();
+                }
+            });
+
+            ui.add_space(4.0);
+
+            // Large multiline input
+            let chat_input_id = egui::Id::new("simplified_chat_input");
+            if should_focus {
+                ui.memory_mut(|mem| mem.request_focus(chat_input_id));
+            }
+
+            // Calculate remaining height for text input
+            let button_height = 32.0;
+            let text_height = ui.available_height() - button_height - 8.0;
+
+            // Multiline text input with LARGER font
+            egui::Frame::default()
+                .fill(Color32::from_rgb(30, 35, 40))
+                .inner_margin(8.0)
+                .rounding(6.0)
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical()
+                        .max_height(text_height)
+                        .show(ui, |ui| {
+                            let response = TextEdit::multiline(&mut self.state.buffers.chat_input)
+                                .font(egui::FontId::proportional(18.0)) // Bigger font (18px+)
+                                .desired_width(f32::INFINITY)
+                                .hint_text(
+                                    RichText::new("Ask the agent...")
+                                        .size(18.0)
+                                        .color(Color32::DARK_GRAY),
+                                )
+                                .id(chat_input_id)
+                                .show(ui);
+
+                            // Send on Ctrl+Enter
+                            let modifiers = ui.input(|i| i.modifiers);
+                            let enter_pressed = ui.input(|i| i.key_pressed(egui::Key::Enter));
+                            if enter_pressed
+                                && (modifiers.ctrl || modifiers.command)
+                                && !loading_chat
+                            {
+                                if !self.state.buffers.chat_input.trim().is_empty() {
+                                    self.state.send_chat_message();
+                                }
+                            }
+
+                            response.response
+                        });
+                });
+
+            // Send button
+            ui.horizontal(|ui| {
+                let can_send = !self.state.buffers.chat_input.trim().is_empty() && !loading_chat;
+                if ui
+                    .add_enabled(
+                        can_send,
+                        egui::Button::new(RichText::new("Send").size(14.0)),
+                    )
+                    .clicked()
+                {
+                    self.state.send_chat_message();
+                }
+                ui.label(
+                    RichText::new("Ctrl+Enter")
+                        .small()
+                        .color(Color32::DARK_GRAY),
+                );
+            });
+        });
+    }
+
+    /// Render runbook / run sheet with chat history (for Simplified layout bottom section)
+    fn render_runbook(&mut self, ui: &mut egui::Ui) {
+        use egui::{Color32, RichText, ScrollArea};
+        use ob_poc_types::{RunSheet, RunSheetEntry};
+
+        // Extract data from state (Rule 3)
+        let run_sheet = self
+            .state
+            .session
+            .as_ref()
+            .and_then(|s| s.run_sheet.clone());
+        let bindings = self
+            .state
+            .session
+            .as_ref()
+            .map(|s| s.bindings.clone())
+            .unwrap_or_default();
+        let messages = self.state.messages.clone();
+
+        ui.vertical(|ui| {
+            // Header with counts
+            let header_text = if let Some(ref rs) = run_sheet {
+                let executed = rs.executed_count();
+                let pending = rs.pending_count();
+                format!("Runbook ({} executed, {} pending)", executed, pending)
+            } else {
+                "Runbook".to_string()
+            };
+
+            ui.label(
+                RichText::new(header_text)
+                    .strong()
+                    .size(14.0)
+                    .color(Color32::from_rgb(200, 180, 120)),
+            );
+            ui.add_space(4.0);
+
+            // Scrollable content
+            ScrollArea::vertical()
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    // === Chat messages (recent only, compact) ===
+                    if !messages.is_empty() {
+                        ui.label(RichText::new("Recent").small().color(Color32::GRAY));
+                        for msg in messages.iter().rev().take(5).rev() {
+                            let is_user = msg.role == crate::state::MessageRole::User;
+                            let bg = if is_user {
+                                Color32::from_rgb(35, 50, 65)
+                            } else {
+                                Color32::from_rgb(40, 45, 50)
+                            };
+                            egui::Frame::default()
+                                .fill(bg)
+                                .inner_margin(6.0)
+                                .rounding(4.0)
+                                .show(ui, |ui| {
+                                    let role = if is_user { "You" } else { "Agent" };
+                                    let role_color = if is_user {
+                                        Color32::LIGHT_BLUE
+                                    } else {
+                                        Color32::LIGHT_GREEN
+                                    };
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            RichText::new(role).small().strong().color(role_color),
+                                        );
+                                        ui.label(
+                                            RichText::new(
+                                                msg.timestamp.format("%H:%M").to_string(),
+                                            )
+                                            .small()
+                                            .color(Color32::DARK_GRAY),
+                                        );
+                                    });
+                                    // Truncate long messages
+                                    let content = if msg.content.len() > 200 {
+                                        format!("{}...", &msg.content[..200])
+                                    } else {
+                                        msg.content.clone()
+                                    };
+                                    ui.label(RichText::new(content).small());
+                                });
+                            ui.add_space(2.0);
+                        }
+                        ui.add_space(8.0);
+                    }
+
+                    // === Run sheet entries ===
+                    if let Some(ref rs) = run_sheet {
+                        if !rs.is_empty() {
+                            ui.label(RichText::new("Statements").small().color(Color32::GRAY));
+                            for (idx, entry) in rs.entries.iter().enumerate() {
+                                let is_current = idx == rs.cursor;
+                                self.render_runbook_entry(ui, entry, is_current);
+                                ui.add_space(2.0);
+                            }
+                        }
+                    }
+
+                    // === Bindings ===
+                    if !bindings.is_empty() {
+                        ui.add_space(8.0);
+                        ui.label(RichText::new("Bindings").small().color(Color32::GRAY));
+                        egui::Frame::default()
+                            .fill(Color32::from_rgb(35, 30, 45))
+                            .inner_margin(6.0)
+                            .rounding(4.0)
+                            .show(ui, |ui| {
+                                for (symbol, info) in &bindings {
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            RichText::new(format!("@{}", symbol))
+                                                .small()
+                                                .monospace()
+                                                .color(Color32::from_rgb(180, 140, 255)),
+                                        );
+                                        ui.label(RichText::new("→").small().color(Color32::GRAY));
+                                        ui.label(
+                                            RichText::new(&info.name)
+                                                .small()
+                                                .color(Color32::LIGHT_GRAY),
+                                        );
+                                    });
+                                }
+                            });
+                    }
+
+                    // Empty state
+                    if run_sheet.is_none() && messages.is_empty() && bindings.is_empty() {
+                        ui.centered_and_justified(|ui| {
+                            ui.label(
+                                RichText::new("No session activity yet")
+                                    .color(Color32::DARK_GRAY)
+                                    .italics(),
+                            );
+                        });
+                    }
+                });
+        });
+    }
+
+    /// Render a single runbook entry (compact view)
+    fn render_runbook_entry(
+        &self,
+        ui: &mut egui::Ui,
+        entry: &ob_poc_types::RunSheetEntry,
+        is_current: bool,
+    ) {
+        use egui::{Color32, RichText};
+
+        let (r, g, b) = entry.status.color_rgb();
+        let status_color = Color32::from_rgb(r, g, b);
+        let bg = if is_current {
+            Color32::from_rgb(40, 50, 60)
+        } else {
+            Color32::from_rgb(30, 32, 35)
+        };
+        let border = if is_current {
+            Color32::from_rgb(80, 120, 180)
+        } else {
+            Color32::TRANSPARENT
+        };
+
+        egui::Frame::default()
+            .fill(bg)
+            .stroke(egui::Stroke::new(1.0, border))
+            .inner_margin(6.0)
+            .rounding(4.0)
+            .show(ui, |ui| {
+                // Status + DSL (truncated)
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(entry.status.icon()).color(status_color));
+                    let display_dsl = entry.display_dsl.as_deref().unwrap_or(&entry.dsl_source);
+                    let truncated = if display_dsl.len() > 60 {
+                        format!("{}...", &display_dsl[..60])
+                    } else {
+                        display_dsl.to_string()
+                    };
+                    ui.label(
+                        RichText::new(truncated)
+                            .small()
+                            .monospace()
+                            .color(Color32::LIGHT_GRAY),
+                    );
+                });
+
+                // Error if any
+                if let Some(ref error) = entry.error {
+                    ui.label(
+                        RichText::new(format!("✗ {}", error))
+                            .small()
+                            .color(Color32::from_rgb(220, 80, 80)),
+                    );
+                }
+            });
     }
 
     /// Render layout:
