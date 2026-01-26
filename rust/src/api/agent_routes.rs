@@ -132,6 +132,22 @@ fn to_api_disambiguation_item(
                     .collect(),
             }
         }
+        crate::api::session::DisambiguationItem::ClientGroupMatch {
+            search_text,
+            candidates,
+        } => ob_poc_types::DisambiguationItem::ClientGroupMatch {
+            search_text: search_text.clone(),
+            candidates: candidates
+                .iter()
+                .map(|c| ob_poc_types::ClientGroupCandidate {
+                    group_id: c.group_id.to_string(),
+                    group_name: c.group_name.clone(),
+                    matched_alias: c.matched_alias.clone(),
+                    confidence: c.confidence,
+                    entity_count: c.entity_count,
+                })
+                .collect(),
+        },
     }
 }
 

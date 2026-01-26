@@ -48,7 +48,7 @@ use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
 
 /// A unified verb search result
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct VerbSearchResult {
     pub verb: String,
     pub score: f32,
@@ -59,6 +59,7 @@ pub struct VerbSearchResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(PartialEq)]
 pub enum VerbSearchSource {
     /// User-specific exact match (highest priority)
     UserLearnedExact,

@@ -3104,6 +3104,29 @@ pub enum DisambiguationItem {
         /// Possible interpretations
         options: Vec<Interpretation>,
     },
+    /// Multiple client groups match - used for Stage 0 scope resolution
+    ClientGroupMatch {
+        /// The original search text (e.g., "allianz")
+        search_text: String,
+        /// Matching client groups to choose from
+        candidates: Vec<ClientGroupCandidate>,
+    },
+}
+
+/// A matching client group for scope disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClientGroupCandidate {
+    /// Client group UUID
+    pub group_id: Uuid,
+    /// Canonical group name (e.g., "Allianz Global Investors")
+    pub group_name: String,
+    /// The alias that matched (e.g., "allianz", "AGI")
+    pub matched_alias: String,
+    /// Match confidence (0.0 - 1.0)
+    pub confidence: f64,
+    /// Number of entities in this group (optional, for display)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub entity_count: Option<i64>,
 }
 
 /// A matching entity for disambiguation

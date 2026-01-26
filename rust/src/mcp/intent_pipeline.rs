@@ -134,6 +134,80 @@ pub enum PipelineOutcome {
     ScopeCandidates,
 }
 
+// =============================================================================
+// INPUT QUALITY CLASSIFICATION - Graceful degradation for ambiguous input
+// =============================================================================
+
+/// Classification of input quality for UX decisions
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum InputQuality {
+    /// Clear intent, proceed normally
+    Clear,
+    /// Multiple verbs too close in score - need clarification
+    Ambiguous { candidates: Vec<VerbSearchResult> },
+    /// Score too low but have a guess - suggest to user
+    TooVague { best_guess: Option<String> },
+    /// No meaningful match - input is nonsense or too short
+    Nonsense,
+}
+
+/// Classify input quality based on verb search results
+pub fn classify_input(candidates: &[VerbSearchResult], threshold: f32) -> InputQuality {
+    match candidates.first() {
+        None => InputQuality::Nonsense,
+        Some(top) if top.score < 0.30 => InputQuality::Nonsense,
+        Some(top) if top.score < threshold => InputQuality::TooVague {
+            best_guess: Some(top.verb.clone()),
+        },
+        Some(top) => {
+            if let Some(runner_up) = candidates.get(1) {
+                if runner_up.score >= threshold && (top.score - runner_up.score) < 0.05 {
+                    return InputQuality::Ambiguous {
+                        candidates: candidates.iter().take(2).cloned().collect(),
+                    };
+                }
+            }
+            InputQuality::Clear
+        }
+    }
+}
+
+/// Confidence tiers for UI treatment
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub enum ConfidenceTier {
+    /// >= 0.85 - auto-execute
+    High,
+    /// 0.70-0.85 - proceed with "did you mean?"
+    Medium,
+    /// 0.55-0.70 - require confirmation
+    Low,
+    /// < 0.55 - require clarification
+    VeryLow,
+}
+
+impl From<f32> for ConfidenceTier {
+    fn from(score: f32) -> Self {
+        match score {
+            s if s >= 0.85 => ConfidenceTier::High,
+            s if s >= 0.70 => ConfidenceTier::Medium,
+            s if s >= 0.55 => ConfidenceTier::Low,
+            _ => ConfidenceTier::VeryLow,
+        }
+    }
+}
+
+impl ConfidenceTier {
+    /// Get threshold for this tier
+    pub fn threshold(&self) -> f32 {
+        match self {
+            ConfidenceTier::High => 0.85,
+            ConfidenceTier::Medium => 0.70,
+            ConfidenceTier::Low => 0.55,
+            ConfidenceTier::VeryLow => 0.0,
+        }
+    }
+}
+
 /// Pipeline result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineResult {
@@ -408,6 +482,18 @@ impl IntentPipeline {
         // Use searcher's semantic_threshold for consistent behavior
         let threshold = self.verb_searcher.semantic_threshold();
         let ambiguity_outcome = check_ambiguity(&candidates, threshold);
+
+        // LOGGING: Candle verb selection (per TODO requirements)
+        tracing::debug!(
+            top_verb = candidates.first().map(|c| c.verb.as_str()).unwrap_or("none"),
+            top_score = candidates.first().map(|c| c.score).unwrap_or(0.0),
+            candidate_count = candidates.len(),
+            threshold = threshold,
+            ambiguity_outcome = ?ambiguity_outcome,
+            has_scope = scope_ctx.has_scope(),
+            client_group = scope_ctx.client_group_name.as_deref().unwrap_or("none"),
+            "Candle verb selection"
+        );
 
         match ambiguity_outcome {
             VerbSearchOutcome::NoMatch => {

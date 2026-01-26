@@ -26,6 +26,84 @@ use uuid::Uuid;
 use sqlx::PgPool;
 
 // =============================================================================
+// SCOPE DETECTION GUARDS - Prevents Stage 0 from being too eager
+// =============================================================================
+
+/// Explicit prefixes that indicate scope-setting intent.
+/// Stage 0 ONLY consumes input if it starts with one of these.
+const SCOPE_PREFIXES: &[&str] = &[
+    "work on ",
+    "working on ",
+    "switch to ",
+    "set client to ",
+    "set client ",
+    "context: ",
+    "context:",
+    "i'm working with ",
+    "im working with ",
+    "client is ",
+    "for client ",
+];
+
+/// Tokens that indicate the input is a TARGET reference, not scope-setting.
+/// If ANY of these appear, Stage 0 should NOT consume the input.
+const TARGET_INDICATORS: &[&str] = &[
+    // CBU/structure
+    "cbu",
+    "cbus",
+    // Fund structure
+    "fund",
+    "funds",
+    "spv",
+    "spvs",
+    "sicav",
+    "sicavs",
+    "manco",
+    "mancos",
+    "subfund",
+    "subfunds",
+    "umbrella",
+    // Product/service
+    "portfolio",
+    "portfolios",
+    "product",
+    "products",
+    "account",
+    "accounts",
+    "custody",
+    "book",
+    "mandate",
+    "mandates",
+    // KYC/compliance
+    "kyc",
+    "ubo",
+    "ubos",
+    "pep",
+    "peps",
+    "sanctions",
+    // Entity structure
+    "entity",
+    "entities",
+    "person",
+    "persons",
+    "company",
+    "companies",
+    "director",
+    "directors",
+    "shareholder",
+    "shareholders",
+    // Ownership
+    "holding",
+    "holdings",
+    "ownership",
+    "stake",
+    "stakes",
+];
+
+/// Minimum confidence for single-token scope acceptance (high bar)
+const MIN_SINGLE_TOKEN_CONFIDENCE: f64 = 0.85;
+
+// =============================================================================
 // SCOPE RESOLUTION OUTCOME - Deterministic UX Contract
 // =============================================================================
 
@@ -125,46 +203,55 @@ impl ScopeResolver {
 
     /// Detect if input is a scope-setting phrase
     ///
-    /// Patterns that indicate scope-setting intent:
-    /// - "work on X", "working on X"
-    /// - "switch to X", "set client to X"
-    /// - "I'm working with X", "client is X"
-    /// - Just a client name by itself (if it matches a known alias)
+    /// Stage 0 should ONLY attempt scope-set if:
+    /// 1. Input matches an **explicit scope prefix** ("work on", "switch to", etc.), OR
+    /// 2. Input is **exactly one token** (will be validated by confidence in resolve())
+    ///
+    /// The old "≤3 words" heuristic is REMOVED - it was too permissive and caused
+    /// "Allianz CBU", "Allianz custody", "Lux funds" to be consumed by Stage 0.
     pub fn is_scope_phrase(input: &str) -> bool {
         let lower = input.to_lowercase();
-        let prefixes = [
-            "work on ",
-            "working on ",
-            "switch to ",
-            "set client to ",
-            "set client ",
-            "i'm working with ",
-            "im working with ",
-            "client is ",
-            "for client ",
-            "load ",
-        ];
 
-        for prefix in prefixes {
+        // GUARD: If contains target indicators, NOT a scope phrase
+        // e.g., "Allianz CBU", "Allianz custody", "Allianz funds"
+        if Self::has_target_indicator(&lower) {
+            return false;
+        }
+
+        // Rule 1: Explicit scope prefix → yes
+        for prefix in SCOPE_PREFIXES {
             if lower.starts_with(prefix) {
                 return true;
             }
         }
 
-        // Also check if it's just a potential client name (short input, no verb-like words)
+        // Rule 2: Single token only (will be validated by confidence in resolve())
+        // e.g., "allianz" by itself might be scope-setting
         let words: Vec<&str> = lower.split_whitespace().collect();
-        if words.len() <= 3 && !Self::has_verb_indicator(&lower) {
-            return true; // Might be just a client name
+        if words.len() == 1 && !Self::has_verb_indicator(&lower) {
+            return true; // But resolve() will require high confidence
         }
 
+        // Everything else → NOT a scope phrase, let Candle handle it
         false
+    }
+
+    /// Check if input has target indicators (CBU, fund, entity, etc.)
+    /// If present, the input is referencing a target, not setting scope.
+    pub fn has_target_indicator(input: &str) -> bool {
+        let lower = input.to_lowercase();
+        TARGET_INDICATORS.iter().any(|t| {
+            lower
+                .split_whitespace()
+                .any(|word| word == *t || word.ends_with(t))
+        })
     }
 
     /// Check if input has verb-like indicators (suggesting it's a command, not scope)
     fn has_verb_indicator(input: &str) -> bool {
         let verb_indicators = [
             "create", "delete", "update", "show", "list", "add", "remove", "get", "set ", "find",
-            "search", "execute", "run", "approve", "reject", "submit",
+            "search", "execute", "run", "approve", "reject", "submit", "load", "unload",
         ];
 
         for indicator in verb_indicators {
@@ -201,8 +288,9 @@ impl ScopeResolver {
         }
 
         // If no prefix matched, the whole input might be a client name
+        // Only accept single tokens (tighter than before)
         let trimmed = input.trim();
-        if !trimmed.is_empty() && trimmed.split_whitespace().count() <= 3 {
+        if !trimmed.is_empty() && trimmed.split_whitespace().count() == 1 {
             return Some(trimmed.to_string());
         }
 
@@ -262,9 +350,13 @@ impl ScopeResolver {
         }
 
         // Check if we have a clear winner
+        // For single-token inputs, require higher confidence threshold
         let top = &matches[0];
-        let has_clear_winner = top.exact_match
-            || matches.len() == 1
+        let is_single_token = input.trim().split_whitespace().count() == 1;
+
+        let has_clear_winner = top.exact_match // Exact match always wins
+            || (!is_single_token && matches.len() == 1 && top.confidence >= 0.7)
+            || (is_single_token && top.confidence >= MIN_SINGLE_TOKEN_CONFIDENCE) // Higher bar for bare names
             || (matches.len() > 1 && (top.confidence - matches[1].confidence) > self.ambiguity_gap);
 
         if has_clear_winner {
@@ -407,22 +499,255 @@ pub struct EntityMatch {
     pub match_type: String, // "exact", "fuzzy", "semantic"
 }
 
+// =============================================================================
+// SCOPED MATCH - Unified result type for typed search dispatch
+// =============================================================================
+
+/// Unified scoped match result - works for CBU, entity, client_group, etc.
+/// Includes display metadata for disambiguation UI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopedMatch {
+    pub id: Uuid,
+    pub name: String,
+    pub matched_tag: String,
+    pub confidence: f64,
+    pub match_type: String, // "exact", "fuzzy", "trigram", "code", "ilike"
+
+    // Typed candidate metadata for UI
+    pub result_type: String,  // "cbu", "entity", "client_group"
+    pub display_kind: String, // "CBU", "Legal Entity", "Person", "Client Group"
+    pub source: String,       // "tag", "alias", "direct", "code"
+}
+
+// =============================================================================
+// TYPED SEARCH DISPATCH - The core fix for "Allianz means different things"
+// =============================================================================
+
+/// Search within scope, dispatching by expected entity type.
+/// This is THE key fix: slot type controls what "Allianz" can mean.
+///
+/// When a verb expects `:cbu-id <Allianz>`, we search CBUs.
+/// When a verb expects `:entity-id <Allianz>`, we search entities.
+#[cfg(feature = "database")]
+pub async fn search_in_scope(
+    pool: &PgPool,
+    scope: &ScopeContext,
+    expected_type: &str, // "cbu" | "entity" | "person" | "company" | ...
+    query: &str,
+    limit: usize,
+) -> Result<Vec<ScopedMatch>> {
+    let Some(group_id) = scope.client_group_id else {
+        tracing::debug!(
+            expected_type = expected_type,
+            query = query,
+            "Scoped search dispatch: no scope, skipping"
+        );
+        return Ok(vec![]);
+    };
+
+    // LOGGING: Scoped search dispatch (per TODO requirements)
+    tracing::debug!(
+        search_type = expected_type,
+        query = query,
+        group_id = %group_id,
+        client_group = scope.client_group_name.as_deref().unwrap_or("unknown"),
+        limit = limit,
+        "Scoped search dispatch"
+    );
+
+    let results = match expected_type {
+        "cbu" | "cbus" => {
+            search_cbus_in_scope(pool, group_id, query, limit, scope.persona.as_deref()).await?
+        }
+        "entity" | "person" | "company" | "legal_entity" => {
+            let matches = search_entities_in_scope(pool, scope, query, limit).await?;
+            matches
+                .into_iter()
+                .map(|m| ScopedMatch {
+                    id: m.entity_id,
+                    name: m.entity_name.clone(),
+                    matched_tag: m.matched_tag,
+                    confidence: m.confidence,
+                    match_type: m.match_type,
+                    result_type: expected_type.to_string(),
+                    display_kind: match expected_type {
+                        "person" => "Person".to_string(),
+                        "company" => "Company".to_string(),
+                        _ => "Legal Entity".to_string(),
+                    },
+                    source: "tag".to_string(),
+                })
+                .collect()
+        }
+        _ => {
+            // Fallback to entity search for unknown types
+            let matches = search_entities_in_scope(pool, scope, query, limit).await?;
+            matches
+                .into_iter()
+                .map(|m| ScopedMatch {
+                    id: m.entity_id,
+                    name: m.entity_name.clone(),
+                    matched_tag: m.matched_tag,
+                    confidence: m.confidence,
+                    match_type: m.match_type,
+                    result_type: expected_type.to_string(),
+                    display_kind: expected_type.to_string(),
+                    source: "tag".to_string(),
+                })
+                .collect()
+        }
+    };
+
+    // LOGGING: Search results (per TODO requirements)
+    tracing::debug!(
+        search_type = expected_type,
+        query = query,
+        result_count = results.len(),
+        top_match = results.first().map(|r| r.name.as_str()).unwrap_or("none"),
+        top_confidence = results.first().map(|r| r.confidence).unwrap_or(0.0),
+        "Scoped search results"
+    );
+
+    Ok(results)
+}
+
+/// Search CBUs within a client group scope.
+/// Prefers: exact match → code match → trigram similarity → ILIKE fallback
+#[cfg(feature = "database")]
+async fn search_cbus_in_scope(
+    pool: &PgPool,
+    group_id: Uuid,
+    query: &str,
+    limit: usize,
+    _persona: Option<&str>,
+) -> Result<Vec<ScopedMatch>> {
+    // CBU → client_group join path:
+    // cbus.commercial_client_entity_id → client_group_entity.entity_id
+
+    let query_lower = query.to_lowercase();
+
+    let rows = sqlx::query!(
+        r#"
+        WITH cbu_matches AS (
+            SELECT
+                c.cbu_id as id,
+                c.name,
+                -- Match type priority: exact > code > trigram > ilike
+                CASE
+                    WHEN LOWER(c.name) = $2 THEN 'exact'
+                    WHEN c.cbu_id::text ILIKE $2 || '%' THEN 'code'
+                    WHEN similarity(c.name, $2) > 0.3 THEN 'trigram'
+                    WHEN c.name ILIKE '%' || $2 || '%' THEN 'ilike'
+                    ELSE 'none'
+                END as match_type,
+                -- Confidence scoring
+                CASE
+                    WHEN LOWER(c.name) = $2 THEN 1.0
+                    WHEN c.cbu_id::text ILIKE $2 || '%' THEN 0.95
+                    ELSE COALESCE(similarity(c.name, $2), 0.0)
+                END as confidence
+            FROM "ob-poc".cbus c
+            JOIN "ob-poc".client_group_entity cge
+                ON cge.entity_id = c.commercial_client_entity_id
+            WHERE cge.group_id = $1
+              AND cge.membership_type != 'historical'
+              AND (
+                  LOWER(c.name) = $2                           -- exact
+                  OR c.cbu_id::text ILIKE $2 || '%'           -- code prefix
+                  OR similarity(c.name, $2) > 0.3             -- trigram
+                  OR c.name ILIKE '%' || $2 || '%'            -- fallback ILIKE
+              )
+        )
+        SELECT
+            id as "id!",
+            name as "name!",
+            match_type as "match_type!",
+            confidence as "confidence!: f64"
+        FROM cbu_matches
+        WHERE match_type != 'none'
+        ORDER BY
+            CASE match_type
+                WHEN 'exact' THEN 0
+                WHEN 'code' THEN 1
+                WHEN 'trigram' THEN 2
+                ELSE 3
+            END,
+            confidence DESC
+        LIMIT $3
+        "#,
+        group_id,
+        query_lower,
+        limit as i32
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| ScopedMatch {
+            id: r.id,
+            name: r.name.clone(),
+            matched_tag: r.name,
+            confidence: r.confidence,
+            match_type: r.match_type.clone(),
+            result_type: "cbu".to_string(),
+            display_kind: "CBU".to_string(),
+            source: if r.match_type == "code" {
+                "code"
+            } else {
+                "direct"
+            }
+            .to_string(),
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_is_scope_phrase() {
+    fn test_is_scope_phrase_explicit_prefixes() {
+        // Explicit scope prefixes → yes
         assert!(ScopeResolver::is_scope_phrase("work on allianz"));
         assert!(ScopeResolver::is_scope_phrase("working on blackrock"));
         assert!(ScopeResolver::is_scope_phrase("switch to aviva"));
         assert!(ScopeResolver::is_scope_phrase("set client to allianz"));
         assert!(ScopeResolver::is_scope_phrase("client is blackrock"));
+        assert!(ScopeResolver::is_scope_phrase("context: allianz"));
+        assert!(ScopeResolver::is_scope_phrase("for client blackrock"));
+    }
 
-        // Short inputs might be client names
+    #[test]
+    fn test_is_scope_phrase_single_token() {
+        // Single token (will be validated by confidence in resolve())
         assert!(ScopeResolver::is_scope_phrase("allianz"));
-        assert!(ScopeResolver::is_scope_phrase("black rock"));
+        assert!(ScopeResolver::is_scope_phrase("blackrock"));
+    }
 
+    #[test]
+    fn test_is_scope_phrase_target_indicators_block() {
+        // Target indicators → NOT scope phrase (the key fix!)
+        assert!(!ScopeResolver::is_scope_phrase("Allianz CBU"));
+        assert!(!ScopeResolver::is_scope_phrase("Allianz custody"));
+        assert!(!ScopeResolver::is_scope_phrase("Allianz funds"));
+        assert!(!ScopeResolver::is_scope_phrase("Lux CBUs"));
+        assert!(!ScopeResolver::is_scope_phrase("Irish funds"));
+        assert!(!ScopeResolver::is_scope_phrase("show allianz products"));
+        assert!(!ScopeResolver::is_scope_phrase("Allianz entities"));
+        assert!(!ScopeResolver::is_scope_phrase("blackrock holdings"));
+    }
+
+    #[test]
+    fn test_is_scope_phrase_multi_token_no_prefix() {
+        // Multi-token without prefix → NOT scope phrase (tightened rule)
+        assert!(!ScopeResolver::is_scope_phrase("allianz ireland"));
+        assert!(!ScopeResolver::is_scope_phrase("black rock"));
+        assert!(!ScopeResolver::is_scope_phrase("allianz lux"));
+    }
+
+    #[test]
+    fn test_is_scope_phrase_commands_blocked() {
         // Commands should NOT be scope phrases
         assert!(!ScopeResolver::is_scope_phrase(
             "create a new cbu for allianz"
@@ -431,6 +756,19 @@ mod tests {
         assert!(!ScopeResolver::is_scope_phrase(
             "list all entities for allianz"
         ));
+        assert!(!ScopeResolver::is_scope_phrase("load the allianz book"));
+    }
+
+    #[test]
+    fn test_has_target_indicator() {
+        assert!(ScopeResolver::has_target_indicator("allianz cbu"));
+        assert!(ScopeResolver::has_target_indicator("some fund"));
+        assert!(ScopeResolver::has_target_indicator("custody account"));
+        assert!(ScopeResolver::has_target_indicator("kyc status"));
+        assert!(ScopeResolver::has_target_indicator("entity search"));
+
+        assert!(!ScopeResolver::has_target_indicator("allianz"));
+        assert!(!ScopeResolver::has_target_indicator("work on allianz"));
     }
 
     #[test]
@@ -451,5 +789,7 @@ mod tests {
             ScopeResolver::extract_client_name("client is Aviva Investors"),
             Some("Aviva Investors".to_string())
         );
+        // Multi-token without prefix → None (tightened)
+        assert_eq!(ScopeResolver::extract_client_name("allianz ireland"), None);
     }
 }

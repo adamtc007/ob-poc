@@ -832,3 +832,150 @@ impl From<f32> for ConfidenceTier {
 1. Is `cbus.commercial_client_entity_id` reliably populated?
 2. If not: add `cbu_client_group` linking table or `client_label` column?
 3. Does `cbus` table have a `code` or `short_code` column for code matching?
+
+
+---
+
+## ACCEPTANCE TESTS (Verify Baseline Works)
+
+> Run these after implementation to verify the pipeline is actually working, not just compiling.
+
+### Test 1: Scope Set Without Stealing Non-Scope Intents
+
+| Input | Expected |
+|-------|----------|
+| `"Allianz"` | Scope chip set (client group), no staging, "scope resolved" message |
+| `"Add custody product to Allianz CBU"` | NOT treated as scope set; stages a command targeting CBU(s) in scope |
+| `"Allianz custody"` | NOT treated as scope set; proceeds to verb search |
+| `"Lux funds"` | NOT treated as scope set; proceeds to verb search |
+
+### Test 2: Typed Disambiguation (CBU vs Entity)
+
+| Input | Expected |
+|-------|----------|
+| `"Add custody to Allianz CBU"` | Resolver searches **CBUs** (not entity tags) |
+| DSL: `(cbu.add-product :cbu-id <Allianz>)` | CBU search returns CBU matches, not entities |
+| DSL: `(entity.assign-role :entity-id <John>)` | Entity search returns entity matches |
+
+Result should be either:
+- Rewrites DSL to `:cbu-ids [uuid, ...]`, OR
+- Shows compact **CBU picker** (if ambiguous) — not entity picker
+
+### Test 3: Staging is Default; Nothing Executes
+
+| Input | Expected |
+|-------|----------|
+| `"Check KYC status for Irish funds"` | Staged line(s) appear; NO DB mutations; runbook shows "Ready/Blocked" |
+| `"run"` | Only NOW execution happens |
+
+### Test 4: Pickers Are Non-Hallucination Gates
+
+| Input | Expected |
+|-------|----------|
+| `"Irish funds"` (ambiguous, multiple matches) | Compact picker shown |
+| | NO UUID invented |
+| | Run button **disabled server-side** until selection made |
+
+### Test 5: DAG Reorder Happens and Is Visible
+
+| Input | Expected |
+|-------|----------|
+| Stage two lines out of order (e.g., apply product before ensure/create) | Reorder diff shown |
+| | Line numbers update |
+| | Stable identities preserved |
+
+---
+
+## REQUIRED LOGGING (Debug Pipeline as Machine, Not Mystery)
+
+Add these log points (even just `tracing::debug!`) so each prompt produces a traceable path:
+
+```rust
+// 1. Stage 0 outcome
+tracing::debug!(
+    outcome = ?scope_outcome,  // Resolved / Candidates / NotScopePhrase
+    input = %input,
+    "Stage0 scope resolution"
+);
+
+// 2. Candle intent selection
+tracing::debug!(
+    verb = %selected_verb,
+    expected_type = %slot_type,  // "cbu" vs "entity"
+    confidence = %score,
+    "Candle verb selection"
+);
+
+// 3. Resolver dispatch
+tracing::debug!(
+    search_type = %expected_type,  // "cbu" vs "entity"
+    query = %query,
+    candidate_count = %matches.len(),
+    "Scoped search dispatch"
+);
+
+// 4. Runbook state
+tracing::debug!(
+    state = ?runbook_state,  // Ready vs Blocked
+    blockers = ?blockers,
+    line_count = %lines.len(),
+    "Runbook staging"
+);
+
+// 5. Execute gate
+tracing::debug!(
+    allowed = %can_execute,
+    reason = %reason,  // "all_resolved" / "has_unresolved" / "picker_pending"
+    "Execute gate check"
+);
+```
+
+---
+
+## COMMON FAILURE MODES (When It "Feels Unfocused")
+
+If tests fail or behavior seems wrong, check these in order:
+
+| Symptom | Likely Cause | Check |
+|---------|--------------|-------|
+| "Allianz CBU" sets scope instead of staging | Stage 0 guard still too eager | `has_target_indicator()` not firing |
+| CBU slot shows entity picker | Typed search not dispatching | `search_in_scope()` ignoring `expected_type` |
+| Verb ranking wrong for domain queries | Candle not receiving scope/hints | `SearchHints` not passed to `search()` |
+| Picker appears but run still enabled | Execute gate not checking disambiguation | Server-side gate missing |
+| Same entity shown as both CBU and Entity | `result_type` not threaded to UI | `ScopedMatch.result_type` lost in conversion |
+
+---
+
+## DEBUG TRANSCRIPT TEMPLATE
+
+When something goes wrong, capture this for debugging:
+
+```
+INPUT: "Add custody to Allianz CBU"
+
+STAGE 0:
+  outcome: NotScopePhrase ✓ (or Resolved ✗ — bug!)
+  
+CANDLE:
+  selected_verb: cbu.add-product
+  expected_type: cbu
+  confidence: 0.82
+
+RESOLVER:
+  search_type: cbu (or entity ✗ — bug!)
+  query: "Allianz"
+  candidates: [
+    { id: uuid1, name: "Allianz Lux CBU", type: "cbu", score: 0.91 },
+    { id: uuid2, name: "Allianz Ireland CBU", type: "cbu", score: 0.87 },
+  ]
+
+RUNBOOK:
+  state: Blocked (pending disambiguation)
+  staged_line: (cbu.add-product :cbu-id <Allianz> :product-id <custody>)
+
+UI:
+  picker_shown: true (CBU picker, not entity picker)
+  run_enabled: false ✓
+```
+
+If the transcript shows the wrong path at any step, that's your bug location.

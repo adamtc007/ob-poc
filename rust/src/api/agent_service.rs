@@ -107,8 +107,8 @@ use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{
-    AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption,
-    ResolutionSubSession, SessionState, UnresolvedRefInfo,
+    AgentSession, ClientGroupCandidate, DisambiguationItem, DisambiguationRequest,
+    EntityMatchOption, ResolutionSubSession, SessionState, UnresolvedRefInfo,
 };
 use crate::database::{derive_semantic_state, VerbService};
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
@@ -118,6 +118,7 @@ use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, Validation
 use crate::dsl_v2::verb_registry::registry;
 use crate::dsl_v2::Statement;
 use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
+use crate::mcp::scope_resolution::ScopeResolver;
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::ontology::SemanticStageRegistry;
 use serde::{Deserialize, Serialize};
@@ -355,6 +356,79 @@ pub struct PreResolvedContext {
     pub roles: Vec<String>,
     /// Available jurisdictions (code -> name)
     pub jurisdictions: Vec<(String, String)>,
+}
+
+// ============================================================================
+// GRACEFUL RESPONSE HELPERS - For ambiguous/vague/nonsense input
+// ============================================================================
+
+use crate::mcp::intent_pipeline::{classify_input, ConfidenceTier, InputQuality};
+
+/// Build a graceful response for various input quality levels
+pub fn build_graceful_response(
+    quality: &InputQuality,
+    has_scope: bool,
+    original_input: &str,
+) -> String {
+    match quality {
+        InputQuality::Clear => {
+            // Should not be called for Clear - handled normally
+            String::new()
+        }
+        InputQuality::Ambiguous { candidates } => {
+            let verb_list = candidates
+                .iter()
+                .map(|c| {
+                    let desc = c.description.as_deref().unwrap_or("No description");
+                    format!("• **{}**: {}", c.verb, desc)
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            format!(
+                "I'm not sure which action you meant. Did you mean:\n\n{}\n\nPlease clarify.",
+                verb_list
+            )
+        }
+        InputQuality::TooVague { best_guess } => {
+            let suggestion = if has_scope {
+                "Try 'show CBUs' or 'list products'"
+            } else {
+                "Try 'work on [client name]' to set context first"
+            };
+            if let Some(guess) = best_guess {
+                format!(
+                    "I'm not sure what you meant by \"{}\". Did you mean **{}**?\n\n{}",
+                    original_input, guess, suggestion
+                )
+            } else {
+                format!(
+                    "I couldn't understand \"{}\". {}\n\nExamples: 'show Allianz CBUs', 'add custody product', 'create a new fund'",
+                    original_input, suggestion
+                )
+            }
+        }
+        InputQuality::Nonsense => {
+            format!(
+                "I couldn't understand \"{}\". Try a command like:\n\n\
+                 • 'show Allianz CBUs'\n\
+                 • 'add custody product'\n\
+                 • 'create a new fund for Blackrock'\n\
+                 • 'work on Allianz' (to set client context)\n\n\
+                 Type /commands for a full list of available commands.",
+                original_input
+            )
+        }
+    }
+}
+
+/// Get confidence tier from pipeline result
+pub fn get_confidence_tier(
+    candidates: &[crate::mcp::verb_search::VerbSearchResult],
+) -> ConfidenceTier {
+    candidates
+        .first()
+        .map(|c| ConfidenceTier::from(c.score))
+        .unwrap_or(ConfidenceTier::VeryLow)
 }
 
 // ============================================================================
@@ -913,24 +987,56 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
                     // Handle scope candidates (user needs to pick)
                     if let PipelineOutcome::ScopeCandidates = &result.outcome {
+                        use crate::mcp::scope_resolution::ScopeResolutionOutcome;
+
                         session.add_user_message(request.message.clone());
 
                         // Build disambiguation for client group selection
-                        let error_msg = result
-                            .validation_error
-                            .clone()
-                            .unwrap_or_else(|| "Multiple clients match".to_string());
-                        session.add_agent_message(error_msg.clone(), None, None);
+                        let candidates: Vec<ClientGroupCandidate> =
+                            if let Some(ScopeResolutionOutcome::Candidates(c)) =
+                                &result.scope_resolution
+                            {
+                                c.iter()
+                                    .map(|sc| ClientGroupCandidate {
+                                        group_id: sc.group_id,
+                                        group_name: sc.group_name.clone(),
+                                        matched_alias: sc.matched_alias.clone(),
+                                        confidence: sc.confidence,
+                                        entity_count: None, // Could fetch if needed
+                                    })
+                                    .collect()
+                            } else {
+                                vec![]
+                            };
+
+                        let search_text = ScopeResolver::extract_client_name(&request.message)
+                            .unwrap_or_else(|| request.message.clone());
+
+                        let disambig = DisambiguationRequest {
+                            request_id: Uuid::new_v4(),
+                            items: vec![DisambiguationItem::ClientGroupMatch {
+                                search_text: search_text.clone(),
+                                candidates,
+                            }],
+                            prompt: format!(
+                                "Multiple clients match '{}'. Which did you mean?",
+                                search_text
+                            ),
+                            original_intents: None,
+                        };
+
+                        let message = "Multiple clients match. Please select:".to_string();
+                        session.add_agent_message(message.clone(), None, None);
 
                         return Ok(AgentChatResponse {
-                            message: error_msg,
+                            message,
                             intents: vec![],
                             validation_results: vec![],
                             session_state: SessionState::PendingValidation,
                             can_execute: false,
                             dsl_source: None,
                             ast: None,
-                            disambiguation: None, // TODO: Build client group picker
+                            disambiguation: Some(disambig),
                             commands: None,
                             unresolved_refs: None,
                             current_ref_index: None,
@@ -2013,8 +2119,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
     /// Search for entities within a specific client group
     ///
-    /// Uses the client_group_entity table to filter results to entities
-    /// that belong to the specified client group.
+    /// Uses typed search dispatch: CBU slots search CBUs, entity slots search entities.
+    /// This is THE core fix for "Allianz means different things depending on context".
     async fn search_entities_by_client_group(
         &self,
         entity_type: &str,
@@ -2022,26 +2128,26 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         limit: usize,
         client_group_id: Uuid,
     ) -> Result<Vec<EntityMatchOption>, String> {
-        use crate::mcp::scope_resolution::search_entities_in_scope;
-        use crate::mcp::scope_resolution::ScopeContext;
+        use crate::mcp::scope_resolution::{search_in_scope, ScopeContext};
 
-        // Build scope context with just the client group
+        // Build scope context with the client group
         let scope = ScopeContext::new().with_client_group(client_group_id, String::new());
 
-        // Use the scope_resolution module's search function
-        let matches = search_entities_in_scope(&self.pool, &scope, query, limit)
+        // TYPE-DISPATCHED SEARCH: The key fix
+        // When entity_type is "cbu", we search CBUs, not entities
+        let matches = search_in_scope(&self.pool, &scope, entity_type, query, limit)
             .await
-            .map_err(|e| format!("Scoped entity search failed: {}", e))?;
+            .map_err(|e| format!("Scoped search failed: {}", e))?;
 
-        // Map to EntityMatchOption
+        // Map to EntityMatchOption with typed metadata
         Ok(matches
             .into_iter()
             .map(|m| EntityMatchOption {
-                entity_id: m.entity_id,
-                name: m.entity_name,
-                entity_type: entity_type.to_string(),
+                entity_id: m.id,
+                name: m.name,
+                entity_type: m.result_type, // Preserve actual type from search
                 jurisdiction: None,
-                context: Some(format!("Matched: {} ({})", m.matched_tag, m.match_type)),
+                context: Some(format!("{} ({})", m.display_kind, m.match_type)),
                 score: Some(m.confidence as f32),
             })
             .collect())
