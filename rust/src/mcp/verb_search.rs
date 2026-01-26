@@ -25,16 +25,17 @@
 //!
 //! All DB access goes through VerbService (no direct sqlx calls).
 //!
-//! ## Threshold Calibration (BGE vs MiniLM)
+//! ## Threshold Calibration (BGE Asymmetric Mode)
 //!
-//! BGE scores are higher than MiniLM for the same match quality:
-//! - MiniLM: scores distributed across [0.3, 1.0]
-//! - BGE: scores cluster in [0.6, 1.0] (even unrelated sentences score ~0.6)
+//! BGE uses asymmetric retrieval: queries get an instruction prefix, targets don't.
+//! This produces LOWER similarity scores than symmetric (target→target) mode:
+//! - Symmetric (target→target): scores 0.6-1.0 (same-embedding comparison)
+//! - Asymmetric (query→target): scores 0.5-0.8 (instruction-prefixed query vs raw target)
 //!
-//! Thresholds for BGE:
-//! - semantic_threshold: 0.78 (decision gate)
-//! - fallback_threshold: 0.70 (retrieval cutoff)
-//! - blocklist_threshold: 0.85 (collision detection)
+//! Thresholds for BGE asymmetric mode:
+//! - fallback_threshold: 0.55 (retrieval cutoff - must retrieve candidates)
+//! - semantic_threshold: 0.65 (decision gate - accepting a match)
+//! - blocklist_threshold: 0.80 (collision detection)
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -203,16 +204,20 @@ impl HybridVerbSearcher {
     /// Create searcher with full capabilities including pgvector semantic search
     ///
     /// Thresholds calibrated for BGE-small-en-v1.5 (retrieval-optimized model).
-    /// BGE scores cluster higher than MiniLM - adjust if switching models.
+    /// BGE asymmetric mode: query embeddings use instruction prefix, targets don't.
+    /// This produces LOWER similarity scores than symmetric (target-to-target) mode.
+    /// Thresholds must be set accordingly:
+    /// - fallback_threshold: 0.55 (retrieval cutoff - must be low enough to retrieve candidates)
+    /// - semantic_threshold: 0.65 (decision gate - accepting a match)
     pub fn new(verb_service: Arc<VerbService>, learned_data: Option<SharedLearnedData>) -> Self {
         Self {
             verb_service: Some(verb_service),
             learned_data,
             embedder: None, // Embedder added separately via with_embedder
-            // BGE-calibrated thresholds
-            semantic_threshold: 0.78,  // Decision gate for accepting match
-            fallback_threshold: 0.70,  // Retrieval cutoff for DB queries
-            blocklist_threshold: 0.85, // Collision detection
+            // BGE asymmetric mode thresholds (query→target is lower than target→target)
+            semantic_threshold: 0.65,  // Decision gate for accepting match
+            fallback_threshold: 0.55,  // Retrieval cutoff for DB queries
+            blocklist_threshold: 0.80, // Collision detection
         }
     }
 
@@ -222,10 +227,10 @@ impl HybridVerbSearcher {
             verb_service: None,
             learned_data: Some(learned_data),
             embedder: None,
-            // BGE-calibrated thresholds
-            semantic_threshold: 0.78,
-            fallback_threshold: 0.70,
-            blocklist_threshold: 0.85,
+            // BGE asymmetric mode thresholds
+            semantic_threshold: 0.65,
+            fallback_threshold: 0.55,
+            blocklist_threshold: 0.80,
         }
     }
 
@@ -235,10 +240,10 @@ impl HybridVerbSearcher {
             verb_service: None,
             learned_data: None,
             embedder: None,
-            // BGE-calibrated thresholds
-            semantic_threshold: 0.78,
-            fallback_threshold: 0.70,
-            blocklist_threshold: 0.85,
+            // BGE asymmetric mode thresholds
+            semantic_threshold: 0.65,
+            fallback_threshold: 0.55,
+            blocklist_threshold: 0.80,
         }
     }
 
@@ -297,19 +302,38 @@ impl HybridVerbSearcher {
         // Normalize query ONCE at the start (used for exact matching)
         let normalized = query.trim().to_lowercase();
 
+        // Debug: Log semantic capability status
+        tracing::debug!(
+            has_verb_service = self.verb_service.is_some(),
+            has_embedder = self.embedder.is_some(),
+            has_semantic = self.has_semantic_capability(),
+            query = %query,
+            "VerbSearch: checking semantic capability"
+        );
+
         // Compute embedding ONCE at the start (used for all semantic lookups)
         // This avoids computing the same embedding 4 times (user semantic, learned semantic,
         // global semantic, blocklist) - saves ~15-30ms per search
         // Use embed_query for user input (applies BGE instruction prefix)
         let query_embedding: Option<Vec<f32>> = if self.has_semantic_capability() {
+            tracing::debug!("VerbSearch: computing query embedding...");
             match self.embedder.as_ref().unwrap().embed_query(query).await {
-                Ok(emb) => Some(emb),
+                Ok(emb) => {
+                    tracing::debug!(
+                        embedding_len = emb.len(),
+                        "VerbSearch: embedding computed successfully"
+                    );
+                    Some(emb)
+                }
                 Err(e) => {
                     tracing::warn!(error = %e, "Failed to compute query embedding, falling back to exact matches only");
                     None
                 }
             }
         } else {
+            tracing::warn!(
+                "VerbSearch: semantic capability NOT available, falling back to exact matches only"
+            );
             None
         };
 
@@ -388,32 +412,47 @@ impl HybridVerbSearcher {
         // 6. Global semantic search (cold start fallback)
         // Uses verb_pattern_embeddings for primary semantic lookup
         if results.len() < limit {
+            tracing::debug!(
+                results_so_far = results.len(),
+                has_embedding = query_embedding.is_some(),
+                "VerbSearch: checking global semantic search"
+            );
             if let Some(ref embedding) = query_embedding {
-                if let Ok(semantic_results) = self
+                tracing::debug!("VerbSearch: calling search_global_semantic_with_embedding...");
+                match self
                     .search_global_semantic_with_embedding(embedding, limit - results.len())
                     .await
                 {
-                    for result in semantic_results {
-                        if seen_verbs.contains(&result.verb) {
-                            continue;
-                        }
-                        if !self.matches_domain(&result.verb, domain_filter) {
-                            continue;
-                        }
-                        if self
-                            .check_blocklist_with_embedding(embedding, user_id, &result.verb)
-                            .await?
-                        {
+                    Ok(semantic_results) => {
+                        tracing::debug!(
+                            semantic_results_count = semantic_results.len(),
+                            "VerbSearch: global semantic search returned"
+                        );
+                        for result in semantic_results {
+                            if seen_verbs.contains(&result.verb) {
+                                continue;
+                            }
+                            if !self.matches_domain(&result.verb, domain_filter) {
+                                continue;
+                            }
+                            if self
+                                .check_blocklist_with_embedding(embedding, user_id, &result.verb)
+                                .await?
+                            {
+                                seen_verbs.insert(result.verb.clone());
+                                continue;
+                            }
+
                             seen_verbs.insert(result.verb.clone());
-                            continue;
-                        }
+                            results.push(result);
 
-                        seen_verbs.insert(result.verb.clone());
-                        results.push(result);
-
-                        if results.len() >= limit {
-                            break;
+                            if results.len() >= limit {
+                                break;
+                            }
                         }
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "VerbSearch: global semantic search failed");
                     }
                 }
             }

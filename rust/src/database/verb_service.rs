@@ -7,6 +7,7 @@
 //! - Blocklist checking
 //! - Verb descriptions from dsl_verbs
 
+use pgvector::Vector;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -134,6 +135,8 @@ impl VerbService {
         query_embedding: &[f32],
         threshold: f32,
     ) -> Result<Option<SemanticMatch>, sqlx::Error> {
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
         let row = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
@@ -144,7 +147,7 @@ impl VerbService {
             LIMIT 1
             "#,
         )
-        .bind(query_embedding)
+        .bind(&embedding_vec)
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await?;
@@ -169,6 +172,8 @@ impl VerbService {
         threshold: f32,
         limit: usize,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
         let rows = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
@@ -180,7 +185,7 @@ impl VerbService {
             LIMIT $3
             "#,
         )
-        .bind(query_embedding)
+        .bind(&embedding_vec)
         .bind(user_id)
         .bind(limit as i32)
         .bind(threshold)
@@ -209,6 +214,8 @@ impl VerbService {
         query_embedding: &[f32],
         threshold: f32,
     ) -> Result<Option<SemanticMatch>, sqlx::Error> {
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
         let row = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
@@ -218,7 +225,7 @@ impl VerbService {
             LIMIT 1
             "#,
         )
-        .bind(query_embedding)
+        .bind(&embedding_vec)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -241,6 +248,8 @@ impl VerbService {
         threshold: f32,
         limit: usize,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
         let rows = sqlx::query_as::<_, GlobalLearnedSemanticRow>(
             r#"
             SELECT phrase, verb, 1 - (embedding <=> $1::vector) as similarity
@@ -251,7 +260,7 @@ impl VerbService {
             LIMIT $2
             "#,
         )
-        .bind(query_embedding)
+        .bind(&embedding_vec)
         .bind(limit as i32)
         .bind(threshold)
         .fetch_all(&self.pool)
@@ -281,6 +290,17 @@ impl VerbService {
         limit: usize,
         min_similarity: f32,
     ) -> Result<Vec<SemanticMatch>, sqlx::Error> {
+        tracing::debug!(
+            embedding_len = query_embedding.len(),
+            limit = limit,
+            min_similarity = min_similarity,
+            first_values = ?&query_embedding[..5.min(query_embedding.len())],
+            "VerbService: search_verb_patterns_semantic called"
+        );
+
+        // Convert &[f32] to pgvector::Vector for proper sqlx binding
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
         let rows = sqlx::query_as::<_, VerbPatternSemanticRow>(
             r#"
             SELECT pattern_phrase, verb_name, 1 - (embedding <=> $1::vector) as similarity, category
@@ -291,11 +311,18 @@ impl VerbService {
             LIMIT $2
             "#,
         )
-        .bind(query_embedding)
+        .bind(&embedding_vec)
         .bind(limit as i32)
         .bind(min_similarity)
         .fetch_all(&self.pool)
-        .await?;
+        .await;
+
+        match &rows {
+            Ok(r) => tracing::debug!(row_count = r.len(), "VerbService: query returned"),
+            Err(e) => tracing::error!(error = %e, "VerbService: query failed"),
+        }
+
+        let rows = rows?;
 
         Ok(rows
             .into_iter()
@@ -321,6 +348,8 @@ impl VerbService {
         verb: &str,
         threshold: f32,
     ) -> Result<bool, sqlx::Error> {
+        let embedding_vec = Vector::from(query_embedding.to_vec());
+
         let blocked = sqlx::query_scalar::<_, bool>(
             r#"
             SELECT EXISTS (
@@ -335,7 +364,7 @@ impl VerbService {
         )
         .bind(verb)
         .bind(user_id)
-        .bind(query_embedding)
+        .bind(&embedding_vec)
         .bind(threshold)
         .fetch_one(&self.pool)
         .await?;

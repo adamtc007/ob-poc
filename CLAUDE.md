@@ -1415,13 +1415,20 @@ IntentPipeline.process()
 | `session.clear` | Clear session | "clear", "start fresh" |
 | `session.undo` / `session.redo` | History navigation | "undo", "redo" |
 
-### Verb Search Thresholds (BGE-calibrated)
+### Verb Search Thresholds (BGE Asymmetric Mode)
+
+BGE uses **asymmetric retrieval**: queries get an instruction prefix (`"Represent this sentence for searching relevant passages: "`), targets don't. This produces **lower** similarity scores than symmetric (target-to-target) comparison:
+
+- **Symmetric (target→target):** scores 0.6-1.0 (same-embedding comparison, like DB tests)
+- **Asymmetric (query→target):** scores 0.5-0.8 (instruction-prefixed query vs raw target)
 
 | Threshold | Value | Purpose |
 |-----------|-------|---------|
-| `semantic_threshold` | 0.78 | Decision gate for accepting match |
-| `fallback_threshold` | 0.70 | Retrieval cutoff for DB queries |
-| `blocklist_threshold` | 0.85 | Collision detection |
+| `fallback_threshold` | 0.55 | Retrieval cutoff for DB queries (must be low enough to retrieve candidates) |
+| `semantic_threshold` | 0.65 | Decision gate for accepting match |
+| `blocklist_threshold` | 0.80 | Collision detection |
+
+> **Warning:** If you see "No matching verbs found" for queries that should match, check that asymmetric thresholds are being used. The old symmetric thresholds (0.70/0.78) will reject valid asymmetric matches.
 
 ### Adding Navigation Phrases
 

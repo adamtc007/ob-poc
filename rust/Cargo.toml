@@ -46,6 +46,7 @@ nom = "7.1"
 # Database integration (optional for Phase 1)
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json", "macros", "bigdecimal", "rust_decimal"], optional = true }
 bigdecimal = { version = "0.4", features = ["serde"], optional = true }
+pgvector = { version = "0.4", features = ["sqlx"], optional = true }
 
 # gRPC client for EntityGateway
 tonic = "0.12"
@@ -189,7 +190,7 @@ required-features = ["database", "cli", "mcp"]
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
 
-database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway"]  # Only enable database functionality when needed
+database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector"]  # Only enable database functionality when needed
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search

@@ -28,6 +28,9 @@ pub mod dsl_session_file;
 pub mod agent_service;
 
 #[cfg(feature = "server")]
+pub mod client_group_adapter;
+
+#[cfg(feature = "server")]
 pub mod entity_routes;
 
 #[cfg(feature = "server")]

@@ -103,6 +103,7 @@
 
 use crate::agent::learning::embedder::CandleEmbedder;
 use crate::agentic::llm_client::LlmClient;
+use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{
@@ -1838,12 +1839,19 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     ///
     /// This is a direct passthrough to EntityGateway for UI autocomplete.
     /// Returns up to `limit` matches with fuzzy search.
+    ///
+    /// For client_group type, uses PgClientGroupResolver with semantic search.
     pub async fn search_entities(
         &self,
         entity_type: &str,
         query: &str,
         limit: usize,
     ) -> Result<Vec<EntityMatchOption>, String> {
+        // Special handling for client_group - uses PgClientGroupResolver
+        if entity_type == "client_group" || entity_type == "client" {
+            return self.search_client_groups(query, limit).await;
+        }
+
         let ref_type = match entity_type {
             "cbu" => RefType::Cbu,
             "entity" | "person" | "company" => RefType::Entity,
@@ -1851,12 +1859,9 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             "role" => RefType::Role,
             "jurisdiction" => RefType::Jurisdiction,
             "currency" => RefType::Currency,
-            "client_group" | "client" => RefType::ClientGroup,
             _ => RefType::Entity,
         };
 
-        // TODO: For ClientGroup, use PgClientGroupResolver instead of Gateway
-        // For now, fall through to Gateway (will return no matches)
         let mut resolver = GatewayRefResolver::connect(&self.config.gateway_addr)
             .await
             .map_err(|e| format!("Gateway connection failed: {}", e))?;
@@ -1881,15 +1886,63 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             .collect())
     }
 
+    /// Search client groups using PgClientGroupResolver with semantic search
+    async fn search_client_groups(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<EntityMatchOption>, String> {
+        use ob_semantic_matcher::client_group_resolver::ClientGroupAliasResolver;
+
+        // Need embedder for semantic search
+        let embedder = match &self.embedder {
+            Some(e) => e.clone(),
+            None => {
+                return Err("Client group search requires embedder (semantic search)".to_string())
+            }
+        };
+
+        let adapter = ClientGroupEmbedderAdapter(embedder);
+        let resolver = ob_semantic_matcher::client_group_resolver::PgClientGroupResolver::new(
+            self.pool.clone(),
+            Arc::new(adapter),
+            "BAAI/bge-small-en-v1.5".to_string(),
+        );
+
+        let matches = resolver
+            .search_aliases(query, limit)
+            .await
+            .map_err(|e| format!("Client group search failed: {}", e))?;
+
+        Ok(matches
+            .into_iter()
+            .map(|m| EntityMatchOption {
+                entity_id: m.group_id,
+                name: m.canonical_name,
+                entity_type: "client_group".to_string(),
+                jurisdiction: None,
+                context: Some(format!("Matched: {}", m.matched_alias)),
+                score: Some(m.similarity_score),
+            })
+            .collect())
+    }
+
     /// Resolve a single entity by exact name match
     ///
     /// Returns the entity if exactly one match is found,
     /// or a list of suggestions if multiple/no matches.
+    ///
+    /// For client_group type, uses PgClientGroupResolver with semantic search.
     pub async fn resolve_entity(
         &self,
         entity_type: &str,
         name: &str,
     ) -> Result<ResolveResult, String> {
+        // Special handling for client_group - uses PgClientGroupResolver
+        if entity_type == "client_group" || entity_type == "client" {
+            return self.resolve_client_group(name).await;
+        }
+
         let ref_type = match entity_type {
             "cbu" => RefType::Cbu,
             "entity" | "person" | "company" => RefType::Entity,
@@ -1897,12 +1950,9 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             "role" => RefType::Role,
             "jurisdiction" => RefType::Jurisdiction,
             "currency" => RefType::Currency,
-            "client_group" | "client" => RefType::ClientGroup,
             _ => RefType::Entity,
         };
 
-        // TODO: For ClientGroup, use PgClientGroupResolver instead of Gateway
-        // For now, fall through to Gateway (will return not found)
         let mut resolver = GatewayRefResolver::connect(&self.config.gateway_addr)
             .await
             .map_err(|e| format!("Gateway connection failed: {}", e))?;
@@ -1911,6 +1961,59 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             .resolve(ref_type, name)
             .await
             .map_err(|e| format!("Resolution failed: {}", e))
+    }
+
+    /// Resolve a client group by name using PgClientGroupResolver
+    async fn resolve_client_group(&self, name: &str) -> Result<ResolveResult, String> {
+        use crate::dsl_v2::ref_resolver::SuggestedMatch;
+        use ob_semantic_matcher::client_group_resolver::{
+            ClientGroupAliasResolver, ClientGroupResolveError, ResolutionConfig,
+        };
+
+        let embedder = match &self.embedder {
+            Some(e) => e.clone(),
+            None => {
+                return Err("Client group resolution requires embedder".to_string());
+            }
+        };
+
+        let adapter = ClientGroupEmbedderAdapter(embedder);
+        let resolver = ob_semantic_matcher::client_group_resolver::PgClientGroupResolver::new(
+            self.pool.clone(),
+            Arc::new(adapter),
+            "BAAI/bge-small-en-v1.5".to_string(),
+        );
+
+        let config = ResolutionConfig::default();
+
+        match resolver.resolve_alias(name, &config).await {
+            Ok(m) => {
+                // Single confident match
+                Ok(ResolveResult::Found {
+                    id: m.group_id,
+                    display: m.canonical_name,
+                })
+            }
+            Err(ClientGroupResolveError::Ambiguous { candidates, .. }) => {
+                // Multiple candidates - return suggestions
+                let suggestions = candidates
+                    .into_iter()
+                    .map(|c| SuggestedMatch {
+                        value: c.group_id.to_string(),
+                        display: c.canonical_name,
+                        score: c.similarity_score,
+                    })
+                    .collect();
+                Ok(ResolveResult::NotFound { suggestions })
+            }
+            Err(ClientGroupResolveError::NoMatch(_)) => {
+                // No match - return empty suggestions
+                Ok(ResolveResult::NotFound {
+                    suggestions: vec![],
+                })
+            }
+            Err(e) => Err(format!("Client group resolution failed: {}", e)),
+        }
     }
 
     /// Get all available DSL verbs (for UI verb picker / autocomplete)
