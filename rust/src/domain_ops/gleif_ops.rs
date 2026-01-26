@@ -1688,3 +1688,290 @@ async fn log_research_action(
 fn escape_dsl_string(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
+
+// =============================================================================
+// GLEIF IMPORT TO CLIENT GROUP
+// =============================================================================
+
+/// Import GLEIF tree and populate client_group_entity with role tagging
+///
+/// This operation:
+/// 1. Creates/finds the client_group
+/// 2. Imports the GLEIF corporate tree
+/// 3. Adds all discovered entities to client_group_entity
+/// 4. Auto-tags entities with roles based on GLEIF category/relationships
+/// 5. Creates client_group_relationship edges
+/// 6. Records source provenance
+#[register_custom_op]
+pub struct GleifImportToClientGroupOp;
+
+#[async_trait]
+impl CustomOperation for GleifImportToClientGroupOp {
+    fn domain(&self) -> &'static str {
+        "gleif"
+    }
+    fn verb(&self) -> &'static str {
+        "import-to-client-group"
+    }
+    fn rationale(&self) -> &'static str {
+        "Imports GLEIF tree and populates client_group tables with role tagging"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = super::helpers::get_required_uuid(verb_call, "group-id")?;
+        let root_lei = extract_string_opt(verb_call, "root-lei")
+            .ok_or_else(|| anyhow::anyhow!(":root-lei required"))?;
+        let max_depth = extract_int_opt(verb_call, "max-depth").unwrap_or(3) as usize;
+
+        // Start discovery status
+        sqlx::query!(
+            r#"
+            UPDATE "ob-poc".client_group
+            SET discovery_status = 'in_progress',
+                discovery_started_at = NOW(),
+                discovery_source = 'gleif',
+                discovery_root_lei = $2,
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+            group_id,
+            &root_lei
+        )
+        .execute(pool)
+        .await?;
+
+        // Import the GLEIF tree (creates/updates entities)
+        let service = GleifEnrichmentService::new(Arc::new(pool.clone()))?;
+        let tree_result = service.import_corporate_tree(&root_lei, max_depth).await?;
+
+        // Get all entities with LEIs that were part of this import
+        // We use the imported_leis from tree_result to ensure we get exactly the entities
+        // that were just imported, regardless of timing
+        let imported_leis = &tree_result.imported_leis;
+
+        let entities_with_lei: Vec<(Uuid, String, String, Option<String>)> =
+            if imported_leis.is_empty() {
+                vec![]
+            } else {
+                sqlx::query_as(
+                    r#"
+                SELECT
+                    e.entity_id,
+                    e.name,
+                    COALESCE(elc.lei, ef.lei) as lei,
+                    COALESCE(elc.gleif_category, ef.gleif_category) as category
+                FROM "ob-poc".entities e
+                LEFT JOIN "ob-poc".entity_limited_companies elc ON elc.entity_id = e.entity_id
+                LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
+                WHERE COALESCE(elc.lei, ef.lei) = ANY($1)
+                "#,
+                )
+                .bind(imported_leis)
+                .fetch_all(pool)
+                .await?
+            };
+
+        let mut entities_added = 0i64;
+        let mut roles_assigned = 0i64;
+        let mut relationships_created = 0i64;
+
+        // Get role IDs we'll need
+        let role_map: HashMap<String, Uuid> = sqlx::query_as::<_, (String, Uuid)>(
+            r#"
+            SELECT name, role_id
+            FROM "ob-poc".roles
+            WHERE name IN (
+                'FUND', 'SICAV', 'UCITS', 'AIF', 'HOLDING_COMPANY',
+                'ULTIMATE_PARENT', 'SUBSIDIARY', 'BRANCH', 'SPV'
+            )
+            "#,
+        )
+        .fetch_all(pool)
+        .await?
+        .into_iter()
+        .collect();
+
+        for (entity_id, entity_name, lei, category_str) in &entities_with_lei {
+            // Add to client_group_entity (upsert)
+            let cge_id: Uuid = sqlx::query_scalar(
+                r#"
+                INSERT INTO "ob-poc".client_group_entity (group_id, entity_id, membership_type, added_by, source_record_id)
+                VALUES ($1, $2, 'in_group', 'gleif', $3)
+                ON CONFLICT (group_id, entity_id)
+                DO UPDATE SET updated_at = NOW(), source_record_id = EXCLUDED.source_record_id
+                RETURNING id
+                "#,
+            )
+            .bind(group_id)
+            .bind(entity_id)
+            .bind(lei)
+            .fetch_one(pool)
+            .await?;
+
+            entities_added += 1;
+
+            // Auto-tag based on GLEIF category
+            let roles_to_assign: Vec<&str> = match category_str.as_deref() {
+                Some("FUND") => vec!["FUND"],
+                Some("BRANCH") => vec!["BRANCH"],
+                Some("SOLE_PROPRIETOR") => vec![], // No role
+                Some("GENERAL") | None => {
+                    // Check if this is the root (ultimate parent)
+                    if lei == &root_lei {
+                        vec!["ULTIMATE_PARENT"]
+                    } else {
+                        vec!["SUBSIDIARY"]
+                    }
+                }
+                _ => vec![],
+            };
+
+            for role_name in roles_to_assign {
+                if let Some(role_id) = role_map.get(role_name) {
+                    let inserted = sqlx::query!(
+                        r#"
+                        INSERT INTO "ob-poc".client_group_entity_roles
+                            (cge_id, role_id, assigned_by, source_record_id)
+                        VALUES ($1, $2, 'gleif', $3)
+                        ON CONFLICT (cge_id, role_id, COALESCE(target_entity_id, '00000000-0000-0000-0000-000000000000'))
+                        DO NOTHING
+                        "#,
+                        cge_id,
+                        role_id,
+                        lei
+                    )
+                    .execute(pool)
+                    .await?
+                    .rows_affected();
+                    roles_assigned += inserted as i64;
+                }
+            }
+
+            tracing::debug!(
+                entity_id = %entity_id,
+                entity_name = %entity_name,
+                lei = %lei,
+                "Added entity to client group"
+            );
+        }
+
+        // Now create relationship edges from parent_relationships table
+        let parent_rels: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT
+                pr.child_entity_id,
+                pr.parent_entity_id,
+                pr.relationship_type
+            FROM "ob-poc".entity_parent_relationships pr
+            JOIN "ob-poc".client_group_entity cge_child
+                ON cge_child.entity_id = pr.child_entity_id AND cge_child.group_id = $1
+            JOIN "ob-poc".client_group_entity cge_parent
+                ON cge_parent.entity_id = pr.parent_entity_id AND cge_parent.group_id = $1
+            WHERE pr.relationship_status = 'ACTIVE'
+            "#,
+        )
+        .bind(group_id)
+        .fetch_all(pool)
+        .await?;
+
+        for (child_id, parent_id, rel_type) in parent_rels {
+            // Create client_group_relationship
+            let relationship_id: Uuid = sqlx::query_scalar(
+                r#"
+                INSERT INTO "ob-poc".client_group_relationship
+                    (group_id, parent_entity_id, child_entity_id, relationship_kind)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (group_id, parent_entity_id, child_entity_id, relationship_kind)
+                DO UPDATE SET updated_at = NOW()
+                RETURNING id
+                "#,
+            )
+            .bind(group_id)
+            .bind(parent_id)
+            .bind(child_id)
+            .bind(if rel_type == "DIRECT_PARENT" {
+                "ownership"
+            } else {
+                "control"
+            })
+            .fetch_one(pool)
+            .await?;
+
+            relationships_created += 1;
+
+            // Add source provenance (GLEIF doesn't provide ownership percentages)
+            sqlx::query!(
+                r#"
+                INSERT INTO "ob-poc".client_group_relationship_sources
+                    (relationship_id, source, source_type, confidence_score)
+                VALUES ($1, 'gleif', 'discovery', 0.80)
+                ON CONFLICT DO NOTHING
+                "#,
+                relationship_id
+            )
+            .execute(pool)
+            .await?;
+        }
+
+        // Update discovery status to complete
+        sqlx::query!(
+            r#"
+            UPDATE "ob-poc".client_group
+            SET discovery_status = 'complete',
+                discovery_completed_at = NOW(),
+                entity_count = (
+                    SELECT COUNT(*) FROM "ob-poc".client_group_entity
+                    WHERE group_id = $1 AND membership_type != 'historical'
+                ),
+                updated_at = NOW()
+            WHERE id = $1
+            "#,
+            group_id
+        )
+        .execute(pool)
+        .await?;
+
+        let result = serde_json::json!({
+            "group_id": group_id,
+            "root_lei": root_lei,
+            "gleif_entities_created": tree_result.entities_created,
+            "gleif_entities_updated": tree_result.entities_updated,
+            "gleif_relationships_created": tree_result.relationships_created,
+            "client_group_entities_added": entities_added,
+            "client_group_roles_assigned": roles_assigned,
+            "client_group_relationships_created": relationships_created,
+        });
+
+        // Log research action if decision-id provided
+        if let Some(decision_id) = extract_uuid_opt(verb_call, _ctx, "decision-id") {
+            log_research_action(
+                pool,
+                decision_id,
+                "gleif:import-to-client-group",
+                &result,
+                entities_added as i32,
+                tree_result.entities_updated as i32,
+            )
+            .await?;
+        }
+
+        Ok(ExecutionResult::Record(result))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for gleif.import-to-client-group"
+        ))
+    }
+}

@@ -7,12 +7,15 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ob_poc_macros::register_custom_op;
 
+use super::helpers::{extract_bool_opt, extract_int_opt, extract_string_opt, get_required_uuid};
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
+#[cfg(feature = "database")]
+use uuid::Uuid;
 
 // ============================================================================
 // CBU Product Assignment
@@ -1402,4 +1405,292 @@ impl CustomOperation for CbuDeleteCascadeOp {
             "error": "Database required for cbu.delete-cascade"
         })))
     }
+}
+
+// ============================================================================
+// CBU Create from Client Group
+// ============================================================================
+
+/// Entity info from client group query - includes GLEIF category and group role for mapping
+#[derive(Debug)]
+struct ClientGroupEntity {
+    entity_id: Uuid,
+    name: String,
+    jurisdiction: Option<String>,
+    gleif_category: Option<String>,
+    group_role: Option<String>,
+}
+
+/// Create CBUs from entities in a client group with GLEIF category and role filters
+///
+/// Rationale: Bulk CBU creation from research results. Queries client_group_entity
+/// with optional filters:
+/// - `gleif-category`: Filter by GLEIF category (FUND, GENERAL) - recommended for fund onboarding
+/// - `role-filter`: Filter by client group role (SUBSIDIARY, ULTIMATE_PARENT)
+/// - `jurisdiction-filter`: Filter by entity jurisdiction
+///
+/// Maps GLEIF roles to CBU entity roles:
+/// - FUND entities get ASSET_OWNER role (the fund owns its trading unit)
+/// - ULTIMATE_PARENT entities get HOLDING_COMPANY role if added to CBU
+/// - Optionally assigns MANAGEMENT_COMPANY and INVESTMENT_MANAGER from provided entity IDs
+#[register_custom_op]
+pub struct CbuCreateFromClientGroupOp;
+
+#[async_trait]
+impl CustomOperation for CbuCreateFromClientGroupOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+    fn verb(&self) -> &'static str {
+        "create-from-client-group"
+    }
+    fn rationale(&self) -> &'static str {
+        "Bulk CBU creation from client group entities - bridges research to onboarding with GLEIF role mapping"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let group_id = get_required_uuid(verb_call, "group-id")?;
+        let gleif_category = extract_string_opt(verb_call, "gleif-category");
+        let role_filter = extract_string_opt(verb_call, "role-filter");
+        let jurisdiction_filter = extract_string_opt(verb_call, "jurisdiction-filter");
+        let default_jurisdiction = extract_string_opt(verb_call, "default-jurisdiction")
+            .unwrap_or_else(|| "LU".to_string());
+        let manco_entity_id = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "manco-entity-id")
+            .and_then(|a| a.value.as_uuid());
+        let im_entity_id = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "im-entity-id")
+            .and_then(|a| a.value.as_uuid());
+        let limit = extract_int_opt(verb_call, "limit").unwrap_or(100) as i64;
+        let dry_run = extract_bool_opt(verb_call, "dry-run").unwrap_or(false);
+
+        // Build query to get entities from client group with GLEIF category and optional role filter
+        // Always fetch gleif_category and group_role for mapping decisions
+        let entities: Vec<ClientGroupEntity> =
+            sqlx::query_as::<_, (Uuid, String, Option<String>, Option<String>, Option<String>)>(
+                r#"
+            SELECT DISTINCT
+                e.entity_id,
+                e.name,
+                COALESCE(elc.jurisdiction, ef.jurisdiction) as jurisdiction,
+                ef.gleif_category,
+                (SELECT r.name FROM "ob-poc".client_group_entity_roles cger
+                 JOIN "ob-poc".roles r ON r.role_id = cger.role_id
+                 WHERE cger.cge_id = cge.id
+                 LIMIT 1) as group_role
+            FROM "ob-poc".client_group_entity cge
+            JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
+            LEFT JOIN "ob-poc".entity_limited_companies elc ON elc.entity_id = e.entity_id
+            LEFT JOIN "ob-poc".entity_funds ef ON ef.entity_id = e.entity_id
+            WHERE cge.group_id = $1
+              AND cge.membership_type NOT IN ('historical', 'rejected')
+              AND ($2::text IS NULL OR ef.gleif_category = $2)
+              AND ($3::text IS NULL OR EXISTS (
+                  SELECT 1 FROM "ob-poc".client_group_entity_roles cger2
+                  JOIN "ob-poc".roles r2 ON r2.role_id = cger2.role_id
+                  WHERE cger2.cge_id = cge.id AND r2.name = $3
+              ))
+              AND ($4::text IS NULL OR COALESCE(elc.jurisdiction, ef.jurisdiction) = $4)
+            ORDER BY e.name
+            LIMIT $5
+            "#,
+            )
+            .bind(group_id)
+            .bind(&gleif_category)
+            .bind(&role_filter)
+            .bind(&jurisdiction_filter)
+            .bind(limit)
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .map(
+                |(entity_id, name, jurisdiction, gleif_category, group_role)| ClientGroupEntity {
+                    entity_id,
+                    name,
+                    jurisdiction,
+                    gleif_category,
+                    group_role,
+                },
+            )
+            .collect();
+
+        if dry_run {
+            let entity_info: Vec<serde_json::Value> = entities
+                .iter()
+                .map(|ent| {
+                    serde_json::json!({
+                        "entity_id": ent.entity_id,
+                        "name": ent.name,
+                        "jurisdiction": ent.jurisdiction.as_deref().unwrap_or(&default_jurisdiction),
+                        "gleif_category": ent.gleif_category,
+                        "group_role": ent.group_role,
+                        "cbu_role_mapping": map_to_cbu_role(&ent.gleif_category, &ent.group_role),
+                    })
+                })
+                .collect();
+
+            return Ok(ExecutionResult::Record(serde_json::json!({
+                "dry_run": true,
+                "group_id": group_id,
+                "gleif_category": gleif_category,
+                "role_filter": role_filter,
+                "jurisdiction_filter": jurisdiction_filter,
+                "entities_found": entities.len(),
+                "entities": entity_info,
+            })));
+        }
+
+        let mut cbus_created = 0i64;
+        let mut roles_assigned = 0i64;
+        let mut skipped_existing = 0i64;
+
+        // Pre-fetch role IDs for CBU entity role assignment
+        let role_ids = fetch_cbu_role_ids(pool).await?;
+
+        for ent in entities {
+            let jurisdiction = ent.jurisdiction.as_deref().unwrap_or(&default_jurisdiction);
+
+            // Try to create CBU (upsert by name+jurisdiction)
+            let result: (Uuid, bool) = sqlx::query_as(
+                r#"
+                INSERT INTO "ob-poc".cbus (name, jurisdiction, client_type)
+                VALUES ($1, $2, 'FUND')
+                ON CONFLICT (name, jurisdiction)
+                DO UPDATE SET updated_at = NOW()
+                RETURNING cbu_id, (xmax = 0) as is_insert
+                "#,
+            )
+            .bind(&ent.name)
+            .bind(jurisdiction)
+            .fetch_one(pool)
+            .await?;
+
+            let (cbu_id, is_new) = result;
+
+            if is_new {
+                cbus_created += 1;
+            } else {
+                skipped_existing += 1;
+            }
+
+            // Map GLEIF category/role to CBU entity role and assign
+            let cbu_role = map_to_cbu_role(&ent.gleif_category, &ent.group_role);
+            if let Some(role_id) = role_ids.get(&cbu_role) {
+                roles_assigned += assign_cbu_role(pool, cbu_id, ent.entity_id, *role_id).await?;
+            }
+
+            // Assign MANAGEMENT_COMPANY role if manco provided
+            if let Some(manco_id) = manco_entity_id {
+                if let Some(role_id) = role_ids.get("MANAGEMENT_COMPANY") {
+                    roles_assigned += assign_cbu_role(pool, cbu_id, manco_id, *role_id).await?;
+                }
+            }
+
+            // Assign INVESTMENT_MANAGER role if im provided
+            if let Some(im_id) = im_entity_id {
+                if let Some(role_id) = role_ids.get("INVESTMENT_MANAGER") {
+                    roles_assigned += assign_cbu_role(pool, cbu_id, im_id, *role_id).await?;
+                }
+            }
+        }
+
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "group_id": group_id,
+            "gleif_category": gleif_category,
+            "role_filter": role_filter,
+            "jurisdiction_filter": jurisdiction_filter,
+            "cbus_created": cbus_created,
+            "skipped_existing": skipped_existing,
+            "roles_assigned": roles_assigned,
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "error": "Database required for cbu.create-from-client-group"
+        })))
+    }
+}
+
+/// Map GLEIF category and group role to the appropriate CBU entity role
+///
+/// Mapping logic:
+/// - GLEIF category FUND → ASSET_OWNER (the fund entity owns its CBU)
+/// - Group role ULTIMATE_PARENT → HOLDING_COMPANY
+/// - Group role SUBSIDIARY with no GLEIF category → SUBSIDIARY (pass-through)
+/// - Default → ASSET_OWNER (safe default for onboarding)
+fn map_to_cbu_role(gleif_category: &Option<String>, group_role: &Option<String>) -> String {
+    // GLEIF category takes precedence - FUND entities are asset owners
+    if let Some(cat) = gleif_category {
+        if cat.eq_ignore_ascii_case("FUND") {
+            return "ASSET_OWNER".to_string();
+        }
+    }
+
+    // Map corporate hierarchy roles
+    if let Some(role) = group_role {
+        match role.to_uppercase().as_str() {
+            "ULTIMATE_PARENT" => return "HOLDING_COMPANY".to_string(),
+            "SUBSIDIARY" => return "SUBSIDIARY".to_string(),
+            _ => {}
+        }
+    }
+
+    // Default to ASSET_OWNER for fund onboarding
+    "ASSET_OWNER".to_string()
+}
+
+/// Pre-fetch commonly used CBU role IDs
+#[cfg(feature = "database")]
+async fn fetch_cbu_role_ids(pool: &PgPool) -> Result<std::collections::HashMap<String, Uuid>> {
+    let roles: Vec<(String, Uuid)> = sqlx::query_as(
+        r#"
+        SELECT name, role_id FROM "ob-poc".roles
+        WHERE name IN ('ASSET_OWNER', 'MANAGEMENT_COMPANY', 'INVESTMENT_MANAGER', 'HOLDING_COMPANY', 'SUBSIDIARY')
+        "#,
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(roles.into_iter().collect())
+}
+
+/// Assign a role to an entity on a CBU (idempotent via ON CONFLICT DO NOTHING)
+#[cfg(feature = "database")]
+async fn assign_cbu_role(
+    pool: &PgPool,
+    cbu_id: Uuid,
+    entity_id: Uuid,
+    role_id: Uuid,
+) -> Result<i64> {
+    let rows = sqlx::query(
+        r#"
+        INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (cbu_id, entity_id, role_id) DO NOTHING
+        "#,
+    )
+    .bind(cbu_id)
+    .bind(entity_id)
+    .bind(role_id)
+    .execute(pool)
+    .await?
+    .rows_affected();
+
+    Ok(rows as i64)
 }

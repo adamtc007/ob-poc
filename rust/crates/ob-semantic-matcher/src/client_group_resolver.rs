@@ -681,6 +681,455 @@ pub async fn pre_extract_client_alias<R: ClientGroupAliasResolver>(
 }
 
 // ============================================================================
+// Slot Type Resolution (Intent Pipeline Integration)
+// ============================================================================
+
+/// Result of scoped entity search within a client group
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScopedEntityMatch {
+    /// ID in client_group_entity junction
+    pub cge_id: Uuid,
+    /// The actual entity ID
+    pub entity_id: Uuid,
+    /// Entity display name
+    pub entity_name: String,
+    /// Membership type (in_group, external_partner, etc.)
+    pub membership_type: String,
+    /// Roles assigned to this entity in the group
+    pub role_names: Vec<String>,
+    /// Match score (0.0-1.0)
+    pub score: f32,
+    /// Is this an external entity?
+    pub is_external: bool,
+}
+
+/// Result of applying the "Allianz rule" - context-dependent resolution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AllianzRuleResult {
+    /// Set session scope to this client group
+    SetScope { group_id: Uuid, group_name: String },
+    /// Resolve to all CBUs in the group
+    AllCbus { group_id: Uuid, cbu_count: i64 },
+    /// Resolve to the group's anchor entity
+    AnchorEntity {
+        entity_id: Uuid,
+        entity_name: String,
+    },
+    /// Resolve to all entities in the group
+    AllEntities { group_id: Uuid, entity_count: i64 },
+    /// Not a group name match - proceed with normal resolution
+    NotGroupName,
+}
+
+/// Map role names to role UUIDs (cached)
+pub async fn lookup_role_ids(
+    role_names: &[String],
+    pool: &PgPool,
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    if role_names.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let rows = sqlx::query_as::<_, (Uuid,)>(
+        r#"
+        SELECT role_id
+        FROM "ob-poc".roles
+        WHERE name = ANY($1)
+          AND is_active = true
+        "#,
+    )
+    .bind(role_names)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
+/// Infer roles from mention text (fallback when no preferred_roles specified)
+///
+/// This maps common role phrases to role names in the `roles` table.
+pub fn infer_roles_from_text(text: &str) -> Option<Vec<String>> {
+    let lower = text.to_lowercase();
+
+    let role_names = if lower.contains("manco") || lower.contains("management company") {
+        vec!["MANAGEMENT_COMPANY".to_string()]
+    } else if lower.contains(" im") || lower.contains("investment manager") {
+        vec!["INVESTMENT_MANAGER".to_string()]
+    } else if lower.contains("spv") || lower.contains("special purpose") {
+        vec!["SPV".to_string()]
+    } else if lower.contains("sicav") {
+        vec!["SICAV".to_string()]
+    } else if lower.contains("ucits") {
+        vec!["UCITS".to_string()]
+    } else if lower.contains("aif") {
+        vec!["AIF".to_string()]
+    } else if lower.contains("fund") && !lower.contains("funded") {
+        vec![
+            "FUND".to_string(),
+            "SICAV".to_string(),
+            "UCITS".to_string(),
+            "AIF".to_string(),
+        ]
+    } else if lower.contains("custodian") {
+        vec!["CUSTODIAN".to_string()]
+    } else if lower.contains("depositary") {
+        vec!["DEPOSITARY".to_string()]
+    } else if lower.contains("ta") || lower.contains("transfer agent") {
+        vec!["TRANSFER_AGENT".to_string()]
+    } else if lower.contains("admin") {
+        vec!["FUND_ADMINISTRATOR".to_string()]
+    } else if lower.contains("auditor") {
+        vec!["AUDITOR".to_string()]
+    } else if lower.contains("holding") {
+        vec!["HOLDING_COMPANY".to_string()]
+    } else if lower.contains("parent") || lower.contains("ultimate") {
+        vec!["ULTIMATE_PARENT".to_string()]
+    } else if lower.contains("subsidiary") {
+        vec!["SUBSIDIARY".to_string()]
+    } else {
+        return None;
+    };
+
+    Some(role_names)
+}
+
+/// Check if text matches a client group name/alias (for Allianz rule)
+pub async fn check_group_name_match(
+    text: &str,
+    pool: &PgPool,
+) -> Result<Option<ClientGroup>, sqlx::Error> {
+    let text_norm = text.to_lowercase().trim().to_string();
+
+    sqlx::query_as::<_, ClientGroup>(
+        r#"
+        SELECT cg.id, cg.canonical_name, cg.short_code, cg.description
+        FROM "ob-poc".client_group cg
+        LEFT JOIN "ob-poc".client_group_alias cga ON cga.group_id = cg.id
+        WHERE LOWER(cg.canonical_name) = $1
+           OR LOWER(cg.short_code) = $1
+           OR cga.alias_norm = $1
+        LIMIT 1
+        "#,
+    )
+    .bind(&text_norm)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Apply the "Allianz rule": resolve same name differently based on slot type
+///
+/// When mention text exactly matches a client group name:
+/// - `ClientGroupRef` → Set scope to this group
+/// - `CbuSetRef` → All CBUs in this group
+/// - `EntityRef` → The group's anchor entity
+/// - `EntitySetRef` → All entities in this group
+pub async fn apply_allianz_rule(
+    mention_text: &str,
+    slot_type: &str,
+    pool: &PgPool,
+) -> Result<AllianzRuleResult, sqlx::Error> {
+    // Check if mention matches a client group
+    let group = match check_group_name_match(mention_text, pool).await? {
+        Some(g) => g,
+        None => return Ok(AllianzRuleResult::NotGroupName),
+    };
+
+    match slot_type {
+        "client_group_ref" => Ok(AllianzRuleResult::SetScope {
+            group_id: group.id,
+            group_name: group.canonical_name,
+        }),
+
+        "cbu_set_ref" => {
+            // Count CBUs in this group
+            let (count,): (i64,) = sqlx::query_as(
+                r#"
+                SELECT COUNT(*)
+                FROM "ob-poc".cbus c
+                JOIN "ob-poc".client_group_entity cge ON cge.entity_id = c.primary_entity_id
+                WHERE cge.group_id = $1
+                  AND cge.membership_type = 'in_group'
+                "#,
+            )
+            .bind(group.id)
+            .fetch_one(pool)
+            .await?;
+
+            Ok(AllianzRuleResult::AllCbus {
+                group_id: group.id,
+                cbu_count: count,
+            })
+        }
+
+        "entity_ref" => {
+            // Get the governance_controller anchor
+            let anchor = sqlx::query_as::<_, (Uuid, String)>(
+                r#"
+                SELECT cga.anchor_entity_id, e.name
+                FROM "ob-poc".client_group_anchor cga
+                JOIN "ob-poc".entities e ON e.entity_id = cga.anchor_entity_id
+                WHERE cga.group_id = $1
+                  AND cga.anchor_role = 'governance_controller'
+                  AND (cga.valid_from IS NULL OR cga.valid_from <= CURRENT_DATE)
+                  AND (cga.valid_to IS NULL OR cga.valid_to >= CURRENT_DATE)
+                ORDER BY cga.priority DESC, cga.confidence DESC
+                LIMIT 1
+                "#,
+            )
+            .bind(group.id)
+            .fetch_optional(pool)
+            .await?;
+
+            match anchor {
+                Some((entity_id, entity_name)) => Ok(AllianzRuleResult::AnchorEntity {
+                    entity_id,
+                    entity_name,
+                }),
+                None => {
+                    // Fallback: return first in_group entity
+                    let fallback = sqlx::query_as::<_, (Uuid, String)>(
+                        r#"
+                        SELECT cge.entity_id, e.name
+                        FROM "ob-poc".client_group_entity cge
+                        JOIN "ob-poc".entities e ON e.entity_id = cge.entity_id
+                        WHERE cge.group_id = $1
+                          AND cge.membership_type = 'in_group'
+                        ORDER BY cge.created_at
+                        LIMIT 1
+                        "#,
+                    )
+                    .bind(group.id)
+                    .fetch_optional(pool)
+                    .await?;
+
+                    match fallback {
+                        Some((entity_id, entity_name)) => Ok(AllianzRuleResult::AnchorEntity {
+                            entity_id,
+                            entity_name,
+                        }),
+                        None => Ok(AllianzRuleResult::NotGroupName),
+                    }
+                }
+            }
+        }
+
+        "entity_set_ref" => {
+            let (count,): (i64,) = sqlx::query_as(
+                r#"
+                SELECT COUNT(*)
+                FROM "ob-poc".client_group_entity
+                WHERE group_id = $1
+                  AND membership_type != 'historical'
+                "#,
+            )
+            .bind(group.id)
+            .fetch_one(pool)
+            .await?;
+
+            Ok(AllianzRuleResult::AllEntities {
+                group_id: group.id,
+                entity_count: count,
+            })
+        }
+
+        _ => Ok(AllianzRuleResult::NotGroupName),
+    }
+}
+
+/// Search entities within a client group scope, optionally filtered by role
+pub async fn search_entities_in_scope(
+    group_id: Uuid,
+    search_text: &str,
+    role_ids: Option<&[Uuid]>,
+    limit: usize,
+    pool: &PgPool,
+) -> Result<Vec<ScopedEntityMatch>, sqlx::Error> {
+    // Build query based on whether we have role filter
+    let rows = if let Some(roles) = role_ids {
+        if roles.is_empty() {
+            // No roles specified, search without filter
+            sqlx::query_as::<_, (Uuid, Uuid, String, String, Vec<String>, f32, bool)>(
+                r#"
+                SELECT
+                    v.cge_id,
+                    v.entity_id,
+                    v.entity_name,
+                    v.membership_type,
+                    v.role_names,
+                    similarity(v.entity_name, $2)::real as score,
+                    v.is_external
+                FROM "ob-poc".v_client_group_entity_search v
+                WHERE v.group_id = $1
+                  AND (
+                      v.entity_name ILIKE '%' || $2 || '%'
+                      OR similarity(v.entity_name, $2) > 0.3
+                  )
+                ORDER BY
+                    CASE v.membership_type WHEN 'in_group' THEN 0 ELSE 1 END,
+                    similarity(v.entity_name, $2) DESC
+                LIMIT $3
+                "#,
+            )
+            .bind(group_id)
+            .bind(search_text)
+            .bind(limit as i32)
+            .fetch_all(pool)
+            .await?
+        } else {
+            // Search with role filter
+            sqlx::query_as::<_, (Uuid, Uuid, String, String, Vec<String>, f32, bool)>(
+                r#"
+                SELECT
+                    v.cge_id,
+                    v.entity_id,
+                    v.entity_name,
+                    v.membership_type,
+                    v.role_names,
+                    similarity(v.entity_name, $2)::real as score,
+                    v.is_external
+                FROM "ob-poc".v_client_group_entity_search v
+                WHERE v.group_id = $1
+                  AND v.role_ids && $4  -- Array overlap: has any of the specified roles
+                  AND (
+                      v.entity_name ILIKE '%' || $2 || '%'
+                      OR similarity(v.entity_name, $2) > 0.3
+                  )
+                ORDER BY
+                    CASE v.membership_type WHEN 'in_group' THEN 0 ELSE 1 END,
+                    similarity(v.entity_name, $2) DESC
+                LIMIT $3
+                "#,
+            )
+            .bind(group_id)
+            .bind(search_text)
+            .bind(limit as i32)
+            .bind(roles)
+            .fetch_all(pool)
+            .await?
+        }
+    } else {
+        // No role filter
+        sqlx::query_as::<_, (Uuid, Uuid, String, String, Vec<String>, f32, bool)>(
+            r#"
+            SELECT
+                v.cge_id,
+                v.entity_id,
+                v.entity_name,
+                v.membership_type,
+                v.role_names,
+                similarity(v.entity_name, $2)::real as score,
+                v.is_external
+            FROM "ob-poc".v_client_group_entity_search v
+            WHERE v.group_id = $1
+              AND (
+                  v.entity_name ILIKE '%' || $2 || '%'
+                  OR similarity(v.entity_name, $2) > 0.3
+              )
+            ORDER BY
+                CASE v.membership_type WHEN 'in_group' THEN 0 ELSE 1 END,
+                similarity(v.entity_name, $2) DESC
+            LIMIT $3
+            "#,
+        )
+        .bind(group_id)
+        .bind(search_text)
+        .bind(limit as i32)
+        .fetch_all(pool)
+        .await?
+    };
+
+    Ok(rows
+        .into_iter()
+        .map(
+            |(cge_id, entity_id, entity_name, membership_type, role_names, score, is_external)| {
+                ScopedEntityMatch {
+                    cge_id,
+                    entity_id,
+                    entity_name,
+                    membership_type,
+                    role_names,
+                    score,
+                    is_external,
+                }
+            },
+        )
+        .collect())
+}
+
+/// Search CBUs within a client group scope
+pub async fn search_cbus_in_scope(
+    group_id: Uuid,
+    search_text: &str,
+    limit: usize,
+    pool: &PgPool,
+) -> Result<Vec<(Uuid, String, f32)>, sqlx::Error> {
+    sqlx::query_as::<_, (Uuid, String, f32)>(
+        r#"
+        SELECT
+            c.cbu_id,
+            c.name,
+            similarity(c.name, $2)::real as score
+        FROM "ob-poc".cbus c
+        JOIN "ob-poc".client_group_entity cge ON cge.entity_id = c.primary_entity_id
+        WHERE cge.group_id = $1
+          AND cge.membership_type = 'in_group'
+          AND (
+              c.name ILIKE '%' || $2 || '%'
+              OR similarity(c.name, $2) > 0.3
+          )
+        ORDER BY similarity(c.name, $2) DESC
+        LIMIT $3
+        "#,
+    )
+    .bind(group_id)
+    .bind(search_text)
+    .bind(limit as i32)
+    .fetch_all(pool)
+    .await
+}
+
+/// Get all CBU IDs in a client group
+pub async fn get_all_cbus_in_group(
+    group_id: Uuid,
+    pool: &PgPool,
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, (Uuid,)>(
+        r#"
+        SELECT c.cbu_id
+        FROM "ob-poc".cbus c
+        JOIN "ob-poc".client_group_entity cge ON cge.entity_id = c.primary_entity_id
+        WHERE cge.group_id = $1
+          AND cge.membership_type = 'in_group'
+        "#,
+    )
+    .bind(group_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
+/// Get all entity IDs in a client group
+pub async fn get_all_entities_in_group(
+    group_id: Uuid,
+    pool: &PgPool,
+) -> Result<Vec<Uuid>, sqlx::Error> {
+    let rows = sqlx::query_as::<_, (Uuid,)>(
+        r#"
+        SELECT entity_id
+        FROM "ob-poc".client_group_entity
+        WHERE group_id = $1
+          AND membership_type != 'historical'
+        "#,
+    )
+    .bind(group_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(|(id,)| id).collect())
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -729,5 +1178,44 @@ mod tests {
             candidates: vec![],
         };
         assert!(err.is_ambiguous());
+    }
+
+    #[test]
+    fn test_infer_roles_from_text() {
+        // Management company variations
+        assert_eq!(
+            infer_roles_from_text("the manco"),
+            Some(vec!["MANAGEMENT_COMPANY".to_string()])
+        );
+        assert_eq!(
+            infer_roles_from_text("our management company"),
+            Some(vec!["MANAGEMENT_COMPANY".to_string()])
+        );
+
+        // Investment manager
+        assert_eq!(
+            infer_roles_from_text("the investment manager"),
+            Some(vec!["INVESTMENT_MANAGER".to_string()])
+        );
+
+        // Fund types - should return multiple options
+        let fund_roles = infer_roles_from_text("the fund");
+        assert!(fund_roles.is_some());
+        let roles = fund_roles.unwrap();
+        assert!(roles.contains(&"FUND".to_string()));
+        assert!(roles.contains(&"SICAV".to_string()));
+
+        // Specific fund type
+        assert_eq!(
+            infer_roles_from_text("our sicav"),
+            Some(vec!["SICAV".to_string()])
+        );
+
+        // Should not infer "funded" as fund
+        assert!(infer_roles_from_text("fully funded").is_none());
+
+        // No match
+        assert!(infer_roles_from_text("the entity").is_none());
+        assert!(infer_roles_from_text("BlackRock").is_none());
     }
 }

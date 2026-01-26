@@ -352,7 +352,7 @@ impl ScopeResolver {
         // Check if we have a clear winner
         // For single-token inputs, require higher confidence threshold
         let top = &matches[0];
-        let is_single_token = input.trim().split_whitespace().count() == 1;
+        let is_single_token = input.split_whitespace().count() == 1;
 
         let has_clear_winner = top.exact_match // Exact match always wins
             || (!is_single_token && matches.len() == 1 && top.confidence >= 0.7)

@@ -446,3 +446,608 @@ domains:
           type: affected
         effects:
           - "Removes entity from group or marks as rejected"
+
+      # ============================================================================
+      # ROLE MANAGEMENT - Entity roles within client group (uses roles table)
+      # ============================================================================
+
+      assign-role:
+        description: "Assign a role to an entity within the client group context"
+        behavior: plugin
+        handler: ClientGroupAssignRoleOp
+        invocation_phrases:
+          - "assign role"
+          - "make this the"
+          - "this is the manco"
+          - "mark as custodian"
+          - "tag as fund"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group_entity_role
+          tags: [role, crud]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: true
+            description: "Entity to assign role to"
+            # Slot type for scoped entity search within client group
+            slot_type: entity_ref
+            lookup:
+              table: v_client_group_entity_search
+              schema: ob-poc
+              search_key: entity_name
+              primary_key: entity_id
+              scope_key: group_id
+              role_filter: role_names
+          - name: role-id
+            type: uuid
+            required: true
+            description: "Role from roles table"
+            lookup:
+              table: roles
+              schema: ob-poc
+              search_key: name
+              primary_key: role_id
+          - name: target-entity-id
+            type: uuid
+            required: false
+            description: "Target entity for directed roles (e.g., IM for which fund)"
+            # Slot type for scoped entity search within client group
+            slot_type: entity_ref
+            # Preferred roles for target entities (typically funds/SICAVs)
+            preferred_roles: [FUND, SICAV, UCITS, AIF, SPV]
+            lookup:
+              table: v_client_group_entity_search
+              schema: ob-poc
+              search_key: entity_name
+              primary_key: entity_id
+              scope_key: group_id
+              role_filter: role_names
+          - name: effective-from
+            type: date
+            required: false
+            description: "When role became effective"
+          - name: source
+            type: string
+            required: false
+            default: "manual"
+            valid_values: ["manual", "gleif", "bods", "auto_tag", "agent"]
+        returns:
+          type: uuid
+          description: "Role assignment ID"
+
+      remove-role:
+        description: "Remove a role assignment from an entity"
+        behavior: plugin
+        handler: ClientGroupRemoveRoleOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group_entity_role
+          tags: [role, crud]
+        args:
+          - name: role-assignment-id
+            type: uuid
+            required: true
+            description: "ID of the role assignment to remove"
+        returns:
+          type: affected
+
+      list-roles:
+        description: "List role assignments for entities in a client group"
+        behavior: plugin
+        handler: ClientGroupListRolesOp
+        invocation_phrases:
+          - "list roles"
+          - "show roles"
+          - "what roles"
+          - "who is the manco"
+          - "who is the custodian"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          internal: false
+          noun: client_group_entity_role
+          tags: [role, read]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: false
+            description: "Filter to specific entity"
+            lookup:
+              table: v_client_group_entity_search
+              schema: ob-poc
+              search_key: entity_name
+              primary_key: entity_id
+              scope_key: group_id
+          - name: role-id
+            type: uuid
+            required: false
+            description: "Filter to specific role"
+            lookup:
+              table: roles
+              schema: ob-poc
+              search_key: name
+              primary_key: role_id
+        returns:
+          type: record_set
+          fields:
+            [
+              id,
+              entity_id,
+              entity_name,
+              role_id,
+              role_name,
+              target_entity_id,
+              target_entity_name,
+              effective_from,
+              effective_to,
+              source,
+            ]
+
+      parties:
+        description: "List all parties (entities with roles) in a client group"
+        behavior: plugin
+        handler: ClientGroupPartiesOp
+        invocation_phrases:
+          - "show parties"
+          - "list parties"
+          - "who are the parties"
+          - "show all service providers"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          internal: false
+          noun: client_group_parties
+          tags: [role, read, overview]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: role-category
+            type: string
+            required: false
+            valid_values: ["structural", "service", "compliance", "ownership"]
+            description: "Filter by role category"
+          - name: include-external
+            type: boolean
+            required: false
+            default: true
+            description: "Include external partners (IM, custodian, etc.)"
+        returns:
+          type: record_set
+          fields:
+            [entity_id, entity_name, membership_type, roles, role_categories]
+
+      # ============================================================================
+      # RELATIONSHIP MANAGEMENT - Ownership/control edges within group
+      # ============================================================================
+
+      add-relationship:
+        description: "Add a provisional ownership/control edge between entities"
+        behavior: plugin
+        handler: ClientGroupAddRelationshipOp
+        invocation_phrases:
+          - "add ownership"
+          - "this owns"
+          - "set parent"
+          - "link ownership"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group_relationship
+          tags: [ownership, crud]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: parent-entity-id
+            type: uuid
+            required: true
+            description: "Parent/owner entity"
+            lookup:
+              table: v_client_group_entity_search
+              schema: ob-poc
+              search_key: entity_name
+              primary_key: entity_id
+              scope_key: group_id
+          - name: child-entity-id
+            type: uuid
+            required: true
+            description: "Child/owned entity"
+            lookup:
+              table: v_client_group_entity_search
+              schema: ob-poc
+              search_key: entity_name
+              primary_key: entity_id
+              scope_key: group_id
+          - name: relationship-kind
+            type: string
+            required: false
+            default: "ownership"
+            valid_values: ["ownership", "control", "beneficial", "management"]
+          - name: effective-from
+            type: date
+            required: false
+        returns:
+          type: uuid
+          description: "Relationship ID"
+
+      list-relationships:
+        description: "List ownership/control relationships in a client group"
+        behavior: plugin
+        handler: ClientGroupListRelationshipsOp
+        invocation_phrases:
+          - "show ownership"
+          - "list relationships"
+          - "who owns whom"
+          - "ownership structure"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          internal: false
+          noun: client_group_relationship
+          tags: [ownership, read]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: entity-id
+            type: uuid
+            required: false
+            description: "Filter to relationships involving this entity"
+            lookup:
+              table: v_client_group_entity_search
+              schema: ob-poc
+              search_key: entity_name
+              primary_key: entity_id
+              scope_key: group_id
+          - name: relationship-kind
+            type: string
+            required: false
+            valid_values: ["ownership", "control", "beneficial", "management"]
+        returns:
+          type: record_set
+          fields:
+            [
+              id,
+              parent_entity_id,
+              parent_name,
+              child_entity_id,
+              child_name,
+              relationship_kind,
+              canonical_ownership_pct,
+              source_count,
+              review_status,
+            ]
+
+      # ============================================================================
+      # OWNERSHIP SOURCE MANAGEMENT - Multi-source lineage for trust-but-verify
+      # ============================================================================
+
+      add-ownership-source:
+        description: "Add an ownership source/allegation for a relationship"
+        behavior: plugin
+        handler: ClientGroupAddOwnershipSourceOp
+        invocation_phrases:
+          - "add ownership source"
+          - "record ownership from"
+          - "gleif says"
+          - "client alleges"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group_relationship_source
+          tags: [ownership, source, crud]
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            description: "Relationship to add source to"
+          - name: source
+            type: string
+            required: true
+            valid_values:
+              [
+                "client_allegation",
+                "gleif",
+                "bods",
+                "companies_house",
+                "clearstream",
+                "annual_report",
+                "fund_prospectus",
+                "kyc_document",
+                "scraper",
+                "manual",
+              ]
+          - name: source-type
+            type: string
+            required: false
+            default: "discovery"
+            valid_values: ["allegation", "verification", "discovery"]
+          - name: ownership-pct
+            type: decimal
+            required: false
+            description: "Ownership percentage from this source"
+          - name: voting-pct
+            type: decimal
+            required: false
+          - name: control-pct
+            type: decimal
+            required: false
+          - name: source-document-ref
+            type: string
+            required: false
+            description: "LEI, BODS statement ID, filing ref, etc."
+          - name: source-document-date
+            type: date
+            required: false
+          - name: verifies-source-id
+            type: uuid
+            required: false
+            description: "If verification, which allegation is being verified"
+        returns:
+          type: uuid
+          description: "Source record ID"
+
+      verify-ownership:
+        description: "Mark an ownership source as verified"
+        behavior: plugin
+        handler: ClientGroupVerifyOwnershipOp
+        invocation_phrases:
+          - "verify ownership"
+          - "confirm ownership"
+          - "ownership verified"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group_relationship_source
+          tags: [ownership, verification]
+        args:
+          - name: source-id
+            type: uuid
+            required: true
+            description: "Source record to verify"
+          - name: verified-by
+            type: string
+            required: false
+            description: "User who verified"
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: affected
+
+      set-canonical:
+        description: "Designate a source as the canonical value for a relationship"
+        behavior: plugin
+        handler: ClientGroupSetCanonicalOp
+        invocation_phrases:
+          - "set canonical"
+          - "use this value"
+          - "this is the correct ownership"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group_relationship_source
+          tags: [ownership, canonical]
+        args:
+          - name: source-id
+            type: uuid
+            required: true
+            description: "Source record to mark as canonical"
+          - name: notes
+            type: string
+            required: false
+            description: "Reason for canonical selection"
+        returns:
+          type: affected
+
+      # ============================================================================
+      # REVIEW WORKFLOW - List unverified and discrepancies
+      # ============================================================================
+
+      list-unverified:
+        description: "List unverified ownership allegations needing review"
+        behavior: plugin
+        handler: ClientGroupListUnverifiedOp
+        invocation_phrases:
+          - "show unverified"
+          - "list allegations"
+          - "what needs verification"
+          - "pending ownership review"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          internal: false
+          noun: ownership_review
+          tags: [ownership, review, kyc]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+        returns:
+          type: record_set
+          fields:
+            [
+              relationship_id,
+              parent_name,
+              child_name,
+              alleged_pct,
+              source_document_ref,
+              source_document_date,
+              verification_count,
+            ]
+
+      list-discrepancies:
+        description: "List ownership relationships with conflicting source values"
+        behavior: plugin
+        handler: ClientGroupListDiscrepanciesOp
+        invocation_phrases:
+          - "show discrepancies"
+          - "ownership conflicts"
+          - "mismatched ownership"
+          - "what needs reconciliation"
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          internal: false
+          noun: ownership_review
+          tags: [ownership, review, reconciliation]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: min-spread
+            type: decimal
+            required: false
+            default: 1.0
+            description: "Minimum percentage spread to report (default 1%)"
+        returns:
+          type: record_set
+          fields:
+            [
+              relationship_id,
+              parent_name,
+              child_name,
+              sources,
+              ownership_values,
+              ownership_spread,
+              alleged_pct,
+              verified_pct,
+            ]
+
+      # ============================================================================
+      # DISCOVERY STATUS - Group-level discovery workflow
+      # ============================================================================
+
+      start-discovery:
+        description: "Start discovery process for a client group"
+        behavior: plugin
+        handler: ClientGroupStartDiscoveryOp
+        invocation_phrases:
+          - "start discovery"
+          - "begin research"
+          - "research this group"
+          - "discover group structure"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group
+          tags: [discovery, workflow]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: source
+            type: string
+            required: false
+            default: "manual"
+            valid_values: ["gleif", "bods", "manual", "mixed"]
+          - name: root-lei
+            type: string
+            required: false
+            description: "Starting LEI for GLEIF crawl"
+        returns:
+          type: affected
+        effects:
+          - "Sets discovery_status to 'in_progress'"
+          - "Records discovery_started_at"
+
+      complete-discovery:
+        description: "Mark discovery process as complete"
+        behavior: plugin
+        handler: ClientGroupCompleteDiscoveryOp
+        invocation_phrases:
+          - "complete discovery"
+          - "finish research"
+          - "discovery done"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          writes_operational: true
+          internal: false
+          noun: client_group
+          tags: [discovery, workflow]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            lookup:
+              table: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: notes
+            type: string
+            required: false
+        returns:
+          type: affected
+        effects:
+          - "Sets discovery_status to 'complete'"
+          - "Records discovery_completed_at"

@@ -3,7 +3,7 @@
 > **Last reviewed:** 2026-01-25
 > **Crates:** 15 Rust crates (includes ob-poc-macros)
 > **Verbs:** 968 verbs, 7505 intent patterns (DB-sourced)
-> **Migrations:** 54 schema migrations
+> **Migrations:** 56 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7505 patterns vectorized
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
@@ -20,6 +20,7 @@
 > **Transactional Execution (050):** ✅ Complete - Atomic execution, advisory locks, expansion audit
 > **CustomOp Auto-Registration (051):** ✅ Complete - `#[register_custom_op]` macro, inventory-based registration
 > **Staged Runbook REPL (054):** ✅ Complete - Anti-hallucination staging, entity resolution, DAG ordering
+> **Client Group Research Integration (055):** ✅ Complete - GLEIF import → client_group_entity staging → CBU creation with role mapping
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -286,6 +287,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Workflow task queue | `TODO-WORKFLOW-TASK-QUEUE.md` | ✅ Complete |
 | Transactional execution | `TODO-DSL-TRANSACTIONAL-EXECUTION-AND-LOCKING.md` | ✅ Complete |
 | CustomOp auto-registration | `TODO-INTEGRATED-TASK-QUEUE-MACROS.md` | ✅ Complete |
+| Client group research integration | `TODO-CLIENT-GROUP-RESEARCH-INTEGRATION.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -1267,6 +1269,106 @@ User prompt: "Show me Irish funds"
 | `staged_command` | Individual DSL commands with resolution status |
 | `staged_command_entity` | Resolved entity footprint |
 | `staged_command_candidate` | Picker candidates for ambiguous resolution |
+
+---
+
+## Client Group Research Integration (055)
+
+> ✅ **IMPLEMENTED (2026-01-26)**: GLEIF import populates client_group_entity staging tables, then CBU creation with GLEIF role mapping.
+
+**Problem Solved:** Research (GLEIF import) and onboarding (CBU creation) were coupled. Now they are separate concerns:
+1. **Research phase**: GLEIF import → entities + `client_group_entity` staging
+2. **Onboarding phase**: `cbu.create-from-client-group` → CBUs with role mapping
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: RESEARCH (GLEIF Import)                                           │
+│                                                                              │
+│  (gleif.import-tree :entity-id <Allianz SE> :depth 3)                       │
+│      │                                                                       │
+│      ├─► entities table (all LEI entities)                                  │
+│      ├─► entity_funds (with gleif_category: FUND, GENERAL)                  │
+│      ├─► entity_parent_relationships (corporate hierarchy)                  │
+│      └─► client_group_entity + client_group_entity_roles                    │
+│              │                                                               │
+│              └─► Roles: SUBSIDIARY, ULTIMATE_PARENT (corporate hierarchy)   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PHASE 2: ONBOARDING (CBU Creation)                                         │
+│                                                                              │
+│  (cbu.create-from-client-group :group-id <Allianz> :gleif-category "FUND")  │
+│      │                                                                       │
+│      ├─► Query client_group_entity WHERE gleif_category = 'FUND'            │
+│      │                                                                       │
+│      ├─► Create CBU per entity                                               │
+│      │                                                                       │
+│      └─► Assign CBU entity roles via GLEIF→CBU role mapping:                │
+│              • GLEIF category FUND → ASSET_OWNER                            │
+│              • Group role ULTIMATE_PARENT → HOLDING_COMPANY                 │
+│              • Group role SUBSIDIARY → SUBSIDIARY                           │
+│              • Optional: MANAGEMENT_COMPANY, INVESTMENT_MANAGER             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### GLEIF Role → CBU Role Mapping
+
+| GLEIF Source | CBU Entity Role | Rationale |
+|--------------|-----------------|-----------|
+| `gleif_category = 'FUND'` | `ASSET_OWNER` | Fund entity owns its trading unit |
+| `group_role = 'ULTIMATE_PARENT'` | `HOLDING_COMPANY` | Top of corporate hierarchy |
+| `group_role = 'SUBSIDIARY'` | `SUBSIDIARY` | Corporate subsidiary |
+| (default) | `ASSET_OWNER` | Safe default for fund onboarding |
+
+### Key Verbs
+
+| Verb | Description |
+|------|-------------|
+| `gleif.import-tree` | Import corporate hierarchy from GLEIF into entities + client_group_entity |
+| `cbu.create-from-client-group` | Create CBUs from staged entities with role mapping |
+
+### DSL Usage
+
+```clojure
+;; Phase 1: Research - import corporate hierarchy
+(gleif.import-tree :entity-id <Allianz SE> :depth 3 :as @import)
+
+;; Phase 2: Onboard - create CBUs for Luxembourg FUNDs
+(cbu.create-from-client-group 
+  :group-id <Allianz>
+  :gleif-category "FUND"
+  :jurisdiction-filter "LU"
+  :manco-entity-id <AGI Holdings GmbH>)
+
+;; Dry-run to preview
+(cbu.create-from-client-group 
+  :group-id <Allianz>
+  :gleif-category "FUND"
+  :dry-run true
+  :limit 10)
+```
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| `client_group_entity` | Staging: entities discovered via research |
+| `client_group_entity_roles` | Staging: GLEIF roles (SUBSIDIARY, ULTIMATE_PARENT) |
+| `entity_funds.gleif_category` | GLEIF entity classification (FUND, GENERAL) |
+| `cbu_entity_roles` | Production: CBU membership roles |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/055_client_group_research.sql` | Schema for client_group_entity_roles |
+| `rust/src/gleif/enrichment.rs` | GLEIF tree import with relationship tracking |
+| `rust/src/domain_ops/gleif_ops.rs` | `GleifImportTreeOp` - links to client_group_entity |
+| `rust/src/domain_ops/cbu_ops.rs` | `CbuCreateFromClientGroupOp` - CBU creation with role mapping |
+| `rust/config/verbs/cbu.yaml` | `create-from-client-group` verb definition |
 
 ---
 

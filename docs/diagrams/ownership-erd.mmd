@@ -1,0 +1,82 @@
+erDiagram
+    %% ═══════════════════════════════════════════════════════════
+    %% OWNERSHIP & UBO LAYER
+    %% ═══════════════════════════════════════════════════════════
+    
+    entities {
+        uuid entity_id PK
+        string name
+        string lei
+        string entity_type
+    }
+    
+    shareholdings {
+        uuid shareholding_id PK
+        uuid owner_entity_id FK
+        uuid owned_entity_id FK
+        decimal ownership_percentage
+        decimal voting_percentage
+        string source
+    }
+    
+    shareholding_sources {
+        uuid id PK
+        uuid shareholding_id FK
+        string source
+        decimal ownership_pct
+        string verification_status
+        jsonb raw_payload
+    }
+    
+    ubo_registry {
+        uuid ubo_id PK
+        uuid ubo_entity_id FK
+        uuid subject_entity_id FK
+        decimal total_ownership_pct
+        string ubo_type
+        string discovery_method
+    }
+    
+    ubo_chains {
+        uuid chain_id PK
+        uuid ubo_id FK
+        uuid shareholding_id FK
+        int chain_position
+    }
+    
+    %% Client Group Research Buffer (NEW in 055)
+    client_group_relationship {
+        uuid id PK
+        uuid group_id FK
+        uuid parent_entity_id FK
+        uuid child_entity_id FK
+        string relationship_kind
+        string review_status
+    }
+    
+    client_group_relationship_sources {
+        uuid id PK
+        uuid relationship_id FK
+        string source
+        decimal ownership_pct
+        boolean is_canonical
+        string verification_status
+    }
+    
+    %% ═══════════════════════════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════════════════════════
+    
+    entities ||--o{ shareholdings : "owner"
+    entities ||--o{ shareholdings : "owned"
+    entities ||--o{ ubo_registry : "is_ubo"
+    entities ||--o{ ubo_registry : "subject"
+    
+    shareholdings ||--o{ shareholding_sources : "evidenced_by"
+    shareholdings ||--o{ ubo_chains : "part_of_chain"
+    
+    ubo_registry ||--o{ ubo_chains : "derived_from"
+    
+    client_group_relationship ||--o{ client_group_relationship_sources : "has_sources"
+    entities ||--o{ client_group_relationship : "parent"
+    entities ||--o{ client_group_relationship : "child"

@@ -1,0 +1,78 @@
+graph TB
+    subgraph "Core Entities"
+        E[entities<br/>113 FKs inbound]
+        CBU[cbus<br/>66 FKs inbound]
+    end
+    
+    subgraph "Client Group Layer"
+        CG[client_group]
+        CGE[client_group_entity]
+        CGER[client_group_entity_roles]
+        CGA[client_group_alias]
+    end
+    
+    subgraph "Role System"
+        R[roles<br/>Unified Taxonomy]
+        CBUER[cbu_entity_roles]
+    end
+    
+    subgraph "Ownership Layer"
+        SH[shareholdings]
+        SHS[shareholding_sources]
+        UBO[ubo_registry]
+        CGR[client_group_relationship<br/>Provisional]
+        CGRS[client_group_relationship_sources]
+    end
+    
+    subgraph "Product/Service Layer"
+        P[products]
+        S[services]
+        SRT[service_resource_types]
+        CRI[cbu_resource_instances]
+    end
+    
+    subgraph "KYC Layer"
+        KC[kyc.cases]
+        DOC[document_catalog]
+        ATTR[attribute_observations]
+    end
+    
+    %% Core relationships
+    E --> CBU
+    E --> CGE
+    E --> CBUER
+    E --> SH
+    E --> UBO
+    
+    %% Client Group
+    CG --> CGE
+    CG --> CGA
+    CGE --> CGER
+    R --> CGER
+    R --> CBUER
+    
+    %% CBU
+    CBU --> CBUER
+    CBU --> CRI
+    
+    %% Ownership
+    SH --> SHS
+    SH --> UBO
+    CGR --> CGRS
+    E --> CGR
+    
+    %% Product/Service
+    P --> S
+    S --> SRT
+    SRT --> CRI
+    
+    %% KYC
+    E --> KC
+    E --> DOC
+    DOC --> ATTR
+    
+    style E fill:#ff6b6b,stroke:#333,stroke-width:3px
+    style CBU fill:#4ecdc4,stroke:#333,stroke-width:3px
+    style CG fill:#45b7d1,stroke:#333,stroke-width:2px
+    style R fill:#96ceb4,stroke:#333,stroke-width:2px
+    style P fill:#ffeaa7,stroke:#333,stroke-width:2px

@@ -12,6 +12,21 @@ use tokio::time::sleep;
 const GLEIF_API_BASE: &str = "https://api.gleif.org/api/v1";
 const RATE_LIMIT_DELAY_MS: u64 = 200; // 5 req/sec to be safe
 
+/// A discovered parent-child relationship from tree traversal
+#[derive(Debug, Clone)]
+pub struct DiscoveredRelationship {
+    pub child_lei: String,
+    pub parent_lei: String,
+    pub relationship_type: String,
+}
+
+/// Result of fetching a corporate tree - includes both entities and relationships
+#[derive(Debug)]
+pub struct CorporateTreeResult {
+    pub records: Vec<LeiRecord>,
+    pub relationships: Vec<DiscoveredRelationship>,
+}
+
 pub struct GleifClient {
     client: Client,
     last_request: Mutex<Instant>,
@@ -208,23 +223,49 @@ impl GleifClient {
 
     /// Fetch all direct children of an entity
     pub async fn get_direct_children(&self, lei: &str) -> Result<Vec<LeiRecord>> {
-        self.rate_limit().await;
-        let url = format!(
-            "{}/lei-records?filter[entity.directParent]={}&page[size]=100",
-            GLEIF_API_BASE, lei
-        );
+        let mut all_children = Vec::new();
+        let mut page = 1;
+        let page_size = 100;
 
-        let response: GleifResponse<Vec<LeiRecord>> = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .context("Failed to fetch direct children")?
-            .json()
-            .await
-            .context("Failed to parse children response")?;
+        loop {
+            self.rate_limit().await;
+            let url = format!(
+                "{}/lei-records/{}/direct-children?page%5Bnumber%5D={}&page%5Bsize%5D={}",
+                GLEIF_API_BASE, lei, page, page_size
+            );
 
-        Ok(response.data)
+            let response = self.client.get(&url).send().await?;
+
+            if !response.status().is_success() {
+                // 404 means no children, which is fine
+                if response.status() == reqwest::StatusCode::NOT_FOUND {
+                    break;
+                }
+                let status = response.status();
+                let body = response.text().await.unwrap_or_default();
+                return Err(anyhow::anyhow!(
+                    "GLEIF API error {}: {}",
+                    status,
+                    body.chars().take(200).collect::<String>()
+                ));
+            }
+
+            let data: GleifResponse<Vec<LeiRecord>> = response
+                .json()
+                .await
+                .context("Failed to parse children response")?;
+
+            let count = data.data.len();
+            all_children.extend(data.data);
+
+            // If we got fewer than page_size, we're done
+            if count < page_size {
+                break;
+            }
+            page += 1;
+        }
+
+        Ok(all_children)
     }
 
     /// Fetch BIC mappings for an entity
@@ -247,44 +288,62 @@ impl GleifClient {
     }
 
     /// Fetch the full corporate tree starting from a root LEI
-    /// Returns all entities in the tree (parents and children)
+    /// Returns all entities in the tree (parents and children) plus discovered relationships
     pub async fn fetch_corporate_tree(
         &self,
         root_lei: &str,
         max_depth: usize,
-    ) -> Result<Vec<LeiRecord>> {
+    ) -> Result<CorporateTreeResult> {
         let mut all_records = Vec::new();
+        let mut all_relationships = Vec::new();
         let mut visited = std::collections::HashSet::new();
-        let mut queue = vec![(root_lei.to_string(), 0usize)];
+        // Queue contains (lei, depth, optional_parent_lei)
+        let mut queue = vec![(root_lei.to_string(), 0usize, None::<String>)];
 
-        while let Some((lei, depth)) = queue.pop() {
+        while let Some((lei, depth, parent_lei)) = queue.pop() {
             if visited.contains(&lei) || depth > max_depth {
                 continue;
             }
             visited.insert(lei.clone());
 
+            // If we know the parent (from traversing children), record that relationship
+            if let Some(ref parent) = parent_lei {
+                all_relationships.push(DiscoveredRelationship {
+                    child_lei: lei.clone(),
+                    parent_lei: parent.clone(),
+                    relationship_type: "DIRECT_PARENT".to_string(),
+                });
+            }
+
             // Fetch the record
             match self.get_lei_record(&lei).await {
                 Ok(record) => {
-                    // Queue parents if not at max depth
+                    // Queue parents if not at max depth (and record relationship)
                     if depth < max_depth {
                         if let Some(ref rels) = record.relationships {
                             // Check direct parent
                             if let Some(ref dp) = rels.direct_parent {
                                 if let Some(ref url) = dp.links.related {
-                                    if let Some(parent_lei) = extract_lei_from_url(url) {
-                                        queue.push((parent_lei, depth + 1));
+                                    if let Some(extracted_parent_lei) = extract_lei_from_url(url) {
+                                        // Record this relationship
+                                        all_relationships.push(DiscoveredRelationship {
+                                            child_lei: lei.clone(),
+                                            parent_lei: extracted_parent_lei.clone(),
+                                            relationship_type: "DIRECT_PARENT".to_string(),
+                                        });
+                                        queue.push((extracted_parent_lei, depth + 1, None));
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Queue children
+                    // Queue children (pass current lei as their parent)
                     if depth < max_depth {
                         if let Ok(children) = self.get_direct_children(&lei).await {
                             for child in children {
-                                queue.push((child.lei().to_string(), depth + 1));
+                                let child_lei = child.lei().to_string();
+                                queue.push((child_lei, depth + 1, Some(lei.clone())));
                             }
                         }
                     }
@@ -297,7 +356,17 @@ impl GleifClient {
             }
         }
 
-        Ok(all_records)
+        // Deduplicate relationships (same child-parent pair might be discovered from both directions)
+        let mut seen_rels = std::collections::HashSet::new();
+        all_relationships.retain(|r| {
+            let key = (r.child_lei.clone(), r.parent_lei.clone());
+            seen_rels.insert(key)
+        });
+
+        Ok(CorporateTreeResult {
+            records: all_records,
+            relationships: all_relationships,
+        })
     }
 
     /// Fetch all funds managed by a given fund manager LEI

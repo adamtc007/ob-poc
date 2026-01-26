@@ -139,6 +139,29 @@ impl GleifRepository {
 
         // Insert other names
         for other in &entity.other_names {
+            // Map GLEIF name types to our allowed types
+            let name_type = match other.name_type.as_deref() {
+                Some("PREVIOUS_LEGAL_NAME") => "HISTORICAL",
+                Some("TRADING_OR_OPERATING_NAME") => "TRADING",
+                Some("AUTO_ASCII_TRANSLITERATED_LEGAL_NAME") => "TRANSLITERATED",
+                Some("ALTERNATIVE_LANGUAGE_LEGAL_NAME") => "ALTERNATIVE",
+                Some("PREFERRED_ASCII_TRANSLITERATED_LEGAL_NAME") => "TRANSLITERATED",
+                Some(t)
+                    if [
+                        "LEGAL",
+                        "TRADING",
+                        "TRANSLITERATED",
+                        "HISTORICAL",
+                        "ALTERNATIVE",
+                        "SHORT",
+                    ]
+                    .contains(&t) =>
+                {
+                    t
+                }
+                _ => "ALTERNATIVE",
+            };
+
             sqlx::query(
                 r#"
                 INSERT INTO "ob-poc".entity_names
@@ -147,7 +170,7 @@ impl GleifRepository {
             "#,
             )
             .bind(entity_id)
-            .bind(other.name_type.as_deref().unwrap_or("ALTERNATIVE"))
+            .bind(name_type)
             .bind(&other.name)
             .bind(&other.language)
             .execute(self.pool.as_ref())
@@ -209,7 +232,19 @@ impl GleifRepository {
 
         // Insert other addresses
         for other in &entity.other_addresses {
-            self.insert_address(entity_id, &other.address_type, &other.address, false)
+            // Map GLEIF address types to our allowed types
+            let address_type = match other.address_type.as_str() {
+                "LEGAL_ADDRESS" | "LEGAL" => "LEGAL",
+                "HEADQUARTERS_ADDRESS" | "HEADQUARTERS" | "HEAD_OFFICE" => "HEADQUARTERS",
+                "BRANCH_ADDRESS" | "BRANCH" => "BRANCH",
+                "ALTERNATIVE_ADDRESS" | "ALTERNATIVE" => "ALTERNATIVE",
+                "TRANSLITERATED_ADDRESS" | "TRANSLITERATED" | "ASCII_TRANSLITERATED_ADDRESS" => {
+                    "TRANSLITERATED"
+                }
+                // Map any unknown types to ALTERNATIVE
+                _ => "ALTERNATIVE",
+            };
+            self.insert_address(entity_id, address_type, &other.address, false)
                 .await?;
             count += 1;
         }

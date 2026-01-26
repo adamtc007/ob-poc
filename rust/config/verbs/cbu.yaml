@@ -799,3 +799,92 @@ domains:
             maps_to: verification_status
         returns:
           type: record_set
+
+      # BULK CBU CREATION FROM CLIENT GROUP
+      create-from-client-group:
+        description: Create CBUs from entities in a client group with GLEIF category and role filters
+        invocation_phrases:
+          - "create CBUs from client group"
+          - "bulk create CBUs for funds"
+          - "onboard entities as CBUs"
+          - "create CBUs from research"
+          - "convert entities to CBUs"
+          - "create CBUs from GLEIF funds"
+        behavior: plugin
+        handler: CbuCreateFromClientGroupOp
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: global
+          noun: cbu
+          tags: [bulk, lifecycle, write, client-group, onboarding, gleif]
+        args:
+          - name: group-id
+            type: uuid
+            required: true
+            description: Client group to source entities from
+            slot_type: client_group_ref
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: gleif-category
+            type: string
+            required: false
+            description: Filter by GLEIF category (FUND, GENERAL) - recommended for fund onboarding
+            valid_values:
+              - FUND
+              - GENERAL
+          - name: role-filter
+            type: string
+            required: false
+            description: Filter by client group role (e.g., SUBSIDIARY, ULTIMATE_PARENT)
+          - name: jurisdiction-filter
+            type: string
+            required: false
+            description: Only create CBUs for entities in this jurisdiction
+          - name: default-jurisdiction
+            type: string
+            required: false
+            default: "LU"
+            description: Default jurisdiction for CBUs if entity has none
+          - name: manco-entity-id
+            type: uuid
+            required: false
+            description: Entity to assign MANAGEMENT_COMPANY role on all created CBUs
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: im-entity-id
+            type: uuid
+            required: false
+            description: Entity to assign INVESTMENT_MANAGER role on all created CBUs
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum CBUs to create in one call
+          - name: dry-run
+            type: boolean
+            required: false
+            default: false
+            description: If true, report what would be created without making changes
+        returns:
+          type: record
+          fields:
+            - cbus_created
+            - roles_assigned
+            - entities_processed
+            - skipped_existing
+            - gleif_category

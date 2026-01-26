@@ -141,6 +141,10 @@ domains:
             type: string
             required: false
             description: Client group nickname (e.g., "Allianz", "AGI", "BlackRock")
+            # Slot type enables "Allianz rule" - resolves to scope setting
+            slot_type: client_group_ref
+            # Preferred roles for anchor resolution (in priority order)
+            preferred_roles: [governance_controller, ultimate_parent]
             lookup:
               table: client_group
               entity_type: client_group
@@ -376,6 +380,16 @@ domains:
             type: string
             required: true
             description: "Client nickname (resolved via client_group_alias)"
+            # Slot type enables "Allianz rule" - resolves to scope setting
+            slot_type: client_group_ref
+            # Preferred roles for anchor resolution (in priority order)
+            preferred_roles: [governance_controller, ultimate_parent]
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: alias
+              primary_key: id
         returns:
           type: record
           fields: [group_id, group_name, entity_count, candidates]

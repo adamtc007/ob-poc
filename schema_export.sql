@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YFUwJpaYeD4PPy0Ymvo7VaPcDo2mVv7i1X4fqvhwIgEPNraVuwOuaS6iPNUAvcV
+\restrict hQ8dFSC7vajxm0ywrQwnDiRZP7TZamXFqR1hwdxNeUGI5kVqb4KcbYh1hxXsZ26
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -5308,6 +5308,38 @@ $$;
 
 
 --
+-- Name: get_source_confidence(character varying); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".get_source_confidence(p_source character varying) RETURNS numeric
+    LANGUAGE plpgsql IMMUTABLE
+    AS $$
+BEGIN
+    RETURN CASE p_source
+        WHEN 'companies_house' THEN 0.95
+        WHEN 'clearstream' THEN 0.90
+        WHEN 'bods' THEN 0.85
+        WHEN 'gleif' THEN 0.80
+        WHEN 'annual_report' THEN 0.75
+        WHEN 'fund_prospectus' THEN 0.70
+        WHEN 'kyc_document' THEN 0.65
+        WHEN 'client_allegation' THEN 0.50
+        WHEN 'manual' THEN 0.40
+        WHEN 'scraper' THEN 0.35
+        ELSE 0.30
+    END;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION get_source_confidence(p_source character varying); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".get_source_confidence(p_source character varying) IS 'Returns default confidence score for ownership sources. Priority: regulatory filings > settlement systems > registries > client-provided.';
+
+
+--
 -- Name: get_verb_config_at_execution(uuid, text); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -7638,6 +7670,39 @@ CREATE FUNCTION "ob-poc".update_cbu_unified_attr_timestamp() RETURNS trigger
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: update_client_group_counts(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".update_client_group_counts() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    v_group_id UUID;
+BEGIN
+    -- Get the affected group_id
+    v_group_id := COALESCE(NEW.group_id, OLD.group_id);
+
+    -- Update counts
+    UPDATE "ob-poc".client_group SET
+        entity_count = (
+            SELECT COUNT(*) FROM "ob-poc".client_group_entity
+            WHERE group_id = v_group_id
+            AND membership_type NOT IN ('historical')
+        ),
+        pending_review_count = (
+            SELECT COUNT(*) FROM "ob-poc".client_group_entity
+            WHERE group_id = v_group_id
+            AND review_status IN ('pending', 'needs_update')
+        ),
+        updated_at = NOW()
+    WHERE id = v_group_id;
+
+    RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
@@ -13849,7 +13914,15 @@ CREATE TABLE "ob-poc".client_group (
     short_code text,
     description text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    discovery_status character varying(20) DEFAULT 'not_started'::character varying NOT NULL,
+    discovery_started_at timestamp with time zone,
+    discovery_completed_at timestamp with time zone,
+    discovery_source character varying(50),
+    discovery_root_lei character varying(20),
+    entity_count integer DEFAULT 0 NOT NULL,
+    pending_review_count integer DEFAULT 0 NOT NULL,
+    CONSTRAINT chk_cg_discovery_status CHECK (((discovery_status)::text = ANY ((ARRAY['not_started'::character varying, 'in_progress'::character varying, 'complete'::character varying, 'stale'::character varying, 'failed'::character varying])::text[])))
 );
 
 
@@ -13858,6 +13931,20 @@ CREATE TABLE "ob-poc".client_group (
 --
 
 COMMENT ON TABLE "ob-poc".client_group IS 'Virtual entity representing client brand/nickname groups';
+
+
+--
+-- Name: COLUMN client_group.discovery_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group.discovery_status IS 'Research discovery status: not_started, in_progress, complete, stale, failed';
+
+
+--
+-- Name: COLUMN client_group.discovery_root_lei; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group.discovery_root_lei IS 'Starting LEI for GLEIF crawl';
 
 
 --
@@ -13947,7 +14034,14 @@ CREATE TABLE "ob-poc".client_group_entity (
     added_by text DEFAULT 'manual'::text NOT NULL,
     notes text,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    source_record_id character varying(255),
+    review_status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    reviewed_by character varying(100),
+    reviewed_at timestamp with time zone,
+    review_notes text,
+    CONSTRAINT chk_cge_membership_type CHECK ((membership_type = ANY (ARRAY['in_group'::text, 'confirmed'::text, 'suspected'::text, 'external_partner'::text, 'counterparty'::text, 'service_provider'::text, 'historical'::text]))),
+    CONSTRAINT chk_cge_review_status CHECK (((review_status)::text = ANY ((ARRAY['pending'::character varying, 'confirmed'::character varying, 'rejected'::character varying, 'needs_update'::character varying])::text[])))
 );
 
 
@@ -13956,6 +14050,52 @@ CREATE TABLE "ob-poc".client_group_entity (
 --
 
 COMMENT ON TABLE "ob-poc".client_group_entity IS 'Entity membership in client groups. Tracks which entities belong to which client universe.';
+
+
+--
+-- Name: COLUMN client_group_entity.review_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group_entity.review_status IS 'Review workflow status: pending (awaiting review), confirmed (approved), rejected (marked for removal), needs_update (data changed)';
+
+
+--
+-- Name: client_group_entity_roles; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_entity_roles (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    cge_id uuid NOT NULL,
+    role_id uuid NOT NULL,
+    target_entity_id uuid,
+    effective_from date,
+    effective_to date,
+    assigned_by text DEFAULT 'manual'::text NOT NULL,
+    source_record_id character varying(255),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: TABLE client_group_entity_roles; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group_entity_roles IS 'Junction table linking client_group_entity to roles. Same pattern as cbu_entity_roles. Used for intent pipeline scoped search.';
+
+
+--
+-- Name: COLUMN client_group_entity_roles.target_entity_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group_entity_roles.target_entity_id IS 'For directed roles (e.g., Investment Manager FOR a specific fund within the group)';
+
+
+--
+-- Name: COLUMN client_group_entity_roles.assigned_by; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group_entity_roles.assigned_by IS 'Source: manual, gleif, bods, auto_tag, agent';
 
 
 --
@@ -14010,6 +14150,103 @@ CREATE TABLE "ob-poc".client_group_entity_tag_embedding (
 --
 
 COMMENT ON TABLE "ob-poc".client_group_entity_tag_embedding IS 'Embeddings for shorthand tags. Enables Candle semantic search: "irish funds" → entity_ids';
+
+
+--
+-- Name: client_group_relationship; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_relationship (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    group_id uuid NOT NULL,
+    parent_entity_id uuid NOT NULL,
+    child_entity_id uuid NOT NULL,
+    relationship_kind character varying(30) DEFAULT 'ownership'::character varying NOT NULL,
+    effective_from date,
+    effective_to date,
+    review_status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    reviewed_by character varying(100),
+    reviewed_at timestamp with time zone,
+    review_notes text,
+    promoted_to_relationship_id uuid,
+    promoted_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_cgr_no_self_reference CHECK ((parent_entity_id <> child_entity_id)),
+    CONSTRAINT chk_cgr_relationship_kind CHECK (((relationship_kind)::text = ANY ((ARRAY['ownership'::character varying, 'control'::character varying, 'beneficial'::character varying, 'management'::character varying])::text[]))),
+    CONSTRAINT chk_cgr_review_status CHECK (((review_status)::text = ANY ((ARRAY['pending'::character varying, 'confirmed'::character varying, 'rejected'::character varying, 'needs_update'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE client_group_relationship; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group_relationship IS 'Provisional ownership/control edges within a client group. Staging area before promotion to formal entity_relationships.';
+
+
+--
+-- Name: client_group_relationship_sources; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_group_relationship_sources (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    relationship_id uuid NOT NULL,
+    source character varying(50) NOT NULL,
+    source_type character varying(20) DEFAULT 'discovery'::character varying NOT NULL,
+    ownership_pct numeric(5,2),
+    voting_pct numeric(5,2),
+    control_pct numeric(5,2),
+    source_document_ref character varying(255),
+    source_document_type character varying(100),
+    source_document_date date,
+    source_effective_date date,
+    source_retrieved_at timestamp with time zone DEFAULT now() NOT NULL,
+    source_retrieved_by character varying(100),
+    raw_payload jsonb,
+    verifies_source_id uuid,
+    verification_outcome character varying(20),
+    discrepancy_pct numeric(5,2),
+    is_canonical boolean DEFAULT false,
+    canonical_set_by character varying(100),
+    canonical_set_at timestamp with time zone,
+    canonical_notes text,
+    verification_status character varying(20) DEFAULT 'unverified'::character varying,
+    verified_by character varying(100),
+    verified_at timestamp with time zone,
+    verification_notes text,
+    confidence_score numeric(3,2),
+    is_direct_evidence boolean DEFAULT false,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT chk_cgrs_confidence_range CHECK (((confidence_score IS NULL) OR ((confidence_score >= 0.00) AND (confidence_score <= 1.00)))),
+    CONSTRAINT chk_cgrs_source CHECK (((source)::text = ANY ((ARRAY['client_allegation'::character varying, 'gleif'::character varying, 'bods'::character varying, 'companies_house'::character varying, 'clearstream'::character varying, 'annual_report'::character varying, 'fund_prospectus'::character varying, 'kyc_document'::character varying, 'scraper'::character varying, 'manual'::character varying])::text[]))),
+    CONSTRAINT chk_cgrs_source_type CHECK (((source_type)::text = ANY ((ARRAY['allegation'::character varying, 'verification'::character varying, 'discovery'::character varying])::text[]))),
+    CONSTRAINT chk_cgrs_verification_needs_target CHECK (((((source_type)::text = 'verification'::text) AND (verifies_source_id IS NOT NULL)) OR ((source_type)::text <> 'verification'::text))),
+    CONSTRAINT chk_cgrs_verification_outcome CHECK (((verification_outcome IS NULL) OR ((verification_outcome)::text = ANY ((ARRAY['confirmed'::character varying, 'disputed'::character varying, 'partial'::character varying, 'superseded'::character varying])::text[])))),
+    CONSTRAINT chk_cgrs_verification_status CHECK (((verification_status)::text = ANY ((ARRAY['unverified'::character varying, 'verified'::character varying, 'disputed'::character varying, 'superseded'::character varying, 'rejected'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE client_group_relationship_sources; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_group_relationship_sources IS 'Multi-source lineage for ownership edges. Supports trust-but-verify workflow: client alleges → we verify against authoritative sources.';
+
+
+--
+-- Name: COLUMN client_group_relationship_sources.verifies_source_id; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group_relationship_sources.verifies_source_id IS 'If this is a verification, which allegation does it verify?';
+
+
+--
+-- Name: COLUMN client_group_relationship_sources.is_canonical; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".client_group_relationship_sources.is_canonical IS 'Analyst override: mark this source as the canonical value for reporting.';
 
 
 --
@@ -19561,6 +19798,135 @@ COMMENT ON VIEW "ob-poc".v_cbus_by_manco IS 'All CBUs grouped by governance cont
 
 
 --
+-- Name: v_cgr_canonical; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cgr_canonical AS
+ SELECT DISTINCT ON (r.id) r.id AS relationship_id,
+    r.group_id,
+    r.parent_entity_id,
+    r.child_entity_id,
+    r.relationship_kind,
+    r.review_status AS relationship_review_status,
+    r.effective_from,
+    r.effective_to,
+    pe.name AS parent_name,
+    ce.name AS child_name,
+    s.id AS source_id,
+    s.ownership_pct,
+    s.voting_pct,
+    s.control_pct,
+    s.source AS canonical_source,
+    s.source_type,
+    s.verification_status,
+    s.is_canonical,
+    s.confidence_score,
+    s.source_document_ref,
+    s.source_document_date,
+    cg.canonical_name AS group_name
+   FROM (((("ob-poc".client_group_relationship r
+     JOIN "ob-poc".client_group cg ON ((cg.id = r.group_id)))
+     JOIN "ob-poc".entities pe ON ((pe.entity_id = r.parent_entity_id)))
+     JOIN "ob-poc".entities ce ON ((ce.entity_id = r.child_entity_id)))
+     LEFT JOIN "ob-poc".client_group_relationship_sources s ON (((s.relationship_id = r.id) AND ((s.verification_status)::text <> 'rejected'::text))))
+  ORDER BY r.id, s.is_canonical DESC NULLS LAST,
+        CASE s.verification_status
+            WHEN 'verified'::text THEN 0
+            ELSE 1
+        END,
+        CASE s.source
+            WHEN 'companies_house'::text THEN 1
+            WHEN 'clearstream'::text THEN 2
+            WHEN 'bods'::text THEN 3
+            WHEN 'gleif'::text THEN 4
+            WHEN 'annual_report'::text THEN 5
+            WHEN 'fund_prospectus'::text THEN 6
+            WHEN 'kyc_document'::text THEN 7
+            WHEN 'client_allegation'::text THEN 8
+            WHEN 'manual'::text THEN 9
+            ELSE 10
+        END, s.confidence_score DESC NULLS LAST, s.source_document_date DESC NULLS LAST;
+
+
+--
+-- Name: VIEW v_cgr_canonical; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_cgr_canonical IS 'Returns best-available (canonical) ownership value for each relationship edge. Priority: explicit canonical > verified > source authority > confidence > recency.';
+
+
+--
+-- Name: v_cgr_discrepancies; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cgr_discrepancies AS
+ SELECT r.group_id,
+    cg.canonical_name AS group_name,
+    r.id AS relationship_id,
+    r.parent_entity_id,
+    r.child_entity_id,
+    r.relationship_kind,
+    pe.name AS parent_name,
+    ce.name AS child_name,
+    array_agg(DISTINCT s.source ORDER BY s.source) AS sources,
+    array_agg(s.ownership_pct ORDER BY s.confidence_score DESC NULLS LAST) AS ownership_values,
+    (max(s.ownership_pct) - min(s.ownership_pct)) AS ownership_spread,
+    max(s.ownership_pct) FILTER (WHERE ((s.source_type)::text = 'allegation'::text)) AS alleged_pct,
+    max(s.ownership_pct) FILTER (WHERE ((s.source_type)::text = 'verification'::text)) AS verified_pct,
+    count(DISTINCT s.source) AS source_count,
+    count(DISTINCT s.ownership_pct) AS distinct_value_count
+   FROM (((("ob-poc".client_group_relationship r
+     JOIN "ob-poc".client_group cg ON ((cg.id = r.group_id)))
+     JOIN "ob-poc".entities pe ON ((pe.entity_id = r.parent_entity_id)))
+     JOIN "ob-poc".entities ce ON ((ce.entity_id = r.child_entity_id)))
+     JOIN "ob-poc".client_group_relationship_sources s ON ((s.relationship_id = r.id)))
+  WHERE ((s.ownership_pct IS NOT NULL) AND ((s.verification_status)::text <> 'rejected'::text))
+  GROUP BY r.group_id, cg.canonical_name, r.id, r.parent_entity_id, r.child_entity_id, r.relationship_kind, pe.name, ce.name
+ HAVING (count(DISTINCT s.ownership_pct) > 1);
+
+
+--
+-- Name: VIEW v_cgr_discrepancies; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_cgr_discrepancies IS 'Identifies relationships where sources disagree on ownership percentage. Shows spread and value counts for reconciliation.';
+
+
+--
+-- Name: v_cgr_unverified_allegations; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_cgr_unverified_allegations AS
+ SELECT r.group_id,
+    cg.canonical_name AS group_name,
+    r.id AS relationship_id,
+    pe.name AS parent_name,
+    ce.name AS child_name,
+    r.relationship_kind,
+    s.id AS source_id,
+    s.ownership_pct AS alleged_pct,
+    s.source_document_ref,
+    s.source_document_date,
+    s.created_at AS alleged_at,
+    ( SELECT count(*) AS count
+           FROM "ob-poc".client_group_relationship_sources v
+          WHERE (v.verifies_source_id = s.id)) AS verification_count
+   FROM (((("ob-poc".client_group_relationship_sources s
+     JOIN "ob-poc".client_group_relationship r ON ((r.id = s.relationship_id)))
+     JOIN "ob-poc".client_group cg ON ((cg.id = r.group_id)))
+     JOIN "ob-poc".entities pe ON ((pe.entity_id = r.parent_entity_id)))
+     JOIN "ob-poc".entities ce ON ((ce.entity_id = r.child_entity_id)))
+  WHERE (((s.source_type)::text = 'allegation'::text) AND ((s.verification_status)::text = 'unverified'::text));
+
+
+--
+-- Name: VIEW v_cgr_unverified_allegations; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_cgr_unverified_allegations IS 'Lists all client allegations awaiting verification. Use for KYC review queue.';
+
+
+--
 -- Name: v_client_entity_tags; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -19618,6 +19984,47 @@ CREATE VIEW "ob-poc".v_client_group_anchors AS
    FROM ("ob-poc".client_group_anchor cga
      JOIN "ob-poc".entities e ON ((e.entity_id = cga.anchor_entity_id)))
   WHERE (((cga.valid_from IS NULL) OR (cga.valid_from <= CURRENT_DATE)) AND ((cga.valid_to IS NULL) OR (cga.valid_to >= CURRENT_DATE)));
+
+
+--
+-- Name: v_client_group_entity_search; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_client_group_entity_search AS
+ SELECT cge.id AS cge_id,
+    cge.group_id,
+    cge.entity_id,
+    cge.membership_type,
+    cge.review_status,
+    cge.added_by,
+    e.name AS entity_name,
+    elc.lei,
+    elc.jurisdiction,
+    et.type_code AS entity_type,
+    COALESCE(( SELECT array_agg(DISTINCT r.name ORDER BY r.name) AS array_agg
+           FROM ("ob-poc".client_group_entity_roles cer
+             JOIN "ob-poc".roles r ON ((r.role_id = cer.role_id)))
+          WHERE ((cer.cge_id = cge.id) AND ((cer.effective_to IS NULL) OR (cer.effective_to > CURRENT_DATE)))), '{}'::character varying[]) AS role_names,
+    COALESCE(( SELECT array_agg(DISTINCT cer.role_id) AS array_agg
+           FROM "ob-poc".client_group_entity_roles cer
+          WHERE ((cer.cge_id = cge.id) AND ((cer.effective_to IS NULL) OR (cer.effective_to > CURRENT_DATE)))), '{}'::uuid[]) AS role_ids,
+    cg.canonical_name AS group_name,
+    (cge.membership_type = ANY (ARRAY['external_partner'::text, 'counterparty'::text, 'service_provider'::text])) AS is_external,
+    cge.created_at,
+    cge.updated_at
+   FROM (((("ob-poc".client_group_entity cge
+     JOIN "ob-poc".entities e ON ((e.entity_id = cge.entity_id)))
+     LEFT JOIN "ob-poc".entity_types et ON ((et.entity_type_id = e.entity_type_id)))
+     LEFT JOIN "ob-poc".entity_limited_companies elc ON ((elc.entity_id = e.entity_id)))
+     JOIN "ob-poc".client_group cg ON ((cg.id = cge.group_id)))
+  WHERE (cge.membership_type <> 'historical'::text);
+
+
+--
+-- Name: VIEW v_client_group_entity_search; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_client_group_entity_search IS 'Denormalized view for intent pipeline scoped search. Hot path for "the IM", "the custodian" resolution.';
 
 
 --
@@ -23534,6 +23941,14 @@ ALTER TABLE ONLY "ob-poc".client_group_entity
 
 
 --
+-- Name: client_group_entity_roles client_group_entity_roles_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_roles
+    ADD CONSTRAINT client_group_entity_roles_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: client_group_entity_tag_embedding client_group_entity_tag_embedding_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23555,6 +23970,22 @@ ALTER TABLE ONLY "ob-poc".client_group_entity_tag
 
 ALTER TABLE ONLY "ob-poc".client_group
     ADD CONSTRAINT client_group_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_group_relationship client_group_relationship_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship
+    ADD CONSTRAINT client_group_relationship_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: client_group_relationship_sources client_group_relationship_sources_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship_sources
+    ADD CONSTRAINT client_group_relationship_sources_pkey PRIMARY KEY (id);
 
 
 --
@@ -27871,6 +28302,41 @@ CREATE INDEX idx_cge_membership ON "ob-poc".client_group_entity USING btree (gro
 
 
 --
+-- Name: idx_cge_review; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cge_review ON "ob-poc".client_group_entity USING btree (group_id, review_status) WHERE ((review_status)::text = ANY ((ARRAY['pending'::character varying, 'needs_update'::character varying])::text[]));
+
+
+--
+-- Name: idx_cger_cge; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cger_cge ON "ob-poc".client_group_entity_roles USING btree (cge_id);
+
+
+--
+-- Name: idx_cger_current; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cger_current ON "ob-poc".client_group_entity_roles USING btree (cge_id) WHERE (effective_to IS NULL);
+
+
+--
+-- Name: idx_cger_role; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cger_role ON "ob-poc".client_group_entity_roles USING btree (role_id);
+
+
+--
+-- Name: idx_cger_target; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cger_target ON "ob-poc".client_group_entity_roles USING btree (target_entity_id) WHERE (target_entity_id IS NOT NULL);
+
+
+--
 -- Name: idx_cget_group_entity; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -27896,6 +28362,62 @@ CREATE INDEX idx_cget_tag_norm ON "ob-poc".client_group_entity_tag USING btree (
 --
 
 CREATE INDEX idx_cget_tag_norm_trgm ON "ob-poc".client_group_entity_tag USING gin (tag_norm public.gin_trgm_ops);
+
+
+--
+-- Name: idx_cgr_child; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgr_child ON "ob-poc".client_group_relationship USING btree (group_id, child_entity_id);
+
+
+--
+-- Name: idx_cgr_kind; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgr_kind ON "ob-poc".client_group_relationship USING btree (group_id, relationship_kind);
+
+
+--
+-- Name: idx_cgr_parent; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgr_parent ON "ob-poc".client_group_relationship USING btree (group_id, parent_entity_id);
+
+
+--
+-- Name: idx_cgr_unpromoted; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgr_unpromoted ON "ob-poc".client_group_relationship USING btree (group_id) WHERE (promoted_to_relationship_id IS NULL);
+
+
+--
+-- Name: idx_cgrs_canonical; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgrs_canonical ON "ob-poc".client_group_relationship_sources USING btree (relationship_id) WHERE (is_canonical = true);
+
+
+--
+-- Name: idx_cgrs_relationship; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgrs_relationship ON "ob-poc".client_group_relationship_sources USING btree (relationship_id);
+
+
+--
+-- Name: idx_cgrs_unverified; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgrs_unverified ON "ob-poc".client_group_relationship_sources USING btree (source_type, verification_status) WHERE (((source_type)::text = 'allegation'::text) AND ((verification_status)::text = 'unverified'::text));
+
+
+--
+-- Name: idx_cgrs_verifies; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cgrs_verifies ON "ob-poc".client_group_relationship_sources USING btree (verifies_source_id) WHERE (verifies_source_id IS NOT NULL);
 
 
 --
@@ -28610,6 +29132,13 @@ CREATE INDEX idx_entities_external_id ON "ob-poc".entities USING btree (external
 --
 
 CREATE INDEX idx_entities_name ON "ob-poc".entities USING btree (name);
+
+
+--
+-- Name: idx_entities_name_trgm; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_entities_name_trgm ON "ob-poc".entities USING gin (name public.gin_trgm_ops);
 
 
 --
@@ -30664,10 +31193,31 @@ CREATE INDEX ix_dsl_verbs_compiled_hash ON "ob-poc".dsl_verbs USING btree (compi
 
 
 --
+-- Name: uq_cger_role_target; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_cger_role_target ON "ob-poc".client_group_entity_roles USING btree (cge_id, role_id, COALESCE(target_entity_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+
+--
 -- Name: uq_cget_tag; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
 CREATE UNIQUE INDEX uq_cget_tag ON "ob-poc".client_group_entity_tag USING btree (group_id, entity_id, tag_norm, COALESCE(persona, ''::text));
+
+
+--
+-- Name: uq_cgr_edge; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_cgr_edge ON "ob-poc".client_group_relationship USING btree (group_id, parent_entity_id, child_entity_id, relationship_kind);
+
+
+--
+-- Name: uq_cgrs_canonical; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_cgrs_canonical ON "ob-poc".client_group_relationship_sources USING btree (relationship_id) WHERE (is_canonical = true);
 
 
 --
@@ -31317,6 +31867,13 @@ CREATE TRIGGER trg_cbu_status_change AFTER UPDATE ON "ob-poc".cbus FOR EACH ROW 
 --
 
 CREATE TRIGGER trg_cbu_unified_attr_updated BEFORE UPDATE ON "ob-poc".cbu_unified_attr_requirements FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_cbu_unified_attr_timestamp();
+
+
+--
+-- Name: client_group_entity trg_cge_counts; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_cge_counts AFTER INSERT OR DELETE OR UPDATE ON "ob-poc".client_group_entity FOR EACH ROW EXECUTE FUNCTION "ob-poc".update_client_group_counts();
 
 
 --
@@ -33511,6 +34068,30 @@ ALTER TABLE ONLY "ob-poc".client_group_entity
 
 
 --
+-- Name: client_group_entity_roles client_group_entity_roles_cge_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_roles
+    ADD CONSTRAINT client_group_entity_roles_cge_id_fkey FOREIGN KEY (cge_id) REFERENCES "ob-poc".client_group_entity(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_entity_roles client_group_entity_roles_role_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_roles
+    ADD CONSTRAINT client_group_entity_roles_role_id_fkey FOREIGN KEY (role_id) REFERENCES "ob-poc".roles(role_id);
+
+
+--
+-- Name: client_group_entity_roles client_group_entity_roles_target_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity_roles
+    ADD CONSTRAINT client_group_entity_roles_target_entity_id_fkey FOREIGN KEY (target_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: client_group_entity_tag_embedding client_group_entity_tag_embedding_tag_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -33532,6 +34113,54 @@ ALTER TABLE ONLY "ob-poc".client_group_entity_tag
 
 ALTER TABLE ONLY "ob-poc".client_group_entity_tag
     ADD CONSTRAINT client_group_entity_tag_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_relationship client_group_relationship_child_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship
+    ADD CONSTRAINT client_group_relationship_child_entity_id_fkey FOREIGN KEY (child_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: client_group_relationship client_group_relationship_group_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship
+    ADD CONSTRAINT client_group_relationship_group_id_fkey FOREIGN KEY (group_id) REFERENCES "ob-poc".client_group(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_relationship client_group_relationship_parent_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship
+    ADD CONSTRAINT client_group_relationship_parent_entity_id_fkey FOREIGN KEY (parent_entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
+-- Name: client_group_relationship client_group_relationship_promoted_to_relationship_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship
+    ADD CONSTRAINT client_group_relationship_promoted_to_relationship_id_fkey FOREIGN KEY (promoted_to_relationship_id) REFERENCES "ob-poc".entity_relationships(relationship_id);
+
+
+--
+-- Name: client_group_relationship_sources client_group_relationship_sources_relationship_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship_sources
+    ADD CONSTRAINT client_group_relationship_sources_relationship_id_fkey FOREIGN KEY (relationship_id) REFERENCES "ob-poc".client_group_relationship(id) ON DELETE CASCADE;
+
+
+--
+-- Name: client_group_relationship_sources client_group_relationship_sources_verifies_source_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_relationship_sources
+    ADD CONSTRAINT client_group_relationship_sources_verifies_source_id_fkey FOREIGN KEY (verifies_source_id) REFERENCES "ob-poc".client_group_relationship_sources(id);
 
 
 --
@@ -35282,5 +35911,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YFUwJpaYeD4PPy0Ymvo7VaPcDo2mVv7i1X4fqvhwIgEPNraVuwOuaS6iPNUAvcV
+\unrestrict hQ8dFSC7vajxm0ywrQwnDiRZP7TZamXFqR1hwdxNeUGI5kVqb4KcbYh1hxXsZ26
 

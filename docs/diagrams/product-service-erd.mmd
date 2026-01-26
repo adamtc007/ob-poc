@@ -1,0 +1,72 @@
+erDiagram
+    %% ═══════════════════════════════════════════════════════════
+    %% PRODUCT / SERVICE / RESOURCE LAYER
+    %% ═══════════════════════════════════════════════════════════
+    
+    products {
+        uuid product_id PK
+        string name
+        string product_category
+        string description
+    }
+    
+    services {
+        uuid service_id PK
+        string name
+        uuid product_id FK
+        string service_type
+    }
+    
+    service_resource_types {
+        uuid id PK
+        uuid service_id FK
+        string resource_type
+        string cardinality
+        boolean required
+    }
+    
+    cbus {
+        uuid cbu_id PK
+        string name
+        string jurisdiction
+    }
+    
+    cbu_resource_instances {
+        uuid id PK
+        uuid cbu_id FK
+        uuid service_resource_type_id FK
+        string status
+        jsonb config
+    }
+    
+    cbu_product_subscriptions {
+        uuid id PK
+        uuid cbu_id FK
+        uuid product_id FK
+        string status
+        date effective_from
+    }
+    
+    cbu_matrix_product_overlay {
+        uuid id PK
+        uuid cbu_id FK
+        uuid product_id FK
+        uuid service_id FK
+        jsonb overrides
+    }
+    
+    %% ═══════════════════════════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════════════════════════
+    
+    products ||--o{ services : "offers"
+    services ||--o{ service_resource_types : "requires"
+    
+    cbus ||--o{ cbu_resource_instances : "has"
+    cbus ||--o{ cbu_product_subscriptions : "subscribes"
+    cbus ||--o{ cbu_matrix_product_overlay : "customizes"
+    
+    service_resource_types ||--o{ cbu_resource_instances : "instantiated_as"
+    products ||--o{ cbu_product_subscriptions : "subscribed_by"
+    products ||--o{ cbu_matrix_product_overlay : "overlayed"
+    services ||--o{ cbu_matrix_product_overlay : "overlayed"

@@ -302,13 +302,16 @@ impl GleifEnrichmentService {
         let mut relationships_created = 0;
         let mut terminal_entities = Vec::new();
 
-        // Fetch all records in the tree
-        let records = self
+        // Fetch all records in the tree (now includes discovered relationships)
+        let tree_result = self
             .client
             .fetch_corporate_tree(root_lei, max_depth)
             .await?;
 
-        for record in &records {
+        let records = &tree_result.records;
+        let discovered_relationships = &tree_result.relationships;
+
+        for record in records {
             let lei = record.lei();
 
             // Check if entity exists
@@ -356,37 +359,31 @@ impl GleifEnrichmentService {
             }
         }
 
-        // Now create parent relationships (second pass to ensure all entities exist)
-        for record in &records {
-            let child_lei = record.lei();
-            let child_id = self.repository.find_entity_by_lei(child_lei).await?;
+        // Now create parent relationships from discovered relationships
+        for rel in discovered_relationships {
+            let child_id = self.repository.find_entity_by_lei(&rel.child_lei).await?;
 
             if let Some(child_entity_id) = child_id {
-                if let Some(ref rels) = record.relationships {
-                    // Direct parent
-                    if let Some(ref dp) = rels.direct_parent {
-                        if let Some(ref url) = dp.links.related {
-                            if let Some(parent_lei) = url.split('/').next_back() {
-                                let parent_record = records.iter().find(|r| r.lei() == parent_lei);
-                                let parent_name = parent_record
-                                    .map(|r| r.attributes.entity.legal_name.name.as_str());
+                // Find parent name from records if available
+                let parent_record = records.iter().find(|r| r.lei() == rel.parent_lei);
+                let parent_name =
+                    parent_record.map(|r| r.attributes.entity.legal_name.name.as_str());
 
-                                self.repository
-                                    .insert_parent_relationship(
-                                        child_entity_id,
-                                        parent_lei,
-                                        parent_name,
-                                        "DIRECT_PARENT",
-                                        None,
-                                    )
-                                    .await?;
-                                relationships_created += 1;
-                            }
-                        }
-                    }
-                }
+                self.repository
+                    .insert_parent_relationship(
+                        child_entity_id,
+                        &rel.parent_lei,
+                        parent_name,
+                        &rel.relationship_type,
+                        None,
+                    )
+                    .await?;
+                relationships_created += 1;
             }
         }
+
+        // Collect all LEIs from the imported records
+        let imported_leis: Vec<String> = records.iter().map(|r| r.lei().to_string()).collect();
 
         Ok(TreeImportResult {
             root_lei: root_lei.to_string(),
@@ -394,6 +391,7 @@ impl GleifEnrichmentService {
             entities_updated,
             relationships_created,
             terminal_entities,
+            imported_leis,
         })
     }
 

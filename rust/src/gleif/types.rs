@@ -1133,6 +1133,8 @@ pub struct TreeImportResult {
     pub entities_updated: i32,
     pub relationships_created: i32,
     pub terminal_entities: Vec<TerminalEntity>,
+    /// All LEIs that were processed in this import (for linking to client groups)
+    pub imported_leis: Vec<String>,
 }
 
 /// An entity at the end of an ownership chain

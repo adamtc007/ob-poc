@@ -602,6 +602,76 @@ pub struct ArgConfig {
     /// and emit a warning if fuzzy matches are found
     #[serde(default)]
     pub fuzzy_check: Option<FuzzyCheckConfig>,
+    /// Slot type for intent pipeline - determines resolution semantics
+    ///
+    /// When set, the resolver uses typed resolution rules:
+    /// - `ClientGroupRef`: Resolves to client_group, sets session scope
+    /// - `EntityRef`: Resolves to single entity within scope
+    /// - `EntitySetRef`: Resolves to multiple entities within scope
+    /// - `CbuRef`: Resolves to single CBU within scope
+    /// - `CbuSetRef`: Resolves to multiple CBUs within scope
+    ///
+    /// Example YAML:
+    /// ```yaml
+    /// - name: client
+    ///   type: uuid
+    ///   slot_type: client_group_ref
+    ///   preferred_roles: [governance_controller, ultimate_parent]
+    /// ```
+    #[serde(default)]
+    pub slot_type: Option<SlotType>,
+    /// Preferred roles for filtering scoped search
+    ///
+    /// When resolving entity references within a client group scope,
+    /// these roles are used to filter `v_client_group_entity_search`.
+    /// Role names are looked up against the `roles` table.
+    ///
+    /// Example: `preferred_roles: [INVESTMENT_MANAGER, CUSTODIAN]`
+    #[serde(default)]
+    pub preferred_roles: Vec<String>,
+}
+
+// =============================================================================
+// SLOT TYPES (Intent Pipeline Resolution)
+// =============================================================================
+
+/// Slot type for intent pipeline - determines resolution semantics
+///
+/// Each slot type has specific resolution rules that the resolver follows:
+/// - **Scope setting**: ClientGroupRef sets session scope
+/// - **Scoped search**: EntityRef/CbuRef search within current scope
+/// - **Role filtering**: Uses preferred_roles to narrow search
+/// - **Allianz rule**: Same name resolves differently based on slot type
+///
+/// ## The "Allianz Rule"
+///
+/// When mention text exactly matches the client group name:
+///
+/// | Slot Type | Resolution |
+/// |-----------|------------|
+/// | ClientGroupRef | Sets scope to this group |
+/// | CbuSetRef | All CBUs in this group |
+/// | EntityRef | The group's anchor entity |
+/// | EntitySetRef | All entities in this group |
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SlotType {
+    /// Single client group reference - sets session scope
+    ClientGroupRef,
+    /// Single entity reference - resolves within scope
+    EntityRef,
+    /// Multiple entities - resolves to set within scope
+    EntitySetRef,
+    /// Single CBU reference - resolves within scope
+    CbuRef,
+    /// Multiple CBUs - resolves to set within scope
+    CbuSetRef,
+    /// Product reference - global catalog lookup
+    ProductRef,
+    /// Role reference - global roles table lookup
+    RoleRef,
+    /// Jurisdiction code - global reference lookup
+    JurisdictionRef,
 }
 
 /// Configuration for fuzzy match checking on upsert args
@@ -708,6 +778,22 @@ pub struct LookupConfig {
     /// Defaults to "reference" if not specified (backwards compatible).
     #[serde(default)]
     pub resolution_mode: Option<ResolutionMode>,
+    /// Scope key column for scoped search within client group
+    ///
+    /// When set, search is restricted to records where this column matches
+    /// the current session's client_group_id.
+    ///
+    /// Example: `scope_key: group_id` for `v_client_group_entity_search`
+    #[serde(default)]
+    pub scope_key: Option<String>,
+    /// Role filter column for role-based search within client group
+    ///
+    /// When set along with `preferred_roles` on the arg, search filters
+    /// to records where this array column contains any of the preferred roles.
+    ///
+    /// Example: `role_filter: role_names` for `v_client_group_entity_search`
+    #[serde(default)]
+    pub role_filter: Option<String>,
 }
 
 // =============================================================================

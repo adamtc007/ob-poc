@@ -76,9 +76,6 @@ enum Command {
     /// Generate TypeScript bindings from ob-poc-types
     TsBindings,
 
-    /// Run DSL test scenarios
-    DslTests,
-
     /// Start the web server (ob-poc-web)
     Serve {
         /// Port to listen on
@@ -516,7 +513,7 @@ fn main() -> Result<()> {
         Command::Build { release } => build(&sh, release),
         Command::SchemaExport => schema_export(&sh),
         Command::TsBindings => ts_bindings(&sh),
-        Command::DslTests => dsl_tests(&sh),
+
         Command::Serve { port } => serve(&sh, port),
         Command::Ci => ci(&sh),
         Command::PreCommit => pre_commit(&sh),
@@ -1065,12 +1062,6 @@ fn ts_bindings(sh: &Shell) -> Result<()> {
         }
     }
 
-    Ok(())
-}
-
-fn dsl_tests(sh: &Shell) -> Result<()> {
-    println!("Running DSL test scenarios...");
-    cmd!(sh, "bash tests/scenarios/run_tests.sh").run()?;
     Ok(())
 }
 

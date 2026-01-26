@@ -362,7 +362,7 @@ pub struct PreResolvedContext {
 // GRACEFUL RESPONSE HELPERS - For ambiguous/vague/nonsense input
 // ============================================================================
 
-use crate::mcp::intent_pipeline::{classify_input, ConfidenceTier, InputQuality};
+use crate::mcp::intent_pipeline::{ConfidenceTier, InputQuality};
 
 /// Build a graceful response for various input quality levels
 pub fn build_graceful_response(

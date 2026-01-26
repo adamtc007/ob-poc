@@ -1,0 +1,89 @@
+erDiagram
+    %% ═══════════════════════════════════════════════════════════
+    %% CORE ENTITY LAYER - The foundation
+    %% ═══════════════════════════════════════════════════════════
+    
+    entities {
+        uuid entity_id PK
+        string name
+        string lei
+        string entity_type
+        string jurisdiction
+    }
+    
+    cbus {
+        uuid cbu_id PK
+        string name
+        uuid commercial_client_entity_id FK
+        string jurisdiction
+        string client_type
+    }
+    
+    %% ═══════════════════════════════════════════════════════════
+    %% CLIENT GROUP LAYER - Scoped working sets
+    %% ═══════════════════════════════════════════════════════════
+    
+    client_group {
+        uuid id PK
+        string canonical_name
+        uuid client_anchor_entity_id FK
+        string discovery_status
+    }
+    
+    client_group_entity {
+        uuid id PK
+        uuid group_id FK
+        uuid entity_id FK
+        string membership_type
+        string review_status
+    }
+    
+    client_group_entity_roles {
+        uuid id PK
+        uuid cge_id FK
+        uuid role_id FK
+        uuid target_entity_id FK
+    }
+    
+    client_group_alias {
+        uuid id PK
+        uuid client_group_id FK
+        string alias_name
+    }
+    
+    %% ═══════════════════════════════════════════════════════════
+    %% ROLE SYSTEM - Unified taxonomy
+    %% ═══════════════════════════════════════════════════════════
+    
+    roles {
+        uuid role_id PK
+        string name
+        string role_category
+        string ubo_treatment
+    }
+    
+    cbu_entity_roles {
+        uuid cbu_entity_role_id PK
+        uuid cbu_id FK
+        uuid entity_id FK
+        uuid role_id FK
+        decimal ownership_percentage
+    }
+    
+    %% ═══════════════════════════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════════════════════════
+    
+    entities ||--o{ cbus : "commercial_client"
+    entities ||--o{ cbu_entity_roles : "has_role"
+    entities ||--o{ client_group_entity : "member_of"
+    entities ||--o{ client_group : "anchors"
+    
+    cbus ||--o{ cbu_entity_roles : "has_parties"
+    
+    client_group ||--o{ client_group_entity : "contains"
+    client_group ||--o{ client_group_alias : "known_as"
+    client_group_entity ||--o{ client_group_entity_roles : "has_role"
+    
+    roles ||--o{ cbu_entity_roles : "defines"
+    roles ||--o{ client_group_entity_roles : "defines"

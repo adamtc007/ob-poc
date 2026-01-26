@@ -1,0 +1,82 @@
+erDiagram
+    %% ═══════════════════════════════════════════════════════════
+    %% KYC & DOCUMENT LAYER
+    %% ═══════════════════════════════════════════════════════════
+    
+    cases {
+        uuid case_id PK
+        uuid entity_id FK
+        string case_type
+        string status
+        date due_date
+    }
+    
+    entity_workstreams {
+        uuid id PK
+        uuid case_id FK
+        uuid entity_id FK
+        string workstream_type
+        string status
+    }
+    
+    document_catalog {
+        uuid document_id PK
+        uuid entity_id FK
+        uuid document_type_id FK
+        string storage_path
+        date valid_from
+        date valid_to
+    }
+    
+    document_types {
+        uuid document_type_id PK
+        string name
+        string category
+        int validity_months
+    }
+    
+    document_requirements {
+        uuid id PK
+        uuid document_type_id FK
+        string entity_type
+        string jurisdiction
+        boolean mandatory
+    }
+    
+    attribute_registry {
+        uuid attribute_id PK
+        string attribute_name
+        string data_type
+        string category
+    }
+    
+    attribute_observations {
+        uuid observation_id PK
+        uuid entity_id FK
+        uuid attribute_id FK
+        jsonb value
+        uuid source_document_id FK
+        date observed_at
+    }
+    
+    verification_challenges {
+        uuid id PK
+        uuid observation_id FK
+        string challenge_type
+        string status
+        string resolution
+    }
+    
+    %% ═══════════════════════════════════════════════════════════
+    %% RELATIONSHIPS
+    %% ═══════════════════════════════════════════════════════════
+    
+    cases ||--o{ entity_workstreams : "tracks"
+    
+    document_types ||--o{ document_catalog : "categorizes"
+    document_types ||--o{ document_requirements : "defines"
+    
+    document_catalog ||--o{ attribute_observations : "sources"
+    
+    attribute_registry ||--o{ attribute_observations : "defines"
+    attribute_observations ||--o{ verification_challenges : "challenged_by"

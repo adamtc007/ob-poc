@@ -12,6 +12,9 @@
 //!
 //! Run all tests:
 //!   DATABASE_URL="postgresql:///data_designer" cargo test --features database --test staged_runbook_integration -- --ignored --nocapture
+//!
+//! Run single test:
+//!   DATABASE_URL="postgresql:///data_designer" cargo test --features database --test staged_runbook_integration test_stage_simple_dsl -- --ignored --nocapture
 
 #[cfg(feature = "database")]
 mod tests {
@@ -21,22 +24,15 @@ mod tests {
         staged_runbook::RunbookStatus,
     };
     use sqlx::PgPool;
-    use tokio::sync::OnceCell;
     use uuid::Uuid;
 
-    // Shared resources
-    static SHARED_POOL: OnceCell<PgPool> = OnceCell::const_new();
-
-    pub async fn get_pool() -> &'static PgPool {
-        SHARED_POOL
-            .get_or_init(|| async {
-                let url = std::env::var("DATABASE_URL")
-                    .unwrap_or_else(|_| panic!("DATABASE_URL must be set for integration tests"));
-                PgPool::connect(&url)
-                    .await
-                    .expect("Failed to connect to database")
-            })
+    /// Create a fresh pool for each test to avoid Tokio runtime shutdown issues
+    async fn create_pool() -> PgPool {
+        let url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| panic!("DATABASE_URL must be set for integration tests"));
+        PgPool::connect(&url)
             .await
+            .expect("Failed to connect to database")
     }
 
     /// Generate a unique session ID for each test
@@ -51,10 +47,10 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_stage_simple_dsl() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Stage a simple DSL command
         let result = service
@@ -92,10 +88,10 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_stage_invalid_dsl_fails() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Stage invalid DSL
         let result = service
@@ -119,10 +115,10 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_stage_multiple_commands() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Stage first command
         let r1 = service
@@ -136,13 +132,13 @@ mod tests {
             )
             .await?;
 
-        // Stage second command
+        // Stage second command - note: status must be a quoted string
         let r2 = service
             .stage(
                 &session_id,
                 None,
                 None,
-                "(cbu.list :status active)",
+                r#"(cbu.list :status "active")"#,
                 Some("Second command"),
                 None,
             )
@@ -165,10 +161,10 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_abort_clears_runbook() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Stage a command
         service
@@ -205,10 +201,10 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_remove_command() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Stage two commands
         let r1 = service
@@ -222,12 +218,13 @@ mod tests {
             )
             .await?;
 
+        // Status must be quoted string
         let r2 = service
             .stage(
                 &session_id,
                 None,
                 None,
-                "(cbu.list :status active)",
+                r#"(cbu.list :status "active")"#,
                 None,
                 None,
             )
@@ -253,29 +250,31 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_dag_ordering() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Stage commands with dependencies (using :as binding)
+        // Use entity.create-limited-company which is a valid verb
         service
             .stage(
                 &session_id,
                 None,
                 None,
-                "(entity.create :name \"Test Corp\" :as @entity)",
+                r#"(entity.create-limited-company :name "Test Corp" :as @entity)"#,
                 Some("Create entity"),
                 None,
             )
             .await?;
 
+        // CBU create requires name and jurisdiction
         service
             .stage(
                 &session_id,
                 None,
                 None,
-                "(cbu.create :name \"Test CBU\" :entity-id @entity :as @cbu)",
+                r#"(cbu.create :name "Test CBU" :jurisdiction "LU" :commercial-client-entity-id @entity :as @cbu)"#,
                 Some("Create CBU referencing entity"),
                 None,
             )
@@ -303,18 +302,19 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_preview_shows_blockers() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
-        // Stage a command that needs entity resolution
+        // Stage a command that references an entity by name (will need resolution)
+        // Use entity.read which takes entity-id - pass a string that will be enriched
         service
             .stage(
                 &session_id,
                 None, // No client group, so resolution will be pending
                 None,
-                "(entity.get :entity-id <SomeEntity>)", // Entity ref that can't be resolved
+                r#"(entity.read :entity-id "SomeEntity")"#, // String that will become EntityRef via enrichment
                 None,
                 None,
             )
@@ -348,10 +348,10 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_dsl_hash_for_audit() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Stage a command
         let result = service
@@ -369,10 +369,9 @@ mod tests {
         assert!(!result.dsl_hash.is_empty());
         println!("DSL hash: {}", result.dsl_hash);
 
-        // Stage same DSL again - hash should be same
+        // Stage same DSL again in a different session - hash should be same
         let session_id_2 = test_session_id();
-        let mut service2 = RunbookService::new(pool);
-        let result2 = service2
+        let result2 = service
             .stage(
                 &session_id_2,
                 None,
@@ -403,10 +402,10 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires database and seed data"]
     async fn test_irish_funds_flow() -> Result<()> {
-        let pool = get_pool().await;
+        let pool = create_pool().await;
         let session_id = test_session_id();
 
-        let mut service = RunbookService::new(pool);
+        let mut service = RunbookService::new(&pool);
 
         // Step 1: Stage "Show me Irish funds"
         println!("\n=== Step 1: Stage 'Show me Irish funds' ===");
@@ -415,7 +414,7 @@ mod tests {
                 &session_id,
                 None, // Would need Allianz client group in real test
                 None,
-                "(entity.list :filter \"jurisdiction=IE AND type=FUND\")",
+                r#"(entity.list :jurisdiction "IE")"#,
                 Some("Show Irish funds"),
                 Some("Show me Irish funds"),
             )
@@ -430,7 +429,7 @@ mod tests {
                 &session_id,
                 None,
                 None,
-                "(entity.list :filter \"jurisdiction=IE AND type=FUND AND status=active\")",
+                r#"(entity.list :jurisdiction "IE" :status "active")"#,
                 Some("Filter to active"),
                 Some("active only"),
             )
