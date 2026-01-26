@@ -7,6 +7,7 @@
 use super::intent::VerbIntent;
 use crate::dsl_v2::ast::{Program, Statement};
 use crate::dsl_v2::batch_executor::BatchResultAccumulator;
+use crate::mcp::scope_resolution::ScopeContext;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -2188,6 +2189,15 @@ pub struct SessionContext {
     pub scope: Option<crate::session::SessionScope>,
 
     // =========================================================================
+    // Client Scope Context - For entity resolution within client group
+    // =========================================================================
+    /// Client group scope from Stage 0 scope resolution.
+    /// When set, entity searches are filtered to this client group.
+    /// Set by IntentPipeline when user says "work on allianz" etc.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_scope: Option<ScopeContext>,
+
+    // =========================================================================
     // View State Fields - For REPL/View synchronization
     // =========================================================================
     /// Current view mode (e.g., "KYC_UBO", "UBO_ONLY", "SERVICE_DELIVERY", "PRODUCTS_ONLY")
@@ -2616,6 +2626,50 @@ impl SessionContext {
             self.scope = Some(crate::session::SessionScope::empty());
         }
         self.scope.as_mut().unwrap()
+    }
+
+    // =========================================================================
+    // CLIENT SCOPE METHODS - For client group-scoped entity resolution
+    // =========================================================================
+
+    /// Set the client scope from Stage 0 scope resolution
+    pub fn set_client_scope(&mut self, scope: ScopeContext) {
+        self.client_scope = Some(scope);
+    }
+
+    /// Get the current client scope
+    pub fn client_scope(&self) -> Option<&ScopeContext> {
+        self.client_scope.as_ref()
+    }
+
+    /// Take the client scope (consumes it)
+    pub fn take_client_scope(&mut self) -> Option<ScopeContext> {
+        self.client_scope.take()
+    }
+
+    /// Check if client scope is set
+    pub fn has_client_scope(&self) -> bool {
+        self.client_scope
+            .as_ref()
+            .map(|s| s.has_scope())
+            .unwrap_or(false)
+    }
+
+    /// Get the client group ID if scope is set
+    pub fn client_group_id(&self) -> Option<Uuid> {
+        self.client_scope.as_ref().and_then(|s| s.client_group_id)
+    }
+
+    /// Get the client group name if scope is set
+    pub fn client_group_name(&self) -> Option<&str> {
+        self.client_scope
+            .as_ref()
+            .and_then(|s| s.client_group_name.as_deref())
+    }
+
+    /// Clear the client scope
+    pub fn clear_client_scope(&mut self) {
+        self.client_scope = None;
     }
 
     // =========================================================================

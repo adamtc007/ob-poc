@@ -852,10 +852,103 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
         // Process via IntentPipeline: user input → semantic verb search → LLM arg extraction → DSL
         if let Ok(pipeline) = self.get_intent_pipeline() {
-            let pipeline_result = pipeline.process(&request.message, None).await;
+            // Pass existing scope context from session (for subsequent commands after scope is set)
+            let existing_scope = session.context.client_scope.clone();
+            let pipeline_result = pipeline
+                .process_with_scope(&request.message, None, existing_scope)
+                .await;
 
             match pipeline_result {
                 Ok(result) => {
+                    // =========================================================
+                    // STAGE 0: Handle Scope Resolution (before verb processing)
+                    // =========================================================
+                    // If scope was resolved, store it in session and return success
+                    // This consumes the input - no verb processing happens
+                    use crate::mcp::intent_pipeline::PipelineOutcome;
+
+                    if let PipelineOutcome::ScopeResolved {
+                        group_id,
+                        group_name,
+                        entity_count,
+                    } = &result.outcome
+                    {
+                        tracing::info!(
+                            "Scope resolved: {} ({}, {} entities)",
+                            group_name,
+                            group_id,
+                            entity_count
+                        );
+
+                        // Store scope context in session
+                        if let Some(scope_ctx) = result.scope_context.clone() {
+                            session.context.set_client_scope(scope_ctx);
+                        }
+
+                        session.add_user_message(request.message.clone());
+                        let response_msg = format!(
+                            "Now working on **{}** ({} entities)",
+                            group_name, entity_count
+                        );
+                        session.add_agent_message(response_msg.clone(), None, None);
+
+                        // Transition to scoped state
+                        session.transition(crate::api::session::SessionEvent::ScopeSet);
+
+                        return Ok(AgentChatResponse {
+                            message: response_msg,
+                            intents: vec![],
+                            validation_results: vec![],
+                            session_state: session.state.clone(),
+                            can_execute: false,
+                            dsl_source: None,
+                            ast: None,
+                            disambiguation: None,
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                        });
+                    }
+
+                    // Handle scope candidates (user needs to pick)
+                    if let PipelineOutcome::ScopeCandidates = &result.outcome {
+                        session.add_user_message(request.message.clone());
+
+                        // Build disambiguation for client group selection
+                        let error_msg = result
+                            .validation_error
+                            .clone()
+                            .unwrap_or_else(|| "Multiple clients match".to_string());
+                        session.add_agent_message(error_msg.clone(), None, None);
+
+                        return Ok(AgentChatResponse {
+                            message: error_msg,
+                            intents: vec![],
+                            validation_results: vec![],
+                            session_state: SessionState::PendingValidation,
+                            can_execute: false,
+                            dsl_source: None,
+                            ast: None,
+                            disambiguation: None, // TODO: Build client group picker
+                            commands: None,
+                            unresolved_refs: None,
+                            current_ref_index: None,
+                            dsl_hash: None,
+                        });
+                    }
+
+                    // =========================================================
+                    // Normal verb processing (scope context passed through)
+                    // =========================================================
+
+                    // Store scope context in session if present (for subsequent operations)
+                    if let Some(scope_ctx) = result.scope_context.clone() {
+                        if scope_ctx.has_scope() {
+                            session.context.set_client_scope(scope_ctx);
+                        }
+                    }
+
                     tracing::info!(
                         "IntentPipeline matched verb: {} (score: {:.2})",
                         result.intent.verb,
