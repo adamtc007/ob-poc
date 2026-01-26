@@ -971,19 +971,27 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         // Convert pipeline unresolved refs to disambiguation items (Fix K)
                         // Pre-populate matches with actual entity search results
                         let mut disambig_items: Vec<DisambiguationItem> = Vec::new();
+                        // Get client_group_id from session scope for scoped entity search
+                        let scope_group_id = session.context.client_group_id();
                         for r in &result.unresolved_refs {
-                            // Search for matching entities using the search text
+                            // Search for matching entities within scope (if scope is set)
                             let entity_type_str = r.entity_type.as_deref().unwrap_or("entity");
                             let matches = self
-                                .search_entities(entity_type_str, &r.search_value, 10)
+                                .search_entities_in_scope(
+                                    entity_type_str,
+                                    &r.search_value,
+                                    10,
+                                    scope_group_id,
+                                )
                                 .await
                                 .unwrap_or_default();
 
                             tracing::info!(
-                                "Pre-populated {} matches for '{}' (type: {})",
+                                "Pre-populated {} matches for '{}' (type: {}, scope: {:?})",
                                 matches.len(),
                                 r.search_value,
-                                entity_type_str
+                                entity_type_str,
+                                scope_group_id
                             );
 
                             disambig_items.push(DisambiguationItem::EntityMatch {
@@ -1940,11 +1948,35 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         query: &str,
         limit: usize,
     ) -> Result<Vec<EntityMatchOption>, String> {
+        self.search_entities_in_scope(entity_type, query, limit, None)
+            .await
+    }
+
+    /// Search for entities within a client group scope
+    ///
+    /// When `client_group_id` is provided, results are filtered to entities
+    /// that belong to that client group. This prevents cross-client entity
+    /// leakage and improves disambiguation accuracy.
+    pub async fn search_entities_in_scope(
+        &self,
+        entity_type: &str,
+        query: &str,
+        limit: usize,
+        client_group_id: Option<Uuid>,
+    ) -> Result<Vec<EntityMatchOption>, String> {
         // Special handling for client_group - uses PgClientGroupResolver
         if entity_type == "client_group" || entity_type == "client" {
             return self.search_client_groups(query, limit).await;
         }
 
+        // If we have a client_group_id, use the scoped search function
+        if let Some(group_id) = client_group_id {
+            return self
+                .search_entities_by_client_group(entity_type, query, limit, group_id)
+                .await;
+        }
+
+        // No scope - fall through to global search
         let ref_type = match entity_type {
             "cbu" => RefType::Cbu,
             "entity" | "person" | "company" => RefType::Entity,
@@ -1975,6 +2007,42 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     context: None,
                     score: Some(m.score),
                 })
+            })
+            .collect())
+    }
+
+    /// Search for entities within a specific client group
+    ///
+    /// Uses the client_group_entity table to filter results to entities
+    /// that belong to the specified client group.
+    async fn search_entities_by_client_group(
+        &self,
+        entity_type: &str,
+        query: &str,
+        limit: usize,
+        client_group_id: Uuid,
+    ) -> Result<Vec<EntityMatchOption>, String> {
+        use crate::mcp::scope_resolution::search_entities_in_scope;
+        use crate::mcp::scope_resolution::ScopeContext;
+
+        // Build scope context with just the client group
+        let scope = ScopeContext::new().with_client_group(client_group_id, String::new());
+
+        // Use the scope_resolution module's search function
+        let matches = search_entities_in_scope(&self.pool, &scope, query, limit)
+            .await
+            .map_err(|e| format!("Scoped entity search failed: {}", e))?;
+
+        // Map to EntityMatchOption
+        Ok(matches
+            .into_iter()
+            .map(|m| EntityMatchOption {
+                entity_id: m.entity_id,
+                name: m.entity_name,
+                entity_type: entity_type.to_string(),
+                jurisdiction: None,
+                context: Some(format!("Matched: {} ({})", m.matched_tag, m.match_type)),
+                score: Some(m.confidence as f32),
             })
             .collect())
     }
