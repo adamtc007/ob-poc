@@ -13,7 +13,7 @@ use std::sync::{Arc, OnceLock};
 static ONTOLOGY: OnceLock<Arc<OntologyService>> = OnceLock::new();
 
 /// Service for accessing entity taxonomy and lifecycle information.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OntologyService {
     taxonomy: EntityTaxonomy,
 }
@@ -53,9 +53,11 @@ impl OntologyService {
     /// Returns error if already initialized.
     #[allow(clippy::result_large_err)]
     pub fn init_global(service: OntologyService) -> Result<(), OntologyService> {
-        ONTOLOGY
-            .set(Arc::new(service))
-            .map_err(|arc| Arc::try_unwrap(arc).unwrap_or_else(|_| panic!("Failed to unwrap Arc")))
+        ONTOLOGY.set(Arc::new(service)).map_err(|arc| {
+            // Try to unwrap the Arc to return the OntologyService
+            // If that fails (multiple references), clone from the Arc
+            Arc::try_unwrap(arc).unwrap_or_else(|arc| (*arc).clone())
+        })
     }
 
     /// Get the default config path for entity taxonomy.

@@ -721,7 +721,14 @@ impl<'a> RunbookService<'a> {
         let mut learned_tags = Vec::new();
 
         for (dag_idx, &cmd_id) in dag_order.iter().enumerate() {
-            let cmd = runbook.commands.iter().find(|c| c.id == cmd_id).unwrap();
+            let cmd = runbook
+                .commands
+                .iter()
+                .find(|c| c.id == cmd_id)
+                .ok_or_else(|| RunError::ExecutionFailed {
+                    command_id: cmd_id,
+                    error: "Command not found in runbook".to_string(),
+                })?;
             let cmd_start = Instant::now();
 
             // TODO: Actually execute the DSL command
@@ -826,7 +833,10 @@ impl<'a> RunbookService<'a> {
             .ok_or_else(|| anyhow!("Runbook not found"))?;
 
         let readiness = repo.check_runbook_ready(runbook_id).await?;
-        let summary = repo.get_runbook_summary(runbook_id).await?.unwrap();
+        let summary = repo
+            .get_runbook_summary(runbook_id)
+            .await?
+            .ok_or_else(|| anyhow!("Runbook summary not found for {}", runbook_id))?;
 
         // Compute DAG order if ready
         let reorder_diff = if readiness.is_ready {
@@ -874,7 +884,10 @@ impl<'a> RunbookService<'a> {
         if let Some(cmd) = command {
             // Get runbook for event
             if let Ok(Some(runbook)) = repo.get_active_runbook("").await {
-                let summary = repo.get_runbook_summary(runbook.id).await?.unwrap();
+                // Summary may not exist if runbook was just created
+                let Some(summary) = repo.get_runbook_summary(runbook.id).await? else {
+                    return Ok(removed);
+                };
 
                 self.emit(RunbookEvent::CommandRemoved {
                     runbook_id: runbook.id,

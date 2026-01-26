@@ -70,7 +70,7 @@ async fn get_or_load_session(session_id: Uuid, state: &CbuSessionState) -> Optio
     }
 }
 
-/// Ensure session exists in memory (load from DB if needed), then return write lock
+/// Ensure session exists in memory (load from DB if needed)
 /// Creates new session if not found anywhere
 async fn ensure_session_in_store(session_id: Uuid, state: &CbuSessionState) {
     // Check if already in memory
@@ -249,7 +249,12 @@ async fn load_cbu(
 
     // Update session
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).expect("session just ensured");
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Session not found after ensure".to_string(),
+        )
+    })?;
 
     let was_new = session.load_cbu(cbu_id);
     session.maybe_save(&state.pool);
@@ -289,7 +294,12 @@ async fn load_jurisdiction(
 
     // Update session
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).expect("session just ensured");
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Session not found after ensure".to_string(),
+        )
+    })?;
 
     let count = session.load_many(cbu_ids);
     session.maybe_save(&state.pool);
@@ -351,7 +361,12 @@ async fn load_galaxy(
 
     // Update session
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).expect("session just ensured");
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Session not found after ensure".to_string(),
+        )
+    })?;
 
     let count = session.load_many(cbu_ids);
     session.maybe_save(&state.pool);
@@ -373,7 +388,12 @@ async fn unload_cbu(
     ensure_session_in_store(session_id, &state).await;
 
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).expect("session just ensured");
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Session not found after ensure".to_string(),
+        )
+    })?;
 
     let was_present = session.unload_cbu(req.cbu_id);
     session.maybe_save(&state.pool);
@@ -394,7 +414,12 @@ async fn clear_session(
     ensure_session_in_store(session_id, &state).await;
 
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).expect("session just ensured");
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Session not found after ensure".to_string(),
+        )
+    })?;
 
     let count = session.clear();
     session.maybe_save(&state.pool);
@@ -415,7 +440,12 @@ async fn undo(
     ensure_session_in_store(session_id, &state).await;
 
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).expect("session just ensured");
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Session not found after ensure".to_string(),
+        )
+    })?;
 
     let success = session.undo();
     if success {
@@ -439,7 +469,12 @@ async fn redo(
     ensure_session_in_store(session_id, &state).await;
 
     let mut sessions = state.sessions.write().await;
-    let session = sessions.get_mut(&session_id).expect("session just ensured");
+    let session = sessions.get_mut(&session_id).ok_or_else(|| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Session not found after ensure".to_string(),
+        )
+    })?;
 
     let success = session.redo();
     if success {
