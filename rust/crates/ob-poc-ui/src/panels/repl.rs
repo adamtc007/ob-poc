@@ -4,19 +4,31 @@
 //! cohesive panel that represents the REPL session workflow:
 //!
 //! 1. Chat history (scrollable)
-//! 2. Resolution card (inline, when needed)
-//! 3. DSL view (collapsible)
-//! 4. Input area with actions
+//! 2. Verb disambiguation card (when multiple verbs match)
+//! 3. Resolution card (inline, when needed)
+//! 4. DSL view (collapsible)
+//! 5. Input area with actions
 
 use crate::state::{AppState, ChatMessage, MessageRole};
 use egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use ob_poc_types::{
     EntityMatchResponse, ResolutionStateResponse, ResolvedRefResponse, ReviewRequirement, RunSheet,
-    RunSheetEntry, UnresolvedRefResponse,
+    RunSheetEntry, UnresolvedRefResponse, VerbOption,
 };
 
+/// Action returned from verb disambiguation card
+#[derive(Debug, Clone)]
+pub enum VerbDisambiguationAction {
+    /// User selected a verb
+    Select { verb_fqn: String },
+    /// User cancelled disambiguation
+    Cancel,
+}
+
 /// Main REPL panel - combines chat, resolution, and DSL
-pub fn repl_panel(ui: &mut Ui, state: &mut AppState) {
+pub fn repl_panel(ui: &mut Ui, state: &mut AppState) -> Option<VerbDisambiguationAction> {
+    let mut action = None;
+
     ui.vertical(|ui| {
         // Calculate available height for content vs input area
         let available_height = ui.available_height();
@@ -30,6 +42,15 @@ pub fn repl_panel(ui: &mut Ui, state: &mut AppState) {
             .show(ui, |ui| {
                 // Chat history
                 render_chat_history(ui, state);
+
+                // Verb disambiguation card (when multiple verbs match user input)
+                // This is higher priority than entity resolution - happens earlier in pipeline
+                if state.verb_disambiguation_ui.active {
+                    ui.add_space(8.0);
+                    if let Some(a) = render_verb_disambiguation_card(ui, state) {
+                        action = Some(a);
+                    }
+                }
 
                 // Resolution card (inline, when active)
                 if should_show_resolution(state) {
@@ -49,6 +70,8 @@ pub fn repl_panel(ui: &mut Ui, state: &mut AppState) {
         // Input area
         render_input_area(ui, state);
     });
+
+    action
 }
 
 // =============================================================================
@@ -111,6 +134,186 @@ fn render_message(ui: &mut Ui, msg: &ChatMessage) {
 
             ui.label(&msg.content);
         });
+}
+
+// =============================================================================
+// VERB DISAMBIGUATION CARD
+// =============================================================================
+
+/// Render verb disambiguation card with clickable buttons
+///
+/// Shown when the agent returns `verb_disambiguation` in a ChatResponse,
+/// meaning multiple verbs matched the user's input and they need to pick one.
+fn render_verb_disambiguation_card(
+    ui: &mut Ui,
+    state: &AppState,
+) -> Option<VerbDisambiguationAction> {
+    let mut action = None;
+
+    let Some(ref request) = state.verb_disambiguation_ui.request else {
+        return None;
+    };
+
+    let is_loading = state.verb_disambiguation_ui.loading;
+
+    // Card frame with amber border (needs attention)
+    egui::Frame::default()
+        .fill(Color32::from_rgb(40, 45, 50))
+        .stroke(egui::Stroke::new(2.0, Color32::from_rgb(180, 130, 50)))
+        .inner_margin(12.0)
+        .rounding(8.0)
+        .show(ui, |ui| {
+            // Header
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new("?")
+                        .size(18.0)
+                        .color(Color32::from_rgb(180, 130, 50)),
+                );
+                ui.label(
+                    RichText::new("Which action did you mean?")
+                        .strong()
+                        .color(Color32::WHITE),
+                );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Show original input
+                    ui.label(
+                        RichText::new(format!("\"{}\"", request.original_input))
+                            .small()
+                            .color(Color32::LIGHT_GRAY)
+                            .italics(),
+                    );
+                });
+            });
+
+            ui.add_space(12.0);
+
+            // Verb option buttons
+            if is_loading {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(RichText::new("Processing selection...").color(Color32::LIGHT_GRAY));
+                });
+            } else {
+                for option in &request.options {
+                    if let Some(a) = render_verb_option_button(ui, option) {
+                        action = Some(a);
+                    }
+                    ui.add_space(4.0);
+                }
+            }
+
+            ui.add_space(8.0);
+
+            // Cancel button
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add_enabled(!is_loading, egui::Button::new("Cancel"))
+                        .on_hover_text("None of these - start fresh")
+                        .clicked()
+                    {
+                        action = Some(VerbDisambiguationAction::Cancel);
+                    }
+
+                    // Timeout indicator
+                    if let Some(shown_at) = state.verb_disambiguation_ui.shown_at {
+                        let current_time = web_sys::window()
+                            .and_then(|w| w.performance())
+                            .map(|p| p.now() / 1000.0)
+                            .unwrap_or(0.0);
+                        let elapsed = (current_time - shown_at) as i32;
+                        let remaining = 30 - elapsed;
+                        if remaining > 0 && remaining <= 10 {
+                            ui.label(
+                                RichText::new(format!("{}s", remaining))
+                                    .small()
+                                    .color(Color32::from_rgb(220, 80, 80)),
+                            );
+                        }
+                    }
+                });
+            });
+        });
+
+    action
+}
+
+/// Render a single verb option as a clickable button
+fn render_verb_option_button(ui: &mut Ui, option: &VerbOption) -> Option<VerbDisambiguationAction> {
+    let mut action = None;
+
+    // Score color: green for high, amber for medium
+    let score_color = if option.score > 0.8 {
+        Color32::from_rgb(100, 200, 100)
+    } else if option.score > 0.6 {
+        Color32::from_rgb(200, 180, 80)
+    } else {
+        Color32::from_rgb(180, 180, 180)
+    };
+
+    // Button frame
+    let response = egui::Frame::default()
+        .fill(Color32::from_rgb(50, 55, 65))
+        .inner_margin(10.0)
+        .rounding(6.0)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                // Main content
+                ui.vertical(|ui| {
+                    // Verb name (e.g., "cbu.create")
+                    ui.label(
+                        RichText::new(&option.verb_fqn)
+                            .strong()
+                            .color(Color32::from_rgb(100, 180, 255)),
+                    );
+
+                    // Description
+                    ui.label(
+                        RichText::new(&option.description)
+                            .small()
+                            .color(Color32::LIGHT_GRAY),
+                    );
+
+                    // Example (if different from verb name)
+                    if !option.example.is_empty()
+                        && option.example != format!("({})", option.verb_fqn)
+                    {
+                        ui.label(
+                            RichText::new(&option.example)
+                                .small()
+                                .monospace()
+                                .color(Color32::DARK_GRAY),
+                        );
+                    }
+                });
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Score badge
+                    ui.label(
+                        RichText::new(format!("{:.0}%", option.score * 100.0))
+                            .small()
+                            .color(score_color),
+                    );
+                });
+            });
+        })
+        .response;
+
+    // Make the whole frame clickable
+    if response.interact(egui::Sense::click()).clicked() {
+        action = Some(VerbDisambiguationAction::Select {
+            verb_fqn: option.verb_fqn.clone(),
+        });
+    }
+
+    // Hover effect
+    if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+
+    action
 }
 
 // =============================================================================

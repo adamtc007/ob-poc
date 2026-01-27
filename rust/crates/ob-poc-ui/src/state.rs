@@ -181,6 +181,9 @@ pub struct AppState {
     /// CBU search modal UI state
     pub cbu_search_ui: CbuSearchUi,
 
+    /// Verb disambiguation UI state (for ambiguous verb matches)
+    pub verb_disambiguation_ui: VerbDisambiguationState,
+
     /// Container browse panel state (slide-in panel for browsing container contents)
     pub container_browse: ContainerBrowseState,
 
@@ -287,6 +290,7 @@ impl Default for AppState {
             resolution_ui: ResolutionPanelUi::default(),
             window_stack: WindowStack::default(),
             cbu_search_ui: CbuSearchUi::default(),
+            verb_disambiguation_ui: VerbDisambiguationState::default(),
             container_browse: ContainerBrowseState::default(),
             token_registry: TokenRegistry::load_defaults().unwrap_or_else(|e| {
                 web_sys::console::warn_1(
@@ -672,6 +676,64 @@ pub struct CbuSearchUi {
 }
 
 // =============================================================================
+// VERB DISAMBIGUATION UI STATE
+// =============================================================================
+
+/// Verb disambiguation UI state
+///
+/// When the agent returns `verb_disambiguation` in a ChatResponse,
+/// the user must select from multiple verb candidates before proceeding.
+/// This is earlier in the pipeline than entity disambiguation.
+#[derive(Default, Clone)]
+pub struct VerbDisambiguationState {
+    /// Whether verb disambiguation is currently active
+    pub active: bool,
+    /// The disambiguation request from the server
+    pub request: Option<ob_poc_types::VerbDisambiguationRequest>,
+    /// Original user input that triggered disambiguation
+    pub original_input: String,
+    /// When disambiguation was shown (for timeout handling)
+    pub shown_at: Option<f64>,
+    /// Loading flag while selecting/abandoning
+    pub loading: bool,
+}
+
+impl VerbDisambiguationState {
+    /// Check if disambiguation has timed out (30 seconds)
+    pub fn is_timed_out(&self, current_time: f64) -> bool {
+        const TIMEOUT_SECS: f64 = 30.0;
+        if let Some(shown_at) = self.shown_at {
+            (current_time - shown_at) > TIMEOUT_SECS
+        } else {
+            false
+        }
+    }
+
+    /// Clear the disambiguation state
+    pub fn clear(&mut self) {
+        self.active = false;
+        self.request = None;
+        self.original_input.clear();
+        self.shown_at = None;
+        self.loading = false;
+    }
+
+    /// Set disambiguation from server response
+    pub fn set_from_response(
+        &mut self,
+        request: ob_poc_types::VerbDisambiguationRequest,
+        original_input: String,
+        current_time: f64,
+    ) {
+        self.active = true;
+        self.request = Some(request);
+        self.original_input = original_input;
+        self.shown_at = Some(current_time);
+        self.loading = false;
+    }
+}
+
+// =============================================================================
 // INVESTOR REGISTER UI STATE
 // =============================================================================
 
@@ -775,9 +837,12 @@ pub struct PendingResults {
     pub investor_register: Option<Result<InvestorRegisterView, String>>,
     pub investor_list: Option<Result<InvestorListResponse, String>>,
 
-    // Disambiguation
+    // Entity disambiguation
     pub disambiguation: Option<ob_poc_types::DisambiguationRequest>,
     pub disambiguation_results: Option<Result<Vec<ob_poc_types::EntityMatch>, String>>,
+
+    // Verb disambiguation (earlier in pipeline than entity disambiguation)
+    pub verb_disambiguation: Option<ob_poc_types::VerbDisambiguationRequest>,
 
     // Unresolved refs (direct from ChatResponse)
     pub unresolved_refs: Option<Vec<UnresolvedRefResponse>>,
@@ -854,13 +919,22 @@ pub struct AsyncState {
     pub pending_investor_register: Option<Result<InvestorRegisterView, String>>,
     pub pending_investor_list: Option<Result<InvestorListResponse, String>>,
 
-    // Disambiguation (from agent chat when entity is ambiguous)
+    // Entity disambiguation (from agent chat when entity is ambiguous)
     /// Disambiguation request from chat response
     pub pending_disambiguation: Option<ob_poc_types::DisambiguationRequest>,
     /// Search results for disambiguation
     pub pending_disambiguation_results: Option<Result<Vec<ob_poc_types::EntityMatch>, String>>,
     /// Loading flag for disambiguation search
     pub loading_disambiguation: bool,
+
+    // Verb disambiguation (from agent chat when verb is ambiguous)
+    /// Verb disambiguation request from chat response
+    pub pending_verb_disambiguation: Option<ob_poc_types::VerbDisambiguationRequest>,
+    /// Result from verb selection API call
+    pub pending_verb_selection_result: Option<Result<ob_poc_types::ChatResponse, String>>,
+    /// Loading flag for verb selection
+    pub loading_verb_selection: bool,
+
     /// Flag to trigger session refetch after entity bind
     pub pending_session_refetch: bool,
     /// Pending CBU lookup result (from name search) - tuple of (uuid, display_name)
@@ -1060,9 +1134,12 @@ impl AsyncState {
             investor_register: self.pending_investor_register.take(),
             investor_list: self.pending_investor_list.take(),
 
-            // Disambiguation
+            // Entity disambiguation
             disambiguation: self.pending_disambiguation.take(),
             disambiguation_results: self.pending_disambiguation_results.take(),
+
+            // Verb disambiguation
+            verb_disambiguation: self.pending_verb_disambiguation.take(),
 
             // Unresolved refs
             unresolved_refs: self.pending_unresolved_refs.take(),
@@ -1467,11 +1544,34 @@ impl AppState {
             self.buffers.chat_input = dsl_source;
         }
 
-        // Process disambiguation request
+        // Process verb disambiguation request (earlier in pipeline than entity disambiguation)
+        if let Some(verb_disambig) = pending.verb_disambiguation {
+            web_sys::console::log_1(
+                &format!(
+                    "process_async_results: verb disambiguation with {} options",
+                    verb_disambig.options.len()
+                )
+                .into(),
+            );
+
+            // Get current time for timeout tracking
+            let current_time = web_sys::window()
+                .and_then(|w| w.performance())
+                .map(|p| p.now() / 1000.0) // Convert to seconds
+                .unwrap_or(0.0);
+
+            self.verb_disambiguation_ui.set_from_response(
+                verb_disambig.clone(),
+                verb_disambig.original_input.clone(),
+                current_time,
+            );
+        }
+
+        // Process entity disambiguation request
         if let Some(disambig) = pending.disambiguation {
             web_sys::console::log_1(
                 &format!(
-                    "process_async_results: opening disambiguation modal for {} items",
+                    "process_async_results: opening entity disambiguation modal for {} items",
                     disambig.items.len()
                 )
                 .into(),

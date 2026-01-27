@@ -23,6 +23,7 @@
 > **Staged Runbook REPL (054):** ✅ Complete - Anti-hallucination staging, entity resolution, DAG ordering
 > **Client Group Research Integration (055):** ✅ Complete - GLEIF import → client_group_entity staging → CBU creation with role mapping
 > **REPL Viewport Feedback Loop (056):** ✅ Complete - Scope propagation in execute_runbook triggers UI refresh
+> **Verb Disambiguation UI (057):** ✅ Complete - Ambiguous verb selection with gold-standard learning signals
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -922,6 +923,112 @@ Always run `populate_embeddings` after teaching to enable semantic matching:
 DATABASE_URL="postgresql:///data_designer" \
   cargo run --release --package ob-semantic-matcher --bin populate_embeddings
 ```
+
+---
+
+## Verb Disambiguation UI (057)
+
+> ✅ **IMPLEMENTED (2026-01-27)**: Interactive disambiguation when verb search returns multiple high-confidence matches.
+
+When the semantic verb search returns multiple verbs with similar scores (within `AMBIGUITY_MARGIN = 0.05`), the system presents an interactive disambiguation UI instead of guessing.
+
+**Flow:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  User: "load the book"                                                      │
+│      │                                                                       │
+│      ▼                                                                       │
+│  HybridVerbSearcher.search() → VerbSearchOutcome::Suggest                   │
+│      │   (top: session.load-galaxy @ 0.82, runner_up: session.load-cbu @ 0.79)
+│      │                                                                       │
+│      ▼                                                                       │
+│  ChatResponse.verb_disambiguation = Some(VerbDisambiguationRequest {        │
+│      original_input: "load the book",                                       │
+│      options: [session.load-galaxy, session.load-cbu, ...]                  │
+│  })                                                                          │
+│      │                                                                       │
+│      ▼                                                                       │
+│  UI shows disambiguation card with clickable verb buttons                   │
+│      │                                                                       │
+│      ├─► User clicks verb → POST /select-verb                               │
+│      │       → Gold-standard learning signal (confidence=0.95)              │
+│      │       → Phrase variants generated for robust learning                │
+│      │       → Continue with selected verb                                  │
+│      │                                                                       │
+│      └─► User cancels/times out (30s) → POST /abandon-disambiguation        │
+│              → Negative signals for all candidates                          │
+│              → Clear disambiguation state                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**API Endpoints:**
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/session/:id/select-verb` | User selected a verb from disambiguation |
+| `POST /api/session/:id/abandon-disambiguation` | User cancelled or timed out |
+
+**Types (`ob-poc-types`):**
+
+```rust
+pub struct VerbDisambiguationRequest {
+    pub original_input: String,
+    pub options: Vec<VerbOption>,
+}
+
+pub struct VerbOption {
+    pub verb_fqn: String,      // e.g., "session.load-galaxy"
+    pub description: String,
+    pub score: f32,
+    pub example: Option<String>,
+}
+
+pub struct VerbSelectionRequest {
+    pub selected_verb: String,
+    pub original_input: String,
+    pub all_candidates: Vec<VerbCandidate>,
+}
+
+pub enum AbandonReason {
+    Cancelled,      // User clicked cancel
+    Timeout,        // 30-second timeout
+    NewInput,       // User started typing new input
+}
+```
+
+**UI State (`VerbDisambiguationState`):**
+
+```rust
+pub struct VerbDisambiguationState {
+    pub active: bool,
+    pub request: Option<VerbDisambiguationRequest>,
+    pub original_input: String,
+    pub shown_at: Option<f64>,  // Timestamp for timeout
+    pub loading: bool,
+}
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/ob-poc-types/src/lib.rs` | Type definitions |
+| `rust/src/api/agent_routes.rs` | `/select-verb`, `/abandon-disambiguation` endpoints |
+| `rust/src/api/agent_service.rs` | `handle_verb_selection()`, wires to ChatResponse |
+| `rust/crates/ob-poc-ui/src/state.rs` | `VerbDisambiguationState` |
+| `rust/crates/ob-poc-ui/src/panels/repl.rs` | `render_verb_disambiguation_card()` |
+| `rust/crates/ob-poc-ui/src/app.rs` | Action handling, timeout check |
+
+**Learning Signal Generation:**
+
+When user selects a verb:
+1. **Gold-standard signal** (confidence=0.95) for selected phrase→verb
+2. **Phrase variants** generated via `generate_phrase_variants()`:
+   - Original phrase
+   - Lowercase normalized
+   - Common prefix variations ("please", "can you", "I want to")
+3. **Negative signals** for rejected candidates
 
 ---
 

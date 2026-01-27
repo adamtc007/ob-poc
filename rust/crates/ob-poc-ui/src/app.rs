@@ -13,7 +13,7 @@ use crate::panels::{
     CbuSearchAction, CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction,
     DslEditorAction, EntityMatchDisplay, InvestorRegisterAction, ResolutionPanelAction,
     ResolutionPanelData, ServiceTaxonomyPanelAction, TaxonomyPanelAction, ToolbarAction,
-    ToolbarData, TradingMatrixPanelAction,
+    ToolbarData, TradingMatrixPanelAction, VerbDisambiguationAction,
 };
 use crate::state::{
     AppState, AsyncState, BrowserTab, CbuSearchUi, LayoutMode, PanelState, TextBuffers,
@@ -180,6 +180,7 @@ impl App {
             current_scope: None,
             investor_register_ui: crate::state::InvestorRegisterUi::default(),
             pending_navigation_verb: None,
+            verb_disambiguation_ui: crate::state::VerbDisambiguationState::default(),
         };
 
         // Try to restore session from localStorage
@@ -916,6 +917,9 @@ impl eframe::App for App {
         // STEP 2: Handle state change flags (SINGLE CENTRAL PLACE)
         // All graph/session refetches happen here, after ALL state changes
         // =================================================================
+
+        // Check verb disambiguation timeout (30s auto-abandon)
+        self.state.check_verb_disambiguation_timeout();
 
         // After execution completes, refetch session and scope graph
         if self.state.should_handle_execution_complete() {
@@ -3264,9 +3268,10 @@ impl App {
                             if enter_pressed
                                 && (modifiers.ctrl || modifiers.command)
                                 && !loading_chat
-                                && !self.state.buffers.chat_input.trim().is_empty() {
-                                    self.state.send_chat_message();
-                                }
+                                && !self.state.buffers.chat_input.trim().is_empty()
+                            {
+                                self.state.send_chat_message();
+                            }
 
                             response.response
                         });
@@ -3645,15 +3650,29 @@ impl App {
             ui.set_height(bottom_height);
 
             // Unified REPL panel (left, 60% width) - chat + resolution + DSL
-            ui.vertical(|ui| {
-                ui.set_width(available.x * 0.6 - 4.0);
-                egui::Frame::default()
-                    .inner_margin(8.0)
-                    .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-                    .show(ui, |ui| {
-                        repl_panel(ui, &mut self.state);
-                    });
-            });
+            let verb_disambig_action = ui
+                .vertical(|ui| {
+                    ui.set_width(available.x * 0.6 - 4.0);
+                    egui::Frame::default()
+                        .inner_margin(8.0)
+                        .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
+                        .show(ui, |ui| repl_panel(ui, &mut self.state))
+                        .inner
+                })
+                .inner;
+
+            // Handle verb disambiguation actions (after render, Rule 2)
+            if let Some(action) = verb_disambig_action {
+                match action {
+                    VerbDisambiguationAction::Select { verb_fqn } => {
+                        self.state.select_verb_disambiguation(&verb_fqn);
+                    }
+                    VerbDisambiguationAction::Cancel => {
+                        self.state
+                            .abandon_verb_disambiguation(ob_poc_types::AbandonReason::Cancelled);
+                    }
+                }
+            }
 
             ui.separator();
 
@@ -4998,11 +5017,24 @@ impl AppState {
                             web_sys::console::log_1(&"send_chat: no commands in response".into());
                         }
 
-                        // Handle disambiguation request - opens resolution modal
+                        // Handle verb disambiguation - user must select which verb before DSL generation
+                        // This is earlier in the pipeline than entity disambiguation
+                        if let Some(verb_disambig) = chat_response.verb_disambiguation {
+                            web_sys::console::log_1(
+                                &format!(
+                                    "send_chat: verb disambiguation requested with {} options",
+                                    verb_disambig.options.len()
+                                )
+                                .into(),
+                            );
+                            state.pending_verb_disambiguation = Some(verb_disambig);
+                        }
+
+                        // Handle entity disambiguation request - opens resolution modal
                         if let Some(disambig) = chat_response.disambiguation_request {
                             web_sys::console::log_1(
                                 &format!(
-                                    "send_chat: disambiguation requested for {} items",
+                                    "send_chat: entity disambiguation requested for {} items",
                                     disambig.items.len()
                                 )
                                 .into(),
@@ -5345,6 +5377,209 @@ impl AppState {
         // Clear resolution state immediately
         self.resolution = None;
         self.resolution_ui = crate::state::ResolutionPanelUi::default();
+    }
+
+    // =========================================================================
+    // Verb Disambiguation Methods
+    // =========================================================================
+
+    /// Select a verb from disambiguation options
+    ///
+    /// Called when user clicks a verb button. Records gold-standard learning signal
+    /// and continues with DSL generation using the selected verb.
+    pub fn select_verb_disambiguation(&mut self, selected_verb: &str) {
+        let Some(session_id) = self.session_id else {
+            web_sys::console::warn_1(&"select_verb_disambiguation: no session_id".into());
+            return;
+        };
+
+        let Some(ref request) = self.verb_disambiguation_ui.request else {
+            web_sys::console::warn_1(
+                &"select_verb_disambiguation: no disambiguation request".into(),
+            );
+            return;
+        };
+
+        // Build the selection request
+        let selection_request = ob_poc_types::VerbSelectionRequest {
+            request_id: request.request_id.clone(),
+            original_input: self.verb_disambiguation_ui.original_input.clone(),
+            selected_verb: selected_verb.to_string(),
+            all_candidates: request.options.iter().map(|o| o.verb_fqn.clone()).collect(),
+        };
+
+        // Mark as loading
+        self.verb_disambiguation_ui.loading = true;
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            web_sys::console::log_1(
+                &format!(
+                    "select_verb_disambiguation: selecting {}",
+                    selection_request.selected_verb
+                )
+                .into(),
+            );
+
+            let result = api::select_verb(session_id, &selection_request).await;
+
+            if let Ok(mut state) = async_state.lock() {
+                state.loading_verb_selection = false;
+
+                match result {
+                    Ok(chat_response) => {
+                        web_sys::console::log_1(
+                            &format!(
+                                "select_verb_disambiguation: success, message: {}",
+                                chat_response.message
+                            )
+                            .into(),
+                        );
+
+                        // Add agent response to chat
+                        state.pending_chat = Some(Ok(crate::state::ChatMessage {
+                            role: crate::state::MessageRole::Agent,
+                            content: chat_response.message.clone(),
+                            timestamp: chrono::Utc::now(),
+                        }));
+
+                        // Handle any commands in the response
+                        // The response may include DSL, commands, etc. - process like normal chat response
+                        if let Some(verb_disambig) = chat_response.verb_disambiguation {
+                            // Another disambiguation needed (shouldn't happen, but handle it)
+                            state.pending_verb_disambiguation = Some(verb_disambig);
+                        }
+
+                        if let Some(disambig) = chat_response.disambiguation_request {
+                            state.pending_disambiguation = Some(disambig);
+                        }
+
+                        if let Some(refs) = chat_response.unresolved_refs {
+                            if !refs.is_empty() {
+                                state.pending_unresolved_refs = Some(refs);
+                                state.pending_current_ref_index = chat_response.current_ref_index;
+                                state.pending_dsl_hash = chat_response.dsl_hash;
+                            }
+                        }
+
+                        // Trigger session refetch to get updated DSL state
+                        state.needs_session_refetch = true;
+                    }
+                    Err(e) => {
+                        web_sys::console::error_1(
+                            &format!("select_verb_disambiguation: error: {}", e).into(),
+                        );
+                        state.last_error = Some(e);
+                    }
+                }
+            }
+
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+
+        // Clear disambiguation state (we're done with it)
+        self.verb_disambiguation_ui.clear();
+    }
+
+    /// Abandon verb disambiguation
+    ///
+    /// Called when user bails without selecting (timeout, new input, cancel).
+    /// Records negative learning signals for all candidates.
+    pub fn abandon_verb_disambiguation(&mut self, reason: ob_poc_types::AbandonReason) {
+        let Some(session_id) = self.session_id else {
+            self.verb_disambiguation_ui.clear();
+            return;
+        };
+
+        let Some(ref request) = self.verb_disambiguation_ui.request else {
+            self.verb_disambiguation_ui.clear();
+            return;
+        };
+
+        // Build the abandon request
+        let abandon_request = ob_poc_types::AbandonDisambiguationRequest {
+            request_id: request.request_id.clone(),
+            original_input: self.verb_disambiguation_ui.original_input.clone(),
+            candidates: request.options.iter().map(|o| o.verb_fqn.clone()).collect(),
+            abandon_reason: Some(reason),
+        };
+
+        let ctx = self.ctx.clone();
+
+        // Fire and forget - we don't need to wait for the response
+        spawn_local(async move {
+            web_sys::console::log_1(
+                &format!(
+                    "abandon_verb_disambiguation: abandoning with {} candidates",
+                    abandon_request.candidates.len()
+                )
+                .into(),
+            );
+
+            let result = api::abandon_verb_disambiguation(session_id, &abandon_request).await;
+
+            match result {
+                Ok(response) => {
+                    web_sys::console::log_1(
+                        &format!(
+                            "abandon_verb_disambiguation: recorded {} negative signals",
+                            response.signals_recorded
+                        )
+                        .into(),
+                    );
+                }
+                Err(e) => {
+                    // Log but don't show to user - abandonment recording is best-effort
+                    web_sys::console::warn_1(
+                        &format!("abandon_verb_disambiguation: error (non-fatal): {}", e).into(),
+                    );
+                }
+            }
+
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+
+        // Clear disambiguation state immediately
+        self.verb_disambiguation_ui.clear();
+    }
+
+    /// Check if user started typing new input while disambiguation is shown
+    ///
+    /// Called from REPL panel when input changes. If disambiguation is active
+    /// and user types something new, we auto-abandon.
+    pub fn check_verb_disambiguation_input_change(&mut self, new_input: &str) {
+        if self.verb_disambiguation_ui.active && !new_input.is_empty() {
+            // User is typing new input - abandon current disambiguation
+            self.abandon_verb_disambiguation(ob_poc_types::AbandonReason::TypedNewInput);
+        }
+    }
+
+    /// Check if verb disambiguation has timed out
+    ///
+    /// Called from update loop. If disambiguation has been shown for >30 seconds
+    /// without user action, auto-abandon.
+    pub fn check_verb_disambiguation_timeout(&mut self) {
+        if !self.verb_disambiguation_ui.active {
+            return;
+        }
+
+        let current_time = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now() / 1000.0) // Convert to seconds
+            .unwrap_or(0.0);
+
+        if self.verb_disambiguation_ui.is_timed_out(current_time) {
+            web_sys::console::log_1(
+                &"check_verb_disambiguation_timeout: 30s timeout reached".into(),
+            );
+            self.abandon_verb_disambiguation(ob_poc_types::AbandonReason::Timeout);
+        }
     }
 
     // =========================================================================

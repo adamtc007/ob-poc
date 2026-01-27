@@ -709,6 +709,36 @@ pub async fn cancel_resolution(session_id: Uuid) -> Result<(), String> {
 }
 
 // =============================================================================
+// Verb Disambiguation API
+// =============================================================================
+
+/// Select a verb from disambiguation options
+///
+/// Called when user clicks a verb button in the disambiguation UI.
+/// Records gold-standard learning signal and executes the selected verb.
+pub async fn select_verb(
+    session_id: Uuid,
+    request: &ob_poc_types::VerbSelectionRequest,
+) -> Result<ob_poc_types::ChatResponse, String> {
+    post(&format!("/api/session/{}/select-verb", session_id), request).await
+}
+
+/// Abandon verb disambiguation
+///
+/// Called when user bails without selecting a verb (timeout, new input, cancel).
+/// Records negative learning signals for all candidates.
+pub async fn abandon_verb_disambiguation(
+    session_id: Uuid,
+    request: &ob_poc_types::AbandonDisambiguationRequest,
+) -> Result<ob_poc_types::AbandonDisambiguationResponse, String> {
+    post(
+        &format!("/api/session/{}/abandon-disambiguation", session_id),
+        request,
+    )
+    .await
+}
+
+// =============================================================================
 // Taxonomy Navigation API
 // =============================================================================
 
