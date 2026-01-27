@@ -108,6 +108,7 @@ pub mod sheet_executor;
 pub mod submission;
 pub mod suggestions;
 pub mod topo_sort;
+pub mod v2_registry;
 pub mod validation;
 pub mod verb_registry;
 
@@ -169,6 +170,10 @@ pub use submission::{
 pub use topo_sort::{
     emit_dsl, topological_sort, topological_sort_with_lifecycle,
     ExecutionPhase as TopoExecutionPhase, TopoSortError, TopoSortResult,
+};
+pub use v2_registry::{
+    extract_aliases, extract_invocation_phrases, load_v2_registry, v2_to_runtime_registry,
+    V2ArgSchema, V2ArgType, V2Registry, V2VerbSpec,
 };
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,

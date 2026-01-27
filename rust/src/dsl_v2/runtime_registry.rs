@@ -564,6 +564,21 @@ impl RuntimeVerbRegistry {
         }
     }
 
+    /// Create registry from pre-built parts (used by V2 loader)
+    pub fn from_parts(
+        verbs: HashMap<String, RuntimeVerb>,
+        by_domain: HashMap<String, Vec<String>>,
+        domains: Vec<String>,
+        templates: TemplateRegistry,
+    ) -> Self {
+        Self {
+            verbs,
+            by_domain,
+            domains,
+            templates,
+        }
+    }
+
     // =========================================================================
     // LOOKUP METHODS
     // =========================================================================

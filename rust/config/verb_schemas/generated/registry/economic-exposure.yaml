@@ -1,0 +1,154 @@
+version: '2.0'
+domain: economic-exposure
+description: |
+  Economic exposure look-through computation for investor register analysis.
+
+  PURPOSE: Computes indirect/ultimate economic ownership through multi-level fund chains
+  with bounded recursion, cycle detection, and configurable stop conditions. Essential for
+  understanding "who really owns what" when ownership passes through intermediaries.
+
+  KEY CONCEPTS:
+  - Look-through: Tracing ownership through intermediary entities (FoFs, master funds, nominees)
+    to find ultimate beneficial owners. Required by AML regulations for certain structures.
+  - Bounded recursion: Prevents infinite loops and runaway computation. Configurable max depth.
+  - Cycle detection: Handles circular ownership (A owns B owns C owns A) gracefully.
+  - Stop conditions: Multiple criteria for terminating traversal (role type, policy, data availability).
+
+  DOMAIN JARGON:
+  - Economic interest: The right to receive distributions/proceeds (vs voting/control rights)
+  - Diluted ownership: Cumulative percentage after traversing multiple levels
+  - Chain depth: Number of hops from root entity to a particular holder
+  - Terminal holder: End of look-through chain (END_INVESTOR or policy=NONE)
+  - Coverage: Percentage of ownership that has been successfully looked-through
+
+  STOP CONDITIONS (in precedence order):
+  1. CYCLE_DETECTED - Circular ownership found (path already includes this entity)
+  2. MAX_DEPTH - Traversal depth limit reached (default: 6 levels)
+  3. BELOW_MIN_PCT - Cumulative ownership drops below threshold (default: 0.01%)
+  4. END_INVESTOR - Holder has role_type=END_INVESTOR (terminal beneficial owner)
+  5. POLICY_NONE - Holder has lookthrough_policy=NONE (no look-through permitted)
+  6. NO_BO_DATA - Holder has beneficial_owner_data_available=false (can't look through)
+
+  OUTPUT: For each discovered holder, returns:
+  - holder_entity_id, holder_name: The discovered beneficial owner
+  - cumulative_pct: Economic percentage after multiplying through all levels
+  - chain_depth: Number of hops from root
+  - path_ids, path_names: Full ownership path (for audit trail)
+  - stop_reason: Why traversal stopped at this holder
+verbs:
+- verb: economic-exposure.compute
+  domain: economic-exposure
+  action: compute
+  aliases:
+  - calculate
+  - compute
+  - derive
+  args:
+    style: keyworded
+    required:
+      root-entity-id:
+        type: entity_name
+    optional:
+      stop-on-policy-none:
+        type: bool
+      max-rows:
+        type: int
+      stop-on-no-bo-data:
+        type: bool
+      max-depth:
+        type: int
+      min-pct:
+        type: decimal
+      as-of-date:
+        type: date
+  positional_sugar:
+  - root-entity-id
+  invocation_phrases:
+  - compute economic exposure
+  - calculate look-through
+  - find ultimate owners
+  - trace ownership chain
+  - economic ownership analysis
+  - diluted ownership report
+  - who are the real owners
+  - look through intermediaries
+  examples:
+  - (economic-exposure.compute :root-entity-id "...")
+  doc: |
+    Compute economic exposure from a root entity through ownership chains.
+
+    Performs bounded recursive traversal of the ownership graph starting from
+    a root entity (typically a fund), following ECONOMIC edges and applying
+    look-through rules based on investor role profiles.
+
+    USE CASES:
+    - "Show me who ultimately owns Fund A after looking through all intermediaries"
+    - "What is BlackRock's diluted economic interest across our fund complex?"
+    - "Identify all beneficial owners above 5% after look-through"
+    - "Generate AML economic exposure report for regulatory filing"
+    - "Trace ownership path from fund to ultimate beneficial owner"
+
+    ALGORITHM:
+    1. Start at root entity with 100% ownership
+    2. For each outgoing ECONOMIC edge:
+       a. Multiply current percentage by edge percentage
+       b. Check if holder should be traversed (based on role profile)
+       c. If yes and not stopped, recurse into holder's ownership
+       d. If no, record holder as terminal with stop_reason
+    3. Apply stop conditions (cycle, depth, min_pct, role, policy, data)
+    4. Return all discovered holders with cumulative percentages
+
+    EXAMPLE OUTPUT:
+    | holder_name    | cumulative_pct | depth | stop_reason    |
+    |----------------|----------------|-------|----------------|
+    | BlackRock Inc  | 15.2%          | 2     | END_INVESTOR   |
+    | State Street   | 8.1%           | 1     | POLICY_NONE    |
+    | Unknown Feeder | 3.4%           | 3     | NO_BO_DATA     |
+  tier: diagnostics
+- verb: economic-exposure.summary
+  domain: economic-exposure
+  action: summary
+  aliases:
+  - summary
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+    optional:
+      as-of-date:
+        type: date
+      threshold-pct:
+        type: decimal
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - economic exposure summary
+  - ownership summary
+  - top shareholders
+  - significant owners
+  - ownership breakdown
+  - investor concentration
+  - major holders
+  - summary economic-exposure
+  examples:
+  - (economic-exposure.summary :issuer-entity-id "...")
+  doc: |
+    Get aggregated economic exposure summary for an issuer.
+
+    Returns a condensed view of significant economic owners, aggregated by
+    investor type, with counts of smaller holders. Useful for dashboards
+    and high-level reporting where you don't need the full chain detail.
+
+    USE CASES:
+    - "Show me the top 10 economic owners of Fund A"
+    - "What's the ownership breakdown by investor type?"
+    - "How many beneficial owners are above 5%?"
+    - "Dashboard summary of significant shareholders"
+
+    OUTPUT includes:
+    - Significant holders (above threshold_pct) with individual details
+    - Aggregation of smaller holders by category
+    - Total coverage percentage
+    - Count of terminal vs intermediate holders
+  tier: diagnostics

@@ -53,6 +53,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::dsl_v2::runtime_registry::{RuntimeBehavior, RuntimeVerb};
+use crate::dsl_v2::v2_registry::{extract_invocation_phrases, V2Registry};
 use crate::dsl_v2::RuntimeVerbRegistry;
 use dsl_core::config::types::VerbsConfig;
 
@@ -853,6 +854,83 @@ impl VerbSyncService {
         .await?;
 
         Ok(())
+    }
+
+    // =========================================================================
+    // V2 Registry Sync Methods
+    // =========================================================================
+
+    /// Sync invocation_phrases from V2 registry to database
+    ///
+    /// This is the V2 equivalent of `sync_invocation_phrases`, using the compiled
+    /// registry.json as the source of truth instead of YAML files.
+    ///
+    /// # Arguments
+    /// * `v2_registry` - The loaded V2 registry
+    ///
+    /// # Returns
+    /// Number of verbs with phrases synced
+    pub async fn sync_v2_invocation_phrases(
+        &self,
+        v2_registry: &V2Registry,
+    ) -> Result<i32, VerbSyncError> {
+        let phrases_map = extract_invocation_phrases(v2_registry);
+        let mut synced = 0;
+
+        for (full_name, phrases) in phrases_map {
+            // Skip if no invocation_phrases
+            if phrases.is_empty() {
+                continue;
+            }
+
+            // Update yaml_intent_patterns (NOT intent_patterns which holds learned patterns)
+            let result = sqlx::query(
+                r#"
+                UPDATE "ob-poc".dsl_verbs
+                SET yaml_intent_patterns = $2,
+                    updated_at = now()
+                WHERE full_name = $1
+                "#,
+            )
+            .bind(&full_name)
+            .bind(&phrases)
+            .execute(&self.pool)
+            .await?;
+
+            if result.rows_affected() > 0 {
+                synced += 1;
+                debug!(
+                    "Synced {} V2 invocation_phrases for {}",
+                    phrases.len(),
+                    full_name
+                );
+            }
+        }
+
+        info!(
+            "Synced V2 invocation_phrases for {} verbs to dsl_verbs.yaml_intent_patterns",
+            synced
+        );
+
+        Ok(synced)
+    }
+
+    /// Combined sync: verbs + V2 invocation_phrases
+    ///
+    /// Use this for startup sync with V2 schemas as the phrase source.
+    pub async fn sync_all_with_v2_phrases(
+        &self,
+        registry: &RuntimeVerbRegistry,
+        v2_registry: &V2Registry,
+    ) -> Result<SyncResult, VerbSyncError> {
+        // First sync verb definitions (still from RuntimeVerbRegistry for behavior/crud config)
+        let result = self.sync_all(registry).await?;
+
+        // Then sync invocation_phrases from V2 registry
+        let phrases_synced = self.sync_v2_invocation_phrases(v2_registry).await?;
+        info!("Synced V2 invocation_phrases for {} verbs", phrases_synced);
+
+        Ok(result)
     }
 
     /// Bulk update RAG metadata from a YAML file

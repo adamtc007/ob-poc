@@ -123,6 +123,15 @@ domains:
 
       list-versions:
         description: List all versions of trading profiles for a CBU
+        invocation_phrases:
+          - "list trading profile versions"
+          - "show profile version history"
+          - "view all profile versions"
+          - "list profile revisions"
+          - "show trading history"
+          - "get version history"
+          - "list CBU profile versions"
+          - "show profile changelog"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -151,6 +160,15 @@ domains:
 
       activate:
         description: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
+        invocation_phrases:
+          - "activate trading profile"
+          - "make profile active"
+          - "activate this version"
+          - "switch to active profile"
+          - "enable trading profile"
+          - "set profile as active"
+          - "go live with profile"
+          - "activate CBU profile"
         behavior: plugin
         handler: activate_trading_profile
         metadata:
@@ -220,6 +238,15 @@ domains:
 
       diff:
         description: Compare two trading profile versions
+        invocation_phrases:
+          - "diff trading profiles"
+          - "compare profiles"
+          - "show profile differences"
+          - "compare two versions"
+          - "what changed between"
+          - "diff profile versions"
+          - "compare changes"
+          - "show profile delta"
         behavior: plugin
         handler: diff_trading_profiles
         metadata:
@@ -248,6 +275,15 @@ domains:
 
       create-draft:
         description: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
+        invocation_phrases:
+          - "create draft profile"
+          - "start new profile draft"
+          - "create trading draft"
+          - "new profile version"
+          - "draft new profile"
+          - "start profile edit"
+          - "create draft from active"
+          - "begin profile changes"
         behavior: plugin
         handler: create_draft_trading_profile
         metadata:
@@ -277,6 +313,15 @@ domains:
 
       clone-to:
         description: Clone a trading profile to another CBU, creating a new DRAFT profile
+        invocation_phrases:
+          - "clone profile to CBU"
+          - "copy trading profile"
+          - "clone profile"
+          - "duplicate profile to"
+          - "copy profile to new CBU"
+          - "replicate trading setup"
+          - "clone configuration"
+          - "copy to target CBU"
         behavior: plugin
         handler: clone_trading_profile_to_cbu
         metadata:
@@ -324,6 +369,14 @@ domains:
 
       create-new-version:
         description: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
+        invocation_phrases:
+          - "create new profile version"
+          - "version this profile"
+          - "bump profile version"
+          - "new version from current"
+          - "create version"
+          - "increment profile version"
+          - "save as new version"
         behavior: plugin
         handler: create_new_version_trading_profile
         metadata:
@@ -361,16 +414,23 @@ domains:
 
       add-instrument-class:
         description: Add instrument class to trading profile universe
+        invocation_phrases:
+          - "add instrument class"
+          - "enable instrument class"
+          - "add equity trading"
+          - "add bond trading"
+          - "enable instrument type"
+          - "add asset class"
+          - "permit instrument class"
+          - "include instrument in profile"
+          - "add instruments"
+          - "enable trading"
+          - "add to universe"
+          - "add equities"
+          - "add bonds"
+          - "add derivatives"
         behavior: plugin
         handler: add_instrument_class_to_profile
-        invocation_phrases:
-          - add instruments
-          - add instrument class
-          - enable trading
-          - add to universe
-          - add equities
-          - add bonds
-          - add derivatives
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -409,6 +469,14 @@ domains:
 
       remove-instrument-class:
         description: Remove instrument class from trading profile universe
+        invocation_phrases:
+          - "remove instrument class"
+          - "disable instrument class"
+          - "remove equity trading"
+          - "remove from profile"
+          - "disable asset class"
+          - "exclude instrument type"
+          - "drop instrument class"
         behavior: plugin
         handler: remove_instrument_class_from_profile
         metadata:
@@ -429,15 +497,21 @@ domains:
 
       add-market:
         description: Add market to trading profile universe under an instrument class
+        invocation_phrases:
+          - "add market to profile"
+          - "enable market access"
+          - "add exchange"
+          - "add trading venue"
+          - "enable market"
+          - "add market MIC"
+          - "permit market trading"
+          - "include market"
+          - "add market"
+          - "add NYSE"
+          - "add LSE"
+          - "trade on"
         behavior: plugin
         handler: add_market_to_profile
-        invocation_phrases:
-          - add market
-          - add exchange
-          - add NYSE
-          - add LSE
-          - enable market
-          - trade on
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -470,6 +544,14 @@ domains:
 
       remove-market:
         description: Remove market from trading profile universe
+        invocation_phrases:
+          - "remove market from profile"
+          - "disable market access"
+          - "remove exchange"
+          - "exclude market"
+          - "drop trading venue"
+          - "remove market MIC"
+          - "disable market"
         behavior: plugin
         handler: remove_market_from_profile
         metadata:
@@ -496,6 +578,14 @@ domains:
 
       set-base-currency:
         description: Set base currency for trading profile
+        invocation_phrases:
+          - "set base currency"
+          - "change base currency"
+          - "set profile currency"
+          - "update base currency"
+          - "set primary currency"
+          - "configure base currency"
+          - "set CBU base currency"
         behavior: plugin
         handler: set_profile_base_currency
         metadata:
@@ -516,6 +606,14 @@ domains:
 
       add-allowed-currency:
         description: Add currency to allowed currencies list
+        invocation_phrases:
+          - "add allowed currency"
+          - "permit currency"
+          - "enable currency"
+          - "add settlement currency"
+          - "allow currency trading"
+          - "add currency to profile"
+          - "include currency"
         behavior: plugin
         handler: add_allowed_currency_to_profile
         metadata:
@@ -538,6 +636,15 @@ domains:
 
       add-standing-instruction:
         description: Add SSI to trading profile standing instructions
+        invocation_phrases:
+          - "add standing instruction"
+          - "add SSI"
+          - "create SSI"
+          - "add settlement instruction"
+          - "configure SSI"
+          - "add new SSI"
+          - "set up standing instruction"
+          - "create settlement instruction"
         behavior: plugin
         handler: add_ssi_to_profile
         metadata:
@@ -588,6 +695,14 @@ domains:
 
       remove-standing-instruction:
         description: Remove SSI from trading profile
+        invocation_phrases:
+          - "remove standing instruction"
+          - "delete SSI"
+          - "remove SSI"
+          - "delete settlement instruction"
+          - "deactivate SSI"
+          - "remove from SSIs"
+          - "drop standing instruction"
         behavior: plugin
         handler: remove_ssi_from_profile
         metadata:
@@ -612,6 +727,15 @@ domains:
 
       add-booking-rule:
         description: Add ALERT-style booking rule to trading profile
+        invocation_phrases:
+          - "add booking rule"
+          - "create booking rule"
+          - "add settlement rule"
+          - "configure booking"
+          - "add SSI selection rule"
+          - "create routing rule"
+          - "add rule to profile"
+          - "define booking rule"
         behavior: plugin
         handler: add_booking_rule_to_profile
         metadata:
@@ -665,6 +789,13 @@ domains:
 
       remove-booking-rule:
         description: Remove booking rule from trading profile
+        invocation_phrases:
+          - "remove booking rule"
+          - "delete booking rule"
+          - "remove settlement rule"
+          - "drop routing rule"
+          - "deactivate booking rule"
+          - "remove rule"
         behavior: plugin
         handler: remove_booking_rule_from_profile
         metadata:
@@ -693,15 +824,21 @@ domains:
 
       add-isda-config:
         description: Add ISDA master agreement to trading profile
+        invocation_phrases:
+          - "add ISDA configuration"
+          - "configure ISDA agreement"
+          - "set up ISDA"
+          - "add ISDA master"
+          - "create ISDA config"
+          - "add ISDA settings"
+          - "configure ISDA master"
+          - "add ISDA"
+          - "establish ISDA"
+          - "create ISDA"
+          - "add counterparty"
+          - "add counterparty for derivatives"
         behavior: plugin
         handler: add_isda_config_to_profile
-        invocation_phrases:
-          - add ISDA
-          - establish ISDA
-          - create ISDA
-          - set up ISDA
-          - add counterparty
-          - add counterparty for derivatives
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -740,6 +877,14 @@ domains:
 
       add-isda-coverage:
         description: Add product coverage to ISDA config
+        invocation_phrases:
+          - "add ISDA coverage"
+          - "extend ISDA coverage"
+          - "add product to ISDA"
+          - "include in ISDA scope"
+          - "add ISDA product coverage"
+          - "expand ISDA coverage"
+          - "add to ISDA products"
         behavior: plugin
         handler: TradingProfileAddIsdaCoverageOp
         metadata:
@@ -771,14 +916,20 @@ domains:
 
       add-csa-config:
         description: Add CSA (Credit Support Annex) to ISDA agreement
+        invocation_phrases:
+          - "add CSA configuration"
+          - "configure CSA"
+          - "set up CSA agreement"
+          - "add credit support annex"
+          - "create CSA config"
+          - "add CSA settings"
+          - "configure collateral agreement"
+          - "add CSA"
+          - "add VM CSA"
+          - "add IM CSA"
+          - "add collateral agreement"
         behavior: plugin
         handler: add_csa_config_to_profile
-        invocation_phrases:
-          - add CSA
-          - add credit support annex
-          - add VM CSA
-          - add IM CSA
-          - add collateral agreement
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -821,6 +972,14 @@ domains:
 
       add-csa-collateral:
         description: Add eligible collateral to CSA
+        invocation_phrases:
+          - "add CSA collateral"
+          - "configure eligible collateral"
+          - "add collateral type"
+          - "set collateral eligibility"
+          - "add eligible securities"
+          - "configure CSA margin"
+          - "add collateral assets"
         behavior: plugin
         handler: TradingProfileAddCsaCollateralOp
         metadata:
@@ -860,6 +1019,14 @@ domains:
 
       link-csa-ssi:
         description: Link CSA to collateral SSI in standing instructions
+        invocation_phrases:
+          - "link CSA to SSI"
+          - "connect CSA SSI"
+          - "associate CSA with SSI"
+          - "set CSA settlement"
+          - "link collateral SSI"
+          - "configure CSA settlement"
+          - "attach SSI to CSA"
         behavior: plugin
         handler: link_csa_ssi_in_profile
         metadata:
@@ -884,6 +1051,13 @@ domains:
 
       remove-isda-config:
         description: Remove ISDA master agreement from trading profile
+        invocation_phrases:
+          - "remove ISDA configuration"
+          - "delete ISDA config"
+          - "remove ISDA agreement"
+          - "deactivate ISDA"
+          - "drop ISDA settings"
+          - "remove ISDA from profile"
         behavior: plugin
         handler: remove_isda_config_from_profile
         metadata:
@@ -907,6 +1081,13 @@ domains:
 
       remove-csa-config:
         description: Remove CSA from ISDA agreement in trading profile
+        invocation_phrases:
+          - "remove CSA configuration"
+          - "delete CSA config"
+          - "remove credit support"
+          - "deactivate CSA"
+          - "drop CSA settings"
+          - "remove CSA from profile"
         behavior: plugin
         handler: remove_csa_config_from_profile
         metadata:
@@ -937,6 +1118,14 @@ domains:
 
       add-im-mandate:
         description: Add investment manager mandate to trading profile
+        invocation_phrases:
+          - "add investment management mandate"
+          - "add IM mandate"
+          - "create management mandate"
+          - "add investment mandate"
+          - "configure IM relationship"
+          - "add discretionary mandate"
+          - "create IM agreement"
         behavior: plugin
         handler: add_im_mandate_to_profile
         metadata:
@@ -994,6 +1183,14 @@ domains:
 
       update-im-scope:
         description: Update scope for existing IM mandate
+        invocation_phrases:
+          - "update IM scope"
+          - "modify mandate scope"
+          - "change IM coverage"
+          - "update management scope"
+          - "adjust mandate scope"
+          - "change discretionary scope"
+          - "modify IM permissions"
         behavior: plugin
         handler: update_im_scope_in_profile
         metadata:
@@ -1023,6 +1220,13 @@ domains:
 
       remove-im-mandate:
         description: Remove investment manager mandate from profile
+        invocation_phrases:
+          - "remove IM mandate"
+          - "terminate mandate"
+          - "end investment mandate"
+          - "remove management mandate"
+          - "deactivate IM relationship"
+          - "delete IM mandate"
         behavior: plugin
         handler: remove_im_mandate_from_profile
         metadata:
@@ -1045,6 +1249,15 @@ domains:
 
       validate-go-live-ready:
         description: Full validation for production readiness
+        invocation_phrases:
+          - "validate go live ready"
+          - "check ready for activation"
+          - "validate profile completeness"
+          - "is profile ready"
+          - "check go live status"
+          - "validate activation ready"
+          - "run go live checks"
+          - "pre-activation validation"
         behavior: plugin
         handler: validate_profile_go_live_ready
         metadata:
@@ -1068,6 +1281,14 @@ domains:
 
       validate-universe-coverage:
         description: Validate all universe entries have required SSIs and booking rules
+        invocation_phrases:
+          - "validate universe coverage"
+          - "check universe completeness"
+          - "verify instrument coverage"
+          - "check SSI coverage"
+          - "validate settlement coverage"
+          - "coverage validation"
+          - "check all markets covered"
         behavior: plugin
         handler: validate_universe_coverage
         metadata:
@@ -1097,12 +1318,17 @@ domains:
 
       submit:
         description: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
+        invocation_phrases:
+          - "submit profile for approval"
+          - "submit trading profile"
+          - "request profile approval"
+          - "submit for review"
+          - "send for approval"
+          - "submit profile changes"
+          - "request go-live approval"
+          - "submit profile for review"
         behavior: plugin
         handler: submit_trading_profile
-        invocation_phrases:
-          - "submit trading profile"
-          - "submit profile for review"
-          - "send for approval"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -1127,12 +1353,17 @@ domains:
 
       approve:
         description: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
-        behavior: plugin
-        handler: approve_trading_profile
         invocation_phrases:
           - "approve trading profile"
           - "approve profile"
+          - "authorize profile"
+          - "approve go-live"
+          - "give profile approval"
+          - "approve activation"
+          - "authorize trading setup"
           - "activate trading profile"
+        behavior: plugin
+        handler: approve_trading_profile
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -1157,6 +1388,14 @@ domains:
 
       reject:
         description: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
+        invocation_phrases:
+          - "reject trading profile"
+          - "reject profile"
+          - "decline profile approval"
+          - "reject changes"
+          - "send back for changes"
+          - "reject activation request"
+          - "deny profile approval"
         behavior: plugin
         handler: reject_trading_profile
         metadata:
@@ -1183,6 +1422,14 @@ domains:
 
       archive:
         description: Archive a trading profile (soft delete, transitions to ARCHIVED status)
+        invocation_phrases:
+          - "archive trading profile"
+          - "archive profile"
+          - "archive old version"
+          - "move to archive"
+          - "archive superseded profile"
+          - "store in archive"
+          - "mark profile archived"
         behavior: plugin
         handler: archive_trading_profile
         metadata:

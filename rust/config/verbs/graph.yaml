@@ -170,6 +170,15 @@ domains:
 
       group-by:
         description: "Group nodes by an attribute (jurisdiction, role, type, etc.)"
+        invocation_phrases:
+          - "group graph by"
+          - "cluster by attribute"
+          - "group nodes by jurisdiction"
+          - "group by role"
+          - "group by type"
+          - "cluster entities"
+          - "group graph nodes"
+          - "organize by"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -211,6 +220,15 @@ domains:
 
       path:
         description: "Find shortest path between two nodes"
+        invocation_phrases:
+          - "find path between"
+          - "show connection"
+          - "path from A to B"
+          - "how are they connected"
+          - "find relationship path"
+          - "trace path"
+          - "show link between"
+          - "graph path"
         metadata:
           tier: intent
           source_of_truth: entity

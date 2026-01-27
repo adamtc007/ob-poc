@@ -10,14 +10,20 @@ domains:
     verbs:
       create:
         description: Create a new Client Business Unit (idempotent by fund-entity-id if provided)
+        invocation_phrases:
+          - "create CBU"
+          - "new CBU"
+          - "add commercial business unit"
+          - "create new CBU"
+          - "set up CBU"
+          - "establish CBU"
+          - "add CBU"
+          - "create business unit"
+          - "create client"
+          - "create fund"
+          - "onboard client"
         behavior: plugin
         handler: CbuCreateOp
-        invocation_phrases:
-          - create CBU
-          - create client
-          - create fund
-          - onboard client
-          - set up CBU
         metadata:
           tier: intent
           source_of_truth: operational
@@ -122,6 +128,14 @@ domains:
           type: record
       update:
         description: Update a CBU
+        invocation_phrases:
+          - "update CBU"
+          - "modify CBU"
+          - "change CBU details"
+          - "edit CBU"
+          - "update CBU name"
+          - "change CBU status"
+          - "modify business unit"
         behavior: crud
         metadata:
           tier: intent
@@ -233,6 +247,14 @@ domains:
           description: Summary of deleted records by table
       list:
         description: List CBUs with optional filters
+        invocation_phrases:
+          - "list CBUs"
+          - "show all CBUs"
+          - "view CBU list"
+          - "display CBUs"
+          - "list all business units"
+          - "show CBUs for client"
+          - "get CBU list"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -389,6 +411,13 @@ domains:
           capture: false
       remove-role:
         description: Remove a specific role from an entity within a CBU
+        invocation_phrases:
+          - "remove role from CBU"
+          - "unassign role"
+          - "delete CBU role"
+          - "remove entity from CBU"
+          - "unlink entity role"
+          - "remove participant"
         behavior: crud
         metadata:
           tier: intent

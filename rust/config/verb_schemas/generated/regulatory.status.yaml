@@ -1,0 +1,24 @@
+version: '2.0'
+domain: regulatory.status
+description: Entity regulatory status queries
+verbs:
+- verb: regulatory.status.check
+  domain: regulatory.status
+  action: check
+  aliases:
+  - check
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - check regulatory.status
+  - check the regulatory.status
+  - regulatory.status check
+  examples:
+  - (regulatory.status.check :entity-id "...")
+  doc: Check entity's overall regulatory status
+  tier: diagnostics

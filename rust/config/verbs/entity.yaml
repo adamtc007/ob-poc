@@ -478,6 +478,15 @@ domains:
           type: record
       update:
         description: Update an entity's base fields
+        invocation_phrases:
+          - "update entity"
+          - "modify entity details"
+          - "change entity information"
+          - "edit entity"
+          - "update company details"
+          - "modify entity"
+          - "change entity name"
+          - "update entity attributes"
         behavior: crud
         metadata:
           tier: intent
@@ -544,6 +553,15 @@ domains:
           type: affected
       list:
         description: List entities with optional filters
+        invocation_phrases:
+          - "list entities"
+          - "show all entities"
+          - "view entity list"
+          - "list companies"
+          - "show entities by type"
+          - "list all entities"
+          - "display entities"
+          - "get entity list"
         behavior: crud
         metadata:
           tier: diagnostics

@@ -1,0 +1,174 @@
+version: '2.0'
+domain: research.sources
+description: Research source loader management - list, search, and fetch from pluggable sources
+verbs:
+- verb: research.sources.find-for-jurisdiction
+  domain: research.sources
+  action: find-for-jurisdiction
+  aliases:
+  - find-for-jurisdiction
+  args:
+    style: keyworded
+    required:
+      data-type:
+        type: enum
+        values:
+        - entity
+        - control-holders
+        - officers
+        - parent-chain
+        - subsidiaries
+        - filings
+      jurisdiction:
+        type: str
+  positional_sugar:
+  - jurisdiction
+  - data-type
+  invocation_phrases:
+  - which source for
+  - best source for jurisdiction
+  - find source for
+  - find for jurisdiction research.sources
+  - find for jurisdiction the research.sources
+  - research.sources find for jurisdiction
+  examples:
+  - (research.sources.find-for-jurisdiction :jurisdiction "..." :data-type "...")
+  doc: Find the best source for a jurisdiction and data type
+  tier: diagnostics
+  tags:
+  - read
+  - meta
+  - source-routing
+- verb: research.sources.fetch
+  domain: research.sources
+  action: fetch
+  aliases:
+  - fetch
+  args:
+    style: keyworded
+    required:
+      key:
+        type: str
+      source-id:
+        type: str
+    optional:
+      include-raw:
+        type: bool
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - source-id
+  - key
+  invocation_phrases:
+  - fetch from source
+  - get record from
+  - import from source
+  - fetch research.sources
+  - fetch the research.sources
+  - research.sources fetch
+  examples:
+  - (research.sources.fetch :source-id "..." :key "...")
+  doc: Fetch entity data from a source by its key
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-fetch
+- verb: research.sources.info
+  domain: research.sources
+  action: info
+  aliases:
+  - info
+  args:
+    style: keyworded
+    required:
+      source-id:
+        type: enum
+        values:
+        - gleif
+        - companies-house
+        - sec-edgar
+  positional_sugar:
+  - source-id
+  invocation_phrases:
+  - tell me about this source
+  - source capabilities
+  - what can this source provide
+  - info research.sources
+  - info the research.sources
+  - research.sources info
+  examples:
+  - (research.sources.info :source-id "...")
+  doc: Get information about a specific research source
+  tier: diagnostics
+  tags:
+  - read
+  - meta
+  - source-info
+- verb: research.sources.list
+  domain: research.sources
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+  invocation_phrases:
+  - list research sources
+  - what sources are available
+  - which registries can you access
+  - show data sources
+  - list research.sources
+  - list the research.sources
+  - show research.sources
+  - get all research.sources
+  examples:
+  - (research.sources.list)
+  doc: List all available research sources
+  tier: diagnostics
+  tags:
+  - read
+  - meta
+  - source-discovery
+- verb: research.sources.search
+  domain: research.sources
+  action: search
+  aliases:
+  - find
+  - lookup
+  - search
+  args:
+    style: keyworded
+    required:
+      query:
+        type: str
+      source-id:
+        type: str
+    optional:
+      include-inactive:
+        type: bool
+      jurisdiction:
+        type: str
+      limit:
+        type: int
+  positional_sugar:
+  - source-id
+  - query
+  invocation_phrases:
+  - search source for
+  - find in source
+  - look up in
+  - search research.sources
+  - search the research.sources
+  - find research.sources
+  - lookup research.sources
+  - research.sources search
+  examples:
+  - (research.sources.search :source-id "..." :query "...")
+  doc: Search a specific source for entities by name
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-lookup

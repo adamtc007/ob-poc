@@ -1,0 +1,51 @@
+version: '2.0'
+domain: readiness
+description: Service readiness operations
+verbs:
+- verb: readiness.explain
+  domain: readiness
+  action: explain
+  aliases:
+  - explain
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      service-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - explain readiness
+  - explain the readiness
+  - readiness explain
+  examples:
+  - (readiness.explain :cbu-id "...")
+  doc: Explain blocking reasons for a service
+  tier: diagnostics
+- verb: readiness.compute
+  domain: readiness
+  action: compute
+  aliases:
+  - calculate
+  - compute
+  - derive
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - compute readiness
+  - compute the readiness
+  - calculate readiness
+  - derive readiness
+  - readiness compute
+  examples:
+  - (readiness.compute :cbu-id "...")
+  doc: Compute service readiness - determines 'good to transact' status
+  tier: composite

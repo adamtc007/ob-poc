@@ -1331,17 +1331,53 @@ impl AppState {
                             short_name: "GC".to_string(),
                             jurisdiction: None,
                         };
+                        // Build a lookup map from cbu_list for names and jurisdiction
+                        let cbu_lookup: std::collections::HashMap<Uuid, &ob_poc_types::CbuSummary> =
+                            self.cbu_list
+                                .iter()
+                                .filter_map(|cbu| {
+                                    Uuid::parse_str(&cbu.cbu_id).ok().map(|id| (id, cbu))
+                                })
+                                .collect();
+
                         let cbus: Vec<ClusterCbuData> = data
                             .cbu_ids
                             .iter()
                             .enumerate()
-                            .map(|(i, cbu_id)| ClusterCbuData {
-                                cbu_id: *cbu_id,
-                                name: format!("CBU {}", i + 1),
-                                short_name: format!("C{}", i + 1),
-                                jurisdiction: None,
-                                risk_rating: RiskRating::Medium,
-                                entity_count: 0,
+                            .map(|(i, cbu_id)| {
+                                // Look up CBU info from cbu_list
+                                let (name, short_name, jurisdiction) =
+                                    if let Some(cbu_info) = cbu_lookup.get(cbu_id) {
+                                        let name = cbu_info.name.clone();
+                                        // Generate short name: first 3 chars uppercase or abbreviation
+                                        let short = if name.len() <= 4 {
+                                            name.to_uppercase()
+                                        } else {
+                                            // Take first letter of each word, up to 3
+                                            name.split_whitespace()
+                                                .filter_map(|w| w.chars().next())
+                                                .take(3)
+                                                .collect::<String>()
+                                                .to_uppercase()
+                                        };
+                                        let short_name = if short.is_empty() {
+                                            format!("C{}", i + 1)
+                                        } else {
+                                            short
+                                        };
+                                        (name, short_name, cbu_info.jurisdiction.clone())
+                                    } else {
+                                        // Fallback if not found in cbu_list
+                                        (format!("CBU {}", i + 1), format!("C{}", i + 1), None)
+                                    };
+                                ClusterCbuData {
+                                    cbu_id: *cbu_id,
+                                    name,
+                                    short_name,
+                                    jurisdiction,
+                                    risk_rating: RiskRating::Medium,
+                                    entity_count: 0,
+                                }
                             })
                             .collect();
                         self.cluster_view.load_data(manco, cbus);

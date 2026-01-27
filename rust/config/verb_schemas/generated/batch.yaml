@@ -1,0 +1,133 @@
+version: '2.0'
+domain: batch
+description: Batch execution control operations for DSL-native batch processing
+verbs:
+- verb: batch.abort
+  domain: batch
+  action: abort
+  aliases:
+  - abort
+  args:
+    style: keyworded
+    optional:
+      reason:
+        type: str
+  invocation_phrases:
+  - abort batch
+  - abort the batch
+  - abort bulk operation
+  - batch abort
+  examples:
+  - (batch.abort)
+  doc: Abort the current batch execution
+  tier: intent
+- verb: batch.status
+  domain: batch
+  action: status
+  aliases:
+  - status
+  args:
+    style: keyworded
+  invocation_phrases:
+  - status batch
+  - status the batch
+  - status bulk operation
+  - batch status
+  examples:
+  - (batch.status)
+  doc: Get the current batch execution status
+  tier: diagnostics
+- verb: batch.skip
+  domain: batch
+  action: skip
+  aliases:
+  - skip
+  args:
+    style: keyworded
+    optional:
+      reason:
+        type: str
+  invocation_phrases:
+  - skip batch
+  - skip the batch
+  - skip bulk operation
+  - batch skip
+  examples:
+  - (batch.skip)
+  doc: Skip the current batch item
+  tier: intent
+- verb: batch.add-products
+  domain: batch
+  action: add-products
+  aliases:
+  - add-products
+  args:
+    style: keyworded
+    required:
+      cbu-ids:
+        type: list
+      products:
+        type: list
+  positional_sugar:
+  - cbu-ids
+  - products
+  invocation_phrases:
+  - add products batch
+  - add products the batch
+  - add products bulk operation
+  - batch add products
+  examples:
+  - (batch.add-products :cbu-ids "..." :products "...")
+  doc: Add products to multiple CBUs in bulk
+  tier: intent
+- verb: batch.pause
+  domain: batch
+  action: pause
+  aliases:
+  - pause
+  args:
+    style: keyworded
+  invocation_phrases:
+  - pause batch
+  - pause the batch
+  - pause bulk operation
+  - batch pause
+  examples:
+  - (batch.pause)
+  doc: Pause the current batch execution
+  tier: intent
+- verb: batch.continue
+  domain: batch
+  action: continue
+  aliases:
+  - continue
+  args:
+    style: keyworded
+    optional:
+      count:
+        type: int
+  invocation_phrases:
+  - continue batch
+  - continue the batch
+  - continue bulk operation
+  - batch continue
+  examples:
+  - (batch.continue)
+  doc: Continue batch execution for N more items
+  tier: intent
+- verb: batch.resume
+  domain: batch
+  action: resume
+  aliases:
+  - resume
+  args:
+    style: keyworded
+  invocation_phrases:
+  - resume batch
+  - resume the batch
+  - resume bulk operation
+  - batch resume
+  examples:
+  - (batch.resume)
+  doc: Resume a paused batch execution
+  tier: intent

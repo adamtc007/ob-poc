@@ -14,6 +14,17 @@ domains:
 
       compute:
         description: Derive ownership snapshots from register holdings
+        invocation_phrases:
+          - "compute ownership"
+          - "calculate ownership snapshot"
+          - "derive ownership"
+          - "run ownership computation"
+          - "compute voting percentages"
+          - "calculate economic ownership"
+          - "generate ownership snapshot"
+          - "compute as of date"
+          - "derive ownership from register"
+          - "calculate who owns what"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -125,6 +136,16 @@ domains:
 
       control-positions:
         description: Get control positions for an issuer (who controls what %)
+        invocation_phrases:
+          - "show control positions"
+          - "who has control"
+          - "display voting percentages"
+          - "show control breakdown"
+          - "view control structure"
+          - "list control positions"
+          - "show who controls what"
+          - "display ownership control"
+          - "get control position summary"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -178,6 +199,15 @@ domains:
 
       who-controls:
         description: Find who controls an issuer (>50% voting or board majority)
+        invocation_phrases:
+          - "who controls this"
+          - "find controller"
+          - "show controlling entity"
+          - "who has majority"
+          - "find majority owner"
+          - "who owns controlling stake"
+          - "show ultimate controller"
+          - "find who controls"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -486,6 +516,16 @@ domains:
 
       reconcile:
         description: Compare ownership from different sources
+        invocation_phrases:
+          - "reconcile ownership"
+          - "compare ownership sources"
+          - "run reconciliation"
+          - "check ownership match"
+          - "reconcile against BODS"
+          - "compare to GLEIF"
+          - "run ownership comparison"
+          - "verify ownership data"
+          - "cross-check ownership"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -659,6 +699,15 @@ domains:
 
       analyze-gaps:
         description: Analyze ownership gaps for an issuer
+        invocation_phrases:
+          - "analyze ownership gaps"
+          - "find missing ownership"
+          - "check for gaps"
+          - "identify ownership holes"
+          - "analyze missing percentages"
+          - "find unidentified holders"
+          - "show ownership gaps"
+          - "check total coverage"
         metadata:
           tier: intent
           source_of_truth: entity
@@ -694,6 +743,15 @@ domains:
 
       trace-chain:
         description: Trace ownership chain from one entity to another
+        invocation_phrases:
+          - "trace ownership chain"
+          - "follow ownership path"
+          - "trace from entity to entity"
+          - "show ownership link"
+          - "follow chain between"
+          - "trace path to owner"
+          - "find connection between"
+          - "map ownership route"
         metadata:
           tier: intent
           source_of_truth: entity

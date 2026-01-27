@@ -4,6 +4,16 @@ domains:
     verbs:
       pep:
         description: Run PEP (Politically Exposed Persons) screening
+        invocation_phrases:
+          - "run PEP screening"
+          - "check for PEP"
+          - "PEP check"
+          - "screen for politically exposed"
+          - "is this person a PEP"
+          - "PEP scan"
+          - "check political exposure"
+          - "run PEP check"
+          - "politically exposed person check"
         metadata:
           tier: intent
           source_of_truth: external
@@ -26,8 +36,19 @@ domains:
         returns:
           type: uuid
           capture: true
+
       sanctions:
         description: Run sanctions list screening
+        invocation_phrases:
+          - "run sanctions check"
+          - "sanctions screening"
+          - "check sanctions lists"
+          - "screen against sanctions"
+          - "OFAC check"
+          - "sanctions scan"
+          - "run sanctions screening"
+          - "check if sanctioned"
+          - "sanctions list check"
         metadata:
           tier: intent
           source_of_truth: external
@@ -50,8 +71,19 @@ domains:
         returns:
           type: uuid
           capture: true
+
       adverse-media:
         description: Run adverse media screening
+        invocation_phrases:
+          - "run adverse media check"
+          - "adverse media screening"
+          - "check for negative news"
+          - "media scan"
+          - "screen for adverse media"
+          - "negative media check"
+          - "run media screening"
+          - "check news coverage"
+          - "adverse news scan"
         metadata:
           tier: intent
           source_of_truth: external

@@ -1,0 +1,47 @@
+version: '2.0'
+domain: admin.regulatory-tiers
+description: Regulatory tiers reference data
+verbs:
+- verb: admin.regulatory-tiers.list
+  domain: admin.regulatory-tiers
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+  invocation_phrases:
+  - list admin.regulatory-tiers
+  - list the admin.regulatory-tiers
+  - show admin.regulatory-tiers
+  - get all admin.regulatory-tiers
+  - admin.regulatory-tiers list
+  examples:
+  - (admin.regulatory-tiers.list)
+  doc: List regulatory tiers
+  tier: reference
+- verb: admin.regulatory-tiers.read
+  domain: admin.regulatory-tiers
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - read admin.regulatory-tiers
+  - read the admin.regulatory-tiers
+  - get admin.regulatory-tiers
+  - fetch admin.regulatory-tiers
+  - admin.regulatory-tiers read
+  examples:
+  - (admin.regulatory-tiers.read :code "...")
+  doc: Get tier by code
+  tier: reference

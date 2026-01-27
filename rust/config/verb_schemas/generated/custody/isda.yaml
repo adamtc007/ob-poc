@@ -1,0 +1,177 @@
+version: '2.0'
+domain: isda
+description: ISDA and CSA agreement management for OTC derivatives
+verbs:
+- verb: isda.add-coverage
+  domain: isda
+  action: add-coverage
+  aliases:
+  - add-coverage
+  args:
+    style: keyworded
+    required:
+      instrument-class:
+        type: entity_name
+      isda-id:
+        type: entity_name
+    optional:
+      isda-taxonomy:
+        type: entity_name
+  positional_sugar:
+  - isda-id
+  - instrument-class
+  invocation_phrases:
+  - add coverage isda
+  - add coverage the isda
+  - add coverage agreement
+  - isda add coverage
+  examples:
+  - (isda.add-coverage :isda-id "..." :instrument-class "...")
+  doc: Add instrument class coverage to ISDA (idempotent by isda+instrument_class). Internal - use trading-profile.add-isda-coverage for authoring.
+  tier: projection
+- verb: isda.create
+  domain: isda
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      effective-date:
+        type: date
+      agreement-date:
+        type: date
+      cbu-id:
+        type: entity_name
+      counterparty:
+        type: entity_name
+    optional:
+      governing-law:
+        type: enum
+        values:
+        - NY
+        - ENGLISH
+  positional_sugar:
+  - cbu-id
+  - counterparty
+  invocation_phrases:
+  - create isda
+  - create the isda
+  - add isda
+  - new isda
+  - create agreement
+  - isda create
+  examples:
+  - (isda.create :cbu-id "..." :counterparty "..." :agreement-date "..." :effective-date "...")
+  doc: Create ISDA agreement with counterparty (idempotent by cbu+counterparty+date). Internal - use trading-profile.add-isda-config for authoring.
+  tier: projection
+- verb: isda.add-csa
+  domain: isda
+  action: add-csa
+  aliases:
+  - add-csa
+  args:
+    style: keyworded
+    required:
+      isda-id:
+        type: entity_name
+      csa-type:
+        type: enum
+        values:
+        - VM
+        - IM
+      effective-date:
+        type: date
+    optional:
+      mta:
+        type: decimal
+      threshold:
+        type: decimal
+      threshold-currency:
+        type: str
+      collateral-ssi:
+        type: uuid
+  positional_sugar:
+  - isda-id
+  - csa-type
+  invocation_phrases:
+  - add csa isda
+  - add csa the isda
+  - add csa agreement
+  - isda add csa
+  examples:
+  - (isda.add-csa :isda-id "..." :csa-type "..." :effective-date "...")
+  doc: Add CSA (Credit Support Annex) to ISDA (idempotent by isda+csa_type). Internal - use trading-profile.add-csa-config for authoring.
+  tier: projection
+- verb: isda.remove-coverage
+  domain: isda
+  action: remove-coverage
+  aliases:
+  - remove-coverage
+  args:
+    style: keyworded
+    required:
+      coverage-id:
+        type: uuid
+  positional_sugar:
+  - coverage-id
+  invocation_phrases:
+  - remove coverage isda
+  - remove coverage the isda
+  - remove coverage agreement
+  - isda remove coverage
+  examples:
+  - (isda.remove-coverage :coverage-id "...")
+  doc: Remove instrument class coverage from ISDA. Internal - use trading-profile.remove-isda-config for authoring.
+  tier: projection
+- verb: isda.remove-csa
+  domain: isda
+  action: remove-csa
+  aliases:
+  - remove-csa
+  args:
+    style: keyworded
+    required:
+      csa-id:
+        type: uuid
+  positional_sugar:
+  - csa-id
+  invocation_phrases:
+  - remove csa isda
+  - remove csa the isda
+  - remove csa agreement
+  - isda remove csa
+  examples:
+  - (isda.remove-csa :csa-id "...")
+  doc: Remove CSA from ISDA. Internal - use trading-profile.remove-csa-config for authoring.
+  tier: projection
+- verb: isda.list
+  domain: isda
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      counterparty:
+        type: uuid
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list isda
+  - list the isda
+  - show isda
+  - get all isda
+  - list agreement
+  - isda list
+  examples:
+  - (isda.list :cbu-id "...")
+  doc: List ISDA agreements for CBU
+  tier: diagnostics

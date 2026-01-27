@@ -1,0 +1,501 @@
+version: '2.0'
+domain: verify
+description: Adversarial verification - challenge/response workflow, pattern detection, confidence assessment
+verbs:
+- verb: verify.respond-to-challenge
+  domain: verify
+  action: respond-to-challenge
+  aliases:
+  - respond-to-challenge
+  args:
+    style: keyworded
+    required:
+      challenge-id:
+        type: entity_name
+      response-text:
+        type: str
+    optional:
+      evidence-ids:
+        type: uuid_array
+  positional_sugar:
+  - challenge-id
+  - response-text
+  invocation_phrases:
+  - respond to challenge verify
+  - respond to challenge the verify
+  - verify respond to challenge
+  examples:
+  - (verify.respond-to-challenge :challenge-id "..." :response-text "...")
+  doc: Record client response to verification challenge
+  tier: intent
+- verb: verify.list-challenges
+  domain: verify
+  action: list-challenges
+  aliases:
+  - list-challenges
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      severity:
+        type: str
+      status:
+        type: enum
+        values:
+        - OPEN
+        - RESPONDED
+        - RESOLVED
+        - ESCALATED
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list challenges verify
+  - list challenges the verify
+  - verify list challenges
+  examples:
+  - (verify.list-challenges :cbu-id "...")
+  doc: List verification challenges for CBU or case
+  tier: reference
+- verb: verify.resolve-challenge
+  domain: verify
+  action: resolve-challenge
+  aliases:
+  - resolve-challenge
+  args:
+    style: keyworded
+    required:
+      status:
+        type: enum
+        values:
+        - RESOLVED
+        - ESCALATED
+      resolution-type:
+        type: enum
+        values:
+        - ACCEPTED
+        - REJECTED
+        - WAIVED
+        - ESCALATED
+      resolved-by:
+        type: str
+      challenge-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - challenge-id
+  - resolution-type
+  invocation_phrases:
+  - resolve challenge verify
+  - resolve challenge the verify
+  - verify resolve challenge
+  examples:
+  - (verify.resolve-challenge :challenge-id "..." :resolution-type "..." :status "..." :resolved-by "...")
+  doc: Resolve verification challenge (accept/reject/escalate)
+  tier: intent
+- verb: verify.resolve-escalation
+  domain: verify
+  action: resolve-escalation
+  aliases:
+  - resolve-escalation
+  args:
+    style: keyworded
+    required:
+      decided-by:
+        type: str
+      escalation-id:
+        type: entity_name
+      decision:
+        type: enum
+        values:
+        - APPROVE
+        - REJECT
+        - REQUIRE_MORE_INFO
+        - ESCALATE_FURTHER
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - escalation-id
+  - decision
+  invocation_phrases:
+  - resolve escalation verify
+  - resolve escalation the verify
+  - verify resolve escalation
+  examples:
+  - (verify.resolve-escalation :escalation-id "..." :decision "..." :decided-by "...")
+  doc: Record escalation decision
+  tier: intent
+- verb: verify.verify-against-registry
+  domain: verify
+  action: verify-against-registry
+  aliases:
+  - verify-against-registry
+  args:
+    style: keyworded
+    required:
+      registry:
+        type: enum
+        values:
+        - GLEIF
+        - COMPANIES_HOUSE
+        - SEC_EDGAR
+        - LUXEMBOURG_RCS
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  - registry
+  invocation_phrases:
+  - verify against registry verify
+  - verify against registry the verify
+  - verify verify against registry
+  examples:
+  - (verify.verify-against-registry :entity-id "..." :registry "...")
+  doc: Check entity against external registry (GLEIF, Companies House)
+  tier: intent
+- verb: verify.record-pattern
+  domain: verify
+  action: record-pattern
+  aliases:
+  - record-pattern
+  args:
+    style: keyworded
+    required:
+      pattern-type:
+        type: enum
+        values:
+        - CIRCULAR_OWNERSHIP
+        - LAYERING
+        - NOMINEE_USAGE
+        - OPACITY_JURISDICTION
+        - REGISTRY_MISMATCH
+        - OWNERSHIP_GAPS
+        - RECENT_RESTRUCTURING
+        - ROLE_CONCENTRATION
+      description:
+        type: str
+      involved-entities:
+        type: uuid_array
+      cbu-id:
+        type: entity_name
+      severity:
+        type: enum
+        values:
+        - INFO
+        - LOW
+        - MEDIUM
+        - HIGH
+        - CRITICAL
+    optional:
+      case-id:
+        type: entity_name
+      evidence:
+        type: json
+  positional_sugar:
+  - cbu-id
+  - pattern-type
+  invocation_phrases:
+  - record pattern verify
+  - record pattern the verify
+  - verify record pattern
+  examples:
+  - (verify.record-pattern :cbu-id "..." :pattern-type "..." :severity "..." :description "..." :involved-entities "...")
+  doc: Manually record a detected pattern
+  tier: intent
+- verb: verify.detect-evasion
+  domain: verify
+  action: detect-evasion
+  aliases:
+  - detect-evasion
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+  positional_sugar:
+  - case-id
+  invocation_phrases:
+  - detect evasion verify
+  - detect evasion the verify
+  - verify detect evasion
+  examples:
+  - (verify.detect-evasion :case-id "...")
+  doc: Analyze doc_request history for evasion signals (delays, selective response, changing explanations)
+  tier: intent
+- verb: verify.resolve-pattern
+  domain: verify
+  action: resolve-pattern
+  aliases:
+  - resolve-pattern
+  args:
+    style: keyworded
+    required:
+      status:
+        type: enum
+        values:
+        - RESOLVED
+        - FALSE_POSITIVE
+      resolved-by:
+        type: str
+      pattern-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - pattern-id
+  - status
+  invocation_phrases:
+  - resolve pattern verify
+  - resolve pattern the verify
+  - verify resolve pattern
+  examples:
+  - (verify.resolve-pattern :pattern-id "..." :status "..." :resolved-by "...")
+  doc: Resolve or dismiss a detected pattern
+  tier: intent
+- verb: verify.challenge
+  domain: verify
+  action: challenge
+  aliases:
+  - challenge
+  args:
+    style: keyworded
+    required:
+      reason:
+        type: str
+      cbu-id:
+        type: entity_name
+      severity:
+        type: enum
+        values:
+        - INFO
+        - LOW
+        - MEDIUM
+        - HIGH
+        - CRITICAL
+      challenge-type:
+        type: enum
+        values:
+        - INCONSISTENCY
+        - LOW_CONFIDENCE
+        - MISSING_CORROBORATION
+        - PATTERN_DETECTED
+        - EVASION_SIGNAL
+        - REGISTRY_MISMATCH
+    optional:
+      allegation-id:
+        type: entity_name
+      observation-id:
+        type: entity_name
+      case-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+      raised-by:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - challenge-type
+  invocation_phrases:
+  - challenge verify
+  - challenge the verify
+  - verify challenge
+  examples:
+  - (verify.challenge :cbu-id "..." :challenge-type "..." :reason "..." :severity "...")
+  doc: Raise formal verification challenge requiring client response
+  tier: intent
+- verb: verify.escalate
+  domain: verify
+  action: escalate
+  aliases:
+  - escalate
+  args:
+    style: keyworded
+    required:
+      reason:
+        type: str
+      cbu-id:
+        type: entity_name
+      level:
+        type: enum
+        values:
+        - SENIOR_ANALYST
+        - COMPLIANCE_OFFICER
+        - MLRO
+        - COMMITTEE
+    optional:
+      challenge-id:
+        type: entity_name
+      risk-indicators:
+        type: json
+      escalated-by:
+        type: str
+      case-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - level
+  invocation_phrases:
+  - escalate verify
+  - escalate the verify
+  - verify escalate
+  examples:
+  - (verify.escalate :cbu-id "..." :level "..." :reason "...")
+  doc: Escalate verification issue to higher authority
+  tier: intent
+- verb: verify.list-patterns
+  domain: verify
+  action: list-patterns
+  aliases:
+  - list-patterns
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      pattern-type:
+        type: str
+      status:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list patterns verify
+  - list patterns the verify
+  - verify list patterns
+  examples:
+  - (verify.list-patterns :cbu-id "...")
+  doc: List detected patterns for CBU
+  tier: reference
+- verb: verify.detect-patterns
+  domain: verify
+  action: detect-patterns
+  aliases:
+  - detect-patterns
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      case-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - detect patterns verify
+  - detect patterns the verify
+  - verify detect patterns
+  examples:
+  - (verify.detect-patterns :cbu-id "...")
+  doc: Run adversarial pattern detection on CBU (circular ownership, layering, nominees, opacity)
+  tier: intent
+- verb: verify.get-status
+  domain: verify
+  action: get-status
+  aliases:
+  - get-status
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - get status verify
+  - get status the verify
+  - verify get status
+  examples:
+  - (verify.get-status :cbu-id "...")
+  doc: Get comprehensive verification status report for CBU
+  tier: diagnostics
+- verb: verify.list-escalations
+  domain: verify
+  action: list-escalations
+  aliases:
+  - list-escalations
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      status:
+        type: enum
+        values:
+        - PENDING
+        - UNDER_REVIEW
+        - DECIDED
+      level:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list escalations verify
+  - list escalations the verify
+  - verify list escalations
+  examples:
+  - (verify.list-escalations :cbu-id "...")
+  doc: List escalations for CBU
+  tier: reference
+- verb: verify.assert
+  domain: verify
+  action: assert
+  aliases:
+  - assert
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      min-confidence:
+        type: decimal
+    optional:
+      fail-action:
+        type: enum
+        values:
+        - error
+        - warn
+        - block
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - min-confidence
+  invocation_phrases:
+  - assert verify
+  - assert the verify
+  - verify assert
+  examples:
+  - (verify.assert :cbu-id "..." :min-confidence "...")
+  doc: Declarative gate - assert minimum confidence threshold for CBU/entity
+  tier: intent
+- verb: verify.calculate-confidence
+  domain: verify
+  action: calculate-confidence
+  aliases:
+  - calculate-confidence
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      attribute:
+        type: str
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - calculate confidence verify
+  - calculate confidence the verify
+  - verify calculate confidence
+  examples:
+  - (verify.calculate-confidence :entity-id "...")
+  doc: Aggregate confidence score across observations for entity/attribute
+  tier: diagnostics

@@ -1,0 +1,1260 @@
+# ============================================================================
+# INVOCATION PHRASES EXTENSION - SPARSE DOMAINS
+# ============================================================================
+# Generated: 2026-01-27
+# Purpose: Add sentence-like patterns to domains with sparse/missing coverage
+# Rules: 8-15 phrases per verb, 3-8 words each, imperative/natural style
+# ============================================================================
+
+# ============================================================================
+# TRADING-PROFILE.YAML - Trading Configuration (47 verbs, 10 have phrases)
+# ============================================================================
+
+trading-profile:
+  # -- Already have phrases: import, read, get-active, materialize --
+  # -- Need phrases for remaining 37 verbs --
+
+  list-versions:
+    invocation_phrases:
+      - "list trading profile versions"
+      - "show profile version history"
+      - "view all profile versions"
+      - "list profile revisions"
+      - "show trading history"
+      - "get version history"
+      - "list CBU profile versions"
+      - "show profile changelog"
+
+  activate:
+    invocation_phrases:
+      - "activate trading profile"
+      - "make profile active"
+      - "activate this version"
+      - "switch to active profile"
+      - "enable trading profile"
+      - "set profile as active"
+      - "go live with profile"
+      - "activate CBU profile"
+
+  diff:
+    invocation_phrases:
+      - "diff trading profiles"
+      - "compare profiles"
+      - "show profile differences"
+      - "compare two versions"
+      - "what changed between"
+      - "diff profile versions"
+      - "compare changes"
+      - "show profile delta"
+
+  create-draft:
+    invocation_phrases:
+      - "create draft profile"
+      - "start new profile draft"
+      - "create trading draft"
+      - "new profile version"
+      - "draft new profile"
+      - "start profile edit"
+      - "create draft from active"
+      - "begin profile changes"
+
+  clone-to:
+    invocation_phrases:
+      - "clone profile to CBU"
+      - "copy trading profile"
+      - "clone profile"
+      - "duplicate profile to"
+      - "copy profile to new CBU"
+      - "replicate trading setup"
+      - "clone configuration"
+      - "copy to target CBU"
+
+  create-new-version:
+    invocation_phrases:
+      - "create new profile version"
+      - "version this profile"
+      - "bump profile version"
+      - "new version from current"
+      - "create version"
+      - "increment profile version"
+      - "save as new version"
+
+  add-instrument-class:
+    invocation_phrases:
+      - "add instrument class"
+      - "enable instrument class"
+      - "add equity trading"
+      - "add bond trading"
+      - "enable instrument type"
+      - "add asset class"
+      - "permit instrument class"
+      - "include instrument in profile"
+
+  remove-instrument-class:
+    invocation_phrases:
+      - "remove instrument class"
+      - "disable instrument class"
+      - "remove equity trading"
+      - "remove from profile"
+      - "disable asset class"
+      - "exclude instrument type"
+      - "drop instrument class"
+
+  add-market:
+    invocation_phrases:
+      - "add market to profile"
+      - "enable market access"
+      - "add exchange"
+      - "add trading venue"
+      - "enable market"
+      - "add market MIC"
+      - "permit market trading"
+      - "include market"
+
+  remove-market:
+    invocation_phrases:
+      - "remove market from profile"
+      - "disable market access"
+      - "remove exchange"
+      - "exclude market"
+      - "drop trading venue"
+      - "remove market MIC"
+      - "disable market"
+
+  set-base-currency:
+    invocation_phrases:
+      - "set base currency"
+      - "change base currency"
+      - "set profile currency"
+      - "update base currency"
+      - "set primary currency"
+      - "configure base currency"
+      - "set CBU base currency"
+
+  add-allowed-currency:
+    invocation_phrases:
+      - "add allowed currency"
+      - "permit currency"
+      - "enable currency"
+      - "add settlement currency"
+      - "allow currency trading"
+      - "add currency to profile"
+      - "include currency"
+
+  add-standing-instruction:
+    invocation_phrases:
+      - "add standing instruction"
+      - "add SSI"
+      - "create SSI"
+      - "add settlement instruction"
+      - "configure SSI"
+      - "add new SSI"
+      - "set up standing instruction"
+      - "create settlement instruction"
+
+  remove-standing-instruction:
+    invocation_phrases:
+      - "remove standing instruction"
+      - "delete SSI"
+      - "remove SSI"
+      - "delete settlement instruction"
+      - "deactivate SSI"
+      - "remove from SSIs"
+      - "drop standing instruction"
+
+  add-booking-rule:
+    invocation_phrases:
+      - "add booking rule"
+      - "create booking rule"
+      - "add settlement rule"
+      - "configure booking"
+      - "add SSI selection rule"
+      - "create routing rule"
+      - "add rule to profile"
+      - "define booking rule"
+
+  remove-booking-rule:
+    invocation_phrases:
+      - "remove booking rule"
+      - "delete booking rule"
+      - "remove settlement rule"
+      - "drop routing rule"
+      - "deactivate booking rule"
+      - "remove rule"
+
+  add-isda-config:
+    invocation_phrases:
+      - "add ISDA configuration"
+      - "configure ISDA agreement"
+      - "set up ISDA"
+      - "add ISDA master"
+      - "create ISDA config"
+      - "add ISDA settings"
+      - "configure ISDA master"
+
+  add-isda-coverage:
+    invocation_phrases:
+      - "add ISDA coverage"
+      - "extend ISDA coverage"
+      - "add product to ISDA"
+      - "include in ISDA scope"
+      - "add ISDA product coverage"
+      - "expand ISDA coverage"
+      - "add to ISDA products"
+
+  add-csa-config:
+    invocation_phrases:
+      - "add CSA configuration"
+      - "configure CSA"
+      - "set up CSA agreement"
+      - "add credit support annex"
+      - "create CSA config"
+      - "add CSA settings"
+      - "configure collateral agreement"
+
+  add-csa-collateral:
+    invocation_phrases:
+      - "add CSA collateral"
+      - "configure eligible collateral"
+      - "add collateral type"
+      - "set collateral eligibility"
+      - "add eligible securities"
+      - "configure CSA margin"
+      - "add collateral assets"
+
+  link-csa-ssi:
+    invocation_phrases:
+      - "link CSA to SSI"
+      - "connect CSA SSI"
+      - "associate CSA with SSI"
+      - "set CSA settlement"
+      - "link collateral SSI"
+      - "configure CSA settlement"
+      - "attach SSI to CSA"
+
+  remove-isda-config:
+    invocation_phrases:
+      - "remove ISDA configuration"
+      - "delete ISDA config"
+      - "remove ISDA agreement"
+      - "deactivate ISDA"
+      - "drop ISDA settings"
+      - "remove ISDA from profile"
+
+  remove-csa-config:
+    invocation_phrases:
+      - "remove CSA configuration"
+      - "delete CSA config"
+      - "remove credit support"
+      - "deactivate CSA"
+      - "drop CSA settings"
+      - "remove CSA from profile"
+
+  add-im-mandate:
+    invocation_phrases:
+      - "add investment management mandate"
+      - "add IM mandate"
+      - "create management mandate"
+      - "add investment mandate"
+      - "configure IM relationship"
+      - "add discretionary mandate"
+      - "create IM agreement"
+
+  update-im-scope:
+    invocation_phrases:
+      - "update IM scope"
+      - "modify mandate scope"
+      - "change IM coverage"
+      - "update management scope"
+      - "adjust mandate scope"
+      - "change discretionary scope"
+      - "modify IM permissions"
+
+  remove-im-mandate:
+    invocation_phrases:
+      - "remove IM mandate"
+      - "terminate mandate"
+      - "end investment mandate"
+      - "remove management mandate"
+      - "deactivate IM relationship"
+      - "delete IM mandate"
+
+  validate-go-live-ready:
+    invocation_phrases:
+      - "validate go live ready"
+      - "check ready for activation"
+      - "validate profile completeness"
+      - "is profile ready"
+      - "check go live status"
+      - "validate activation ready"
+      - "run go live checks"
+      - "pre-activation validation"
+
+  validate-universe-coverage:
+    invocation_phrases:
+      - "validate universe coverage"
+      - "check universe completeness"
+      - "verify instrument coverage"
+      - "check SSI coverage"
+      - "validate settlement coverage"
+      - "coverage validation"
+      - "check all markets covered"
+
+  submit:
+    invocation_phrases:
+      - "submit profile for approval"
+      - "submit trading profile"
+      - "request profile approval"
+      - "submit for review"
+      - "send for approval"
+      - "submit profile changes"
+      - "request go-live approval"
+
+  approve:
+    invocation_phrases:
+      - "approve trading profile"
+      - "approve profile"
+      - "authorize profile"
+      - "approve go-live"
+      - "give profile approval"
+      - "approve activation"
+      - "authorize trading setup"
+
+  reject:
+    invocation_phrases:
+      - "reject trading profile"
+      - "reject profile"
+      - "decline profile approval"
+      - "reject changes"
+      - "send back for changes"
+      - "reject activation request"
+      - "deny profile approval"
+
+  archive:
+    invocation_phrases:
+      - "archive trading profile"
+      - "archive profile"
+      - "archive old version"
+      - "move to archive"
+      - "archive superseded profile"
+      - "store in archive"
+      - "mark profile archived"
+
+  # -- Corporate Actions (ca.*) verbs --
+
+  ca.enable-event-types:
+    invocation_phrases:
+      - "enable corporate action types"
+      - "turn on CA events"
+      - "enable dividend events"
+      - "enable stock split"
+      - "activate CA event types"
+      - "enable CA processing"
+      - "turn on event types"
+
+  ca.disable-event-types:
+    invocation_phrases:
+      - "disable corporate action types"
+      - "turn off CA events"
+      - "disable dividend events"
+      - "disable CA processing"
+      - "deactivate event types"
+      - "turn off CA events"
+
+  ca.set-notification-policy:
+    invocation_phrases:
+      - "set CA notification policy"
+      - "configure CA notifications"
+      - "set notification preferences"
+      - "configure event alerts"
+      - "set CA alert policy"
+      - "notification settings"
+      - "configure CA alerts"
+
+  ca.set-election-policy:
+    invocation_phrases:
+      - "set CA election policy"
+      - "configure election defaults"
+      - "set default elections"
+      - "election policy settings"
+      - "configure CA choices"
+      - "set election preferences"
+      - "configure automatic elections"
+
+  ca.set-default-option:
+    invocation_phrases:
+      - "set default CA option"
+      - "configure default election"
+      - "set default choice"
+      - "set automatic election"
+      - "configure default option"
+      - "set fallback election"
+      - "default CA selection"
+
+  ca.remove-default-option:
+    invocation_phrases:
+      - "remove default CA option"
+      - "clear default election"
+      - "remove automatic election"
+      - "delete default option"
+      - "clear default choice"
+      - "remove CA default"
+
+  ca.add-cutoff-rule:
+    invocation_phrases:
+      - "add CA cutoff rule"
+      - "set election cutoff"
+      - "add deadline rule"
+      - "configure cutoff time"
+      - "add instruction deadline"
+      - "set CA deadline"
+      - "add cutoff configuration"
+
+  ca.remove-cutoff-rule:
+    invocation_phrases:
+      - "remove CA cutoff rule"
+      - "delete cutoff rule"
+      - "remove deadline rule"
+      - "clear cutoff configuration"
+      - "remove instruction deadline"
+
+  ca.link-proceeds-ssi:
+    invocation_phrases:
+      - "link proceeds SSI"
+      - "set CA proceeds account"
+      - "link dividend SSI"
+      - "configure proceeds settlement"
+      - "set proceeds destination"
+      - "link CA payout SSI"
+      - "configure proceeds routing"
+
+  ca.remove-proceeds-ssi:
+    invocation_phrases:
+      - "remove proceeds SSI"
+      - "unlink proceeds account"
+      - "remove dividend SSI"
+      - "clear proceeds SSI"
+      - "remove payout routing"
+      - "delete proceeds link"
+
+  ca.get-policy:
+    invocation_phrases:
+      - "get CA policy"
+      - "show CA configuration"
+      - "view CA settings"
+      - "display CA policy"
+      - "get corporate action policy"
+      - "show CA setup"
+      - "view event policy"
+
+
+
+# ============================================================================
+# ENTITY.YAML - Entity Management (17 verbs, 4 have phrases)
+# ============================================================================
+
+entity:
+  # -- Already have phrases: create-limited-company, create-proper-person --
+  # -- Need phrases for remaining verbs --
+
+  create-trust:
+    invocation_phrases:
+      - "create trust"
+      - "add trust entity"
+      - "create new trust"
+      - "register trust"
+      - "set up trust"
+      - "add trust structure"
+      - "create trust vehicle"
+      - "new trust entity"
+
+  create-partnership:
+    invocation_phrases:
+      - "create partnership"
+      - "add partnership entity"
+      - "create LP"
+      - "create LLP"
+      - "register partnership"
+      - "new partnership"
+      - "create limited partnership"
+      - "add partnership"
+
+  create-government-entity:
+    invocation_phrases:
+      - "create government entity"
+      - "add government body"
+      - "create sovereign entity"
+      - "register government"
+      - "add state entity"
+      - "create public entity"
+
+  create-nominee:
+    invocation_phrases:
+      - "create nominee"
+      - "add nominee entity"
+      - "create nominee company"
+      - "register nominee"
+      - "add nominee shareholder"
+      - "create nominee vehicle"
+
+  update:
+    invocation_phrases:
+      - "update entity"
+      - "modify entity details"
+      - "change entity information"
+      - "edit entity"
+      - "update company details"
+      - "modify entity"
+      - "change entity name"
+      - "update entity attributes"
+
+  merge:
+    invocation_phrases:
+      - "merge entities"
+      - "combine entities"
+      - "entity merger"
+      - "merge duplicate entities"
+      - "consolidate entities"
+      - "merge into one"
+      - "combine duplicate records"
+
+  archive:
+    invocation_phrases:
+      - "archive entity"
+      - "deactivate entity"
+      - "mark entity inactive"
+      - "archive company"
+      - "soft delete entity"
+      - "retire entity"
+      - "end entity"
+
+  unarchive:
+    invocation_phrases:
+      - "unarchive entity"
+      - "reactivate entity"
+      - "restore entity"
+      - "bring back entity"
+      - "undelete entity"
+      - "reinstate entity"
+
+  get:
+    invocation_phrases:
+      - "get entity"
+      - "show entity details"
+      - "view entity"
+      - "fetch entity"
+      - "display entity info"
+      - "look up entity"
+      - "get entity by ID"
+      - "retrieve entity"
+
+  list:
+    invocation_phrases:
+      - "list entities"
+      - "show all entities"
+      - "view entity list"
+      - "list companies"
+      - "show entities by type"
+      - "list all entities"
+      - "display entities"
+      - "get entity list"
+
+  search:
+    invocation_phrases:
+      - "search entities"
+      - "find entity"
+      - "search for company"
+      - "look up entity by name"
+      - "find company"
+      - "entity search"
+      - "search by name"
+      - "find matching entities"
+
+  resolve:
+    invocation_phrases:
+      - "resolve entity"
+      - "match entity"
+      - "resolve entity reference"
+      - "find exact entity"
+      - "entity resolution"
+      - "match to known entity"
+      - "resolve entity name"
+
+  enrich:
+    invocation_phrases:
+      - "enrich entity"
+      - "add entity data"
+      - "enrich from GLEIF"
+      - "fetch external data"
+      - "enrich company data"
+      - "pull entity information"
+      - "populate entity details"
+      - "auto-fill entity"
+
+# ============================================================================
+# CONTROL.YAML - Control Relationships (15 verbs, 6 have phrases)
+# ============================================================================
+
+control:
+  add:
+    invocation_phrases:
+      - "add control relationship"
+      - "create control link"
+      - "add controller"
+      - "add voting control"
+      - "add board control"
+      - "create control"
+      - "link controller"
+      - "add management control"
+
+  end:
+    invocation_phrases:
+      - "end control relationship"
+      - "terminate control"
+      - "end voting control"
+      - "remove controller"
+      - "control relationship ended"
+      - "end board control"
+      - "close control link"
+
+  list-controllers:
+    invocation_phrases:
+      - "list controllers"
+      - "who controls this"
+      - "show controllers"
+      - "find controllers"
+      - "list who controls"
+      - "view control relationships"
+      - "show controlling parties"
+      - "list control sources"
+
+  list-controlled:
+    invocation_phrases:
+      - "list controlled entities"
+      - "what do they control"
+      - "show controlled"
+      - "list subsidiaries"
+      - "view controlled companies"
+      - "what is controlled"
+      - "show control targets"
+      - "list control targets"
+
+  list-all:
+    invocation_phrases:
+      - "list all control"
+      - "show all control relationships"
+      - "view control structure"
+      - "display control network"
+      - "list control links"
+      - "show full control map"
+
+  get:
+    invocation_phrases:
+      - "get control relationship"
+      - "view control details"
+      - "show control link"
+      - "get control by ID"
+      - "fetch control relationship"
+      - "display control info"
+
+  update:
+    invocation_phrases:
+      - "update control"
+      - "modify control relationship"
+      - "change control percentage"
+      - "update voting rights"
+      - "modify control details"
+      - "adjust control"
+
+  history:
+    invocation_phrases:
+      - "control history"
+      - "show control changes"
+      - "view control timeline"
+      - "control audit trail"
+      - "historical control"
+      - "past control relationships"
+
+  transfer:
+    invocation_phrases:
+      - "transfer control"
+      - "change controller"
+      - "control transferred"
+      - "move control to"
+      - "reassign control"
+      - "control succession"
+      - "new controller"
+
+# ============================================================================
+# GLEIF.YAML - GLEIF Integration (16 verbs, 6 have phrases)
+# ============================================================================
+
+gleif:
+  lookup-lei:
+    invocation_phrases:
+      - "look up LEI"
+      - "search by LEI"
+      - "find entity by LEI"
+      - "LEI lookup"
+      - "get entity from LEI"
+      - "resolve LEI"
+      - "fetch LEI data"
+      - "search LEI database"
+
+  lookup-name:
+    invocation_phrases:
+      - "search GLEIF by name"
+      - "find company in GLEIF"
+      - "GLEIF name search"
+      - "search for company LEI"
+      - "find LEI by name"
+      - "look up company in GLEIF"
+      - "name search GLEIF"
+
+  get-relationships:
+    invocation_phrases:
+      - "get GLEIF relationships"
+      - "show LEI relationships"
+      - "fetch parent company"
+      - "get ultimate parent"
+      - "show GLEIF hierarchy"
+      - "LEI relationship data"
+      - "get ownership from GLEIF"
+
+  get-level2:
+    invocation_phrases:
+      - "get GLEIF level 2"
+      - "fetch ownership data"
+      - "get parent relationships"
+      - "LEI level 2 data"
+      - "show direct parent"
+      - "get ultimate owner from GLEIF"
+
+  enrich-entity:
+    invocation_phrases:
+      - "enrich from GLEIF"
+      - "pull GLEIF data"
+      - "auto-fill from LEI"
+      - "enrich entity from GLEIF"
+      - "populate from GLEIF"
+      - "fetch GLEIF details"
+      - "sync with GLEIF"
+
+  import-hierarchy:
+    invocation_phrases:
+      - "import GLEIF hierarchy"
+      - "pull ownership chain"
+      - "import from GLEIF"
+      - "create from GLEIF"
+      - "import LEI structure"
+      - "build from GLEIF data"
+      - "pull full hierarchy"
+
+  validate-lei:
+    invocation_phrases:
+      - "validate LEI"
+      - "check LEI status"
+      - "verify LEI"
+      - "is LEI valid"
+      - "LEI validation"
+      - "check LEI active"
+      - "verify LEI status"
+
+  check-updates:
+    invocation_phrases:
+      - "check GLEIF updates"
+      - "any LEI changes"
+      - "GLEIF data changed"
+      - "check for LEI updates"
+      - "has GLEIF data changed"
+      - "monitor LEI changes"
+
+  refresh-entity:
+    invocation_phrases:
+      - "refresh from GLEIF"
+      - "update from GLEIF"
+      - "resync GLEIF data"
+      - "refresh LEI data"
+      - "reload from GLEIF"
+      - "pull latest GLEIF"
+      - "sync entity with GLEIF"
+
+  batch-lookup:
+    invocation_phrases:
+      - "batch LEI lookup"
+      - "bulk GLEIF search"
+      - "lookup multiple LEIs"
+      - "batch validate LEIs"
+      - "mass LEI lookup"
+      - "bulk LEI check"
+
+# ============================================================================
+# CBU.YAML - CBU Management (19 verbs, 3 have phrases)
+# ============================================================================
+
+cbu:
+  create:
+    invocation_phrases:
+      - "create CBU"
+      - "new CBU"
+      - "add commercial business unit"
+      - "create new CBU"
+      - "set up CBU"
+      - "establish CBU"
+      - "add CBU"
+      - "create business unit"
+
+  update:
+    invocation_phrases:
+      - "update CBU"
+      - "modify CBU"
+      - "change CBU details"
+      - "edit CBU"
+      - "update CBU name"
+      - "change CBU status"
+      - "modify business unit"
+
+  get:
+    invocation_phrases:
+      - "get CBU"
+      - "show CBU"
+      - "view CBU details"
+      - "fetch CBU"
+      - "display CBU"
+      - "look up CBU"
+      - "get CBU by ID"
+
+  list:
+    invocation_phrases:
+      - "list CBUs"
+      - "show all CBUs"
+      - "view CBU list"
+      - "display CBUs"
+      - "list all business units"
+      - "show CBUs for client"
+      - "get CBU list"
+
+  search:
+    invocation_phrases:
+      - "search CBUs"
+      - "find CBU"
+      - "search by CBU name"
+      - "look up CBU"
+      - "CBU search"
+      - "find matching CBUs"
+
+  archive:
+    invocation_phrases:
+      - "archive CBU"
+      - "deactivate CBU"
+      - "close CBU"
+      - "retire CBU"
+      - "mark CBU inactive"
+      - "end CBU"
+
+  unarchive:
+    invocation_phrases:
+      - "unarchive CBU"
+      - "reactivate CBU"
+      - "restore CBU"
+      - "reinstate CBU"
+      - "bring back CBU"
+
+  add-role:
+    invocation_phrases:
+      - "add role to CBU"
+      - "assign CBU role"
+      - "add entity role"
+      - "link entity to CBU"
+      - "add custodian role"
+      - "add fund admin role"
+      - "assign role"
+      - "add CBU participant"
+
+  remove-role:
+    invocation_phrases:
+      - "remove role from CBU"
+      - "unassign role"
+      - "delete CBU role"
+      - "remove entity from CBU"
+      - "unlink entity role"
+      - "remove participant"
+
+  list-roles:
+    invocation_phrases:
+      - "list CBU roles"
+      - "show roles"
+      - "view CBU participants"
+      - "display roles"
+      - "who is in this CBU"
+      - "list participants"
+      - "show CBU entities"
+
+  set-status:
+    invocation_phrases:
+      - "set CBU status"
+      - "change CBU status"
+      - "update status"
+      - "set to active"
+      - "mark CBU status"
+      - "transition CBU status"
+
+  add-jurisdiction:
+    invocation_phrases:
+      - "add jurisdiction to CBU"
+      - "add trading jurisdiction"
+      - "enable jurisdiction"
+      - "add CBU market"
+      - "include jurisdiction"
+      - "add country to CBU"
+
+  remove-jurisdiction:
+    invocation_phrases:
+      - "remove jurisdiction from CBU"
+      - "disable jurisdiction"
+      - "remove CBU market"
+      - "exclude jurisdiction"
+      - "drop jurisdiction"
+
+  clone:
+    invocation_phrases:
+      - "clone CBU"
+      - "copy CBU"
+      - "duplicate CBU"
+      - "replicate CBU"
+      - "create CBU from template"
+      - "copy CBU structure"
+
+  summary:
+    invocation_phrases:
+      - "CBU summary"
+      - "show CBU overview"
+      - "CBU status summary"
+      - "get CBU summary"
+      - "display CBU info"
+      - "CBU snapshot"
+
+
+
+# ============================================================================
+# GRAPH.YAML - Additional Coverage (9 verbs, all have some but extend)
+# ============================================================================
+
+graph:
+  group-by:
+    invocation_phrases:
+      - "group graph by"
+      - "cluster by attribute"
+      - "group nodes by jurisdiction"
+      - "group by role"
+      - "group by type"
+      - "cluster entities"
+      - "group graph nodes"
+      - "organize by"
+
+  collapse:
+    invocation_phrases:
+      - "collapse graph group"
+      - "collapse node"
+      - "collapse cluster"
+      - "hide group details"
+      - "collapse into summary"
+      - "collapse children"
+      - "fold group"
+
+  expand:
+    invocation_phrases:
+      - "expand graph group"
+      - "expand node"
+      - "expand collapsed"
+      - "show group details"
+      - "expand cluster"
+      - "unfold group"
+      - "show children"
+
+  path:
+    invocation_phrases:
+      - "find path between"
+      - "show connection"
+      - "path from A to B"
+      - "how are they connected"
+      - "find relationship path"
+      - "trace path"
+      - "show link between"
+      - "graph path"
+
+  layers:
+    invocation_phrases:
+      - "show graph layers"
+      - "toggle layer"
+      - "enable layer"
+      - "disable layer"
+      - "layer visibility"
+      - "show custody layer"
+      - "show UBO layer"
+      - "toggle graph layers"
+
+# ============================================================================
+# BODS.YAML - BODS Integration (9 verbs, 2 have phrases)
+# ============================================================================
+
+bods:
+  export:
+    invocation_phrases:
+      - "export to BODS"
+      - "generate BODS"
+      - "create BODS export"
+      - "export ownership to BODS"
+      - "BODS export"
+      - "generate BODS data"
+      - "create BODS file"
+      - "export beneficial ownership"
+
+  import:
+    invocation_phrases:
+      - "import from BODS"
+      - "load BODS data"
+      - "import BODS file"
+      - "create from BODS"
+      - "BODS import"
+      - "load ownership from BODS"
+      - "import BODS entities"
+
+  validate:
+    invocation_phrases:
+      - "validate BODS"
+      - "check BODS compliance"
+      - "BODS validation"
+      - "is BODS valid"
+      - "validate BODS export"
+      - "check BODS format"
+      - "run BODS validation"
+
+  reconcile:
+    invocation_phrases:
+      - "reconcile with BODS"
+      - "compare to BODS"
+      - "BODS reconciliation"
+      - "check BODS match"
+      - "sync with BODS"
+      - "BODS comparison"
+      - "verify against BODS"
+
+  get-statement:
+    invocation_phrases:
+      - "get BODS statement"
+      - "fetch BODS record"
+      - "view BODS statement"
+      - "show BODS data"
+      - "retrieve BODS statement"
+      - "get ownership statement"
+
+  list-statements:
+    invocation_phrases:
+      - "list BODS statements"
+      - "show BODS history"
+      - "view BODS statements"
+      - "BODS statement list"
+      - "list ownership statements"
+      - "show BODS records"
+
+  publish:
+    invocation_phrases:
+      - "publish to BODS"
+      - "submit BODS"
+      - "publish ownership"
+      - "register with BODS"
+      - "BODS submission"
+      - "publish beneficial ownership"
+
+# ============================================================================
+# SESSION.YAML - Session Management (13 verbs, 8 have phrases)
+# ============================================================================
+
+session:
+  save-as:
+    invocation_phrases:
+      - "save session as"
+      - "save view as"
+      - "create saved view"
+      - "save state as"
+      - "name this session"
+      - "save as workspace"
+      - "bookmark session"
+
+  restore:
+    invocation_phrases:
+      - "restore session"
+      - "load saved session"
+      - "restore saved view"
+      - "load workspace"
+      - "restore state"
+      - "open saved session"
+      - "load previous session"
+
+  share:
+    invocation_phrases:
+      - "share session"
+      - "share this view"
+      - "send session link"
+      - "share workspace"
+      - "export session"
+      - "share with team"
+
+  list-saved:
+    invocation_phrases:
+      - "list saved sessions"
+      - "show my saved views"
+      - "view saved sessions"
+      - "list workspaces"
+      - "show saved states"
+      - "my saved sessions"
+
+  delete-saved:
+    invocation_phrases:
+      - "delete saved session"
+      - "remove saved view"
+      - "delete workspace"
+      - "remove saved state"
+      - "delete bookmark"
+
+# ============================================================================
+# CBU-ROLE-V2.YAML - CBU Role Management (10 verbs, 1 has phrases)
+# ============================================================================
+
+cbu-role-v2:
+  assign:
+    invocation_phrases:
+      - "assign role"
+      - "add role to entity"
+      - "assign entity role"
+      - "grant role"
+      - "give role"
+      - "assign to CBU"
+      - "add participant role"
+      - "assign CBU role"
+
+  unassign:
+    invocation_phrases:
+      - "unassign role"
+      - "remove role"
+      - "revoke role"
+      - "unassign from CBU"
+      - "remove entity role"
+      - "take away role"
+      - "remove participant"
+
+  list-by-entity:
+    invocation_phrases:
+      - "list roles for entity"
+      - "what roles does entity have"
+      - "show entity roles"
+      - "entity role list"
+      - "view roles assigned"
+      - "roles for entity"
+
+  list-by-cbu:
+    invocation_phrases:
+      - "list roles in CBU"
+      - "show CBU participants"
+      - "who is in this CBU"
+      - "CBU role list"
+      - "list CBU entities"
+      - "show CBU roles"
+
+  list-by-role:
+    invocation_phrases:
+      - "list entities with role"
+      - "who has this role"
+      - "find by role"
+      - "list custodians"
+      - "list fund admins"
+      - "entities by role"
+
+  transfer:
+    invocation_phrases:
+      - "transfer role"
+      - "move role to new entity"
+      - "role succession"
+      - "transfer responsibility"
+      - "change role holder"
+      - "reassign role"
+
+  update:
+    invocation_phrases:
+      - "update role"
+      - "modify role assignment"
+      - "change role details"
+      - "update role attributes"
+      - "modify assignment"
+
+  validate:
+    invocation_phrases:
+      - "validate roles"
+      - "check role completeness"
+      - "role validation"
+      - "are required roles filled"
+      - "validate CBU roles"
+      - "check role requirements"
+
+  history:
+    invocation_phrases:
+      - "role history"
+      - "show role changes"
+      - "role audit trail"
+      - "past role assignments"
+      - "view role timeline"
+
+# ============================================================================
+# CLIENT-GROUP.YAML - Client Group Operations (23 verbs, 18 have phrases)
+# ============================================================================
+
+client-group:
+  fork:
+    invocation_phrases:
+      - "fork client group"
+      - "branch from group"
+      - "create group variant"
+      - "fork working set"
+      - "create branch"
+      - "fork for exploration"
+
+  merge:
+    invocation_phrases:
+      - "merge client groups"
+      - "combine groups"
+      - "merge changes back"
+      - "merge branch"
+      - "combine working sets"
+      - "merge into main"
+
+  diff:
+    invocation_phrases:
+      - "diff client groups"
+      - "compare groups"
+      - "show group differences"
+      - "what changed"
+      - "group comparison"
+      - "diff working sets"
+
+  export:
+    invocation_phrases:
+      - "export client group"
+      - "export group to file"
+      - "save group"
+      - "export working set"
+      - "download group"
+      - "export to YAML"
+
+  import:
+    invocation_phrases:
+      - "import client group"
+      - "load group from file"
+      - "import working set"
+      - "upload group"
+      - "import from YAML"
+      - "load saved group"
+
+# ============================================================================
+# END OF EXTENSION
+# ============================================================================

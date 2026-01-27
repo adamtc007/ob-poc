@@ -1,0 +1,319 @@
+version: '2.0'
+domain: requirement
+description: Document requirement management - what we need from entities
+verbs:
+- verb: requirement.mark-expired
+  domain: requirement
+  action: mark-expired
+  aliases:
+  - mark-expired
+  args:
+    style: keyworded
+    required:
+      requirement-id:
+        type: uuid
+  positional_sugar:
+  - requirement-id
+  invocation_phrases:
+  - mark expired requirement
+  - mark expired the requirement
+  - mark expired document requirement
+  - requirement mark expired
+  examples:
+  - (requirement.mark-expired :requirement-id "...")
+  doc: Mark a requirement as expired (document validity lapsed)
+  tier: diagnostics
+  tags:
+  - workflow
+  - write
+- verb: requirement.for-workflow
+  domain: requirement
+  action: for-workflow
+  aliases:
+  - for-workflow
+  args:
+    style: keyworded
+    required:
+      workflow-instance-id:
+        type: uuid
+  positional_sugar:
+  - workflow-instance-id
+  invocation_phrases:
+  - show workflow requirements
+  - list requirements for workflow
+  - what documents needed for workflow
+  - for workflow requirement
+  - for workflow the requirement
+  - for workflow document requirement
+  - requirement for workflow
+  examples:
+  - (requirement.for-workflow :workflow-instance-id "...")
+  doc: List all requirements for a workflow instance
+  tier: intent
+  tags:
+  - read
+  - query
+- verb: requirement.for-entity
+  domain: requirement
+  action: for-entity
+  aliases:
+  - for-entity
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - show requirements for entity
+  - list entity requirements
+  - what does entity need to provide
+  - for entity requirement
+  - for entity the requirement
+  - for entity document requirement
+  - requirement for entity
+  examples:
+  - (requirement.for-entity :entity-id "...")
+  doc: List all requirements for an entity
+  tier: intent
+  tags:
+  - read
+  - query
+- verb: requirement.with-status
+  domain: requirement
+  action: with-status
+  aliases:
+  - with-status
+  args:
+    style: keyworded
+    optional:
+      workflow-instance-id:
+        type: uuid
+      entity-id:
+        type: uuid
+  invocation_phrases:
+  - with status requirement
+  - with status the requirement
+  - with status document requirement
+  - requirement with status
+  examples:
+  - (requirement.with-status)
+  doc: Get requirements with latest version status (joined view)
+  tier: diagnostics
+  tags:
+  - read
+  - query
+- verb: requirement.unsatisfied
+  domain: requirement
+  action: unsatisfied
+  aliases:
+  - unsatisfied
+  args:
+    style: keyworded
+    required:
+      workflow-instance-id:
+        type: uuid
+  positional_sugar:
+  - workflow-instance-id
+  invocation_phrases:
+  - show missing requirements
+  - list unsatisfied requirements
+  - what requirements are not met
+  - incomplete requirements
+  - unsatisfied requirement
+  - unsatisfied the requirement
+  - unsatisfied document requirement
+  - requirement unsatisfied
+  examples:
+  - (requirement.unsatisfied :workflow-instance-id "...")
+  doc: List unsatisfied requirements for a workflow
+  tier: intent
+  tags:
+  - read
+  - query
+  - workflow
+- verb: requirement.reset
+  domain: requirement
+  action: reset
+  aliases:
+  - reset
+  args:
+    style: keyworded
+    required:
+      requirement-id:
+        type: uuid
+  positional_sugar:
+  - requirement-id
+  invocation_phrases:
+  - reset requirement
+  - restart document collection
+  - re-request document
+  - reset the requirement
+  - reset document requirement
+  - requirement reset
+  examples:
+  - (requirement.reset :requirement-id "...")
+  doc: Reset a requirement to missing (for re-collection)
+  tier: diagnostics
+  tags:
+  - workflow
+  - write
+- verb: requirement.create
+  domain: requirement
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      subject-entity-id:
+        type: entity_name
+      doc-type:
+        type: enum
+        values:
+        - passport
+        - proof_of_address
+        - articles_of_incorporation
+        - certificate_of_incumbency
+        - board_resolution
+        - tax_form
+        - financial_statement
+        - identity_card
+        - utility_bill
+        - bank_statement
+    optional:
+      workflow-instance-id:
+        type: uuid
+      max-attempts:
+        type: int
+      required-state:
+        type: enum
+        values:
+        - received
+        - verified
+      due-date:
+        type: str
+      subject-cbu-id:
+        type: entity_name
+  positional_sugar:
+  - subject-entity-id
+  - doc-type
+  invocation_phrases:
+  - create requirement
+  - add document requirement
+  - require document
+  - set up document requirement
+  - create the requirement
+  - add requirement
+  - new requirement
+  - create document requirement
+  examples:
+  - (requirement.create :subject-entity-id "..." :doc-type "...")
+  doc: Create a document requirement for an entity
+  tier: diagnostics
+  tags:
+  - workflow
+  - write
+- verb: requirement.get
+  domain: requirement
+  action: get
+  aliases:
+  - fetch
+  - get
+  - show
+  args:
+    style: keyworded
+    required:
+      requirement-id:
+        type: uuid
+  positional_sugar:
+  - requirement-id
+  invocation_phrases:
+  - get requirement
+  - get the requirement
+  - show requirement
+  - fetch requirement
+  - get document requirement
+  - requirement get
+  examples:
+  - (requirement.get :requirement-id "...")
+  doc: Get a requirement by ID
+  tier: diagnostics
+  tags:
+  - read
+- verb: requirement.create-set
+  domain: requirement
+  action: create-set
+  aliases:
+  - create-set
+  args:
+    style: keyworded
+    required:
+      subject-entity-id:
+        type: entity_name
+      doc-types:
+        type: list
+    optional:
+      required-state:
+        type: enum
+        values:
+        - received
+        - verified
+      due-date:
+        type: str
+      workflow-instance-id:
+        type: uuid
+  positional_sugar:
+  - subject-entity-id
+  - doc-types
+  invocation_phrases:
+  - create requirements
+  - add document requirements
+  - require documents
+  - set up KYC requirements
+  - create set requirement
+  - create set the requirement
+  - create set document requirement
+  - requirement create set
+  examples:
+  - (requirement.create-set :subject-entity-id "..." :doc-types "...")
+  doc: Create multiple document requirements for an entity
+  tier: intent
+  tags:
+  - workflow
+  - write
+  - batch
+- verb: requirement.waive
+  domain: requirement
+  action: waive
+  aliases:
+  - waive
+  args:
+    style: keyworded
+    required:
+      requirement-id:
+        type: uuid
+      reason:
+        type: str
+  positional_sugar:
+  - requirement-id
+  - reason
+  invocation_phrases:
+  - waive requirement
+  - skip document requirement
+  - override document requirement
+  - exempt from document
+  - waive the requirement
+  - waive document requirement
+  - requirement waive
+  examples:
+  - (requirement.waive :requirement-id "..." :reason "...")
+  doc: Waive a document requirement (manual override)
+  tier: intent
+  tags:
+  - workflow
+  - write
+  - override

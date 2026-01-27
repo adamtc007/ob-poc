@@ -2,9 +2,10 @@
 
 > **Last reviewed:** 2026-01-27
 > **Crates:** 15 Rust crates (includes ob-poc-macros)
-> **Verbs:** 968 verbs, 7505 intent patterns (DB-sourced)
+> **Verbs:** 534 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 56 schema migrations
-> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 7505 patterns vectorized
+> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
+> **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
@@ -595,6 +596,148 @@ SELECT * FROM "ob-poc".v_verb_embedding_stats;
 -- total_embeddings: 7928
 -- unique_verbs_embedded: 977
 ```
+
+---
+
+## V2 Verb Schema Pipeline (057)
+
+> ✅ **IMPLEMENTED (2026-01-27)**: Canonical V2 YAML schema with deterministic phrase generation and compiled registry.
+
+The V2 schema pipeline provides a canonical verb definition format with:
+- Inline args (HashMap-style) instead of nested arrays
+- Deterministic invocation phrase generation (no LLM)
+- Compiled registry.json artifact for fast server startup
+- Alias collision detection for disambiguation
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    V2 SCHEMA PIPELINE                                        │
+│                                                                              │
+│  V1 YAML (config/verbs/*.yaml)                                              │
+│         │                                                                    │
+│         ▼                                                                    │
+│  cargo x verbs migrate-v2                                                   │
+│         │                                                                    │
+│         ├─► V2 YAML (config/verb_schemas/generated/*.yaml)                  │
+│         │   - Canonical format with inline args                             │
+│         │   - Generated invocation_phrases (deterministic)                  │
+│         │                                                                    │
+│         └─► Lint pass (0 errors, 0 warnings required)                       │
+│                                                                              │
+│  cargo x verbs build-registry                                               │
+│         │                                                                    │
+│         ▼                                                                    │
+│  registry.json (config/verb_schemas/registry.json)                          │
+│         │   - 534 canonical verbs                                            │
+│         │   - 480 aliases (short forms)                                      │
+│         │   - 76 alias collisions (for disambiguation)                       │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Server startup (ob-poc-web)                                                │
+│         │   - Auto-detects registry.json                                    │
+│         │   - Loads V2Registry with invocation phrases                      │
+│         │   - Syncs to dsl_verbs.yaml_intent_patterns                       │
+│         │                                                                    │
+│         ▼                                                                    │
+│  populate_embeddings                                                        │
+│         │   - Delta loading (only new patterns)                             │
+│         │   - 10,160 total patterns vectorized                              │
+│         │                                                                    │
+│         ▼                                                                    │
+│  HybridVerbSearcher (semantic search ready)                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### V2 Schema Format
+
+```yaml
+# config/verb_schemas/generated/cbu.yaml
+cbu.create:
+  verb: cbu.create
+  domain: cbu
+  action: create
+  description: "Create a new Client Business Unit"
+  behavior: plugin
+  
+  # Inline args (HashMap style, not nested arrays)
+  args:
+    name: { type: str, required: true, description: "CBU name" }
+    type: { type: str, required: false, valid_values: [FUND, MANDATE, SEGREGATED] }
+    jurisdiction: { type: str, required: false }
+  
+  # Positional sugar for common patterns
+  positional_sugar: [name]
+  
+  # Auto-generated invocation phrases
+  invocation_phrases:
+    - "create cbu"
+    - "add cbu"
+    - "new client business unit"
+    - "register trading unit"
+```
+
+### Commands
+
+```bash
+cd rust/
+
+# Migrate V1 → V2 (dry-run first)
+cargo x verbs migrate-v2 --dry-run
+cargo x verbs migrate-v2
+
+# Lint V2 schemas (must pass with 0 errors/warnings)
+cargo x verbs lint-v2
+
+# Build compiled registry
+cargo x verbs build-registry
+
+# After server startup, populate embeddings
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/xtask/src/verb_migrate.rs` | Migration logic, phrase generation |
+| `rust/src/dsl_v2/v2_registry.rs` | V2Registry loader, type conversion |
+| `rust/src/session/verb_sync.rs` | `sync_v2_invocation_phrases()` |
+| `rust/crates/ob-poc-web/src/main.rs` | V2 auto-detection on startup |
+| `config/verb_schemas/generated/` | V2 YAML output directory |
+| `config/verb_schemas/registry.json` | Compiled registry artifact |
+
+### Phrase Generation (Deterministic)
+
+Phrases are generated using synonym dictionaries - no LLM required:
+
+```rust
+// Verb synonyms (CRUD operations)
+"create" → ["add", "new", "make", "register"]
+"list"   → ["show", "get all", "display", "enumerate"]
+"update" → ["edit", "modify", "change"]
+"delete" → ["remove", "drop"]
+
+// Domain nouns
+"cbu"    → ["cbu", "client business unit", "trading unit"]
+"entity" → ["entity", "company", "person"]
+"fund"   → ["fund", "investment fund", "portfolio"]
+```
+
+Each verb gets 3+ phrases combining verb synonyms with domain nouns.
+
+### Alias Collisions
+
+Short aliases like `create`, `list`, `delete` map to multiple verbs:
+
+```
+'create' → ["cbu.create", "entity.create", "user.create", ...]
+'delete' → ["entity.delete", "cbu.delete", "identifier.remove", ...]
+```
+
+These are intentional - the semantic search uses full phrases to disambiguate, and the UI can show disambiguation options when the user types a bare alias.
 
 ---
 

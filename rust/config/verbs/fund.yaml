@@ -8,6 +8,19 @@ domains:
 
       create-umbrella:
         description: Create an umbrella fund structure (SICAV, ICAV, OEIC, etc.)
+        invocation_phrases:
+          - "create umbrella fund"
+          - "new SICAV"
+          - "create SICAV"
+          - "establish umbrella"
+          - "new ICAV"
+          - "create OEIC"
+          - "set up umbrella fund"
+          - "register new umbrella"
+          - "create fund umbrella"
+          - "establish new SICAV"
+          - "new umbrella structure"
+          - "create VCC fund"
         metadata:
           tier: intent
           source_of_truth: register
@@ -137,6 +150,16 @@ domains:
 
       create-subfund:
         description: Create a sub-fund/compartment within an umbrella
+        invocation_phrases:
+          - "create sub-fund"
+          - "new compartment"
+          - "add sub-fund"
+          - "create fund compartment"
+          - "new sub-fund under umbrella"
+          - "establish sub-fund"
+          - "add compartment to umbrella"
+          - "create new sub-fund"
+          - "set up compartment"
         metadata:
           tier: intent
           source_of_truth: register
@@ -226,6 +249,16 @@ domains:
 
       create-share-class:
         description: Create a share class within a sub-fund
+        invocation_phrases:
+          - "create share class"
+          - "add share class"
+          - "new share class"
+          - "create institutional class"
+          - "add retail class"
+          - "create accumulating class"
+          - "new distributing class"
+          - "set up share class"
+          - "add new share class"
         metadata:
           tier: intent
           source_of_truth: register
@@ -309,6 +342,15 @@ domains:
 
       create-standalone:
         description: Create a standalone fund (not part of umbrella structure)
+        invocation_phrases:
+          - "create standalone fund"
+          - "new hedge fund"
+          - "create PE fund"
+          - "new private equity fund"
+          - "create real estate fund"
+          - "establish standalone fund"
+          - "new standalone vehicle"
+          - "create independent fund"
         metadata:
           tier: intent
           source_of_truth: register
@@ -397,6 +439,14 @@ domains:
 
       ensure-umbrella:
         description: Create or update an umbrella fund (idempotent by name)
+        invocation_phrases:
+          - "ensure umbrella exists"
+          - "upsert umbrella fund"
+          - "create or update umbrella"
+          - "ensure SICAV"
+          - "idempotent umbrella create"
+          - "make sure umbrella exists"
+          - "upsert fund umbrella"
         metadata:
           tier: intent
           source_of_truth: register
@@ -493,6 +543,12 @@ domains:
 
       ensure-subfund:
         description: Create or update a sub-fund (idempotent by name)
+        invocation_phrases:
+          - "ensure sub-fund exists"
+          - "upsert sub-fund"
+          - "create or update subfund"
+          - "idempotent compartment"
+          - "ensure compartment exists"
         metadata:
           tier: intent
           source_of_truth: register
@@ -578,6 +634,12 @@ domains:
 
       ensure-share-class:
         description: Create or update a share class (idempotent by name)
+        invocation_phrases:
+          - "ensure share class"
+          - "upsert share class"
+          - "create or update class"
+          - "idempotent share class"
+          - "ensure class exists"
         metadata:
           tier: intent
           source_of_truth: register
@@ -650,6 +712,13 @@ domains:
 
       create-master:
         description: Create a master fund (for master-feeder structures)
+        invocation_phrases:
+          - "create master fund"
+          - "new master fund"
+          - "establish master"
+          - "set up master fund"
+          - "create master vehicle"
+          - "new master for feeders"
         metadata:
           tier: intent
           source_of_truth: register
@@ -717,6 +786,14 @@ domains:
 
       create-feeder:
         description: Create a feeder fund linked to a master
+        invocation_phrases:
+          - "create feeder fund"
+          - "new feeder"
+          - "add feeder fund"
+          - "create US feeder"
+          - "establish feeder"
+          - "set up feeder fund"
+          - "new feeder vehicle"
         metadata:
           tier: intent
           source_of_truth: register
@@ -804,6 +881,13 @@ domains:
 
       link-feeder:
         description: Link an existing feeder fund to a master fund (idempotent by parent+child+type)
+        invocation_phrases:
+          - "link feeder to master"
+          - "connect feeder"
+          - "attach feeder fund"
+          - "link to master"
+          - "associate feeder"
+          - "connect to master fund"
         metadata:
           tier: intent
           source_of_truth: register
@@ -854,6 +938,13 @@ domains:
 
       add-to-umbrella:
         description: Add an existing sub-fund to an umbrella (idempotent by parent+child+type)
+        invocation_phrases:
+          - "add to umbrella"
+          - "attach sub-fund"
+          - "link to umbrella"
+          - "add fund to umbrella"
+          - "connect to umbrella"
+          - "put under umbrella"
         metadata:
           tier: intent
           source_of_truth: register
@@ -900,6 +991,12 @@ domains:
 
       add-share-class:
         description: Add a share class to a sub-fund (idempotent by parent+child+type)
+        invocation_phrases:
+          - "add share class to fund"
+          - "attach share class"
+          - "link share class"
+          - "add class to subfund"
+          - "connect share class"
         metadata:
           tier: intent
           source_of_truth: register
@@ -946,6 +1043,13 @@ domains:
 
       list-subfunds:
         description: List all sub-funds within an umbrella
+        invocation_phrases:
+          - "list sub-funds"
+          - "show compartments"
+          - "view umbrella contents"
+          - "list fund compartments"
+          - "show sub-funds in umbrella"
+          - "display all sub-funds"
         metadata:
           tier: reference
           source_of_truth: register
@@ -973,6 +1077,13 @@ domains:
 
       list-share-classes:
         description: List all share classes for a sub-fund
+        invocation_phrases:
+          - "list share classes"
+          - "show fund classes"
+          - "view share classes"
+          - "display all classes"
+          - "show classes for subfund"
+          - "list fund share classes"
         metadata:
           tier: reference
           source_of_truth: register
@@ -1000,6 +1111,13 @@ domains:
 
       list-feeders:
         description: List all feeder funds for a master
+        invocation_phrases:
+          - "list feeder funds"
+          - "show feeders"
+          - "view master feeders"
+          - "display feeder structure"
+          - "list connected feeders"
+          - "show all feeders"
         metadata:
           tier: reference
           source_of_truth: register
@@ -1031,6 +1149,14 @@ domains:
 
       add-investment:
         description: Record a fund's investment in another fund (idempotent by investor+investee)
+        invocation_phrases:
+          - "add fund investment"
+          - "record fund holding"
+          - "add FoF investment"
+          - "create investment link"
+          - "fund invests in fund"
+          - "record fund allocation"
+          - "add underlying investment"
         metadata:
           tier: intent
           source_of_truth: register
@@ -1097,6 +1223,13 @@ domains:
 
       update-investment:
         description: Update investment allocation percentage
+        invocation_phrases:
+          - "update investment"
+          - "change allocation"
+          - "modify investment percentage"
+          - "update fund holding"
+          - "adjust investment"
+          - "change NAV allocation"
         metadata:
           tier: intent
           source_of_truth: register
@@ -1126,6 +1259,13 @@ domains:
 
       end-investment:
         description: End/redeem a fund investment
+        invocation_phrases:
+          - "end investment"
+          - "redeem investment"
+          - "close fund position"
+          - "terminate investment"
+          - "exit fund investment"
+          - "redeem fund holding"
         metadata:
           tier: intent
           source_of_truth: register
@@ -1151,6 +1291,13 @@ domains:
 
       list-investments:
         description: List all investments made by a fund (what does this FoF hold)
+        invocation_phrases:
+          - "list fund investments"
+          - "show fund holdings"
+          - "what does fund hold"
+          - "display investments"
+          - "show underlying funds"
+          - "list portfolio holdings"
         metadata:
           tier: reference
           source_of_truth: register
@@ -1178,6 +1325,13 @@ domains:
 
       list-investors:
         description: List all fund investors in a fund (who holds this fund)
+        invocation_phrases:
+          - "list fund investors"
+          - "show who invests"
+          - "view investor list"
+          - "who holds this fund"
+          - "display fund investors"
+          - "show fund shareholders"
         metadata:
           tier: reference
           source_of_truth: register

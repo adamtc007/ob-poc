@@ -1,0 +1,31 @@
+version: '2.0'
+domain: onboarding
+description: Automated onboarding orchestration
+verbs:
+- verb: onboarding.auto-complete
+  domain: onboarding
+  action: auto-complete
+  aliases:
+  - auto-complete
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      dry-run:
+        type: bool
+      max-steps:
+        type: int
+      target-stage:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - auto complete onboarding
+  - auto complete the onboarding
+  - onboarding auto complete
+  examples:
+  - (onboarding.auto-complete :cbu-id "...")
+  doc: Automatically progress onboarding by generating and executing DSL for missing entities
+  tier: intent

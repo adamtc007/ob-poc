@@ -38,6 +38,13 @@ domains:
       import:
         description: Bulk import BODS statements from data dump
         invocation_phrases:
+          - "import from BODS"
+          - "load BODS data"
+          - "import BODS file"
+          - "create from BODS"
+          - "BODS import"
+          - "load ownership from BODS"
+          - "import BODS entities"
           - "import BODS data"
           - "import ownership data"
           - "load BODS statements"
@@ -125,6 +132,13 @@ domains:
 
       get-statement:
         description: Get a BODS statement by ID
+        invocation_phrases:
+          - "get BODS statement"
+          - "fetch BODS record"
+          - "view BODS statement"
+          - "show BODS data"
+          - "retrieve BODS statement"
+          - "get ownership statement"
         metadata:
           tier: reference
           source_of_truth: external

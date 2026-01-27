@@ -1,0 +1,268 @@
+version: '2.0'
+domain: tollgate
+description: |
+  Decision engine for KYC workflow gates.
+  Evaluates verification completeness against configurable thresholds.
+  Supports management overrides with audit trail.
+verbs:
+- verb: tollgate.list-overrides
+  domain: tollgate
+  action: list-overrides
+  aliases:
+  - list-overrides
+  args:
+    style: keyworded
+    optional:
+      evaluation-id:
+        type: uuid
+      case-id:
+        type: uuid
+  invocation_phrases:
+  - list overrides tollgate
+  - list overrides the tollgate
+  - tollgate list overrides
+  examples:
+  - (tollgate.list-overrides)
+  doc: List overrides for a case or evaluation
+  tier: reference
+- verb: tollgate.list-thresholds
+  domain: tollgate
+  action: list-thresholds
+  aliases:
+  - list-thresholds
+  args:
+    style: keyworded
+    optional:
+      is-blocking:
+        type: bool
+      evaluation-type:
+        type: str
+  invocation_phrases:
+  - list thresholds tollgate
+  - list thresholds the tollgate
+  - tollgate list thresholds
+  examples:
+  - (tollgate.list-thresholds)
+  doc: List all configured thresholds
+  tier: reference
+- verb: tollgate.list-evaluations
+  domain: tollgate
+  action: list-evaluations
+  aliases:
+  - list-evaluations
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+    optional:
+      evaluation-type:
+        type: enum
+        values:
+        - DISCOVERY_COMPLETE
+        - EVIDENCE_COMPLETE
+        - VERIFICATION_COMPLETE
+        - DECISION_READY
+        - PERIODIC_REVIEW
+  positional_sugar:
+  - case-id
+  invocation_phrases:
+  - list evaluations tollgate
+  - list evaluations the tollgate
+  - tollgate list evaluations
+  examples:
+  - (tollgate.list-evaluations :case-id "...")
+  doc: List tollgate evaluations for a case
+  tier: reference
+- verb: tollgate.set-threshold
+  domain: tollgate
+  action: set-threshold
+  aliases:
+  - set-threshold
+  args:
+    style: keyworded
+    required:
+      threshold-name:
+        type: str
+    optional:
+      weight:
+        type: decimal
+      comparison:
+        type: enum
+        values:
+        - GT
+        - GTE
+        - LT
+        - LTE
+        - EQ
+        - NEQ
+      is-blocking:
+        type: bool
+      threshold-value:
+        type: decimal
+      metric-type:
+        type: enum
+        values:
+        - OWNERSHIP_VERIFIED_PCT
+        - CONTROL_VERIFIED_PCT
+        - UBO_COVERAGE_PCT
+        - DOC_COMPLETENESS_PCT
+        - SCREENING_CLEAR_PCT
+        - RED_FLAG_COUNT
+        - ALLEGATION_UNRESOLVED_COUNT
+        - DAYS_SINCE_REFRESH
+  positional_sugar:
+  - threshold-name
+  invocation_phrases:
+  - set threshold tollgate
+  - set threshold the tollgate
+  - tollgate set threshold
+  examples:
+  - (tollgate.set-threshold :threshold-name "...")
+  doc: Update a tollgate threshold
+  tier: intent
+- verb: tollgate.override
+  domain: tollgate
+  action: override
+  aliases:
+  - override
+  args:
+    style: keyworded
+    required:
+      approved-by:
+        type: str
+      override-reason:
+        type: str
+      evaluation-id:
+        type: uuid
+      approval-authority:
+        type: enum
+        values:
+        - ANALYST
+        - SENIOR_ANALYST
+        - TEAM_LEAD
+        - COMPLIANCE_OFFICER
+        - SENIOR_COMPLIANCE
+        - MLRO
+        - EXECUTIVE
+        - BOARD
+    optional:
+      conditions:
+        type: str
+      expiry-date:
+        type: date
+  positional_sugar:
+  - evaluation-id
+  - override-reason
+  invocation_phrases:
+  - override tollgate
+  - override the tollgate
+  - tollgate override
+  examples:
+  - (tollgate.override :evaluation-id "..." :override-reason "..." :approved-by "..." :approval-authority "...")
+  doc: Record management override of tollgate failure
+  tier: intent
+- verb: tollgate.expire-override
+  domain: tollgate
+  action: expire-override
+  aliases:
+  - expire-override
+  args:
+    style: keyworded
+    required:
+      expired-by:
+        type: str
+      override-id:
+        type: uuid
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - override-id
+  - expired-by
+  invocation_phrases:
+  - expire override tollgate
+  - expire override the tollgate
+  - tollgate expire override
+  examples:
+  - (tollgate.expire-override :override-id "..." :expired-by "...")
+  doc: Manually expire an override
+  tier: intent
+- verb: tollgate.get-metrics
+  domain: tollgate
+  action: get-metrics
+  aliases:
+  - get-metrics
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - get metrics tollgate
+  - get metrics the tollgate
+  - tollgate get metrics
+  examples:
+  - (tollgate.get-metrics :cbu-id "...")
+  doc: Compute current metrics for a CBU without recording evaluation
+  tier: reference
+- verb: tollgate.evaluate
+  domain: tollgate
+  action: evaluate
+  aliases:
+  - evaluate
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+      evaluation-type:
+        type: enum
+        values:
+        - DISCOVERY_COMPLETE
+        - EVIDENCE_COMPLETE
+        - VERIFICATION_COMPLETE
+        - DECISION_READY
+        - PERIODIC_REVIEW
+    optional:
+      evaluated-by:
+        type: str
+  positional_sugar:
+  - case-id
+  - evaluation-type
+  invocation_phrases:
+  - evaluate tollgate
+  - evaluate the tollgate
+  - tollgate evaluate
+  examples:
+  - (tollgate.evaluate :case-id "..." :evaluation-type "...")
+  doc: |
+    Run tollgate evaluation for a case.
+    Computes all metrics and compares against thresholds.
+  tier: intent
+- verb: tollgate.get-decision-readiness
+  domain: tollgate
+  action: get-decision-readiness
+  aliases:
+  - get-decision-readiness
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+  positional_sugar:
+  - case-id
+  invocation_phrases:
+  - get decision readiness tollgate
+  - get decision readiness the tollgate
+  - tollgate get decision readiness
+  examples:
+  - (tollgate.get-decision-readiness :case-id "...")
+  doc: |
+    Summary view of decision readiness:
+      - What's blocking?
+      - What's complete?
+      - What needs attention?
+  tier: reference

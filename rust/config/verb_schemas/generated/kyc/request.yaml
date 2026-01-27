@@ -1,0 +1,275 @@
+version: '2.0'
+domain: request
+description: Outstanding request operations (fire-and-forget pattern)
+verbs:
+- verb: request.remind
+  domain: request
+  action: remind
+  aliases:
+  - remind
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: entity_name
+    optional:
+      message:
+        type: str
+      channel:
+        type: enum
+        values:
+        - EMAIL
+        - PORTAL
+        - SMS
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - remind request
+  - remind the request
+  - request remind
+  examples:
+  - (request.remind :request-id "...")
+  doc: Send reminder for pending request
+  tier: intent
+- verb: request.cancel
+  domain: request
+  action: cancel
+  aliases:
+  - cancel
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: entity_name
+      reason:
+        type: str
+  positional_sugar:
+  - request-id
+  - reason
+  invocation_phrases:
+  - cancel request
+  - cancel the request
+  - request cancel
+  examples:
+  - (request.cancel :request-id "..." :reason "...")
+  doc: Cancel a pending request
+  tier: intent
+- verb: request.list
+  domain: request
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      case-id:
+        type: entity_name
+      workstream-id:
+        type: entity_name
+      cbu-id:
+        type: entity_name
+      status:
+        type: str
+  invocation_phrases:
+  - list request
+  - list the request
+  - show request
+  - get all request
+  - request list
+  examples:
+  - (request.list)
+  doc: List outstanding requests
+  tier: reference
+- verb: request.extend
+  domain: request
+  action: extend
+  aliases:
+  - extend
+  args:
+    style: keyworded
+    required:
+      reason:
+        type: str
+      request-id:
+        type: entity_name
+    optional:
+      new-due-date:
+        type: date
+      days:
+        type: int
+  positional_sugar:
+  - request-id
+  - reason
+  invocation_phrases:
+  - extend request
+  - extend the request
+  - request extend
+  examples:
+  - (request.extend :request-id "..." :reason "...")
+  doc: Extend request due date
+  tier: intent
+- verb: request.overdue
+  domain: request
+  action: overdue
+  aliases:
+  - overdue
+  args:
+    style: keyworded
+    optional:
+      cbu-id:
+        type: entity_name
+      include-grace-period:
+        type: bool
+      case-id:
+        type: entity_name
+  invocation_phrases:
+  - overdue request
+  - overdue the request
+  - request overdue
+  examples:
+  - (request.overdue)
+  doc: List overdue requests
+  tier: intent
+- verb: request.waive
+  domain: request
+  action: waive
+  aliases:
+  - waive
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: entity_name
+      reason:
+        type: str
+      approved-by:
+        type: uuid
+  positional_sugar:
+  - request-id
+  - reason
+  invocation_phrases:
+  - waive request
+  - waive the request
+  - request waive
+  examples:
+  - (request.waive :request-id "..." :reason "..." :approved-by "...")
+  doc: Waive a request requirement
+  tier: intent
+- verb: request.create
+  domain: request
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      type:
+        type: enum
+        values:
+        - DOCUMENT
+        - INFORMATION
+        - VERIFICATION
+        - APPROVAL
+        - SIGNATURE
+      subject-id:
+        type: uuid
+      subtype:
+        type: str
+      subject-type:
+        type: enum
+        values:
+        - WORKSTREAM
+        - KYC_CASE
+        - ENTITY
+        - CBU
+    optional:
+      from:
+        type: str
+      from-entity:
+        type: entity_name
+      due-in-days:
+        type: int
+      blocks:
+        type: bool
+      details:
+        type: json
+      due-date:
+        type: date
+      message:
+        type: str
+  positional_sugar:
+  - subject-type
+  - subject-id
+  invocation_phrases:
+  - create request
+  - create the request
+  - add request
+  - new request
+  - request create
+  examples:
+  - (request.create :subject-type "..." :subject-id "..." :type "..." :subtype "...")
+  doc: Create an outstanding request (generic)
+  tier: intent
+- verb: request.fulfill
+  domain: request
+  action: fulfill
+  aliases:
+  - fulfill
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: entity_name
+    optional:
+      reference-type:
+        type: str
+      reference-id:
+        type: uuid
+      fulfillment-type:
+        type: enum
+        values:
+        - DOCUMENT_UPLOAD
+        - MANUAL_ENTRY
+        - API_RESPONSE
+        - WAIVER
+      notes:
+        type: str
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - fulfill request
+  - fulfill the request
+  - request fulfill
+  examples:
+  - (request.fulfill :request-id "...")
+  doc: Mark request as fulfilled
+  tier: intent
+- verb: request.escalate
+  domain: request
+  action: escalate
+  aliases:
+  - escalate
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: entity_name
+    optional:
+      escalate-to:
+        type: uuid
+      reason:
+        type: str
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - escalate request
+  - escalate the request
+  - request escalate
+  examples:
+  - (request.escalate :request-id "...")
+  doc: Escalate overdue request
+  tier: intent

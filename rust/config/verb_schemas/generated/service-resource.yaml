@@ -1,0 +1,298 @@
+version: '2.0'
+domain: service-resource
+description: Service resource type (read-only) and instance operations
+verbs:
+- verb: service-resource.read
+  domain: service-resource
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    optional:
+      resource-code:
+        type: str
+      resource-id:
+        type: entity_name
+  invocation_phrases:
+  - read service resource
+  - read service-resource
+  - read the service resource
+  - get service resource
+  - fetch service resource
+  - read resource
+  - service resource read
+  examples:
+  - (service-resource.read)
+  doc: Read a service resource type by ID or code
+  tier: reference
+- verb: service-resource.decommission
+  domain: service-resource
+  action: decommission
+  aliases:
+  - decommission
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: entity_name
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - instance-id
+  invocation_phrases:
+  - decommission service resource
+  - decommission service-resource
+  - decommission the service resource
+  - decommission resource
+  - service resource decommission
+  examples:
+  - (service-resource.decommission :instance-id "...")
+  doc: Decommission a service resource instance
+  tier: intent
+- verb: service-resource.list-by-service
+  domain: service-resource
+  action: list-by-service
+  aliases:
+  - list-by-service
+  args:
+    style: keyworded
+    required:
+      service-id:
+        type: entity_name
+  positional_sugar:
+  - service-id
+  invocation_phrases:
+  - list by service service resource
+  - list by service service-resource
+  - list by service the service resource
+  - list by service resource
+  - service resource list by service
+  examples:
+  - (service-resource.list-by-service :service-id "...")
+  doc: List service resource types for a service
+  tier: reference
+- verb: service-resource.list-attributes
+  domain: service-resource
+  action: list-attributes
+  aliases:
+  - list-attributes
+  args:
+    style: keyworded
+    required:
+      resource-id:
+        type: entity_name
+    optional:
+      is-mandatory:
+        type: bool
+  positional_sugar:
+  - resource-id
+  invocation_phrases:
+  - list attributes service resource
+  - list attributes service-resource
+  - list attributes the service resource
+  - list attributes resource
+  - service resource list attributes
+  examples:
+  - (service-resource.list-attributes :resource-id "...")
+  doc: List attribute requirements for a service resource type
+  tier: reference
+- verb: service-resource.activate
+  domain: service-resource
+  action: activate
+  aliases:
+  - activate
+  - enable
+  - start
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: uuid
+  positional_sugar:
+  - instance-id
+  invocation_phrases:
+  - activate service resource
+  - activate service-resource
+  - activate the service resource
+  - enable service resource
+  - start service resource
+  - activate resource
+  - service resource activate
+  examples:
+  - (service-resource.activate :instance-id "...")
+  doc: Activate a service resource instance
+  tier: intent
+- verb: service-resource.list
+  domain: service-resource
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      owner:
+        type: str
+      is-active:
+        type: bool
+      limit:
+        type: int
+      offset:
+        type: int
+      resource-type:
+        type: str
+  invocation_phrases:
+  - list service resource
+  - list service-resource
+  - list the service resource
+  - show service resource
+  - get all service resource
+  - list resource
+  - service resource list
+  examples:
+  - (service-resource.list)
+  doc: List service resource types with optional filters
+  tier: reference
+- verb: service-resource.validate-attrs
+  domain: service-resource
+  action: validate-attrs
+  aliases:
+  - validate-attrs
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: entity_name
+  positional_sugar:
+  - instance-id
+  invocation_phrases:
+  - validate attrs service resource
+  - validate attrs service-resource
+  - validate attrs the service resource
+  - validate attrs resource
+  - service resource validate attrs
+  examples:
+  - (service-resource.validate-attrs :instance-id "...")
+  doc: Validate that all required attributes are set for a resource instance
+  tier: diagnostics
+- verb: service-resource.suspend
+  domain: service-resource
+  action: suspend
+  aliases:
+  - hold
+  - pause
+  - suspend
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: entity_name
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - instance-id
+  invocation_phrases:
+  - suspend service resource
+  - suspend service-resource
+  - suspend the service resource
+  - pause service resource
+  - hold service resource
+  - suspend resource
+  - service resource suspend
+  examples:
+  - (service-resource.suspend :instance-id "...")
+  doc: Suspend a service resource instance
+  tier: intent
+- verb: service-resource.provision
+  domain: service-resource
+  action: provision
+  aliases:
+  - configure
+  - provision
+  - setup
+  args:
+    style: keyworded
+    required:
+      resource-type:
+        type: str
+      cbu-id:
+        type: entity_name
+    optional:
+      config:
+        type: json
+      custody-account-url:
+        type: str
+      depends-on:
+        type: list
+      instance-id:
+        type: str
+      instance-name:
+        type: str
+      nav-engine-url:
+        type: str
+      instance-url:
+        type: str
+      service-id:
+        type: entity_name
+      product-id:
+        type: entity_name
+      settlement-account-url:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - resource-type
+  invocation_phrases:
+  - provision service resource
+  - provision service-resource
+  - provision the service resource
+  - setup service resource
+  - configure service resource
+  - provision resource
+  - service resource provision
+  examples:
+  - (service-resource.provision :cbu-id "..." :resource-type "...")
+  doc: Provision a service resource instance for a CBU
+  tier: intent
+- verb: service-resource.set-attr
+  domain: service-resource
+  action: set-attr
+  aliases:
+  - set-attr
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: entity_name
+      attr:
+        type: str
+      value:
+        type: str
+    optional:
+      state:
+        type: enum
+        values:
+        - proposed
+        - confirmed
+        - derived
+        - system
+      source:
+        type: json
+  positional_sugar:
+  - instance-id
+  - attr
+  invocation_phrases:
+  - set attr service resource
+  - set attr service-resource
+  - set attr the service resource
+  - set attr resource
+  - service resource set attr
+  examples:
+  - (service-resource.set-attr :instance-id "..." :attr "..." :value "...")
+  doc: Set an attribute value on a service resource instance
+  tier: intent

@@ -1,0 +1,229 @@
+version: '2.0'
+domain: observation
+description: Attribute observations from various sources
+verbs:
+- verb: observation.record
+  domain: observation
+  action: record
+  aliases:
+  - record
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      attribute-id:
+        type: entity_name
+      source-type:
+        type: str
+    optional:
+      extraction-method:
+        type: str
+      value-boolean:
+        type: bool
+      is-authoritative:
+        type: bool
+      value-number:
+        type: decimal
+      confidence:
+        type: decimal
+      value-text:
+        type: str
+      source-document-id:
+        type: entity_name
+      value-date:
+        type: date
+      value-json:
+        type: json
+  positional_sugar:
+  - entity-id
+  - attribute-id
+  invocation_phrases:
+  - record observation
+  - record the observation
+  - observation record
+  examples:
+  - (observation.record :entity-id "..." :attribute-id "..." :source-type "...")
+  doc: Record an attribute observation
+  tier: intent
+- verb: observation.list-for-entity
+  domain: observation
+  action: list-for-entity
+  aliases:
+  - list-for-entity
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      status:
+        type: str
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - list for entity observation
+  - list for entity the observation
+  - observation list for entity
+  examples:
+  - (observation.list-for-entity :entity-id "...")
+  doc: List all observations for an entity
+  tier: reference
+- verb: observation.reconcile
+  domain: observation
+  action: reconcile
+  aliases:
+  - reconcile
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      attribute:
+        type: str
+    optional:
+      case-id:
+        type: entity_name
+      auto-create-discrepancies:
+        type: bool
+  positional_sugar:
+  - entity-id
+  - attribute
+  invocation_phrases:
+  - reconcile observation
+  - reconcile the observation
+  - observation reconcile
+  examples:
+  - (observation.reconcile :entity-id "..." :attribute "...")
+  doc: Compare observations for an attribute and auto-create discrepancies
+  tier: intent
+- verb: observation.verify-allegations
+  domain: observation
+  action: verify-allegations
+  aliases:
+  - verify-allegations
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      case-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - entity-id
+  invocation_phrases:
+  - verify allegations observation
+  - verify allegations the observation
+  - observation verify allegations
+  examples:
+  - (observation.verify-allegations :cbu-id "..." :entity-id "...")
+  doc: Batch verify pending allegations against observations
+  tier: intent
+- verb: observation.supersede
+  domain: observation
+  action: supersede
+  aliases:
+  - supersede
+  args:
+    style: keyworded
+    required:
+      observation-id:
+        type: entity_name
+      superseded-by:
+        type: uuid
+  positional_sugar:
+  - observation-id
+  - superseded-by
+  invocation_phrases:
+  - supersede observation
+  - supersede the observation
+  - observation supersede
+  examples:
+  - (observation.supersede :observation-id "..." :superseded-by "...")
+  doc: Supersede an observation with a newer one
+  tier: intent
+- verb: observation.get-current
+  domain: observation
+  action: get-current
+  aliases:
+  - get-current
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      attribute:
+        type: str
+  positional_sugar:
+  - entity-id
+  - attribute
+  invocation_phrases:
+  - get current observation
+  - get current the observation
+  - observation get current
+  examples:
+  - (observation.get-current :entity-id "..." :attribute "...")
+  doc: Get current best observation for an attribute
+  tier: reference
+- verb: observation.record-from-document
+  domain: observation
+  action: record-from-document
+  aliases:
+  - record-from-document
+  args:
+    style: keyworded
+    required:
+      value:
+        type: str
+      document-id:
+        type: entity_name
+      attribute:
+        type: str
+      entity-id:
+        type: entity_name
+    optional:
+      confidence:
+        type: decimal
+      extraction-method:
+        type: str
+  positional_sugar:
+  - entity-id
+  - document-id
+  invocation_phrases:
+  - record from document observation
+  - record from document the observation
+  - observation record from document
+  examples:
+  - (observation.record-from-document :entity-id "..." :document-id "..." :attribute "..." :value "...")
+  doc: Record observation extracted from a document
+  tier: intent
+- verb: observation.list-for-attribute
+  domain: observation
+  action: list-for-attribute
+  aliases:
+  - list-for-attribute
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      attribute-id:
+        type: entity_name
+    optional:
+      status:
+        type: str
+  positional_sugar:
+  - entity-id
+  - attribute-id
+  invocation_phrases:
+  - list for attribute observation
+  - list for attribute the observation
+  - observation list for attribute
+  examples:
+  - (observation.list-for-attribute :entity-id "..." :attribute-id "...")
+  doc: List observations of a specific attribute for an entity
+  tier: reference

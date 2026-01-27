@@ -1,0 +1,235 @@
+version: '2.0'
+domain: investment-manager
+description: Investment manager assignment and scope management
+verbs:
+- verb: investment-manager.suspend
+  domain: investment-manager
+  action: suspend
+  aliases:
+  - hold
+  - pause
+  - suspend
+  args:
+    style: keyworded
+    required:
+      assignment-id:
+        type: uuid
+  positional_sugar:
+  - assignment-id
+  invocation_phrases:
+  - suspend investment-manager
+  - suspend the investment-manager
+  - pause investment-manager
+  - hold investment-manager
+  - investment-manager suspend
+  examples:
+  - (investment-manager.suspend :assignment-id "...")
+  doc: Suspend an IM assignment
+  tier: intent
+- verb: investment-manager.list
+  domain: investment-manager
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      status:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list investment-manager
+  - list the investment-manager
+  - show investment-manager
+  - get all investment-manager
+  - investment-manager list
+  examples:
+  - (investment-manager.list :cbu-id "...")
+  doc: List IM assignments for CBU
+  tier: reference
+- verb: investment-manager.terminate
+  domain: investment-manager
+  action: terminate
+  aliases:
+  - terminate
+  args:
+    style: keyworded
+    required:
+      assignment-id:
+        type: uuid
+    optional:
+      termination-date:
+        type: date
+  positional_sugar:
+  - assignment-id
+  invocation_phrases:
+  - terminate investment-manager
+  - terminate the investment-manager
+  - investment-manager terminate
+  examples:
+  - (investment-manager.terminate :assignment-id "...")
+  doc: Terminate an IM assignment
+  tier: intent
+- verb: investment-manager.link-connectivity
+  domain: investment-manager
+  action: link-connectivity
+  aliases:
+  - link-connectivity
+  args:
+    style: keyworded
+    required:
+      resource-instance-id:
+        type: entity_name
+      assignment-id:
+        type: uuid
+  positional_sugar:
+  - assignment-id
+  - resource-instance-id
+  invocation_phrases:
+  - link connectivity investment-manager
+  - link connectivity the investment-manager
+  - investment-manager link connectivity
+  examples:
+  - (investment-manager.link-connectivity :assignment-id "..." :resource-instance-id "...")
+  doc: Link IM assignment to instruction delivery resource
+  tier: intent
+- verb: investment-manager.set-scope
+  domain: investment-manager
+  action: set-scope
+  aliases:
+  - set-scope
+  args:
+    style: keyworded
+    required:
+      assignment-id:
+        type: uuid
+    optional:
+      scope-all:
+        type: bool
+      scope-isda-asset-classes:
+        type: list
+      scope-currencies:
+        type: list
+      scope-instrument-classes:
+        type: list
+      scope-markets:
+        type: list
+  positional_sugar:
+  - assignment-id
+  invocation_phrases:
+  - set scope investment-manager
+  - set scope the investment-manager
+  - investment-manager set scope
+  examples:
+  - (investment-manager.set-scope :assignment-id "...")
+  doc: Update scope for existing IM assignment
+  tier: intent
+- verb: investment-manager.assign
+  domain: investment-manager
+  action: assign
+  aliases:
+  - allocate
+  - assign
+  - set
+  args:
+    style: keyworded
+    required:
+      priority:
+        type: int
+      cbu-id:
+        type: entity_name
+      manager-lei:
+        type: str
+      instruction-method:
+        type: enum
+        values:
+        - SWIFT
+        - CTM
+        - FIX
+        - API
+        - ALERT
+        - MANUAL
+    optional:
+      manager-name:
+        type: str
+      scope-markets:
+        type: list
+      scope-instrument-classes:
+        type: list
+      scope-currencies:
+        type: list
+      can-trade:
+        type: bool
+      profile-id:
+        type: entity_name
+      can-affirm:
+        type: bool
+      manager-bic:
+        type: str
+      scope-all:
+        type: bool
+      effective-date:
+        type: date
+      can-settle:
+        type: bool
+      scope-isda-asset-classes:
+        type: list
+      role:
+        type: enum
+        values:
+        - INVESTMENT_MANAGER
+        - SUB_ADVISOR
+        - OVERLAY_MANAGER
+        - TRANSITION_MANAGER
+        - EXECUTION_BROKER
+      manager-entity-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - manager-lei
+  invocation_phrases:
+  - assign investment-manager
+  - assign the investment-manager
+  - allocate investment-manager
+  - set investment-manager
+  - investment-manager assign
+  examples:
+  - (investment-manager.assign :cbu-id "..." :manager-lei "..." :priority "..." :instruction-method "...")
+  doc: Assign investment manager to CBU with trading scope (idempotent by cbu+manager_lei+role)
+  tier: intent
+- verb: investment-manager.find-for-trade
+  domain: investment-manager
+  action: find-for-trade
+  aliases:
+  - find-for-trade
+  args:
+    style: keyworded
+    required:
+      instrument-class:
+        type: str
+      cbu-id:
+        type: uuid
+    optional:
+      isda-asset-class:
+        type: str
+      currency:
+        type: str
+      market:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - instrument-class
+  invocation_phrases:
+  - find for trade investment-manager
+  - find for trade the investment-manager
+  - investment-manager find for trade
+  examples:
+  - (investment-manager.find-for-trade :cbu-id "..." :instrument-class "...")
+  doc: Find IM assignment that covers given trade characteristics
+  tier: reference

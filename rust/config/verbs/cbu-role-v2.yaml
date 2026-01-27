@@ -23,13 +23,20 @@ domains:
           Assign a role to an entity within a CBU.
           Validates entity type compatibility and role conflicts before assignment.
         invocation_phrases:
-          - assign role
-          - add as director
-          - add as UBO
-          - add as shareholder
-          - add as signatory
-          - make director
-          - appoint director
+          - "assign role"
+          - "add role to entity"
+          - "assign entity role"
+          - "grant role"
+          - "give role"
+          - "assign to CBU"
+          - "add participant role"
+          - "assign CBU role"
+          - "add as director"
+          - "add as UBO"
+          - "add as shareholder"
+          - "add as signatory"
+          - "make director"
+          - "appoint director"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -569,6 +576,13 @@ domains:
 
       validate:
         description: "Validate all role assignments for a CBU (check requirements)"
+        invocation_phrases:
+          - "validate roles"
+          - "check role completeness"
+          - "role validation"
+          - "are required roles filled"
+          - "validate CBU roles"
+          - "check role requirements"
         metadata:
           tier: diagnostics
           source_of_truth: operational

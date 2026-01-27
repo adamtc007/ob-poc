@@ -1,0 +1,945 @@
+# ============================================================================
+# INVOCATION PHRASES FOR PRIORITY DOMAINS
+# ============================================================================
+# Generated: 2026-01-27
+# Purpose: Add sentence-like patterns for semantic intent matching
+# Rules: 8-15 phrases per verb, 3-8 words each, imperative/natural style
+#
+# USAGE: Merge these into the corresponding YAML files under each verb
+# ============================================================================
+
+# ============================================================================
+# VIEW.YAML - Navigation Domain (25 verbs)
+# ============================================================================
+
+view:
+  universe:
+    invocation_phrases:
+      - "show me everything"
+      - "view all CBUs"
+      - "show the universe"
+      - "display all clients"
+      - "show me all entities"
+      - "view entire portfolio"
+      - "show global view"
+      - "display everything"
+      - "see all CBUs"
+      - "give me the full picture"
+      - "show complete universe"
+      - "view all records"
+
+  book:
+    invocation_phrases:
+      - "show client book"
+      - "view the book"
+      - "display client CBUs"
+      - "show me client portfolio"
+      - "open the book view"
+      - "view client entities"
+      - "show book for client"
+      - "display commercial book"
+      - "see client CBUs"
+      - "open client view"
+      - "show all CBUs for client"
+
+  cbu:
+    invocation_phrases:
+      - "focus on CBU"
+      - "view this CBU"
+      - "show CBU details"
+      - "open the CBU"
+      - "zoom into CBU"
+      - "display CBU view"
+      - "focus view on CBU"
+      - "show me the CBU"
+      - "select this CBU"
+      - "drill into CBU"
+
+  entity-forest:
+    invocation_phrases:
+      - "show entity tree"
+      - "view entity forest"
+      - "display entity hierarchy"
+      - "show me entities by type"
+      - "view ownership forest"
+      - "show entity structure"
+      - "display entity relationships"
+      - "see the entity tree"
+      - "open entity view"
+      - "show entities filtered by"
+
+  refine:
+    invocation_phrases:
+      - "filter the view"
+      - "refine current selection"
+      - "narrow down results"
+      - "add a filter"
+      - "filter by status"
+      - "refine by jurisdiction"
+      - "narrow the view"
+      - "apply filter to view"
+      - "restrict to matching"
+      - "filter down to"
+      - "show only matching"
+
+  clear:
+    invocation_phrases:
+      - "clear all filters"
+      - "reset the view"
+      - "remove all refinements"
+      - "clear current filters"
+      - "start fresh"
+      - "reset to base view"
+      - "clear refinements"
+      - "remove filters"
+      - "reset filters"
+      - "go back to unfiltered"
+
+  select:
+    invocation_phrases:
+      - "select these items"
+      - "select all visible"
+      - "mark as selected"
+      - "select everything"
+      - "clear selection"
+      - "select none"
+      - "choose these nodes"
+      - "select current items"
+      - "pick these entities"
+      - "highlight selected"
+
+  layout:
+    invocation_phrases:
+      - "change layout"
+      - "switch to grid view"
+      - "use tree layout"
+      - "show as network"
+      - "arrange as pyramid"
+      - "change display layout"
+      - "switch visualization"
+      - "use galaxy layout"
+      - "arrange nodes differently"
+      - "show in grid format"
+      - "display as hierarchy"
+
+  zoom-in:
+    invocation_phrases:
+      - "zoom in"
+      - "zoom into this"
+      - "expand this node"
+      - "go deeper"
+      - "dive into details"
+      - "expand and zoom"
+      - "zoom closer"
+      - "magnify this area"
+      - "show more detail"
+      - "get closer view"
+
+  zoom-out:
+    invocation_phrases:
+      - "zoom out"
+      - "zoom back out"
+      - "see bigger picture"
+      - "go back up"
+      - "expand view outward"
+      - "zoom to parent"
+      - "pull back view"
+      - "see wider context"
+      - "zoom out one level"
+      - "show less detail"
+
+  back-to:
+    invocation_phrases:
+      - "go back to"
+      - "jump back to"
+      - "return to level"
+      - "back to breadcrumb"
+      - "go to parent level"
+      - "jump to root"
+      - "return to start"
+      - "back to beginning"
+      - "go back several levels"
+      - "return to previous"
+
+  breadcrumbs:
+    invocation_phrases:
+      - "show breadcrumbs"
+      - "where am I"
+      - "show navigation path"
+      - "display current path"
+      - "show my location"
+      - "what level am I at"
+      - "show navigation trail"
+      - "display breadcrumb trail"
+      - "current navigation path"
+
+  drill:
+    invocation_phrases:
+      - "drill down"
+      - "drill into entity"
+      - "go deeper into"
+      - "expand this entity"
+      - "show subsidiaries"
+      - "drill into structure"
+      - "explore deeper"
+      - "dive into entity"
+      - "show child entities"
+      - "drill down into"
+      - "expand ownership"
+      - "show what's beneath"
+
+  surface:
+    invocation_phrases:
+      - "go back"
+      - "surface up"
+      - "go up one level"
+      - "back to parent"
+      - "return to parent"
+      - "surface to top"
+      - "go back up"
+      - "pop back up"
+      - "return up the chain"
+      - "back to universe"
+      - "surface all the way"
+
+  trace:
+    invocation_phrases:
+      - "trace the money"
+      - "follow the money"
+      - "trace control chain"
+      - "follow the risk"
+      - "trace document chain"
+      - "follow alert thread"
+      - "trace ownership path"
+      - "show money flow"
+      - "trace from entity"
+      - "follow the trail"
+
+  xray:
+    invocation_phrases:
+      - "show x-ray view"
+      - "see through structure"
+      - "show hidden layers"
+      - "x-ray this entity"
+      - "make layers transparent"
+      - "show underlying structure"
+      - "reveal hidden details"
+      - "transparent view"
+      - "see all layers"
+      - "turn on x-ray"
+
+  peel:
+    invocation_phrases:
+      - "peel back layer"
+      - "remove outer layer"
+      - "peel the structure"
+      - "strip away layer"
+      - "show what's inside"
+      - "peel to reveal"
+      - "remove top layer"
+      - "peel away custody"
+      - "strip outer shell"
+      - "reset peeled layers"
+
+  illuminate:
+    invocation_phrases:
+      - "highlight risks"
+      - "illuminate documents"
+      - "show screening results"
+      - "highlight data gaps"
+      - "illuminate pending items"
+      - "light up risks"
+      - "highlight problem areas"
+      - "show what needs attention"
+      - "illuminate issues"
+      - "turn off highlighting"
+
+  shadow:
+    invocation_phrases:
+      - "shadow non-risk items"
+      - "dim safe items"
+      - "emphasize risky entities"
+      - "shadow mode on"
+      - "highlight only risks"
+      - "dim everything except risk"
+      - "show risk shadow"
+      - "turn on shadow mode"
+      - "turn off shadow mode"
+
+  red-flag:
+    invocation_phrases:
+      - "show red flags"
+      - "scan for red flags"
+      - "highlight PEP flags"
+      - "show sanctions flags"
+      - "find red flags"
+      - "display adverse media"
+      - "scan all flags"
+      - "show warning indicators"
+      - "highlight compliance flags"
+      - "turn off red flags"
+
+  black-holes:
+    invocation_phrases:
+      - "show data gaps"
+      - "find missing data"
+      - "show black holes"
+      - "highlight missing ownership"
+      - "find missing documents"
+      - "show incomplete data"
+      - "display data gaps"
+      - "find what's missing"
+      - "show screening gaps"
+      - "turn off black holes"
+
+  detail:
+    invocation_phrases:
+      - "show more detail"
+      - "expand details"
+      - "show attributes"
+      - "view raw data"
+      - "show full details"
+      - "display attribute cards"
+      - "see all details"
+      - "show JSON view"
+      - "expand all attributes"
+
+  context:
+    invocation_phrases:
+      - "switch to onboarding"
+      - "set review context"
+      - "investigation mode"
+      - "monitoring context"
+      - "remediation workflow"
+      - "change context mode"
+      - "switch workflow mode"
+      - "set context to"
+      - "enter investigation mode"
+
+  status:
+    invocation_phrases:
+      - "show current status"
+      - "what's the status"
+      - "view state summary"
+      - "show view status"
+      - "current view state"
+      - "where am I now"
+      - "show session status"
+      - "display current state"
+
+  selection-info:
+    invocation_phrases:
+      - "show selection details"
+      - "what's selected"
+      - "selection summary"
+      - "show selected info"
+      - "details on selection"
+      - "info about selected"
+      - "selected items info"
+      - "describe selection"
+
+# ============================================================================
+# OWNERSHIP.YAML - Ownership Computation (18 verbs)
+# ============================================================================
+
+ownership:
+  compute:
+    invocation_phrases:
+      - "compute ownership"
+      - "calculate ownership snapshot"
+      - "derive ownership"
+      - "run ownership computation"
+      - "compute voting percentages"
+      - "calculate economic ownership"
+      - "generate ownership snapshot"
+      - "compute as of date"
+      - "derive ownership from register"
+      - "calculate who owns what"
+
+  snapshot.list:
+    invocation_phrases:
+      - "list ownership snapshots"
+      - "show ownership history"
+      - "view ownership records"
+      - "list snapshots for issuer"
+      - "show ownership timeline"
+      - "display ownership snapshots"
+      - "get snapshot history"
+      - "list historical ownership"
+
+  snapshot.get:
+    invocation_phrases:
+      - "get ownership snapshot"
+      - "show specific snapshot"
+      - "view snapshot details"
+      - "retrieve ownership record"
+      - "display snapshot"
+      - "fetch snapshot by ID"
+      - "get snapshot details"
+
+  control-positions:
+    invocation_phrases:
+      - "show control positions"
+      - "who has control"
+      - "display voting percentages"
+      - "show control breakdown"
+      - "view control structure"
+      - "list control positions"
+      - "show who controls what"
+      - "display ownership control"
+      - "get control position summary"
+
+  who-controls:
+    invocation_phrases:
+      - "who controls this"
+      - "find controller"
+      - "show controlling entity"
+      - "who has majority"
+      - "find majority owner"
+      - "who owns controlling stake"
+      - "show ultimate controller"
+      - "find who controls"
+
+  right.add-to-class:
+    invocation_phrases:
+      - "add class right"
+      - "attach right to class"
+      - "add share class right"
+      - "grant class voting right"
+      - "add board appointment right"
+      - "attach veto to class"
+      - "add anti-dilution right"
+      - "grant tag along right"
+
+  right.add-to-holder:
+    invocation_phrases:
+      - "add holder right"
+      - "grant investor right"
+      - "add side letter right"
+      - "attach right to holder"
+      - "grant board observer"
+      - "add information rights"
+      - "grant protective provision"
+      - "add investor veto"
+
+  right.end:
+    invocation_phrases:
+      - "end special right"
+      - "terminate right"
+      - "expire holder right"
+      - "remove special right"
+      - "end board right"
+      - "terminate veto right"
+      - "close out right"
+
+  right.list-for-issuer:
+    invocation_phrases:
+      - "list issuer rights"
+      - "show rights for company"
+      - "display special rights"
+      - "list all rights"
+      - "show company rights"
+      - "view issuer special rights"
+      - "get rights summary"
+
+  right.list-for-holder:
+    invocation_phrases:
+      - "list holder rights"
+      - "show my rights"
+      - "display investor rights"
+      - "what rights do they have"
+      - "list entity rights"
+      - "show rights held"
+      - "view holder entitlements"
+
+  reconcile:
+    invocation_phrases:
+      - "reconcile ownership"
+      - "compare ownership sources"
+      - "run reconciliation"
+      - "check ownership match"
+      - "reconcile against BODS"
+      - "compare to GLEIF"
+      - "run ownership comparison"
+      - "verify ownership data"
+      - "cross-check ownership"
+
+  reconcile.findings:
+    invocation_phrases:
+      - "show reconciliation findings"
+      - "list discrepancies"
+      - "view reconcile results"
+      - "show ownership mismatches"
+      - "display findings"
+      - "get reconciliation errors"
+      - "show what doesn't match"
+
+  reconcile.resolve-finding:
+    invocation_phrases:
+      - "resolve finding"
+      - "close reconciliation issue"
+      - "mark as resolved"
+      - "acknowledge finding"
+      - "dismiss false positive"
+      - "resolve discrepancy"
+      - "close out finding"
+
+  reconcile.list-runs:
+    invocation_phrases:
+      - "list reconciliation runs"
+      - "show reconcile history"
+      - "view past reconciliations"
+      - "list previous runs"
+      - "show reconciliation jobs"
+      - "display run history"
+
+  analyze-gaps:
+    invocation_phrases:
+      - "analyze ownership gaps"
+      - "find missing ownership"
+      - "check for gaps"
+      - "identify ownership holes"
+      - "analyze missing percentages"
+      - "find unidentified holders"
+      - "show ownership gaps"
+      - "check total coverage"
+
+  trace-chain:
+    invocation_phrases:
+      - "trace ownership chain"
+      - "follow ownership path"
+      - "trace from entity to entity"
+      - "show ownership link"
+      - "follow chain between"
+      - "trace path to owner"
+      - "find connection between"
+      - "map ownership route"
+
+# ============================================================================
+# FUND.YAML - Fund Structure (25 verbs)
+# ============================================================================
+
+fund:
+  create-umbrella:
+    invocation_phrases:
+      - "create umbrella fund"
+      - "new SICAV"
+      - "create SICAV"
+      - "establish umbrella"
+      - "new ICAV"
+      - "create OEIC"
+      - "set up umbrella fund"
+      - "register new umbrella"
+      - "create fund umbrella"
+      - "establish new SICAV"
+      - "new umbrella structure"
+      - "create VCC fund"
+
+  create-subfund:
+    invocation_phrases:
+      - "create sub-fund"
+      - "new compartment"
+      - "add sub-fund"
+      - "create fund compartment"
+      - "new sub-fund under umbrella"
+      - "establish sub-fund"
+      - "add compartment to umbrella"
+      - "create new sub-fund"
+      - "set up compartment"
+
+  create-share-class:
+    invocation_phrases:
+      - "create share class"
+      - "add share class"
+      - "new share class"
+      - "create institutional class"
+      - "add retail class"
+      - "create accumulating class"
+      - "new distributing class"
+      - "set up share class"
+      - "add new share class"
+
+  create-standalone:
+    invocation_phrases:
+      - "create standalone fund"
+      - "new hedge fund"
+      - "create PE fund"
+      - "new private equity fund"
+      - "create real estate fund"
+      - "establish standalone fund"
+      - "new standalone vehicle"
+      - "create independent fund"
+
+  ensure-umbrella:
+    invocation_phrases:
+      - "ensure umbrella exists"
+      - "upsert umbrella fund"
+      - "create or update umbrella"
+      - "ensure SICAV"
+      - "idempotent umbrella create"
+      - "make sure umbrella exists"
+      - "upsert fund umbrella"
+
+  ensure-standalone:
+    invocation_phrases:
+      - "ensure fund exists"
+      - "upsert standalone fund"
+      - "create or update fund"
+      - "ensure fund by LEI"
+      - "idempotent fund create"
+      - "make sure fund exists"
+
+  ensure-subfund:
+    invocation_phrases:
+      - "ensure sub-fund exists"
+      - "upsert sub-fund"
+      - "create or update subfund"
+      - "idempotent compartment"
+      - "ensure compartment exists"
+
+  ensure-share-class:
+    invocation_phrases:
+      - "ensure share class"
+      - "upsert share class"
+      - "create or update class"
+      - "idempotent share class"
+      - "ensure class exists"
+
+  create-master:
+    invocation_phrases:
+      - "create master fund"
+      - "new master fund"
+      - "establish master"
+      - "set up master fund"
+      - "create master vehicle"
+      - "new master for feeders"
+
+  create-feeder:
+    invocation_phrases:
+      - "create feeder fund"
+      - "new feeder"
+      - "add feeder fund"
+      - "create US feeder"
+      - "establish feeder"
+      - "set up feeder fund"
+      - "new feeder vehicle"
+
+  link-feeder:
+    invocation_phrases:
+      - "link feeder to master"
+      - "connect feeder"
+      - "attach feeder fund"
+      - "link to master"
+      - "associate feeder"
+      - "connect to master fund"
+
+  add-to-umbrella:
+    invocation_phrases:
+      - "add to umbrella"
+      - "attach sub-fund"
+      - "link to umbrella"
+      - "add fund to umbrella"
+      - "connect to umbrella"
+      - "put under umbrella"
+
+  add-share-class:
+    invocation_phrases:
+      - "add share class to fund"
+      - "attach share class"
+      - "link share class"
+      - "add class to subfund"
+      - "connect share class"
+
+  list-subfunds:
+    invocation_phrases:
+      - "list sub-funds"
+      - "show compartments"
+      - "view umbrella contents"
+      - "list fund compartments"
+      - "show sub-funds in umbrella"
+      - "display all sub-funds"
+
+  list-share-classes:
+    invocation_phrases:
+      - "list share classes"
+      - "show fund classes"
+      - "view share classes"
+      - "display all classes"
+      - "show classes for subfund"
+      - "list fund share classes"
+
+  list-feeders:
+    invocation_phrases:
+      - "list feeder funds"
+      - "show feeders"
+      - "view master feeders"
+      - "display feeder structure"
+      - "list connected feeders"
+      - "show all feeders"
+
+  add-investment:
+    invocation_phrases:
+      - "add fund investment"
+      - "record fund holding"
+      - "add FoF investment"
+      - "create investment link"
+      - "fund invests in fund"
+      - "record fund allocation"
+      - "add underlying investment"
+
+  update-investment:
+    invocation_phrases:
+      - "update investment"
+      - "change allocation"
+      - "modify investment percentage"
+      - "update fund holding"
+      - "adjust investment"
+      - "change NAV allocation"
+
+  end-investment:
+    invocation_phrases:
+      - "end investment"
+      - "redeem investment"
+      - "close fund position"
+      - "terminate investment"
+      - "exit fund investment"
+      - "redeem fund holding"
+
+  list-investments:
+    invocation_phrases:
+      - "list fund investments"
+      - "show fund holdings"
+      - "what does fund hold"
+      - "display investments"
+      - "show underlying funds"
+      - "list portfolio holdings"
+
+  list-investors:
+    invocation_phrases:
+      - "list fund investors"
+      - "show who invests"
+      - "view investor list"
+      - "who holds this fund"
+      - "display fund investors"
+      - "show fund shareholders"
+
+# ============================================================================
+# UBO.YAML - UBO Ownership & Control (26 verbs)
+# ============================================================================
+
+ubo:
+  add-ownership:
+    invocation_phrases:
+      - "add ownership"
+      - "create ownership link"
+      - "record ownership"
+      - "add owner relationship"
+      - "link owner to entity"
+      - "set ownership percentage"
+      - "create ownership record"
+      - "add beneficial owner"
+      - "record shareholding"
+      - "add ownership stake"
+
+  update-ownership:
+    invocation_phrases:
+      - "update ownership"
+      - "change ownership percentage"
+      - "modify ownership"
+      - "adjust ownership stake"
+      - "update shareholding"
+      - "change ownership details"
+
+  end-ownership:
+    invocation_phrases:
+      - "end ownership"
+      - "terminate ownership"
+      - "close ownership"
+      - "ownership has ended"
+      - "sold ownership stake"
+      - "ownership disposed"
+      - "divested ownership"
+
+  delete-ownership:
+    invocation_phrases:
+      - "delete ownership"
+      - "remove ownership record"
+      - "hard delete ownership"
+      - "erase ownership link"
+      - "permanently remove ownership"
+
+  add-control:
+    invocation_phrases:
+      - "add control"
+      - "create control relationship"
+      - "add board member"
+      - "add controller"
+      - "link controller"
+      - "add voting control"
+      - "create control link"
+      - "add executive control"
+
+  end-control:
+    invocation_phrases:
+      - "end control"
+      - "terminate control"
+      - "control relationship ended"
+      - "remove from board"
+      - "end executive control"
+      - "control has ceased"
+
+  delete-control:
+    invocation_phrases:
+      - "delete control"
+      - "remove control record"
+      - "hard delete control"
+      - "erase control relationship"
+      - "permanently remove control"
+
+  add-trust-role:
+    invocation_phrases:
+      - "add trust role"
+      - "add settlor"
+      - "add trustee"
+      - "add beneficiary"
+      - "add protector"
+      - "create trust role"
+      - "link to trust"
+      - "assign trust role"
+
+  end-trust-role:
+    invocation_phrases:
+      - "end trust role"
+      - "terminate trust role"
+      - "remove from trust"
+      - "trust role ended"
+      - "beneficiary removed"
+
+  delete-trust-role:
+    invocation_phrases:
+      - "delete trust role"
+      - "remove trust relationship"
+      - "hard delete trust role"
+      - "erase trust link"
+
+  delete-relationship:
+    invocation_phrases:
+      - "delete relationship"
+      - "remove relationship"
+      - "hard delete link"
+      - "erase relationship"
+      - "permanently remove link"
+
+  list-owners:
+    invocation_phrases:
+      - "list owners"
+      - "show who owns"
+      - "view ownership"
+      - "who owns this"
+      - "display owners"
+      - "show shareholders"
+      - "list beneficial owners"
+      - "find all owners"
+
+  list-owned:
+    invocation_phrases:
+      - "list owned entities"
+      - "what do they own"
+      - "show holdings"
+      - "view owned companies"
+      - "list subsidiaries"
+      - "show what's owned"
+
+  list-ubos:
+    invocation_phrases:
+      - "list UBOs"
+      - "show ultimate owners"
+      - "find UBO candidates"
+      - "who are the UBOs"
+      - "display beneficial owners"
+      - "show natural person owners"
+      - "list ultimate beneficiaries"
+      - "find all UBOs"
+
+  list-by-subject:
+    invocation_phrases:
+      - "list by subject"
+      - "show owners of"
+      - "who owns this entity"
+      - "reverse ownership lookup"
+      - "find owners by subject"
+
+  calculate:
+    invocation_phrases:
+      - "calculate UBO"
+      - "compute beneficial ownership"
+      - "run UBO calculation"
+      - "calculate ownership chain"
+      - "determine UBOs"
+      - "compute ultimate owners"
+      - "find ultimate beneficiaries"
+      - "calculate ownership percentages"
+
+  trace-chains:
+    invocation_phrases:
+      - "trace ownership chains"
+      - "trace UBO chains"
+      - "follow ownership to persons"
+      - "trace to natural persons"
+      - "map ownership structure"
+      - "trace complete chain"
+      - "follow all ownership paths"
+      - "trace client ownership"
+
+  mark-deceased:
+    invocation_phrases:
+      - "mark as deceased"
+      - "person has died"
+      - "record death"
+      - "update deceased status"
+      - "owner is deceased"
+      - "mark person deceased"
+
+  convergence-supersede:
+    invocation_phrases:
+      - "supersede ownership"
+      - "transfer ownership"
+      - "replace owner"
+      - "ownership changed hands"
+      - "new owner replaces old"
+      - "supersede relationship"
+      - "ownership succession"
+
+  transfer-control:
+    invocation_phrases:
+      - "transfer control"
+      - "change controller"
+      - "control transferred"
+      - "new board member"
+      - "executive replaced"
+      - "transfer board seat"
+
+  waive-verification:
+    invocation_phrases:
+      - "waive verification"
+      - "skip verification"
+      - "waive UBO check"
+      - "exempt from verification"
+      - "approve waiver"
+      - "grant exemption"
+      - "low risk waiver"
+
+  mark-terminus:
+    invocation_phrases:
+      - "mark chain terminus"
+      - "ownership stops here"
+      - "listed company terminus"
+      - "public company endpoint"
+      - "mark as widely held"
+      - "government entity terminus"
+      - "chain ends here"
+      - "no further tracing"
+
+# ============================================================================
+# END OF INVOCATION PHRASES
+# ============================================================================

@@ -1,0 +1,58 @@
+version: '2.0'
+domain: product
+description: Product catalog operations (read-only - products are reference data)
+verbs:
+- verb: product.list
+  domain: product
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      is-active:
+        type: bool
+      offset:
+        type: int
+      limit:
+        type: int
+      product-category:
+        type: str
+  invocation_phrases:
+  - list product
+  - list the product
+  - show product
+  - get all product
+  - list service
+  - product list
+  examples:
+  - (product.list)
+  doc: List products with optional filters
+  tier: reference
+- verb: product.read
+  domain: product
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    optional:
+      product-code:
+        type: str
+      product-id:
+        type: entity_name
+  invocation_phrases:
+  - read product
+  - read the product
+  - get product
+  - fetch product
+  - read service
+  - product read
+  examples:
+  - (product.read)
+  doc: Read a product by ID or code
+  tier: reference

@@ -739,8 +739,18 @@ RULES:
    - Example: "load blackrock fund book" → entity name is "BlackRock" (not "blackrock fund")
 3. For dates, use ISO format (YYYY-MM-DD)
 4. For enums, match to closest valid value
-5. If a required parameter cannot be found in the instruction, set value to null
-6. Do NOT write DSL syntax - only extract values
+5. For jurisdiction/country parameters, normalize to ISO 3166-1 alpha-2 codes:
+   - UK, Britain, United Kingdom → GB
+   - USA, America, United States → US
+   - Germany, Deutschland, Ger → DE
+   - France → FR
+   - Luxembourg → LU
+   - Ireland → IE
+   - Switzerland, Schweiz → CH
+   - Netherlands, Holland → NL
+   - Example: "load allianz UK funds" → jurisdiction is "GB"
+6. If a required parameter cannot be found in the instruction, set value to null
+7. Do NOT write DSL syntax - only extract values
 
 Respond with ONLY valid JSON:
 {{

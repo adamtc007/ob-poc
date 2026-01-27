@@ -37,7 +37,7 @@ use entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGateway
 use ob_poc::dsl_v2::{gateway_resolver::gateway_addr, GatewayRefResolver};
 
 // Import verb sync and config loader for startup sync
-use ob_poc::dsl_v2::ConfigLoader;
+use ob_poc::dsl_v2::{load_v2_registry, ConfigLoader};
 use ob_poc::session::VerbSyncService;
 
 // Import background learning task
@@ -128,11 +128,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // =========================================================================
     // Sync verb definitions from YAML to database
     // With DYNAMIC VERB EXPANSION from entity_types table
+    // V2 schemas provide invocation_phrases when available
     // =========================================================================
     tracing::info!("Syncing verb definitions to database...");
 
     let verb_sync_service = VerbSyncService::new(pool.clone());
     let config_loader = ConfigLoader::from_env();
+
+    // Check for V2 registry (preferred source for invocation_phrases)
+    let v2_registry_path = config_loader
+        .config_dir()
+        .join("verb_schemas/registry.json");
+    let v2_registry = if v2_registry_path.exists() {
+        match load_v2_registry(&v2_registry_path) {
+            Ok(v2) => {
+                tracing::info!(
+                    "Loaded V2 registry: {} verbs, {} aliases (generated: {})",
+                    v2.verb_count,
+                    v2.alias_count,
+                    v2.generated
+                );
+                Some(v2)
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load V2 registry, falling back to V1: {}", e);
+                None
+            }
+        }
+    } else {
+        tracing::info!(
+            "V2 registry not found at {:?}, using V1 YAML",
+            v2_registry_path
+        );
+        None
+    };
 
     match config_loader.load_verbs() {
         Ok(verbs_config) => {
@@ -161,18 +190,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             // Sync verbs AND invocation_phrases to DB (intent_patterns column)
-            // This makes dsl_verbs.intent_patterns the source of truth for Candle semantic pipeline
-            match verb_sync_service
-                .sync_all_with_phrases(&registry, &verbs_config)
-                .await
-            {
+            // Use V2 registry if available (better phrase generation), otherwise V1 YAML
+            let sync_result = if let Some(ref v2) = v2_registry {
+                // V2 path: sync verb definitions from YAML, but invocation_phrases from V2
+                verb_sync_service
+                    .sync_all_with_v2_phrases(&registry, v2)
+                    .await
+            } else {
+                // V1 path: sync both from YAML
+                verb_sync_service
+                    .sync_all_with_phrases(&registry, &verbs_config)
+                    .await
+            };
+
+            match sync_result {
                 Ok(result) => {
                     tracing::info!(
-                        "Verb sync complete: {} added, {} updated, {} unchanged in {}ms",
+                        "Verb sync complete: {} added, {} updated, {} unchanged in {}ms (source: {})",
                         result.verbs_added,
                         result.verbs_updated,
                         result.verbs_unchanged,
-                        result.duration_ms
+                        result.duration_ms,
+                        if v2_registry.is_some() { "V2" } else { "V1" }
                     );
                 }
                 Err(e) => {

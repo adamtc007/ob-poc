@@ -1,0 +1,526 @@
+version: '2.0'
+domain: investor
+description: |
+  Investor lifecycle management for TA KYC-as-a-Service.
+  Implements full investor lifecycle from ENQUIRY through OFFBOARDED.
+  Transitions are validated by database trigger to ensure valid state machine flow.
+verbs:
+- verb: investor.read
+  domain: investor
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - read investor
+  - read the investor
+  - get investor
+  - fetch investor
+  - read shareholder
+  - investor read
+  examples:
+  - (investor.read :investor-id "...")
+  doc: Read investor by ID
+  tier: reference
+- verb: investor.mark-eligible
+  domain: investor
+  action: mark-eligible
+  aliases:
+  - mark-eligible
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+    optional:
+      eligible-share-classes:
+        type: list
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - mark eligible investor
+  - mark eligible the investor
+  - mark eligible shareholder
+  - investor mark eligible
+  examples:
+  - (investor.mark-eligible :investor-id "...")
+  doc: Transition from KYC_APPROVED to ELIGIBLE_TO_SUBSCRIBE
+  tier: intent
+- verb: investor.activate
+  domain: investor
+  action: activate
+  aliases:
+  - activate
+  - enable
+  - start
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - activate investor
+  - activate the investor
+  - enable investor
+  - start investor
+  - activate shareholder
+  - investor activate
+  examples:
+  - (investor.activate :investor-id "...")
+  doc: Transition from SUBSCRIBED to ACTIVE_HOLDER
+  tier: intent
+- verb: investor.count-by-state
+  domain: investor
+  action: count-by-state
+  aliases:
+  - count-by-state
+  args:
+    style: keyworded
+    required:
+      owning-cbu-id:
+        type: entity_name
+  positional_sugar:
+  - owning-cbu-id
+  invocation_phrases:
+  - count by state investor
+  - count by state the investor
+  - count by state shareholder
+  - investor count by state
+  examples:
+  - (investor.count-by-state :owning-cbu-id "...")
+  doc: Count investors by lifecycle state for a CBU
+  tier: diagnostics
+- verb: investor.create
+  domain: investor
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      investor-type:
+        type: str
+    optional:
+      owning-cbu-id:
+        type: entity_name
+      tax-jurisdiction:
+        type: str
+      provider:
+        type: str
+      provider-reference:
+        type: str
+      investor-category:
+        type: str
+  positional_sugar:
+  - entity-id
+  - investor-type
+  invocation_phrases:
+  - create investor
+  - create the investor
+  - add investor
+  - new investor
+  - create shareholder
+  - investor create
+  examples:
+  - (investor.create :entity-id "..." :investor-type "...")
+  doc: Create a new investor record (starts in ENQUIRY state)
+  tier: intent
+- verb: investor.reinstate
+  domain: investor
+  action: reinstate
+  aliases:
+  - reinstate
+  args:
+    style: keyworded
+    required:
+      reinstate-to-state:
+        type: str
+      investor-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - investor-id
+  - reinstate-to-state
+  invocation_phrases:
+  - reinstate investor
+  - reinstate the investor
+  - reinstate shareholder
+  - investor reinstate
+  examples:
+  - (investor.reinstate :investor-id "..." :reinstate-to-state "...")
+  doc: Reinstate suspended investor to previous state
+  tier: intent
+- verb: investor.request-documents
+  domain: investor
+  action: request-documents
+  aliases:
+  - request-documents
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+    optional:
+      required-documents:
+        type: list
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - request documents investor
+  - request documents the investor
+  - request documents shareholder
+  - investor request documents
+  examples:
+  - (investor.request-documents :investor-id "...")
+  doc: Transition from ENQUIRY to PENDING_DOCUMENTS
+  tier: intent
+- verb: investor.ensure
+  domain: investor
+  action: ensure
+  aliases:
+  - ensure
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      investor-type:
+        type: str
+    optional:
+      provider-reference:
+        type: str
+      provider:
+        type: str
+      owning-cbu-id:
+        type: entity_name
+      investor-category:
+        type: str
+      tax-jurisdiction:
+        type: str
+  positional_sugar:
+  - entity-id
+  - investor-type
+  invocation_phrases:
+  - ensure investor
+  - ensure the investor
+  - ensure shareholder
+  - investor ensure
+  examples:
+  - (investor.ensure :entity-id "..." :investor-type "...")
+  doc: Create or update investor by entity_id + owning_cbu_id (idempotent)
+  tier: intent
+- verb: investor.offboard
+  domain: investor
+  action: offboard
+  aliases:
+  - offboard
+  args:
+    style: keyworded
+    required:
+      offboard-reason:
+        type: str
+      investor-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - investor-id
+  - offboard-reason
+  invocation_phrases:
+  - offboard investor
+  - offboard the investor
+  - offboard shareholder
+  - investor offboard
+  examples:
+  - (investor.offboard :investor-id "..." :offboard-reason "...")
+  doc: Transition to OFFBOARDED (terminal state)
+  tier: intent
+- verb: investor.suspend
+  domain: investor
+  action: suspend
+  aliases:
+  - hold
+  - pause
+  - suspend
+  args:
+    style: keyworded
+    required:
+      suspension-reason:
+        type: str
+      investor-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - investor-id
+  - suspension-reason
+  invocation_phrases:
+  - suspend investor
+  - suspend the investor
+  - pause investor
+  - hold investor
+  - suspend shareholder
+  - investor suspend
+  examples:
+  - (investor.suspend :investor-id "..." :suspension-reason "...")
+  doc: Suspend investor (can be done from most states)
+  tier: intent
+- verb: investor.start-kyc
+  domain: investor
+  action: start-kyc
+  aliases:
+  - start-kyc
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+    optional:
+      case-id:
+        type: entity_name
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - start kyc investor
+  - start kyc the investor
+  - start kyc shareholder
+  - investor start kyc
+  examples:
+  - (investor.start-kyc :investor-id "...")
+  doc: Transition from PENDING_DOCUMENTS to KYC_IN_PROGRESS
+  tier: intent
+- verb: investor.start-redemption
+  domain: investor
+  action: start-redemption
+  aliases:
+  - start-redemption
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+    optional:
+      full-redemption:
+        type: bool
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - start redemption investor
+  - start redemption the investor
+  - start redemption shareholder
+  - investor start redemption
+  examples:
+  - (investor.start-redemption :investor-id "...")
+  doc: Transition from ACTIVE_HOLDER to REDEEMING
+  tier: intent
+- verb: investor.complete-redemption
+  domain: investor
+  action: complete-redemption
+  aliases:
+  - complete-redemption
+  args:
+    style: keyworded
+    required:
+      remaining-balance:
+        type: bool
+      investor-id:
+        type: entity_name
+  positional_sugar:
+  - investor-id
+  - remaining-balance
+  invocation_phrases:
+  - complete redemption investor
+  - complete redemption the investor
+  - complete redemption shareholder
+  - investor complete redemption
+  examples:
+  - (investor.complete-redemption :investor-id "..." :remaining-balance "...")
+  doc: Complete redemption - return to ACTIVE_HOLDER or proceed to OFFBOARDED
+  tier: intent
+- verb: investor.list-by-cbu
+  domain: investor
+  action: list-by-cbu
+  aliases:
+  - list-by-cbu
+  args:
+    style: keyworded
+    required:
+      owning-cbu-id:
+        type: entity_name
+    optional:
+      lifecycle-state:
+        type: str
+  positional_sugar:
+  - owning-cbu-id
+  invocation_phrases:
+  - list by cbu investor
+  - list by cbu the investor
+  - list by cbu shareholder
+  - investor list by cbu
+  examples:
+  - (investor.list-by-cbu :owning-cbu-id "...")
+  doc: List investors for a CBU (fund)
+  tier: reference
+- verb: investor.record-subscription
+  domain: investor
+  action: record-subscription
+  aliases:
+  - record-subscription
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+    optional:
+      holding-id:
+        type: entity_name
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - record subscription investor
+  - record subscription the investor
+  - record subscription shareholder
+  - investor record subscription
+  examples:
+  - (investor.record-subscription :investor-id "...")
+  doc: Transition from ELIGIBLE_TO_SUBSCRIBE to SUBSCRIBED
+  tier: intent
+- verb: investor.schedule-review
+  domain: investor
+  action: schedule-review
+  aliases:
+  - schedule-review
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+      next-review-date:
+        type: date
+  positional_sugar:
+  - investor-id
+  - next-review-date
+  invocation_phrases:
+  - schedule review investor
+  - schedule review the investor
+  - schedule review shareholder
+  - investor schedule review
+  examples:
+  - (investor.schedule-review :investor-id "..." :next-review-date "...")
+  doc: Schedule periodic KYC review
+  tier: intent
+- verb: investor.get-lifecycle-history
+  domain: investor
+  action: get-lifecycle-history
+  aliases:
+  - get-lifecycle-history
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - get lifecycle history investor
+  - get lifecycle history the investor
+  - get lifecycle history shareholder
+  - investor get lifecycle history
+  examples:
+  - (investor.get-lifecycle-history :investor-id "...")
+  doc: Get lifecycle state change history for an investor
+  tier: reference
+- verb: investor.list-by-entity
+  domain: investor
+  action: list-by-entity
+  aliases:
+  - list-by-entity
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - list by entity investor
+  - list by entity the investor
+  - list by entity shareholder
+  - investor list by entity
+  examples:
+  - (investor.list-by-entity :entity-id "...")
+  doc: List investor records for an entity across all CBUs
+  tier: reference
+- verb: investor.approve-kyc
+  domain: investor
+  action: approve-kyc
+  aliases:
+  - approve-kyc
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+      next-review-date:
+        type: date
+      risk-rating:
+        type: str
+  positional_sugar:
+  - investor-id
+  invocation_phrases:
+  - approve kyc investor
+  - approve kyc the investor
+  - approve kyc shareholder
+  - investor approve kyc
+  examples:
+  - (investor.approve-kyc :investor-id "...")
+  doc: Transition from KYC_IN_PROGRESS to KYC_APPROVED
+  tier: intent
+- verb: investor.reject-kyc
+  domain: investor
+  action: reject-kyc
+  aliases:
+  - reject-kyc
+  args:
+    style: keyworded
+    required:
+      investor-id:
+        type: entity_name
+      rejection-reason:
+        type: str
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - investor-id
+  - rejection-reason
+  invocation_phrases:
+  - reject kyc investor
+  - reject kyc the investor
+  - reject kyc shareholder
+  - investor reject kyc
+  examples:
+  - (investor.reject-kyc :investor-id "..." :rejection-reason "...")
+  doc: Transition from KYC_IN_PROGRESS to KYC_REJECTED
+  tier: intent

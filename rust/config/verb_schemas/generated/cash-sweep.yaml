@@ -1,0 +1,273 @@
+version: '2.0'
+domain: cash-sweep
+description: Cash sweep and STIF configuration management
+verbs:
+- verb: cash-sweep.update-threshold
+  domain: cash-sweep
+  action: update-threshold
+  aliases:
+  - update-threshold
+  args:
+    style: keyworded
+    required:
+      threshold-amount:
+        type: decimal
+      sweep-id:
+        type: uuid
+  positional_sugar:
+  - sweep-id
+  - threshold-amount
+  invocation_phrases:
+  - update threshold cash-sweep
+  - update threshold the cash-sweep
+  - cash-sweep update threshold
+  examples:
+  - (cash-sweep.update-threshold :sweep-id "..." :threshold-amount "...")
+  doc: Update sweep threshold amount
+  tier: intent
+- verb: cash-sweep.remove
+  domain: cash-sweep
+  action: remove
+  aliases:
+  - delete
+  - drop
+  - remove
+  args:
+    style: keyworded
+    required:
+      sweep-id:
+        type: uuid
+  positional_sugar:
+  - sweep-id
+  invocation_phrases:
+  - remove cash-sweep
+  - remove the cash-sweep
+  - delete cash-sweep
+  - drop cash-sweep
+  - cash-sweep remove
+  examples:
+  - (cash-sweep.remove :sweep-id "...")
+  doc: Remove cash sweep configuration
+  tier: intent
+- verb: cash-sweep.change-vehicle
+  domain: cash-sweep
+  action: change-vehicle
+  aliases:
+  - change-vehicle
+  args:
+    style: keyworded
+    required:
+      sweep-id:
+        type: uuid
+      vehicle-type:
+        type: enum
+        values:
+        - STIF
+        - MMF
+        - DEPOSIT
+        - OVERNIGHT_REPO
+        - TRI_PARTY_REPO
+        - MANUAL
+    optional:
+      vehicle-id:
+        type: str
+      vehicle-name:
+        type: str
+  positional_sugar:
+  - sweep-id
+  - vehicle-type
+  invocation_phrases:
+  - change vehicle cash-sweep
+  - change vehicle the cash-sweep
+  - cash-sweep change vehicle
+  examples:
+  - (cash-sweep.change-vehicle :sweep-id "..." :vehicle-type "...")
+  doc: Change sweep investment vehicle
+  tier: intent
+- verb: cash-sweep.list
+  domain: cash-sweep
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      is-active:
+        type: bool
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list cash-sweep
+  - list the cash-sweep
+  - show cash-sweep
+  - get all cash-sweep
+  - cash-sweep list
+  examples:
+  - (cash-sweep.list :cbu-id "...")
+  doc: List cash sweep configurations for CBU
+  tier: reference
+- verb: cash-sweep.reactivate
+  domain: cash-sweep
+  action: reactivate
+  aliases:
+  - reactivate
+  args:
+    style: keyworded
+    required:
+      sweep-id:
+        type: uuid
+  positional_sugar:
+  - sweep-id
+  invocation_phrases:
+  - reactivate cash-sweep
+  - reactivate the cash-sweep
+  - cash-sweep reactivate
+  examples:
+  - (cash-sweep.reactivate :sweep-id "...")
+  doc: Reactivate cash sweep
+  tier: intent
+- verb: cash-sweep.configure
+  domain: cash-sweep
+  action: configure
+  aliases:
+  - configure
+  args:
+    style: keyworded
+    required:
+      currency:
+        type: str
+      sweep-time:
+        type: str
+      cbu-id:
+        type: entity_name
+      threshold-amount:
+        type: decimal
+      vehicle-type:
+        type: enum
+        values:
+        - STIF
+        - MMF
+        - DEPOSIT
+        - OVERNIGHT_REPO
+        - TRI_PARTY_REPO
+        - MANUAL
+      sweep-timezone:
+        type: str
+    optional:
+      vehicle-id:
+        type: str
+      vehicle-name:
+        type: str
+      interest-allocation:
+        type: enum
+        values:
+        - ACCRUED
+        - MONTHLY
+        - QUARTERLY
+        - REINVEST
+      sweep-frequency:
+        type: enum
+        values:
+        - INTRADAY
+        - DAILY
+        - WEEKLY
+        - MONTHLY
+      effective-date:
+        type: date
+      profile-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - currency
+  invocation_phrases:
+  - configure cash-sweep
+  - configure the cash-sweep
+  - cash-sweep configure
+  examples:
+  - (cash-sweep.configure :cbu-id "..." :currency "..." :threshold-amount "..." :vehicle-type "..." :sweep-time "..." :sweep-timezone "...")
+  doc: Configure cash sweep for currency
+  tier: intent
+- verb: cash-sweep.update-timing
+  domain: cash-sweep
+  action: update-timing
+  aliases:
+  - update-timing
+  args:
+    style: keyworded
+    required:
+      sweep-id:
+        type: uuid
+    optional:
+      sweep-frequency:
+        type: enum
+        values:
+        - INTRADAY
+        - DAILY
+        - WEEKLY
+        - MONTHLY
+      sweep-time:
+        type: str
+      sweep-timezone:
+        type: str
+  positional_sugar:
+  - sweep-id
+  invocation_phrases:
+  - update timing cash-sweep
+  - update timing the cash-sweep
+  - cash-sweep update timing
+  examples:
+  - (cash-sweep.update-timing :sweep-id "...")
+  doc: Update sweep timing
+  tier: intent
+- verb: cash-sweep.link-resource
+  domain: cash-sweep
+  action: link-resource
+  aliases:
+  - link-resource
+  args:
+    style: keyworded
+    required:
+      sweep-id:
+        type: uuid
+      sweep-resource-id:
+        type: entity_name
+  positional_sugar:
+  - sweep-id
+  - sweep-resource-id
+  invocation_phrases:
+  - link resource cash-sweep
+  - link resource the cash-sweep
+  - cash-sweep link resource
+  examples:
+  - (cash-sweep.link-resource :sweep-id "..." :sweep-resource-id "...")
+  doc: Link sweep config to cash management resource
+  tier: intent
+- verb: cash-sweep.suspend
+  domain: cash-sweep
+  action: suspend
+  aliases:
+  - hold
+  - pause
+  - suspend
+  args:
+    style: keyworded
+    required:
+      sweep-id:
+        type: uuid
+  positional_sugar:
+  - sweep-id
+  invocation_phrases:
+  - suspend cash-sweep
+  - suspend the cash-sweep
+  - pause cash-sweep
+  - hold cash-sweep
+  - cash-sweep suspend
+  examples:
+  - (cash-sweep.suspend :sweep-id "...")
+  doc: Suspend cash sweep
+  tier: intent

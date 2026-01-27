@@ -1,0 +1,426 @@
+version: '2.0'
+domain: movement
+description: Fund subscription, redemption, transfer, and PE/VC capital transactions
+verbs:
+- verb: movement.subscribe
+  domain: movement
+  action: subscribe
+  aliases:
+  - subscribe
+  args:
+    style: keyworded
+    required:
+      price-per-unit:
+        type: decimal
+      reference:
+        type: str
+      units:
+        type: decimal
+      trade-date:
+        type: date
+      holding-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+      amount:
+        type: decimal
+      currency:
+        type: str
+      settlement-date:
+        type: date
+  positional_sugar:
+  - holding-id
+  - units
+  invocation_phrases:
+  - subscribe movement
+  - subscribe the movement
+  - movement subscribe
+  examples:
+  - (movement.subscribe :holding-id "..." :units "..." :price-per-unit "..." :trade-date "..." :reference "...")
+  doc: Record a subscription (investor buying units). Idempotent via (holding_id, trade_date, reference).
+  tier: intent
+- verb: movement.distribution
+  domain: movement
+  action: distribution
+  aliases:
+  - distribution
+  args:
+    style: keyworded
+    required:
+      amount:
+        type: decimal
+      trade-date:
+        type: date
+      holding-id:
+        type: entity_name
+      reference:
+        type: str
+    optional:
+      is-recallable:
+        type: bool
+      settlement-date:
+        type: date
+      distribution-type:
+        type: str
+      currency:
+        type: str
+      notes:
+        type: str
+  positional_sugar:
+  - holding-id
+  - amount
+  invocation_phrases:
+  - distribution movement
+  - distribution the movement
+  - movement distribution
+  examples:
+  - (movement.distribution :holding-id "..." :amount "..." :trade-date "..." :reference "...")
+  doc: Record distribution to LP (return of capital or profit)
+  tier: intent
+- verb: movement.cancel
+  domain: movement
+  action: cancel
+  aliases:
+  - cancel
+  args:
+    style: keyworded
+    required:
+      movement-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - movement-id
+  invocation_phrases:
+  - cancel movement
+  - cancel the movement
+  - movement cancel
+  examples:
+  - (movement.cancel :movement-id "...")
+  doc: Cancel a pending movement
+  tier: intent
+- verb: movement.confirm
+  domain: movement
+  action: confirm
+  aliases:
+  - confirm
+  args:
+    style: keyworded
+    required:
+      movement-id:
+        type: entity_name
+  positional_sugar:
+  - movement-id
+  invocation_phrases:
+  - confirm movement
+  - confirm the movement
+  - movement confirm
+  examples:
+  - (movement.confirm :movement-id "...")
+  doc: Confirm a pending movement
+  tier: intent
+- verb: movement.transfer-in
+  domain: movement
+  action: transfer-in
+  aliases:
+  - transfer-in
+  args:
+    style: keyworded
+    required:
+      reference:
+        type: str
+      trade-date:
+        type: date
+      holding-id:
+        type: entity_name
+      units:
+        type: decimal
+    optional:
+      price-per-unit:
+        type: decimal
+      notes:
+        type: str
+  positional_sugar:
+  - holding-id
+  - units
+  invocation_phrases:
+  - transfer in movement
+  - transfer in the movement
+  - movement transfer in
+  examples:
+  - (movement.transfer-in :holding-id "..." :units "..." :trade-date "..." :reference "...")
+  doc: Record an incoming transfer of units. Idempotent via (holding_id, trade_date, reference).
+  tier: intent
+- verb: movement.fail
+  domain: movement
+  action: fail
+  aliases:
+  - fail
+  args:
+    style: keyworded
+    required:
+      movement-id:
+        type: entity_name
+    optional:
+      failure-reason:
+        type: str
+      notes:
+        type: str
+  positional_sugar:
+  - movement-id
+  invocation_phrases:
+  - fail movement
+  - fail the movement
+  - movement fail
+  examples:
+  - (movement.fail :movement-id "...")
+  doc: Mark a movement as failed
+  tier: intent
+- verb: movement.read
+  domain: movement
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      movement-id:
+        type: entity_name
+  positional_sugar:
+  - movement-id
+  invocation_phrases:
+  - read movement
+  - read the movement
+  - get movement
+  - fetch movement
+  - movement read
+  examples:
+  - (movement.read :movement-id "...")
+  doc: Read a movement by ID
+  tier: reference
+- verb: movement.transfer-out
+  domain: movement
+  action: transfer-out
+  aliases:
+  - transfer-out
+  args:
+    style: keyworded
+    required:
+      units:
+        type: decimal
+      trade-date:
+        type: date
+      reference:
+        type: str
+      holding-id:
+        type: entity_name
+    optional:
+      price-per-unit:
+        type: decimal
+      notes:
+        type: str
+  positional_sugar:
+  - holding-id
+  - units
+  invocation_phrases:
+  - transfer out movement
+  - transfer out the movement
+  - movement transfer out
+  examples:
+  - (movement.transfer-out :holding-id "..." :units "..." :trade-date "..." :reference "...")
+  doc: Record an outgoing transfer of units. Idempotent via (holding_id, trade_date, reference).
+  tier: intent
+- verb: movement.settle
+  domain: movement
+  action: settle
+  aliases:
+  - settle
+  args:
+    style: keyworded
+    required:
+      movement-id:
+        type: entity_name
+    optional:
+      settlement-date:
+        type: date
+  positional_sugar:
+  - movement-id
+  invocation_phrases:
+  - settle movement
+  - settle the movement
+  - movement settle
+  examples:
+  - (movement.settle :movement-id "...")
+  doc: Mark a movement as settled
+  tier: intent
+- verb: movement.list-by-holding
+  domain: movement
+  action: list-by-holding
+  aliases:
+  - list-by-holding
+  args:
+    style: keyworded
+    required:
+      holding-id:
+        type: entity_name
+    optional:
+      movement-type:
+        type: str
+      status:
+        type: str
+  positional_sugar:
+  - holding-id
+  invocation_phrases:
+  - list by holding movement
+  - list by holding the movement
+  - movement list by holding
+  examples:
+  - (movement.list-by-holding :holding-id "...")
+  doc: List movements for a holding
+  tier: reference
+- verb: movement.recallable-distribution
+  domain: movement
+  action: recallable-distribution
+  aliases:
+  - recallable-distribution
+  args:
+    style: keyworded
+    required:
+      holding-id:
+        type: entity_name
+      trade-date:
+        type: date
+      amount:
+        type: decimal
+      reference:
+        type: str
+    optional:
+      currency:
+        type: str
+      recall-deadline:
+        type: date
+      notes:
+        type: str
+  positional_sugar:
+  - holding-id
+  - amount
+  invocation_phrases:
+  - recallable distribution movement
+  - recallable distribution the movement
+  - movement recallable distribution
+  examples:
+  - (movement.recallable-distribution :holding-id "..." :amount "..." :trade-date "..." :reference "...")
+  doc: Record a recallable distribution (can be called back by GP)
+  tier: intent
+- verb: movement.commitment
+  domain: movement
+  action: commitment
+  aliases:
+  - commitment
+  args:
+    style: keyworded
+    required:
+      amount:
+        type: decimal
+      trade-date:
+        type: date
+      reference:
+        type: str
+      holding-id:
+        type: entity_name
+    optional:
+      currency:
+        type: str
+      commitment-period-end:
+        type: date
+      notes:
+        type: str
+  positional_sugar:
+  - holding-id
+  - amount
+  invocation_phrases:
+  - commitment movement
+  - commitment the movement
+  - movement commitment
+  examples:
+  - (movement.commitment :holding-id "..." :amount "..." :trade-date "..." :reference "...")
+  doc: Record LP commitment to PE/VC fund (total amount investor commits to invest)
+  tier: intent
+- verb: movement.capital-call
+  domain: movement
+  action: capital-call
+  aliases:
+  - capital-call
+  args:
+    style: keyworded
+    required:
+      holding-id:
+        type: entity_name
+      amount:
+        type: decimal
+      reference:
+        type: str
+      trade-date:
+        type: date
+    optional:
+      call-number:
+        type: int
+      settlement-date:
+        type: date
+      currency:
+        type: str
+      notes:
+        type: str
+  positional_sugar:
+  - holding-id
+  - amount
+  invocation_phrases:
+  - capital call movement
+  - capital call the movement
+  - movement capital call
+  examples:
+  - (movement.capital-call :holding-id "..." :amount "..." :trade-date "..." :reference "...")
+  doc: Record capital call (drawdown from LP commitment)
+  tier: intent
+- verb: movement.redeem
+  domain: movement
+  action: redeem
+  aliases:
+  - redeem
+  args:
+    style: keyworded
+    required:
+      units:
+        type: decimal
+      price-per-unit:
+        type: decimal
+      reference:
+        type: str
+      holding-id:
+        type: entity_name
+      trade-date:
+        type: date
+    optional:
+      amount:
+        type: decimal
+      currency:
+        type: str
+      settlement-date:
+        type: date
+      notes:
+        type: str
+  positional_sugar:
+  - holding-id
+  - units
+  invocation_phrases:
+  - redeem movement
+  - redeem the movement
+  - movement redeem
+  examples:
+  - (movement.redeem :holding-id "..." :units "..." :price-per-unit "..." :trade-date "..." :reference "...")
+  doc: Record a redemption (investor selling units). Idempotent via (holding_id, trade_date, reference).
+  tier: intent

@@ -17,6 +17,7 @@ mod gleif_load;
 mod gleif_test;
 mod seed_allianz;
 mod ubo_test;
+mod verb_migrate;
 mod verbs;
 
 #[derive(Parser)]
@@ -495,6 +496,41 @@ enum VerbsAction {
         #[arg(long)]
         show_untagged: bool,
     },
+
+    /// Migrate V1 verb YAML to V2 schema format
+    ///
+    /// Converts existing verb definitions to the new V2 format with:
+    /// - Inline args (HashMap style)
+    /// - Generated invocation phrases
+    /// - Positional sugar (max 2)
+    /// - Alias deduplication
+    MigrateV2 {
+        /// Dry run - show what would be done without writing files
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Show additional details
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Lint V2 schema files (CI gate)
+    ///
+    /// Validates V2 schemas against lint rules:
+    /// - Minimum 3 invocation phrases
+    /// - Max 2 positional args
+    /// - No alias collisions
+    LintV2 {
+        /// Show only errors, not warnings
+        #[arg(long)]
+        errors_only: bool,
+    },
+
+    /// Build compiled VerbRegistry artifact
+    ///
+    /// Compiles all V2 schemas into a single registry.json file
+    /// for fast runtime loading.
+    BuildRegistry,
 }
 
 fn main() -> Result<()> {
@@ -638,6 +674,11 @@ fn main() -> Result<()> {
                     update_claude_md,
                     show_untagged,
                 } => verbs::verbs_inventory(output, update_claude_md, show_untagged),
+                VerbsAction::MigrateV2 { dry_run, verbose } => {
+                    verb_migrate::run_migrate_v2(dry_run, verbose)
+                }
+                VerbsAction::LintV2 { errors_only } => verb_migrate::run_lint(errors_only),
+                VerbsAction::BuildRegistry => verb_migrate::run_build_registry(),
             }
         }
         Command::LoadFundProgramme {

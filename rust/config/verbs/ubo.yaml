@@ -4,6 +4,17 @@ domains:
     verbs:
       add-ownership:
         description: Add ownership relationship between entities (idempotent by owner+owned)
+        invocation_phrases:
+          - "add ownership"
+          - "create ownership link"
+          - "record ownership"
+          - "add owner relationship"
+          - "link owner to entity"
+          - "set ownership percentage"
+          - "create ownership record"
+          - "add beneficial owner"
+          - "record shareholding"
+          - "add ownership stake"
         behavior: crud
         metadata:
           tier: intent
@@ -102,6 +113,13 @@ domains:
           capture: true
       update-ownership:
         description: Update ownership percentage or end date
+        invocation_phrases:
+          - "update ownership"
+          - "change ownership percentage"
+          - "modify ownership"
+          - "adjust ownership stake"
+          - "update shareholding"
+          - "change ownership details"
         behavior: crud
         metadata:
           tier: intent
@@ -140,6 +158,14 @@ domains:
           type: affected
       end-ownership:
         description: End an ownership relationship (soft delete - sets effective_to date)
+        invocation_phrases:
+          - "end ownership"
+          - "terminate ownership"
+          - "close ownership"
+          - "ownership has ended"
+          - "sold ownership stake"
+          - "ownership disposed"
+          - "divested ownership"
         behavior: crud
         metadata:
           tier: intent
@@ -172,6 +198,12 @@ domains:
 
       delete-ownership:
         description: Hard delete an ownership relationship (removes row from entity_relationships)
+        invocation_phrases:
+          - "delete ownership"
+          - "remove ownership record"
+          - "hard delete ownership"
+          - "erase ownership link"
+          - "permanently remove ownership"
         behavior: crud
         metadata:
           tier: intent
@@ -200,6 +232,15 @@ domains:
 
       add-control:
         description: Add control relationship between entities (board, voting rights, etc.)
+        invocation_phrases:
+          - "add control"
+          - "create control relationship"
+          - "add board member"
+          - "add controller"
+          - "link controller"
+          - "add voting control"
+          - "create control link"
+          - "add executive control"
         behavior: crud
         metadata:
           tier: intent
@@ -266,6 +307,13 @@ domains:
 
       end-control:
         description: End a control relationship (soft delete - sets effective_to date)
+        invocation_phrases:
+          - "end control"
+          - "terminate control"
+          - "control relationship ended"
+          - "remove from board"
+          - "end executive control"
+          - "control has ceased"
         behavior: crud
         metadata:
           tier: intent
@@ -298,6 +346,12 @@ domains:
 
       delete-control:
         description: Hard delete a control relationship (removes row from entity_relationships)
+        invocation_phrases:
+          - "delete control"
+          - "remove control record"
+          - "hard delete control"
+          - "erase control relationship"
+          - "permanently remove control"
         behavior: crud
         metadata:
           tier: intent
@@ -326,6 +380,15 @@ domains:
 
       add-trust-role:
         description: Add trust role relationship (settlor, trustee, beneficiary, protector)
+        invocation_phrases:
+          - "add trust role"
+          - "add settlor"
+          - "add trustee"
+          - "add beneficiary"
+          - "add protector"
+          - "create trust role"
+          - "link to trust"
+          - "assign trust role"
         behavior: crud
         metadata:
           tier: intent
@@ -401,6 +464,12 @@ domains:
 
       end-trust-role:
         description: End a trust role relationship (soft delete - sets effective_to date)
+        invocation_phrases:
+          - "end trust role"
+          - "terminate trust role"
+          - "remove from trust"
+          - "trust role ended"
+          - "beneficiary removed"
         behavior: crud
         metadata:
           tier: intent
@@ -433,6 +502,11 @@ domains:
 
       delete-trust-role:
         description: Hard delete a trust role relationship (removes row from entity_relationships)
+        invocation_phrases:
+          - "delete trust role"
+          - "remove trust relationship"
+          - "hard delete trust role"
+          - "erase trust link"
         behavior: crud
         metadata:
           tier: intent
@@ -461,6 +535,12 @@ domains:
 
       delete-relationship:
         description: Hard delete any entity relationship by ID (generic fallback)
+        invocation_phrases:
+          - "delete relationship"
+          - "remove relationship"
+          - "hard delete link"
+          - "erase relationship"
+          - "permanently remove link"
         behavior: crud
         metadata:
           tier: intent
@@ -488,6 +568,15 @@ domains:
           type: affected
       list-owners:
         description: List owners of an entity as of a specific date
+        invocation_phrases:
+          - "list owners"
+          - "show who owns"
+          - "view ownership"
+          - "who owns this"
+          - "display owners"
+          - "show shareholders"
+          - "list beneficial owners"
+          - "find all owners"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -514,6 +603,13 @@ domains:
           type: record_set
       list-owned:
         description: List entities owned by an entity (what does this entity own)
+        invocation_phrases:
+          - "list owned entities"
+          - "what do they own"
+          - "show holdings"
+          - "view owned companies"
+          - "list subsidiaries"
+          - "show what's owned"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -543,6 +639,15 @@ domains:
           type: record_set
       list-ubos:
         description: List UBO candidates for a CBU (natural persons with ≥25% ownership)
+        invocation_phrases:
+          - "list UBOs"
+          - "show ultimate owners"
+          - "find UBO candidates"
+          - "who are the UBOs"
+          - "display beneficial owners"
+          - "show natural person owners"
+          - "list ultimate beneficiaries"
+          - "find all UBOs"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -569,6 +674,12 @@ domains:
           type: record_set
       list-by-subject:
         description: List ownership relationships where entity is the owned party
+        invocation_phrases:
+          - "list by subject"
+          - "show owners of"
+          - "who owns this entity"
+          - "reverse ownership lookup"
+          - "find owners by subject"
         behavior: crud
         metadata:
           tier: diagnostics
@@ -598,6 +709,15 @@ domains:
           type: record_set
       calculate:
         description: Calculate ultimate beneficial ownership chain
+        invocation_phrases:
+          - "calculate UBO"
+          - "compute beneficial ownership"
+          - "run UBO calculation"
+          - "calculate ownership chain"
+          - "determine UBOs"
+          - "compute ultimate owners"
+          - "find ultimate beneficiaries"
+          - "calculate ownership percentages"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -633,6 +753,15 @@ domains:
 
       trace-chains:
         description: Trace all ownership and control chains to natural persons for a CBU or client
+        invocation_phrases:
+          - "trace ownership chains"
+          - "trace UBO chains"
+          - "follow ownership to persons"
+          - "trace to natural persons"
+          - "map ownership structure"
+          - "trace complete chain"
+          - "follow all ownership paths"
+          - "trace client ownership"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -693,6 +822,13 @@ domains:
 
       mark-deceased:
         description: Mark a person as deceased and cascade effects to ownership/control relationships
+        invocation_phrases:
+          - "mark as deceased"
+          - "person has died"
+          - "record death"
+          - "update deceased status"
+          - "owner is deceased"
+          - "mark person deceased"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -723,6 +859,14 @@ domains:
 
       convergence-supersede:
         description: Atomically supersede an ownership relationship with a new one in the convergence model
+        invocation_phrases:
+          - "supersede ownership"
+          - "transfer ownership"
+          - "replace owner"
+          - "ownership changed hands"
+          - "new owner replaces old"
+          - "supersede relationship"
+          - "ownership succession"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -776,6 +920,13 @@ domains:
 
       transfer-control:
         description: Transfer control relationship from one entity to another
+        invocation_phrases:
+          - "transfer control"
+          - "change controller"
+          - "control transferred"
+          - "new board member"
+          - "executive replaced"
+          - "transfer board seat"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -846,6 +997,14 @@ domains:
 
       waive-verification:
         description: Waive verification requirement for a relationship with documented justification
+        invocation_phrases:
+          - "waive verification"
+          - "skip verification"
+          - "waive UBO check"
+          - "exempt from verification"
+          - "approve waiver"
+          - "grant exemption"
+          - "low risk waiver"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -899,6 +1058,15 @@ domains:
 
       mark-terminus:
         description: Mark an entity as a UBO chain terminus (ownership tracing stops here)
+        invocation_phrases:
+          - "mark chain terminus"
+          - "ownership stops here"
+          - "listed company terminus"
+          - "public company endpoint"
+          - "mark as widely held"
+          - "government entity terminus"
+          - "chain ends here"
+          - "no further tracing"
         metadata:
           tier: intent
           source_of_truth: operational

@@ -1,0 +1,47 @@
+version: '2.0'
+domain: provisioning
+description: Resource provisioning operations
+verbs:
+- verb: provisioning.run
+  domain: provisioning
+  action: run
+  aliases:
+  - run
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      dry-run:
+        type: bool
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - run provisioning
+  - run the provisioning
+  - provisioning run
+  examples:
+  - (provisioning.run :cbu-id "...")
+  doc: Run provisioning orchestrator - creates resources for ready SRDEFs
+  tier: composite
+- verb: provisioning.status
+  domain: provisioning
+  action: status
+  aliases:
+  - status
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: uuid
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - status provisioning
+  - status the provisioning
+  - provisioning status
+  examples:
+  - (provisioning.status :request-id "...")
+  doc: Check provisioning request status
+  tier: diagnostics

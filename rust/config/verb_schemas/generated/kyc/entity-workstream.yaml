@@ -1,0 +1,235 @@
+version: '2.0'
+domain: entity-workstream
+description: Per-entity workstream within a KYC case
+verbs:
+- verb: entity-workstream.update-status
+  domain: entity-workstream
+  action: update-status
+  aliases:
+  - update-status
+  args:
+    style: keyworded
+    required:
+      workstream-id:
+        type: entity_name
+      status:
+        type: enum
+        values:
+        - PENDING
+        - COLLECT
+        - VERIFY
+        - SCREEN
+        - ASSESS
+        - COMPLETE
+        - BLOCKED
+        - ENHANCED_DD
+  positional_sugar:
+  - workstream-id
+  - status
+  invocation_phrases:
+  - update status entity-workstream
+  - update status the entity-workstream
+  - entity-workstream update status
+  examples:
+  - (entity-workstream.update-status :workstream-id "..." :status "...")
+  doc: Update workstream status
+  tier: intent
+- verb: entity-workstream.state
+  domain: entity-workstream
+  action: state
+  aliases:
+  - state
+  args:
+    style: keyworded
+    required:
+      workstream-id:
+        type: entity_name
+  positional_sugar:
+  - workstream-id
+  invocation_phrases:
+  - state entity-workstream
+  - state the entity-workstream
+  - entity-workstream state
+  examples:
+  - (entity-workstream.state :workstream-id "...")
+  doc: Get workstream state with embedded awaiting requests, checks, and documents
+  tier: intent
+- verb: entity-workstream.block
+  domain: entity-workstream
+  action: block
+  aliases:
+  - block
+  args:
+    style: keyworded
+    required:
+      reason:
+        type: str
+      workstream-id:
+        type: entity_name
+  positional_sugar:
+  - workstream-id
+  - reason
+  invocation_phrases:
+  - block entity-workstream
+  - block the entity-workstream
+  - entity-workstream block
+  examples:
+  - (entity-workstream.block :workstream-id "..." :reason "...")
+  doc: Block workstream with reason
+  tier: intent
+- verb: entity-workstream.read
+  domain: entity-workstream
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      workstream-id:
+        type: entity_name
+  positional_sugar:
+  - workstream-id
+  invocation_phrases:
+  - read entity-workstream
+  - read the entity-workstream
+  - get entity-workstream
+  - fetch entity-workstream
+  - entity-workstream read
+  examples:
+  - (entity-workstream.read :workstream-id "...")
+  doc: Read workstream details
+  tier: reference
+- verb: entity-workstream.set-ubo
+  domain: entity-workstream
+  action: set-ubo
+  aliases:
+  - set-ubo
+  args:
+    style: keyworded
+    required:
+      workstream-id:
+        type: entity_name
+    optional:
+      ownership-percentage:
+        type: decimal
+  positional_sugar:
+  - workstream-id
+  invocation_phrases:
+  - set ubo entity-workstream
+  - set ubo the entity-workstream
+  - entity-workstream set ubo
+  examples:
+  - (entity-workstream.set-ubo :workstream-id "...")
+  doc: Mark workstream entity as UBO
+  tier: intent
+- verb: entity-workstream.list-by-case
+  domain: entity-workstream
+  action: list-by-case
+  aliases:
+  - list-by-case
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+    optional:
+      status:
+        type: str
+  positional_sugar:
+  - case-id
+  invocation_phrases:
+  - list by case entity-workstream
+  - list by case the entity-workstream
+  - entity-workstream list by case
+  examples:
+  - (entity-workstream.list-by-case :case-id "...")
+  doc: List workstreams for a case
+  tier: reference
+- verb: entity-workstream.create
+  domain: entity-workstream
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      ownership-percentage:
+        type: decimal
+      discovery-depth:
+        type: int
+      discovery-source-id:
+        type: entity_name
+      discovery-reason:
+        type: str
+      is-ubo:
+        type: bool
+  positional_sugar:
+  - case-id
+  - entity-id
+  invocation_phrases:
+  - create entity-workstream
+  - create the entity-workstream
+  - add entity-workstream
+  - new entity-workstream
+  - entity-workstream create
+  examples:
+  - (entity-workstream.create :case-id "..." :entity-id "...")
+  doc: Create a new entity workstream (idempotent by case+entity)
+  tier: intent
+- verb: entity-workstream.complete
+  domain: entity-workstream
+  action: complete
+  aliases:
+  - complete
+  args:
+    style: keyworded
+    required:
+      workstream-id:
+        type: entity_name
+    optional:
+      risk-rating:
+        type: enum
+        values:
+        - LOW
+        - MEDIUM
+        - HIGH
+        - VERY_HIGH
+  positional_sugar:
+  - workstream-id
+  invocation_phrases:
+  - complete entity-workstream
+  - complete the entity-workstream
+  - entity-workstream complete
+  examples:
+  - (entity-workstream.complete :workstream-id "...")
+  doc: Mark workstream as complete
+  tier: intent
+- verb: entity-workstream.set-enhanced-dd
+  domain: entity-workstream
+  action: set-enhanced-dd
+  aliases:
+  - set-enhanced-dd
+  args:
+    style: keyworded
+    required:
+      workstream-id:
+        type: entity_name
+  positional_sugar:
+  - workstream-id
+  invocation_phrases:
+  - set enhanced dd entity-workstream
+  - set enhanced dd the entity-workstream
+  - entity-workstream set enhanced dd
+  examples:
+  - (entity-workstream.set-enhanced-dd :workstream-id "...")
+  doc: Flag workstream for enhanced due diligence
+  tier: intent

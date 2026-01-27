@@ -1,0 +1,98 @@
+version: '2.0'
+domain: entity-settlement
+description: Entity settlement identity and SSIs (counterparty data from ALERT)
+verbs:
+- verb: entity-settlement.set-identity
+  domain: entity-settlement
+  action: set-identity
+  aliases:
+  - set-identity
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      bic:
+        type: str
+    optional:
+      alert-id:
+        type: str
+      lei:
+        type: str
+      ctm-id:
+        type: str
+  positional_sugar:
+  - entity-id
+  - bic
+  invocation_phrases:
+  - set identity entity-settlement
+  - set identity the entity-settlement
+  - entity-settlement set identity
+  examples:
+  - (entity-settlement.set-identity :entity-id "..." :bic "...")
+  doc: Set primary settlement identity for an entity
+  tier: intent
+- verb: entity-settlement.add-ssi
+  domain: entity-settlement
+  action: add-ssi
+  aliases:
+  - add-ssi
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      counterparty-bic:
+        type: str
+      effective-date:
+        type: date
+    optional:
+      safekeeping-account:
+        type: str
+      source:
+        type: enum
+        values:
+        - ALERT
+        - MANUAL
+        - CTM
+      market:
+        type: entity_name
+      source-reference:
+        type: str
+      security-type:
+        type: entity_name
+      currency:
+        type: str
+      instrument-class:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  - counterparty-bic
+  invocation_phrases:
+  - add ssi entity-settlement
+  - add ssi the entity-settlement
+  - entity-settlement add ssi
+  examples:
+  - (entity-settlement.add-ssi :entity-id "..." :counterparty-bic "..." :effective-date "...")
+  doc: Add counterparty SSI (idempotent by entity+counterparty_bic+market+currency)
+  tier: intent
+- verb: entity-settlement.remove-ssi
+  domain: entity-settlement
+  action: remove-ssi
+  aliases:
+  - remove-ssi
+  args:
+    style: keyworded
+    required:
+      ssi-id:
+        type: uuid
+  positional_sugar:
+  - ssi-id
+  invocation_phrases:
+  - remove ssi entity-settlement
+  - remove ssi the entity-settlement
+  - entity-settlement remove ssi
+  examples:
+  - (entity-settlement.remove-ssi :ssi-id "...")
+  doc: Remove a counterparty SSI
+  tier: intent

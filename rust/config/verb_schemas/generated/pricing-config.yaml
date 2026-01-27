@@ -1,0 +1,404 @@
+version: '2.0'
+domain: pricing-config
+description: Pricing source configuration management
+verbs:
+- verb: pricing-config.list-nav-thresholds
+  domain: pricing-config
+  action: list-nav-thresholds
+  aliases:
+  - list-nav-thresholds
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list nav thresholds pricing-config
+  - list nav thresholds the pricing-config
+  - pricing-config list nav thresholds
+  examples:
+  - (pricing-config.list-nav-thresholds :cbu-id "...")
+  doc: List NAV impact thresholds for CBU
+  tier: reference
+- verb: pricing-config.set-nav-threshold
+  domain: pricing-config
+  action: set-nav-threshold
+  aliases:
+  - set-nav-threshold
+  args:
+    style: keyworded
+    required:
+      action:
+        type: str
+      threshold-pct:
+        type: decimal
+      cbu-id:
+        type: entity_name
+    optional:
+      notification-email:
+        type: str
+      instrument-class:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - threshold-pct
+  invocation_phrases:
+  - set nav threshold pricing-config
+  - set nav threshold the pricing-config
+  - pricing-config set nav threshold
+  examples:
+  - (pricing-config.set-nav-threshold :cbu-id "..." :threshold-pct "..." :action "...")
+  doc: Set NAV impact alert threshold
+  tier: intent
+- verb: pricing-config.link-resource
+  domain: pricing-config
+  action: link-resource
+  aliases:
+  - link-resource
+  args:
+    style: keyworded
+    required:
+      config-id:
+        type: uuid
+      pricing-resource-id:
+        type: entity_name
+  positional_sugar:
+  - config-id
+  - pricing-resource-id
+  invocation_phrases:
+  - link resource pricing-config
+  - link resource the pricing-config
+  - pricing-config link resource
+  examples:
+  - (pricing-config.link-resource :config-id "..." :pricing-resource-id "...")
+  doc: Link pricing config to pricing feed resource
+  tier: intent
+- verb: pricing-config.remove
+  domain: pricing-config
+  action: remove
+  aliases:
+  - delete
+  - drop
+  - remove
+  args:
+    style: keyworded
+    required:
+      config-id:
+        type: uuid
+  positional_sugar:
+  - config-id
+  invocation_phrases:
+  - remove pricing-config
+  - remove the pricing-config
+  - delete pricing-config
+  - drop pricing-config
+  - pricing-config remove
+  examples:
+  - (pricing-config.remove :config-id "...")
+  doc: Remove pricing configuration
+  tier: intent
+- verb: pricing-config.deactivate
+  domain: pricing-config
+  action: deactivate
+  aliases:
+  - deactivate
+  - disable
+  - stop
+  args:
+    style: keyworded
+    required:
+      config-id:
+        type: uuid
+  positional_sugar:
+  - config-id
+  invocation_phrases:
+  - deactivate pricing-config
+  - deactivate the pricing-config
+  - disable pricing-config
+  - stop pricing-config
+  - pricing-config deactivate
+  examples:
+  - (pricing-config.deactivate :config-id "...")
+  doc: Deactivate pricing configuration
+  tier: intent
+- verb: pricing-config.set
+  domain: pricing-config
+  action: set
+  aliases:
+  - set
+  args:
+    style: keyworded
+    required:
+      instrument-class:
+        type: entity_name
+      cbu-id:
+        type: entity_name
+      priority:
+        type: int
+      source:
+        type: enum
+        values:
+        - BLOOMBERG
+        - REUTERS
+        - MARKIT
+        - REFINITIV
+        - ICE
+        - MODEL
+        - INTERNAL
+        - VENDOR
+        - COUNTERPARTY
+    optional:
+      max-age-hours:
+        type: int
+      tolerance-pct:
+        type: decimal
+      profile-id:
+        type: entity_name
+      currency:
+        type: str
+      fallback-source:
+        type: str
+      stale-action:
+        type: enum
+        values:
+        - WARN
+        - BLOCK
+        - USE_FALLBACK
+        - ESCALATE
+      price-type:
+        type: enum
+        values:
+        - CLOSING
+        - MID
+        - BID
+        - ASK
+        - VWAP
+        - OFFICIAL
+      market:
+        type: entity_name
+      effective-date:
+        type: date
+  positional_sugar:
+  - cbu-id
+  - instrument-class
+  invocation_phrases:
+  - set pricing-config
+  - set the pricing-config
+  - pricing-config set
+  examples:
+  - (pricing-config.set :cbu-id "..." :instrument-class "..." :priority "..." :source "...")
+  doc: Set pricing source for instrument class
+  tier: intent
+- verb: pricing-config.find-for-instrument
+  domain: pricing-config
+  action: find-for-instrument
+  aliases:
+  - find-for-instrument
+  args:
+    style: keyworded
+    required:
+      instrument-class:
+        type: str
+      cbu-id:
+        type: entity_name
+    optional:
+      market:
+        type: str
+      currency:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - instrument-class
+  invocation_phrases:
+  - find for instrument pricing-config
+  - find for instrument the pricing-config
+  - pricing-config find for instrument
+  examples:
+  - (pricing-config.find-for-instrument :cbu-id "..." :instrument-class "...")
+  doc: Find pricing source for given instrument characteristics
+  tier: reference
+- verb: pricing-config.list-valuation-schedules
+  domain: pricing-config
+  action: list-valuation-schedules
+  aliases:
+  - list-valuation-schedules
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list valuation schedules pricing-config
+  - list valuation schedules the pricing-config
+  - pricing-config list valuation schedules
+  examples:
+  - (pricing-config.list-valuation-schedules :cbu-id "...")
+  doc: List valuation schedules for CBU
+  tier: reference
+- verb: pricing-config.set-valuation-schedule
+  domain: pricing-config
+  action: set-valuation-schedule
+  aliases:
+  - set-valuation-schedule
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      frequency:
+        type: str
+    optional:
+      valuation-time:
+        type: str
+      timezone:
+        type: str
+      instrument-class:
+        type: entity_name
+      business-days-only:
+        type: bool
+      market:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - frequency
+  invocation_phrases:
+  - set valuation schedule pricing-config
+  - set valuation schedule the pricing-config
+  - pricing-config set valuation schedule
+  examples:
+  - (pricing-config.set-valuation-schedule :cbu-id "..." :frequency "...")
+  doc: Set position valuation frequency and timing
+  tier: intent
+- verb: pricing-config.list
+  domain: pricing-config
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      is-active:
+        type: bool
+      instrument-class:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list pricing-config
+  - list the pricing-config
+  - show pricing-config
+  - get all pricing-config
+  - pricing-config list
+  examples:
+  - (pricing-config.list :cbu-id "...")
+  doc: List pricing configurations for CBU
+  tier: reference
+- verb: pricing-config.set-fallback-chain
+  domain: pricing-config
+  action: set-fallback-chain
+  aliases:
+  - set-fallback-chain
+  args:
+    style: keyworded
+    required:
+      fallback-trigger:
+        type: str
+      cbu-id:
+        type: entity_name
+      fallback-sources:
+        type: list
+    optional:
+      market:
+        type: entity_name
+      instrument-class:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - fallback-sources
+  invocation_phrases:
+  - set fallback chain pricing-config
+  - set fallback chain the pricing-config
+  - pricing-config set fallback chain
+  examples:
+  - (pricing-config.set-fallback-chain :cbu-id "..." :fallback-sources "..." :fallback-trigger "...")
+  doc: Define multi-source pricing fallback chain
+  tier: intent
+- verb: pricing-config.list-fallback-chains
+  domain: pricing-config
+  action: list-fallback-chains
+  aliases:
+  - list-fallback-chains
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list fallback chains pricing-config
+  - list fallback chains the pricing-config
+  - pricing-config list fallback chains
+  examples:
+  - (pricing-config.list-fallback-chains :cbu-id "...")
+  doc: List pricing fallback chains for CBU
+  tier: reference
+- verb: pricing-config.list-stale-policies
+  domain: pricing-config
+  action: list-stale-policies
+  aliases:
+  - list-stale-policies
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list stale policies pricing-config
+  - list stale policies the pricing-config
+  - pricing-config list stale policies
+  examples:
+  - (pricing-config.list-stale-policies :cbu-id "...")
+  doc: List stale price policies for CBU
+  tier: reference
+- verb: pricing-config.set-stale-policy
+  domain: pricing-config
+  action: set-stale-policy
+  aliases:
+  - set-stale-policy
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      max-age-hours:
+        type: int
+      stale-action:
+        type: str
+    optional:
+      instrument-class:
+        type: entity_name
+      escalation-contact:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - max-age-hours
+  invocation_phrases:
+  - set stale policy pricing-config
+  - set stale policy the pricing-config
+  - pricing-config set stale policy
+  examples:
+  - (pricing-config.set-stale-policy :cbu-id "..." :max-age-hours "..." :stale-action "...")
+  doc: Configure stale price handling policy
+  tier: intent

@@ -1,0 +1,433 @@
+version: '2.0'
+domain: lifecycle
+description: Instrument lifecycle taxonomy operations
+verbs:
+- verb: lifecycle.list-by-instrument
+  domain: lifecycle
+  action: list-by-instrument
+  aliases:
+  - list-by-instrument
+  args:
+    style: keyworded
+    required:
+      instrument-class:
+        type: entity_name
+    optional:
+      is-mandatory:
+        type: bool
+  positional_sugar:
+  - instrument-class
+  invocation_phrases:
+  - list by instrument lifecycle
+  - list by instrument the lifecycle
+  - lifecycle list by instrument
+  examples:
+  - (lifecycle.list-by-instrument :instrument-class "...")
+  doc: List lifecycles for an instrument class
+  tier: reference
+- verb: lifecycle.activate
+  domain: lifecycle
+  action: activate
+  aliases:
+  - activate
+  - enable
+  - start
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: uuid
+  positional_sugar:
+  - instance-id
+  invocation_phrases:
+  - activate lifecycle
+  - activate the lifecycle
+  - enable lifecycle
+  - start lifecycle
+  - lifecycle activate
+  examples:
+  - (lifecycle.activate :instance-id "...")
+  doc: Activate a lifecycle resource instance
+  tier: intent
+- verb: lifecycle.check-readiness
+  domain: lifecycle
+  action: check-readiness
+  aliases:
+  - check-readiness
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      instrument-class:
+        type: entity_name
+    optional:
+      counterparty:
+        type: entity_name
+      market:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - instrument-class
+  invocation_phrases:
+  - check readiness lifecycle
+  - check readiness the lifecycle
+  - lifecycle check readiness
+  examples:
+  - (lifecycle.check-readiness :cbu-id "..." :instrument-class "...")
+  doc: Check if CBU is ready to trade an instrument
+  tier: diagnostics
+- verb: lifecycle.list-resource-types
+  domain: lifecycle
+  action: list-resource-types
+  aliases:
+  - list-resource-types
+  args:
+    style: keyworded
+    optional:
+      owner:
+        type: str
+      resource-type:
+        type: enum
+        values:
+        - ACCOUNT
+        - SSI
+        - AGREEMENT
+        - CONNECTIVITY
+        - DATA_FEED
+        - PROCESS
+        - CLASSIFICATION
+  invocation_phrases:
+  - list resource types lifecycle
+  - list resource types the lifecycle
+  - lifecycle list resource types
+  examples:
+  - (lifecycle.list-resource-types)
+  doc: List lifecycle resource types
+  tier: reference
+- verb: lifecycle.suspend
+  domain: lifecycle
+  action: suspend
+  aliases:
+  - hold
+  - pause
+  - suspend
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: uuid
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - instance-id
+  invocation_phrases:
+  - suspend lifecycle
+  - suspend the lifecycle
+  - pause lifecycle
+  - hold lifecycle
+  - lifecycle suspend
+  examples:
+  - (lifecycle.suspend :instance-id "...")
+  doc: Suspend a lifecycle resource instance
+  tier: intent
+- verb: lifecycle.analyze-gaps
+  domain: lifecycle
+  action: analyze-gaps
+  aliases:
+  - analyze-gaps
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      scope:
+        type: enum
+        values:
+        - ALL
+        - SECURITIES
+        - DERIVATIVES
+        - NEW
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - analyze gaps lifecycle
+  - analyze gaps the lifecycle
+  - lifecycle analyze gaps
+  examples:
+  - (lifecycle.analyze-gaps :cbu-id "...")
+  doc: Analyze lifecycle provisioning gaps for a CBU
+  tier: intent
+- verb: lifecycle.generate-plan
+  domain: lifecycle
+  action: generate-plan
+  aliases:
+  - generate-plan
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      user-responses:
+        type: json
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - generate plan lifecycle
+  - generate plan the lifecycle
+  - lifecycle generate plan
+  examples:
+  - (lifecycle.generate-plan :cbu-id "...")
+  doc: Generate DSL provisioning plan for lifecycle gaps
+  tier: intent
+- verb: lifecycle.read-resource-type
+  domain: lifecycle
+  action: read-resource-type
+  aliases:
+  - read-resource-type
+  args:
+    style: keyworded
+    optional:
+      code:
+        type: str
+      resource-type-id:
+        type: uuid
+  invocation_phrases:
+  - read resource type lifecycle
+  - read resource type the lifecycle
+  - lifecycle read resource type
+  examples:
+  - (lifecycle.read-resource-type)
+  doc: Read a lifecycle resource type
+  tier: reference
+- verb: lifecycle.provision
+  domain: lifecycle
+  action: provision
+  aliases:
+  - configure
+  - provision
+  - setup
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      resource-type:
+        type: entity_name
+    optional:
+      depends-on:
+        type: list
+      provider-account:
+        type: str
+      market:
+        type: entity_name
+      config:
+        type: json
+      provider-bic:
+        type: str
+      instance-identifier:
+        type: str
+      counterparty:
+        type: entity_name
+      provider:
+        type: str
+      currency:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - resource-type
+  invocation_phrases:
+  - provision lifecycle
+  - provision the lifecycle
+  - setup lifecycle
+  - configure lifecycle
+  - lifecycle provision
+  examples:
+  - (lifecycle.provision :cbu-id "..." :resource-type "...")
+  doc: Provision a lifecycle resource instance for a CBU
+  tier: intent
+- verb: lifecycle.list-resources-for-lifecycle
+  domain: lifecycle
+  action: list-resources-for-lifecycle
+  aliases:
+  - list-resources-for-lifecycle
+  args:
+    style: keyworded
+    required:
+      lifecycle:
+        type: entity_name
+    optional:
+      is-required:
+        type: bool
+  positional_sugar:
+  - lifecycle
+  invocation_phrases:
+  - list resources for lifecycle lifecycle
+  - list resources for lifecycle the lifecycle
+  - lifecycle list resources for lifecycle
+  examples:
+  - (lifecycle.list-resources-for-lifecycle :lifecycle "...")
+  doc: List resource types required by a lifecycle
+  tier: reference
+- verb: lifecycle.execute-plan
+  domain: lifecycle
+  action: execute-plan
+  aliases:
+  - execute-plan
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      plan:
+        type: json
+    optional:
+      dry-run:
+        type: bool
+  positional_sugar:
+  - cbu-id
+  - plan
+  invocation_phrases:
+  - execute plan lifecycle
+  - execute plan the lifecycle
+  - lifecycle execute plan
+  examples:
+  - (lifecycle.execute-plan :cbu-id "..." :plan "...")
+  doc: Execute a provisioning plan
+  tier: intent
+- verb: lifecycle.discover
+  domain: lifecycle
+  action: discover
+  aliases:
+  - discover
+  - find
+  - identify
+  args:
+    style: keyworded
+    required:
+      instrument-class:
+        type: entity_name
+    optional:
+      include-optional:
+        type: bool
+  positional_sugar:
+  - instrument-class
+  invocation_phrases:
+  - discover lifecycle
+  - discover the lifecycle
+  - find lifecycle
+  - identify lifecycle
+  - lifecycle discover
+  examples:
+  - (lifecycle.discover :instrument-class "...")
+  doc: Discover all lifecycles and resources for an instrument
+  tier: composite
+- verb: lifecycle.list-instances
+  domain: lifecycle
+  action: list-instances
+  aliases:
+  - list-instances
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      resource-type:
+        type: str
+      status:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list instances lifecycle
+  - list instances the lifecycle
+  - lifecycle list instances
+  examples:
+  - (lifecycle.list-instances :cbu-id "...")
+  doc: List lifecycle resource instances for a CBU
+  tier: reference
+- verb: lifecycle.read
+  domain: lifecycle
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    optional:
+      lifecycle-id:
+        type: uuid
+      code:
+        type: str
+  invocation_phrases:
+  - read lifecycle
+  - read the lifecycle
+  - get lifecycle
+  - fetch lifecycle
+  - lifecycle read
+  examples:
+  - (lifecycle.read)
+  doc: Read a lifecycle by ID or code
+  tier: reference
+- verb: lifecycle.decommission
+  domain: lifecycle
+  action: decommission
+  aliases:
+  - decommission
+  args:
+    style: keyworded
+    required:
+      instance-id:
+        type: uuid
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - instance-id
+  invocation_phrases:
+  - decommission lifecycle
+  - decommission the lifecycle
+  - lifecycle decommission
+  examples:
+  - (lifecycle.decommission :instance-id "...")
+  doc: Decommission a lifecycle resource instance
+  tier: intent
+- verb: lifecycle.list
+  domain: lifecycle
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      category:
+        type: enum
+        values:
+        - SETTLEMENT
+        - ASSET_SERVICING
+        - PRICING
+        - OTC_LIFECYCLE
+        - COLLATERAL
+        - TAX
+        - REGULATORY
+      owner:
+        type: str
+      is-active:
+        type: bool
+  invocation_phrases:
+  - list lifecycle
+  - list the lifecycle
+  - show lifecycle
+  - get all lifecycle
+  - lifecycle list
+  examples:
+  - (lifecycle.list)
+  doc: List lifecycles with optional filters
+  tier: reference

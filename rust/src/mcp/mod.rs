@@ -46,6 +46,7 @@ pub mod handlers;
 pub mod intent_pipeline;
 pub mod protocol;
 pub mod resolution;
+pub mod schema;
 pub mod scope_resolution;
 pub mod server;
 pub mod session;

@@ -217,6 +217,18 @@ pub struct ClusterView {
 
     /// Selection highlight animation
     selection_pulse: f32,
+
+    /// Zoom level (1.0 = default, >1 = zoomed in, <1 = zoomed out)
+    zoom: f32,
+
+    /// Pan offset from center
+    pan_offset: egui::Vec2,
+
+    /// Is panning active (middle mouse or right mouse drag)
+    panning: bool,
+
+    /// Last drag position for pan calculation
+    last_drag_pos: Option<Pos2>,
 }
 
 impl Default for ClusterView {
@@ -242,6 +254,10 @@ impl ClusterView {
             center_glow: SpringF32::new(0.0),
             has_data: false,
             selection_pulse: 0.0,
+            zoom: 1.0,
+            pan_offset: egui::Vec2::ZERO,
+            panning: false,
+            last_drag_pos: None,
         }
     }
 
@@ -255,6 +271,11 @@ impl ClusterView {
         self.hovered_manco = false;
         self.glow_springs.clear();
         self.has_data = true;
+        // Reset zoom/pan for new data
+        self.zoom = 1.0;
+        self.pan_offset = egui::Vec2::ZERO;
+        self.panning = false;
+        self.last_drag_pos = None;
     }
 
     /// Clear data
@@ -380,11 +401,16 @@ impl ClusterView {
 
     /// Render the cluster view
     pub fn render(&self, painter: &Painter, _camera: &Camera2D, screen_rect: Rect) {
-        let center = screen_rect.center();
-        let available_radius = screen_rect.width().min(screen_rect.height()) * 0.45;
+        let base_center = screen_rect.center();
+        // Apply pan offset and zoom
+        let center = Pos2::new(
+            base_center.x + self.pan_offset.x,
+            base_center.y + self.pan_offset.y,
+        );
+        let available_radius = screen_rect.width().min(screen_rect.height()) * 0.45 * self.zoom;
 
-        // Recompute layout with actual available space
-        let layout = RingLayout::compute(self.cbus.len(), 50.0, available_radius);
+        // Recompute layout with actual available space (scaled by zoom)
+        let layout = RingLayout::compute(self.cbus.len(), 50.0 * self.zoom, available_radius);
 
         // Draw orbit rings (faint circles)
         for radius in &layout.radii {
@@ -403,7 +429,7 @@ impl ClusterView {
                         let is_selected =
                             self.orbit_pos.ring == ring_idx && self.orbit_pos.index == pos_idx;
                         let is_hovered = self.hovered == Some(cbu_idx);
-                        self.draw_cbu_icon(painter, cbu, pos, is_selected, is_hovered);
+                        self.draw_cbu_icon(painter, cbu, pos, is_selected, is_hovered, self.zoom);
                     }
                 }
             }
@@ -411,7 +437,7 @@ impl ClusterView {
 
         // Draw ManCo at center
         if let Some(manco) = &self.manco {
-            self.draw_manco_icon(painter, manco, center, self.hovered_manco);
+            self.draw_manco_icon(painter, manco, center, self.hovered_manco, self.zoom);
         }
     }
 
@@ -423,8 +449,9 @@ impl ClusterView {
         pos: Pos2,
         is_selected: bool,
         is_hovered: bool,
+        zoom: f32,
     ) {
-        let base_radius = 20.0;
+        let base_radius = 20.0 * zoom;
         let radius = if is_selected || is_hovered {
             base_radius * 1.2
         } else {
@@ -451,7 +478,7 @@ impl ClusterView {
         if is_selected {
             painter.circle_filled(
                 pos,
-                radius + 8.0,
+                radius + 8.0 * zoom,
                 Color32::from_rgba_unmultiplied(255, 215, 0, pulse_alpha),
             );
         }
@@ -470,10 +497,11 @@ impl ClusterView {
         } else {
             Color32::from_rgba_unmultiplied(255, 255, 255, 100)
         };
-        painter.circle_stroke(pos, radius, Stroke::new(2.0, border_color));
+        painter.circle_stroke(pos, radius, Stroke::new(2.0 * zoom, border_color));
 
-        // Draw short name
-        let font = FontId::proportional(10.0);
+        // Draw short name (scale font with zoom, but clamp to reasonable range)
+        let font_size = (10.0 * zoom).clamp(8.0, 16.0);
+        let font = FontId::proportional(font_size);
         painter.text(
             pos,
             egui::Align2::CENTER_CENTER,
@@ -482,22 +510,31 @@ impl ClusterView {
             Color32::WHITE,
         );
 
-        // Draw full name on hover
-        if is_hovered || is_selected {
-            let name_pos = Pos2::new(pos.x, pos.y + radius + 12.0);
+        // Draw full name on hover (or always if zoomed in enough)
+        if is_hovered || is_selected || zoom > 1.5 {
+            let name_pos = Pos2::new(pos.x, pos.y + radius + 12.0 * zoom);
+            let name_font_size = (11.0 * zoom).clamp(9.0, 14.0);
             painter.text(
                 name_pos,
                 egui::Align2::CENTER_TOP,
                 &cbu.name,
-                FontId::proportional(11.0),
+                FontId::proportional(name_font_size),
                 Color32::WHITE,
             );
         }
     }
 
     /// Draw the ManCo icon at center
-    fn draw_manco_icon(&self, painter: &Painter, manco: &ManCoData, pos: Pos2, is_hovered: bool) {
-        let radius = if is_hovered { 45.0 } else { 40.0 };
+    fn draw_manco_icon(
+        &self,
+        painter: &Painter,
+        manco: &ManCoData,
+        pos: Pos2,
+        is_hovered: bool,
+        zoom: f32,
+    ) {
+        let base_radius = if is_hovered { 45.0 } else { 40.0 };
+        let radius = base_radius * zoom;
 
         // ManCo uses a distinct color (gold/sun)
         let fill_color = if is_hovered {
@@ -507,7 +544,7 @@ impl ClusterView {
         };
 
         // Draw glow
-        let glow_radius = radius + 15.0;
+        let glow_radius = radius + 15.0 * zoom;
         painter.circle_filled(
             pos,
             glow_radius,
@@ -521,25 +558,27 @@ impl ClusterView {
         painter.circle_stroke(
             pos,
             radius,
-            Stroke::new(3.0, Color32::from_rgb(255, 235, 100)),
+            Stroke::new(3.0 * zoom, Color32::from_rgb(255, 235, 100)),
         );
 
-        // Draw ManCo label
+        // Draw ManCo label (scale font with zoom, clamp to reasonable range)
+        let label_font_size = (14.0 * zoom).clamp(10.0, 20.0);
         painter.text(
             pos,
             egui::Align2::CENTER_CENTER,
             &manco.short_name,
-            FontId::proportional(14.0),
+            FontId::proportional(label_font_size),
             Color32::from_rgb(50, 30, 0),
         );
 
         // Draw full name below
-        let name_pos = Pos2::new(pos.x, pos.y + radius + 10.0);
+        let name_pos = Pos2::new(pos.x, pos.y + radius + 10.0 * zoom);
+        let name_font_size = (12.0 * zoom).clamp(10.0, 16.0);
         painter.text(
             name_pos,
             egui::Align2::CENTER_TOP,
             &manco.name,
-            FontId::proportional(12.0),
+            FontId::proportional(name_font_size),
             Color32::WHITE,
         );
     }
@@ -554,26 +593,62 @@ impl ClusterView {
         response: &egui::Response,
         screen_rect: Rect,
     ) -> Option<NavigationAction> {
-        let center = screen_rect.center();
-        let available_radius = screen_rect.width().min(screen_rect.height()) * 0.45;
-        let layout = RingLayout::compute(self.cbus.len(), 50.0, available_radius);
+        // Calculate center with pan offset (same as render)
+        let base_center = screen_rect.center();
+        let center = Pos2::new(
+            base_center.x + self.pan_offset.x,
+            base_center.y + self.pan_offset.y,
+        );
+        let available_radius = screen_rect.width().min(screen_rect.height()) * 0.45 * self.zoom;
+        let layout = RingLayout::compute(self.cbus.len(), 50.0 * self.zoom, available_radius);
+
+        // Handle scroll wheel zoom
+        let scroll_delta = response.ctx.input(|i| i.smooth_scroll_delta.y);
+        if scroll_delta != 0.0 {
+            let zoom_factor = 1.0 + scroll_delta * 0.002;
+            let new_zoom = (self.zoom * zoom_factor).clamp(0.3, 3.0);
+
+            // Zoom toward mouse position if hovering
+            if let Some(hover_pos) = response.hover_pos() {
+                let old_zoom = self.zoom;
+                self.zoom = new_zoom;
+
+                // Adjust pan to zoom toward cursor
+                let cursor_offset = hover_pos - base_center;
+                let zoom_ratio = new_zoom / old_zoom;
+                self.pan_offset = self.pan_offset * zoom_ratio + cursor_offset * (1.0 - zoom_ratio);
+            } else {
+                self.zoom = new_zoom;
+            }
+        }
+
+        // Handle drag for panning (any mouse button)
+        // Left-click drag on empty space pans, right/middle always pan
+        let is_dragging = response.dragged_by(egui::PointerButton::Primary)
+            || response.dragged_by(egui::PointerButton::Secondary)
+            || response.dragged_by(egui::PointerButton::Middle);
+
+        if is_dragging {
+            self.pan_offset += response.drag_delta();
+        }
 
         // Reset hover state
         self.hovered = None;
         self.hovered_manco = false;
 
-        // Check for hover
+        // Check for hover (using zoomed/panned coordinates)
         if let Some(hover_pos) = response.hover_pos() {
             // Check ManCo hover
-            let manco_radius = 40.0;
+            let manco_radius = 40.0 * self.zoom;
             if (hover_pos - center).length() < manco_radius {
                 self.hovered_manco = true;
             } else {
                 // Check CBU hovers
+                let cbu_hit_radius = 25.0 * self.zoom;
                 for (ring_idx, ring) in layout.rings.iter().enumerate() {
                     for (pos_idx, &cbu_idx) in ring.iter().enumerate() {
                         if let Some(cbu_pos) = layout.position_at(ring_idx, pos_idx, center) {
-                            if (hover_pos - cbu_pos).length() < 25.0 {
+                            if (hover_pos - cbu_pos).length() < cbu_hit_radius {
                                 self.hovered = Some(cbu_idx);
                                 break;
                             }
@@ -583,8 +658,8 @@ impl ClusterView {
             }
         }
 
-        // Check for clicks
-        if response.clicked() {
+        // Check for clicks (left mouse button only)
+        if response.clicked_by(egui::PointerButton::Primary) {
             if self.hovered_manco {
                 // Clicked on ManCo - could show ManCo details
                 // For now, just log
@@ -616,6 +691,12 @@ impl ClusterView {
         }
 
         None
+    }
+
+    /// Reset zoom and pan to defaults
+    pub fn reset_view(&mut self) {
+        self.zoom = 1.0;
+        self.pan_offset = egui::Vec2::ZERO;
     }
 }
 

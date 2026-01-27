@@ -1,0 +1,827 @@
+version: '2.0'
+domain: ubo
+description: UBO ownership and control chain management
+verbs:
+- verb: ubo.list-owned
+  domain: ubo
+  action: list-owned
+  aliases:
+  - list-owned
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - list owned entities
+  - what do they own
+  - show holdings
+  - view owned companies
+  - list subsidiaries
+  - show what's owned
+  - list owned ubo
+  - list owned the ubo
+  examples:
+  - (ubo.list-owned :entity-id "...")
+  doc: List entities owned by an entity (what does this entity own)
+  tier: diagnostics
+  tags:
+  - ownership
+  - query
+  - ubo
+- verb: ubo.mark-deceased
+  domain: ubo
+  action: mark-deceased
+  aliases:
+  - mark-deceased
+  args:
+    style: keyworded
+    required:
+      date-of-death:
+        type: date
+      entity-id:
+        type: entity_name
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - entity-id
+  - date-of-death
+  invocation_phrases:
+  - mark as deceased
+  - person has died
+  - record death
+  - update deceased status
+  - owner is deceased
+  - mark person deceased
+  - mark deceased ubo
+  - mark deceased the ubo
+  examples:
+  - (ubo.mark-deceased :entity-id "..." :date-of-death "...")
+  doc: Mark a person as deceased and cascade effects to ownership/control relationships
+  tier: intent
+  tags:
+  - ubo
+  - ownership
+- verb: ubo.mark-terminus
+  domain: ubo
+  action: mark-terminus
+  aliases:
+  - mark-terminus
+  args:
+    style: keyworded
+    required:
+      terminus-type:
+        type: enum
+        values:
+        - LISTED_COMPANY
+        - GOVERNMENT_ENTITY
+        - REGULATED_FUND
+        - WIDELY_HELD
+        - EXCHANGE_TRADED
+      entity-id:
+        type: entity_name
+    optional:
+      lei:
+        type: str
+      effective-from:
+        type: date
+      exchange:
+        type: str
+  positional_sugar:
+  - entity-id
+  - terminus-type
+  invocation_phrases:
+  - mark chain terminus
+  - ownership stops here
+  - listed company terminus
+  - public company endpoint
+  - mark as widely held
+  - government entity terminus
+  - chain ends here
+  - no further tracing
+  examples:
+  - (ubo.mark-terminus :entity-id "..." :terminus-type "...")
+  doc: Mark an entity as a UBO chain terminus (ownership tracing stops here)
+  tier: intent
+  tags:
+  - ubo
+  - ownership
+- verb: ubo.end-ownership
+  domain: ubo
+  action: end-ownership
+  aliases:
+  - end-ownership
+  args:
+    style: keyworded
+    required:
+      effective-to:
+        type: date
+      relationship-id:
+        type: entity_name
+  positional_sugar:
+  - relationship-id
+  - effective-to
+  invocation_phrases:
+  - end ownership
+  - terminate ownership
+  - close ownership
+  - ownership has ended
+  - sold ownership stake
+  - ownership disposed
+  - divested ownership
+  - end ownership ubo
+  examples:
+  - (ubo.end-ownership :relationship-id "..." :effective-to "...")
+  doc: End an ownership relationship (soft delete - sets effective_to date)
+  tier: intent
+  tags:
+  - ownership
+  - relationship
+  - lifecycle
+  - ubo
+- verb: ubo.waive-verification
+  domain: ubo
+  action: waive-verification
+  aliases:
+  - waive-verification
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      relationship-id:
+        type: entity_name
+      reason:
+        type: str
+      approved-by:
+        type: str
+    optional:
+      waiver-type:
+        type: enum
+        values:
+        - REGULATORY_EXEMPTION
+        - LISTED_COMPANY
+        - GOVERNMENT_ENTITY
+        - LOW_RISK
+        - SENIOR_APPROVAL
+  positional_sugar:
+  - cbu-id
+  - relationship-id
+  invocation_phrases:
+  - waive verification
+  - skip verification
+  - waive UBO check
+  - exempt from verification
+  - approve waiver
+  - grant exemption
+  - low risk waiver
+  - waive verification ubo
+  examples:
+  - (ubo.waive-verification :cbu-id "..." :relationship-id "..." :reason "..." :approved-by "...")
+  doc: Waive verification requirement for a relationship with documented justification
+  tier: intent
+  tags:
+  - ubo
+  - ownership
+- verb: ubo.add-ownership
+  domain: ubo
+  action: add-ownership
+  aliases:
+  - add-ownership
+  args:
+    style: keyworded
+    required:
+      owned-entity-id:
+        type: entity_name
+      percentage:
+        type: decimal
+      owner-entity-id:
+        type: entity_name
+    optional:
+      effective-from:
+        type: date
+      notes:
+        type: str
+      interest-type:
+        type: entity_name
+      evidence-doc-id:
+        type: entity_name
+      direct-or-indirect:
+        type: enum
+        values:
+        - direct
+        - indirect
+        - unknown
+      ownership-type:
+        type: enum
+        values:
+        - DIRECT
+        - INDIRECT
+        - BENEFICIAL
+        - DIRECTLY_CONSOLIDATED
+        - ULTIMATELY_CONSOLIDATED
+  positional_sugar:
+  - owner-entity-id
+  - owned-entity-id
+  invocation_phrases:
+  - add ownership
+  - create ownership link
+  - record ownership
+  - add owner relationship
+  - link owner to entity
+  - set ownership percentage
+  - create ownership record
+  - add beneficial owner
+  examples:
+  - (ubo.add-ownership :owner-entity-id "..." :owned-entity-id "..." :percentage "...")
+  doc: Add ownership relationship between entities (idempotent by owner+owned)
+  tier: intent
+  tags:
+  - ownership
+  - relationship
+  - create
+  - ubo
+- verb: ubo.end-trust-role
+  domain: ubo
+  action: end-trust-role
+  aliases:
+  - end-trust-role
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: entity_name
+      effective-to:
+        type: date
+  positional_sugar:
+  - relationship-id
+  - effective-to
+  invocation_phrases:
+  - end trust role
+  - terminate trust role
+  - remove from trust
+  - trust role ended
+  - beneficiary removed
+  - end trust role ubo
+  - end trust role the ubo
+  - end trust role beneficial owner
+  examples:
+  - (ubo.end-trust-role :relationship-id "..." :effective-to "...")
+  doc: End a trust role relationship (soft delete - sets effective_to date)
+  tier: intent
+  tags:
+  - trust
+  - relationship
+  - lifecycle
+  - ubo
+  - ownership
+- verb: ubo.list-owners
+  domain: ubo
+  action: list-owners
+  aliases:
+  - list-owners
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      as-of-date:
+        type: date
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - list owners
+  - show who owns
+  - view ownership
+  - who owns this
+  - display owners
+  - show shareholders
+  - list beneficial owners
+  - find all owners
+  examples:
+  - (ubo.list-owners :entity-id "...")
+  doc: List owners of an entity as of a specific date
+  tier: diagnostics
+  tags:
+  - ownership
+  - query
+  - temporal
+  - ubo
+- verb: ubo.end-control
+  domain: ubo
+  action: end-control
+  aliases:
+  - end-control
+  args:
+    style: keyworded
+    required:
+      effective-to:
+        type: date
+      relationship-id:
+        type: entity_name
+  positional_sugar:
+  - relationship-id
+  - effective-to
+  invocation_phrases:
+  - end control
+  - terminate control
+  - control relationship ended
+  - remove from board
+  - end executive control
+  - control has ceased
+  - end control ubo
+  - end control the ubo
+  examples:
+  - (ubo.end-control :relationship-id "..." :effective-to "...")
+  doc: End a control relationship (soft delete - sets effective_to date)
+  tier: intent
+  tags:
+  - control
+  - relationship
+  - lifecycle
+  - ubo
+  - ownership
+- verb: ubo.delete-control
+  domain: ubo
+  action: delete-control
+  aliases:
+  - delete-control
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: entity_name
+  positional_sugar:
+  - relationship-id
+  invocation_phrases:
+  - delete control
+  - remove control record
+  - hard delete control
+  - erase control relationship
+  - permanently remove control
+  - delete control ubo
+  - delete control the ubo
+  - delete control beneficial owner
+  examples:
+  - (ubo.delete-control :relationship-id "...")
+  doc: Hard delete a control relationship (removes row from entity_relationships)
+  tier: intent
+  tags:
+  - control
+  - relationship
+  - delete
+  - ubo
+  - ownership
+- verb: ubo.list-ubos
+  domain: ubo
+  action: list-ubos
+  aliases:
+  - list-ubos
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list UBOs
+  - show ultimate owners
+  - find UBO candidates
+  - who are the UBOs
+  - display beneficial owners
+  - show natural person owners
+  - list ultimate beneficiaries
+  - find all UBOs
+  examples:
+  - (ubo.list-ubos :cbu-id "...")
+  doc: List UBO candidates for a CBU (natural persons with ≥25% ownership)
+  tier: diagnostics
+  tags:
+  - query
+  - ubo-candidates
+  - ubo
+  - ownership
+- verb: ubo.update-ownership
+  domain: ubo
+  action: update-ownership
+  aliases:
+  - update-ownership
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: entity_name
+    optional:
+      percentage:
+        type: decimal
+      effective-to:
+        type: date
+      notes:
+        type: str
+  positional_sugar:
+  - relationship-id
+  invocation_phrases:
+  - update ownership
+  - change ownership percentage
+  - modify ownership
+  - adjust ownership stake
+  - update shareholding
+  - change ownership details
+  - update ownership ubo
+  - update ownership the ubo
+  examples:
+  - (ubo.update-ownership :relationship-id "...")
+  doc: Update ownership percentage or end date
+  tier: intent
+  tags:
+  - ownership
+  - relationship
+  - update
+  - ubo
+- verb: ubo.add-trust-role
+  domain: ubo
+  action: add-trust-role
+  aliases:
+  - add-trust-role
+  args:
+    style: keyworded
+    required:
+      trust-role:
+        type: enum
+        values:
+        - settlor
+        - trustee
+        - beneficiary
+        - protector
+      person-entity-id:
+        type: entity_name
+      trust-entity-id:
+        type: entity_name
+    optional:
+      trust-interest-type:
+        type: enum
+        values:
+        - fixed
+        - discretionary
+        - contingent
+      notes:
+        type: str
+      effective-from:
+        type: date
+  positional_sugar:
+  - person-entity-id
+  - trust-entity-id
+  invocation_phrases:
+  - add trust role
+  - add settlor
+  - add trustee
+  - add beneficiary
+  - add protector
+  - create trust role
+  - link to trust
+  - assign trust role
+  examples:
+  - (ubo.add-trust-role :person-entity-id "..." :trust-entity-id "..." :trust-role "...")
+  doc: Add trust role relationship (settlor, trustee, beneficiary, protector)
+  tier: intent
+  tags:
+  - trust
+  - relationship
+  - create
+  - ubo
+  - ownership
+- verb: ubo.trace-chains
+  domain: ubo
+  action: trace-chains
+  aliases:
+  - trace-chains
+  args:
+    style: keyworded
+    optional:
+      threshold:
+        type: decimal
+      client:
+        type: entity_name
+      as-of-date:
+        type: date
+      cbu-id:
+        type: entity_name
+      target-entity-id:
+        type: entity_name
+  invocation_phrases:
+  - trace ownership chains
+  - trace UBO chains
+  - follow ownership to persons
+  - trace to natural persons
+  - map ownership structure
+  - trace complete chain
+  - follow all ownership paths
+  - trace client ownership
+  examples:
+  - (ubo.trace-chains)
+  doc: Trace all ownership and control chains to natural persons for a CBU or client
+  tier: intent
+  tags:
+  - ubo
+  - ownership
+- verb: ubo.transfer-control
+  domain: ubo
+  action: transfer-control
+  aliases:
+  - transfer-control
+  args:
+    style: keyworded
+    required:
+      to-entity-id:
+        type: entity_name
+      control-type:
+        type: enum
+        values:
+        - board_member
+        - executive
+        - voting_rights
+        - veto_rights
+        - appointee
+      cbu-id:
+        type: entity_name
+      controlled-entity-id:
+        type: entity_name
+      reason:
+        type: str
+      from-entity-id:
+        type: entity_name
+    optional:
+      effective-date:
+        type: date
+  positional_sugar:
+  - cbu-id
+  - from-entity-id
+  invocation_phrases:
+  - transfer control
+  - change controller
+  - control transferred
+  - new board member
+  - executive replaced
+  - transfer board seat
+  - transfer control ubo
+  - transfer control the ubo
+  examples:
+  - (ubo.transfer-control :cbu-id "..." :from-entity-id "..." :to-entity-id "..." :controlled-entity-id "..." :control-type "..." :reason "...")
+  doc: Transfer control relationship from one entity to another
+  tier: intent
+  tags:
+  - ubo
+  - ownership
+- verb: ubo.convergence-supersede
+  domain: ubo
+  action: convergence-supersede
+  aliases:
+  - convergence-supersede
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      percentage:
+        type: decimal
+      reason:
+        type: str
+      old-relationship-id:
+        type: entity_name
+      new-owner-entity-id:
+        type: entity_name
+    optional:
+      effective-date:
+        type: date
+  positional_sugar:
+  - cbu-id
+  - old-relationship-id
+  invocation_phrases:
+  - supersede ownership
+  - transfer ownership
+  - replace owner
+  - ownership changed hands
+  - new owner replaces old
+  - supersede relationship
+  - ownership succession
+  - convergence supersede ubo
+  examples:
+  - (ubo.convergence-supersede :cbu-id "..." :old-relationship-id "..." :new-owner-entity-id "..." :percentage "..." :reason "...")
+  doc: Atomically supersede an ownership relationship with a new one in the convergence model
+  tier: intent
+  tags:
+  - ubo
+  - ownership
+- verb: ubo.add-control
+  domain: ubo
+  action: add-control
+  aliases:
+  - add-control
+  args:
+    style: keyworded
+    required:
+      control-type:
+        type: enum
+        values:
+        - board_member
+        - executive
+        - voting_rights
+        - veto_rights
+        - appointee
+        - other
+      controlled-entity-id:
+        type: entity_name
+      controller-entity-id:
+        type: entity_name
+    optional:
+      effective-from:
+        type: date
+      notes:
+        type: str
+  positional_sugar:
+  - controller-entity-id
+  - controlled-entity-id
+  invocation_phrases:
+  - add control
+  - create control relationship
+  - add board member
+  - add controller
+  - link controller
+  - add voting control
+  - create control link
+  - add executive control
+  examples:
+  - (ubo.add-control :controller-entity-id "..." :controlled-entity-id "..." :control-type "...")
+  doc: Add control relationship between entities (board, voting rights, etc.)
+  tier: intent
+  tags:
+  - control
+  - relationship
+  - create
+  - ubo
+  - ownership
+- verb: ubo.delete-trust-role
+  domain: ubo
+  action: delete-trust-role
+  aliases:
+  - delete-trust-role
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: entity_name
+  positional_sugar:
+  - relationship-id
+  invocation_phrases:
+  - delete trust role
+  - remove trust relationship
+  - hard delete trust role
+  - erase trust link
+  - delete trust role ubo
+  - delete trust role the ubo
+  - delete trust role beneficial owner
+  - ubo delete trust role
+  examples:
+  - (ubo.delete-trust-role :relationship-id "...")
+  doc: Hard delete a trust role relationship (removes row from entity_relationships)
+  tier: intent
+  tags:
+  - trust
+  - relationship
+  - delete
+  - ubo
+  - ownership
+- verb: ubo.list-by-subject
+  domain: ubo
+  action: list-by-subject
+  aliases:
+  - list-by-subject
+  args:
+    style: keyworded
+    required:
+      subject-entity-id:
+        type: entity_name
+  positional_sugar:
+  - subject-entity-id
+  invocation_phrases:
+  - list by subject
+  - show owners of
+  - who owns this entity
+  - reverse ownership lookup
+  - find owners by subject
+  - list by subject ubo
+  - list by subject the ubo
+  - list by subject beneficial owner
+  examples:
+  - (ubo.list-by-subject :subject-entity-id "...")
+  doc: List ownership relationships where entity is the owned party
+  tier: diagnostics
+  tags:
+  - ownership
+  - query
+  - reverse-lookup
+  - ubo
+- verb: ubo.calculate
+  domain: ubo
+  action: calculate
+  aliases:
+  - calculate
+  - compute
+  - derive
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      threshold:
+        type: decimal
+  positional_sugar:
+  - cbu-id
+  - entity-id
+  invocation_phrases:
+  - calculate UBO
+  - compute beneficial ownership
+  - run UBO calculation
+  - calculate ownership chain
+  - determine UBOs
+  - compute ultimate owners
+  - find ultimate beneficiaries
+  - calculate ownership percentages
+  examples:
+  - (ubo.calculate :cbu-id "..." :entity-id "...")
+  doc: Calculate ultimate beneficial ownership chain
+  tier: diagnostics
+  tags:
+  - computation
+  - ownership
+  - graph-traversal
+  - ubo
+- verb: ubo.delete-ownership
+  domain: ubo
+  action: delete-ownership
+  aliases:
+  - delete-ownership
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: entity_name
+  positional_sugar:
+  - relationship-id
+  invocation_phrases:
+  - delete ownership
+  - remove ownership record
+  - hard delete ownership
+  - erase ownership link
+  - permanently remove ownership
+  - delete ownership ubo
+  - delete ownership the ubo
+  - delete ownership beneficial owner
+  examples:
+  - (ubo.delete-ownership :relationship-id "...")
+  doc: Hard delete an ownership relationship (removes row from entity_relationships)
+  tier: intent
+  tags:
+  - ownership
+  - relationship
+  - delete
+  - ubo
+- verb: ubo.delete-relationship
+  domain: ubo
+  action: delete-relationship
+  aliases:
+  - delete-relationship
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: entity_name
+  positional_sugar:
+  - relationship-id
+  invocation_phrases:
+  - delete relationship
+  - remove relationship
+  - hard delete link
+  - erase relationship
+  - permanently remove link
+  - delete relationship ubo
+  - delete relationship the ubo
+  - delete relationship beneficial owner
+  examples:
+  - (ubo.delete-relationship :relationship-id "...")
+  doc: Hard delete any entity relationship by ID (generic fallback)
+  tier: intent
+  tags:
+  - relationship
+  - delete
+  - generic
+  - ubo
+  - ownership

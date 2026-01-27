@@ -1,0 +1,199 @@
+version: '2.0'
+domain: ownership
+description: Ownership control link operations
+verbs:
+- verb: ownership.bridge.bods-ownership
+  domain: ownership
+  action: bridge.bods-ownership
+  aliases:
+  - bridge.bods-ownership
+  args:
+    style: keyworded
+    optional:
+      as-of:
+        type: date
+  invocation_phrases:
+  - bridge bods ownership
+  - bods to holdings
+  - convert ownership statements
+  - bridge.bods ownership ownership
+  - bridge.bods ownership the ownership
+  - bridge.bods ownership stake
+  - ownership bridge.bods ownership
+  examples:
+  - (ownership.bridge.bods-ownership)
+  doc: |
+    Bridge BODS ownership statements to kyc.holdings.
+    Run after BODS import to enable governance controller from ownership percentages.
+  tier: composite
+  tags:
+  - bridge
+  - batch
+  - bods
+  - ownership
+- verb: ownership.control-links.compute
+  domain: ownership
+  action: control-links.compute
+  aliases:
+  - control-links.compute
+  args:
+    style: keyworded
+    optional:
+      as-of:
+        type: date
+      issuer-entity-id:
+        type: entity_name
+  invocation_phrases:
+  - compute control links
+  - refresh ownership links
+  - materialize shareholding control
+  - control links.compute ownership
+  - control links.compute the ownership
+  - control links.compute stake
+  - ownership control links.compute
+  examples:
+  - (ownership.control-links.compute)
+  doc: |
+    Compute control links from holdings.
+    Materializes shareholding control relationships for efficient queries.
+  tier: composite
+  tags:
+  - compute
+  - batch
+  - ownership
+- verb: ownership.bridge.manco-roles
+  domain: ownership
+  action: bridge.manco-roles
+  aliases:
+  - bridge.manco-roles
+  args:
+    style: keyworded
+    optional:
+      as-of:
+        type: date
+  invocation_phrases:
+  - bridge manco roles
+  - convert roles to rights
+  - manco to board rights
+  - bridge.manco roles ownership
+  - bridge.manco roles the ownership
+  - bridge.manco roles stake
+  - ownership bridge.manco roles
+  examples:
+  - (ownership.bridge.manco-roles)
+  doc: |
+    Bridge MANAGEMENT_COMPANY role assignments to BOARD_APPOINTMENT special rights.
+    Enables governance controller to fire for CBUs with ManCo roles assigned.
+  tier: composite
+  tags:
+  - bridge
+  - batch
+  - ownership
+- verb: ownership.bridge.gleif-fund-managers
+  domain: ownership
+  action: bridge.gleif-fund-managers
+  aliases:
+  - bridge.gleif-fund-managers
+  args:
+    style: keyworded
+    optional:
+      as-of:
+        type: date
+  invocation_phrases:
+  - bridge gleif managers
+  - gleif to board rights
+  - fund manager rights
+  - bridge.gleif fund managers ownership
+  - bridge.gleif fund managers the ownership
+  - bridge.gleif fund managers stake
+  - ownership bridge.gleif fund managers
+  examples:
+  - (ownership.bridge.gleif-fund-managers)
+  doc: |
+    Bridge GLEIF IS_FUND_MANAGED_BY relationships to BOARD_APPOINTMENT special rights.
+    Run after GLEIF import to enable governance controller for fund entities.
+  tier: composite
+  tags:
+  - bridge
+  - batch
+  - gleif
+  - ownership
+- verb: ownership.refresh
+  domain: ownership
+  action: refresh
+  aliases:
+  - refresh
+  args:
+    style: keyworded
+    optional:
+      as-of:
+        type: date
+  invocation_phrases:
+  - refresh governance
+  - full governance refresh
+  - recompute all groups
+  - run governance pipeline
+  - manco refresh
+  - refresh ownership
+  - refresh the ownership
+  - refresh stake
+  examples:
+  - (ownership.refresh)
+  doc: |
+    Full governance refresh pipeline. Runs all bridges then derives groups.
+
+    Pipeline:
+      1. Bridge ManCo roles → board rights
+      2. Bridge GLEIF fund managers → board rights
+      3. Bridge BODS ownership → holdings
+      4. Compute control links from holdings
+      5. Derive CBU groups from governance controller
+
+    Idempotent - safe to run repeatedly.
+  tier: composite
+  tags:
+  - macro
+  - pipeline
+  - batch
+  - ownership
+- verb: ownership.control-links.list
+  domain: ownership
+  action: control-links.list
+  aliases:
+  - control-links.list
+  args:
+    style: keyworded
+    optional:
+      control-type:
+        type: enum
+        values:
+        - CONTROLLING
+        - SIGNIFICANT_INFLUENCE
+        - MATERIAL
+        - NOTIFIABLE
+        - MINORITY
+      as-of:
+        type: date
+      holder-entity-id:
+        type: entity_name
+      issuer-entity-id:
+        type: entity_name
+  invocation_phrases:
+  - list control links
+  - show shareholding control
+  - who controls what
+  - controlling shareholders
+  - control links.list ownership
+  - control links.list the ownership
+  - control links.list stake
+  - ownership control links.list
+  examples:
+  - (ownership.control-links.list)
+  doc: |
+    List holding control links for an issuer or holder.
+    Shows all shareholdings that establish control/influence.
+  tier: diagnostics
+  tags:
+  - read
+  - query
+  - ownership

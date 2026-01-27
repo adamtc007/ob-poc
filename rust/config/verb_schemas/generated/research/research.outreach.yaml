@@ -1,0 +1,249 @@
+version: '2.0'
+domain: research.outreach
+description: Counterparty outreach tracking for ownership disclosures and information requests
+verbs:
+- verb: research.outreach.mark-sent
+  domain: research.outreach
+  action: mark-sent
+  aliases:
+  - mark-sent
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: uuid
+    optional:
+      status:
+        type: str
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - mark sent research.outreach
+  - mark sent the research.outreach
+  - research.outreach mark sent
+  examples:
+  - (research.outreach.mark-sent :request-id "...")
+  doc: Mark request as sent
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - status-update
+- verb: research.outreach.list-pending
+  domain: research.outreach
+  action: list-pending
+  aliases:
+  - list-pending
+  args:
+    style: keyworded
+    optional:
+      status:
+        type: str
+      request-type:
+        type: str
+      target-entity-id:
+        type: uuid
+  invocation_phrases:
+  - list pending research.outreach
+  - list pending the research.outreach
+  - research.outreach list pending
+  examples:
+  - (research.outreach.list-pending)
+  doc: List pending outreach requests
+  tier: diagnostics
+  tags:
+  - read
+  - query
+  - workflow
+- verb: research.outreach.list-overdue
+  domain: research.outreach
+  action: list-overdue
+  aliases:
+  - list-overdue
+  args:
+    style: keyworded
+    optional:
+      days-overdue:
+        type: int
+  invocation_phrases:
+  - show overdue requests
+  - what's overdue
+  - pending outreach
+  - who hasn't responded
+  - list overdue research.outreach
+  - list overdue the research.outreach
+  - research.outreach list overdue
+  examples:
+  - (research.outreach.list-overdue)
+  doc: List overdue outreach requests
+  tier: diagnostics
+  tags:
+  - read
+  - query
+  - workflow
+  - validation
+- verb: research.outreach.send-reminder
+  domain: research.outreach
+  action: send-reminder
+  aliases:
+  - send-reminder
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: uuid
+    optional:
+      status:
+        type: str
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - send reminder research.outreach
+  - send reminder the research.outreach
+  - research.outreach send reminder
+  examples:
+  - (research.outreach.send-reminder :request-id "...")
+  doc: Mark that a reminder was sent
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - status-update
+- verb: research.outreach.close-request
+  domain: research.outreach
+  action: close-request
+  aliases:
+  - close-request
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: uuid
+    optional:
+      resolution-notes:
+        type: str
+      status:
+        type: str
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - close request research.outreach
+  - close request the research.outreach
+  - research.outreach close request
+  examples:
+  - (research.outreach.close-request :request-id "...")
+  doc: Close an outreach request
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - status-update
+- verb: research.outreach.record-response
+  domain: research.outreach
+  action: record-response
+  aliases:
+  - record-response
+  args:
+    style: keyworded
+    required:
+      response-type:
+        type: enum
+        values:
+        - FULL_DISCLOSURE
+        - PARTIAL_DISCLOSURE
+        - DECLINED
+        - NO_RESPONSE
+      request-id:
+        type: uuid
+    optional:
+      document-id:
+        type: uuid
+      notes:
+        type: str
+  positional_sugar:
+  - request-id
+  - response-type
+  invocation_phrases:
+  - record the response
+  - they responded
+  - got a disclosure
+  - received ownership information
+  - record response research.outreach
+  - record response the research.outreach
+  - research.outreach record response
+  examples:
+  - (research.outreach.record-response :request-id "..." :response-type "...")
+  doc: Record response to outreach request
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - response-capture
+- verb: research.outreach.create-request
+  domain: research.outreach
+  action: create-request
+  aliases:
+  - create-request
+  args:
+    style: keyworded
+    required:
+      target-entity-id:
+        type: entity_name
+      request-type:
+        type: str
+    optional:
+      recipient-email:
+        type: str
+      recipient-entity-id:
+        type: entity_name
+      deadline-days:
+        type: int
+      request-notes:
+        type: str
+      trigger-id:
+        type: uuid
+      recipient-name:
+        type: str
+  positional_sugar:
+  - target-entity-id
+  - request-type
+  invocation_phrases:
+  - create outreach request
+  - request ownership disclosure
+  - ask for information
+  - send a request to
+  - create request research.outreach
+  - create request the research.outreach
+  - research.outreach create request
+  examples:
+  - (research.outreach.create-request :target-entity-id "..." :request-type "...")
+  doc: Create an outreach request
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - request-management
+- verb: research.outreach.get-request
+  domain: research.outreach
+  action: get-request
+  aliases:
+  - get-request
+  args:
+    style: keyworded
+    required:
+      request-id:
+        type: uuid
+  positional_sugar:
+  - request-id
+  invocation_phrases:
+  - get request research.outreach
+  - get request the research.outreach
+  - research.outreach get request
+  examples:
+  - (research.outreach.get-request :request-id "...")
+  doc: Get details of a specific request
+  tier: diagnostics
+  tags:
+  - read
+  - query
+  - workflow

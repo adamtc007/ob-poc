@@ -1,0 +1,107 @@
+version: '2.0'
+domain: settlement-type
+description: Settlement type reference data (DVP, FOP, RVP, etc.)
+verbs:
+- verb: settlement-type.read
+  domain: settlement-type
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - read settlement-type
+  - read the settlement-type
+  - get settlement-type
+  - fetch settlement-type
+  - settlement-type read
+  examples:
+  - (settlement-type.read :code "...")
+  doc: Read a settlement type by code
+  tier: reference
+- verb: settlement-type.list
+  domain: settlement-type
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      is-active:
+        type: bool
+  invocation_phrases:
+  - list settlement-type
+  - list the settlement-type
+  - show settlement-type
+  - get all settlement-type
+  - settlement-type list
+  examples:
+  - (settlement-type.list)
+  doc: List all settlement types
+  tier: reference
+- verb: settlement-type.ensure
+  domain: settlement-type
+  action: ensure
+  aliases:
+  - ensure
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+      code:
+        type: str
+    optional:
+      display-order:
+        type: int
+      is-active:
+        type: bool
+      description:
+        type: str
+  positional_sugar:
+  - code
+  - name
+  invocation_phrases:
+  - ensure settlement-type
+  - ensure the settlement-type
+  - settlement-type ensure
+  examples:
+  - (settlement-type.ensure :code "..." :name "...")
+  doc: Create or update a settlement type
+  tier: intent
+- verb: settlement-type.deactivate
+  domain: settlement-type
+  action: deactivate
+  aliases:
+  - deactivate
+  - disable
+  - stop
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+    optional:
+      is-active:
+        type: bool
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - deactivate settlement-type
+  - deactivate the settlement-type
+  - disable settlement-type
+  - stop settlement-type
+  - settlement-type deactivate
+  examples:
+  - (settlement-type.deactivate :code "...")
+  doc: Deactivate a settlement type
+  tier: intent

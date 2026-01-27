@@ -1,0 +1,89 @@
+version: '2.0'
+domain: service-intent
+description: Service intent management - declares what products/services a CBU wants
+verbs:
+- verb: service-intent.supersede
+  domain: service-intent
+  action: supersede
+  aliases:
+  - supersede
+  args:
+    style: keyworded
+    required:
+      intent-id:
+        type: uuid
+      options:
+        type: json
+  positional_sugar:
+  - intent-id
+  - options
+  invocation_phrases:
+  - supersede service intent
+  - supersede service-intent
+  - supersede the service intent
+  - supersede intent
+  - service intent supersede
+  examples:
+  - (service-intent.supersede :intent-id "..." :options "...")
+  doc: Supersede an existing service intent with new options
+  tier: intent
+- verb: service-intent.list
+  domain: service-intent
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list service intent
+  - list service-intent
+  - list the service intent
+  - show service intent
+  - get all service intent
+  - list intent
+  - service intent list
+  examples:
+  - (service-intent.list :cbu-id "...")
+  doc: List all service intents for a CBU
+  tier: diagnostics
+- verb: service-intent.create
+  domain: service-intent
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      product-id:
+        type: entity_name
+      service-id:
+        type: entity_name
+    optional:
+      options:
+        type: json
+  positional_sugar:
+  - cbu-id
+  - product-id
+  invocation_phrases:
+  - create service intent
+  - create service-intent
+  - create the service intent
+  - add service intent
+  - new service intent
+  - create intent
+  - service intent create
+  examples:
+  - (service-intent.create :cbu-id "..." :product-id "..." :service-id "...")
+  doc: Create a service intent for a CBU
+  tier: intent

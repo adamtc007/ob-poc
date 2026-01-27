@@ -1,0 +1,806 @@
+version: '2.0'
+domain: client-group
+description: |
+  Manages client group entity membership and shorthand tags for semantic resolution.
+  Enables Candle-assisted fuzzy search from human language to entity_ids.
+verbs:
+- verb: client-group.assign-role
+  domain: client-group
+  action: assign-role
+  aliases:
+  - assign-role
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+      role-id:
+        type: entity_name
+    optional:
+      target-entity-id:
+        type: entity_name
+      effective-from:
+        type: date
+      source:
+        type: enum
+        values:
+        - manual
+        - gleif
+        - bods
+        - auto_tag
+        - agent
+  positional_sugar:
+  - group-id
+  - entity-id
+  invocation_phrases:
+  - assign role
+  - make this the
+  - this is the manco
+  - mark as custodian
+  - tag as fund
+  - assign role client-group
+  - assign role the client-group
+  - client-group assign role
+  examples:
+  - (client-group.assign-role :group-id "..." :entity-id "..." :role-id "...")
+  doc: Assign a role to an entity within the client group context
+  tier: intent
+  tags:
+  - role
+  - crud
+- verb: client-group.search
+  domain: client-group
+  action: search
+  aliases:
+  - find
+  - lookup
+  - search
+  args:
+    style: keyworded
+    required:
+      query:
+        type: str
+      group-id:
+        type: entity_name
+    optional:
+      persona:
+        type: enum
+        values:
+        - kyc
+        - trading
+        - ops
+        - onboarding
+      limit:
+        type: int
+  positional_sugar:
+  - group-id
+  - query
+  invocation_phrases:
+  - find
+  - show me the
+  - where is the
+  - get the
+  - which is the
+  - who is the
+  - search client-group
+  - search the client-group
+  examples:
+  - (client-group.search :group-id "..." :query "...")
+  doc: Search entities by shorthand tags (Candle-assisted fuzzy search)
+  tier: intent
+  tags:
+  - search
+  - semantic
+  - candle
+- verb: client-group.list-roles
+  domain: client-group
+  action: list-roles
+  aliases:
+  - list-roles
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      role-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - list roles
+  - show roles
+  - what roles
+  - who is the manco
+  - who is the custodian
+  - list roles client-group
+  - list roles the client-group
+  - client-group list roles
+  examples:
+  - (client-group.list-roles :group-id "...")
+  doc: List role assignments for entities in a client group
+  tier: diagnostics
+  tags:
+  - role
+  - read
+- verb: client-group.list-discrepancies
+  domain: client-group
+  action: list-discrepancies
+  aliases:
+  - list-discrepancies
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      min-spread:
+        type: decimal
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - show discrepancies
+  - ownership conflicts
+  - mismatched ownership
+  - what needs reconciliation
+  - list discrepancies client-group
+  - list discrepancies the client-group
+  - client-group list discrepancies
+  examples:
+  - (client-group.list-discrepancies :group-id "...")
+  doc: List ownership relationships with conflicting source values
+  tier: diagnostics
+  tags:
+  - ownership
+  - review
+  - reconciliation
+- verb: client-group.add-relationship
+  domain: client-group
+  action: add-relationship
+  aliases:
+  - add-relationship
+  args:
+    style: keyworded
+    required:
+      child-entity-id:
+        type: entity_name
+      group-id:
+        type: entity_name
+      parent-entity-id:
+        type: entity_name
+    optional:
+      effective-from:
+        type: date
+      relationship-kind:
+        type: enum
+        values:
+        - ownership
+        - control
+        - beneficial
+        - management
+  positional_sugar:
+  - group-id
+  - parent-entity-id
+  invocation_phrases:
+  - add ownership
+  - this owns
+  - set parent
+  - link ownership
+  - add relationship client-group
+  - add relationship the client-group
+  - client-group add relationship
+  examples:
+  - (client-group.add-relationship :group-id "..." :parent-entity-id "..." :child-entity-id "...")
+  doc: Add a provisional ownership/control edge between entities
+  tier: intent
+  tags:
+  - ownership
+  - crud
+- verb: client-group.verify-ownership
+  domain: client-group
+  action: verify-ownership
+  aliases:
+  - verify-ownership
+  args:
+    style: keyworded
+    required:
+      source-id:
+        type: uuid
+    optional:
+      verified-by:
+        type: str
+      notes:
+        type: str
+  positional_sugar:
+  - source-id
+  invocation_phrases:
+  - verify ownership
+  - confirm ownership
+  - ownership verified
+  - verify ownership client-group
+  - verify ownership the client-group
+  - client-group verify ownership
+  examples:
+  - (client-group.verify-ownership :source-id "...")
+  doc: Mark an ownership source as verified
+  tier: intent
+  tags:
+  - ownership
+  - verification
+- verb: client-group.remove-role
+  domain: client-group
+  action: remove-role
+  aliases:
+  - remove-role
+  args:
+    style: keyworded
+    required:
+      role-assignment-id:
+        type: uuid
+  positional_sugar:
+  - role-assignment-id
+  invocation_phrases:
+  - remove role client-group
+  - remove role the client-group
+  - client-group remove role
+  examples:
+  - (client-group.remove-role :role-assignment-id "...")
+  doc: Remove a role assignment from an entity
+  tier: intent
+  tags:
+  - role
+  - crud
+- verb: client-group.start-discovery
+  domain: client-group
+  action: start-discovery
+  aliases:
+  - start-discovery
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      source:
+        type: enum
+        values:
+        - gleif
+        - bods
+        - manual
+        - mixed
+      root-lei:
+        type: str
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - start discovery
+  - begin research
+  - research this group
+  - discover group structure
+  - start discovery client-group
+  - start discovery the client-group
+  - client-group start discovery
+  examples:
+  - (client-group.start-discovery :group-id "...")
+  doc: Start discovery process for a client group
+  tier: intent
+  tags:
+  - discovery
+  - workflow
+- verb: client-group.list-relationships
+  domain: client-group
+  action: list-relationships
+  aliases:
+  - list-relationships
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      relationship-kind:
+        type: enum
+        values:
+        - ownership
+        - control
+        - beneficial
+        - management
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - show ownership
+  - list relationships
+  - who owns whom
+  - ownership structure
+  - list relationships client-group
+  - list relationships the client-group
+  - client-group list relationships
+  examples:
+  - (client-group.list-relationships :group-id "...")
+  doc: List ownership/control relationships in a client group
+  tier: diagnostics
+  tags:
+  - ownership
+  - read
+- verb: client-group.entity-add
+  domain: client-group
+  action: entity-add
+  aliases:
+  - entity-add
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+      membership-type:
+        type: enum
+        values:
+        - confirmed
+        - suspected
+        - historical
+  positional_sugar:
+  - group-id
+  - entity-id
+  invocation_phrases:
+  - entity add client-group
+  - entity add the client-group
+  - client-group entity add
+  examples:
+  - (client-group.entity-add :group-id "..." :entity-id "...")
+  doc: Add an entity to this client group's universe
+  tier: intent
+  tags:
+  - membership
+  - crud
+- verb: client-group.list-unverified
+  domain: client-group
+  action: list-unverified
+  aliases:
+  - list-unverified
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      limit:
+        type: int
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - show unverified
+  - list allegations
+  - what needs verification
+  - pending ownership review
+  - list unverified client-group
+  - list unverified the client-group
+  - client-group list unverified
+  examples:
+  - (client-group.list-unverified :group-id "...")
+  doc: List unverified ownership allegations needing review
+  tier: diagnostics
+  tags:
+  - ownership
+  - review
+  - kyc
+- verb: client-group.reject-entity
+  domain: client-group
+  action: reject-entity
+  aliases:
+  - reject-entity
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - group-id
+  - entity-id
+  invocation_phrases:
+  - reject entity client-group
+  - reject entity the client-group
+  - client-group reject entity
+  examples:
+  - (client-group.reject-entity :group-id "..." :entity-id "...")
+  doc: Mark a suspected entity as NOT belonging to client
+  tier: intent
+  tags:
+  - onboarding
+  - rejection
+- verb: client-group.set-canonical
+  domain: client-group
+  action: set-canonical
+  aliases:
+  - set-canonical
+  args:
+    style: keyworded
+    required:
+      source-id:
+        type: uuid
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - source-id
+  invocation_phrases:
+  - set canonical
+  - use this value
+  - this is the correct ownership
+  - set canonical client-group
+  - set canonical the client-group
+  - client-group set canonical
+  examples:
+  - (client-group.set-canonical :source-id "...")
+  doc: Designate a source as the canonical value for a relationship
+  tier: intent
+  tags:
+  - ownership
+  - canonical
+- verb: client-group.confirm-entity
+  domain: client-group
+  action: confirm-entity
+  aliases:
+  - confirm-entity
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      tags:
+        type: list
+  positional_sugar:
+  - group-id
+  - entity-id
+  invocation_phrases:
+  - confirm this entity
+  - yes this belongs
+  - add to group
+  - confirm entity client-group
+  - confirm entity the client-group
+  - client-group confirm entity
+  examples:
+  - (client-group.confirm-entity :group-id "..." :entity-id "...")
+  doc: Confirm a suspected entity as belonging to client
+  tier: intent
+  tags:
+  - onboarding
+  - confirmation
+- verb: client-group.complete-discovery
+  domain: client-group
+  action: complete-discovery
+  aliases:
+  - complete-discovery
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - complete discovery
+  - finish research
+  - discovery done
+  - complete discovery client-group
+  - complete discovery the client-group
+  - client-group complete discovery
+  examples:
+  - (client-group.complete-discovery :group-id "...")
+  doc: Mark discovery process as complete
+  tier: intent
+  tags:
+  - discovery
+  - workflow
+- verb: client-group.tag-add
+  domain: client-group
+  action: tag-add
+  aliases:
+  - tag-add
+  args:
+    style: keyworded
+    required:
+      tag:
+        type: str
+      group-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      persona:
+        type: enum
+        values:
+        - kyc
+        - trading
+        - ops
+        - onboarding
+  positional_sugar:
+  - group-id
+  - entity-id
+  invocation_phrases:
+  - tag this as
+  - call this
+  - label this
+  - this is the
+  - mark as
+  - refer to this as
+  - tag add client-group
+  - tag add the client-group
+  examples:
+  - (client-group.tag-add :group-id "..." :entity-id "..." :tag "...")
+  doc: Add a shorthand tag to an entity within client context
+  tier: intent
+  tags:
+  - tag
+  - crud
+  - learning
+- verb: client-group.parties
+  domain: client-group
+  action: parties
+  aliases:
+  - parties
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      include-external:
+        type: bool
+      role-category:
+        type: enum
+        values:
+        - structural
+        - service
+        - compliance
+        - ownership
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - show parties
+  - list parties
+  - who are the parties
+  - show all service providers
+  - parties client-group
+  - parties the client-group
+  - client-group parties
+  examples:
+  - (client-group.parties :group-id "...")
+  doc: List all parties (entities with roles) in a client group
+  tier: diagnostics
+  tags:
+  - role
+  - read
+  - overview
+- verb: client-group.entity-list
+  domain: client-group
+  action: entity-list
+  aliases:
+  - entity-list
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      membership-type:
+        type: str
+      limit:
+        type: int
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - list entities in group
+  - show group entities
+  - who is in this group
+  - group members
+  - entity list client-group
+  - entity list the client-group
+  - client-group entity list
+  examples:
+  - (client-group.entity-list :group-id "...")
+  doc: List all entities in this client group
+  tier: diagnostics
+  tags:
+  - membership
+  - read
+- verb: client-group.entity-remove
+  domain: client-group
+  action: entity-remove
+  aliases:
+  - entity-remove
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+      entity-id:
+        type: entity_name
+    optional:
+      mark-historical:
+        type: bool
+  positional_sugar:
+  - group-id
+  - entity-id
+  invocation_phrases:
+  - entity remove client-group
+  - entity remove the client-group
+  - client-group entity remove
+  examples:
+  - (client-group.entity-remove :group-id "..." :entity-id "...")
+  doc: Remove an entity from this client group (or mark historical)
+  tier: intent
+  tags:
+  - membership
+  - crud
+- verb: client-group.tag-list
+  domain: client-group
+  action: tag-list
+  aliases:
+  - tag-list
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      persona:
+        type: str
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - show tags
+  - list tags
+  - what do we call
+  - tag list client-group
+  - tag list the client-group
+  - client-group tag list
+  examples:
+  - (client-group.tag-list :group-id "...")
+  doc: List tags for entities in client group
+  tier: diagnostics
+  tags:
+  - tag
+  - read
+- verb: client-group.discover-entities
+  domain: client-group
+  action: discover-entities
+  aliases:
+  - discover-entities
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      search-terms:
+        type: list
+      jurisdiction:
+        type: str
+      auto-add:
+        type: bool
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - find all entities for
+  - discover entities for
+  - what entities belong to
+  - find related entities
+  - discover entities client-group
+  - discover entities the client-group
+  - client-group discover entities
+  examples:
+  - (client-group.discover-entities :group-id "...")
+  doc: Discover entities that might belong to this client (onboarding)
+  tier: intent
+  tags:
+  - onboarding
+  - discovery
+  - bulk
+- verb: client-group.add-ownership-source
+  domain: client-group
+  action: add-ownership-source
+  aliases:
+  - add-ownership-source
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: uuid
+      source:
+        type: enum
+        values:
+        - client_allegation
+        - gleif
+        - bods
+        - companies_house
+        - clearstream
+        - annual_report
+        - fund_prospectus
+        - kyc_document
+        - scraper
+        - manual
+    optional:
+      source-type:
+        type: enum
+        values:
+        - allegation
+        - verification
+        - discovery
+      source-document-date:
+        type: date
+      verifies-source-id:
+        type: uuid
+      control-pct:
+        type: decimal
+      ownership-pct:
+        type: decimal
+      voting-pct:
+        type: decimal
+      source-document-ref:
+        type: str
+  positional_sugar:
+  - relationship-id
+  - source
+  invocation_phrases:
+  - add ownership source
+  - record ownership from
+  - gleif says
+  - client alleges
+  - add ownership source client-group
+  - add ownership source the client-group
+  - client-group add ownership source
+  examples:
+  - (client-group.add-ownership-source :relationship-id "..." :source "...")
+  doc: Add an ownership source/allegation for a relationship
+  tier: intent
+  tags:
+  - ownership
+  - source
+  - crud
+- verb: client-group.tag-remove
+  domain: client-group
+  action: tag-remove
+  aliases:
+  - tag-remove
+  args:
+    style: keyworded
+    required:
+      tag-id:
+        type: uuid
+  positional_sugar:
+  - tag-id
+  invocation_phrases:
+  - tag remove client-group
+  - tag remove the client-group
+  - client-group tag remove
+  examples:
+  - (client-group.tag-remove :tag-id "...")
+  doc: Remove a shorthand tag
+  tier: intent
+  tags:
+  - tag
+  - crud

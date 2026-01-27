@@ -9,6 +9,15 @@ domains:
 
       define-location:
         description: "Define settlement location (CSD/ICSD)"
+        invocation_phrases:
+          - "define settlement location"
+          - "add settlement location"
+          - "create CSD"
+          - "add ICSD"
+          - "register settlement venue"
+          - "define CSD location"
+          - "create settlement depot"
+          - "add custodian location"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -65,6 +74,14 @@ domains:
 
       list-locations:
         description: "List settlement locations"
+        invocation_phrases:
+          - "list settlement locations"
+          - "show CSDs"
+          - "view settlement venues"
+          - "list custodian locations"
+          - "show ICSDs"
+          - "display settlement depots"
+          - "list all locations"
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -96,6 +113,14 @@ domains:
 
       create-chain:
         description: "Create settlement chain for CBU"
+        invocation_phrases:
+          - "create settlement chain"
+          - "add settlement chain"
+          - "define settlement path"
+          - "create settlement route"
+          - "new settlement chain"
+          - "set up settlement chain"
+          - "add settlement configuration"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -176,6 +201,13 @@ domains:
 
       list-chains:
         description: "List settlement chains for CBU"
+        invocation_phrases:
+          - "list settlement chains"
+          - "show settlement chains"
+          - "view settlement paths"
+          - "display settlement routes"
+          - "list CBU chains"
+          - "show settlement configuration"
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -212,6 +244,13 @@ domains:
 
       deactivate-chain:
         description: "Deactivate a settlement chain"
+        invocation_phrases:
+          - "deactivate settlement chain"
+          - "disable settlement chain"
+          - "turn off settlement chain"
+          - "remove settlement chain"
+          - "deactivate chain"
+          - "end settlement chain"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -242,6 +281,14 @@ domains:
 
       add-hop:
         description: "Add intermediary hop to settlement chain"
+        invocation_phrases:
+          - "add settlement hop"
+          - "add intermediary"
+          - "add chain hop"
+          - "insert settlement step"
+          - "add subcustodian hop"
+          - "add agent hop"
+          - "add settlement intermediary"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -323,6 +370,13 @@ domains:
 
       list-hops:
         description: "List hops in a settlement chain"
+        invocation_phrases:
+          - "list settlement hops"
+          - "show chain hops"
+          - "view intermediaries"
+          - "display settlement steps"
+          - "list chain intermediaries"
+          - "show settlement path"
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -348,6 +402,12 @@ domains:
 
       remove-hop:
         description: "Remove hop from settlement chain"
+        invocation_phrases:
+          - "remove settlement hop"
+          - "delete chain hop"
+          - "remove intermediary"
+          - "delete settlement step"
+          - "remove hop from chain"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -375,6 +435,13 @@ domains:
 
       set-location-preference:
         description: "Set preferred settlement location for market/instrument"
+        invocation_phrases:
+          - "set settlement preference"
+          - "set location preference"
+          - "prefer settlement location"
+          - "set preferred CSD"
+          - "configure settlement preference"
+          - "set default settlement"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -453,6 +520,12 @@ domains:
 
       list-location-preferences:
         description: "List settlement location preferences for CBU"
+        invocation_phrases:
+          - "list settlement preferences"
+          - "show location preferences"
+          - "view settlement preferences"
+          - "list preferred locations"
+          - "show settlement choices"
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -487,6 +560,13 @@ domains:
 
       set-cross-border:
         description: "Configure cross-border settlement routing"
+        invocation_phrases:
+          - "set cross-border routing"
+          - "configure cross-border"
+          - "add cross-border settlement"
+          - "set international settlement"
+          - "configure bridge settlement"
+          - "set cross-border config"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -584,6 +664,12 @@ domains:
 
       list-cross-border:
         description: "List cross-border configurations for CBU"
+        invocation_phrases:
+          - "list cross-border configs"
+          - "show cross-border routing"
+          - "view international settlement"
+          - "list cross-border"
+          - "show bridge configurations"
         metadata:
           tier: reference
           source_of_truth: matrix
@@ -617,6 +703,12 @@ domains:
 
       deactivate-cross-border:
         description: "Deactivate cross-border configuration"
+        invocation_phrases:
+          - "deactivate cross-border"
+          - "disable cross-border routing"
+          - "turn off cross-border"
+          - "remove cross-border config"
+          - "end cross-border"
         metadata:
           tier: intent
           source_of_truth: matrix
@@ -640,7 +732,3 @@ domains:
         lifecycle:
           writes_tables:
             - custody.cbu_cross_border_config
-
-      # =========================================================================
-      # VALIDATION
-      # =========================================================================

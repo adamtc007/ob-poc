@@ -879,7 +879,7 @@ async fn get_or_create_entity_from_record(pool: &PgPool, record: &LeiRecord) -> 
     let mut ctx = ExecutionContext::new();
 
     let dsl = if is_fund {
-        // Use fund.ensure-standalone for fund entities
+        // Use fund.ensure-standalone for fund entities (idempotent via upsert, minimal required fields)
         format!(
             r#"(fund.ensure-standalone :name "{}" :jurisdiction "{}" :lei "{}" :as @entity)"#,
             escape_dsl_string(name),

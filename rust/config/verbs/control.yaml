@@ -4,6 +4,15 @@ domains:
     verbs:
       add:
         description: Add a control relationship between entities (idempotent by controller+controlled+type)
+        invocation_phrases:
+          - "add control relationship"
+          - "create control link"
+          - "add controller"
+          - "add voting control"
+          - "add board control"
+          - "create control"
+          - "link controller"
+          - "add management control"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -84,6 +93,14 @@ domains:
 
       end:
         description: End a control relationship
+        invocation_phrases:
+          - "end control relationship"
+          - "terminate control"
+          - "end voting control"
+          - "remove controller"
+          - "control relationship ended"
+          - "end board control"
+          - "close control link"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -114,6 +131,15 @@ domains:
 
       list-controllers:
         description: List who controls an entity
+        invocation_phrases:
+          - "list controllers"
+          - "who controls this"
+          - "show controllers"
+          - "find controllers"
+          - "list who controls"
+          - "view control relationships"
+          - "show controlling parties"
+          - "list control sources"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -143,6 +169,15 @@ domains:
 
       list-controlled:
         description: List what an entity controls
+        invocation_phrases:
+          - "list controlled entities"
+          - "what do they control"
+          - "show controlled"
+          - "list subsidiaries"
+          - "view controlled companies"
+          - "what is controlled"
+          - "show control targets"
+          - "list control targets"
         metadata:
           tier: reference
           source_of_truth: workflow

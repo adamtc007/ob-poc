@@ -1,0 +1,111 @@
+version: '2.0'
+domain: issuer-control-config
+description: |
+  Per-issuer configuration for control/disclosure thresholds and look-through parameters.
+
+  PURPOSE: Different issuers (funds, companies) have different regulatory requirements
+  and visualization preferences for ownership thresholds. This allows customization
+  per issuer rather than using global defaults.
+
+  THRESHOLD HIERARCHY:
+  - disclosure_threshold_pct (5%): Above this → individual node in visualization
+  - material_threshold_pct (10%): Highlighted as material holding
+  - significant_threshold_pct (25%): ⚡ indicator, blocking minority
+  - control_threshold_pct (50%): Control edge, majority shareholder
+
+  These thresholds affect:
+  1. Investor register visualization (node vs aggregate)
+  2. Regulatory filing triggers (13D/13G, TR-1)
+  3. Look-through depth for economic exposure
+
+  REGULATORY CONTEXT:
+  - US: 5% triggers 13D/13G filing (SEC beneficial ownership)
+  - EU: Various thresholds per jurisdiction (TR-1 major holdings)
+  - UK: 3% disclosure threshold (DTR5)
+  - Many jurisdictions have tiered disclosure (5%, 10%, 25%, 50%)
+verbs:
+- verb: issuer-control-config.read
+  domain: issuer-control-config
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - get control thresholds
+  - read issuer config
+  - what are the thresholds
+  - check disclosure threshold
+  - read issuer-control-config
+  - read the issuer-control-config
+  - get issuer-control-config
+  - fetch issuer-control-config
+  examples:
+  - (issuer-control-config.read :issuer-entity-id "...")
+  doc: |
+    Read the current control/disclosure thresholds for an issuer.
+
+    Returns the active configuration including all threshold levels
+    and look-through parameters.
+  tier: diagnostics
+- verb: issuer-control-config.upsert
+  domain: issuer-control-config
+  action: upsert
+  aliases:
+  - upsert
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+    optional:
+      disclosure-threshold-pct:
+        type: decimal
+      control-threshold-pct:
+        type: decimal
+      control-basis:
+        type: str
+      disclosure-basis:
+        type: str
+      effective-from:
+        type: date
+      significant-threshold-pct:
+        type: decimal
+      material-threshold-pct:
+        type: decimal
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - set control thresholds
+  - configure disclosure threshold
+  - set ownership thresholds
+  - customize issuer config
+  - adjust threshold levels
+  - set regulatory thresholds
+  - upsert issuer-control-config
+  - upsert the issuer-control-config
+  examples:
+  - (issuer-control-config.upsert :issuer-entity-id "...")
+  doc: |
+    Set control and disclosure thresholds for an issuer.
+
+    Configures the percentage thresholds that determine:
+    - When a holder appears as individual node vs aggregated
+    - Highlighting levels in visualization (material, significant, control)
+    - Look-through computation parameters
+
+    USE CASES:
+    - "Set Fund A to use UK 3% disclosure threshold"
+    - "Configure custom thresholds for regulatory compliance"
+    - "Adjust look-through depth for complex structures"
+
+    These settings are temporal (effective_from) for audit trail and
+    can be changed when regulations or fund policies change.
+  tier: intent

@@ -1,0 +1,193 @@
+version: '2.0'
+domain: temporal
+description: Point-in-time queries for historical state lookback
+verbs:
+- verb: temporal.cbu-state-at-approval
+  domain: temporal
+  action: cbu-state-at-approval
+  aliases:
+  - cbu-state-at-approval
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - cbu state at approval temporal
+  - cbu state at approval the temporal
+  - temporal cbu state at approval
+  examples:
+  - (temporal.cbu-state-at-approval :cbu-id "...")
+  doc: Get CBU state at the time its KYC case was approved
+  tier: intent
+- verb: temporal.ubo-chain-as-of
+  domain: temporal
+  action: ubo-chain-as-of
+  aliases:
+  - ubo-chain-as-of
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      as-of-date:
+        type: date
+      threshold:
+        type: decimal
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - ubo chain as of temporal
+  - ubo chain as of the temporal
+  - temporal ubo chain as of
+  examples:
+  - (temporal.ubo-chain-as-of :entity-id "...")
+  doc: Trace ownership chain to UBOs as of a specific date
+  tier: intent
+- verb: temporal.entity-history
+  domain: temporal
+  action: entity-history
+  aliases:
+  - entity-history
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      to-date:
+        type: date
+      from-date:
+        type: date
+      limit:
+        type: int
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - entity history temporal
+  - entity history the temporal
+  - temporal entity history
+  examples:
+  - (temporal.entity-history :entity-id "...")
+  doc: Get all relationship changes involving an entity
+  tier: intent
+- verb: temporal.cbu-roles-as-of
+  domain: temporal
+  action: cbu-roles-as-of
+  aliases:
+  - cbu-roles-as-of
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      as-of-date:
+        type: date
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - cbu roles as of temporal
+  - cbu roles as of the temporal
+  - temporal cbu roles as of
+  examples:
+  - (temporal.cbu-roles-as-of :cbu-id "...")
+  doc: Get entity roles within a CBU as of a specific date
+  tier: intent
+- verb: temporal.compare-ownership
+  domain: temporal
+  action: compare-ownership
+  aliases:
+  - compare-ownership
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      date-a:
+        type: date
+      date-b:
+        type: date
+  positional_sugar:
+  - entity-id
+  - date-a
+  invocation_phrases:
+  - compare ownership temporal
+  - compare ownership the temporal
+  - temporal compare ownership
+  examples:
+  - (temporal.compare-ownership :entity-id "..." :date-a "..." :date-b "...")
+  doc: Compare ownership structure between two dates
+  tier: intent
+- verb: temporal.cbu-relationships-as-of
+  domain: temporal
+  action: cbu-relationships-as-of
+  aliases:
+  - cbu-relationships-as-of
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      as-of-date:
+        type: date
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - cbu relationships as of temporal
+  - cbu relationships as of the temporal
+  - temporal cbu relationships as of
+  examples:
+  - (temporal.cbu-relationships-as-of :cbu-id "...")
+  doc: Get all relationships (ownership, control, trust) for a CBU as of a date
+  tier: intent
+- verb: temporal.relationship-history
+  domain: temporal
+  action: relationship-history
+  aliases:
+  - relationship-history
+  args:
+    style: keyworded
+    required:
+      relationship-id:
+        type: uuid
+    optional:
+      limit:
+        type: int
+  positional_sugar:
+  - relationship-id
+  invocation_phrases:
+  - relationship history temporal
+  - relationship history the temporal
+  - temporal relationship history
+  examples:
+  - (temporal.relationship-history :relationship-id "...")
+  doc: Get change history for a specific relationship
+  tier: intent
+- verb: temporal.ownership-as-of
+  domain: temporal
+  action: ownership-as-of
+  aliases:
+  - ownership-as-of
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      as-of-date:
+        type: date
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - ownership as of temporal
+  - ownership as of the temporal
+  - temporal ownership as of
+  examples:
+  - (temporal.ownership-as-of :entity-id "...")
+  doc: Get ownership relationships for an entity as of a specific date
+  tier: intent

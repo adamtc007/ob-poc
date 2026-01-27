@@ -1,0 +1,231 @@
+version: '2.0'
+domain: runbook
+description: |
+  Staged execution model for safe, auditable DSL operations.
+  Commands are staged first, then executed on explicit confirmation.
+  This is the anti-hallucination mechanism - all entity lookups
+  go through DB, and user confirms before any mutation.
+verbs:
+- verb: runbook.run
+  domain: runbook
+  action: run
+  aliases:
+  - commit
+  - execute
+  - go
+  - proceed
+  - run
+  args:
+    style: keyworded
+    required:
+      runbook-id:
+        type: uuid
+  positional_sugar:
+  - runbook-id
+  invocation_phrases:
+  - run
+  - execute
+  - commit
+  - go
+  - do it
+  - execute runbook
+  - run all
+  - proceed
+  examples:
+  - (runbook.run :runbook-id "...")
+  doc: Execute all staged commands in the runbook
+  tier: intent
+  tags:
+  - execute
+  - runbook
+  - commit
+- verb: runbook.show
+  domain: runbook
+  action: show
+  aliases:
+  - show
+  args:
+    style: keyworded
+  invocation_phrases:
+  - show runbook
+  - show staged
+  - list commands
+  - what's staged
+  - show pending
+  - runbook status
+  - show the runbook
+  - show command
+  examples:
+  - (runbook.show)
+  doc: Display the current runbook with all staged commands
+  tier: intent
+  tags:
+  - show
+  - runbook
+  - status
+- verb: runbook.preview
+  domain: runbook
+  action: preview
+  aliases:
+  - preview
+  args:
+    style: keyworded
+    required:
+      runbook-id:
+        type: uuid
+  positional_sugar:
+  - runbook-id
+  invocation_phrases:
+  - preview
+  - dry run
+  - what will happen
+  - show impact
+  - preview runbook
+  - preview the runbook
+  - preview command
+  - runbook preview
+  examples:
+  - (runbook.preview :runbook-id "...")
+  doc: Preview what will happen when runbook is executed
+  tier: intent
+  tags:
+  - preview
+  - runbook
+  - audit
+- verb: runbook.pick
+  domain: runbook
+  action: pick
+  aliases:
+  - choose
+  - pick
+  - select
+  args:
+    style: keyworded
+    required:
+      entity-ids:
+        type: list
+      command-id:
+        type: uuid
+  positional_sugar:
+  - command-id
+  - entity-ids
+  invocation_phrases:
+  - pick
+  - select
+  - choose
+  - resolve to
+  - use these
+  - pick runbook
+  - pick the runbook
+  - pick command
+  examples:
+  - (runbook.pick :command-id "..." :entity-ids "...")
+  doc: Select entities to resolve an ambiguous command
+  tier: intent
+  tags:
+  - pick
+  - resolve
+  - runbook
+- verb: runbook.remove
+  domain: runbook
+  action: remove
+  aliases:
+  - delete
+  - drop
+  - remove
+  - unstage
+  args:
+    style: keyworded
+    required:
+      command-id:
+        type: uuid
+  positional_sugar:
+  - command-id
+  invocation_phrases:
+  - remove
+  - delete command
+  - unstage
+  - take out
+  - remove from runbook
+  - remove runbook
+  - remove the runbook
+  - delete runbook
+  examples:
+  - (runbook.remove :command-id "...")
+  doc: Remove a command from the runbook
+  tier: intent
+  tags:
+  - remove
+  - runbook
+  - edit
+- verb: runbook.stage
+  domain: runbook
+  action: stage
+  aliases:
+  - prepare
+  - queue
+  - stage
+  args:
+    style: keyworded
+    required:
+      input:
+        type: str
+    optional:
+      source-prompt:
+        type: str
+      client-group-id:
+        type: entity_name
+      persona:
+        type: str
+      description:
+        type: str
+  positional_sugar:
+  - input
+  invocation_phrases:
+  - stage
+  - add to runbook
+  - prepare
+  - queue
+  - line up
+  - stage runbook
+  - stage the runbook
+  - stage command
+  examples:
+  - (runbook.stage :input "...")
+  doc: Stage a DSL command for later execution
+  tier: intent
+  tags:
+  - stage
+  - runbook
+  - safe
+- verb: runbook.abort
+  domain: runbook
+  action: abort
+  aliases:
+  - abort
+  - cancel
+  - discard
+  args:
+    style: keyworded
+    required:
+      runbook-id:
+        type: uuid
+  positional_sugar:
+  - runbook-id
+  invocation_phrases:
+  - abort
+  - cancel
+  - clear runbook
+  - start over
+  - discard
+  - abort runbook
+  - abort the runbook
+  - abort command
+  examples:
+  - (runbook.abort :runbook-id "...")
+  doc: Abort the runbook and clear all staged commands
+  tier: intent
+  tags:
+  - abort
+  - runbook
+  - clear

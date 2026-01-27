@@ -1,0 +1,170 @@
+version: '2.0'
+domain: research.sec-edgar
+description: SEC EDGAR - US public company filings, 13D/13G beneficial ownership
+verbs:
+- verb: research.sec-edgar.fetch-filings
+  domain: research.sec-edgar
+  action: fetch-filings
+  aliases:
+  - fetch-filings
+  args:
+    style: keyworded
+    required:
+      cik:
+        type: str
+    optional:
+      form-types:
+        type: list
+      limit:
+        type: int
+  positional_sugar:
+  - cik
+  invocation_phrases:
+  - get SEC filings
+  - recent EDGAR filings
+  - company filings
+  - fetch filings research.sec-edgar
+  - fetch filings the research.sec-edgar
+  - research.sec-edgar fetch filings
+  examples:
+  - (research.sec-edgar.fetch-filings :cik "...")
+  doc: Fetch recent SEC filings for a company
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-fetch
+- verb: research.sec-edgar.fetch-beneficial-owners
+  domain: research.sec-edgar
+  action: fetch-beneficial-owners
+  aliases:
+  - fetch-beneficial-owners
+  args:
+    style: keyworded
+    required:
+      cik:
+        type: str
+    optional:
+      include-13g:
+        type: bool
+      decision-id:
+        type: uuid
+      since-date:
+        type: date
+      include-13d:
+        type: bool
+  positional_sugar:
+  - cik
+  invocation_phrases:
+  - get 13D filings
+  - 13G beneficial owners
+  - who owns this US company
+  - SEC beneficial ownership
+  - fetch beneficial owners research.sec-edgar
+  - fetch beneficial owners the research.sec-edgar
+  - research.sec-edgar fetch beneficial owners
+  examples:
+  - (research.sec-edgar.fetch-beneficial-owners :cik "...")
+  doc: Fetch 13D/13G beneficial ownership filings
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-fetch
+  - ownership
+- verb: research.sec-edgar.search
+  domain: research.sec-edgar
+  action: search
+  aliases:
+  - find
+  - lookup
+  - search
+  args:
+    style: keyworded
+    required:
+      query:
+        type: str
+    optional:
+      limit:
+        type: int
+  positional_sugar:
+  - query
+  invocation_phrases:
+  - search SEC
+  - find US public company
+  - look up in EDGAR
+  - search research.sec-edgar
+  - search the research.sec-edgar
+  - find research.sec-edgar
+  - lookup research.sec-edgar
+  - research.sec-edgar search
+  examples:
+  - (research.sec-edgar.search :query "...")
+  doc: Search SEC EDGAR for companies by name
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-lookup
+- verb: research.sec-edgar.fetch-company
+  domain: research.sec-edgar
+  action: fetch-company
+  aliases:
+  - fetch-company
+  args:
+    style: keyworded
+    required:
+      cik:
+        type: str
+    optional:
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - cik
+  invocation_phrases:
+  - get SEC company
+  - fetch from EDGAR
+  - company from SEC
+  - fetch company research.sec-edgar
+  - fetch company the research.sec-edgar
+  - research.sec-edgar fetch company
+  examples:
+  - (research.sec-edgar.fetch-company :cik "...")
+  doc: Fetch company information from SEC EDGAR
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-fetch
+- verb: research.sec-edgar.import-company
+  domain: research.sec-edgar
+  action: import-company
+  aliases:
+  - import-company
+  args:
+    style: keyworded
+    required:
+      cik:
+        type: str
+    optional:
+      include-beneficial-owners:
+        type: bool
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - cik
+  invocation_phrases:
+  - import from SEC
+  - add US company to database
+  - import EDGAR company
+  - import company research.sec-edgar
+  - import company the research.sec-edgar
+  - research.sec-edgar import company
+  examples:
+  - (research.sec-edgar.import-company :cik "...")
+  doc: Import SEC company and optionally beneficial owners to database
+  tier: intent
+  tags:
+  - write
+  - import
+  - registry-import

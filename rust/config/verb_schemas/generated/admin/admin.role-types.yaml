@@ -1,0 +1,155 @@
+version: '2.0'
+domain: admin.role-types
+description: Role types reference data management
+verbs:
+- verb: admin.role-types.deactivate
+  domain: admin.role-types
+  action: deactivate
+  aliases:
+  - deactivate
+  - disable
+  - stop
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - deactivate admin.role-types
+  - deactivate the admin.role-types
+  - disable admin.role-types
+  - stop admin.role-types
+  - admin.role-types deactivate
+  examples:
+  - (admin.role-types.deactivate :code "...")
+  doc: Deactivate a role type
+  tier: intent
+- verb: admin.role-types.create
+  domain: admin.role-types
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+      name:
+        type: str
+      category:
+        type: str
+    optional:
+      triggers-id-verification:
+        type: bool
+      description:
+        type: str
+      triggers-screening:
+        type: bool
+      triggers-full-kyc:
+        type: bool
+      check-regulatory-status:
+        type: bool
+      if-regulated-obligation:
+        type: str
+      cascade-to-entity-ubos:
+        type: bool
+  positional_sugar:
+  - code
+  - name
+  invocation_phrases:
+  - create admin.role-types
+  - create the admin.role-types
+  - add admin.role-types
+  - new admin.role-types
+  - admin.role-types create
+  examples:
+  - (admin.role-types.create :code "..." :name "..." :category "...")
+  doc: Create new role type (idempotent by code)
+  tier: intent
+- verb: admin.role-types.list
+  domain: admin.role-types
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      category:
+        type: str
+      active-only:
+        type: bool
+  invocation_phrases:
+  - list admin.role-types
+  - list the admin.role-types
+  - show admin.role-types
+  - get all admin.role-types
+  - admin.role-types list
+  examples:
+  - (admin.role-types.list)
+  doc: List all role types
+  tier: reference
+- verb: admin.role-types.read
+  domain: admin.role-types
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - read admin.role-types
+  - read the admin.role-types
+  - get admin.role-types
+  - fetch admin.role-types
+  - admin.role-types read
+  examples:
+  - (admin.role-types.read :code "...")
+  doc: Get role type by code
+  tier: reference
+- verb: admin.role-types.update
+  domain: admin.role-types
+  action: update
+  aliases:
+  - edit
+  - modify
+  - update
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+    optional:
+      active:
+        type: bool
+      if-regulated-obligation:
+        type: str
+      triggers-full-kyc:
+        type: bool
+      triggers-screening:
+        type: bool
+      check-regulatory-status:
+        type: bool
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - update admin.role-types
+  - update the admin.role-types
+  - edit admin.role-types
+  - modify admin.role-types
+  - admin.role-types update
+  examples:
+  - (admin.role-types.update :code "...")
+  doc: Update role type
+  tier: intent

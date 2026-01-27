@@ -1,0 +1,79 @@
+version: '2.0'
+domain: service
+description: Service catalog operations (read-only - services are reference data)
+verbs:
+- verb: service.list
+  domain: service
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      is-active:
+        type: bool
+      offset:
+        type: int
+      limit:
+        type: int
+      service-type:
+        type: str
+  invocation_phrases:
+  - list service
+  - list the service
+  - show service
+  - get all service
+  - service list
+  examples:
+  - (service.list)
+  doc: List services with optional filters
+  tier: reference
+- verb: service.read
+  domain: service
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    optional:
+      service-id:
+        type: entity_name
+      service-code:
+        type: str
+  invocation_phrases:
+  - read service
+  - read the service
+  - get service
+  - fetch service
+  - service read
+  examples:
+  - (service.read)
+  doc: Read a service by ID or code
+  tier: reference
+- verb: service.list-by-product
+  domain: service
+  action: list-by-product
+  aliases:
+  - list-by-product
+  args:
+    style: keyworded
+    required:
+      product-id:
+        type: entity_name
+    optional:
+      is-mandatory:
+        type: bool
+  positional_sugar:
+  - product-id
+  invocation_phrases:
+  - list by product service
+  - list by product the service
+  - service list by product
+  examples:
+  - (service.list-by-product :product-id "...")
+  doc: List services for a product
+  tier: reference

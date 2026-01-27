@@ -2157,6 +2157,7 @@ impl eframe::App for App {
             egui::CentralPanel::default().show(ctx, |ui| match self.state.view_level {
                 ViewLevel::Universe => self.render_galaxy_view(ui),
                 ViewLevel::Cluster => self.render_cluster_view(ui),
+                ViewLevel::System => self.render_system_view(ui),
                 _ => self.state.graph_widget.ui(ui),
             });
         } else {
@@ -3175,6 +3176,7 @@ impl App {
                     match self.state.view_level {
                         ViewLevel::Universe => self.render_galaxy_view(ui),
                         ViewLevel::Cluster => self.render_cluster_view(ui),
+                        ViewLevel::System => self.render_system_view(ui),
                         _ => self.state.graph_widget.ui(ui),
                     }
                 });
@@ -3262,11 +3264,9 @@ impl App {
                             if enter_pressed
                                 && (modifiers.ctrl || modifiers.command)
                                 && !loading_chat
-                            {
-                                if !self.state.buffers.chat_input.trim().is_empty() {
+                                && !self.state.buffers.chat_input.trim().is_empty() {
                                     self.state.send_chat_message();
                                 }
-                            }
 
                             response.response
                         });
@@ -3620,6 +3620,7 @@ impl App {
                                 match self.state.view_level {
                                     ViewLevel::Universe => self.render_galaxy_view(ui),
                                     ViewLevel::Cluster => self.render_cluster_view(ui),
+                                    ViewLevel::System => self.render_system_view(ui),
                                     _ => self.state.graph_widget.ui(ui),
                                 }
                             });
@@ -3748,6 +3749,7 @@ impl App {
                 match self.state.view_level {
                     ViewLevel::Universe => self.render_galaxy_view(ui),
                     ViewLevel::Cluster => self.render_cluster_view(ui),
+                    ViewLevel::System => self.render_system_view(ui),
                     _ => self.state.graph_widget.ui(ui),
                 }
             });
@@ -3781,6 +3783,7 @@ impl App {
                 match self.state.view_level {
                     ViewLevel::Universe => self.render_galaxy_view(ui),
                     ViewLevel::Cluster => self.render_cluster_view(ui),
+                    ViewLevel::System => self.render_system_view(ui),
                     _ => self.state.graph_widget.ui(ui),
                 }
             });
@@ -3823,6 +3826,28 @@ impl App {
         }
     }
 
+    /// Render the system view (single CBU graph with back navigation)
+    fn render_system_view(&mut self, ui: &mut egui::Ui) {
+        // Navigation bar at top with back button
+        ui.horizontal(|ui| {
+            if ui.button("← Back to Cluster").clicked() {
+                web_sys::console::log_1(&"System: back to cluster view".into());
+                self.state.view_level = ViewLevel::Cluster;
+            }
+            ui.separator();
+            // Show current CBU name if available from session context
+            if let Some(ref ctx) = self.state.session_context {
+                if let Some(ref cbu) = ctx.cbu {
+                    ui.label(format!("CBU: {}", cbu.name));
+                }
+            }
+        });
+        ui.separator();
+
+        // Render the CBU graph in remaining space
+        self.state.graph_widget.ui(ui);
+    }
+
     /// Render the cluster view widget (ManCo center + CBU orbital rings)
     fn render_cluster_view(&mut self, ui: &mut egui::Ui) {
         // Tick animations before rendering (egui-rules: tick BEFORE ui)
@@ -3855,11 +3880,17 @@ impl App {
         match action {
             NavigationAction::DrillIntoCbu { cbu_id } => {
                 web_sys::console::log_1(&format!("Cluster: drilling into CBU: {}", cbu_id).into());
-                // Execute DSL to drill into CBU
-                if let Some(session_id) = self.state.session_id {
-                    let dsl = format!("(view.cbu :cbu-id \"{}\")", cbu_id);
-                    self.state.execute_dsl_with_content(session_id, dsl);
+                // Parse UUID and select CBU directly (changes view_level to System)
+                if let Ok(uuid) = Uuid::parse_str(&cbu_id) {
+                    self.state.select_cbu(uuid, "");
+                } else {
+                    web_sys::console::error_1(&format!("Invalid CBU UUID: {}", cbu_id).into());
                 }
+            }
+            NavigationAction::DrillUp => {
+                web_sys::console::log_1(&"Cluster: drilling up to cluster view".into());
+                // Go back to cluster view
+                self.state.view_level = ViewLevel::Cluster;
             }
             _ => {
                 // Other actions (zoom, pan, etc.) handled by widget internally

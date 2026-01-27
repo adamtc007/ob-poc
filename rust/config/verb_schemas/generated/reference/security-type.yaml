@@ -1,0 +1,56 @@
+version: '2.0'
+domain: security-type
+description: SMPG/ALERT security type codes
+verbs:
+- verb: security-type.ensure
+  domain: security-type
+  action: ensure
+  aliases:
+  - ensure
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+      name:
+        type: str
+      class:
+        type: entity_name
+    optional:
+      cfi-pattern:
+        type: str
+  positional_sugar:
+  - class
+  - code
+  invocation_phrases:
+  - ensure security-type
+  - ensure the security-type
+  - security-type ensure
+  examples:
+  - (security-type.ensure :class "..." :code "..." :name "...")
+  doc: Create or update ALERT security type
+  tier: intent
+- verb: security-type.list
+  domain: security-type
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      class:
+        type: entity_name
+  positional_sugar:
+  - class
+  invocation_phrases:
+  - list security-type
+  - list the security-type
+  - show security-type
+  - get all security-type
+  - security-type list
+  examples:
+  - (security-type.list :class "...")
+  doc: List security types for an instrument class
+  tier: reference
