@@ -558,6 +558,105 @@ impl VerbService {
             })
             .collect())
     }
+
+    /// Search verb patterns by phonetic (dmetaphone) matching
+    ///
+    /// This is used as a fallback when semantic search returns low confidence,
+    /// particularly for handling typos like "allainz" → "allianz".
+    ///
+    /// The search generates phonetic codes for each word in the query and
+    /// finds patterns that contain ANY of those codes.
+    pub async fn search_by_phonetic(
+        &self,
+        query: &str,
+        limit: i64,
+    ) -> Result<Vec<PhoneticMatch>, sqlx::Error> {
+        // Generate phonetic codes for the query words
+        // We'll do this in SQL to use the same dmetaphone function
+        let rows = sqlx::query_as::<_, PhoneticMatchRow>(
+            r#"
+            WITH query_phonetics AS (
+                -- Generate phonetic codes for each word in the query
+                SELECT DISTINCT dmetaphone(word) as code
+                FROM unnest(string_to_array(lower($1), ' ')) as word
+                WHERE length(word) >= 2
+                  AND dmetaphone(word) IS NOT NULL
+                  AND dmetaphone(word) != ''
+            ),
+            matching_patterns AS (
+                -- Find patterns that have ANY matching phonetic code
+                SELECT DISTINCT ON (vpe.verb_name)
+                    vpe.verb_name,
+                    vpe.pattern_phrase,
+                    vpe.phonetic_codes,
+                    -- Count how many query phonetics match
+                    (SELECT COUNT(*)
+                     FROM query_phonetics qp
+                     WHERE qp.code = ANY(vpe.phonetic_codes)) as match_count,
+                    -- Total query phonetics for scoring
+                    (SELECT COUNT(*) FROM query_phonetics) as total_query_codes
+                FROM "ob-poc".verb_pattern_embeddings vpe
+                WHERE EXISTS (
+                    SELECT 1 FROM query_phonetics qp
+                    WHERE qp.code = ANY(vpe.phonetic_codes)
+                )
+            )
+            SELECT
+                verb_name,
+                pattern_phrase,
+                phonetic_codes,
+                match_count,
+                total_query_codes,
+                -- Score: proportion of query phonetics that matched
+                CASE
+                    WHEN total_query_codes > 0
+                    THEN match_count::float / total_query_codes::float
+                    ELSE 0.0
+                END as phonetic_score
+            FROM matching_patterns
+            WHERE match_count > 0
+            ORDER BY match_count DESC, verb_name
+            LIMIT $2
+            "#,
+        )
+        .bind(query)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| PhoneticMatch {
+                verb: r.verb_name,
+                pattern: r.pattern_phrase,
+                phonetic_codes: r.phonetic_codes,
+                match_count: r.match_count,
+                phonetic_score: r.phonetic_score,
+            })
+            .collect())
+    }
+}
+
+/// Row struct for phonetic match queries
+#[derive(Debug, sqlx::FromRow)]
+struct PhoneticMatchRow {
+    verb_name: String,
+    pattern_phrase: String,
+    phonetic_codes: Vec<String>,
+    match_count: i64,
+    #[allow(dead_code)]
+    total_query_codes: i64,
+    phonetic_score: f64,
+}
+
+/// A phonetic match result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhoneticMatch {
+    pub verb: String,
+    pub pattern: String,
+    pub phonetic_codes: Vec<String>,
+    pub match_count: i64,
+    pub phonetic_score: f64,
 }
 
 #[cfg(test)]

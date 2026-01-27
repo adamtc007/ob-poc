@@ -320,6 +320,10 @@ impl ScopeResolver {
         let client_norm = client_name.to_lowercase();
 
         // Search for matching client groups via aliases
+        // Uses three matching strategies:
+        // 1. Exact match (highest priority)
+        // 2. Trigram similarity (handles minor typos)
+        // 3. Phonetic match via dmetaphone (handles phonetic typos like "allainz" → "allianz")
         let matches = sqlx::query!(
             r#"
             SELECT
@@ -327,14 +331,17 @@ impl ScopeResolver {
                 cg.canonical_name as "group_name!",
                 cga.alias as "matched_alias!",
                 cga.confidence as "confidence!",
-                (cga.alias_norm = $1) as "exact_match!"
+                (cga.alias_norm = $1) as "exact_match!",
+                (dmetaphone(cga.alias_norm) = dmetaphone($1)) as "phonetic_match!"
             FROM "ob-poc".client_group_alias cga
             JOIN "ob-poc".client_group cg ON cg.id = cga.group_id
             WHERE cga.alias_norm = $1
                OR cga.alias_norm ILIKE '%' || $1 || '%'
                OR similarity(cga.alias_norm, $1) > $2
+               OR dmetaphone(cga.alias_norm) = dmetaphone($1)
             ORDER BY
                 (cga.alias_norm = $1) DESC,
+                (dmetaphone(cga.alias_norm) = dmetaphone($1)) DESC,
                 cga.confidence DESC,
                 similarity(cga.alias_norm, $1) DESC
             LIMIT 5
@@ -354,7 +361,10 @@ impl ScopeResolver {
         let top = &matches[0];
         let is_single_token = input.split_whitespace().count() == 1;
 
+        // Phonetic match is a strong signal - treat it like a high-confidence match
+        // This handles typos like "allainz" → "allianz"
         let has_clear_winner = top.exact_match // Exact match always wins
+            || top.phonetic_match // Phonetic match is strong signal for typos
             || (!is_single_token && matches.len() == 1 && top.confidence >= 0.7)
             || (is_single_token && top.confidence >= MIN_SINGLE_TOKEN_CONFIDENCE) // Higher bar for bare names
             || (matches.len() > 1 && (top.confidence - matches[1].confidence) > self.ambiguity_gap);

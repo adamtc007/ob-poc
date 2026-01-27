@@ -77,6 +77,8 @@ pub enum VerbSearchSource {
     GlobalLearned,
     /// Cold start pattern embeddings (Issue I distinction)
     PatternEmbedding,
+    /// Phonetic (dmetaphone) match - fallback for typos
+    Phonetic,
 }
 
 // ============================================================================
@@ -556,6 +558,57 @@ impl HybridVerbSearcher {
                     }
                     Err(e) => {
                         tracing::warn!(error = %e, "VerbSearch: global semantic search failed");
+                    }
+                }
+            }
+        }
+
+        // 7. Phonetic fallback (typo handling)
+        // If semantic search returned low-confidence results, try phonetic matching
+        // This handles typos like "allainz" → "allianz" via dmetaphone codes
+        let top_score = results.first().map(|r| r.score).unwrap_or(0.0);
+        if top_score < self.semantic_threshold && results.len() < limit {
+            if let Some(verb_service) = &self.verb_service {
+                tracing::debug!(
+                    top_score = top_score,
+                    threshold = self.semantic_threshold,
+                    "VerbSearch: semantic confidence low, trying phonetic fallback"
+                );
+                match verb_service
+                    .search_by_phonetic(query, (limit - results.len()) as i64)
+                    .await
+                {
+                    Ok(phonetic_results) => {
+                        tracing::debug!(
+                            phonetic_results_count = phonetic_results.len(),
+                            "VerbSearch: phonetic search returned"
+                        );
+                        for pm in phonetic_results {
+                            if seen_verbs.contains(&pm.verb) {
+                                continue;
+                            }
+                            if !self.matches_domain(&pm.verb, domain_filter) {
+                                continue;
+                            }
+                            // Score phonetic matches slightly below semantic threshold
+                            // to indicate they're from phonetic fallback
+                            let phonetic_score = (pm.phonetic_score * 0.7) as f32;
+                            let description = self.get_verb_description(&pm.verb).await;
+                            seen_verbs.insert(pm.verb.clone());
+                            results.push(VerbSearchResult {
+                                verb: pm.verb,
+                                score: phonetic_score.max(0.5), // Floor at 0.5
+                                source: VerbSearchSource::Phonetic,
+                                matched_phrase: pm.pattern,
+                                description,
+                            });
+                            if results.len() >= limit {
+                                break;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "VerbSearch: phonetic search failed");
                     }
                 }
             }
