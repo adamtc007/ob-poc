@@ -16,10 +16,10 @@ verbs:
         type: bool
       offset:
         type: int
-      limit:
-        type: int
       product-category:
         type: str
+      limit:
+        type: int
   invocation_phrases:
   - list product
   - list the product
@@ -41,10 +41,10 @@ verbs:
   args:
     style: keyworded
     optional:
-      product-code:
-        type: str
       product-id:
         type: entity_name
+      product-code:
+        type: str
   invocation_phrases:
   - read product
   - read the product

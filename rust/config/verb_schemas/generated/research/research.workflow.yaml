@@ -2,115 +2,6 @@ version: '2.0'
 domain: research.workflow
 description: Research workflow management - decision tracking, audit trail, corrections
 verbs:
-- verb: research.workflow.pending-decisions
-  domain: research.workflow
-  action: pending-decisions
-  aliases:
-  - pending-decisions
-  args:
-    style: keyworded
-    optional:
-      source-provider:
-        type: str
-      limit:
-        type: int
-  invocation_phrases:
-  - pending decisions research.workflow
-  - pending decisions the research.workflow
-  - research.workflow pending decisions
-  examples:
-  - (research.workflow.pending-decisions)
-  doc: List decisions awaiting user input
-  tier: diagnostics
-  tags:
-  - read
-  - query
-  - workflow
-- verb: research.workflow.audit-trail
-  domain: research.workflow
-  action: audit-trail
-  aliases:
-  - audit-trail
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-    optional:
-      include-anomalies:
-        type: bool
-      include-decisions:
-        type: bool
-      include-actions:
-        type: bool
-      include-corrections:
-        type: bool
-  positional_sugar:
-  - entity-id
-  invocation_phrases:
-  - show audit trail
-  - what research was done
-  - history of decisions
-  - how did we get this data
-  - where did this come from
-  - audit trail research.workflow
-  - audit trail the research.workflow
-  - research.workflow audit trail
-  examples:
-  - (research.workflow.audit-trail :entity-id "...")
-  doc: Get research audit trail for an entity
-  tier: diagnostics
-  tags:
-  - read
-  - query
-  - workflow
-  - audit-trail
-- verb: research.workflow.record-decision
-  domain: research.workflow
-  action: record-decision
-  aliases:
-  - record-decision
-  args:
-    style: keyworded
-    required:
-      search-query:
-        type: str
-      decision-type:
-        type: str
-      source-provider:
-        type: str
-      reasoning:
-        type: str
-      candidates-found:
-        type: json
-    optional:
-      selected-key-type:
-        type: str
-      candidates-count:
-        type: int
-      auto-selected:
-        type: bool
-      confidence:
-        type: decimal
-      target-entity-id:
-        type: entity_name
-      selected-key:
-        type: str
-  positional_sugar:
-  - search-query
-  - source-provider
-  invocation_phrases:
-  - record decision research.workflow
-  - record decision the research.workflow
-  - research.workflow record decision
-  examples:
-  - (research.workflow.record-decision :search-query "..." :source-provider "..." :candidates-found "..." :reasoning "..." :decision-type "...")
-  doc: Record a research decision (Phase 1 outcome)
-  tier: intent
-  tags:
-  - write
-  - workflow
-  - audit-trail
 - verb: research.workflow.record-anomaly
   domain: research.workflow
   action: record-anomaly
@@ -119,15 +10,15 @@ verbs:
   args:
     style: keyworded
     required:
-      rule-code:
-        type: str
-      entity-id:
+      action-id:
         type: uuid
       description:
         type: str
-      action-id:
-        type: uuid
       severity:
+        type: str
+      entity-id:
+        type: uuid
+      rule-code:
         type: str
     optional:
       actual-value:
@@ -149,71 +40,6 @@ verbs:
   - write
   - workflow
   - validation
-- verb: research.workflow.reject-decision
-  domain: research.workflow
-  action: reject-decision
-  aliases:
-  - reject
-  - reject-decision
-  args:
-    style: keyworded
-    required:
-      decision-id:
-        type: uuid
-      rejection-reason:
-        type: str
-  positional_sugar:
-  - decision-id
-  - rejection-reason
-  invocation_phrases:
-  - no that's wrong
-  - reject
-  - not that one
-  - none of these
-  - reject decision research.workflow
-  - reject decision the research.workflow
-  - research.workflow reject decision
-  examples:
-  - (research.workflow.reject-decision :decision-id "..." :rejection-reason "...")
-  doc: User rejects a suggested decision
-  tier: intent
-  tags:
-  - write
-  - workflow
-  - user-rejection
-- verb: research.workflow.confirm-decision
-  domain: research.workflow
-  action: confirm-decision
-  aliases:
-  - confirm-decision
-  args:
-    style: keyworded
-    required:
-      selected-key-type:
-        type: str
-      selected-key:
-        type: str
-      decision-id:
-        type: uuid
-  positional_sugar:
-  - decision-id
-  - selected-key
-  invocation_phrases:
-  - confirm this
-  - yes that's right
-  - use that one
-  - select this match
-  - confirm decision research.workflow
-  - confirm decision the research.workflow
-  - research.workflow confirm decision
-  examples:
-  - (research.workflow.confirm-decision :decision-id "..." :selected-key "..." :selected-key-type "...")
-  doc: User confirms an ambiguous decision
-  tier: intent
-  tags:
-  - write
-  - workflow
-  - user-confirmation
 - verb: research.workflow.resolve-anomaly
   domain: research.workflow
   action: resolve-anomaly
@@ -245,60 +71,67 @@ verbs:
   - workflow
   - validation
   - resolution
-- verb: research.workflow.record-action
+- verb: research.workflow.pending-decisions
   domain: research.workflow
-  action: record-action
+  action: pending-decisions
   aliases:
-  - record-action
+  - pending-decisions
+  args:
+    style: keyworded
+    optional:
+      limit:
+        type: int
+      source-provider:
+        type: str
+  invocation_phrases:
+  - pending decisions research.workflow
+  - pending decisions the research.workflow
+  - research.workflow pending decisions
+  examples:
+  - (research.workflow.pending-decisions)
+  doc: List decisions awaiting user input
+  tier: diagnostics
+  tags:
+  - read
+  - query
+  - workflow
+- verb: research.workflow.audit-trail
+  domain: research.workflow
+  action: audit-trail
+  aliases:
+  - audit-trail
   args:
     style: keyworded
     required:
-      source-key:
-        type: str
-      source-key-type:
-        type: str
-      verb-domain:
-        type: str
-      success:
-        type: bool
-      source-provider:
-        type: str
-      target-entity-id:
-        type: uuid
-      action-type:
-        type: str
-      verb-name:
-        type: str
+      entity-id:
+        type: entity_name
     optional:
-      entities-created:
-        type: int
-      entities-updated:
-        type: int
-      decision-id:
-        type: uuid
-      relationships-created:
-        type: int
-      verb-args:
-        type: json
-      duration-ms:
-        type: int
-      error-message:
-        type: str
-      error-code:
-        type: str
+      include-decisions:
+        type: bool
+      include-anomalies:
+        type: bool
+      include-actions:
+        type: bool
+      include-corrections:
+        type: bool
   positional_sugar:
-  - target-entity-id
-  - action-type
+  - entity-id
   invocation_phrases:
-  - record action research.workflow
-  - record action the research.workflow
-  - research.workflow record action
+  - show audit trail
+  - what research was done
+  - history of decisions
+  - how did we get this data
+  - where did this come from
+  - audit trail research.workflow
+  - audit trail the research.workflow
+  - research.workflow audit trail
   examples:
-  - (research.workflow.record-action :target-entity-id "..." :action-type "..." :source-provider "..." :source-key "..." :source-key-type "..." :verb-domain "..." :verb-name "..." :success "...")
-  doc: Record a research action (Phase 2 execution)
-  tier: intent
+  - (research.workflow.audit-trail :entity-id "...")
+  doc: Get research audit trail for an entity
+  tier: diagnostics
   tags:
-  - write
+  - read
+  - query
   - workflow
   - audit-trail
 - verb: research.workflow.record-correction
@@ -316,13 +149,13 @@ verbs:
       correction-reason:
         type: str
     optional:
-      correct-key-type:
+      wrong-key:
         type: str
       wrong-key-type:
         type: str
       correct-key:
         type: str
-      wrong-key:
+      correct-key-type:
         type: str
       original-action-id:
         type: uuid
@@ -345,3 +178,170 @@ verbs:
   - write
   - workflow
   - correction
+- verb: research.workflow.record-decision
+  domain: research.workflow
+  action: record-decision
+  aliases:
+  - record-decision
+  args:
+    style: keyworded
+    required:
+      reasoning:
+        type: str
+      candidates-found:
+        type: json
+      source-provider:
+        type: str
+      search-query:
+        type: str
+      decision-type:
+        type: str
+    optional:
+      selected-key:
+        type: str
+      candidates-count:
+        type: int
+      auto-selected:
+        type: bool
+      confidence:
+        type: decimal
+      target-entity-id:
+        type: entity_name
+      selected-key-type:
+        type: str
+  positional_sugar:
+  - search-query
+  - source-provider
+  invocation_phrases:
+  - record decision research.workflow
+  - record decision the research.workflow
+  - research.workflow record decision
+  examples:
+  - (research.workflow.record-decision :search-query "..." :source-provider "..." :candidates-found "..." :reasoning "..." :decision-type "...")
+  doc: Record a research decision (Phase 1 outcome)
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - audit-trail
+- verb: research.workflow.confirm-decision
+  domain: research.workflow
+  action: confirm-decision
+  aliases:
+  - confirm-decision
+  args:
+    style: keyworded
+    required:
+      decision-id:
+        type: uuid
+      selected-key-type:
+        type: str
+      selected-key:
+        type: str
+  positional_sugar:
+  - decision-id
+  - selected-key
+  invocation_phrases:
+  - confirm this
+  - yes that's right
+  - use that one
+  - select this match
+  - confirm decision research.workflow
+  - confirm decision the research.workflow
+  - research.workflow confirm decision
+  examples:
+  - (research.workflow.confirm-decision :decision-id "..." :selected-key "..." :selected-key-type "...")
+  doc: User confirms an ambiguous decision
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - user-confirmation
+- verb: research.workflow.reject-decision
+  domain: research.workflow
+  action: reject-decision
+  aliases:
+  - reject
+  - reject-decision
+  args:
+    style: keyworded
+    required:
+      rejection-reason:
+        type: str
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - decision-id
+  - rejection-reason
+  invocation_phrases:
+  - no that's wrong
+  - reject
+  - not that one
+  - none of these
+  - reject decision research.workflow
+  - reject decision the research.workflow
+  - research.workflow reject decision
+  examples:
+  - (research.workflow.reject-decision :decision-id "..." :rejection-reason "...")
+  doc: User rejects a suggested decision
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - user-rejection
+- verb: research.workflow.record-action
+  domain: research.workflow
+  action: record-action
+  aliases:
+  - record-action
+  args:
+    style: keyworded
+    required:
+      target-entity-id:
+        type: uuid
+      source-provider:
+        type: str
+      action-type:
+        type: str
+      source-key-type:
+        type: str
+      source-key:
+        type: str
+      verb-domain:
+        type: str
+      success:
+        type: bool
+      verb-name:
+        type: str
+    optional:
+      duration-ms:
+        type: int
+      verb-args:
+        type: json
+      relationships-created:
+        type: int
+      entities-created:
+        type: int
+      error-code:
+        type: str
+      decision-id:
+        type: uuid
+      entities-updated:
+        type: int
+      error-message:
+        type: str
+  positional_sugar:
+  - target-entity-id
+  - action-type
+  invocation_phrases:
+  - record action research.workflow
+  - record action the research.workflow
+  - research.workflow record action
+  examples:
+  - (research.workflow.record-action :target-entity-id "..." :action-type "..." :source-provider "..." :source-key "..." :source-key-type "..." :verb-domain "..." :verb-name "..." :success "...")
+  doc: Record a research action (Phase 2 execution)
+  tier: intent
+  tags:
+  - write
+  - workflow
+  - audit-trail

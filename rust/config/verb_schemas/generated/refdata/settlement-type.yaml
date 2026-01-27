@@ -2,30 +2,36 @@ version: '2.0'
 domain: settlement-type
 description: Settlement type reference data (DVP, FOP, RVP, etc.)
 verbs:
-- verb: settlement-type.read
+- verb: settlement-type.ensure
   domain: settlement-type
-  action: read
+  action: ensure
   aliases:
-  - fetch
-  - get
-  - read
+  - ensure
   args:
     style: keyworded
     required:
+      name:
+        type: str
       code:
         type: str
+    optional:
+      description:
+        type: str
+      is-active:
+        type: bool
+      display-order:
+        type: int
   positional_sugar:
   - code
+  - name
   invocation_phrases:
-  - read settlement-type
-  - read the settlement-type
-  - get settlement-type
-  - fetch settlement-type
-  - settlement-type read
+  - ensure settlement-type
+  - ensure the settlement-type
+  - settlement-type ensure
   examples:
-  - (settlement-type.read :code "...")
-  doc: Read a settlement type by code
-  tier: reference
+  - (settlement-type.ensure :code "..." :name "...")
+  doc: Create or update a settlement type
+  tier: intent
 - verb: settlement-type.list
   domain: settlement-type
   action: list
@@ -48,36 +54,6 @@ verbs:
   - (settlement-type.list)
   doc: List all settlement types
   tier: reference
-- verb: settlement-type.ensure
-  domain: settlement-type
-  action: ensure
-  aliases:
-  - ensure
-  args:
-    style: keyworded
-    required:
-      name:
-        type: str
-      code:
-        type: str
-    optional:
-      display-order:
-        type: int
-      is-active:
-        type: bool
-      description:
-        type: str
-  positional_sugar:
-  - code
-  - name
-  invocation_phrases:
-  - ensure settlement-type
-  - ensure the settlement-type
-  - settlement-type ensure
-  examples:
-  - (settlement-type.ensure :code "..." :name "...")
-  doc: Create or update a settlement type
-  tier: intent
 - verb: settlement-type.deactivate
   domain: settlement-type
   action: deactivate
@@ -105,3 +81,27 @@ verbs:
   - (settlement-type.deactivate :code "...")
   doc: Deactivate a settlement type
   tier: intent
+- verb: settlement-type.read
+  domain: settlement-type
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - read settlement-type
+  - read the settlement-type
+  - get settlement-type
+  - fetch settlement-type
+  - settlement-type read
+  examples:
+  - (settlement-type.read :code "...")
+  doc: Read a settlement type by code
+  tier: reference

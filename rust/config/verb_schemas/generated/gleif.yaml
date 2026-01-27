@@ -2,6 +2,157 @@ version: '2.0'
 domain: gleif
 description: GLEIF API integration for LEI data enrichment and corporate tree import
 verbs:
+- verb: gleif.get-manager
+  domain: gleif
+  action: get-manager
+  aliases:
+  - get-manager
+  args:
+    style: keyworded
+    optional:
+      entity-id:
+        type: entity_name
+      lei:
+        type: str
+  invocation_phrases:
+  - get manager gleif
+  - get manager the gleif
+  - get manager lei
+  - gleif get manager
+  examples:
+  - (gleif.get-manager)
+  doc: Get fund manager for a fund (IS_FUND-MANAGED_BY relationship). Use this for SICAVs which have no umbrella above them.
+  tier: diagnostics
+  tags:
+  - gleif
+  - external-api
+  - lookup
+  - relationship
+  - funds
+- verb: gleif.trace-ownership
+  domain: gleif
+  action: trace-ownership
+  aliases:
+  - trace-ownership
+  args:
+    style: keyworded
+    optional:
+      lei:
+        type: str
+      entity-id:
+        type: entity_name
+  invocation_phrases:
+  - trace ownership
+  - find ultimate parent
+  - who owns this ultimately
+  - trace to UBO
+  - trace ownership gleif
+  - trace ownership the gleif
+  - trace ownership lei
+  - gleif trace ownership
+  examples:
+  - (gleif.trace-ownership)
+  doc: Trace ownership chain from entity to UBO terminus via GLEIF parent relationships
+  tier: diagnostics
+  tags:
+  - gleif
+  - external-api
+  - trace
+  - ownership
+- verb: gleif.lookup-by-isin
+  domain: gleif
+  action: lookup-by-isin
+  aliases:
+  - lookup-by-isin
+  args:
+    style: keyworded
+    required:
+      isin:
+        type: str
+  positional_sugar:
+  - isin
+  invocation_phrases:
+  - lookup by isin gleif
+  - lookup by isin the gleif
+  - lookup by isin lei
+  - gleif lookup by isin
+  examples:
+  - (gleif.lookup-by-isin :isin "...")
+  doc: Look up entity LEI by ISIN (uses GLEIF ISIN-LEI mapping)
+  tier: diagnostics
+  tags:
+  - gleif
+  - external-api
+  - lookup
+  - isin
+- verb: gleif.import-managed-funds
+  domain: gleif
+  action: import-managed-funds
+  aliases:
+  - import-managed-funds
+  args:
+    style: keyworded
+    required:
+      manager-lei:
+        type: str
+    optional:
+      dry-run:
+        type: bool
+      limit:
+        type: int
+      ultimate-client-lei:
+        type: str
+      create-cbus:
+        type: bool
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - manager-lei
+  invocation_phrases:
+  - import managed funds
+  - get funds for manager
+  - load fund portfolio
+  - import investment manager funds
+  - import managed funds gleif
+  - import managed funds the gleif
+  - import managed funds lei
+  - gleif import managed funds
+  examples:
+  - (gleif.import-managed-funds :manager-lei "...")
+  doc: Import funds managed by an investment manager with full CBU structure
+  tier: intent
+  tags:
+  - gleif
+  - external-api
+  - import
+  - funds
+- verb: gleif.get-umbrella
+  domain: gleif
+  action: get-umbrella
+  aliases:
+  - get-umbrella
+  args:
+    style: keyworded
+    optional:
+      lei:
+        type: str
+      entity-id:
+        type: entity_name
+  invocation_phrases:
+  - get umbrella gleif
+  - get umbrella the gleif
+  - get umbrella lei
+  - gleif get umbrella
+  examples:
+  - (gleif.get-umbrella)
+  doc: Get umbrella fund for a sub-fund (IS_SUBFUND_OF relationship). SICAVs have no umbrella - use get-manager instead.
+  tier: diagnostics
+  tags:
+  - gleif
+  - external-api
+  - lookup
+  - relationship
+  - funds
 - verb: gleif.get-record
   domain: gleif
   action: get-record
@@ -27,6 +178,138 @@ verbs:
   - gleif
   - external-api
   - lookup
+- verb: gleif.search
+  domain: gleif
+  action: search
+  aliases:
+  - find
+  - lookup
+  - search
+  args:
+    style: keyworded
+    optional:
+      category:
+        type: enum
+        values:
+        - FUND
+        - BRANCH
+        - SOLE_PROPRIETOR
+        - GENERAL
+      name:
+        type: str
+      limit:
+        type: int
+      jurisdiction:
+        type: str
+      status:
+        type: enum
+        values:
+        - ACTIVE
+        - INACTIVE
+        - LAPSED
+  invocation_phrases:
+  - search GLEIF
+  - find in GLEIF
+  - look up LEI
+  - search for entity
+  - search gleif
+  - search the gleif
+  - find gleif
+  - lookup gleif
+  - search lei
+  - gleif search
+  examples:
+  - (gleif.search)
+  doc: Search GLEIF for entities by name, jurisdiction, or category
+  tier: diagnostics
+  tags:
+  - gleif
+  - external-api
+  - search
+- verb: gleif.get-master-fund
+  domain: gleif
+  action: get-master-fund
+  aliases:
+  - get-master-fund
+  args:
+    style: keyworded
+    optional:
+      entity-id:
+        type: entity_name
+      lei:
+        type: str
+  invocation_phrases:
+  - get master fund gleif
+  - get master fund the gleif
+  - get master fund lei
+  - gleif get master fund
+  examples:
+  - (gleif.get-master-fund)
+  doc: Get master fund for a feeder fund (IS_FEEDER_TO relationship)
+  tier: diagnostics
+  tags:
+  - gleif
+  - external-api
+  - lookup
+  - relationship
+  - funds
+- verb: gleif.get-parent
+  domain: gleif
+  action: get-parent
+  aliases:
+  - get-parent
+  args:
+    style: keyworded
+    required:
+      lei:
+        type: str
+  positional_sugar:
+  - lei
+  invocation_phrases:
+  - get parent gleif
+  - get parent the gleif
+  - get parent lei
+  - gleif get parent
+  examples:
+  - (gleif.get-parent :lei "...")
+  doc: Get direct parent relationship from GLEIF
+  tier: diagnostics
+  tags:
+  - gleif
+  - external-api
+  - lookup
+  - relationship
+- verb: gleif.enrich
+  domain: gleif
+  action: enrich
+  aliases:
+  - enrich
+  args:
+    style: keyworded
+    optional:
+      entity-id:
+        type: entity_name
+      decision-id:
+        type: uuid
+      lei:
+        type: str
+  invocation_phrases:
+  - enrich from GLEIF
+  - get LEI data
+  - fetch LEI record
+  - import from GLEIF
+  - enrich gleif
+  - enrich the gleif
+  - enrich lei
+  - gleif enrich
+  examples:
+  - (gleif.enrich)
+  doc: Enrich an entity with GLEIF data by LEI (creates entity if not exists)
+  tier: intent
+  tags:
+  - gleif
+  - external-api
+  - enrichment
 - verb: gleif.get-children
   domain: gleif
   action: get-children
@@ -56,58 +339,6 @@ verbs:
   - external-api
   - lookup
   - relationship
-- verb: gleif.get-parent
-  domain: gleif
-  action: get-parent
-  aliases:
-  - get-parent
-  args:
-    style: keyworded
-    required:
-      lei:
-        type: str
-  positional_sugar:
-  - lei
-  invocation_phrases:
-  - get parent gleif
-  - get parent the gleif
-  - get parent lei
-  - gleif get parent
-  examples:
-  - (gleif.get-parent :lei "...")
-  doc: Get direct parent relationship from GLEIF
-  tier: diagnostics
-  tags:
-  - gleif
-  - external-api
-  - lookup
-  - relationship
-- verb: gleif.lookup-by-isin
-  domain: gleif
-  action: lookup-by-isin
-  aliases:
-  - lookup-by-isin
-  args:
-    style: keyworded
-    required:
-      isin:
-        type: str
-  positional_sugar:
-  - isin
-  invocation_phrases:
-  - lookup by isin gleif
-  - lookup by isin the gleif
-  - lookup by isin lei
-  - gleif lookup by isin
-  examples:
-  - (gleif.lookup-by-isin :isin "...")
-  doc: Look up entity LEI by ISIN (uses GLEIF ISIN-LEI mapping)
-  tier: diagnostics
-  tags:
-  - gleif
-  - external-api
-  - lookup
-  - isin
 - verb: gleif.import-tree
   domain: gleif
   action: import-tree
@@ -119,18 +350,18 @@ verbs:
       root-lei:
         type: str
     optional:
-      max-depth:
-        type: int
-      create-entities:
-        type: bool
-      decision-id:
-        type: uuid
       direction:
         type: enum
         values:
         - UP
         - DOWN
         - BOTH
+      decision-id:
+        type: uuid
+      max-depth:
+        type: int
+      create-entities:
+        type: bool
   positional_sugar:
   - root-lei
   invocation_phrases:
@@ -151,32 +382,33 @@ verbs:
   - external-api
   - import
   - hierarchy
-- verb: gleif.resolve-successor
+- verb: gleif.refresh
   domain: gleif
-  action: resolve-successor
+  action: refresh
   aliases:
-  - resolve-successor
+  - refresh
   args:
     style: keyworded
-    required:
-      lei:
-        type: str
-  positional_sugar:
-  - lei
+    optional:
+      entity-id:
+        type: entity_name
+      limit:
+        type: int
+      stale-days:
+        type: int
   invocation_phrases:
-  - resolve successor gleif
-  - resolve successor the gleif
-  - resolve successor lei
-  - gleif resolve successor
+  - refresh gleif
+  - refresh the gleif
+  - refresh lei
+  - gleif refresh
   examples:
-  - (gleif.resolve-successor :lei "...")
-  doc: Resolve a merged or inactive LEI to its current successor entity
-  tier: diagnostics
+  - (gleif.refresh)
+  doc: Refresh stale GLEIF data for entities
+  tier: intent
   tags:
   - gleif
   - external-api
-  - lookup
-  - successor
+  - refresh
 - verb: gleif.get-managed-funds
   domain: gleif
   action: get-managed-funds
@@ -208,205 +440,32 @@ verbs:
   - external-api
   - lookup
   - funds
-- verb: gleif.search
+- verb: gleif.resolve-successor
   domain: gleif
-  action: search
+  action: resolve-successor
   aliases:
-  - find
-  - lookup
-  - search
-  args:
-    style: keyworded
-    optional:
-      name:
-        type: str
-      category:
-        type: enum
-        values:
-        - FUND
-        - BRANCH
-        - SOLE_PROPRIETOR
-        - GENERAL
-      status:
-        type: enum
-        values:
-        - ACTIVE
-        - INACTIVE
-        - LAPSED
-      jurisdiction:
-        type: str
-      limit:
-        type: int
-  invocation_phrases:
-  - search GLEIF
-  - find in GLEIF
-  - look up LEI
-  - search for entity
-  - search gleif
-  - search the gleif
-  - find gleif
-  - lookup gleif
-  examples:
-  - (gleif.search)
-  doc: Search GLEIF for entities by name, jurisdiction, or category
-  tier: diagnostics
-  tags:
-  - gleif
-  - external-api
-  - search
-- verb: gleif.import-managed-funds
-  domain: gleif
-  action: import-managed-funds
-  aliases:
-  - import-managed-funds
+  - resolve-successor
   args:
     style: keyworded
     required:
-      manager-lei:
+      lei:
         type: str
-    optional:
-      ultimate-client-lei:
-        type: str
-      create-cbus:
-        type: bool
-      limit:
-        type: int
-      dry-run:
-        type: bool
-      decision-id:
-        type: uuid
   positional_sugar:
-  - manager-lei
+  - lei
   invocation_phrases:
-  - import managed funds
-  - get funds for manager
-  - load fund portfolio
-  - import investment manager funds
-  - import managed funds gleif
-  - import managed funds the gleif
-  - import managed funds lei
-  - gleif import managed funds
+  - resolve successor gleif
+  - resolve successor the gleif
+  - resolve successor lei
+  - gleif resolve successor
   examples:
-  - (gleif.import-managed-funds :manager-lei "...")
-  doc: Import funds managed by an investment manager with full CBU structure
-  tier: intent
-  tags:
-  - gleif
-  - external-api
-  - import
-  - funds
-- verb: gleif.get-manager
-  domain: gleif
-  action: get-manager
-  aliases:
-  - get-manager
-  args:
-    style: keyworded
-    optional:
-      lei:
-        type: str
-      entity-id:
-        type: entity_name
-  invocation_phrases:
-  - get manager gleif
-  - get manager the gleif
-  - get manager lei
-  - gleif get manager
-  examples:
-  - (gleif.get-manager)
-  doc: Get fund manager for a fund (IS_FUND-MANAGED_BY relationship). Use this for SICAVs which have no umbrella above them.
+  - (gleif.resolve-successor :lei "...")
+  doc: Resolve a merged or inactive LEI to its current successor entity
   tier: diagnostics
   tags:
   - gleif
   - external-api
   - lookup
-  - relationship
-  - funds
-- verb: gleif.get-umbrella
-  domain: gleif
-  action: get-umbrella
-  aliases:
-  - get-umbrella
-  args:
-    style: keyworded
-    optional:
-      entity-id:
-        type: entity_name
-      lei:
-        type: str
-  invocation_phrases:
-  - get umbrella gleif
-  - get umbrella the gleif
-  - get umbrella lei
-  - gleif get umbrella
-  examples:
-  - (gleif.get-umbrella)
-  doc: Get umbrella fund for a sub-fund (IS_SUBFUND_OF relationship). SICAVs have no umbrella - use get-manager instead.
-  tier: diagnostics
-  tags:
-  - gleif
-  - external-api
-  - lookup
-  - relationship
-  - funds
-- verb: gleif.get-master-fund
-  domain: gleif
-  action: get-master-fund
-  aliases:
-  - get-master-fund
-  args:
-    style: keyworded
-    optional:
-      entity-id:
-        type: entity_name
-      lei:
-        type: str
-  invocation_phrases:
-  - get master fund gleif
-  - get master fund the gleif
-  - get master fund lei
-  - gleif get master fund
-  examples:
-  - (gleif.get-master-fund)
-  doc: Get master fund for a feeder fund (IS_FEEDER_TO relationship)
-  tier: diagnostics
-  tags:
-  - gleif
-  - external-api
-  - lookup
-  - relationship
-  - funds
-- verb: gleif.enrich
-  domain: gleif
-  action: enrich
-  aliases:
-  - enrich
-  args:
-    style: keyworded
-    optional:
-      decision-id:
-        type: uuid
-      lei:
-        type: str
-      entity-id:
-        type: entity_name
-  invocation_phrases:
-  - enrich from GLEIF
-  - get LEI data
-  - fetch LEI record
-  - import from GLEIF
-  - enrich gleif
-  - enrich the gleif
-  - enrich lei
-  - gleif enrich
-  examples:
-  - (gleif.enrich)
-  doc: Enrich an entity with GLEIF data by LEI (creates entity if not exists)
-  tier: intent
-  tags:
-  - gleif
-  - external-api
-  - enrichment
+  - successor
 - verb: gleif.import-to-client-group
   domain: gleif
   action: import-to-client-group
@@ -420,14 +479,14 @@ verbs:
       group-id:
         type: entity_name
     optional:
-      max-depth:
-        type: int
       decision-id:
         type: uuid
-      include-funds:
-        type: bool
       max-funds-per-manco:
         type: int
+      max-depth:
+        type: int
+      include-funds:
+        type: bool
   positional_sugar:
   - group-id
   - root-lei
@@ -440,6 +499,9 @@ verbs:
   - import group with funds
   - discover funds for client group
   - import to client group gleif
+  - import to client group the gleif
+  - import to client group lei
+  - gleif import to client group
   examples:
   - (gleif.import-to-client-group :group-id "..." :root-lei "...")
   doc: Import GLEIF tree and populate client_group tables with role tagging. Optionally includes managed funds (IM relationships).
@@ -451,60 +513,3 @@ verbs:
   - client-group
   - discovery
   - funds
-- verb: gleif.trace-ownership
-  domain: gleif
-  action: trace-ownership
-  aliases:
-  - trace-ownership
-  args:
-    style: keyworded
-    optional:
-      entity-id:
-        type: entity_name
-      lei:
-        type: str
-  invocation_phrases:
-  - trace ownership
-  - find ultimate parent
-  - who owns this ultimately
-  - trace to UBO
-  - trace ownership gleif
-  - trace ownership the gleif
-  - trace ownership lei
-  - gleif trace ownership
-  examples:
-  - (gleif.trace-ownership)
-  doc: Trace ownership chain from entity to UBO terminus via GLEIF parent relationships
-  tier: diagnostics
-  tags:
-  - gleif
-  - external-api
-  - trace
-  - ownership
-- verb: gleif.refresh
-  domain: gleif
-  action: refresh
-  aliases:
-  - refresh
-  args:
-    style: keyworded
-    optional:
-      stale-days:
-        type: int
-      limit:
-        type: int
-      entity-id:
-        type: entity_name
-  invocation_phrases:
-  - refresh gleif
-  - refresh the gleif
-  - refresh lei
-  - gleif refresh
-  examples:
-  - (gleif.refresh)
-  doc: Refresh stale GLEIF data for entities
-  tier: intent
-  tags:
-  - gleif
-  - external-api
-  - refresh

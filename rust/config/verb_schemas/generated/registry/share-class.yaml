@@ -43,6 +43,8 @@ verbs:
   - set instrument type share class
   - set instrument type share-class
   - set instrument type the share class
+  - set instrument type class
+  - share class set instrument type
   examples:
   - (share-class.set-instrument-type :share-class-id "..." :instrument-type "...")
   doc: |
@@ -59,9 +61,9 @@ verbs:
   args:
     style: keyworded
     required:
-      share-class-id:
-        type: entity_name
       compartment-id:
+        type: entity_name
+      share-class-id:
         type: entity_name
   positional_sugar:
   - share-class-id
@@ -75,6 +77,7 @@ verbs:
   - link to compartment share-class
   - link to compartment the share class
   - link to compartment class
+  - share class link to compartment
   examples:
   - (share-class.link-to-compartment :share-class-id "..." :compartment-id "...")
   doc: |
@@ -83,34 +86,6 @@ verbs:
     Associates the share class with a specific compartment/sleeve
     within an umbrella fund. Investors in this share class own
     exposure to the linked compartment.
-  tier: intent
-- verb: share-class.unlink-from-compartment
-  domain: share-class
-  action: unlink-from-compartment
-  aliases:
-  - unlink-from-compartment
-  args:
-    style: keyworded
-    required:
-      share-class-id:
-        type: entity_name
-  positional_sugar:
-  - share-class-id
-  invocation_phrases:
-  - unlink from compartment
-  - remove from compartment
-  - detach from sleeve
-  - unlink from compartment share class
-  - unlink from compartment share-class
-  - unlink from compartment the share class
-  - unlink from compartment class
-  - share class unlink from compartment
-  examples:
-  - (share-class.unlink-from-compartment :share-class-id "...")
-  doc: |
-    Remove share class from compartment (set compartment_id to NULL).
-
-    Use when restructuring fund or moving share class to different compartment.
   tier: intent
 - verb: share-class.list-by-compartment
   domain: share-class
@@ -141,3 +116,31 @@ verbs:
     Returns all share classes linked to the specified compartment.
     Useful for viewing fee structures and investor breakdowns by sleeve.
   tier: diagnostics
+- verb: share-class.unlink-from-compartment
+  domain: share-class
+  action: unlink-from-compartment
+  aliases:
+  - unlink-from-compartment
+  args:
+    style: keyworded
+    required:
+      share-class-id:
+        type: entity_name
+  positional_sugar:
+  - share-class-id
+  invocation_phrases:
+  - unlink from compartment
+  - remove from compartment
+  - detach from sleeve
+  - unlink from compartment share class
+  - unlink from compartment share-class
+  - unlink from compartment the share class
+  - unlink from compartment class
+  - share class unlink from compartment
+  examples:
+  - (share-class.unlink-from-compartment :share-class-id "...")
+  doc: |
+    Remove share class from compartment (set compartment_id to NULL).
+
+    Use when restructuring fund or moving share class to different compartment.
+  tier: intent

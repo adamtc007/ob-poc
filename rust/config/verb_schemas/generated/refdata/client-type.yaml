@@ -37,9 +37,9 @@ verbs:
   args:
     style: keyworded
     required:
-      code:
-        type: str
       name:
+        type: str
+      code:
         type: str
     optional:
       description:

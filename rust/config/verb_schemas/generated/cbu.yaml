@@ -2,63 +2,99 @@ version: '2.0'
 domain: cbu
 description: Client Business Unit operations
 verbs:
-- verb: cbu.remove-product
+- verb: cbu.list
   domain: cbu
-  action: remove-product
+  action: list
   aliases:
-  - remove-product
+  - get all
+  - list
+  - show
   args:
     style: keyworded
-    required:
-      product:
-        type: entity_name
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  - product
+    optional:
+      offset:
+        type: int
+      status:
+        type: str
+      client-type:
+        type: str
+      jurisdiction:
+        type: str
+      limit:
+        type: int
   invocation_phrases:
-  - remove product cbu
-  - remove product the cbu
-  - remove product client business unit
-  - cbu remove product
+  - list CBUs
+  - show all CBUs
+  - view CBU list
+  - display CBUs
+  - list all business units
+  - show CBUs for client
+  - get CBU list
+  - list all cbus
+  - show cbu list
+  - display all cbus
+  - list every cbu
+  - show me all cbus
+  - get all cbus
+  - what cbus exist
+  - show cbus in database
   examples:
-  - (cbu.remove-product :cbu-id "..." :product "...")
-  doc: Remove a product from a CBU (deletes service_delivery_map entries)
-  tier: intent
+  - (cbu.list)
+  doc: List CBUs with optional filters
+  tier: diagnostics
   tags:
-  - relationship
-  - write
-  - product
+  - read
+  - query
+  - list
   - cbu
-- verb: cbu.add-product
+- verb: cbu.update
   domain: cbu
-  action: add-product
+  action: update
   aliases:
-  - add-product
+  - edit
+  - modify
+  - update
   args:
     style: keyworded
     required:
       cbu-id:
         type: entity_name
-      product:
+    optional:
+      name:
+        type: str
+      jurisdiction:
+        type: str
+      commercial-client-entity-id:
         type: entity_name
+      client-type:
+        type: str
+      status:
+        type: str
   positional_sugar:
   - cbu-id
-  - product
   invocation_phrases:
-  - add product cbu
-  - add product the cbu
-  - add product client business unit
-  - cbu add product
+  - update CBU
+  - update cbu details
+  - modify CBU
+  - change CBU details
+  - edit CBU
+  - update CBU name
+  - change CBU status
+  - modify business unit
+  - edit cbu details
+  - modify cbu details
+  - update the cbu
+  - update cbu
+  - edit cbu
+  - modify cbu
+  - update client business unit
   examples:
-  - (cbu.add-product :cbu-id "..." :product "...")
-  doc: Add a product to a CBU (creates service_delivery_map entries for all services)
+  - (cbu.update :cbu-id "...")
+  doc: Update a CBU
   tier: intent
   tags:
-  - relationship
+  - lifecycle
   - write
-  - product
   - cbu
 - verb: cbu.verify-evidence
   domain: cbu
@@ -68,10 +104,6 @@ verbs:
   args:
     style: keyworded
     required:
-      evidence-id:
-        type: uuid
-      verified-by:
-        type: str
       verification-status:
         type: enum
         values:
@@ -79,6 +111,10 @@ verbs:
         - VERIFIED
         - REJECTED
         - EXPIRED
+      verified-by:
+        type: str
+      evidence-id:
+        type: uuid
     optional:
       verification-notes:
         type: str
@@ -99,6 +135,73 @@ verbs:
   - write
   - kyc
   - verification
+  - cbu
+- verb: cbu.delete
+  domain: cbu
+  action: delete
+  aliases:
+  - delete
+  - drop
+  - remove
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - delete cbu
+  - delete the cbu
+  - remove cbu
+  - drop cbu
+  - delete client business unit
+  - cbu delete
+  examples:
+  - (cbu.delete :cbu-id "...")
+  doc: Delete a CBU (fails if has dependencies - use delete-cascade for full cleanup)
+  tier: intent
+  tags:
+  - lifecycle
+  - write
+  - destructive
+  - cbu
+- verb: cbu.remove-role
+  domain: cbu
+  action: remove-role
+  aliases:
+  - remove-role
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+      role:
+        type: entity_name
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - entity-id
+  invocation_phrases:
+  - remove role from CBU
+  - unassign role
+  - delete CBU role
+  - remove entity from CBU
+  - unlink entity role
+  - remove participant
+  - remove role cbu
+  - remove role the cbu
+  - remove role client business unit
+  - cbu remove role
+  examples:
+  - (cbu.remove-role :cbu-id "..." :entity-id "..." :role "...")
+  doc: Remove a specific role from an entity within a CBU
+  tier: intent
+  tags:
+  - relationship
+  - write
+  - role
   - cbu
 - verb: cbu.read
   domain: cbu
@@ -129,36 +232,45 @@ verbs:
   - read
   - query
   - cbu
-- verb: cbu.list-evidence
+- verb: cbu.decide
   domain: cbu
-  action: list-evidence
+  action: decide
   aliases:
-  - list-evidence
+  - decide
   args:
     style: keyworded
     required:
+      decided-by:
+        type: str
+      rationale:
+        type: str
+      decision:
+        type: str
       cbu-id:
         type: entity_name
     optional:
-      verification-status:
+      case-id:
+        type: entity_name
+      escalation-reason:
         type: str
-      evidence-type:
+      conditions:
         type: str
   positional_sugar:
   - cbu-id
+  - decision
   invocation_phrases:
-  - list evidence cbu
-  - list evidence the cbu
-  - list evidence client business unit
-  - cbu list evidence
+  - decide cbu
+  - decide the cbu
+  - decide client business unit
+  - cbu decide
   examples:
-  - (cbu.list-evidence :cbu-id "...")
-  doc: List evidence for a CBU
-  tier: diagnostics
+  - (cbu.decide :cbu-id "..." :decision "..." :decided-by "..." :rationale "...")
+  doc: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
+  tier: intent
   tags:
-  - evidence
-  - read
-  - query
+  - lifecycle
+  - write
+  - decision
   - kyc
   - cbu
 - verb: cbu.assign-role
@@ -169,11 +281,11 @@ verbs:
   args:
     style: keyworded
     required:
-      role:
-        type: entity_name
       cbu-id:
         type: entity_name
       entity-id:
+        type: entity_name
+      role:
         type: entity_name
   positional_sugar:
   - cbu-id
@@ -191,6 +303,137 @@ verbs:
   - relationship
   - write
   - role
+  - cbu
+- verb: cbu.create-from-client-group
+  domain: cbu
+  action: create-from-client-group
+  aliases:
+  - create-from-client-group
+  args:
+    style: keyworded
+    required:
+      group-id:
+        type: entity_name
+    optional:
+      dry-run:
+        type: bool
+      limit:
+        type: int
+      role-filter:
+        type: str
+      jurisdiction-filter:
+        type: str
+      gleif-category:
+        type: enum
+        values:
+        - FUND
+        - GENERAL
+      default-jurisdiction:
+        type: str
+      manco-entity-id:
+        type: entity_name
+  positional_sugar:
+  - group-id
+  invocation_phrases:
+  - create CBUs from client group
+  - bulk create CBUs for funds
+  - onboard entities as CBUs
+  - create CBUs from research
+  - convert entities to CBUs
+  - create CBUs from GLEIF funds
+  - onboard allianz funds
+  - create cbus for allianz
+  - create from client group cbu
+  - create from client group the cbu
+  - create from client group client business unit
+  - cbu create from client group
+  examples:
+  - (cbu.create-from-client-group :group-id "...")
+  doc: Generate DSL batch to create CBUs from client group entities (stages in runbook)
+  tier: composite
+  tags:
+  - bulk
+  - lifecycle
+  - write
+  - client-group
+  - onboarding
+  - gleif
+  - macro
+  - cbu
+- verb: cbu.remove-product
+  domain: cbu
+  action: remove-product
+  aliases:
+  - remove-product
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      product:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - product
+  invocation_phrases:
+  - remove product cbu
+  - remove product the cbu
+  - remove product client business unit
+  - cbu remove product
+  examples:
+  - (cbu.remove-product :cbu-id "..." :product "...")
+  doc: Remove a product from a CBU (deletes service_delivery_map entries)
+  tier: intent
+  tags:
+  - relationship
+  - write
+  - product
+  - cbu
+- verb: cbu.attach-evidence
+  domain: cbu
+  action: attach-evidence
+  aliases:
+  - attach-evidence
+  args:
+    style: keyworded
+    required:
+      evidence-type:
+        type: enum
+        values:
+        - DOCUMENT
+        - ATTESTATION
+        - SCREENING
+        - REGISTRY_CHECK
+        - MANUAL_VERIFICATION
+      cbu-id:
+        type: entity_name
+    optional:
+      attestation-ref:
+        type: str
+      evidence-category:
+        type: str
+      attached-by:
+        type: str
+      description:
+        type: str
+      document-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - evidence-type
+  invocation_phrases:
+  - attach evidence cbu
+  - attach evidence the cbu
+  - attach evidence client business unit
+  - cbu attach evidence
+  examples:
+  - (cbu.attach-evidence :cbu-id "..." :evidence-type "...")
+  doc: Attach evidence (document or attestation) to CBU
+  tier: intent
+  tags:
+  - evidence
+  - write
+  - kyc
   - cbu
 - verb: cbu.parties
   domain: cbu
@@ -236,17 +479,17 @@ verbs:
       jurisdiction:
         type: entity_name
     optional:
-      client-type:
-        type: str
       manco-entity-id:
         type: entity_name
-      description:
+      fund-entity-id:
+        type: entity_name
+      client-type:
         type: str
       nature-purpose:
         type: str
+      description:
+        type: str
       commercial-client-entity-id:
-        type: entity_name
-      fund-entity-id:
         type: entity_name
   positional_sugar:
   - name
@@ -260,6 +503,13 @@ verbs:
   - establish CBU
   - add CBU
   - create business unit
+  - create client
+  - create fund
+  - onboard client
+  - create cbu
+  - create the cbu
+  - add cbu
+  - new cbu
   examples:
   - (cbu.create :name "..." :jurisdiction "...")
   doc: Create a new Client Business Unit (idempotent by fund-entity-id if provided)
@@ -268,35 +518,66 @@ verbs:
   - lifecycle
   - write
   - cbu
-- verb: cbu.delete
+- verb: cbu.list-evidence
   domain: cbu
-  action: delete
+  action: list-evidence
   aliases:
-  - delete
-  - drop
-  - remove
+  - list-evidence
   args:
     style: keyworded
     required:
       cbu-id:
         type: entity_name
+    optional:
+      verification-status:
+        type: str
+      evidence-type:
+        type: str
   positional_sugar:
   - cbu-id
   invocation_phrases:
-  - delete cbu
-  - delete the cbu
-  - remove cbu
-  - drop cbu
-  - delete client business unit
-  - cbu delete
+  - list evidence cbu
+  - list evidence the cbu
+  - list evidence client business unit
+  - cbu list evidence
   examples:
-  - (cbu.delete :cbu-id "...")
-  doc: Delete a CBU (fails if has dependencies - use delete-cascade for full cleanup)
-  tier: intent
+  - (cbu.list-evidence :cbu-id "...")
+  doc: List evidence for a CBU
+  tier: diagnostics
   tags:
-  - lifecycle
-  - write
-  - destructive
+  - evidence
+  - read
+  - query
+  - kyc
+  - cbu
+- verb: cbu.show
+  domain: cbu
+  action: show
+  aliases:
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      as-of-date:
+        type: date
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - show cbu
+  - show the cbu
+  - show client business unit
+  - cbu show
+  examples:
+  - (cbu.show :cbu-id "...")
+  doc: Show full CBU structure including entities, roles, documents, screenings
+  tier: diagnostics
+  tags:
+  - read
+  - query
+  - detailed
   - cbu
 - verb: cbu.delete-cascade
   domain: cbu
@@ -328,6 +609,35 @@ verbs:
   - destructive
   - cascade
   - cbu
+- verb: cbu.add-product
+  domain: cbu
+  action: add-product
+  aliases:
+  - add-product
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      product:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - product
+  invocation_phrases:
+  - add product cbu
+  - add product the cbu
+  - add product client business unit
+  - cbu add product
+  examples:
+  - (cbu.add-product :cbu-id "..." :product "...")
+  doc: Add a product to a CBU (creates service_delivery_map entries for all services)
+  tier: intent
+  tags:
+  - relationship
+  - write
+  - product
+  - cbu
 - verb: cbu.ensure
   domain: cbu
   action: ensure
@@ -336,17 +646,17 @@ verbs:
   args:
     style: keyworded
     required:
-      name:
-        type: str
       jurisdiction:
         type: entity_name
+      name:
+        type: str
     optional:
-      client-type:
-        type: str
-      nature-purpose:
-        type: str
       commercial-client-entity-id:
         type: entity_name
+      nature-purpose:
+        type: str
+      client-type:
+        type: str
   positional_sugar:
   - name
   - jurisdiction
@@ -372,10 +682,10 @@ verbs:
   args:
     style: keyworded
     required:
-      category:
-        type: str
       cbu-id:
         type: entity_name
+      category:
+        type: str
   positional_sugar:
   - cbu-id
   - category
@@ -392,287 +702,4 @@ verbs:
   - lifecycle
   - write
   - classification
-  - cbu
-- verb: cbu.update
-  domain: cbu
-  action: update
-  aliases:
-  - edit
-  - modify
-  - update
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      status:
-        type: str
-      jurisdiction:
-        type: str
-      commercial-client-entity-id:
-        type: entity_name
-      client-type:
-        type: str
-      name:
-        type: str
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - update CBU
-  - modify CBU
-  - change CBU details
-  - edit CBU
-  - update CBU name
-  - change CBU status
-  - modify business unit
-  - update cbu
-  examples:
-  - (cbu.update :cbu-id "...")
-  doc: Update a CBU
-  tier: intent
-  tags:
-  - lifecycle
-  - write
-  - cbu
-- verb: cbu.show
-  domain: cbu
-  action: show
-  aliases:
-  - show
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      as-of-date:
-        type: date
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - show cbu
-  - show the cbu
-  - show client business unit
-  - cbu show
-  examples:
-  - (cbu.show :cbu-id "...")
-  doc: Show full CBU structure including entities, roles, documents, screenings
-  tier: diagnostics
-  tags:
-  - read
-  - query
-  - detailed
-  - cbu
-- verb: cbu.decide
-  domain: cbu
-  action: decide
-  aliases:
-  - decide
-  args:
-    style: keyworded
-    required:
-      rationale:
-        type: str
-      cbu-id:
-        type: entity_name
-      decision:
-        type: str
-      decided-by:
-        type: str
-    optional:
-      case-id:
-        type: entity_name
-      conditions:
-        type: str
-      escalation-reason:
-        type: str
-  positional_sugar:
-  - cbu-id
-  - decision
-  invocation_phrases:
-  - decide cbu
-  - decide the cbu
-  - decide client business unit
-  - cbu decide
-  examples:
-  - (cbu.decide :cbu-id "..." :decision "..." :decided-by "..." :rationale "...")
-  doc: Record KYC/AML decision for CBU collective state (entities, UBOs, documents)
-  tier: intent
-  tags:
-  - lifecycle
-  - write
-  - decision
-  - kyc
-  - cbu
-- verb: cbu.list
-  domain: cbu
-  action: list
-  aliases:
-  - get all
-  - list
-  - show
-  args:
-    style: keyworded
-    optional:
-      status:
-        type: str
-      jurisdiction:
-        type: str
-      limit:
-        type: int
-      offset:
-        type: int
-      client-type:
-        type: str
-  invocation_phrases:
-  - list CBUs
-  - show all CBUs
-  - view CBU list
-  - display CBUs
-  - list all business units
-  - show CBUs for client
-  - get CBU list
-  - list cbu
-  examples:
-  - (cbu.list)
-  doc: List CBUs with optional filters
-  tier: diagnostics
-  tags:
-  - read
-  - query
-  - list
-  - cbu
-- verb: cbu.remove-role
-  domain: cbu
-  action: remove-role
-  aliases:
-  - remove-role
-  args:
-    style: keyworded
-    required:
-      role:
-        type: entity_name
-      cbu-id:
-        type: entity_name
-      entity-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  - entity-id
-  invocation_phrases:
-  - remove role from CBU
-  - unassign role
-  - delete CBU role
-  - remove entity from CBU
-  - unlink entity role
-  - remove participant
-  - remove role cbu
-  - remove role the cbu
-  examples:
-  - (cbu.remove-role :cbu-id "..." :entity-id "..." :role "...")
-  doc: Remove a specific role from an entity within a CBU
-  tier: intent
-  tags:
-  - relationship
-  - write
-  - role
-  - cbu
-- verb: cbu.attach-evidence
-  domain: cbu
-  action: attach-evidence
-  aliases:
-  - attach-evidence
-  args:
-    style: keyworded
-    required:
-      evidence-type:
-        type: enum
-        values:
-        - DOCUMENT
-        - ATTESTATION
-        - SCREENING
-        - REGISTRY_CHECK
-        - MANUAL_VERIFICATION
-      cbu-id:
-        type: entity_name
-    optional:
-      evidence-category:
-        type: str
-      attestation-ref:
-        type: str
-      document-id:
-        type: entity_name
-      description:
-        type: str
-      attached-by:
-        type: str
-  positional_sugar:
-  - cbu-id
-  - evidence-type
-  invocation_phrases:
-  - attach evidence cbu
-  - attach evidence the cbu
-  - attach evidence client business unit
-  - cbu attach evidence
-  examples:
-  - (cbu.attach-evidence :cbu-id "..." :evidence-type "...")
-  doc: Attach evidence (document or attestation) to CBU
-  tier: intent
-  tags:
-  - evidence
-  - write
-  - kyc
-  - cbu
-- verb: cbu.create-from-client-group
-  domain: cbu
-  action: create-from-client-group
-  aliases:
-  - create-from-client-group
-  args:
-    style: keyworded
-    required:
-      group-id:
-        type: entity_name
-    optional:
-      dry-run:
-        type: bool
-      gleif-category:
-        type: enum
-        values:
-        - FUND
-        - GENERAL
-      default-jurisdiction:
-        type: str
-      limit:
-        type: int
-      role-filter:
-        type: str
-      jurisdiction-filter:
-        type: str
-      manco-entity-id:
-        type: entity_name
-  positional_sugar:
-  - group-id
-  invocation_phrases:
-  - create CBUs from client group
-  - bulk create CBUs for funds
-  - onboard entities as CBUs
-  - create CBUs from research
-  - convert entities to CBUs
-  - create CBUs from GLEIF funds
-  - onboard allianz funds
-  - create cbus for allianz
-  examples:
-  - (cbu.create-from-client-group :group-id "...")
-  doc: Generate DSL batch to create CBUs from client group entities (stages in runbook)
-  tier: composite
-  tags:
-  - bulk
-  - lifecycle
-  - write
-  - client-group
-  - onboarding
-  - gleif
-  - macro
   - cbu

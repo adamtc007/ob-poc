@@ -2,6 +2,96 @@ version: '2.0'
 domain: trade-gateway
 description: Trade gateway configuration - defines routing to external systems
 verbs:
+- verb: trade-gateway.read-gateway
+  domain: trade-gateway
+  action: read-gateway
+  aliases:
+  - read-gateway
+  args:
+    style: keyworded
+    optional:
+      gateway-id:
+        type: uuid
+      code:
+        type: str
+  invocation_phrases:
+  - read gateway trade-gateway
+  - read gateway the trade-gateway
+  - trade-gateway read gateway
+  examples:
+  - (trade-gateway.read-gateway)
+  doc: Read gateway definition
+  tier: reference
+- verb: trade-gateway.define-gateway
+  domain: trade-gateway
+  action: define-gateway
+  aliases:
+  - define-gateway
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+      name:
+        type: str
+      supported-events:
+        type: list
+      protocol:
+        type: str
+      gateway-type:
+        type: str
+    optional:
+      provider:
+        type: str
+      description:
+        type: str
+  positional_sugar:
+  - code
+  - name
+  invocation_phrases:
+  - define gateway trade-gateway
+  - define gateway the trade-gateway
+  - trade-gateway define gateway
+  examples:
+  - (trade-gateway.define-gateway :code "..." :name "..." :gateway-type "..." :protocol "..." :supported-events "...")
+  doc: Define available trade gateway
+  tier: intent
+- verb: trade-gateway.add-routing-rule
+  domain: trade-gateway
+  action: add-routing-rule
+  aliases:
+  - add-routing-rule
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      lifecycle-event:
+        type: str
+      priority:
+        type: int
+      gateway-id:
+        type: entity_name
+    optional:
+      market:
+        type: entity_name
+      counterparty:
+        type: entity_name
+      instrument-class:
+        type: entity_name
+      is-active:
+        type: bool
+  positional_sugar:
+  - cbu-id
+  - gateway-id
+  invocation_phrases:
+  - add routing rule trade-gateway
+  - add routing rule the trade-gateway
+  - trade-gateway add routing rule
+  examples:
+  - (trade-gateway.add-routing-rule :cbu-id "..." :gateway-id "..." :lifecycle-event "..." :priority "...")
+  doc: Add gateway routing rule for CBU
+  tier: intent
 - verb: trade-gateway.list-cbu-gateways
   domain: trade-gateway
   action: list-cbu-gateways
@@ -25,60 +115,6 @@ verbs:
   - (trade-gateway.list-cbu-gateways :cbu-id "...")
   doc: List gateway connectivity for CBU
   tier: reference
-- verb: trade-gateway.define-gateway
-  domain: trade-gateway
-  action: define-gateway
-  aliases:
-  - define-gateway
-  args:
-    style: keyworded
-    required:
-      name:
-        type: str
-      protocol:
-        type: str
-      supported-events:
-        type: list
-      gateway-type:
-        type: str
-      code:
-        type: str
-    optional:
-      provider:
-        type: str
-      description:
-        type: str
-  positional_sugar:
-  - code
-  - name
-  invocation_phrases:
-  - define gateway trade-gateway
-  - define gateway the trade-gateway
-  - trade-gateway define gateway
-  examples:
-  - (trade-gateway.define-gateway :code "..." :name "..." :gateway-type "..." :protocol "..." :supported-events "...")
-  doc: Define available trade gateway
-  tier: intent
-- verb: trade-gateway.read-gateway
-  domain: trade-gateway
-  action: read-gateway
-  aliases:
-  - read-gateway
-  args:
-    style: keyworded
-    optional:
-      gateway-id:
-        type: uuid
-      code:
-        type: str
-  invocation_phrases:
-  - read gateway trade-gateway
-  - read gateway the trade-gateway
-  - trade-gateway read gateway
-  examples:
-  - (trade-gateway.read-gateway)
-  doc: Read gateway definition
-  tier: reference
 - verb: trade-gateway.activate-gateway
   domain: trade-gateway
   action: activate-gateway
@@ -99,60 +135,6 @@ verbs:
   - (trade-gateway.activate-gateway :connectivity-id "...")
   doc: Activate gateway connectivity
   tier: intent
-- verb: trade-gateway.enable-gateway
-  domain: trade-gateway
-  action: enable-gateway
-  aliases:
-  - enable-gateway
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-      gateway-id:
-        type: entity_name
-    optional:
-      config:
-        type: json
-      status:
-        type: str
-      connectivity-resource-id:
-        type: entity_name
-      effective-date:
-        type: date
-      credentials-reference:
-        type: str
-  positional_sugar:
-  - cbu-id
-  - gateway-id
-  invocation_phrases:
-  - enable gateway trade-gateway
-  - enable gateway the trade-gateway
-  - trade-gateway enable gateway
-  examples:
-  - (trade-gateway.enable-gateway :cbu-id "..." :gateway-id "...")
-  doc: Enable gateway connectivity for CBU
-  tier: intent
-- verb: trade-gateway.list-fallbacks
-  domain: trade-gateway
-  action: list-fallbacks
-  aliases:
-  - list-fallbacks
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - list fallbacks trade-gateway
-  - list fallbacks the trade-gateway
-  - trade-gateway list fallbacks
-  examples:
-  - (trade-gateway.list-fallbacks :cbu-id "...")
-  doc: List fallback configurations
-  tier: reference
 - verb: trade-gateway.suspend-gateway
   domain: trade-gateway
   action: suspend-gateway
@@ -176,63 +158,26 @@ verbs:
   - (trade-gateway.suspend-gateway :connectivity-id "...")
   doc: Suspend gateway connectivity
   tier: intent
-- verb: trade-gateway.list-routing-rules
+- verb: trade-gateway.list-fallbacks
   domain: trade-gateway
-  action: list-routing-rules
+  action: list-fallbacks
   aliases:
-  - list-routing-rules
+  - list-fallbacks
   args:
     style: keyworded
     required:
       cbu-id:
         type: entity_name
-    optional:
-      is-active:
-        type: bool
-      lifecycle-event:
-        type: str
   positional_sugar:
   - cbu-id
   invocation_phrases:
-  - list routing rules trade-gateway
-  - list routing rules the trade-gateway
-  - trade-gateway list routing rules
+  - list fallbacks trade-gateway
+  - list fallbacks the trade-gateway
+  - trade-gateway list fallbacks
   examples:
-  - (trade-gateway.list-routing-rules :cbu-id "...")
-  doc: List gateway routing rules for CBU
+  - (trade-gateway.list-fallbacks :cbu-id "...")
+  doc: List fallback configurations
   tier: reference
-- verb: trade-gateway.set-fallback
-  domain: trade-gateway
-  action: set-fallback
-  aliases:
-  - set-fallback
-  args:
-    style: keyworded
-    required:
-      fallback-gateway-id:
-        type: entity_name
-      trigger-conditions:
-        type: list
-      primary-gateway-id:
-        type: entity_name
-      priority:
-        type: int
-      cbu-id:
-        type: entity_name
-    optional:
-      lifecycle-event:
-        type: str
-  positional_sugar:
-  - cbu-id
-  - primary-gateway-id
-  invocation_phrases:
-  - set fallback trade-gateway
-  - set fallback the trade-gateway
-  - trade-gateway set fallback
-  examples:
-  - (trade-gateway.set-fallback :cbu-id "..." :primary-gateway-id "..." :fallback-gateway-id "..." :trigger-conditions "..." :priority "...")
-  doc: Configure fallback gateway
-  tier: intent
 - verb: trade-gateway.remove-routing-rule
   domain: trade-gateway
   action: remove-routing-rule
@@ -273,39 +218,94 @@ verbs:
   - (trade-gateway.list-gateways)
   doc: List available gateways
   tier: reference
-- verb: trade-gateway.add-routing-rule
+- verb: trade-gateway.enable-gateway
   domain: trade-gateway
-  action: add-routing-rule
+  action: enable-gateway
   aliases:
-  - add-routing-rule
+  - enable-gateway
   args:
     style: keyworded
     required:
-      cbu-id:
-        type: entity_name
       gateway-id:
         type: entity_name
-      priority:
-        type: int
-      lifecycle-event:
-        type: str
+      cbu-id:
+        type: entity_name
     optional:
-      instrument-class:
-        type: entity_name
-      counterparty:
-        type: entity_name
-      is-active:
-        type: bool
-      market:
+      credentials-reference:
+        type: str
+      status:
+        type: str
+      effective-date:
+        type: date
+      config:
+        type: json
+      connectivity-resource-id:
         type: entity_name
   positional_sugar:
   - cbu-id
   - gateway-id
   invocation_phrases:
-  - add routing rule trade-gateway
-  - add routing rule the trade-gateway
-  - trade-gateway add routing rule
+  - enable gateway trade-gateway
+  - enable gateway the trade-gateway
+  - trade-gateway enable gateway
   examples:
-  - (trade-gateway.add-routing-rule :cbu-id "..." :gateway-id "..." :lifecycle-event "..." :priority "...")
-  doc: Add gateway routing rule for CBU
+  - (trade-gateway.enable-gateway :cbu-id "..." :gateway-id "...")
+  doc: Enable gateway connectivity for CBU
+  tier: intent
+- verb: trade-gateway.list-routing-rules
+  domain: trade-gateway
+  action: list-routing-rules
+  aliases:
+  - list-routing-rules
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      is-active:
+        type: bool
+      lifecycle-event:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list routing rules trade-gateway
+  - list routing rules the trade-gateway
+  - trade-gateway list routing rules
+  examples:
+  - (trade-gateway.list-routing-rules :cbu-id "...")
+  doc: List gateway routing rules for CBU
+  tier: reference
+- verb: trade-gateway.set-fallback
+  domain: trade-gateway
+  action: set-fallback
+  aliases:
+  - set-fallback
+  args:
+    style: keyworded
+    required:
+      priority:
+        type: int
+      fallback-gateway-id:
+        type: entity_name
+      trigger-conditions:
+        type: list
+      cbu-id:
+        type: entity_name
+      primary-gateway-id:
+        type: entity_name
+    optional:
+      lifecycle-event:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - primary-gateway-id
+  invocation_phrases:
+  - set fallback trade-gateway
+  - set fallback the trade-gateway
+  - trade-gateway set fallback
+  examples:
+  - (trade-gateway.set-fallback :cbu-id "..." :primary-gateway-id "..." :fallback-gateway-id "..." :trigger-conditions "..." :priority "...")
+  doc: Configure fallback gateway
   tier: intent

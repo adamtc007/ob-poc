@@ -36,6 +36,7 @@
 //! └─────────────────────────────────────────┘
 //! ```
 
+pub mod centroid;
 pub mod client_group_resolver;
 pub mod embedder;
 pub mod feedback;

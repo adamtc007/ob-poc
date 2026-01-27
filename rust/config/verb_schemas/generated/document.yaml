@@ -26,183 +26,6 @@ verbs:
   tags:
   - read
   - document
-- verb: document.extract
-  domain: document
-  action: extract
-  aliases:
-  - extract
-  args:
-    style: keyworded
-    required:
-      document-id:
-        type: uuid
-  positional_sugar:
-  - document-id
-  invocation_phrases:
-  - extract document data
-  - OCR document
-  - parse document
-  - extract document
-  - extract the document
-  - extract file
-  - document extract
-  examples:
-  - (document.extract :document-id "...")
-  doc: Extract data from document using AI/OCR
-  tier: diagnostics
-  tags:
-  - write
-  - ai
-  - document
-- verb: document.reject
-  domain: document
-  action: reject
-  aliases:
-  - decline
-  - deny
-  - reject
-  args:
-    style: keyworded
-    required:
-      rejection-code:
-        type: enum
-        values:
-        - UNREADABLE
-        - CUTOFF
-        - GLARE
-        - LOW_RESOLUTION
-        - WRONG_DOC_TYPE
-        - WRONG_PERSON
-        - SAMPLE_DOC
-        - EXPIRED
-        - NOT_YET_VALID
-        - UNDATED
-        - DOB_MISMATCH
-        - NAME_MISMATCH
-        - ADDRESS_MISMATCH
-        - UNSUPPORTED_FORMAT
-        - PASSWORD_PROTECTED
-        - CORRUPTED
-        - SUSPECTED_ALTERATION
-        - INCONSISTENT_FONTS
-      version-id:
-        type: uuid
-      verified-by:
-        type: str
-    optional:
-      rejection-reason:
-        type: str
-  positional_sugar:
-  - version-id
-  - rejection-code
-  invocation_phrases:
-  - reject document
-  - QA reject
-  - mark document rejected
-  - fail document verification
-  - reject the document
-  - decline document
-  - deny document
-  - reject file
-  examples:
-  - (document.reject :version-id "..." :rejection-code "..." :verified-by "...")
-  doc: QA rejects a document version with reason code
-  tier: intent
-  tags:
-  - workflow
-  - qa
-  - write
-  - document
-- verb: document.start-qa
-  domain: document
-  action: start-qa
-  aliases:
-  - start-qa
-  args:
-    style: keyworded
-    required:
-      version-id:
-        type: uuid
-  positional_sugar:
-  - version-id
-  invocation_phrases:
-  - start QA
-  - begin verification
-  - queue for QA
-  - start qa document
-  - start qa the document
-  - start qa file
-  - document start qa
-  examples:
-  - (document.start-qa :version-id "...")
-  doc: Move document version to QA queue
-  tier: diagnostics
-  tags:
-  - workflow
-  - write
-  - document
-- verb: document.for-entity
-  domain: document
-  action: for-entity
-  aliases:
-  - for-entity
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-  positional_sugar:
-  - entity-id
-  invocation_phrases:
-  - show documents for entity
-  - list entity documents
-  - what documents does entity have
-  - for entity document
-  - for entity the document
-  - for entity file
-  - document for entity
-  examples:
-  - (document.for-entity :entity-id "...")
-  doc: List all documents for an entity
-  tier: intent
-  tags:
-  - read
-  - query
-  - document
-- verb: document.catalog
-  domain: document
-  action: catalog
-  aliases:
-  - catalog
-  args:
-    style: keyworded
-    required:
-      doc-type:
-        type: str
-    optional:
-      entity-id:
-        type: entity_name
-      cbu-id:
-        type: entity_name
-      title:
-        type: str
-  positional_sugar:
-  - doc-type
-  invocation_phrases:
-  - catalog document
-  - add document to catalog
-  - register document type
-  - catalog the document
-  - catalog file
-  - document catalog
-  examples:
-  - (document.catalog :doc-type "...")
-  doc: Catalog a document with type lookup (legacy - prefer document.create)
-  tier: diagnostics
-  tags:
-  - write
-  - legacy
-  - document
 - verb: document.missing-for-entity
   domain: document
   action: missing-for-entity
@@ -236,140 +59,61 @@ verbs:
   - query
   - workflow
   - document
-- verb: document.create
+- verb: document.for-entity
   domain: document
-  action: create
+  action: for-entity
   aliases:
-  - add
-  - create
-  - new
+  - for-entity
   args:
     style: keyworded
     required:
-      source:
-        type: str
-      document-type:
-        type: str
-    optional:
-      subject-entity-id:
+      entity-id:
         type: entity_name
-      requirement-id:
-        type: uuid
-      subject-cbu-id:
-        type: entity_name
-      source-ref:
-        type: str
   positional_sugar:
-  - document-type
-  - source
+  - entity-id
   invocation_phrases:
-  - create document
-  - add document record
-  - register document
-  - create the document
-  - add document
-  - new document
-  - create file
-  - document create
+  - show documents for entity
+  - list entity documents
+  - what documents does entity have
+  - for entity document
+  - for entity the document
+  - for entity file
+  - document for entity
   examples:
-  - (document.create :document-type "..." :source "...")
-  doc: Create a document record (Layer B - logical identity)
+  - (document.for-entity :entity-id "...")
+  doc: List all documents for an entity
+  tier: intent
+  tags:
+  - read
+  - query
+  - document
+- verb: document.extract
+  domain: document
+  action: extract
+  aliases:
+  - extract
+  args:
+    style: keyworded
+    required:
+      document-id:
+        type: uuid
+  positional_sugar:
+  - document-id
+  invocation_phrases:
+  - extract document data
+  - OCR document
+  - parse document
+  - extract document
+  - extract the document
+  - extract file
+  - document extract
+  examples:
+  - (document.extract :document-id "...")
+  doc: Extract data from document using AI/OCR
   tier: diagnostics
   tags:
   - write
-  - document
-- verb: document.solicit-set
-  domain: document
-  action: solicit-set
-  aliases:
-  - solicit-set
-  args:
-    style: keyworded
-    required:
-      subject-entity-id:
-        type: entity_name
-      doc-types:
-        type: list
-    optional:
-      workflow-instance-id:
-        type: uuid
-      due-date:
-        type: str
-  positional_sugar:
-  - subject-entity-id
-  - doc-types
-  invocation_phrases:
-  - request documents
-  - solicit document set
-  - ask for passport and proof of address
-  - get KYC documents
-  - request identity documents
-  - solicit set document
-  - solicit set the document
-  - solicit set file
-  examples:
-  - (document.solicit-set :subject-entity-id "..." :doc-types "...")
-  doc: Solicit multiple documents from an entity (creates single multi-result task)
-  tier: intent
-  tags:
-  - workflow
-  - outbound
-  - write
-  - batch
-  - document
-- verb: document.solicit
-  domain: document
-  action: solicit
-  aliases:
-  - solicit
-  args:
-    style: keyworded
-    required:
-      doc-type:
-        type: enum
-        values:
-        - passport
-        - proof_of_address
-        - articles_of_incorporation
-        - certificate_of_incumbency
-        - board_resolution
-        - tax_form
-        - financial_statement
-        - identity_card
-        - utility_bill
-        - bank_statement
-      subject-entity-id:
-        type: entity_name
-    optional:
-      due-date:
-        type: str
-      required-state:
-        type: enum
-        values:
-        - received
-        - verified
-      workflow-instance-id:
-        type: uuid
-  positional_sugar:
-  - subject-entity-id
-  - doc-type
-  invocation_phrases:
-  - request document
-  - solicit document
-  - ask for passport
-  - request proof of address
-  - get document from entity
-  - solicit the document
-  - solicit file
-  - document solicit
-  examples:
-  - (document.solicit :subject-entity-id "..." :doc-type "...")
-  doc: Solicit a single document from an entity (creates pending task)
-  tier: intent
-  tags:
-  - workflow
-  - outbound
-  - write
+  - ai
   - document
 - verb: document.upload-version
   domain: document
@@ -388,10 +132,10 @@ verbs:
         type: str
       blob-ref:
         type: str
-      valid-to:
-        type: str
       structured-data:
         type: json
+      valid-to:
+        type: str
   positional_sugar:
   - document-id
   - content-type
@@ -410,6 +154,62 @@ verbs:
   tier: diagnostics
   tags:
   - write
+  - document
+- verb: document.start-qa
+  domain: document
+  action: start-qa
+  aliases:
+  - start-qa
+  args:
+    style: keyworded
+    required:
+      version-id:
+        type: uuid
+  positional_sugar:
+  - version-id
+  invocation_phrases:
+  - start QA
+  - begin verification
+  - queue for QA
+  - start qa document
+  - start qa the document
+  - start qa file
+  - document start qa
+  examples:
+  - (document.start-qa :version-id "...")
+  doc: Move document version to QA queue
+  tier: diagnostics
+  tags:
+  - workflow
+  - write
+  - document
+- verb: document.get
+  domain: document
+  action: get
+  aliases:
+  - fetch
+  - get
+  - show
+  args:
+    style: keyworded
+    required:
+      document-id:
+        type: uuid
+  positional_sugar:
+  - document-id
+  invocation_phrases:
+  - get document
+  - get the document
+  - show document
+  - fetch document
+  - get file
+  - document get
+  examples:
+  - (document.get :document-id "...")
+  doc: Get document with latest version status
+  tier: diagnostics
+  tags:
+  - read
   - document
 - verb: document.verify
   domain: document
@@ -443,31 +243,233 @@ verbs:
   - qa
   - write
   - document
-- verb: document.get
+- verb: document.solicit
   domain: document
-  action: get
+  action: solicit
   aliases:
-  - fetch
-  - get
-  - show
+  - solicit
   args:
     style: keyworded
     required:
-      document-id:
+      subject-entity-id:
+        type: entity_name
+      doc-type:
+        type: enum
+        values:
+        - passport
+        - proof_of_address
+        - articles_of_incorporation
+        - certificate_of_incumbency
+        - board_resolution
+        - tax_form
+        - financial_statement
+        - identity_card
+        - utility_bill
+        - bank_statement
+    optional:
+      workflow-instance-id:
+        type: uuid
+      due-date:
+        type: str
+      required-state:
+        type: enum
+        values:
+        - received
+        - verified
+  positional_sugar:
+  - subject-entity-id
+  - doc-type
+  invocation_phrases:
+  - request document
+  - solicit document
+  - ask for passport
+  - request proof of address
+  - get document from entity
+  - solicit the document
+  - solicit file
+  - document solicit
+  examples:
+  - (document.solicit :subject-entity-id "..." :doc-type "...")
+  doc: Solicit a single document from an entity (creates pending task)
+  tier: intent
+  tags:
+  - workflow
+  - outbound
+  - write
+  - document
+- verb: document.solicit-set
+  domain: document
+  action: solicit-set
+  aliases:
+  - solicit-set
+  args:
+    style: keyworded
+    required:
+      subject-entity-id:
+        type: entity_name
+      doc-types:
+        type: list
+    optional:
+      due-date:
+        type: str
+      workflow-instance-id:
         type: uuid
   positional_sugar:
-  - document-id
+  - subject-entity-id
+  - doc-types
   invocation_phrases:
-  - get document
-  - get the document
-  - show document
-  - fetch document
-  - get file
-  - document get
+  - request documents
+  - solicit document set
+  - ask for passport and proof of address
+  - get KYC documents
+  - request identity documents
+  - solicit set document
+  - solicit set the document
+  - solicit set file
+  - document solicit set
   examples:
-  - (document.get :document-id "...")
-  doc: Get document with latest version status
+  - (document.solicit-set :subject-entity-id "..." :doc-types "...")
+  doc: Solicit multiple documents from an entity (creates single multi-result task)
+  tier: intent
+  tags:
+  - workflow
+  - outbound
+  - write
+  - batch
+  - document
+- verb: document.catalog
+  domain: document
+  action: catalog
+  aliases:
+  - catalog
+  args:
+    style: keyworded
+    required:
+      doc-type:
+        type: str
+    optional:
+      cbu-id:
+        type: entity_name
+      title:
+        type: str
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - doc-type
+  invocation_phrases:
+  - catalog document
+  - add document to catalog
+  - register document type
+  - catalog the document
+  - catalog file
+  - document catalog
+  examples:
+  - (document.catalog :doc-type "...")
+  doc: Catalog a document with type lookup (legacy - prefer document.create)
   tier: diagnostics
   tags:
-  - read
+  - write
+  - legacy
+  - document
+- verb: document.create
+  domain: document
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      document-type:
+        type: str
+      source:
+        type: str
+    optional:
+      subject-entity-id:
+        type: entity_name
+      subject-cbu-id:
+        type: entity_name
+      source-ref:
+        type: str
+      requirement-id:
+        type: uuid
+  positional_sugar:
+  - document-type
+  - source
+  invocation_phrases:
+  - create document
+  - add document record
+  - register document
+  - create the document
+  - add document
+  - new document
+  - create file
+  - document create
+  examples:
+  - (document.create :document-type "..." :source "...")
+  doc: Create a document record (Layer B - logical identity)
+  tier: diagnostics
+  tags:
+  - write
+  - document
+- verb: document.reject
+  domain: document
+  action: reject
+  aliases:
+  - decline
+  - deny
+  - reject
+  args:
+    style: keyworded
+    required:
+      rejection-code:
+        type: enum
+        values:
+        - UNREADABLE
+        - CUTOFF
+        - GLARE
+        - LOW_RESOLUTION
+        - WRONG_DOC_TYPE
+        - WRONG_PERSON
+        - SAMPLE_DOC
+        - EXPIRED
+        - NOT_YET_VALID
+        - UNDATED
+        - DOB_MISMATCH
+        - NAME_MISMATCH
+        - ADDRESS_MISMATCH
+        - UNSUPPORTED_FORMAT
+        - PASSWORD_PROTECTED
+        - CORRUPTED
+        - SUSPECTED_ALTERATION
+        - INCONSISTENT_FONTS
+      verified-by:
+        type: str
+      version-id:
+        type: uuid
+    optional:
+      rejection-reason:
+        type: str
+  positional_sugar:
+  - version-id
+  - rejection-code
+  invocation_phrases:
+  - reject document
+  - QA reject
+  - mark document rejected
+  - fail document verification
+  - reject the document
+  - decline document
+  - deny document
+  - reject file
+  - document reject
+  examples:
+  - (document.reject :version-id "..." :rejection-code "..." :verified-by "...")
+  doc: QA rejects a document version with reason code
+  tier: intent
+  tags:
+  - workflow
+  - qa
+  - write
   - document

@@ -2,6 +2,42 @@ version: '2.0'
 domain: capital
 description: Capital structure management - share classes, issuance events, dilution instruments
 verbs:
+- verb: capital.share-class.create
+  domain: capital
+  action: share-class.create
+  aliases:
+  - share-class.create
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+      instrument-kind:
+        type: str
+      name:
+        type: str
+    optional:
+      cbu-id:
+        type: entity_name
+      votes-per-unit:
+        type: decimal
+      authorized-units:
+        type: decimal
+      economic-per-unit:
+        type: decimal
+      currency:
+        type: str
+  positional_sugar:
+  - issuer-entity-id
+  - name
+  invocation_phrases:
+  - share class.create capital
+  - share class.create the capital
+  - capital share class.create
+  examples:
+  - (capital.share-class.create :issuer-entity-id "..." :name "..." :instrument-kind "...")
+  doc: Create a new share class for an issuer
+  tier: crud
 - verb: capital.cancel
   domain: capital
   action: cancel
@@ -10,10 +46,10 @@ verbs:
   args:
     style: keyworded
     required:
-      share-class-id:
-        type: entity_name
       units:
         type: decimal
+      share-class-id:
+        type: entity_name
     optional:
       effective-date:
         type: date
@@ -30,30 +66,39 @@ verbs:
   - (capital.cancel :share-class-id "..." :units "...")
   doc: Permanent share cancellation
   tier: intent
-- verb: capital.dilution.list
+- verb: capital.dilution.create-convertible-note
   domain: capital
-  action: dilution.list
+  action: dilution.create-convertible-note
   aliases:
-  - dilution.list
+  - dilution.create-convertible-note
   args:
     style: keyworded
     required:
       issuer-entity-id:
         type: entity_name
+      expiration-date:
+        type: date
+      holder-entity-id:
+        type: entity_name
+      principal-amount:
+        type: decimal
     optional:
-      instrument-type:
-        type: str
-      status:
-        type: str
+      converts-to-share-class-id:
+        type: entity_name
+      discount-pct:
+        type: decimal
+      valuation-cap:
+        type: decimal
   positional_sugar:
   - issuer-entity-id
+  - holder-entity-id
   invocation_phrases:
-  - dilution.list capital
-  - dilution.list the capital
-  - capital dilution.list
+  - dilution.create convertible note capital
+  - dilution.create convertible note the capital
+  - capital dilution.create convertible note
   examples:
-  - (capital.dilution.list :issuer-entity-id "...")
-  doc: List dilution instruments for an issuer
+  - (capital.dilution.create-convertible-note :issuer-entity-id "..." :holder-entity-id "..." :principal-amount "..." :expiration-date "...")
+  doc: Create a convertible note
   tier: crud
 - verb: capital.issue.initial
   domain: capital
@@ -85,75 +130,202 @@ verbs:
   - (capital.issue.initial :share-class-id "..." :units "...")
   doc: Initial issuance of shares (incorporation/fund launch)
   tier: crud
-- verb: capital.control-config.set
+- verb: capital.dilution.issue-warrant
   domain: capital
-  action: control-config.set
+  action: dilution.issue-warrant
   aliases:
-  - control-config.set
+  - dilution.issue-warrant
   args:
     style: keyworded
     required:
-      issuer-entity-id:
-        type: entity_name
-    optional:
-      disclosure-threshold-pct:
-        type: decimal
-      voting-basis:
-        type: str
-      material-threshold-pct:
-        type: decimal
-      control-threshold-pct:
-        type: decimal
-      effective-from:
+      expiration-date:
         type: date
-      significant-threshold-pct:
-        type: decimal
-      jurisdiction:
-        type: str
-      control-basis:
-        type: str
-  positional_sugar:
-  - issuer-entity-id
-  invocation_phrases:
-  - control config.set capital
-  - control config.set the capital
-  - capital control config.set
-  examples:
-  - (capital.control-config.set :issuer-entity-id "...")
-  doc: Set control thresholds for an issuer
-  tier: crud
-- verb: capital.dilution.create-safe
-  domain: capital
-  action: dilution.create-safe
-  aliases:
-  - dilution.create-safe
-  args:
-    style: keyworded
-    required:
       issuer-entity-id:
         type: entity_name
-      holder-entity-id:
-        type: entity_name
-      principal-amount:
-        type: decimal
-    optional:
-      discount-pct:
-        type: decimal
-      valuation-cap:
-        type: decimal
       converts-to-share-class-id:
         type: entity_name
+      units:
+        type: decimal
+      exercise-price:
+        type: decimal
+      holder-entity-id:
+        type: entity_name
+    optional:
+      exercisable-from:
+        type: date
   positional_sugar:
   - issuer-entity-id
-  - holder-entity-id
+  - converts-to-share-class-id
   invocation_phrases:
-  - dilution.create safe capital
-  - dilution.create safe the capital
-  - capital dilution.create safe
+  - dilution.issue warrant capital
+  - dilution.issue warrant the capital
+  - capital dilution.issue warrant
   examples:
-  - (capital.dilution.create-safe :issuer-entity-id "..." :holder-entity-id "..." :principal-amount "...")
-  doc: Create a SAFE (Simple Agreement for Future Equity)
+  - (capital.dilution.issue-warrant :issuer-entity-id "..." :converts-to-share-class-id "..." :holder-entity-id "..." :units "..." :exercise-price "..." :expiration-date "...")
+  doc: Issue warrants to an investor
   tier: crud
+- verb: capital.dilution.get-summary
+  domain: capital
+  action: dilution.get-summary
+  aliases:
+  - dilution.get-summary
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - dilution.get summary capital
+  - dilution.get summary the capital
+  - capital dilution.get summary
+  examples:
+  - (capital.dilution.get-summary :issuer-entity-id "...")
+  doc: Get dilution summary for an issuer
+  tier: crud
+- verb: capital.dilution.grant-options
+  domain: capital
+  action: dilution.grant-options
+  aliases:
+  - dilution.grant-options
+  args:
+    style: keyworded
+    required:
+      holder-entity-id:
+        type: entity_name
+      expiration-date:
+        type: date
+      converts-to-share-class-id:
+        type: entity_name
+      issuer-entity-id:
+        type: entity_name
+      units:
+        type: decimal
+      exercise-price:
+        type: decimal
+    optional:
+      plan-name:
+        type: str
+      exercise-currency:
+        type: str
+      vesting-end-date:
+        type: date
+      vesting-cliff-months:
+        type: int
+      vesting-start-date:
+        type: date
+  positional_sugar:
+  - issuer-entity-id
+  - converts-to-share-class-id
+  invocation_phrases:
+  - dilution.grant options capital
+  - dilution.grant options the capital
+  - capital dilution.grant options
+  examples:
+  - (capital.dilution.grant-options :issuer-entity-id "..." :converts-to-share-class-id "..." :holder-entity-id "..." :units "..." :exercise-price "..." :expiration-date "...")
+  doc: Grant stock options to a holder
+  tier: crud
+- verb: capital.control-config.get
+  domain: capital
+  action: control-config.get
+  aliases:
+  - control-config.get
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - control config.get capital
+  - control config.get the capital
+  - capital control config.get
+  examples:
+  - (capital.control-config.get :issuer-entity-id "...")
+  doc: Get control configuration for an issuer
+  tier: crud
+- verb: capital.dilution.list
+  domain: capital
+  action: dilution.list
+  aliases:
+  - dilution.list
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+    optional:
+      instrument-type:
+        type: str
+      status:
+        type: str
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - dilution.list capital
+  - dilution.list the capital
+  - capital dilution.list
+  examples:
+  - (capital.dilution.list :issuer-entity-id "...")
+  doc: List dilution instruments for an issuer
+  tier: crud
+- verb: capital.cap-table
+  domain: capital
+  action: cap-table
+  aliases:
+  - cap-table
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+    optional:
+      include-dilution:
+        type: bool
+      as-of:
+        type: date
+      basis:
+        type: str
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - cap table capital
+  - cap table the capital
+  - capital cap table
+  examples:
+  - (capital.cap-table :issuer-entity-id "...")
+  doc: Get full cap table for an issuer
+  tier: intent
+- verb: capital.buyback
+  domain: capital
+  action: buyback
+  aliases:
+  - buyback
+  args:
+    style: keyworded
+    required:
+      price-per-unit:
+        type: decimal
+      units:
+        type: decimal
+      share-class-id:
+        type: entity_name
+    optional:
+      effective-date:
+        type: date
+  positional_sugar:
+  - share-class-id
+  - units
+  invocation_phrases:
+  - buyback capital
+  - buyback the capital
+  - capital buyback
+  examples:
+  - (capital.buyback :share-class-id "..." :units "..." :price-per-unit "...")
+  doc: Share buyback into treasury
+  tier: intent
 - verb: capital.holders
   domain: capital
   action: holders
@@ -209,10 +381,10 @@ verbs:
     required:
       ratio-to:
         type: int
-      ratio-from:
-        type: int
       share-class-id:
         type: entity_name
+      ratio-from:
+        type: int
     optional:
       record-date:
         type: date
@@ -229,67 +401,36 @@ verbs:
   - (capital.split :share-class-id "..." :ratio-from "..." :ratio-to "...")
   doc: Stock split (e.g., 2:1 doubles shares)
   tier: intent
-- verb: capital.dilution.create-convertible-note
+- verb: capital.share-class.add-identifier
   domain: capital
-  action: dilution.create-convertible-note
+  action: share-class.add-identifier
   aliases:
-  - dilution.create-convertible-note
+  - share-class.add-identifier
   args:
     style: keyworded
     required:
-      principal-amount:
-        type: decimal
-      issuer-entity-id:
+      value:
+        type: str
+      share-class-id:
         type: entity_name
-      holder-entity-id:
-        type: entity_name
-      expiration-date:
-        type: date
+      scheme:
+        type: str
     optional:
-      discount-pct:
-        type: decimal
-      converts-to-share-class-id:
-        type: entity_name
-      valuation-cap:
-        type: decimal
-  positional_sugar:
-  - issuer-entity-id
-  - holder-entity-id
-  invocation_phrases:
-  - dilution.create convertible note capital
-  - dilution.create convertible note the capital
-  - capital dilution.create convertible note
-  examples:
-  - (capital.dilution.create-convertible-note :issuer-entity-id "..." :holder-entity-id "..." :principal-amount "..." :expiration-date "...")
-  doc: Create a convertible note
-  tier: crud
-- verb: capital.cap-table
-  domain: capital
-  action: cap-table
-  aliases:
-  - cap-table
-  args:
-    style: keyworded
-    required:
-      issuer-entity-id:
-        type: entity_name
-    optional:
-      as-of:
-        type: date
-      include-dilution:
+      is-primary:
         type: bool
-      basis:
+      source:
         type: str
   positional_sugar:
-  - issuer-entity-id
+  - share-class-id
+  - scheme
   invocation_phrases:
-  - cap table capital
-  - cap table the capital
-  - capital cap table
+  - share class.add identifier capital
+  - share class.add identifier the capital
+  - capital share class.add identifier
   examples:
-  - (capital.cap-table :issuer-entity-id "...")
-  doc: Get full cap table for an issuer
-  tier: intent
+  - (capital.share-class.add-identifier :share-class-id "..." :scheme "..." :value "...")
+  doc: Add an identifier (ISIN, SEDOL, etc.) to a share class
+  tier: crud
 - verb: capital.share-class.get-supply
   domain: capital
   action: share-class.get-supply
@@ -313,6 +454,38 @@ verbs:
   - (capital.share-class.get-supply :share-class-id "...")
   doc: Get current supply state for a share class
   tier: crud
+- verb: capital.dilution.create-safe
+  domain: capital
+  action: dilution.create-safe
+  aliases:
+  - dilution.create-safe
+  args:
+    style: keyworded
+    required:
+      holder-entity-id:
+        type: entity_name
+      principal-amount:
+        type: decimal
+      issuer-entity-id:
+        type: entity_name
+    optional:
+      discount-pct:
+        type: decimal
+      converts-to-share-class-id:
+        type: entity_name
+      valuation-cap:
+        type: decimal
+  positional_sugar:
+  - issuer-entity-id
+  - holder-entity-id
+  invocation_phrases:
+  - dilution.create safe capital
+  - dilution.create safe the capital
+  - capital dilution.create safe
+  examples:
+  - (capital.dilution.create-safe :issuer-entity-id "..." :holder-entity-id "..." :principal-amount "...")
+  doc: Create a SAFE (Simple Agreement for Future Equity)
+  tier: crud
 - verb: capital.dilution.exercise
   domain: capital
   action: dilution.exercise
@@ -326,10 +499,10 @@ verbs:
       instrument-id:
         type: entity_name
     optional:
-      exercise-date:
-        type: date
       is-cashless:
         type: bool
+      exercise-date:
+        type: date
   positional_sugar:
   - instrument-id
   - units
@@ -341,198 +514,6 @@ verbs:
   - (capital.dilution.exercise :instrument-id "..." :units "...")
   doc: Exercise options/warrants and convert to shares
   tier: crud
-- verb: capital.dilution.issue-warrant
-  domain: capital
-  action: dilution.issue-warrant
-  aliases:
-  - dilution.issue-warrant
-  args:
-    style: keyworded
-    required:
-      issuer-entity-id:
-        type: entity_name
-      converts-to-share-class-id:
-        type: entity_name
-      exercise-price:
-        type: decimal
-      units:
-        type: decimal
-      holder-entity-id:
-        type: entity_name
-      expiration-date:
-        type: date
-    optional:
-      exercisable-from:
-        type: date
-  positional_sugar:
-  - issuer-entity-id
-  - converts-to-share-class-id
-  invocation_phrases:
-  - dilution.issue warrant capital
-  - dilution.issue warrant the capital
-  - capital dilution.issue warrant
-  examples:
-  - (capital.dilution.issue-warrant :issuer-entity-id "..." :converts-to-share-class-id "..." :holder-entity-id "..." :units "..." :exercise-price "..." :expiration-date "...")
-  doc: Issue warrants to an investor
-  tier: crud
-- verb: capital.share-class.add-identifier
-  domain: capital
-  action: share-class.add-identifier
-  aliases:
-  - share-class.add-identifier
-  args:
-    style: keyworded
-    required:
-      scheme:
-        type: str
-      value:
-        type: str
-      share-class-id:
-        type: entity_name
-    optional:
-      source:
-        type: str
-      is-primary:
-        type: bool
-  positional_sugar:
-  - share-class-id
-  - scheme
-  invocation_phrases:
-  - share class.add identifier capital
-  - share class.add identifier the capital
-  - capital share class.add identifier
-  examples:
-  - (capital.share-class.add-identifier :share-class-id "..." :scheme "..." :value "...")
-  doc: Add an identifier (ISIN, SEDOL, etc.) to a share class
-  tier: crud
-- verb: capital.dilution.grant-options
-  domain: capital
-  action: dilution.grant-options
-  aliases:
-  - dilution.grant-options
-  args:
-    style: keyworded
-    required:
-      units:
-        type: decimal
-      exercise-price:
-        type: decimal
-      holder-entity-id:
-        type: entity_name
-      issuer-entity-id:
-        type: entity_name
-      converts-to-share-class-id:
-        type: entity_name
-      expiration-date:
-        type: date
-    optional:
-      vesting-start-date:
-        type: date
-      vesting-end-date:
-        type: date
-      exercise-currency:
-        type: str
-      vesting-cliff-months:
-        type: int
-      plan-name:
-        type: str
-  positional_sugar:
-  - issuer-entity-id
-  - converts-to-share-class-id
-  invocation_phrases:
-  - dilution.grant options capital
-  - dilution.grant options the capital
-  - capital dilution.grant options
-  examples:
-  - (capital.dilution.grant-options :issuer-entity-id "..." :converts-to-share-class-id "..." :holder-entity-id "..." :units "..." :exercise-price "..." :expiration-date "...")
-  doc: Grant stock options to a holder
-  tier: crud
-- verb: capital.dilution.get-summary
-  domain: capital
-  action: dilution.get-summary
-  aliases:
-  - dilution.get-summary
-  args:
-    style: keyworded
-    required:
-      issuer-entity-id:
-        type: entity_name
-  positional_sugar:
-  - issuer-entity-id
-  invocation_phrases:
-  - dilution.get summary capital
-  - dilution.get summary the capital
-  - capital dilution.get summary
-  examples:
-  - (capital.dilution.get-summary :issuer-entity-id "...")
-  doc: Get dilution summary for an issuer
-  tier: crud
-- verb: capital.share-class.create
-  domain: capital
-  action: share-class.create
-  aliases:
-  - share-class.create
-  args:
-    style: keyworded
-    required:
-      name:
-        type: str
-      issuer-entity-id:
-        type: entity_name
-      instrument-kind:
-        type: str
-    optional:
-      authorized-units:
-        type: decimal
-      currency:
-        type: str
-      votes-per-unit:
-        type: decimal
-      economic-per-unit:
-        type: decimal
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - issuer-entity-id
-  - name
-  invocation_phrases:
-  - share class.create capital
-  - share class.create the capital
-  - capital share class.create
-  examples:
-  - (capital.share-class.create :issuer-entity-id "..." :name "..." :instrument-kind "...")
-  doc: Create a new share class for an issuer
-  tier: crud
-- verb: capital.issue.new
-  domain: capital
-  action: issue.new
-  aliases:
-  - issue.new
-  args:
-    style: keyworded
-    required:
-      units:
-        type: decimal
-      share-class-id:
-        type: entity_name
-      price-per-unit:
-        type: decimal
-    optional:
-      board-resolution-ref:
-        type: str
-      effective-date:
-        type: date
-  positional_sugar:
-  - share-class-id
-  - units
-  invocation_phrases:
-  - issue.new capital
-  - issue.new the capital
-  - capital issue.new
-  examples:
-  - (capital.issue.new :share-class-id "..." :units "..." :price-per-unit "...")
-  doc: Subsequent issuance (capital raise)
-  tier: crud
 - verb: capital.dilution.forfeit
   domain: capital
   action: dilution.forfeit
@@ -541,10 +522,10 @@ verbs:
   args:
     style: keyworded
     required:
-      instrument-id:
-        type: entity_name
       units:
         type: decimal
+      instrument-id:
+        type: entity_name
     optional:
       reason:
         type: str
@@ -559,31 +540,48 @@ verbs:
   - (capital.dilution.forfeit :instrument-id "..." :units "...")
   doc: Forfeit/cancel unvested or unexercised instruments
   tier: crud
-- verb: capital.control-config.get
+- verb: capital.control-config.set
   domain: capital
-  action: control-config.get
+  action: control-config.set
   aliases:
-  - control-config.get
+  - control-config.set
   args:
     style: keyworded
     required:
       issuer-entity-id:
         type: entity_name
+    optional:
+      material-threshold-pct:
+        type: decimal
+      control-threshold-pct:
+        type: decimal
+      significant-threshold-pct:
+        type: decimal
+      control-basis:
+        type: str
+      effective-from:
+        type: date
+      disclosure-threshold-pct:
+        type: decimal
+      voting-basis:
+        type: str
+      jurisdiction:
+        type: str
   positional_sugar:
   - issuer-entity-id
   invocation_phrases:
-  - control config.get capital
-  - control config.get the capital
-  - capital control config.get
+  - control config.set capital
+  - control config.set the capital
+  - capital control config.set
   examples:
-  - (capital.control-config.get :issuer-entity-id "...")
-  doc: Get control configuration for an issuer
+  - (capital.control-config.set :issuer-entity-id "...")
+  doc: Set control thresholds for an issuer
   tier: crud
-- verb: capital.buyback
+- verb: capital.issue.new
   domain: capital
-  action: buyback
+  action: issue.new
   aliases:
-  - buyback
+  - issue.new
   args:
     style: keyworded
     required:
@@ -596,14 +594,16 @@ verbs:
     optional:
       effective-date:
         type: date
+      board-resolution-ref:
+        type: str
   positional_sugar:
   - share-class-id
   - units
   invocation_phrases:
-  - buyback capital
-  - buyback the capital
-  - capital buyback
+  - issue.new capital
+  - issue.new the capital
+  - capital issue.new
   examples:
-  - (capital.buyback :share-class-id "..." :units "..." :price-per-unit "...")
-  doc: Share buyback into treasury
-  tier: intent
+  - (capital.issue.new :share-class-id "..." :units "..." :price-per-unit "...")
+  doc: Subsequent issuance (capital raise)
+  tier: crud

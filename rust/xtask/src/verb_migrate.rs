@@ -4,10 +4,16 @@
 //! - `migrate_v2`: Convert V1 YAML verbs to V2 schema format
 //! - `lint_schemas`: Validate V2 schemas against lint rules
 //! - `build_registry`: Compile VerbRegistry artifact
+//!
+//! Phrase merging:
+//! - Loads draft phrases from `_invocation_phrases_draft.yaml`
+//! - Loads extension phrases from `_invocation_phrases_extension.yaml`
+//! - Merges with existing V1 invocation_phrases
+//! - Generates additional phrases from templates
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 // ============================================================================
@@ -381,6 +387,125 @@ pub fn domain_nouns() -> HashMap<&'static str, Vec<&'static str>> {
     nouns
 }
 
+// ============================================================================
+// Draft Phrase Loading
+// ============================================================================
+
+/// Structure for draft phrase files (_invocation_phrases_draft.yaml)
+#[derive(Debug, Clone, Deserialize)]
+pub struct DraftPhraseFile {
+    #[serde(flatten)]
+    pub domains: HashMap<String, DraftDomainPhrases>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DraftDomainPhrases {
+    #[serde(flatten)]
+    pub verbs: HashMap<String, DraftVerbPhrases>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DraftVerbPhrases {
+    pub invocation_phrases: Vec<String>,
+}
+
+/// Load all draft phrase files from config/verbs/
+pub fn load_draft_phrases(verbs_dir: &Path) -> HashMap<String, Vec<String>> {
+    let mut all_phrases: HashMap<String, Vec<String>> = HashMap::new();
+
+    // Load _invocation_phrases_draft.yaml
+    let draft_path = verbs_dir.join("_invocation_phrases_draft.yaml");
+    if let Ok(phrases) = load_draft_file(&draft_path) {
+        for (fqn, phrases_list) in phrases {
+            all_phrases.entry(fqn).or_default().extend(phrases_list);
+        }
+    }
+
+    // Load _invocation_phrases_extension.yaml
+    let ext_path = verbs_dir.join("_invocation_phrases_extension.yaml");
+    if let Ok(phrases) = load_draft_file(&ext_path) {
+        for (fqn, phrases_list) in phrases {
+            all_phrases.entry(fqn).or_default().extend(phrases_list);
+        }
+    }
+
+    if !all_phrases.is_empty() {
+        println!("Loaded draft phrases for {} verbs", all_phrases.len());
+    }
+
+    all_phrases
+}
+
+/// Load a single draft phrase file using serde_yaml::Value for flexible parsing
+fn load_draft_file(path: &Path) -> Result<HashMap<String, Vec<String>>> {
+    if !path.exists() {
+        return Ok(HashMap::new());
+    }
+
+    let content = std::fs::read_to_string(path)?;
+    let value: serde_yaml::Value = serde_yaml::from_str(&content)
+        .with_context(|| format!("Parsing draft file: {}", path.display()))?;
+
+    let mut result = HashMap::new();
+
+    // Parse nested structure: domain -> verb -> invocation_phrases
+    if let serde_yaml::Value::Mapping(domains) = value {
+        for (domain_key, domain_value) in domains {
+            let domain = match domain_key {
+                serde_yaml::Value::String(s) => s,
+                _ => continue,
+            };
+
+            if let serde_yaml::Value::Mapping(verbs) = domain_value {
+                for (verb_key, verb_value) in verbs {
+                    let verb = match verb_key {
+                        serde_yaml::Value::String(s) => s,
+                        _ => continue,
+                    };
+
+                    if let serde_yaml::Value::Mapping(verb_content) = verb_value {
+                        if let Some(serde_yaml::Value::Sequence(phrases)) =
+                            verb_content.get("invocation_phrases")
+                        {
+                            let phrase_strings: Vec<String> = phrases
+                                .iter()
+                                .filter_map(|p| match p {
+                                    serde_yaml::Value::String(s) => Some(s.clone()),
+                                    _ => None,
+                                })
+                                .collect();
+
+                            if !phrase_strings.is_empty() {
+                                let fqn = format!("{}.{}", domain, verb);
+                                result.insert(fqn, phrase_strings);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+/// Merge phrases from multiple sources (deduplicates)
+pub fn merge_phrases(sources: Vec<&[String]>) -> Vec<String> {
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut result = Vec::new();
+
+    for source in sources {
+        for phrase in source {
+            let normalized = phrase.to_lowercase().trim().to_string();
+            if !normalized.is_empty() && seen.insert(normalized) {
+                result.push(phrase.clone());
+            }
+        }
+    }
+
+    result
+}
+
 /// Generate invocation phrases for a verb
 pub fn generate_phrases(domain: &str, action: &str, existing: &[String]) -> Vec<String> {
     let mut phrases: Vec<String> = existing.to_vec();
@@ -455,7 +580,9 @@ pub fn generate_phrases(domain: &str, action: &str, existing: &[String]) -> Vec<
         }
     }
 
-    phrases.truncate(8); // Max 8 phrases
+    // Keep more phrases - existing curated phrases are valuable
+    // Only truncate if way over limit (allows 15 phrases from draft files + generated)
+    phrases.truncate(15);
     phrases
 }
 
@@ -651,6 +778,9 @@ pub fn migrate_v2(verbs_dir: &Path, schemas_dir: &Path, dry_run: bool) -> Result
     let mut report = MigrationReport::default();
     let templates = domain_templates();
 
+    // Load draft phrases from _invocation_phrases_*.yaml files
+    let draft_phrases = load_draft_phrases(verbs_dir);
+
     // Ensure output directory exists
     if !dry_run {
         std::fs::create_dir_all(schemas_dir)?;
@@ -676,7 +806,7 @@ pub fn migrate_v2(verbs_dir: &Path, schemas_dir: &Path, dry_run: bool) -> Result
             }
         }
 
-        match process_verb_file(&path, schemas_dir, &templates, dry_run) {
+        match process_verb_file(&path, schemas_dir, &templates, &draft_phrases, dry_run) {
             Ok(file_report) => {
                 report.files_processed += 1;
                 report.verbs_migrated += file_report.verbs_migrated;
@@ -723,6 +853,7 @@ fn process_verb_file(
     path: &Path,
     schemas_dir: &Path,
     templates: &HashMap<String, DomainTemplate>,
+    draft_phrases: &HashMap<String, Vec<String>>,
     dry_run: bool,
 ) -> Result<FileReport> {
     let content = std::fs::read_to_string(path)?;
@@ -739,7 +870,15 @@ fn process_verb_file(
             .unwrap_or_else(|| templates.get("default").unwrap());
 
         for (verb_name, verb_content) in domain_content.verbs {
-            let v2_spec = convert_verb_to_v2(&domain_name, &verb_name, &verb_content, template);
+            let fqn = format!("{}.{}", domain_name, verb_name);
+            let extra_phrases = draft_phrases.get(&fqn).map(|v| v.as_slice()).unwrap_or(&[]);
+            let v2_spec = convert_verb_to_v2(
+                &domain_name,
+                &verb_name,
+                &verb_content,
+                template,
+                extra_phrases,
+            );
 
             // Lint the V2 spec
             let lint_errors = lint_v2_schema(&v2_spec);
@@ -784,6 +923,7 @@ fn convert_verb_to_v2(
     action: &str,
     v1: &V1VerbContent,
     template: &DomainTemplate,
+    extra_phrases: &[String],
 ) -> V2VerbSpec {
     let verb = format!("{}.{}", domain, action);
 
@@ -812,8 +952,10 @@ fn convert_verb_to_v2(
         .map(|a| a.name.clone())
         .collect();
 
-    // Generate invocation phrases
-    let invocation_phrases = generate_phrases(domain, action, &v1.invocation_phrases);
+    // Merge phrases: V1 existing + draft files + generated
+    let merged_existing = merge_phrases(vec![&v1.invocation_phrases, extra_phrases]);
+    // Generate invocation phrases (will add template-based phrases on top of merged)
+    let invocation_phrases = generate_phrases(domain, action, &merged_existing);
 
     // Generate examples
     let examples = generate_examples(&verb, &v1.args);
@@ -1131,29 +1273,44 @@ pub fn run_build_registry() -> Result<()> {
     let mut all_verbs: Vec<V2VerbSpec> = Vec::new();
     let mut alias_map: HashMap<String, Vec<String>> = HashMap::new();
 
-    // Load all schemas
-    for entry in std::fs::read_dir(&schemas_dir)? {
-        let entry = entry?;
-        let path = entry.path();
+    // Load all schemas (recursively including subdirectories)
+    fn load_schemas_recursive(
+        dir: &Path,
+        all_verbs: &mut Vec<V2VerbSpec>,
+        alias_map: &mut HashMap<String, Vec<String>>,
+    ) -> Result<()> {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
 
-        if !path.extension().map(|e| e == "yaml").unwrap_or(false) {
-            continue;
-        }
-
-        let content = std::fs::read_to_string(&path)?;
-        let schema: V2SchemaFile = serde_yaml::from_str(&content)?;
-
-        for spec in schema.verbs {
-            // Track aliases
-            for alias in &spec.aliases {
-                alias_map
-                    .entry(alias.to_lowercase())
-                    .or_default()
-                    .push(spec.verb.clone());
+            if path.is_dir() {
+                // Recurse into subdirectories
+                load_schemas_recursive(&path, all_verbs, alias_map)?;
+                continue;
             }
-            all_verbs.push(spec);
+
+            if !path.extension().map(|e| e == "yaml").unwrap_or(false) {
+                continue;
+            }
+
+            let content = std::fs::read_to_string(&path)?;
+            let schema: V2SchemaFile = serde_yaml::from_str(&content)?;
+
+            for spec in schema.verbs {
+                // Track aliases
+                for alias in &spec.aliases {
+                    alias_map
+                        .entry(alias.to_lowercase())
+                        .or_default()
+                        .push(spec.verb.clone());
+                }
+                all_verbs.push(spec);
+            }
         }
+        Ok(())
     }
+
+    load_schemas_recursive(&schemas_dir, &mut all_verbs, &mut alias_map)?;
 
     // Check for alias collisions
     let collisions: Vec<_> = alias_map

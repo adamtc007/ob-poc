@@ -49,10 +49,10 @@ verbs:
         type: bool
       decision-id:
         type: uuid
-      since-date:
-        type: date
       include-13d:
         type: bool
+      since-date:
+        type: date
   positional_sugar:
   - cik
   invocation_phrases:
@@ -72,6 +72,68 @@ verbs:
   - external-source
   - registry-fetch
   - ownership
+- verb: research.sec-edgar.import-company
+  domain: research.sec-edgar
+  action: import-company
+  aliases:
+  - import-company
+  args:
+    style: keyworded
+    required:
+      cik:
+        type: str
+    optional:
+      decision-id:
+        type: uuid
+      include-beneficial-owners:
+        type: bool
+  positional_sugar:
+  - cik
+  invocation_phrases:
+  - import from SEC
+  - add US company to database
+  - import EDGAR company
+  - import company research.sec-edgar
+  - import company the research.sec-edgar
+  - research.sec-edgar import company
+  examples:
+  - (research.sec-edgar.import-company :cik "...")
+  doc: Import SEC company and optionally beneficial owners to database
+  tier: intent
+  tags:
+  - write
+  - import
+  - registry-import
+- verb: research.sec-edgar.fetch-company
+  domain: research.sec-edgar
+  action: fetch-company
+  aliases:
+  - fetch-company
+  args:
+    style: keyworded
+    required:
+      cik:
+        type: str
+    optional:
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - cik
+  invocation_phrases:
+  - get SEC company
+  - fetch from EDGAR
+  - company from SEC
+  - fetch company research.sec-edgar
+  - fetch company the research.sec-edgar
+  - research.sec-edgar fetch company
+  examples:
+  - (research.sec-edgar.fetch-company :cik "...")
+  doc: Fetch company information from SEC EDGAR
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-fetch
 - verb: research.sec-edgar.search
   domain: research.sec-edgar
   action: search
@@ -106,65 +168,3 @@ verbs:
   - read
   - external-source
   - registry-lookup
-- verb: research.sec-edgar.fetch-company
-  domain: research.sec-edgar
-  action: fetch-company
-  aliases:
-  - fetch-company
-  args:
-    style: keyworded
-    required:
-      cik:
-        type: str
-    optional:
-      decision-id:
-        type: uuid
-  positional_sugar:
-  - cik
-  invocation_phrases:
-  - get SEC company
-  - fetch from EDGAR
-  - company from SEC
-  - fetch company research.sec-edgar
-  - fetch company the research.sec-edgar
-  - research.sec-edgar fetch company
-  examples:
-  - (research.sec-edgar.fetch-company :cik "...")
-  doc: Fetch company information from SEC EDGAR
-  tier: diagnostics
-  tags:
-  - read
-  - external-source
-  - registry-fetch
-- verb: research.sec-edgar.import-company
-  domain: research.sec-edgar
-  action: import-company
-  aliases:
-  - import-company
-  args:
-    style: keyworded
-    required:
-      cik:
-        type: str
-    optional:
-      include-beneficial-owners:
-        type: bool
-      decision-id:
-        type: uuid
-  positional_sugar:
-  - cik
-  invocation_phrases:
-  - import from SEC
-  - add US company to database
-  - import EDGAR company
-  - import company research.sec-edgar
-  - import company the research.sec-edgar
-  - research.sec-edgar import company
-  examples:
-  - (research.sec-edgar.import-company :cik "...")
-  doc: Import SEC company and optionally beneficial owners to database
-  tier: intent
-  tags:
-  - write
-  - import
-  - registry-import

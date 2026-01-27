@@ -25,6 +25,52 @@ verbs:
   - (refdata.load-all :directory "...")
   doc: Load all reference data from directory
   tier: intent
+- verb: refdata.load-instrument-classes
+  domain: refdata
+  action: load-instrument-classes
+  aliases:
+  - load-instrument-classes
+  args:
+    style: keyworded
+    required:
+      file-path:
+        type: str
+    optional:
+      mode:
+        type: str
+  positional_sugar:
+  - file-path
+  invocation_phrases:
+  - load instrument classes refdata
+  - load instrument classes the refdata
+  - refdata load instrument classes
+  examples:
+  - (refdata.load-instrument-classes :file-path "...")
+  doc: Load instrument class taxonomy from YAML into custody.instrument_classes
+  tier: intent
+- verb: refdata.load-subcustodians
+  domain: refdata
+  action: load-subcustodians
+  aliases:
+  - load-subcustodians
+  args:
+    style: keyworded
+    required:
+      file-path:
+        type: str
+    optional:
+      mode:
+        type: str
+  positional_sugar:
+  - file-path
+  invocation_phrases:
+  - load subcustodians refdata
+  - load subcustodians the refdata
+  - refdata load subcustodians
+  examples:
+  - (refdata.load-subcustodians :file-path "...")
+  doc: Load subcustodian network from YAML into custody.subcustodian_network
+  tier: intent
 - verb: refdata.load-markets
   domain: refdata
   action: load-markets
@@ -70,50 +116,4 @@ verbs:
   examples:
   - (refdata.load-sla-templates :file-path "...")
   doc: Load SLA templates from YAML into ob-poc.sla_templates
-  tier: intent
-- verb: refdata.load-subcustodians
-  domain: refdata
-  action: load-subcustodians
-  aliases:
-  - load-subcustodians
-  args:
-    style: keyworded
-    required:
-      file-path:
-        type: str
-    optional:
-      mode:
-        type: str
-  positional_sugar:
-  - file-path
-  invocation_phrases:
-  - load subcustodians refdata
-  - load subcustodians the refdata
-  - refdata load subcustodians
-  examples:
-  - (refdata.load-subcustodians :file-path "...")
-  doc: Load subcustodian network from YAML into custody.subcustodian_network
-  tier: intent
-- verb: refdata.load-instrument-classes
-  domain: refdata
-  action: load-instrument-classes
-  aliases:
-  - load-instrument-classes
-  args:
-    style: keyworded
-    required:
-      file-path:
-        type: str
-    optional:
-      mode:
-        type: str
-  positional_sugar:
-  - file-path
-  invocation_phrases:
-  - load instrument classes refdata
-  - load instrument classes the refdata
-  - refdata load instrument classes
-  examples:
-  - (refdata.load-instrument-classes :file-path "...")
-  doc: Load instrument class taxonomy from YAML into custody.instrument_classes
   tier: intent

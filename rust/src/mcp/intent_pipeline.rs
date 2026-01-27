@@ -561,6 +561,39 @@ impl IntentPipeline {
                     },
                 });
             }
+            VerbSearchOutcome::Suggest {
+                candidates: suggestion_candidates,
+            } => {
+                // Low confidence but has suggestions - offer menu for learning
+                // This is the CRITICAL path for queries like "show me the cbus"
+                // that fall between fallback_threshold and semantic_threshold.
+                // By showing a menu, we capture user selection as training data.
+                let verb_list: Vec<String> = suggestion_candidates
+                    .iter()
+                    .take(5)
+                    .map(|c| c.verb.clone())
+                    .collect();
+                return Ok(PipelineResult {
+                    intent: StructuredIntent::empty(),
+                    verb_candidates: suggestion_candidates,
+                    dsl: String::new(),
+                    dsl_hash: None,
+                    valid: false,
+                    validation_error: Some(format!(
+                        "Low confidence match. Did you mean one of: {}?",
+                        verb_list.join(", ")
+                    )),
+                    unresolved_refs: vec![],
+                    missing_required: vec![],
+                    outcome: PipelineOutcome::NeedsClarification,
+                    scope_resolution: None,
+                    scope_context: if scope_ctx.has_scope() {
+                        Some(scope_ctx.clone())
+                    } else {
+                        None
+                    },
+                });
+            }
             VerbSearchOutcome::Matched(matched_verb) => {
                 // Clear winner - continue with LLM extraction
                 // Use matched_verb below

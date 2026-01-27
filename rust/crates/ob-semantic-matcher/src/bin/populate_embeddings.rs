@@ -31,10 +31,11 @@
 //!   --client-groups    Also populate client group alias embeddings
 
 use anyhow::{Context, Result};
-use ob_semantic_matcher::{Embedder, PhoneticMatcher};
+use ob_semantic_matcher::{centroid, Embedder, PhoneticMatcher};
 use pgvector::Vector;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use std::collections::HashMap;
 use tracing::info;
 
 /// Pattern record from v_verb_intent_patterns view
@@ -144,6 +145,9 @@ async fn main() -> Result<()> {
         info!("All verb patterns already have embeddings. Nothing to do for verbs.");
         print_stats(&pool).await?;
 
+        // Always compute centroids (they may be missing even if patterns exist)
+        compute_and_store_centroids(&pool).await?;
+
         // Still process client groups if requested
         if client_groups {
             populate_client_group_embeddings(&pool, &embedder, force).await?;
@@ -217,6 +221,9 @@ async fn main() -> Result<()> {
     );
 
     print_stats(&pool).await?;
+
+    // Always compute centroids after embedding patterns
+    compute_and_store_centroids(&pool).await?;
 
     // Optionally populate client group alias embeddings
     if client_groups {
@@ -478,4 +485,127 @@ async fn populate_client_group_embeddings(
         .context("Failed to analyze client_group_alias_embedding")?;
 
     Ok(inserted)
+}
+
+// ============================================================================
+// Verb Centroid Computation
+// ============================================================================
+
+/// Statistics from centroid computation
+#[derive(Debug)]
+struct CentroidStats {
+    total_verbs: usize,
+    inserted: usize,
+    updated: usize,
+    deleted: usize,
+}
+
+/// Compute and store centroids for all verbs
+///
+/// Centroids are the mean of all normalized phrase embeddings for a verb.
+/// They provide a stable "prototype" vector for efficient two-stage search:
+/// 1. Query centroids to shortlist candidate verbs
+/// 2. Refine with pattern-level matches within shortlist
+///
+/// Call this AFTER all pattern embeddings are populated.
+async fn compute_and_store_centroids(pool: &PgPool) -> Result<CentroidStats> {
+    info!("Computing verb centroids...");
+
+    // 1) Load all pattern embeddings grouped by verb
+    let rows: Vec<(String, Vec<f32>)> = sqlx::query_as(
+        r#"
+        SELECT verb_name, embedding::real[]
+        FROM "ob-poc".verb_pattern_embeddings
+        WHERE embedding IS NOT NULL
+        "#,
+    )
+    .fetch_all(pool)
+    .await
+    .context("Failed to fetch pattern embeddings for centroids")?;
+
+    info!("  Loaded {} pattern embeddings", rows.len());
+
+    // 2) Group by verb
+    let mut map: HashMap<String, Vec<Vec<f32>>> = HashMap::new();
+    for (verb_name, embedding) in rows {
+        map.entry(verb_name).or_default().push(embedding);
+    }
+
+    info!("  Found {} unique verbs", map.len());
+
+    // 3) Compute + upsert centroids
+    let mut inserted = 0;
+    let mut updated = 0;
+
+    for (verb_name, vecs) in &map {
+        if vecs.is_empty() {
+            continue;
+        }
+
+        let centroid_vec = centroid::compute_centroid(vecs);
+        let phrase_count = vecs.len() as i32;
+        let embedding = Vector::from(centroid_vec);
+
+        let result: (bool,) = sqlx::query_as(
+            r#"
+            INSERT INTO "ob-poc".verb_centroids (verb_name, embedding, phrase_count, updated_at)
+            VALUES ($1, $2, $3, now())
+            ON CONFLICT (verb_name)
+            DO UPDATE SET
+                embedding = EXCLUDED.embedding,
+                phrase_count = EXCLUDED.phrase_count,
+                updated_at = now()
+            RETURNING (xmax = 0) as inserted
+            "#,
+        )
+        .bind(verb_name)
+        .bind(&embedding)
+        .bind(phrase_count)
+        .fetch_one(pool)
+        .await
+        .context("Failed to upsert centroid")?;
+
+        if result.0 {
+            inserted += 1;
+        } else {
+            updated += 1;
+        }
+    }
+
+    // 4) Cleanup orphaned centroids (verbs no longer in patterns)
+    let deleted: i64 = sqlx::query_scalar(
+        r#"
+        WITH deleted AS (
+            DELETE FROM "ob-poc".verb_centroids
+            WHERE verb_name NOT IN (
+                SELECT DISTINCT verb_name FROM "ob-poc".verb_pattern_embeddings
+            )
+            RETURNING 1
+        )
+        SELECT COUNT(*) FROM deleted
+        "#,
+    )
+    .fetch_one(pool)
+    .await
+    .context("Failed to cleanup orphaned centroids")?;
+
+    let stats = CentroidStats {
+        total_verbs: map.len(),
+        inserted,
+        updated,
+        deleted: deleted as usize,
+    };
+
+    info!(
+        "  Centroids: {} inserted, {} updated, {} deleted (total: {} verbs)",
+        stats.inserted, stats.updated, stats.deleted, stats.total_verbs
+    );
+
+    // Refresh index stats for good recall
+    sqlx::query(r#"ANALYZE "ob-poc".verb_centroids"#)
+        .execute(pool)
+        .await
+        .context("Failed to analyze verb_centroids")?;
+
+    Ok(stats)
 }

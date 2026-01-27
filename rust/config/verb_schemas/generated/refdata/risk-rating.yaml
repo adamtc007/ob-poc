@@ -2,38 +2,6 @@ version: '2.0'
 domain: risk-rating
 description: Risk rating reference data (LOW, MEDIUM, HIGH, etc.)
 verbs:
-- verb: risk-rating.ensure
-  domain: risk-rating
-  action: ensure
-  aliases:
-  - ensure
-  args:
-    style: keyworded
-    required:
-      code:
-        type: str
-      name:
-        type: str
-    optional:
-      severity-level:
-        type: int
-      display-order:
-        type: int
-      description:
-        type: str
-      is-active:
-        type: bool
-  positional_sugar:
-  - code
-  - name
-  invocation_phrases:
-  - ensure risk-rating
-  - ensure the risk-rating
-  - risk-rating ensure
-  examples:
-  - (risk-rating.ensure :code "..." :name "...")
-  doc: Create or update a risk rating
-  tier: intent
 - verb: risk-rating.read
   domain: risk-rating
   action: read
@@ -58,6 +26,38 @@ verbs:
   - (risk-rating.read :code "...")
   doc: Read a risk rating by code
   tier: reference
+- verb: risk-rating.ensure
+  domain: risk-rating
+  action: ensure
+  aliases:
+  - ensure
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+      name:
+        type: str
+    optional:
+      display-order:
+        type: int
+      severity-level:
+        type: int
+      is-active:
+        type: bool
+      description:
+        type: str
+  positional_sugar:
+  - code
+  - name
+  invocation_phrases:
+  - ensure risk-rating
+  - ensure the risk-rating
+  - risk-rating ensure
+  examples:
+  - (risk-rating.ensure :code "..." :name "...")
+  doc: Create or update a risk rating
+  tier: intent
 - verb: risk-rating.list
   domain: risk-rating
   action: list

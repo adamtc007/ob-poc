@@ -2,6 +2,29 @@ version: '2.0'
 domain: delegation
 description: Service provider delegation chains - ManCo to sub-advisor, administrator to sub-contractor
 verbs:
+- verb: delegation.end
+  domain: delegation
+  action: end
+  aliases:
+  - end
+  args:
+    style: keyworded
+    required:
+      delegation-id:
+        type: uuid
+      effective-to:
+        type: date
+  positional_sugar:
+  - delegation-id
+  - effective-to
+  invocation_phrases:
+  - end delegation
+  - end the delegation
+  - delegation end
+  examples:
+  - (delegation.end :delegation-id "..." :effective-to "...")
+  doc: End a delegation
+  tier: intent
 - verb: delegation.list-delegates
   domain: delegation
   action: list-delegates
@@ -30,23 +53,23 @@ verbs:
   args:
     style: keyworded
     required:
-      delegator-entity-id:
-        type: entity_name
-      delegate-entity-id:
-        type: entity_name
       scope:
         type: str
+      delegate-entity-id:
+        type: entity_name
       effective-from:
         type: date
+      delegator-entity-id:
+        type: entity_name
     optional:
-      description:
-        type: str
       applies-to-cbu-id:
         type: entity_name
       regulatory-notification-date:
         type: date
       contract-doc-id:
         type: entity_name
+      description:
+        type: str
   positional_sugar:
   - delegator-entity-id
   - delegate-entity-id
@@ -78,26 +101,3 @@ verbs:
   - (delegation.list-delegations-received :entity-id "...")
   doc: List delegations an entity has received
   tier: reference
-- verb: delegation.end
-  domain: delegation
-  action: end
-  aliases:
-  - end
-  args:
-    style: keyworded
-    required:
-      delegation-id:
-        type: uuid
-      effective-to:
-        type: date
-  positional_sugar:
-  - delegation-id
-  - effective-to
-  invocation_phrases:
-  - end delegation
-  - end the delegation
-  - delegation end
-  examples:
-  - (delegation.end :delegation-id "..." :effective-to "...")
-  doc: End a delegation
-  tier: intent

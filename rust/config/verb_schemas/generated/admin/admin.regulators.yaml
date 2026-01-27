@@ -2,30 +2,63 @@ version: '2.0'
 domain: admin.regulators
 description: Regulators reference data management
 verbs:
-- verb: admin.regulators.read
+- verb: admin.regulators.list
   domain: admin.regulators
-  action: read
+  action: list
   aliases:
-  - fetch
-  - get
-  - read
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      jurisdiction:
+        type: str
+      tier:
+        type: str
+      active-only:
+        type: bool
+  invocation_phrases:
+  - list admin.regulators
+  - list the admin.regulators
+  - show admin.regulators
+  - get all admin.regulators
+  - admin.regulators list
+  examples:
+  - (admin.regulators.list)
+  doc: List recognized regulators
+  tier: reference
+- verb: admin.regulators.update
+  domain: admin.regulators
+  action: update
+  aliases:
+  - edit
+  - modify
+  - update
   args:
     style: keyworded
     required:
       code:
         type: str
+    optional:
+      tier:
+        type: str
+      registry-url:
+        type: str
+      active:
+        type: bool
   positional_sugar:
   - code
   invocation_phrases:
-  - read admin.regulators
-  - read the admin.regulators
-  - get admin.regulators
-  - fetch admin.regulators
-  - admin.regulators read
+  - update admin.regulators
+  - update the admin.regulators
+  - edit admin.regulators
+  - modify admin.regulators
+  - admin.regulators update
   examples:
-  - (admin.regulators.read :code "...")
-  doc: Get regulator by code
-  tier: reference
+  - (admin.regulators.update :code "...")
+  doc: Update regulator
+  tier: intent
 - verb: admin.regulators.deactivate
   domain: admin.regulators
   action: deactivate
@@ -50,37 +83,30 @@ verbs:
   - (admin.regulators.deactivate :code "...")
   doc: Deactivate regulator
   tier: intent
-- verb: admin.regulators.update
+- verb: admin.regulators.read
   domain: admin.regulators
-  action: update
+  action: read
   aliases:
-  - edit
-  - modify
-  - update
+  - fetch
+  - get
+  - read
   args:
     style: keyworded
     required:
       code:
         type: str
-    optional:
-      tier:
-        type: str
-      active:
-        type: bool
-      registry-url:
-        type: str
   positional_sugar:
   - code
   invocation_phrases:
-  - update admin.regulators
-  - update the admin.regulators
-  - edit admin.regulators
-  - modify admin.regulators
-  - admin.regulators update
+  - read admin.regulators
+  - read the admin.regulators
+  - get admin.regulators
+  - fetch admin.regulators
+  - admin.regulators read
   examples:
-  - (admin.regulators.update :code "...")
-  doc: Update regulator
-  tier: intent
+  - (admin.regulators.read :code "...")
+  doc: Get regulator by code
+  tier: reference
 - verb: admin.regulators.create
   domain: admin.regulators
   action: create
@@ -91,18 +117,18 @@ verbs:
   args:
     style: keyworded
     required:
-      name:
+      jurisdiction:
         type: str
-      tier:
+      name:
         type: str
       code:
         type: str
-      jurisdiction:
+      tier:
         type: str
     optional:
-      type:
-        type: str
       registry-url:
+        type: str
+      type:
         type: str
   positional_sugar:
   - code
@@ -117,29 +143,3 @@ verbs:
   - (admin.regulators.create :code "..." :name "..." :jurisdiction "..." :tier "...")
   doc: Add new recognized regulator (idempotent by code)
   tier: intent
-- verb: admin.regulators.list
-  domain: admin.regulators
-  action: list
-  aliases:
-  - get all
-  - list
-  - show
-  args:
-    style: keyworded
-    optional:
-      active-only:
-        type: bool
-      tier:
-        type: str
-      jurisdiction:
-        type: str
-  invocation_phrases:
-  - list admin.regulators
-  - list the admin.regulators
-  - show admin.regulators
-  - get all admin.regulators
-  - admin.regulators list
-  examples:
-  - (admin.regulators.list)
-  doc: List recognized regulators
-  tier: reference

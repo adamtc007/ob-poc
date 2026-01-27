@@ -2,6 +2,549 @@ version: '2.0'
 domain: view
 description: Semantic view operations - set session scope and selection
 verbs:
+- verb: view.universe
+  domain: view
+  action: universe
+  aliases:
+  - universe
+  args:
+    style: keyworded
+    optional:
+      status:
+        type: enum
+        values:
+        - RED
+        - AMBER
+        - GREEN
+      needs-attention:
+        type: bool
+      jurisdiction:
+        type: list
+      client:
+        type: entity_name
+      fund-type:
+        type: list
+  invocation_phrases:
+  - show me everything
+  - view all CBUs
+  - show the universe
+  - display all clients
+  - show me all entities
+  - view entire portfolio
+  - show global view
+  - display everything
+  - see all CBUs
+  - give me the full picture
+  - show complete universe
+  - view all records
+  - show my universe
+  - display universe view
+  - view universe
+  examples:
+  - (view.universe)
+  doc: View all CBUs with optional filters
+  tier: intent
+  tags:
+  - navigation
+  - universe
+  - filtering
+  - view
+- verb: view.context
+  domain: view
+  action: context
+  aliases:
+  - context
+  args:
+    style: keyworded
+    required:
+      mode:
+        type: enum
+        values:
+        - onboarding
+        - review
+        - investigation
+        - monitoring
+        - remediation
+  positional_sugar:
+  - mode
+  invocation_phrases:
+  - switch to onboarding
+  - set review context
+  - investigation mode
+  - monitoring context
+  - remediation workflow
+  - change context mode
+  - switch workflow mode
+  - set context to
+  - enter investigation mode
+  - context view
+  - context the view
+  - context display
+  - view context
+  examples:
+  - (view.context :mode "...")
+  doc: Set UI context mode (changes workflow adaptation)
+  tier: intent
+  tags:
+  - navigation
+  - view
+- verb: view.xray
+  domain: view
+  action: xray
+  aliases:
+  - xray
+  args:
+    style: keyworded
+    optional:
+      off:
+        type: bool
+      layers:
+        type: enum
+        values:
+        - custody
+        - ubo
+        - services
+        - documents
+        - screenings
+  invocation_phrases:
+  - show x-ray view
+  - see through structure
+  - show hidden layers
+  - x-ray this entity
+  - make layers transparent
+  - show underlying structure
+  - reveal hidden details
+  - transparent view
+  - see all layers
+  - turn on x-ray
+  - xray view
+  - xray the view
+  - xray display
+  - view xray
+  examples:
+  - (view.xray)
+  doc: Show hidden layers transparently (see through structure)
+  tier: intent
+  tags:
+  - visualization
+  - esper
+  - transparency
+  - navigation
+  - view
+- verb: view.detail
+  domain: view
+  action: detail
+  aliases:
+  - detail
+  args:
+    style: keyworded
+    required:
+      level:
+        type: enum
+        values:
+        - graph
+        - attributes
+        - raw
+  positional_sugar:
+  - level
+  invocation_phrases:
+  - show more detail
+  - expand details
+  - show attributes
+  - view raw data
+  - show full details
+  - display attribute cards
+  - see all details
+  - show JSON view
+  - expand all attributes
+  - detail view
+  - detail the view
+  - detail display
+  - view detail
+  examples:
+  - (view.detail :level "...")
+  doc: Change detail level for current focus
+  tier: intent
+  tags:
+  - navigation
+  - view
+- verb: view.selection-info
+  domain: view
+  action: selection-info
+  aliases:
+  - selection-info
+  args:
+    style: keyworded
+  invocation_phrases:
+  - show selection details
+  - what's selected
+  - selection summary
+  - show selected info
+  - details on selection
+  - info about selected
+  - selected items info
+  - describe selection
+  - selection info view
+  - selection info the view
+  - selection info display
+  - view selection info
+  examples:
+  - (view.selection-info)
+  doc: Get detailed info about current selection
+  tier: intent
+  tags:
+  - navigation
+  - view
+- verb: view.back-to
+  domain: view
+  action: back-to
+  aliases:
+  - back-to
+  args:
+    style: keyworded
+    optional:
+      frame-id:
+        type: uuid
+      depth:
+        type: int
+  invocation_phrases:
+  - go back to
+  - jump back to
+  - return to level
+  - back to breadcrumb
+  - go to parent level
+  - jump to root
+  - return to start
+  - back to beginning
+  - go back several levels
+  - return to previous
+  - back to view
+  - back to the view
+  - back to display
+  - view back to
+  examples:
+  - (view.back-to)
+  doc: Jump back to a specific breadcrumb level
+  tier: intent
+  tags:
+  - navigation
+  - fractal
+  - breadcrumbs
+  - view
+- verb: view.surface
+  domain: view
+  action: surface
+  aliases:
+  - back
+  - surface
+  - up
+  args:
+    style: keyworded
+    optional:
+      levels:
+        type: int
+      to-universe:
+        type: bool
+  invocation_phrases:
+  - go back
+  - surface up
+  - go up one level
+  - back to parent
+  - return to parent
+  - surface to top
+  - go back up
+  - pop back up
+  - return up the chain
+  - back to universe
+  - surface all the way
+  - surface view
+  - surface the view
+  - back view
+  - up view
+  examples:
+  - (view.surface)
+  doc: Surface up from current drill (pop navigation stack)
+  tier: intent
+  tags:
+  - navigation
+  - esper
+  - drill
+  - view
+- verb: view.trace
+  domain: view
+  action: trace
+  aliases:
+  - follow
+  - trace
+  - track
+  args:
+    style: keyworded
+    required:
+      mode:
+        type: enum
+        values:
+        - money
+        - control
+        - risk
+        - documents
+        - alerts
+    optional:
+      from-entity:
+        type: entity_name
+      depth:
+        type: int
+  positional_sugar:
+  - mode
+  invocation_phrases:
+  - trace the money
+  - follow the money
+  - trace control chain
+  - follow the risk
+  - trace document chain
+  - follow alert thread
+  - trace ownership path
+  - show money flow
+  - trace from entity
+  - follow the trail
+  - trace view
+  - trace the view
+  - follow view
+  - track view
+  - trace display
+  examples:
+  - (view.trace :mode "...")
+  doc: Follow money, control, or risk threads from an entity
+  tier: intent
+  tags:
+  - navigation
+  - esper
+  - trace
+  - view
+- verb: view.drill
+  domain: view
+  action: drill
+  aliases:
+  - dive
+  - drill
+  - expand
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      direction:
+        type: enum
+        values:
+        - down
+        - up
+      depth:
+        type: int
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - drill down
+  - drill into entity
+  - go deeper into
+  - expand this entity
+  - show subsidiaries
+  - drill into structure
+  - explore deeper
+  - dive into entity
+  - show child entities
+  - drill down into
+  - expand ownership
+  - show what's beneath
+  - drill view
+  - drill the view
+  - dive view
+  examples:
+  - (view.drill :entity-id "...")
+  doc: Drill into an entity, showing subsidiaries or parent chain
+  tier: intent
+  tags:
+  - navigation
+  - esper
+  - drill
+  - view
+- verb: view.cbu
+  domain: view
+  action: cbu
+  aliases:
+  - cbu
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      mode:
+        type: enum
+        values:
+        - trading
+        - ubo
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - focus on CBU
+  - view this CBU
+  - show CBU details
+  - open the CBU
+  - zoom into CBU
+  - display CBU view
+  - focus view on CBU
+  - show me the CBU
+  - select this CBU
+  - drill into CBU
+  - cbu view
+  - cbu the view
+  - cbu display
+  - view cbu
+  examples:
+  - (view.cbu :cbu-id "...")
+  doc: Focus on a single CBU with specified view mode
+  tier: intent
+  tags:
+  - navigation
+  - focus
+  - cbu
+  - view
+- verb: view.refine
+  domain: view
+  action: refine
+  aliases:
+  - refine
+  args:
+    style: keyworded
+    optional:
+      add:
+        type: list
+      exclude:
+        type: json
+      include:
+        type: json
+      remove:
+        type: list
+  invocation_phrases:
+  - filter the view
+  - refine current selection
+  - narrow down results
+  - add a filter
+  - filter by status
+  - refine by jurisdiction
+  - narrow the view
+  - apply filter to view
+  - restrict to matching
+  - filter down to
+  - show only matching
+  - refine view
+  - refine the view
+  - refine display
+  - view refine
+  examples:
+  - (view.refine)
+  doc: Refine current view with additional filter
+  tier: intent
+  tags:
+  - refinement
+  - filtering
+  - navigation
+  - view
+- verb: view.breadcrumbs
+  domain: view
+  action: breadcrumbs
+  aliases:
+  - breadcrumbs
+  args:
+    style: keyworded
+  invocation_phrases:
+  - show breadcrumbs
+  - where am I
+  - show navigation path
+  - display current path
+  - show my location
+  - what level am I at
+  - show navigation trail
+  - display breadcrumb trail
+  - current navigation path
+  - breadcrumbs view
+  - breadcrumbs the view
+  - breadcrumbs display
+  - view breadcrumbs
+  examples:
+  - (view.breadcrumbs)
+  doc: Get current navigation breadcrumbs
+  tier: intent
+  tags:
+  - navigation
+  - fractal
+  - breadcrumbs
+  - introspection
+  - view
+- verb: view.status
+  domain: view
+  action: status
+  aliases:
+  - status
+  args:
+    style: keyworded
+  invocation_phrases:
+  - show current status
+  - what's the status
+  - view state summary
+  - show view status
+  - current view state
+  - where am I now
+  - show session status
+  - display current state
+  - status view
+  - status the view
+  - status display
+  - view status
+  examples:
+  - (view.status)
+  doc: Get current view state summary
+  tier: diagnostics
+  tags:
+  - navigation
+  - view
+- verb: view.select
+  domain: view
+  action: select
+  aliases:
+  - select
+  args:
+    style: keyworded
+    optional:
+      ids:
+        type: list
+      all:
+        type: bool
+      none:
+        type: bool
+  invocation_phrases:
+  - select these items
+  - select all visible
+  - mark as selected
+  - select everything
+  - clear selection
+  - select none
+  - choose these nodes
+  - select current items
+  - pick these entities
+  - highlight selected
+  - select view
+  - select the view
+  - select display
+  - view select
+  examples:
+  - (view.select)
+  doc: Explicitly set selection within current view
+  tier: intent
+  tags:
+  - selection
+  - navigation
+  - view
 - verb: view.illuminate
   domain: view
   action: illuminate
@@ -32,6 +575,12 @@ verbs:
   - light up risks
   - highlight problem areas
   - show what needs attention
+  - illuminate issues
+  - turn off highlighting
+  - illuminate view
+  - illuminate the view
+  - illuminate display
+  - view illuminate
   examples:
   - (view.illuminate :aspect "...")
   doc: Highlight a specific aspect across all visible entities
@@ -68,58 +617,17 @@ verbs:
   - display adverse media
   - scan all flags
   - show warning indicators
+  - highlight compliance flags
+  - turn off red flags
+  - red flag view
+  - red flag the view
+  - red flag display
+  - view red flag
   examples:
   - (view.red-flag)
   doc: Scan and highlight red flags
   tier: intent
   tags:
-  - navigation
-  - view
-- verb: view.layout
-  domain: view
-  action: layout
-  aliases:
-  - layout
-  args:
-    style: keyworded
-    optional:
-      primary-axis:
-        type: enum
-        values:
-        - jurisdiction
-        - fund_type
-        - status
-        - manco
-        - role_category
-      size-by:
-        type: str
-      mode:
-        type: enum
-        values:
-        - auto
-        - galaxy
-        - grid
-        - tree
-        - network
-        - pyramid
-      color-by:
-        type: str
-  invocation_phrases:
-  - change layout
-  - switch to grid view
-  - use tree layout
-  - show as network
-  - arrange as pyramid
-  - change display layout
-  - switch visualization
-  - use galaxy layout
-  examples:
-  - (view.layout)
-  doc: Change layout strategy for current view
-  tier: intent
-  tags:
-  - visualization
-  - layout
   - navigation
   - view
 - verb: view.black-holes
@@ -148,414 +656,15 @@ verbs:
   - show incomplete data
   - display data gaps
   - find what's missing
+  - show screening gaps
+  - turn off black holes
+  - black holes view
+  - black holes the view
+  - black holes display
+  - view black holes
   examples:
   - (view.black-holes)
   doc: Show data gaps as 'black holes'
-  tier: intent
-  tags:
-  - navigation
-  - view
-- verb: view.book
-  domain: view
-  action: book
-  aliases:
-  - book
-  args:
-    style: keyworded
-    required:
-      client:
-        type: entity_name
-  positional_sugar:
-  - client
-  invocation_phrases:
-  - show client book
-  - view the book
-  - display client CBUs
-  - show me client portfolio
-  - open the book view
-  - view client entities
-  - show book for client
-  - display commercial book
-  examples:
-  - (view.book :client "...")
-  doc: View all CBUs for a commercial client (book view)
-  tier: intent
-  tags:
-  - navigation
-  - book
-  - client
-  - view
-- verb: view.drill
-  domain: view
-  action: drill
-  aliases:
-  - dive
-  - drill
-  - expand
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-    optional:
-      direction:
-        type: enum
-        values:
-        - down
-        - up
-      depth:
-        type: int
-  positional_sugar:
-  - entity-id
-  invocation_phrases:
-  - drill down
-  - drill into entity
-  - go deeper into
-  - expand this entity
-  - show subsidiaries
-  - drill into structure
-  - explore deeper
-  - dive into entity
-  examples:
-  - (view.drill :entity-id "...")
-  doc: Drill into an entity, showing subsidiaries or parent chain
-  tier: intent
-  tags:
-  - navigation
-  - esper
-  - drill
-  - view
-- verb: view.universe
-  domain: view
-  action: universe
-  aliases:
-  - universe
-  args:
-    style: keyworded
-    optional:
-      jurisdiction:
-        type: list
-      status:
-        type: enum
-        values:
-        - RED
-        - AMBER
-        - GREEN
-      needs-attention:
-        type: bool
-      client:
-        type: entity_name
-      fund-type:
-        type: list
-  invocation_phrases:
-  - show me everything
-  - view all CBUs
-  - show the universe
-  - display all clients
-  - show me all entities
-  - view entire portfolio
-  - show global view
-  - display everything
-  examples:
-  - (view.universe)
-  doc: View all CBUs with optional filters
-  tier: intent
-  tags:
-  - navigation
-  - universe
-  - filtering
-  - view
-- verb: view.refine
-  domain: view
-  action: refine
-  aliases:
-  - refine
-  args:
-    style: keyworded
-    optional:
-      remove:
-        type: list
-      add:
-        type: list
-      include:
-        type: json
-      exclude:
-        type: json
-  invocation_phrases:
-  - filter the view
-  - refine current selection
-  - narrow down results
-  - add a filter
-  - filter by status
-  - refine by jurisdiction
-  - narrow the view
-  - apply filter to view
-  examples:
-  - (view.refine)
-  doc: Refine current view with additional filter
-  tier: intent
-  tags:
-  - refinement
-  - filtering
-  - navigation
-  - view
-- verb: view.trace
-  domain: view
-  action: trace
-  aliases:
-  - follow
-  - trace
-  - track
-  args:
-    style: keyworded
-    required:
-      mode:
-        type: enum
-        values:
-        - money
-        - control
-        - risk
-        - documents
-        - alerts
-    optional:
-      from-entity:
-        type: entity_name
-      depth:
-        type: int
-  positional_sugar:
-  - mode
-  invocation_phrases:
-  - trace the money
-  - follow the money
-  - trace control chain
-  - follow the risk
-  - trace document chain
-  - follow alert thread
-  - trace ownership path
-  - show money flow
-  examples:
-  - (view.trace :mode "...")
-  doc: Follow money, control, or risk threads from an entity
-  tier: intent
-  tags:
-  - navigation
-  - esper
-  - trace
-  - view
-- verb: view.clear
-  domain: view
-  action: clear
-  aliases:
-  - clear
-  args:
-    style: keyworded
-  invocation_phrases:
-  - clear all filters
-  - reset the view
-  - remove all refinements
-  - clear current filters
-  - start fresh
-  - reset to base view
-  - clear refinements
-  - remove filters
-  examples:
-  - (view.clear)
-  doc: Clear refinements, return to base view
-  tier: intent
-  tags:
-  - refinement
-  - reset
-  - navigation
-  - view
-- verb: view.zoom-out
-  domain: view
-  action: zoom-out
-  aliases:
-  - zoom-out
-  args:
-    style: keyworded
-  invocation_phrases:
-  - zoom out
-  - zoom back out
-  - see bigger picture
-  - go back up
-  - expand view outward
-  - zoom to parent
-  - pull back view
-  - see wider context
-  examples:
-  - (view.zoom-out)
-  doc: Zoom out to the parent taxonomy
-  tier: intent
-  tags:
-  - navigation
-  - fractal
-  - zoom
-  - view
-- verb: view.xray
-  domain: view
-  action: xray
-  aliases:
-  - xray
-  args:
-    style: keyworded
-    optional:
-      layers:
-        type: enum
-        values:
-        - custody
-        - ubo
-        - services
-        - documents
-        - screenings
-      off:
-        type: bool
-  invocation_phrases:
-  - show x-ray view
-  - see through structure
-  - show hidden layers
-  - x-ray this entity
-  - make layers transparent
-  - show underlying structure
-  - reveal hidden details
-  - transparent view
-  examples:
-  - (view.xray)
-  doc: Show hidden layers transparently (see through structure)
-  tier: intent
-  tags:
-  - visualization
-  - esper
-  - transparency
-  - navigation
-  - view
-- verb: view.peel
-  domain: view
-  action: peel
-  aliases:
-  - peel
-  args:
-    style: keyworded
-    optional:
-      reset:
-        type: bool
-      layer:
-        type: str
-  invocation_phrases:
-  - peel back layer
-  - remove outer layer
-  - peel the structure
-  - strip away layer
-  - show what's inside
-  - peel to reveal
-  - remove top layer
-  - peel away custody
-  examples:
-  - (view.peel)
-  doc: Remove outer layer to reveal inner structure
-  tier: intent
-  tags:
-  - visualization
-  - esper
-  - layers
-  - navigation
-  - view
-- verb: view.cbu
-  domain: view
-  action: cbu
-  aliases:
-  - cbu
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      mode:
-        type: enum
-        values:
-        - trading
-        - ubo
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - focus on CBU
-  - view this CBU
-  - show CBU details
-  - open the CBU
-  - zoom into CBU
-  - display CBU view
-  - focus view on CBU
-  - show me the CBU
-  examples:
-  - (view.cbu :cbu-id "...")
-  doc: Focus on a single CBU with specified view mode
-  tier: intent
-  tags:
-  - navigation
-  - focus
-  - cbu
-  - view
-- verb: view.entity-forest
-  domain: view
-  action: entity-forest
-  aliases:
-  - entity-forest
-  args:
-    style: keyworded
-    optional:
-      entity-type:
-        type: list
-      role:
-        type: list
-      jurisdiction:
-        type: list
-  invocation_phrases:
-  - show entity tree
-  - view entity forest
-  - display entity hierarchy
-  - show me entities by type
-  - view ownership forest
-  - show entity structure
-  - display entity relationships
-  - see the entity tree
-  examples:
-  - (view.entity-forest)
-  doc: View entities by type/ownership filters
-  tier: intent
-  tags:
-  - navigation
-  - entity
-  - filtering
-  - view
-- verb: view.detail
-  domain: view
-  action: detail
-  aliases:
-  - detail
-  args:
-    style: keyworded
-    required:
-      level:
-        type: enum
-        values:
-        - graph
-        - attributes
-        - raw
-  positional_sugar:
-  - level
-  invocation_phrases:
-  - show more detail
-  - expand details
-  - show attributes
-  - view raw data
-  - show full details
-  - display attribute cards
-  - see all details
-  - show JSON view
-  examples:
-  - (view.detail :level "...")
-  doc: Change detail level for current focus
   tier: intent
   tags:
   - navigation
@@ -568,14 +677,14 @@ verbs:
   args:
     style: keyworded
     optional:
+      off:
+        type: bool
       threshold:
         type: enum
         values:
         - high
         - medium
         - any
-      off:
-        type: bool
   invocation_phrases:
   - shadow non-risk items
   - dim safe items
@@ -585,6 +694,11 @@ verbs:
   - dim everything except risk
   - show risk shadow
   - turn on shadow mode
+  - turn off shadow mode
+  - shadow view
+  - shadow the view
+  - shadow display
+  - view shadow
   examples:
   - (view.shadow)
   doc: Dim non-risk items to emphasize risk (shadow mode)
@@ -596,204 +710,42 @@ verbs:
   - highlighting
   - navigation
   - view
-- verb: view.status
+- verb: view.entity-forest
   domain: view
-  action: status
+  action: entity-forest
   aliases:
-  - status
-  args:
-    style: keyworded
-  invocation_phrases:
-  - show current status
-  - what's the status
-  - view state summary
-  - show view status
-  - current view state
-  - where am I now
-  - show session status
-  - display current state
-  examples:
-  - (view.status)
-  doc: Get current view state summary
-  tier: diagnostics
-  tags:
-  - navigation
-  - view
-- verb: view.surface
-  domain: view
-  action: surface
-  aliases:
-  - back
-  - surface
-  - up
+  - entity-forest
   args:
     style: keyworded
     optional:
-      to-universe:
-        type: bool
-      levels:
-        type: int
-  invocation_phrases:
-  - go back
-  - surface up
-  - go up one level
-  - back to parent
-  - return to parent
-  - surface to top
-  - go back up
-  - pop back up
-  examples:
-  - (view.surface)
-  doc: Surface up from current drill (pop navigation stack)
-  tier: intent
-  tags:
-  - navigation
-  - esper
-  - drill
-  - view
-- verb: view.select
-  domain: view
-  action: select
-  aliases:
-  - select
-  args:
-    style: keyworded
-    optional:
-      all:
-        type: bool
-      ids:
+      entity-type:
         type: list
-      none:
-        type: bool
+      jurisdiction:
+        type: list
+      role:
+        type: list
   invocation_phrases:
-  - select these items
-  - select all visible
-  - mark as selected
-  - select everything
-  - clear selection
-  - select none
-  - choose these nodes
-  - select current items
+  - show entity tree
+  - view entity forest
+  - display entity hierarchy
+  - show me entities by type
+  - view ownership forest
+  - show entity structure
+  - display entity relationships
+  - see the entity tree
+  - open entity view
+  - show entities filtered by
+  - entity forest view
+  - entity forest the view
+  - entity forest display
   examples:
-  - (view.select)
-  doc: Explicitly set selection within current view
-  tier: intent
-  tags:
-  - selection
-  - navigation
-  - view
-- verb: view.back-to
-  domain: view
-  action: back-to
-  aliases:
-  - back-to
-  args:
-    style: keyworded
-    optional:
-      depth:
-        type: int
-      frame-id:
-        type: uuid
-  invocation_phrases:
-  - go back to
-  - jump back to
-  - return to level
-  - back to breadcrumb
-  - go to parent level
-  - jump to root
-  - return to start
-  - back to beginning
-  examples:
-  - (view.back-to)
-  doc: Jump back to a specific breadcrumb level
+  - (view.entity-forest)
+  doc: View entities by type/ownership filters
   tier: intent
   tags:
   - navigation
-  - fractal
-  - breadcrumbs
-  - view
-- verb: view.selection-info
-  domain: view
-  action: selection-info
-  aliases:
-  - selection-info
-  args:
-    style: keyworded
-  invocation_phrases:
-  - show selection details
-  - what's selected
-  - selection summary
-  - show selected info
-  - details on selection
-  - info about selected
-  - selected items info
-  - describe selection
-  examples:
-  - (view.selection-info)
-  doc: Get detailed info about current selection
-  tier: intent
-  tags:
-  - navigation
-  - view
-- verb: view.breadcrumbs
-  domain: view
-  action: breadcrumbs
-  aliases:
-  - breadcrumbs
-  args:
-    style: keyworded
-  invocation_phrases:
-  - show breadcrumbs
-  - where am I
-  - show navigation path
-  - display current path
-  - show my location
-  - what level am I at
-  - show navigation trail
-  - display breadcrumb trail
-  examples:
-  - (view.breadcrumbs)
-  doc: Get current navigation breadcrumbs
-  tier: intent
-  tags:
-  - navigation
-  - fractal
-  - breadcrumbs
-  - introspection
-  - view
-- verb: view.context
-  domain: view
-  action: context
-  aliases:
-  - context
-  args:
-    style: keyworded
-    required:
-      mode:
-        type: enum
-        values:
-        - onboarding
-        - review
-        - investigation
-        - monitoring
-        - remediation
-  positional_sugar:
-  - mode
-  invocation_phrases:
-  - switch to onboarding
-  - set review context
-  - investigation mode
-  - monitoring context
-  - remediation workflow
-  - change context mode
-  - switch workflow mode
-  - set context to
-  examples:
-  - (view.context :mode "...")
-  doc: Set UI context mode (changes workflow adaptation)
-  tier: intent
-  tags:
-  - navigation
+  - entity
+  - filtering
   - view
 - verb: view.zoom-in
   domain: view
@@ -816,6 +768,12 @@ verbs:
   - expand and zoom
   - zoom closer
   - magnify this area
+  - show more detail
+  - get closer view
+  - zoom in view
+  - zoom in the view
+  - zoom in display
+  - view zoom in
   examples:
   - (view.zoom-in :node-id "...")
   doc: Zoom into a node, expanding it into its child taxonomy
@@ -824,4 +782,194 @@ verbs:
   - navigation
   - fractal
   - zoom
+  - view
+- verb: view.clear
+  domain: view
+  action: clear
+  aliases:
+  - clear
+  args:
+    style: keyworded
+  invocation_phrases:
+  - clear all filters
+  - reset the view
+  - remove all refinements
+  - clear current filters
+  - start fresh
+  - reset to base view
+  - clear refinements
+  - remove filters
+  - reset filters
+  - go back to unfiltered
+  - clear view
+  - clear the view
+  - clear display
+  - view clear
+  examples:
+  - (view.clear)
+  doc: Clear refinements, return to base view
+  tier: intent
+  tags:
+  - refinement
+  - reset
+  - navigation
+  - view
+- verb: view.peel
+  domain: view
+  action: peel
+  aliases:
+  - peel
+  args:
+    style: keyworded
+    optional:
+      layer:
+        type: str
+      reset:
+        type: bool
+  invocation_phrases:
+  - peel back layer
+  - remove outer layer
+  - peel the structure
+  - strip away layer
+  - show what's inside
+  - peel to reveal
+  - remove top layer
+  - peel away custody
+  - strip outer shell
+  - reset peeled layers
+  - peel view
+  - peel the view
+  - peel display
+  - view peel
+  examples:
+  - (view.peel)
+  doc: Remove outer layer to reveal inner structure
+  tier: intent
+  tags:
+  - visualization
+  - esper
+  - layers
+  - navigation
+  - view
+- verb: view.zoom-out
+  domain: view
+  action: zoom-out
+  aliases:
+  - zoom-out
+  args:
+    style: keyworded
+  invocation_phrases:
+  - zoom out
+  - zoom back out
+  - see bigger picture
+  - go back up
+  - expand view outward
+  - zoom to parent
+  - pull back view
+  - see wider context
+  - zoom out one level
+  - show less detail
+  - zoom out view
+  - zoom out the view
+  - zoom out display
+  - view zoom out
+  examples:
+  - (view.zoom-out)
+  doc: Zoom out to the parent taxonomy
+  tier: intent
+  tags:
+  - navigation
+  - fractal
+  - zoom
+  - view
+- verb: view.book
+  domain: view
+  action: book
+  aliases:
+  - book
+  args:
+    style: keyworded
+    required:
+      client:
+        type: entity_name
+  positional_sugar:
+  - client
+  invocation_phrases:
+  - show client book
+  - view the book
+  - display client CBUs
+  - show me client portfolio
+  - open the book view
+  - view client entities
+  - show book for client
+  - display commercial book
+  - see client CBUs
+  - open client view
+  - show all CBUs for client
+  - book view
+  - book the view
+  - book display
+  - view book
+  examples:
+  - (view.book :client "...")
+  doc: View all CBUs for a commercial client (book view)
+  tier: intent
+  tags:
+  - navigation
+  - book
+  - client
+  - view
+- verb: view.layout
+  domain: view
+  action: layout
+  aliases:
+  - layout
+  args:
+    style: keyworded
+    optional:
+      size-by:
+        type: str
+      color-by:
+        type: str
+      primary-axis:
+        type: enum
+        values:
+        - jurisdiction
+        - fund_type
+        - status
+        - manco
+        - role_category
+      mode:
+        type: enum
+        values:
+        - auto
+        - galaxy
+        - grid
+        - tree
+        - network
+        - pyramid
+  invocation_phrases:
+  - change layout
+  - switch to grid view
+  - use tree layout
+  - show as network
+  - arrange as pyramid
+  - change display layout
+  - switch visualization
+  - use galaxy layout
+  - arrange nodes differently
+  - show in grid format
+  - display as hierarchy
+  - layout view
+  - layout the view
+  - layout display
+  - view layout
+  examples:
+  - (view.layout)
+  doc: Change layout strategy for current view
+  tier: intent
+  tags:
+  - visualization
+  - layout
+  - navigation
   - view

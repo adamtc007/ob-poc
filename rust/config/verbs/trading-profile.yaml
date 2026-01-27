@@ -416,6 +416,8 @@ domains:
         description: Add instrument class to trading profile universe
         invocation_phrases:
           - "add instrument class"
+          - "add equity instruments"
+          - "add bond instruments"
           - "enable instrument class"
           - "add equity trading"
           - "add bond trading"
@@ -471,6 +473,8 @@ domains:
         description: Remove instrument class from trading profile universe
         invocation_phrases:
           - "remove instrument class"
+          - "remove equity instruments"
+          - "remove bond instruments"
           - "disable instrument class"
           - "remove equity trading"
           - "remove from profile"

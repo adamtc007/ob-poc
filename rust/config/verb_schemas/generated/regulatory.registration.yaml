@@ -2,6 +2,36 @@ version: '2.0'
 domain: regulatory.registration
 description: Entity regulatory registration management (multi-regulator)
 verbs:
+- verb: regulatory.registration.verify
+  domain: regulatory.registration
+  action: verify
+  aliases:
+  - verify
+  args:
+    style: keyworded
+    required:
+      method:
+        type: str
+      entity-id:
+        type: entity_name
+      regulator:
+        type: str
+    optional:
+      expires:
+        type: date
+      reference:
+        type: str
+  positional_sugar:
+  - entity-id
+  - regulator
+  invocation_phrases:
+  - verify regulatory.registration
+  - verify the regulatory.registration
+  - regulatory.registration verify
+  examples:
+  - (regulatory.registration.verify :entity-id "..." :regulator "..." :method "...")
+  doc: Verify a regulatory registration
+  tier: intent
 - verb: regulatory.registration.add
   domain: regulatory.registration
   action: add
@@ -10,21 +40,21 @@ verbs:
   args:
     style: keyworded
     required:
-      entity-id:
-        type: entity_name
       registration-type:
         type: str
       regulator:
+        type: entity_name
+      entity-id:
         type: entity_name
     optional:
       registration-number:
         type: str
       activity-scope:
         type: str
-      effective-date:
-        type: date
       home-regulator:
         type: str
+      effective-date:
+        type: date
   positional_sugar:
   - entity-id
   - regulator
@@ -35,33 +65,6 @@ verbs:
   examples:
   - (regulatory.registration.add :entity-id "..." :regulator "..." :registration-type "...")
   doc: Add regulatory registration for an entity (idempotent by entity+regulator+type)
-  tier: intent
-- verb: regulatory.registration.remove
-  domain: regulatory.registration
-  action: remove
-  aliases:
-  - delete
-  - drop
-  - remove
-  args:
-    style: keyworded
-    required:
-      regulator:
-        type: str
-      entity-id:
-        type: uuid
-  positional_sugar:
-  - entity-id
-  - regulator
-  invocation_phrases:
-  - remove regulatory.registration
-  - remove the regulatory.registration
-  - delete regulatory.registration
-  - drop regulatory.registration
-  - regulatory.registration remove
-  examples:
-  - (regulatory.registration.remove :entity-id "..." :regulator "...")
-  doc: Remove/withdraw registration
   tier: intent
 - verb: regulatory.registration.list
   domain: regulatory.registration
@@ -90,33 +93,30 @@ verbs:
   - (regulatory.registration.list :entity-id "...")
   doc: List regulatory registrations for an entity
   tier: reference
-- verb: regulatory.registration.verify
+- verb: regulatory.registration.remove
   domain: regulatory.registration
-  action: verify
+  action: remove
   aliases:
-  - verify
+  - delete
+  - drop
+  - remove
   args:
     style: keyworded
     required:
       regulator:
         type: str
       entity-id:
-        type: entity_name
-      method:
-        type: str
-    optional:
-      reference:
-        type: str
-      expires:
-        type: date
+        type: uuid
   positional_sugar:
   - entity-id
   - regulator
   invocation_phrases:
-  - verify regulatory.registration
-  - verify the regulatory.registration
-  - regulatory.registration verify
+  - remove regulatory.registration
+  - remove the regulatory.registration
+  - delete regulatory.registration
+  - drop regulatory.registration
+  - regulatory.registration remove
   examples:
-  - (regulatory.registration.verify :entity-id "..." :regulator "..." :method "...")
-  doc: Verify a regulatory registration
+  - (regulatory.registration.remove :entity-id "..." :regulator "...")
+  doc: Remove/withdraw registration
   tier: intent

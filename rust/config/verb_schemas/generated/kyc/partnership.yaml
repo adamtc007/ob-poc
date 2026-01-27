@@ -4,36 +4,6 @@ description: |
   Partnership capital accounts and control structure.
   Models GP/LP dynamics and profit/loss allocation.
 verbs:
-- verb: partnership.record-contribution
-  domain: partnership
-  action: record-contribution
-  aliases:
-  - record-contribution
-  args:
-    style: keyworded
-    required:
-      contribution-date:
-        type: date
-      partnership-entity-id:
-        type: entity_name
-      partner-entity-id:
-        type: entity_name
-      amount:
-        type: decimal
-    optional:
-      reference:
-        type: str
-  positional_sugar:
-  - partnership-entity-id
-  - partner-entity-id
-  invocation_phrases:
-  - record contribution partnership
-  - record contribution the partnership
-  - partnership record contribution
-  examples:
-  - (partnership.record-contribution :partnership-entity-id "..." :partner-entity-id "..." :amount "..." :contribution-date "...")
-  doc: Record capital contribution (drawdown)
-  tier: intent
 - verb: partnership.record-distribution
   domain: partnership
   action: record-distribution
@@ -42,11 +12,7 @@ verbs:
   args:
     style: keyworded
     required:
-      amount:
-        type: decimal
       partnership-entity-id:
-        type: entity_name
-      partner-entity-id:
         type: entity_name
       distribution-type:
         type: enum
@@ -54,6 +20,10 @@ verbs:
         - PROFIT
         - RETURN_OF_CAPITAL
         - LIQUIDATION
+      partner-entity-id:
+        type: entity_name
+      amount:
+        type: decimal
       distribution-date:
         type: date
   positional_sugar:
@@ -67,60 +37,6 @@ verbs:
   - (partnership.record-distribution :partnership-entity-id "..." :partner-entity-id "..." :amount "..." :distribution-type "..." :distribution-date "...")
   doc: Record distribution to partner
   tier: intent
-- verb: partnership.list-partners
-  domain: partnership
-  action: list-partners
-  aliases:
-  - list-partners
-  args:
-    style: keyworded
-    required:
-      partnership-entity-id:
-        type: entity_name
-    optional:
-      include-inactive:
-        type: bool
-      partner-type:
-        type: enum
-        values:
-        - GP
-        - LP
-        - MEMBER
-  positional_sugar:
-  - partnership-entity-id
-  invocation_phrases:
-  - list partners partnership
-  - list partners the partnership
-  - partnership list partners
-  examples:
-  - (partnership.list-partners :partnership-entity-id "...")
-  doc: List all partners in a partnership
-  tier: reference
-- verb: partnership.withdraw-partner
-  domain: partnership
-  action: withdraw-partner
-  aliases:
-  - withdraw-partner
-  args:
-    style: keyworded
-    required:
-      partnership-entity-id:
-        type: entity_name
-      withdrawal-date:
-        type: date
-      partner-entity-id:
-        type: entity_name
-  positional_sugar:
-  - partnership-entity-id
-  - partner-entity-id
-  invocation_phrases:
-  - withdraw partner partnership
-  - withdraw partner the partnership
-  - partnership withdraw partner
-  examples:
-  - (partnership.withdraw-partner :partnership-entity-id "..." :partner-entity-id "..." :withdrawal-date "...")
-  doc: Record partner withdrawal/exit
-  tier: intent
 - verb: partnership.add-partner
   domain: partnership
   action: add-partner
@@ -129,11 +45,11 @@ verbs:
   args:
     style: keyworded
     required:
-      profit-share-pct:
-        type: decimal
-      cbu-id:
+      partner-entity-id:
         type: entity_name
       partnership-entity-id:
+        type: entity_name
+      cbu-id:
         type: entity_name
       partner-type:
         type: enum
@@ -141,21 +57,21 @@ verbs:
         - GP
         - LP
         - MEMBER
-      partner-entity-id:
-        type: entity_name
+      profit-share-pct:
+        type: decimal
       capital-commitment:
         type: decimal
     optional:
-      source-document-id:
-        type: entity_name
+      admission-date:
+        type: date
       voting-pct:
+        type: decimal
+      loss-share-pct:
         type: decimal
       management-rights:
         type: bool
-      loss-share-pct:
-        type: decimal
-      admission-date:
-        type: date
+      source-document-id:
+        type: entity_name
   positional_sugar:
   - cbu-id
   - partnership-entity-id
@@ -167,29 +83,35 @@ verbs:
   - (partnership.add-partner :cbu-id "..." :partnership-entity-id "..." :partner-entity-id "..." :partner-type "..." :capital-commitment "..." :profit-share-pct "...")
   doc: Add a partner to the partnership with capital commitment
   tier: intent
-- verb: partnership.reconcile
+- verb: partnership.record-contribution
   domain: partnership
-  action: reconcile
+  action: record-contribution
   aliases:
-  - reconcile
+  - record-contribution
   args:
     style: keyworded
     required:
       partnership-entity-id:
         type: entity_name
+      partner-entity-id:
+        type: entity_name
+      amount:
+        type: decimal
+      contribution-date:
+        type: date
+    optional:
+      reference:
+        type: str
   positional_sugar:
   - partnership-entity-id
+  - partner-entity-id
   invocation_phrases:
-  - reconcile partnership
-  - reconcile the partnership
-  - partnership reconcile
+  - record contribution partnership
+  - record contribution the partnership
+  - partnership record contribution
   examples:
-  - (partnership.reconcile :partnership-entity-id "...")
-  doc: |
-    Reconcile partnership capital:
-    - Verify profit shares sum to 100%
-    - Calculate total committed/contributed/unfunded
-    - Identify control (GP or majority LP)
+  - (partnership.record-contribution :partnership-entity-id "..." :partner-entity-id "..." :amount "..." :contribution-date "...")
+  doc: Record capital contribution (drawdown)
   tier: intent
 - verb: partnership.analyze-control
   domain: partnership
@@ -216,4 +138,82 @@ verbs:
     Analyze control structure of partnership for UBO identification.
     GPs have presumptive control regardless of capital percentage.
     LPs may have control through voting rights or super-majority stake.
+  tier: intent
+- verb: partnership.withdraw-partner
+  domain: partnership
+  action: withdraw-partner
+  aliases:
+  - withdraw-partner
+  args:
+    style: keyworded
+    required:
+      withdrawal-date:
+        type: date
+      partnership-entity-id:
+        type: entity_name
+      partner-entity-id:
+        type: entity_name
+  positional_sugar:
+  - partnership-entity-id
+  - partner-entity-id
+  invocation_phrases:
+  - withdraw partner partnership
+  - withdraw partner the partnership
+  - partnership withdraw partner
+  examples:
+  - (partnership.withdraw-partner :partnership-entity-id "..." :partner-entity-id "..." :withdrawal-date "...")
+  doc: Record partner withdrawal/exit
+  tier: intent
+- verb: partnership.list-partners
+  domain: partnership
+  action: list-partners
+  aliases:
+  - list-partners
+  args:
+    style: keyworded
+    required:
+      partnership-entity-id:
+        type: entity_name
+    optional:
+      partner-type:
+        type: enum
+        values:
+        - GP
+        - LP
+        - MEMBER
+      include-inactive:
+        type: bool
+  positional_sugar:
+  - partnership-entity-id
+  invocation_phrases:
+  - list partners partnership
+  - list partners the partnership
+  - partnership list partners
+  examples:
+  - (partnership.list-partners :partnership-entity-id "...")
+  doc: List all partners in a partnership
+  tier: reference
+- verb: partnership.reconcile
+  domain: partnership
+  action: reconcile
+  aliases:
+  - reconcile
+  args:
+    style: keyworded
+    required:
+      partnership-entity-id:
+        type: entity_name
+  positional_sugar:
+  - partnership-entity-id
+  invocation_phrases:
+  - reconcile partnership
+  - reconcile the partnership
+  - partnership reconcile
+  examples:
+  - (partnership.reconcile :partnership-entity-id "...")
+  doc: |
+    Reconcile partnership capital:
+    - Verify profit shares sum to 100%
+    - Calculate total committed/contributed/unfunded
+    - Identify control (GP or majority LP)
   tier: intent

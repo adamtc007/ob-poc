@@ -2,6 +2,31 @@ version: '2.0'
 domain: settlement-chain
 description: Settlement chain configuration - multi-hop settlement paths and cross-border routing
 verbs:
+- verb: settlement-chain.deactivate-cross-border
+  domain: settlement-chain
+  action: deactivate-cross-border
+  aliases:
+  - deactivate-cross-border
+  args:
+    style: keyworded
+    required:
+      config-id:
+        type: uuid
+  positional_sugar:
+  - config-id
+  invocation_phrases:
+  - deactivate cross-border
+  - disable cross-border routing
+  - turn off cross-border
+  - remove cross-border config
+  - end cross-border
+  - deactivate cross border settlement-chain
+  - deactivate cross border the settlement-chain
+  - settlement-chain deactivate cross border
+  examples:
+  - (settlement-chain.deactivate-cross-border :config-id "...")
+  doc: Deactivate cross-border configuration
+  tier: intent
 - verb: settlement-chain.add-hop
   domain: settlement-chain
   action: add-hop
@@ -18,22 +43,22 @@ verbs:
         - AGENT
         - CSD
         - ICSD
-      sequence:
-        type: int
       chain-id:
         type: uuid
+      sequence:
+        type: int
     optional:
       intermediary-name:
         type: str
       intermediary-bic:
         type: str
-      instructions:
-        type: str
-      intermediary-entity-id:
-        type: entity_name
       account-number:
         type: str
       ssi-id:
+        type: entity_name
+      instructions:
+        type: str
+      intermediary-entity-id:
         type: entity_name
   positional_sugar:
   - chain-id
@@ -47,38 +72,219 @@ verbs:
   - add agent hop
   - add settlement intermediary
   - add hop settlement-chain
+  - add hop the settlement-chain
+  - settlement-chain add hop
   examples:
   - (settlement-chain.add-hop :chain-id "..." :sequence "..." :role "...")
   doc: Add intermediary hop to settlement chain
   tier: intent
-- verb: settlement-chain.list-cross-border
+- verb: settlement-chain.list-hops
   domain: settlement-chain
-  action: list-cross-border
+  action: list-hops
   aliases:
-  - list-cross-border
+  - list-hops
+  args:
+    style: keyworded
+    required:
+      chain-id:
+        type: uuid
+  positional_sugar:
+  - chain-id
+  invocation_phrases:
+  - list settlement hops
+  - show chain hops
+  - view intermediaries
+  - display settlement steps
+  - list chain intermediaries
+  - show settlement path
+  - list hops settlement-chain
+  - list hops the settlement-chain
+  - settlement-chain list hops
+  examples:
+  - (settlement-chain.list-hops :chain-id "...")
+  doc: List hops in a settlement chain
+  tier: reference
+- verb: settlement-chain.define-location
+  domain: settlement-chain
+  action: define-location
+  aliases:
+  - define-location
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+      location-type:
+        type: enum
+        values:
+        - CSD
+        - ICSD
+        - CUSTODIAN
+      name:
+        type: str
+    optional:
+      country-code:
+        type: str
+      bic:
+        type: str
+      operating-hours:
+        type: json
+      settlement-cycles:
+        type: json
+  positional_sugar:
+  - code
+  - name
+  invocation_phrases:
+  - define settlement location
+  - add settlement location
+  - create CSD
+  - add ICSD
+  - register settlement venue
+  - define CSD location
+  - create settlement depot
+  - add custodian location
+  - define location settlement-chain
+  - define location the settlement-chain
+  - settlement-chain define location
+  examples:
+  - (settlement-chain.define-location :code "..." :name "..." :location-type "...")
+  doc: Define settlement location (CSD/ICSD)
+  tier: intent
+- verb: settlement-chain.list-locations
+  domain: settlement-chain
+  action: list-locations
+  aliases:
+  - list-locations
+  args:
+    style: keyworded
+    optional:
+      location-type:
+        type: str
+      country-code:
+        type: str
+  invocation_phrases:
+  - list settlement locations
+  - show CSDs
+  - view settlement venues
+  - list custodian locations
+  - show ICSDs
+  - display settlement depots
+  - list all locations
+  - list locations settlement-chain
+  - list locations the settlement-chain
+  - settlement-chain list locations
+  examples:
+  - (settlement-chain.list-locations)
+  doc: List settlement locations
+  tier: reference
+- verb: settlement-chain.list-chains
+  domain: settlement-chain
+  action: list-chains
+  aliases:
+  - list-chains
   args:
     style: keyworded
     required:
       cbu-id:
         type: entity_name
     optional:
+      market:
+        type: str
       is-active:
         type: bool
   positional_sugar:
   - cbu-id
   invocation_phrases:
-  - list cross-border configs
-  - show cross-border routing
-  - view international settlement
-  - list cross-border
-  - show bridge configurations
-  - list cross border settlement-chain
-  - list cross border the settlement-chain
-  - settlement-chain list cross border
+  - list settlement chains
+  - show settlement chains
+  - view settlement paths
+  - display settlement routes
+  - list CBU chains
+  - show settlement configuration
+  - list chains settlement-chain
+  - list chains the settlement-chain
+  - settlement-chain list chains
   examples:
-  - (settlement-chain.list-cross-border :cbu-id "...")
-  doc: List cross-border configurations for CBU
+  - (settlement-chain.list-chains :cbu-id "...")
+  doc: List settlement chains for CBU
   tier: reference
+- verb: settlement-chain.set-cross-border
+  domain: settlement-chain
+  action: set-cross-border
+  aliases:
+  - set-cross-border
+  args:
+    style: keyworded
+    required:
+      source-market:
+        type: entity_name
+      cbu-id:
+        type: entity_name
+      target-market:
+        type: entity_name
+      settlement-method:
+        type: enum
+        values:
+        - BRIDGE
+        - DIRECT
+        - VIA_ICSD
+    optional:
+      special-instructions:
+        type: str
+      additional-days:
+        type: int
+      fx-timing:
+        type: enum
+        values:
+        - PRE_SETTLEMENT
+        - ON_SETTLEMENT
+        - POST_SETTLEMENT
+      bridge-location-id:
+        type: entity_name
+      preferred-currency:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - source-market
+  invocation_phrases:
+  - set cross-border routing
+  - configure cross-border
+  - add cross-border settlement
+  - set international settlement
+  - configure bridge settlement
+  - set cross-border config
+  - set cross border settlement-chain
+  - set cross border the settlement-chain
+  - settlement-chain set cross border
+  examples:
+  - (settlement-chain.set-cross-border :cbu-id "..." :source-market "..." :target-market "..." :settlement-method "...")
+  doc: Configure cross-border settlement routing
+  tier: intent
+- verb: settlement-chain.remove-hop
+  domain: settlement-chain
+  action: remove-hop
+  aliases:
+  - remove-hop
+  args:
+    style: keyworded
+    required:
+      hop-id:
+        type: uuid
+  positional_sugar:
+  - hop-id
+  invocation_phrases:
+  - remove settlement hop
+  - delete chain hop
+  - remove intermediary
+  - delete settlement step
+  - remove hop from chain
+  - remove hop settlement-chain
+  - remove hop the settlement-chain
+  - settlement-chain remove hop
+  examples:
+  - (settlement-chain.remove-hop :hop-id "...")
+  doc: Remove hop from settlement chain
+  tier: intent
 - verb: settlement-chain.set-location-preference
   domain: settlement-chain
   action: set-location-preference
@@ -92,14 +298,14 @@ verbs:
       location-id:
         type: entity_name
     optional:
-      priority:
-        type: int
-      reason:
-        type: str
       instrument-class:
         type: entity_name
+      priority:
+        type: int
       market:
         type: entity_name
+      reason:
+        type: str
   positional_sugar:
   - cbu-id
   - location-id
@@ -112,6 +318,7 @@ verbs:
   - set default settlement
   - set location preference settlement-chain
   - set location preference the settlement-chain
+  - settlement-chain set location preference
   examples:
   - (settlement-chain.set-location-preference :cbu-id "..." :location-id "...")
   doc: Set preferred settlement location for market/instrument
@@ -154,19 +361,19 @@ verbs:
       cbu-id:
         type: entity_name
     optional:
-      currency:
-        type: str
-      settlement-type:
-        type: str
-      market:
-        type: entity_name
-      instrument-class:
-        type: entity_name
       is-default:
         type: bool
       effective-date:
         type: date
+      market:
+        type: entity_name
       notes:
+        type: str
+      instrument-class:
+        type: entity_name
+      currency:
+        type: str
+      settlement-type:
         type: str
   positional_sugar:
   - cbu-id
@@ -180,6 +387,8 @@ verbs:
   - set up settlement chain
   - add settlement configuration
   - create chain settlement-chain
+  - create chain the settlement-chain
+  - settlement-chain create chain
   examples:
   - (settlement-chain.create-chain :cbu-id "..." :name "...")
   doc: Create settlement chain for CBU
@@ -205,231 +414,36 @@ verbs:
   - end settlement chain
   - deactivate chain settlement-chain
   - deactivate chain the settlement-chain
+  - settlement-chain deactivate chain
   examples:
   - (settlement-chain.deactivate-chain :chain-id "...")
   doc: Deactivate a settlement chain
   tier: intent
-- verb: settlement-chain.list-chains
+- verb: settlement-chain.list-cross-border
   domain: settlement-chain
-  action: list-chains
+  action: list-cross-border
   aliases:
-  - list-chains
+  - list-cross-border
   args:
     style: keyworded
     required:
       cbu-id:
         type: entity_name
     optional:
-      market:
-        type: str
       is-active:
         type: bool
   positional_sugar:
   - cbu-id
   invocation_phrases:
-  - list settlement chains
-  - show settlement chains
-  - view settlement paths
-  - display settlement routes
-  - list CBU chains
-  - show settlement configuration
-  - list chains settlement-chain
-  - list chains the settlement-chain
+  - list cross-border configs
+  - show cross-border routing
+  - view international settlement
+  - list cross-border
+  - show bridge configurations
+  - list cross border settlement-chain
+  - list cross border the settlement-chain
+  - settlement-chain list cross border
   examples:
-  - (settlement-chain.list-chains :cbu-id "...")
-  doc: List settlement chains for CBU
+  - (settlement-chain.list-cross-border :cbu-id "...")
+  doc: List cross-border configurations for CBU
   tier: reference
-- verb: settlement-chain.define-location
-  domain: settlement-chain
-  action: define-location
-  aliases:
-  - define-location
-  args:
-    style: keyworded
-    required:
-      code:
-        type: str
-      location-type:
-        type: enum
-        values:
-        - CSD
-        - ICSD
-        - CUSTODIAN
-      name:
-        type: str
-    optional:
-      bic:
-        type: str
-      settlement-cycles:
-        type: json
-      country-code:
-        type: str
-      operating-hours:
-        type: json
-  positional_sugar:
-  - code
-  - name
-  invocation_phrases:
-  - define settlement location
-  - add settlement location
-  - create CSD
-  - add ICSD
-  - register settlement venue
-  - define CSD location
-  - create settlement depot
-  - add custodian location
-  examples:
-  - (settlement-chain.define-location :code "..." :name "..." :location-type "...")
-  doc: Define settlement location (CSD/ICSD)
-  tier: intent
-- verb: settlement-chain.list-hops
-  domain: settlement-chain
-  action: list-hops
-  aliases:
-  - list-hops
-  args:
-    style: keyworded
-    required:
-      chain-id:
-        type: uuid
-  positional_sugar:
-  - chain-id
-  invocation_phrases:
-  - list settlement hops
-  - show chain hops
-  - view intermediaries
-  - display settlement steps
-  - list chain intermediaries
-  - show settlement path
-  - list hops settlement-chain
-  - list hops the settlement-chain
-  examples:
-  - (settlement-chain.list-hops :chain-id "...")
-  doc: List hops in a settlement chain
-  tier: reference
-- verb: settlement-chain.remove-hop
-  domain: settlement-chain
-  action: remove-hop
-  aliases:
-  - remove-hop
-  args:
-    style: keyworded
-    required:
-      hop-id:
-        type: uuid
-  positional_sugar:
-  - hop-id
-  invocation_phrases:
-  - remove settlement hop
-  - delete chain hop
-  - remove intermediary
-  - delete settlement step
-  - remove hop from chain
-  - remove hop settlement-chain
-  - remove hop the settlement-chain
-  - settlement-chain remove hop
-  examples:
-  - (settlement-chain.remove-hop :hop-id "...")
-  doc: Remove hop from settlement chain
-  tier: intent
-- verb: settlement-chain.set-cross-border
-  domain: settlement-chain
-  action: set-cross-border
-  aliases:
-  - set-cross-border
-  args:
-    style: keyworded
-    required:
-      source-market:
-        type: entity_name
-      settlement-method:
-        type: enum
-        values:
-        - BRIDGE
-        - DIRECT
-        - VIA_ICSD
-      cbu-id:
-        type: entity_name
-      target-market:
-        type: entity_name
-    optional:
-      special-instructions:
-        type: str
-      bridge-location-id:
-        type: entity_name
-      preferred-currency:
-        type: str
-      fx-timing:
-        type: enum
-        values:
-        - PRE_SETTLEMENT
-        - ON_SETTLEMENT
-        - POST_SETTLEMENT
-      additional-days:
-        type: int
-  positional_sugar:
-  - cbu-id
-  - source-market
-  invocation_phrases:
-  - set cross-border routing
-  - configure cross-border
-  - add cross-border settlement
-  - set international settlement
-  - configure bridge settlement
-  - set cross-border config
-  - set cross border settlement-chain
-  - set cross border the settlement-chain
-  examples:
-  - (settlement-chain.set-cross-border :cbu-id "..." :source-market "..." :target-market "..." :settlement-method "...")
-  doc: Configure cross-border settlement routing
-  tier: intent
-- verb: settlement-chain.list-locations
-  domain: settlement-chain
-  action: list-locations
-  aliases:
-  - list-locations
-  args:
-    style: keyworded
-    optional:
-      country-code:
-        type: str
-      location-type:
-        type: str
-  invocation_phrases:
-  - list settlement locations
-  - show CSDs
-  - view settlement venues
-  - list custodian locations
-  - show ICSDs
-  - display settlement depots
-  - list all locations
-  - list locations settlement-chain
-  examples:
-  - (settlement-chain.list-locations)
-  doc: List settlement locations
-  tier: reference
-- verb: settlement-chain.deactivate-cross-border
-  domain: settlement-chain
-  action: deactivate-cross-border
-  aliases:
-  - deactivate-cross-border
-  args:
-    style: keyworded
-    required:
-      config-id:
-        type: uuid
-  positional_sugar:
-  - config-id
-  invocation_phrases:
-  - deactivate cross-border
-  - disable cross-border routing
-  - turn off cross-border
-  - remove cross-border config
-  - end cross-border
-  - deactivate cross border settlement-chain
-  - deactivate cross border the settlement-chain
-  - settlement-chain deactivate cross border
-  examples:
-  - (settlement-chain.deactivate-cross-border :config-id "...")
-  doc: Deactivate cross-border configuration
-  tier: intent

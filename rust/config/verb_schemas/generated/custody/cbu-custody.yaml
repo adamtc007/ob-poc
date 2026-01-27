@@ -2,30 +2,6 @@ version: '2.0'
 domain: cbu-custody
 description: 'CBU custody diagnostics: Query operational universe, SSIs, and Booking Rules'
 verbs:
-- verb: cbu-custody.derive-required-coverage
-  domain: cbu-custody
-  action: derive-required-coverage
-  aliases:
-  - derive-required-coverage
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - derive required coverage cbu-custody
-  - derive required coverage the cbu-custody
-  - cbu-custody derive required coverage
-  examples:
-  - (cbu-custody.derive-required-coverage :cbu-id "...")
-  doc: Compare universe to booking rules, find gaps
-  tier: diagnostics
-  tags:
-  - read
-  - validation
-  - gap-analysis
 - verb: cbu-custody.list-agent-overrides
   domain: cbu-custody
   action: list-agent-overrides
@@ -49,104 +25,6 @@ verbs:
   tags:
   - read
   - operational-state
-- verb: cbu-custody.lookup-ssi
-  domain: cbu-custody
-  action: lookup-ssi
-  aliases:
-  - lookup-ssi
-  args:
-    style: keyworded
-    required:
-      instrument-class:
-        type: str
-      cbu-id:
-        type: entity_name
-      currency:
-        type: str
-    optional:
-      counterparty-bic:
-        type: str
-      security-type:
-        type: str
-      settlement-type:
-        type: str
-      market:
-        type: str
-  positional_sugar:
-  - cbu-id
-  - instrument-class
-  invocation_phrases:
-  - lookup ssi cbu-custody
-  - lookup ssi the cbu-custody
-  - cbu-custody lookup ssi
-  examples:
-  - (cbu-custody.lookup-ssi :cbu-id "..." :instrument-class "..." :currency "...")
-  doc: Find SSI for given trade characteristics (simulate ALERT lookup)
-  tier: diagnostics
-  tags:
-  - read
-  - routing
-  - alert-simulation
-- verb: cbu-custody.list-ssis
-  domain: cbu-custody
-  action: list-ssis
-  aliases:
-  - list-ssis
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      status:
-        type: str
-      type:
-        type: str
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - list ssis cbu-custody
-  - list ssis the cbu-custody
-  - cbu-custody list ssis
-  examples:
-  - (cbu-custody.list-ssis :cbu-id "...")
-  doc: List SSIs for a CBU (read from operational tables)
-  tier: diagnostics
-  tags:
-  - read
-  - operational-state
-- verb: cbu-custody.setup-ssi
-  domain: cbu-custody
-  action: setup-ssi
-  aliases:
-  - setup-ssi
-  args:
-    style: keyworded
-    required:
-      document-id:
-        type: entity_name
-      cbu-id:
-        type: entity_name
-    optional:
-      validation-mode:
-        type: enum
-        values:
-        - STRICT
-        - PERMISSIVE
-  positional_sugar:
-  - cbu-id
-  - document-id
-  invocation_phrases:
-  - setup ssi cbu-custody
-  - setup ssi the cbu-custody
-  - cbu-custody setup ssi
-  examples:
-  - (cbu-custody.setup-ssi :cbu-id "..." :document-id "...")
-  doc: Bulk import SSIs from SSI_ONBOARDING document
-  tier: composite
-  tags:
-  - bulk-import
-  - document-driven
 - verb: cbu-custody.validate-booking-coverage
   domain: cbu-custody
   action: validate-booking-coverage
@@ -197,6 +75,128 @@ verbs:
   tags:
   - read
   - operational-state
+- verb: cbu-custody.derive-required-coverage
+  domain: cbu-custody
+  action: derive-required-coverage
+  aliases:
+  - derive-required-coverage
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - derive required coverage cbu-custody
+  - derive required coverage the cbu-custody
+  - cbu-custody derive required coverage
+  examples:
+  - (cbu-custody.derive-required-coverage :cbu-id "...")
+  doc: Compare universe to booking rules, find gaps
+  tier: diagnostics
+  tags:
+  - read
+  - validation
+  - gap-analysis
+- verb: cbu-custody.setup-ssi
+  domain: cbu-custody
+  action: setup-ssi
+  aliases:
+  - setup-ssi
+  args:
+    style: keyworded
+    required:
+      document-id:
+        type: entity_name
+      cbu-id:
+        type: entity_name
+    optional:
+      validation-mode:
+        type: enum
+        values:
+        - STRICT
+        - PERMISSIVE
+  positional_sugar:
+  - cbu-id
+  - document-id
+  invocation_phrases:
+  - setup ssi cbu-custody
+  - setup ssi the cbu-custody
+  - cbu-custody setup ssi
+  examples:
+  - (cbu-custody.setup-ssi :cbu-id "..." :document-id "...")
+  doc: Bulk import SSIs from SSI_ONBOARDING document
+  tier: composite
+  tags:
+  - bulk-import
+  - document-driven
+- verb: cbu-custody.list-ssis
+  domain: cbu-custody
+  action: list-ssis
+  aliases:
+  - list-ssis
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      type:
+        type: str
+      status:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list ssis cbu-custody
+  - list ssis the cbu-custody
+  - cbu-custody list ssis
+  examples:
+  - (cbu-custody.list-ssis :cbu-id "...")
+  doc: List SSIs for a CBU (read from operational tables)
+  tier: diagnostics
+  tags:
+  - read
+  - operational-state
+- verb: cbu-custody.lookup-ssi
+  domain: cbu-custody
+  action: lookup-ssi
+  aliases:
+  - lookup-ssi
+  args:
+    style: keyworded
+    required:
+      currency:
+        type: str
+      instrument-class:
+        type: str
+      cbu-id:
+        type: entity_name
+    optional:
+      market:
+        type: str
+      security-type:
+        type: str
+      counterparty-bic:
+        type: str
+      settlement-type:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - instrument-class
+  invocation_phrases:
+  - lookup ssi cbu-custody
+  - lookup ssi the cbu-custody
+  - cbu-custody lookup ssi
+  examples:
+  - (cbu-custody.lookup-ssi :cbu-id "..." :instrument-class "..." :currency "...")
+  doc: Find SSI for given trade characteristics (simulate ALERT lookup)
+  tier: diagnostics
+  tags:
+  - read
+  - routing
+  - alert-simulation
 - verb: cbu-custody.list-universe
   domain: cbu-custody
   action: list-universe

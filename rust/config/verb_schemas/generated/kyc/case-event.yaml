@@ -15,10 +15,6 @@ verbs:
       event-type:
         type: str
     optional:
-      event-data:
-        type: json
-      actor-id:
-        type: entity_name
       actor-type:
         type: enum
         values:
@@ -26,10 +22,14 @@ verbs:
         - SYSTEM
         - RULE_ENGINE
         - INTEGRATION
-      workstream-id:
-        type: entity_name
       comment:
         type: str
+      workstream-id:
+        type: entity_name
+      actor-id:
+        type: entity_name
+      event-data:
+        type: json
   positional_sugar:
   - case-id
   - event-type

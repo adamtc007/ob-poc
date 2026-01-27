@@ -270,6 +270,11 @@ pub struct AgentChatResponse {
     /// UI must pass this back to /resolve-by-ref-id to prevent stale commits
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dsl_hash: Option<String>,
+    /// Verb disambiguation request (when multiple verbs match with similar confidence)
+    /// UI should render these as clickable buttons, not text
+    /// User selection triggers POST /api/session/:id/select-verb
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verb_disambiguation: Option<ob_poc_types::VerbDisambiguationRequest>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -897,15 +902,16 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     return Ok(self.staged_response(r.dsl, msg));
                 }
 
-                // Ambiguous? Ask clarification
+                // Ambiguous? Return structured disambiguation request
+                // User will click a button, triggering /select-verb endpoint
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification)
                     && r.verb_candidates.len() >= 2
                 {
-                    let msg = format!(
-                        "Did you mean '{}' or '{}'?",
-                        r.verb_candidates[0].verb, r.verb_candidates[1].verb
-                    );
-                    return Ok(self.fail(&msg, session));
+                    return Ok(self.build_verb_disambiguation_response(
+                        &request.message,
+                        &r.verb_candidates,
+                        session,
+                    ));
                 }
 
                 // Pipeline gave an error message? Return it
@@ -1056,6 +1062,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                                     unresolved_refs: None,
                                     current_ref_index: None,
                                     dsl_hash: None,
+                                    verb_disambiguation: None,
                                 });
                             }
                         }
@@ -1125,6 +1132,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     unresolved_refs: None,
                     current_ref_index: None,
                     dsl_hash: None,
+                    verb_disambiguation: None,
                 })
             }
             Err(e) => {
@@ -1274,6 +1282,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             unresolved_refs: None,
             current_ref_index: None,
             dsl_hash: None,
+            verb_disambiguation: None,
         }
     }
 
@@ -1291,6 +1300,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             unresolved_refs: None,
             current_ref_index: None,
             dsl_hash: None,
+            verb_disambiguation: None,
         }
     }
 
@@ -1310,6 +1320,88 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             unresolved_refs: None,
             current_ref_index: None,
             dsl_hash: None,
+            verb_disambiguation: None,
+        }
+    }
+
+    /// Build a structured verb disambiguation response for the UI
+    ///
+    /// When verb search returns ambiguous results (multiple verbs with similar scores),
+    /// this method creates a response with clickable options instead of just text.
+    ///
+    /// The UI will render these as buttons. When clicked, the selection is sent to
+    /// `/api/session/:id/select-verb` which records the learning signal and executes.
+    fn build_verb_disambiguation_response(
+        &self,
+        original_input: &str,
+        candidates: &[crate::mcp::verb_search::VerbSearchResult],
+        session: &mut AgentSession,
+    ) -> AgentChatResponse {
+        use ob_poc_types::{VerbDisambiguationRequest, VerbOption};
+
+        // Build verb options from candidates (top 5 max)
+        let options: Vec<VerbOption> = candidates
+            .iter()
+            .take(5)
+            .map(|c| {
+                let description = c
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| format!("Execute {}", c.verb));
+                VerbOption {
+                    verb_fqn: c.verb.clone(),
+                    description,
+                    example: format!("({})", c.verb),
+                    score: c.score,
+                    matched_phrase: Some(c.matched_phrase.clone()),
+                }
+            })
+            .collect();
+
+        let request_id = Uuid::new_v4().to_string();
+
+        let disambiguation_request = VerbDisambiguationRequest {
+            request_id: request_id.clone(),
+            original_input: original_input.to_string(),
+            options,
+            prompt: "Which action did you mean?".to_string(),
+        };
+
+        // Build message for display (also shown in chat history)
+        let options_text: Vec<String> = candidates
+            .iter()
+            .take(5)
+            .enumerate()
+            .map(|(i, c)| {
+                let desc = c.description.as_deref().unwrap_or("No description");
+                format!("{}. **{}**: {}", i + 1, c.verb, desc)
+            })
+            .collect();
+
+        let message = format!(
+            "I found multiple matching actions for \"{}\":\n\n{}\n\nPlease select one.",
+            original_input,
+            options_text.join("\n")
+        );
+
+        session.add_agent_message(message.clone(), None, None);
+
+        // Return response with verb_disambiguation field populated
+        // The UI should check for this field and render clickable buttons
+        AgentChatResponse {
+            message,
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::PendingValidation,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None, // Legacy entity disambiguation
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: Some(disambiguation_request),
         }
     }
 
@@ -1519,6 +1611,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     unresolved_refs: None,
                     current_ref_index: None,
                     dsl_hash: None,
+                    verb_disambiguation: None,
                 });
             } else {
                 return Some(AgentChatResponse {
@@ -1534,6 +1627,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     unresolved_refs: None,
                     current_ref_index: None,
                     dsl_hash: None,
+                    verb_disambiguation: None,
                 });
             }
         }
@@ -1553,6 +1647,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                verb_disambiguation: None,
             });
         }
 
@@ -1571,6 +1666,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                verb_disambiguation: None,
             });
         }
 
@@ -2012,6 +2108,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             unresolved_refs,
             current_ref_index,
             dsl_hash,
+            verb_disambiguation: None,
         })
     }
 

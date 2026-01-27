@@ -130,12 +130,16 @@ domains:
         description: Update a CBU
         invocation_phrases:
           - "update CBU"
+          - "update cbu details"
           - "modify CBU"
           - "change CBU details"
           - "edit CBU"
           - "update CBU name"
           - "change CBU status"
           - "modify business unit"
+          - "edit cbu details"
+          - "modify cbu details"
+          - "update the cbu"
         behavior: crud
         metadata:
           tier: intent

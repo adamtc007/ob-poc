@@ -2,57 +2,6 @@ version: '2.0'
 domain: attributes
 description: Attribute requirement and value management
 verbs:
-- verb: attributes.set
-  domain: attributes
-  action: set
-  aliases:
-  - set
-  args:
-    style: keyworded
-    required:
-      attr-id:
-        type: uuid
-      cbu-id:
-        type: entity_name
-      value:
-        type: str
-    optional:
-      evidence:
-        type: list
-  positional_sugar:
-  - cbu-id
-  - attr-id
-  invocation_phrases:
-  - set attributes
-  - set the attributes
-  - attributes set
-  examples:
-  - (attributes.set :cbu-id "..." :attr-id "..." :value "...")
-  doc: Set an attribute value manually
-  tier: intent
-- verb: attributes.populate
-  domain: attributes
-  action: populate
-  aliases:
-  - populate
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      sources:
-        type: list
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - populate attributes
-  - populate the attributes
-  - attributes populate
-  examples:
-  - (attributes.populate :cbu-id "...")
-  doc: Auto-populate attribute values from available sources
-  tier: composite
 - verb: attributes.gaps
   domain: attributes
   action: gaps
@@ -96,3 +45,54 @@ verbs:
   - (attributes.rollup :cbu-id "...")
   doc: Roll up attribute requirements from discovered SRDEFs
   tier: composite
+- verb: attributes.populate
+  domain: attributes
+  action: populate
+  aliases:
+  - populate
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      sources:
+        type: list
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - populate attributes
+  - populate the attributes
+  - attributes populate
+  examples:
+  - (attributes.populate :cbu-id "...")
+  doc: Auto-populate attribute values from available sources
+  tier: composite
+- verb: attributes.set
+  domain: attributes
+  action: set
+  aliases:
+  - set
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      attr-id:
+        type: uuid
+      value:
+        type: str
+    optional:
+      evidence:
+        type: list
+  positional_sugar:
+  - cbu-id
+  - attr-id
+  invocation_phrases:
+  - set attributes
+  - set the attributes
+  - attributes set
+  examples:
+  - (attributes.set :cbu-id "..." :attr-id "..." :value "...")
+  doc: Set an attribute value manually
+  tier: intent

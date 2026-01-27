@@ -2,6 +2,32 @@ version: '2.0'
 domain: kyc-case
 description: KYC case lifecycle management
 verbs:
+- verb: kyc-case.read
+  domain: kyc-case
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+  positional_sugar:
+  - case-id
+  invocation_phrases:
+  - read kyc case
+  - read kyc-case
+  - read the kyc case
+  - get kyc case
+  - fetch kyc case
+  - read compliance case
+  - kyc case read
+  examples:
+  - (kyc-case.read :case-id "...")
+  doc: Read case details
+  tier: reference
 - verb: kyc-case.escalate
   domain: kyc-case
   action: escalate
@@ -34,89 +60,6 @@ verbs:
   - (kyc-case.escalate :case-id "..." :escalation-level "...")
   doc: Escalate case to higher authority
   tier: intent
-- verb: kyc-case.read
-  domain: kyc-case
-  action: read
-  aliases:
-  - fetch
-  - get
-  - read
-  args:
-    style: keyworded
-    required:
-      case-id:
-        type: entity_name
-  positional_sugar:
-  - case-id
-  invocation_phrases:
-  - read kyc case
-  - read kyc-case
-  - read the kyc case
-  - get kyc case
-  - fetch kyc case
-  - read compliance case
-  - kyc case read
-  examples:
-  - (kyc-case.read :case-id "...")
-  doc: Read case details
-  tier: reference
-- verb: kyc-case.assign
-  domain: kyc-case
-  action: assign
-  aliases:
-  - allocate
-  - assign
-  - set
-  args:
-    style: keyworded
-    required:
-      case-id:
-        type: entity_name
-    optional:
-      analyst-id:
-        type: entity_name
-      reviewer-id:
-        type: entity_name
-  positional_sugar:
-  - case-id
-  invocation_phrases:
-  - assign case
-  - assign to analyst
-  - assign case to
-  - assign kyc case
-  - assign kyc-case
-  - assign the kyc case
-  - allocate kyc case
-  - set kyc case
-  examples:
-  - (kyc-case.assign :case-id "...")
-  doc: Assign case to analyst and/or reviewer
-  tier: intent
-- verb: kyc-case.list-by-cbu
-  domain: kyc-case
-  action: list-by-cbu
-  aliases:
-  - list-by-cbu
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      status:
-        type: str
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - list by cbu kyc case
-  - list by cbu kyc-case
-  - list by cbu the kyc case
-  - list by cbu compliance case
-  - kyc case list by cbu
-  examples:
-  - (kyc-case.list-by-cbu :cbu-id "...")
-  doc: List cases for a CBU
-  tier: reference
 - verb: kyc-case.update-status
   domain: kyc-case
   action: update-status
@@ -185,82 +128,31 @@ verbs:
   - (kyc-case.set-risk-rating :case-id "..." :risk-rating "...")
   doc: Set case risk rating
   tier: intent
-- verb: kyc-case.create
+- verb: kyc-case.list-by-cbu
   domain: kyc-case
-  action: create
+  action: list-by-cbu
   aliases:
-  - add
-  - create
-  - new
+  - list-by-cbu
   args:
     style: keyworded
     required:
       cbu-id:
         type: entity_name
     optional:
-      notes:
+      status:
         type: str
-      sla-deadline:
-        type: timestamp
-      case-type:
-        type: enum
-        values:
-        - NEW_CLIENT
-        - PERIODIC_REVIEW
-        - EVENT_DRIVEN
-        - REMEDIATION
-      assigned-analyst-id:
-        type: entity_name
   positional_sugar:
   - cbu-id
   invocation_phrases:
-  - create kyc case
-  - open case
-  - start onboarding
-  - create case for
-  - create kyc-case
-  - create the kyc case
-  - add kyc case
-  - new kyc case
+  - list by cbu kyc case
+  - list by cbu kyc-case
+  - list by cbu the kyc case
+  - list by cbu compliance case
+  - kyc case list by cbu
   examples:
-  - (kyc-case.create :cbu-id "...")
-  doc: Create a new KYC case for a CBU
-  tier: intent
-- verb: kyc-case.close
-  domain: kyc-case
-  action: close
-  aliases:
-  - close
-  args:
-    style: keyworded
-    required:
-      case-id:
-        type: entity_name
-      status:
-        type: enum
-        values:
-        - APPROVED
-        - REJECTED
-        - WITHDRAWN
-        - EXPIRED
-        - REFER_TO_REGULATOR
-        - DO_NOT_ONBOARD
-    optional:
-      notes:
-        type: str
-  positional_sugar:
-  - case-id
-  - status
-  invocation_phrases:
-  - close kyc case
-  - close kyc-case
-  - close the kyc case
-  - close compliance case
-  - kyc case close
-  examples:
-  - (kyc-case.close :case-id "..." :status "...")
-  doc: Close the case
-  tier: intent
+  - (kyc-case.list-by-cbu :cbu-id "...")
+  doc: List cases for a CBU
+  tier: reference
 - verb: kyc-case.reopen
   domain: kyc-case
   action: reopen
@@ -319,4 +211,116 @@ verbs:
   examples:
   - (kyc-case.state :case-id "...")
   doc: Get full case state with workstreams and embedded awaiting requests
+  tier: intent
+- verb: kyc-case.create
+  domain: kyc-case
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      assigned-analyst-id:
+        type: entity_name
+      sla-deadline:
+        type: timestamp
+      case-type:
+        type: enum
+        values:
+        - NEW_CLIENT
+        - PERIODIC_REVIEW
+        - EVENT_DRIVEN
+        - REMEDIATION
+      notes:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - create kyc case
+  - open case
+  - start onboarding
+  - create case for
+  - create kyc-case
+  - create the kyc case
+  - add kyc case
+  - new kyc case
+  - create compliance case
+  - kyc case create
+  examples:
+  - (kyc-case.create :cbu-id "...")
+  doc: Create a new KYC case for a CBU
+  tier: intent
+- verb: kyc-case.assign
+  domain: kyc-case
+  action: assign
+  aliases:
+  - allocate
+  - assign
+  - set
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+    optional:
+      reviewer-id:
+        type: entity_name
+      analyst-id:
+        type: entity_name
+  positional_sugar:
+  - case-id
+  invocation_phrases:
+  - assign case
+  - assign to analyst
+  - assign case to
+  - assign kyc case
+  - assign kyc-case
+  - assign the kyc case
+  - allocate kyc case
+  - set kyc case
+  - assign compliance case
+  - kyc case assign
+  examples:
+  - (kyc-case.assign :case-id "...")
+  doc: Assign case to analyst and/or reviewer
+  tier: intent
+- verb: kyc-case.close
+  domain: kyc-case
+  action: close
+  aliases:
+  - close
+  args:
+    style: keyworded
+    required:
+      case-id:
+        type: entity_name
+      status:
+        type: enum
+        values:
+        - APPROVED
+        - REJECTED
+        - WITHDRAWN
+        - EXPIRED
+        - REFER_TO_REGULATOR
+        - DO_NOT_ONBOARD
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - case-id
+  - status
+  invocation_phrases:
+  - close kyc case
+  - close kyc-case
+  - close the kyc case
+  - close compliance case
+  - kyc case close
+  examples:
+  - (kyc-case.close :case-id "..." :status "...")
+  doc: Close the case
   tier: intent

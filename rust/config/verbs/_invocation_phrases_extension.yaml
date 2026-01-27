@@ -447,8 +447,6 @@ trading-profile:
       - "show CA setup"
       - "view event policy"
 
-
-
 # ============================================================================
 # ENTITY.YAML - Entity Management (17 verbs, 4 have phrases)
 # ============================================================================
@@ -685,6 +683,35 @@ control:
       - "control succession"
       - "new controller"
 
+  identify-ubos:
+    invocation_phrases:
+      - "who owns this company"
+      - "who owns this"
+      - "identify owners"
+      - "find ubos"
+      - "identify ubos"
+      - "who are the beneficial owners"
+      - "find ultimate beneficial owners"
+      - "discover ubos"
+      - "identify beneficial owners"
+      - "who ultimately owns"
+      - "who owns this entity"
+      - "find the ubos"
+      - "calculate ownership"
+      - "trace beneficial ownership"
+      - "who controls this company"
+
+  trace-chain:
+    invocation_phrases:
+      - "show ownership chain"
+      - "trace ownership"
+      - "ownership chain"
+      - "follow ownership"
+      - "trace control chain"
+      - "show control chain"
+      - "ownership hierarchy"
+      - "trace ownership path"
+
 # ============================================================================
 # GLEIF.YAML - GLEIF Integration (16 verbs, 6 have phrases)
 # ============================================================================
@@ -833,6 +860,14 @@ cbu:
       - "list all business units"
       - "show CBUs for client"
       - "get CBU list"
+      - "list all cbus"
+      - "show cbu list"
+      - "display all cbus"
+      - "list every cbu"
+      - "show me all cbus"
+      - "get all cbus"
+      - "what cbus exist"
+      - "show cbus in database"
 
   search:
     invocation_phrases:
@@ -933,8 +968,6 @@ cbu:
       - "get CBU summary"
       - "display CBU info"
       - "CBU snapshot"
-
-
 
 # ============================================================================
 # GRAPH.YAML - Additional Coverage (9 verbs, all have some but extend)
@@ -1254,6 +1287,40 @@ client-group:
       - "upload group"
       - "import from YAML"
       - "load saved group"
+
+# ============================================================================
+# KYC-CASE - Fix ambiguous "open a kyc case"
+# ============================================================================
+
+kyc-case:
+  create:
+    invocation_phrases:
+      - "create kyc case"
+      - "new kyc case"
+      - "open new kyc case"
+      - "start kyc case"
+      - "open a kyc case"
+      - "create new case"
+      - "initiate kyc case"
+      - "begin kyc case"
+      - "start new case"
+
+# ============================================================================
+# VIEW - Fix ambiguous "show the universe"
+# ============================================================================
+
+view:
+  universe:
+    invocation_phrases:
+      - "show my universe"
+      - "display universe view"
+      - "view universe"
+      - "show universe view"
+      - "display the universe"
+      - "show all cbus in universe"
+      - "universe view"
+      - "see the universe"
+      - "show the universe"
 
 # ============================================================================
 # END OF EXTENSION

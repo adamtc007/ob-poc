@@ -2,138 +2,52 @@ version: '2.0'
 domain: attribute
 description: Attribute dictionary management - define attributes and map them to document types
 verbs:
-- verb: attribute.read
+- verb: attribute.unmap-from-document
   domain: attribute
-  action: read
+  action: unmap-from-document
   aliases:
-  - fetch
-  - get
-  - read
-  args:
-    style: keyworded
-    required:
-      id:
-        type: str
-  positional_sugar:
-  - id
-  invocation_phrases:
-  - read attribute
-  - read the attribute
-  - get attribute
-  - fetch attribute
-  - attribute read
-  examples:
-  - (attribute.read :id "...")
-  doc: Read an attribute by semantic ID
-  tier: reference
-- verb: attribute.check-coverage
-  domain: attribute
-  action: check-coverage
-  aliases:
-  - check-coverage
+  - unmap-from-document
   args:
     style: keyworded
     required:
       document-type:
-        type: str
+        type: entity_name
+      attribute:
+        type: entity_name
   positional_sugar:
   - document-type
-  invocation_phrases:
-  - check coverage attribute
-  - check coverage the attribute
-  - attribute check coverage
-  examples:
-  - (attribute.check-coverage :document-type "...")
-  doc: Check attribute coverage for a document type - what's mapped vs what's required
-  tier: diagnostics
-- verb: attribute.define
-  domain: attribute
-  action: define
-  aliases:
-  - define
-  args:
-    style: keyworded
-    required:
-      display-name:
-        type: str
-      value-type:
-        type: enum
-        values:
-        - string
-        - integer
-        - number
-        - boolean
-        - date
-        - datetime
-        - email
-        - phone
-        - address
-        - currency
-        - percentage
-        - tax_id
-        - json
-      id:
-        type: str
-      category:
-        type: enum
-        values:
-        - identity
-        - financial
-        - compliance
-        - document
-        - risk
-        - contact
-        - address
-        - tax
-        - employment
-        - product
-        - entity
-        - ubo
-        - isda
-        - resource
-        - cbu
-        - trust
-        - fund
-        - partnership
-    optional:
-      validation-rules:
-        type: json
-      domain:
-        type: str
-      applicability:
-        type: json
-      requires-authoritative-source:
-        type: bool
-  positional_sugar:
-  - id
-  - display-name
-  invocation_phrases:
-  - define attribute
-  - define the attribute
-  - attribute define
-  examples:
-  - (attribute.define :id "..." :display-name "..." :category "..." :value-type "...")
-  doc: Define a new attribute in the registry
-  tier: intent
-- verb: attribute.list-sinks
-  domain: attribute
-  action: list-sinks
-  aliases:
-  - list-sinks
-  args:
-    style: keyworded
-    required:
-      attribute:
-        type: str
-  positional_sugar:
   - attribute
   invocation_phrases:
-  - list sinks attribute
-  - list sinks the attribute
-  - attribute list sinks
+  - unmap from document attribute
+  - unmap from document the attribute
+  - attribute unmap from document
   examples:
-  - (attribute.list-sinks :attribute "...")
-  doc: List all document types that require (sink) a given attribute
+  - (attribute.unmap-from-document :document-type "..." :attribute "...")
+  doc: Remove attribute mapping from document type
+  tier: intent
+- verb: attribute.list
+  domain: attribute
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      domain:
+        type: str
+      category:
+        type: str
+  invocation_phrases:
+  - list attribute
+  - list the attribute
+  - show attribute
+  - get all attribute
+  - attribute list
+  examples:
+  - (attribute.list)
+  doc: List attributes, optionally filtered by category or domain
   tier: reference
 - verb: attribute.list-by-document
   domain: attribute
@@ -170,6 +84,8 @@ verbs:
   args:
     style: keyworded
     required:
+      document-type:
+        type: entity_name
       attribute:
         type: entity_name
       direction:
@@ -178,8 +94,6 @@ verbs:
         - SOURCE
         - SINK
         - BOTH
-      document-type:
-        type: entity_name
     optional:
       extraction-method:
         type: enum
@@ -190,18 +104,18 @@ verbs:
         - IMAGE
         - MANUAL
         - DERIVED
-      extraction-field-path:
-        type: str
       is-authoritative:
         type: bool
+      extraction-confidence-default:
+        type: decimal
       proof-strength:
         type: enum
         values:
         - PRIMARY
         - SECONDARY
         - SUPPORTING
-      extraction-confidence-default:
-        type: decimal
+      extraction-field-path:
+        type: str
   positional_sugar:
   - document-type
   - attribute
@@ -212,106 +126,6 @@ verbs:
   examples:
   - (attribute.map-to-document :document-type "..." :attribute "..." :direction "...")
   doc: Map attribute to document type (source or sink relationship)
-  tier: intent
-- verb: attribute.trace-lineage
-  domain: attribute
-  action: trace-lineage
-  aliases:
-  - trace-lineage
-  args:
-    style: keyworded
-    required:
-      attribute:
-        type: str
-  positional_sugar:
-  - attribute
-  invocation_phrases:
-  - trace lineage attribute
-  - trace lineage the attribute
-  - attribute trace lineage
-  examples:
-  - (attribute.trace-lineage :attribute "...")
-  doc: Show complete lineage for an attribute - sources, sinks, and resources that require it
-  tier: intent
-- verb: attribute.list
-  domain: attribute
-  action: list
-  aliases:
-  - get all
-  - list
-  - show
-  args:
-    style: keyworded
-    optional:
-      domain:
-        type: str
-      category:
-        type: str
-  invocation_phrases:
-  - list attribute
-  - list the attribute
-  - show attribute
-  - get all attribute
-  - attribute list
-  examples:
-  - (attribute.list)
-  doc: List attributes, optionally filtered by category or domain
-  tier: reference
-- verb: attribute.update
-  domain: attribute
-  action: update
-  aliases:
-  - edit
-  - modify
-  - update
-  args:
-    style: keyworded
-    required:
-      id:
-        type: str
-    optional:
-      validation-rules:
-        type: json
-      applicability:
-        type: json
-      requires-authoritative-source:
-        type: bool
-      display-name:
-        type: str
-  positional_sugar:
-  - id
-  invocation_phrases:
-  - update attribute
-  - update the attribute
-  - edit attribute
-  - modify attribute
-  - attribute update
-  examples:
-  - (attribute.update :id "...")
-  doc: Update an existing attribute
-  tier: intent
-- verb: attribute.unmap-from-document
-  domain: attribute
-  action: unmap-from-document
-  aliases:
-  - unmap-from-document
-  args:
-    style: keyworded
-    required:
-      document-type:
-        type: entity_name
-      attribute:
-        type: entity_name
-  positional_sugar:
-  - document-type
-  - attribute
-  invocation_phrases:
-  - unmap from document attribute
-  - unmap from document the attribute
-  - attribute unmap from document
-  examples:
-  - (attribute.unmap-from-document :document-type "..." :attribute "...")
-  doc: Remove attribute mapping from document type
   tier: intent
 - verb: attribute.list-sources
   domain: attribute
@@ -333,3 +147,189 @@ verbs:
   - (attribute.list-sources :attribute "...")
   doc: List all document types that provide (source) a given attribute
   tier: reference
+- verb: attribute.list-sinks
+  domain: attribute
+  action: list-sinks
+  aliases:
+  - list-sinks
+  args:
+    style: keyworded
+    required:
+      attribute:
+        type: str
+  positional_sugar:
+  - attribute
+  invocation_phrases:
+  - list sinks attribute
+  - list sinks the attribute
+  - attribute list sinks
+  examples:
+  - (attribute.list-sinks :attribute "...")
+  doc: List all document types that require (sink) a given attribute
+  tier: reference
+- verb: attribute.check-coverage
+  domain: attribute
+  action: check-coverage
+  aliases:
+  - check-coverage
+  args:
+    style: keyworded
+    required:
+      document-type:
+        type: str
+  positional_sugar:
+  - document-type
+  invocation_phrases:
+  - check coverage attribute
+  - check coverage the attribute
+  - attribute check coverage
+  examples:
+  - (attribute.check-coverage :document-type "...")
+  doc: Check attribute coverage for a document type - what's mapped vs what's required
+  tier: diagnostics
+- verb: attribute.read
+  domain: attribute
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      id:
+        type: str
+  positional_sugar:
+  - id
+  invocation_phrases:
+  - read attribute
+  - read the attribute
+  - get attribute
+  - fetch attribute
+  - attribute read
+  examples:
+  - (attribute.read :id "...")
+  doc: Read an attribute by semantic ID
+  tier: reference
+- verb: attribute.trace-lineage
+  domain: attribute
+  action: trace-lineage
+  aliases:
+  - trace-lineage
+  args:
+    style: keyworded
+    required:
+      attribute:
+        type: str
+  positional_sugar:
+  - attribute
+  invocation_phrases:
+  - trace lineage attribute
+  - trace lineage the attribute
+  - attribute trace lineage
+  examples:
+  - (attribute.trace-lineage :attribute "...")
+  doc: Show complete lineage for an attribute - sources, sinks, and resources that require it
+  tier: intent
+- verb: attribute.define
+  domain: attribute
+  action: define
+  aliases:
+  - define
+  args:
+    style: keyworded
+    required:
+      category:
+        type: enum
+        values:
+        - identity
+        - financial
+        - compliance
+        - document
+        - risk
+        - contact
+        - address
+        - tax
+        - employment
+        - product
+        - entity
+        - ubo
+        - isda
+        - resource
+        - cbu
+        - trust
+        - fund
+        - partnership
+      id:
+        type: str
+      display-name:
+        type: str
+      value-type:
+        type: enum
+        values:
+        - string
+        - integer
+        - number
+        - boolean
+        - date
+        - datetime
+        - email
+        - phone
+        - address
+        - currency
+        - percentage
+        - tax_id
+        - json
+    optional:
+      applicability:
+        type: json
+      domain:
+        type: str
+      requires-authoritative-source:
+        type: bool
+      validation-rules:
+        type: json
+  positional_sugar:
+  - id
+  - display-name
+  invocation_phrases:
+  - define attribute
+  - define the attribute
+  - attribute define
+  examples:
+  - (attribute.define :id "..." :display-name "..." :category "..." :value-type "...")
+  doc: Define a new attribute in the registry
+  tier: intent
+- verb: attribute.update
+  domain: attribute
+  action: update
+  aliases:
+  - edit
+  - modify
+  - update
+  args:
+    style: keyworded
+    required:
+      id:
+        type: str
+    optional:
+      display-name:
+        type: str
+      validation-rules:
+        type: json
+      requires-authoritative-source:
+        type: bool
+      applicability:
+        type: json
+  positional_sugar:
+  - id
+  invocation_phrases:
+  - update attribute
+  - update the attribute
+  - edit attribute
+  - modify attribute
+  - attribute update
+  examples:
+  - (attribute.update :id "...")
+  doc: Update an existing attribute
+  tier: intent

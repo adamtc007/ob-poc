@@ -2,160 +2,35 @@ version: '2.0'
 domain: bods
 description: Beneficial Ownership Data Standard (BODS) integration for UBO discovery
 verbs:
-- verb: bods.list-ownership
+- verb: bods.discover-ubos
   domain: bods
-  action: list-ownership
+  action: discover-ubos
   aliases:
-  - list-ownership
+  - discover-ubos
   args:
     style: keyworded
+    required:
+      entity-id:
+        type: entity_name
     optional:
-      subject-lei:
-        type: str
-      include-expired:
+      save:
         type: bool
-      entity-id:
-        type: entity_name
-  invocation_phrases:
-  - list ownership bods
-  - list ownership the bods
-  - list ownership beneficial ownership
-  - bods list ownership
-  examples:
-  - (bods.list-ownership)
-  doc: List ownership statements for an entity
-  tier: reference
-- verb: bods.get-statement
-  domain: bods
-  action: get-statement
-  aliases:
-  - get-statement
-  args:
-    style: keyworded
-    required:
-      statement-id:
-        type: str
-    optional:
-      statement-type:
-        type: enum
-        values:
-        - entity
-        - person
-        - ownership
-  positional_sugar:
-  - statement-id
-  invocation_phrases:
-  - get BODS statement
-  - fetch BODS record
-  - view BODS statement
-  - show BODS data
-  - retrieve BODS statement
-  - get ownership statement
-  - get statement bods
-  - get statement the bods
-  examples:
-  - (bods.get-statement :statement-id "...")
-  doc: Get a BODS statement by ID
-  tier: reference
-- verb: bods.list-by-entity
-  domain: bods
-  action: list-by-entity
-  aliases:
-  - list-by-entity
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
   positional_sugar:
   - entity-id
   invocation_phrases:
-  - list by entity bods
-  - list by entity the bods
-  - list by entity beneficial ownership
-  - bods list by entity
+  - discover UBOs
+  - find UBOs
+  - find beneficial owners
+  - who are the UBOs
+  - trace ownership
+  - discover ubos bods
+  - discover ubos the bods
+  - discover ubos beneficial ownership
+  - bods discover ubos
   examples:
-  - (bods.list-by-entity :entity-id "...")
-  doc: List BODS statements linked to an entity
-  tier: reference
-- verb: bods.list-persons
-  domain: bods
-  action: list-persons
-  aliases:
-  - list-persons
-  args:
-    style: keyworded
-    optional:
-      nationality:
-        type: str
-      country-of-residence:
-        type: str
-      limit:
-        type: int
-  invocation_phrases:
-  - list persons bods
-  - list persons the bods
-  - list persons beneficial ownership
-  - bods list persons
-  examples:
-  - (bods.list-persons)
-  doc: List person statements with beneficial ownership
-  tier: reference
-- verb: bods.sync-from-gleif
-  domain: bods
-  action: sync-from-gleif
-  aliases:
-  - sync-from-gleif
-  args:
-    style: keyworded
-    optional:
-      limit:
-        type: int
-      entity-id:
-        type: entity_name
-  invocation_phrases:
-  - sync from gleif bods
-  - sync from gleif the bods
-  - sync from gleif beneficial ownership
-  - bods sync from gleif
-  examples:
-  - (bods.sync-from-gleif)
-  doc: Sync BODS data from GLEIF reporting exceptions
+  - (bods.discover-ubos :entity-id "...")
+  doc: Discover Ultimate Beneficial Owners for an entity using GLEIF + BODS data
   tier: composite
-- verb: bods.link-entity
-  domain: bods
-  action: link-entity
-  aliases:
-  - link-entity
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-      bods-statement-id:
-        type: str
-    optional:
-      match-method:
-        type: enum
-        values:
-        - LEI
-        - NAME
-        - MANUAL
-        - API
-      match-confidence:
-        type: decimal
-  positional_sugar:
-  - entity-id
-  - bods-statement-id
-  invocation_phrases:
-  - link entity bods
-  - link entity the bods
-  - link entity beneficial ownership
-  - bods link entity
-  examples:
-  - (bods.link-entity :entity-id "..." :bods-statement-id "...")
-  doc: Link a local entity to a BODS entity statement
-  tier: intent
 - verb: bods.import
   domain: bods
   action: import
@@ -188,10 +63,81 @@ verbs:
   - load ownership from BODS
   - import BODS entities
   - import BODS data
+  - import ownership data
+  - load BODS statements
+  - import bods
+  - import the bods
+  - import beneficial ownership
+  - bods import
   examples:
   - (bods.import :source "...")
   doc: Bulk import BODS statements from data dump
   tier: intent
+- verb: bods.list-persons
+  domain: bods
+  action: list-persons
+  aliases:
+  - list-persons
+  args:
+    style: keyworded
+    optional:
+      country-of-residence:
+        type: str
+      limit:
+        type: int
+      nationality:
+        type: str
+  invocation_phrases:
+  - list persons bods
+  - list persons the bods
+  - list persons beneficial ownership
+  - bods list persons
+  examples:
+  - (bods.list-persons)
+  doc: List person statements with beneficial ownership
+  tier: reference
+- verb: bods.sync-from-gleif
+  domain: bods
+  action: sync-from-gleif
+  aliases:
+  - sync-from-gleif
+  args:
+    style: keyworded
+    optional:
+      limit:
+        type: int
+      entity-id:
+        type: entity_name
+  invocation_phrases:
+  - sync from gleif bods
+  - sync from gleif the bods
+  - sync from gleif beneficial ownership
+  - bods sync from gleif
+  examples:
+  - (bods.sync-from-gleif)
+  doc: Sync BODS data from GLEIF reporting exceptions
+  tier: composite
+- verb: bods.list-by-entity
+  domain: bods
+  action: list-by-entity
+  aliases:
+  - list-by-entity
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - list by entity bods
+  - list by entity the bods
+  - list by entity beneficial ownership
+  - bods list by entity
+  examples:
+  - (bods.list-by-entity :entity-id "...")
+  doc: List BODS statements linked to an entity
+  tier: reference
 - verb: bods.find-by-lei
   domain: bods
   action: find-by-lei
@@ -213,31 +159,94 @@ verbs:
   - (bods.find-by-lei :lei "...")
   doc: Find BODS entity statement by LEI
   tier: reference
-- verb: bods.discover-ubos
+- verb: bods.get-statement
   domain: bods
-  action: discover-ubos
+  action: get-statement
   aliases:
-  - discover-ubos
+  - get-statement
+  args:
+    style: keyworded
+    required:
+      statement-id:
+        type: str
+    optional:
+      statement-type:
+        type: enum
+        values:
+        - entity
+        - person
+        - ownership
+  positional_sugar:
+  - statement-id
+  invocation_phrases:
+  - get BODS statement
+  - fetch BODS record
+  - view BODS statement
+  - show BODS data
+  - retrieve BODS statement
+  - get ownership statement
+  - get statement bods
+  - get statement the bods
+  - get statement beneficial ownership
+  - bods get statement
+  examples:
+  - (bods.get-statement :statement-id "...")
+  doc: Get a BODS statement by ID
+  tier: reference
+- verb: bods.list-ownership
+  domain: bods
+  action: list-ownership
+  aliases:
+  - list-ownership
+  args:
+    style: keyworded
+    optional:
+      subject-lei:
+        type: str
+      entity-id:
+        type: entity_name
+      include-expired:
+        type: bool
+  invocation_phrases:
+  - list ownership bods
+  - list ownership the bods
+  - list ownership beneficial ownership
+  - bods list ownership
+  examples:
+  - (bods.list-ownership)
+  doc: List ownership statements for an entity
+  tier: reference
+- verb: bods.link-entity
+  domain: bods
+  action: link-entity
+  aliases:
+  - link-entity
   args:
     style: keyworded
     required:
       entity-id:
         type: entity_name
+      bods-statement-id:
+        type: str
     optional:
-      save:
-        type: bool
+      match-confidence:
+        type: decimal
+      match-method:
+        type: enum
+        values:
+        - LEI
+        - NAME
+        - MANUAL
+        - API
   positional_sugar:
   - entity-id
+  - bods-statement-id
   invocation_phrases:
-  - discover UBOs
-  - find UBOs
-  - find beneficial owners
-  - who are the UBOs
-  - trace ownership
-  - discover ubos bods
-  - discover ubos the bods
-  - discover ubos beneficial ownership
+  - link entity bods
+  - link entity the bods
+  - link entity beneficial ownership
+  - bods link entity
   examples:
-  - (bods.discover-ubos :entity-id "...")
-  doc: Discover Ultimate Beneficial Owners for an entity using GLEIF + BODS data
-  tier: composite
+  - (bods.link-entity :entity-id "..." :bods-statement-id "...")
+  doc: Link a local entity to a BODS entity statement
+  tier: intent

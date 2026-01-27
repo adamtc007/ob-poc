@@ -2,47 +2,112 @@ version: '2.0'
 domain: identifier
 description: External identifier management for entities (LEI, Clearstream, Tax ID, ISIN, etc.)
 verbs:
-- verb: identifier.attach-lei
+- verb: identifier.remove
   domain: identifier
-  action: attach-lei
+  action: remove
   aliases:
-  - attach-lei
+  - delete
+  - drop
+  - remove
   args:
     style: keyworded
     required:
-      lei:
+      identifier-id:
+        type: uuid
+  positional_sugar:
+  - identifier-id
+  invocation_phrases:
+  - remove identifier
+  - remove the identifier
+  - delete identifier
+  - drop identifier
+  - remove id
+  - identifier remove
+  examples:
+  - (identifier.remove :identifier-id "...")
+  doc: Remove an identifier from an entity (hard delete)
+  tier: intent
+- verb: identifier.find-by-clearstream
+  domain: identifier
+  action: find-by-clearstream
+  aliases:
+  - find-by-clearstream
+  args:
+    style: keyworded
+    required:
+      reference:
+        type: str
+    optional:
+      reference-type:
+        type: str
+  positional_sugar:
+  - reference
+  invocation_phrases:
+  - find by clearstream identifier
+  - find by clearstream the identifier
+  - find by clearstream id
+  - identifier find by clearstream
+  examples:
+  - (identifier.find-by-clearstream :reference "...")
+  doc: Find entity by Clearstream reference
+  tier: reference
+- verb: identifier.list-by-entity
+  domain: identifier
+  action: list-by-entity
+  aliases:
+  - list-by-entity
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      scheme:
+        type: str
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - list by entity identifier
+  - list by entity the identifier
+  - list by entity id
+  - identifier list by entity
+  examples:
+  - (identifier.list-by-entity :entity-id "...")
+  doc: List all identifiers for an entity
+  tier: reference
+- verb: identifier.attach-clearstream
+  domain: identifier
+  action: attach-clearstream
+  aliases:
+  - attach-clearstream
+  args:
+    style: keyworded
+    required:
+      reference:
         type: str
       entity-id:
         type: entity_name
     optional:
-      validation-source:
-        type: str
-      lei-next-renewal:
-        type: date
-      lei-status:
+      reference-type:
         type: enum
         values:
-        - ISSUED
-        - LAPSED
-        - RETIRED
-        - PENDING_ARCHIVAL
-        - MERGED
-        - DUPLICATE
+        - CLEARSTREAM_KV
+        - CLEARSTREAM_ACCT
       is-validated:
         type: bool
-      lei-managing-lou:
+      validation-source:
         type: str
   positional_sugar:
   - entity-id
-  - lei
+  - reference
   invocation_phrases:
-  - attach lei identifier
-  - attach lei the identifier
-  - attach lei id
-  - identifier attach lei
+  - attach clearstream identifier
+  - attach clearstream the identifier
+  - attach clearstream id
+  - identifier attach clearstream
   examples:
-  - (identifier.attach-lei :entity-id "..." :lei "...")
-  doc: Attach LEI with GLEIF-specific metadata (convenience wrapper)
+  - (identifier.attach-clearstream :entity-id "..." :reference "...")
+  doc: Attach Clearstream KV reference or account number
   tier: intent
 - verb: identifier.validate
   domain: identifier
@@ -54,10 +119,10 @@ verbs:
   args:
     style: keyworded
     required:
-      validation-source:
-        type: str
       identifier-id:
         type: uuid
+      validation-source:
+        type: str
   positional_sugar:
   - identifier-id
   - validation-source
@@ -72,39 +137,59 @@ verbs:
   - (identifier.validate :identifier-id "..." :validation-source "...")
   doc: Mark an identifier as validated
   tier: intent
-- verb: identifier.attach-clearstream
+- verb: identifier.attach
   domain: identifier
-  action: attach-clearstream
+  action: attach
   aliases:
-  - attach-clearstream
+  - attach
+  - connect
+  - link
   args:
     style: keyworded
     required:
-      reference:
-        type: str
       entity-id:
         type: entity_name
-    optional:
-      is-validated:
-        type: bool
-      validation-source:
-        type: str
-      reference-type:
+      scheme:
         type: enum
         values:
+        - LEI
         - CLEARSTREAM_KV
         - CLEARSTREAM_ACCT
+        - ISIN
+        - company_register
+        - tax_id
+        - SWIFT_BIC
+        - DUNS
+        - VAT
+        - national_id
+      id:
+        type: str
+    optional:
+      validation-source:
+        type: str
+      scheme-name:
+        type: str
+      uri:
+        type: str
+      is-validated:
+        type: bool
+      effective-from:
+        type: date
+      effective-to:
+        type: date
   positional_sugar:
   - entity-id
-  - reference
+  - scheme
   invocation_phrases:
-  - attach clearstream identifier
-  - attach clearstream the identifier
-  - attach clearstream id
-  - identifier attach clearstream
+  - attach identifier
+  - attach the identifier
+  - link identifier
+  - connect identifier
+  - attach id
+  - identifier attach
   examples:
-  - (identifier.attach-clearstream :entity-id "..." :reference "...")
-  doc: Attach Clearstream KV reference or account number
+  - (identifier.attach :entity-id "..." :scheme "..." :id "...")
+  doc: Attach an external identifier to an entity (idempotent by entity+scheme+id)
   tier: intent
 - verb: identifier.invalidate
   domain: identifier
@@ -151,31 +236,6 @@ verbs:
   - (identifier.find-by-isin :isin "...")
   doc: Find entity by ISIN (for share classes/funds)
   tier: reference
-- verb: identifier.remove
-  domain: identifier
-  action: remove
-  aliases:
-  - delete
-  - drop
-  - remove
-  args:
-    style: keyworded
-    required:
-      identifier-id:
-        type: uuid
-  positional_sugar:
-  - identifier-id
-  invocation_phrases:
-  - remove identifier
-  - remove the identifier
-  - delete identifier
-  - drop identifier
-  - remove id
-  - identifier remove
-  examples:
-  - (identifier.remove :identifier-id "...")
-  doc: Remove an identifier from an entity (hard delete)
-  tier: intent
 - verb: identifier.update-lei-status
   domain: identifier
   action: update-lei-status
@@ -184,8 +244,6 @@ verbs:
   args:
     style: keyworded
     required:
-      identifier-id:
-        type: uuid
       lei-status:
         type: enum
         values:
@@ -195,6 +253,8 @@ verbs:
         - PENDING_ARCHIVAL
         - MERGED
         - DUPLICATE
+      identifier-id:
+        type: uuid
     optional:
       lei-next-renewal:
         type: date
@@ -210,84 +270,48 @@ verbs:
   - (identifier.update-lei-status :identifier-id "..." :lei-status "...")
   doc: Update LEI status after GLEIF refresh
   tier: intent
-- verb: identifier.attach
+- verb: identifier.attach-lei
   domain: identifier
-  action: attach
+  action: attach-lei
   aliases:
-  - attach
-  - connect
-  - link
+  - attach-lei
   args:
     style: keyworded
     required:
-      id:
-        type: str
       entity-id:
         type: entity_name
-      scheme:
+      lei:
+        type: str
+    optional:
+      lei-managing-lou:
+        type: str
+      lei-next-renewal:
+        type: date
+      lei-status:
         type: enum
         values:
-        - LEI
-        - CLEARSTREAM_KV
-        - CLEARSTREAM_ACCT
-        - ISIN
-        - company_register
-        - tax_id
-        - SWIFT_BIC
-        - DUNS
-        - VAT
-        - national_id
-    optional:
+        - ISSUED
+        - LAPSED
+        - RETIRED
+        - PENDING_ARCHIVAL
+        - MERGED
+        - DUPLICATE
       is-validated:
         type: bool
       validation-source:
         type: str
-      effective-to:
-        type: date
-      uri:
-        type: str
-      effective-from:
-        type: date
-      scheme-name:
-        type: str
   positional_sugar:
   - entity-id
-  - scheme
+  - lei
   invocation_phrases:
-  - attach identifier
-  - attach the identifier
-  - link identifier
-  - connect identifier
-  - attach id
-  - identifier attach
+  - attach lei identifier
+  - attach lei the identifier
+  - attach lei id
+  - identifier attach lei
   examples:
-  - (identifier.attach :entity-id "..." :scheme "..." :id "...")
-  doc: Attach an external identifier to an entity (idempotent by entity+scheme+id)
+  - (identifier.attach-lei :entity-id "..." :lei "...")
+  doc: Attach LEI with GLEIF-specific metadata (convenience wrapper)
   tier: intent
-- verb: identifier.list-by-entity
-  domain: identifier
-  action: list-by-entity
-  aliases:
-  - list-by-entity
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-    optional:
-      scheme:
-        type: str
-  positional_sugar:
-  - entity-id
-  invocation_phrases:
-  - list by entity identifier
-  - list by entity the identifier
-  - list by entity id
-  - identifier list by entity
-  examples:
-  - (identifier.list-by-entity :entity-id "...")
-  doc: List all identifiers for an entity
-  tier: reference
 - verb: identifier.find-by-lei
   domain: identifier
   action: find-by-lei
@@ -308,28 +332,4 @@ verbs:
   examples:
   - (identifier.find-by-lei :lei "...")
   doc: Find entity by LEI
-  tier: reference
-- verb: identifier.find-by-clearstream
-  domain: identifier
-  action: find-by-clearstream
-  aliases:
-  - find-by-clearstream
-  args:
-    style: keyworded
-    required:
-      reference:
-        type: str
-    optional:
-      reference-type:
-        type: str
-  positional_sugar:
-  - reference
-  invocation_phrases:
-  - find by clearstream identifier
-  - find by clearstream the identifier
-  - find by clearstream id
-  - identifier find by clearstream
-  examples:
-  - (identifier.find-by-clearstream :reference "...")
-  doc: Find entity by Clearstream reference
   tier: reference

@@ -2,6 +2,90 @@ version: '2.0'
 domain: instruction-profile
 description: Trade instruction message configuration - defines how trades are communicated to gateways
 verbs:
+- verb: instruction-profile.list-message-types
+  domain: instruction-profile
+  action: list-message-types
+  aliases:
+  - list-message-types
+  args:
+    style: keyworded
+    optional:
+      lifecycle-event:
+        type: str
+      message-standard:
+        type: str
+  invocation_phrases:
+  - list message types instruction-profile
+  - list message types the instruction-profile
+  - instruction-profile list message types
+  examples:
+  - (instruction-profile.list-message-types)
+  doc: List available message types
+  tier: reference
+- verb: instruction-profile.define-message-type
+  domain: instruction-profile
+  action: define-message-type
+  aliases:
+  - define-message-type
+  args:
+    style: keyworded
+    required:
+      lifecycle-event:
+        type: str
+      message-type:
+        type: str
+      message-standard:
+        type: str
+      direction:
+        type: str
+    optional:
+      schema-version:
+        type: str
+      description:
+        type: str
+  positional_sugar:
+  - lifecycle-event
+  - message-standard
+  invocation_phrases:
+  - define message type instruction-profile
+  - define message type the instruction-profile
+  - instruction-profile define message type
+  examples:
+  - (instruction-profile.define-message-type :lifecycle-event "..." :message-standard "..." :message-type "..." :direction "...")
+  doc: Define instruction message type for a lifecycle event
+  tier: intent
+- verb: instruction-profile.create-template
+  domain: instruction-profile
+  action: create-template
+  aliases:
+  - create-template
+  args:
+    style: keyworded
+    required:
+      base-template:
+        type: json
+      name:
+        type: str
+      code:
+        type: str
+      message-type-id:
+        type: entity_name
+    optional:
+      validation-rules:
+        type: json
+      field-mappings:
+        type: json
+  positional_sugar:
+  - code
+  - name
+  invocation_phrases:
+  - create template instruction-profile
+  - create template the instruction-profile
+  - instruction-profile create template
+  examples:
+  - (instruction-profile.create-template :code "..." :name "..." :message-type-id "..." :base-template "...")
+  doc: Create instruction message template
+  tier: intent
 - verb: instruction-profile.read-template
   domain: instruction-profile
   action: read-template
@@ -21,6 +105,24 @@ verbs:
   examples:
   - (instruction-profile.read-template)
   doc: Read instruction template
+  tier: reference
+- verb: instruction-profile.list-templates
+  domain: instruction-profile
+  action: list-templates
+  aliases:
+  - list-templates
+  args:
+    style: keyworded
+    optional:
+      message-type-id:
+        type: uuid
+  invocation_phrases:
+  - list templates instruction-profile
+  - list templates the instruction-profile
+  - instruction-profile list templates
+  examples:
+  - (instruction-profile.list-templates)
+  doc: List instruction templates
   tier: reference
 - verb: instruction-profile.list-assignments
   domain: instruction-profile
@@ -45,76 +147,6 @@ verbs:
   - (instruction-profile.list-assignments :cbu-id "...")
   doc: List instruction template assignments for CBU
   tier: reference
-- verb: instruction-profile.list-templates
-  domain: instruction-profile
-  action: list-templates
-  aliases:
-  - list-templates
-  args:
-    style: keyworded
-    optional:
-      message-type-id:
-        type: uuid
-  invocation_phrases:
-  - list templates instruction-profile
-  - list templates the instruction-profile
-  - instruction-profile list templates
-  examples:
-  - (instruction-profile.list-templates)
-  doc: List instruction templates
-  tier: reference
-- verb: instruction-profile.create-template
-  domain: instruction-profile
-  action: create-template
-  aliases:
-  - create-template
-  args:
-    style: keyworded
-    required:
-      message-type-id:
-        type: entity_name
-      name:
-        type: str
-      code:
-        type: str
-      base-template:
-        type: json
-    optional:
-      field-mappings:
-        type: json
-      validation-rules:
-        type: json
-  positional_sugar:
-  - code
-  - name
-  invocation_phrases:
-  - create template instruction-profile
-  - create template the instruction-profile
-  - instruction-profile create template
-  examples:
-  - (instruction-profile.create-template :code "..." :name "..." :message-type-id "..." :base-template "...")
-  doc: Create instruction message template
-  tier: intent
-- verb: instruction-profile.list-message-types
-  domain: instruction-profile
-  action: list-message-types
-  aliases:
-  - list-message-types
-  args:
-    style: keyworded
-    optional:
-      lifecycle-event:
-        type: str
-      message-standard:
-        type: str
-  invocation_phrases:
-  - list message types instruction-profile
-  - list message types the instruction-profile
-  - instruction-profile list message types
-  examples:
-  - (instruction-profile.list-message-types)
-  doc: List available message types
-  tier: reference
 - verb: instruction-profile.list-field-overrides
   domain: instruction-profile
   action: list-field-overrides
@@ -135,35 +167,3 @@ verbs:
   - (instruction-profile.list-field-overrides :assignment-id "...")
   doc: List field overrides for assignment
   tier: reference
-- verb: instruction-profile.define-message-type
-  domain: instruction-profile
-  action: define-message-type
-  aliases:
-  - define-message-type
-  args:
-    style: keyworded
-    required:
-      message-type:
-        type: str
-      lifecycle-event:
-        type: str
-      message-standard:
-        type: str
-      direction:
-        type: str
-    optional:
-      description:
-        type: str
-      schema-version:
-        type: str
-  positional_sugar:
-  - lifecycle-event
-  - message-standard
-  invocation_phrases:
-  - define message type instruction-profile
-  - define message type the instruction-profile
-  - instruction-profile define message type
-  examples:
-  - (instruction-profile.define-message-type :lifecycle-event "..." :message-standard "..." :message-type "..." :direction "...")
-  doc: Define instruction message type for a lifecycle event
-  tier: intent

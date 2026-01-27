@@ -22,13 +22,13 @@ description: |
   others are purely internal accounting segregation. Use compartment_entity_id
   to link to a separate entity when applicable.
 verbs:
-- verb: fund-compartment.read
+- verb: fund-compartment.delete
   domain: fund-compartment
-  action: read
+  action: delete
   aliases:
-  - fetch
-  - get
-  - read
+  - delete
+  - drop
+  - remove
   args:
     style: keyworded
     required:
@@ -37,19 +37,22 @@ verbs:
   positional_sugar:
   - id
   invocation_phrases:
-  - get compartment
-  - read sub-fund
-  - compartment details
-  - read fund-compartment
-  - read the fund-compartment
-  - get fund-compartment
-  - fetch fund-compartment
-  - fund-compartment read
+  - delete compartment
+  - remove sub-fund
+  - delete sleeve
+  - delete fund-compartment
+  - delete the fund-compartment
+  - remove fund-compartment
+  - drop fund-compartment
+  - fund-compartment delete
   examples:
-  - (fund-compartment.read :id "...")
+  - (fund-compartment.delete :id "...")
   doc: |
-    Read compartment details by ID.
-  tier: diagnostics
+    Delete a compartment.
+
+    WARNING: May break share class linkages. Ensure no share classes
+    are linked to this compartment before deleting.
+  tier: intent
 - verb: fund-compartment.upsert
   domain: fund-compartment
   action: upsert
@@ -58,17 +61,17 @@ verbs:
   args:
     style: keyworded
     required:
-      compartment-code:
-        type: str
       umbrella-fund-entity-id:
         type: entity_name
+      compartment-code:
+        type: str
     optional:
       compartment-entity-id:
         type: entity_name
-      meta:
-        type: json
       compartment-name:
         type: str
+      meta:
+        type: json
   positional_sugar:
   - umbrella-fund-entity-id
   - compartment-code
@@ -121,13 +124,13 @@ verbs:
 
     Returns all sleeves/sub-funds within the umbrella structure.
   tier: diagnostics
-- verb: fund-compartment.delete
+- verb: fund-compartment.read
   domain: fund-compartment
-  action: delete
+  action: read
   aliases:
-  - delete
-  - drop
-  - remove
+  - fetch
+  - get
+  - read
   args:
     style: keyworded
     required:
@@ -136,19 +139,16 @@ verbs:
   positional_sugar:
   - id
   invocation_phrases:
-  - delete compartment
-  - remove sub-fund
-  - delete sleeve
-  - delete fund-compartment
-  - delete the fund-compartment
-  - remove fund-compartment
-  - drop fund-compartment
-  - fund-compartment delete
+  - get compartment
+  - read sub-fund
+  - compartment details
+  - read fund-compartment
+  - read the fund-compartment
+  - get fund-compartment
+  - fetch fund-compartment
+  - fund-compartment read
   examples:
-  - (fund-compartment.delete :id "...")
+  - (fund-compartment.read :id "...")
   doc: |
-    Delete a compartment.
-
-    WARNING: May break share class linkages. Ensure no share classes
-    are linked to this compartment before deleting.
-  tier: intent
+    Read compartment details by ID.
+  tier: diagnostics

@@ -49,18 +49,18 @@ verbs:
       root-entity-id:
         type: entity_name
     optional:
-      stop-on-policy-none:
-        type: bool
-      max-rows:
+      max-depth:
         type: int
       stop-on-no-bo-data:
         type: bool
-      max-depth:
-        type: int
-      min-pct:
-        type: decimal
+      stop-on-policy-none:
+        type: bool
       as-of-date:
         type: date
+      min-pct:
+        type: decimal
+      max-rows:
+        type: int
   positional_sugar:
   - root-entity-id
   invocation_phrases:
@@ -72,6 +72,13 @@ verbs:
   - diluted ownership report
   - who are the real owners
   - look through intermediaries
+  - AML exposure analysis
+  - beneficial owner chain
+  - indirect ownership
+  - compute economic-exposure
+  - compute the economic-exposure
+  - calculate economic-exposure
+  - derive economic-exposure
   examples:
   - (economic-exposure.compute :root-entity-id "...")
   doc: |
@@ -131,6 +138,8 @@ verbs:
   - investor concentration
   - major holders
   - summary economic-exposure
+  - summary the economic-exposure
+  - economic-exposure summary
   examples:
   - (economic-exposure.summary :issuer-entity-id "...")
   doc: |

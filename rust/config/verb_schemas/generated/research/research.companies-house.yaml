@@ -2,6 +2,36 @@ version: '2.0'
 domain: research.companies-house
 description: UK Companies House registry - company profiles, PSC, and officers
 verbs:
+- verb: research.companies-house.fetch-company
+  domain: research.companies-house
+  action: fetch-company
+  aliases:
+  - fetch-company
+  args:
+    style: keyworded
+    required:
+      company-number:
+        type: str
+    optional:
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - company-number
+  invocation_phrases:
+  - get UK company
+  - fetch from Companies House
+  - company profile
+  - fetch company research.companies-house
+  - fetch company the research.companies-house
+  - research.companies-house fetch company
+  examples:
+  - (research.companies-house.fetch-company :company-number "...")
+  doc: Fetch company profile from Companies House
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-fetch
 - verb: research.companies-house.fetch-psc
   domain: research.companies-house
   action: fetch-psc
@@ -13,10 +43,10 @@ verbs:
       company-number:
         type: str
     optional:
-      include-ceased:
-        type: bool
       decision-id:
         type: uuid
+      include-ceased:
+        type: bool
   positional_sugar:
   - company-number
   invocation_phrases:
@@ -36,6 +66,76 @@ verbs:
   - external-source
   - registry-fetch
   - ownership
+- verb: research.companies-house.search
+  domain: research.companies-house
+  action: search
+  aliases:
+  - find
+  - lookup
+  - search
+  args:
+    style: keyworded
+    required:
+      query:
+        type: str
+    optional:
+      limit:
+        type: int
+      include-inactive:
+        type: bool
+  positional_sugar:
+  - query
+  invocation_phrases:
+  - search Companies House
+  - find UK company
+  - look up British company
+  - search research.companies-house
+  - search the research.companies-house
+  - find research.companies-house
+  - lookup research.companies-house
+  - research.companies-house search
+  examples:
+  - (research.companies-house.search :query "...")
+  doc: Search UK Companies House for companies by name
+  tier: diagnostics
+  tags:
+  - read
+  - external-source
+  - registry-lookup
+- verb: research.companies-house.import-company
+  domain: research.companies-house
+  action: import-company
+  aliases:
+  - import-company
+  args:
+    style: keyworded
+    required:
+      company-number:
+        type: str
+    optional:
+      include-officers:
+        type: bool
+      include-psc:
+        type: bool
+      decision-id:
+        type: uuid
+  positional_sugar:
+  - company-number
+  invocation_phrases:
+  - import from Companies House
+  - add UK company to database
+  - import British company
+  - import company research.companies-house
+  - import company the research.companies-house
+  - research.companies-house import company
+  examples:
+  - (research.companies-house.import-company :company-number "...")
+  doc: Import company and optionally PSC/officers to database
+  tier: intent
+  tags:
+  - write
+  - import
+  - registry-import
 - verb: research.companies-house.fetch-officers
   domain: research.companies-house
   action: fetch-officers
@@ -69,103 +169,3 @@ verbs:
   - external-source
   - registry-fetch
   - governance
-- verb: research.companies-house.fetch-company
-  domain: research.companies-house
-  action: fetch-company
-  aliases:
-  - fetch-company
-  args:
-    style: keyworded
-    required:
-      company-number:
-        type: str
-    optional:
-      decision-id:
-        type: uuid
-  positional_sugar:
-  - company-number
-  invocation_phrases:
-  - get UK company
-  - fetch from Companies House
-  - company profile
-  - fetch company research.companies-house
-  - fetch company the research.companies-house
-  - research.companies-house fetch company
-  examples:
-  - (research.companies-house.fetch-company :company-number "...")
-  doc: Fetch company profile from Companies House
-  tier: diagnostics
-  tags:
-  - read
-  - external-source
-  - registry-fetch
-- verb: research.companies-house.import-company
-  domain: research.companies-house
-  action: import-company
-  aliases:
-  - import-company
-  args:
-    style: keyworded
-    required:
-      company-number:
-        type: str
-    optional:
-      decision-id:
-        type: uuid
-      include-officers:
-        type: bool
-      include-psc:
-        type: bool
-  positional_sugar:
-  - company-number
-  invocation_phrases:
-  - import from Companies House
-  - add UK company to database
-  - import British company
-  - import company research.companies-house
-  - import company the research.companies-house
-  - research.companies-house import company
-  examples:
-  - (research.companies-house.import-company :company-number "...")
-  doc: Import company and optionally PSC/officers to database
-  tier: intent
-  tags:
-  - write
-  - import
-  - registry-import
-- verb: research.companies-house.search
-  domain: research.companies-house
-  action: search
-  aliases:
-  - find
-  - lookup
-  - search
-  args:
-    style: keyworded
-    required:
-      query:
-        type: str
-    optional:
-      include-inactive:
-        type: bool
-      limit:
-        type: int
-  positional_sugar:
-  - query
-  invocation_phrases:
-  - search Companies House
-  - find UK company
-  - look up British company
-  - search research.companies-house
-  - search the research.companies-house
-  - find research.companies-house
-  - lookup research.companies-house
-  - research.companies-house search
-  examples:
-  - (research.companies-house.search :query "...")
-  doc: Search UK Companies House for companies by name
-  tier: diagnostics
-  tags:
-  - read
-  - external-source
-  - registry-lookup

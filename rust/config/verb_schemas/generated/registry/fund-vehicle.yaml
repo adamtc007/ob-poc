@@ -35,66 +35,6 @@ description: |
   - REIT (Real Estate Investment Trust): Tax-efficient real estate vehicle.
   - BDC (Business Development Company): US closed-end for middle market.
 verbs:
-- verb: fund-vehicle.delete
-  domain: fund-vehicle
-  action: delete
-  aliases:
-  - delete
-  - drop
-  - remove
-  args:
-    style: keyworded
-    required:
-      fund-entity-id:
-        type: entity_name
-  positional_sugar:
-  - fund-entity-id
-  invocation_phrases:
-  - delete fund vehicle
-  - remove fund type
-  - unclassify fund
-  - delete fund-vehicle
-  - delete the fund-vehicle
-  - remove fund-vehicle
-  - drop fund-vehicle
-  - fund-vehicle delete
-  examples:
-  - (fund-vehicle.delete :fund-entity-id "...")
-  doc: |
-    Delete fund vehicle metadata from an entity.
-
-    WARNING: This removes the vehicle type classification, not the entity itself.
-    Use with caution - may break compartment relationships.
-  tier: intent
-- verb: fund-vehicle.list-by-manager
-  domain: fund-vehicle
-  action: list-by-manager
-  aliases:
-  - list-by-manager
-  args:
-    style: keyworded
-    required:
-      manager-entity-id:
-        type: entity_name
-  positional_sugar:
-  - manager-entity-id
-  invocation_phrases:
-  - funds by manager
-  - funds managed by
-  - ManCo funds
-  - AIFM portfolio
-  - list managed funds
-  - list by manager fund-vehicle
-  - list by manager the fund-vehicle
-  - fund-vehicle list by manager
-  examples:
-  - (fund-vehicle.list-by-manager :manager-entity-id "...")
-  doc: |
-    List all funds managed by an entity (ManCo/AIFM).
-
-    Returns all funds where manager_entity_id matches.
-    Useful for management company oversight and AuM aggregation.
-  tier: diagnostics
 - verb: fund-vehicle.list-by-type
   domain: fund-vehicle
   action: list-by-type
@@ -116,6 +56,7 @@ verbs:
   - show all LPs
   - list by type fund-vehicle
   - list by type the fund-vehicle
+  - fund-vehicle list by type
   examples:
   - (fund-vehicle.list-by-type :vehicle-type "...")
   doc: |
@@ -147,6 +88,8 @@ verbs:
   - read fund-vehicle
   - read the fund-vehicle
   - get fund-vehicle
+  - fetch fund-vehicle
+  - fund-vehicle read
   examples:
   - (fund-vehicle.read :fund-entity-id "...")
   doc: |
@@ -155,60 +98,6 @@ verbs:
     Returns vehicle type, umbrella relationship, manager, domicile,
     and any custom metadata.
   tier: diagnostics
-- verb: fund-vehicle.upsert
-  domain: fund-vehicle
-  action: upsert
-  aliases:
-  - upsert
-  args:
-    style: keyworded
-    required:
-      fund-entity-id:
-        type: entity_name
-      vehicle-type:
-        type: str
-    optional:
-      meta:
-        type: json
-      domicile-country:
-        type: str
-      created-by:
-        type: str
-      umbrella-entity-id:
-        type: entity_name
-      is-umbrella:
-        type: bool
-      manager-entity-id:
-        type: entity_name
-  positional_sugar:
-  - fund-entity-id
-  - vehicle-type
-  invocation_phrases:
-  - create fund vehicle
-  - set fund type
-  - register fund structure
-  - configure fund vehicle
-  - set as SICAV
-  - set as SCSp
-  - make umbrella fund
-  - link to umbrella
-  examples:
-  - (fund-vehicle.upsert :fund-entity-id "..." :vehicle-type "...")
-  doc: |
-    Create or update fund vehicle metadata for an entity.
-
-    Links an entity (the fund) to its vehicle type classification,
-    umbrella relationship, management company, and jurisdiction.
-
-    USE CASES:
-    - "Register Allianz SICAV as a SICAV-RAIF umbrella in Luxembourg"
-    - "Set Fund A as a sub-fund under the main SICAV"
-    - "Link fund to its management company"
-    - "Change vehicle type after restructuring"
-
-    NOTE: The entity must already exist. This verb adds fund-specific
-    metadata to an existing legal entity, not create a new entity.
-  tier: intent
 - verb: fund-vehicle.list-by-umbrella
   domain: fund-vehicle
   action: list-by-umbrella
@@ -237,4 +126,123 @@ verbs:
 
     Returns all funds that have this umbrella as their parent.
     Useful for viewing the complete structure of a SICAV or similar umbrella.
+  tier: diagnostics
+- verb: fund-vehicle.delete
+  domain: fund-vehicle
+  action: delete
+  aliases:
+  - delete
+  - drop
+  - remove
+  args:
+    style: keyworded
+    required:
+      fund-entity-id:
+        type: entity_name
+  positional_sugar:
+  - fund-entity-id
+  invocation_phrases:
+  - delete fund vehicle
+  - remove fund type
+  - unclassify fund
+  - delete fund-vehicle
+  - delete the fund-vehicle
+  - remove fund-vehicle
+  - drop fund-vehicle
+  - fund-vehicle delete
+  examples:
+  - (fund-vehicle.delete :fund-entity-id "...")
+  doc: |
+    Delete fund vehicle metadata from an entity.
+
+    WARNING: This removes the vehicle type classification, not the entity itself.
+    Use with caution - may break compartment relationships.
+  tier: intent
+- verb: fund-vehicle.upsert
+  domain: fund-vehicle
+  action: upsert
+  aliases:
+  - upsert
+  args:
+    style: keyworded
+    required:
+      vehicle-type:
+        type: str
+      fund-entity-id:
+        type: entity_name
+    optional:
+      domicile-country:
+        type: str
+      umbrella-entity-id:
+        type: entity_name
+      meta:
+        type: json
+      is-umbrella:
+        type: bool
+      manager-entity-id:
+        type: entity_name
+      created-by:
+        type: str
+  positional_sugar:
+  - fund-entity-id
+  - vehicle-type
+  invocation_phrases:
+  - create fund vehicle
+  - set fund type
+  - register fund structure
+  - configure fund vehicle
+  - set as SICAV
+  - set as SCSp
+  - make umbrella fund
+  - link to umbrella
+  - set management company
+  - register Luxembourg fund
+  - upsert fund-vehicle
+  - upsert the fund-vehicle
+  - fund-vehicle upsert
+  examples:
+  - (fund-vehicle.upsert :fund-entity-id "..." :vehicle-type "...")
+  doc: |
+    Create or update fund vehicle metadata for an entity.
+
+    Links an entity (the fund) to its vehicle type classification,
+    umbrella relationship, management company, and jurisdiction.
+
+    USE CASES:
+    - "Register Allianz SICAV as a SICAV-RAIF umbrella in Luxembourg"
+    - "Set Fund A as a sub-fund under the main SICAV"
+    - "Link fund to its management company"
+    - "Change vehicle type after restructuring"
+
+    NOTE: The entity must already exist. This verb adds fund-specific
+    metadata to an existing legal entity, not create a new entity.
+  tier: intent
+- verb: fund-vehicle.list-by-manager
+  domain: fund-vehicle
+  action: list-by-manager
+  aliases:
+  - list-by-manager
+  args:
+    style: keyworded
+    required:
+      manager-entity-id:
+        type: entity_name
+  positional_sugar:
+  - manager-entity-id
+  invocation_phrases:
+  - funds by manager
+  - funds managed by
+  - ManCo funds
+  - AIFM portfolio
+  - list managed funds
+  - list by manager fund-vehicle
+  - list by manager the fund-vehicle
+  - fund-vehicle list by manager
+  examples:
+  - (fund-vehicle.list-by-manager :manager-entity-id "...")
+  doc: |
+    List all funds managed by an entity (ManCo/AIFM).
+
+    Returns all funds where manager_entity_id matches.
+    Useful for management company oversight and AuM aggregation.
   tier: diagnostics

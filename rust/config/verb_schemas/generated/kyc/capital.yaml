@@ -5,247 +5,6 @@ description: |
   Wraps share-class and holding verbs with corporate-specific semantics.
   Enforces reconciliation: SUM(holdings) = issued_shares.
 verbs:
-- verb: capital.cancel-shares
-  domain: capital
-  action: cancel-shares
-  aliases:
-  - cancel-shares
-  args:
-    style: keyworded
-    required:
-      cancel-date:
-        type: date
-      shares-to-cancel:
-        type: int
-      share-class-id:
-        type: entity_name
-    optional:
-      reason:
-        type: str
-  positional_sugar:
-  - share-class-id
-  - shares-to-cancel
-  invocation_phrases:
-  - cancel shares capital
-  - cancel shares the capital
-  - capital cancel shares
-  examples:
-  - (capital.cancel-shares :share-class-id "..." :shares-to-cancel "..." :cancel-date "...")
-  doc: Cancel/buyback shares (decreases issued_shares)
-  tier: intent
-- verb: capital.get-ownership-chain
-  domain: capital
-  action: get-ownership-chain
-  aliases:
-  - get-ownership-chain
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-    optional:
-      min-ownership-pct:
-        type: decimal
-  positional_sugar:
-  - entity-id
-  invocation_phrases:
-  - get ownership chain capital
-  - get ownership chain the capital
-  - capital get ownership chain
-  examples:
-  - (capital.get-ownership-chain :entity-id "...")
-  doc: |
-    Traverse ownership upward from entity to all terminus points.
-    Computes indirect ownership percentages multiplicatively.
-  tier: reference
-- verb: capital.reconcile
-  domain: capital
-  action: reconcile
-  aliases:
-  - reconcile
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-  positional_sugar:
-  - entity-id
-  invocation_phrases:
-  - reconcile capital
-  - reconcile the capital
-  - capital reconcile
-  examples:
-  - (capital.reconcile :entity-id "...")
-  doc: |
-    Verify capital structure reconciliation:
-    - SUM(holdings.units) = issued_shares
-    - All shareholders have verified identity
-    Returns ownership% and voting% for each holder.
-  tier: intent
-- verb: capital.list-by-issuer
-  domain: capital
-  action: list-by-issuer
-  aliases:
-  - list-by-issuer
-  args:
-    style: keyworded
-    required:
-      issuer-entity-id:
-        type: entity_name
-  positional_sugar:
-  - issuer-entity-id
-  invocation_phrases:
-  - list by issuer capital
-  - list by issuer the capital
-  - capital list by issuer
-  examples:
-  - (capital.list-by-issuer :issuer-entity-id "...")
-  doc: List all share classes for an issuing entity
-  tier: reference
-- verb: capital.list-shareholders
-  domain: capital
-  action: list-shareholders
-  aliases:
-  - list-shareholders
-  args:
-    style: keyworded
-    required:
-      share-class-id:
-        type: entity_name
-    optional:
-      include-inactive:
-        type: bool
-  positional_sugar:
-  - share-class-id
-  invocation_phrases:
-  - list shareholders capital
-  - list shareholders the capital
-  - capital list shareholders
-  examples:
-  - (capital.list-shareholders :share-class-id "...")
-  doc: List all shareholders for a share class
-  tier: reference
-- verb: capital.allocate
-  domain: capital
-  action: allocate
-  aliases:
-  - allocate
-  args:
-    style: keyworded
-    required:
-      shareholder-entity-id:
-        type: entity_name
-      share-class-id:
-        type: entity_name
-      units:
-        type: decimal
-    optional:
-      acquisition-date:
-        type: date
-      cost-basis:
-        type: decimal
-  positional_sugar:
-  - share-class-id
-  - shareholder-entity-id
-  invocation_phrases:
-  - allocate capital
-  - allocate the capital
-  - capital allocate
-  examples:
-  - (capital.allocate :share-class-id "..." :shareholder-entity-id "..." :units "...")
-  doc: |
-    Allocate shares to a shareholder. Creates holding record.
-    Validates total allocations don't exceed issued_shares.
-  tier: intent
-- verb: capital.define-share-class
-  domain: capital
-  action: define-share-class
-  aliases:
-  - define-share-class
-  args:
-    style: keyworded
-    required:
-      share-type:
-        type: enum
-        values:
-        - ORDINARY
-        - PREFERENCE_A
-        - PREFERENCE_B
-        - DEFERRED
-        - REDEEMABLE
-        - GROWTH
-        - MANAGEMENT
-        - CONVERTIBLE
-        - COMMON
-        - PREFERRED
-        - RESTRICTED
-        - FOUNDERS
-      name:
-        type: str
-      issued-shares:
-        type: int
-      issuer-entity-id:
-        type: entity_name
-      cbu-id:
-        type: entity_name
-    optional:
-      voting-rights-per-share:
-        type: decimal
-      authorized-shares:
-        type: int
-      dividend-rights:
-        type: bool
-      par-value-currency:
-        type: str
-      liquidation-preference:
-        type: decimal
-      par-value:
-        type: decimal
-  positional_sugar:
-  - cbu-id
-  - issuer-entity-id
-  invocation_phrases:
-  - define share class capital
-  - define share class the capital
-  - capital define share class
-  examples:
-  - (capital.define-share-class :cbu-id "..." :issuer-entity-id "..." :name "..." :share-type "..." :issued-shares "...")
-  doc: Define a corporate share class (ordinary, preference, etc.)
-  tier: intent
-- verb: capital.transfer
-  domain: capital
-  action: transfer
-  aliases:
-  - transfer
-  args:
-    style: keyworded
-    required:
-      share-class-id:
-        type: entity_name
-      units:
-        type: decimal
-      transfer-date:
-        type: date
-      to-entity-id:
-        type: entity_name
-      reference:
-        type: str
-      from-entity-id:
-        type: entity_name
-    optional:
-      price-per-unit:
-        type: decimal
-  positional_sugar:
-  - share-class-id
-  - from-entity-id
-  invocation_phrases:
-  - transfer capital
-  - transfer the capital
-  - capital transfer
-  examples:
-  - (capital.transfer :share-class-id "..." :from-entity-id "..." :to-entity-id "..." :units "..." :transfer-date "..." :reference "...")
-  doc: Transfer shares between shareholders (creates movement records)
-  tier: intent
 - verb: capital.issue-shares
   domain: capital
   action: issue-shares
@@ -274,3 +33,244 @@ verbs:
   - (capital.issue-shares :share-class-id "..." :additional-shares "..." :issue-date "...")
   doc: Issue additional shares (increases issued_shares)
   tier: intent
+- verb: capital.transfer
+  domain: capital
+  action: transfer
+  aliases:
+  - transfer
+  args:
+    style: keyworded
+    required:
+      units:
+        type: decimal
+      from-entity-id:
+        type: entity_name
+      transfer-date:
+        type: date
+      reference:
+        type: str
+      to-entity-id:
+        type: entity_name
+      share-class-id:
+        type: entity_name
+    optional:
+      price-per-unit:
+        type: decimal
+  positional_sugar:
+  - share-class-id
+  - from-entity-id
+  invocation_phrases:
+  - transfer capital
+  - transfer the capital
+  - capital transfer
+  examples:
+  - (capital.transfer :share-class-id "..." :from-entity-id "..." :to-entity-id "..." :units "..." :transfer-date "..." :reference "...")
+  doc: Transfer shares between shareholders (creates movement records)
+  tier: intent
+- verb: capital.define-share-class
+  domain: capital
+  action: define-share-class
+  aliases:
+  - define-share-class
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      issued-shares:
+        type: int
+      name:
+        type: str
+      issuer-entity-id:
+        type: entity_name
+      share-type:
+        type: enum
+        values:
+        - ORDINARY
+        - PREFERENCE_A
+        - PREFERENCE_B
+        - DEFERRED
+        - REDEEMABLE
+        - GROWTH
+        - MANAGEMENT
+        - CONVERTIBLE
+        - COMMON
+        - PREFERRED
+        - RESTRICTED
+        - FOUNDERS
+    optional:
+      liquidation-preference:
+        type: decimal
+      voting-rights-per-share:
+        type: decimal
+      par-value-currency:
+        type: str
+      dividend-rights:
+        type: bool
+      par-value:
+        type: decimal
+      authorized-shares:
+        type: int
+  positional_sugar:
+  - cbu-id
+  - issuer-entity-id
+  invocation_phrases:
+  - define share class capital
+  - define share class the capital
+  - capital define share class
+  examples:
+  - (capital.define-share-class :cbu-id "..." :issuer-entity-id "..." :name "..." :share-type "..." :issued-shares "...")
+  doc: Define a corporate share class (ordinary, preference, etc.)
+  tier: intent
+- verb: capital.allocate
+  domain: capital
+  action: allocate
+  aliases:
+  - allocate
+  args:
+    style: keyworded
+    required:
+      share-class-id:
+        type: entity_name
+      units:
+        type: decimal
+      shareholder-entity-id:
+        type: entity_name
+    optional:
+      acquisition-date:
+        type: date
+      cost-basis:
+        type: decimal
+  positional_sugar:
+  - share-class-id
+  - shareholder-entity-id
+  invocation_phrases:
+  - allocate capital
+  - allocate the capital
+  - capital allocate
+  examples:
+  - (capital.allocate :share-class-id "..." :shareholder-entity-id "..." :units "...")
+  doc: |
+    Allocate shares to a shareholder. Creates holding record.
+    Validates total allocations don't exceed issued_shares.
+  tier: intent
+- verb: capital.cancel-shares
+  domain: capital
+  action: cancel-shares
+  aliases:
+  - cancel-shares
+  args:
+    style: keyworded
+    required:
+      cancel-date:
+        type: date
+      share-class-id:
+        type: entity_name
+      shares-to-cancel:
+        type: int
+    optional:
+      reason:
+        type: str
+  positional_sugar:
+  - share-class-id
+  - shares-to-cancel
+  invocation_phrases:
+  - cancel shares capital
+  - cancel shares the capital
+  - capital cancel shares
+  examples:
+  - (capital.cancel-shares :share-class-id "..." :shares-to-cancel "..." :cancel-date "...")
+  doc: Cancel/buyback shares (decreases issued_shares)
+  tier: intent
+- verb: capital.list-shareholders
+  domain: capital
+  action: list-shareholders
+  aliases:
+  - list-shareholders
+  args:
+    style: keyworded
+    required:
+      share-class-id:
+        type: entity_name
+    optional:
+      include-inactive:
+        type: bool
+  positional_sugar:
+  - share-class-id
+  invocation_phrases:
+  - list shareholders capital
+  - list shareholders the capital
+  - capital list shareholders
+  examples:
+  - (capital.list-shareholders :share-class-id "...")
+  doc: List all shareholders for a share class
+  tier: reference
+- verb: capital.reconcile
+  domain: capital
+  action: reconcile
+  aliases:
+  - reconcile
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - reconcile capital
+  - reconcile the capital
+  - capital reconcile
+  examples:
+  - (capital.reconcile :entity-id "...")
+  doc: |
+    Verify capital structure reconciliation:
+    - SUM(holdings.units) = issued_shares
+    - All shareholders have verified identity
+    Returns ownership% and voting% for each holder.
+  tier: intent
+- verb: capital.get-ownership-chain
+  domain: capital
+  action: get-ownership-chain
+  aliases:
+  - get-ownership-chain
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      min-ownership-pct:
+        type: decimal
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - get ownership chain capital
+  - get ownership chain the capital
+  - capital get ownership chain
+  examples:
+  - (capital.get-ownership-chain :entity-id "...")
+  doc: |
+    Traverse ownership upward from entity to all terminus points.
+    Computes indirect ownership percentages multiplicatively.
+  tier: reference
+- verb: capital.list-by-issuer
+  domain: capital
+  action: list-by-issuer
+  aliases:
+  - list-by-issuer
+  args:
+    style: keyworded
+    required:
+      issuer-entity-id:
+        type: entity_name
+  positional_sugar:
+  - issuer-entity-id
+  invocation_phrases:
+  - list by issuer capital
+  - list by issuer the capital
+  - capital list by issuer
+  examples:
+  - (capital.list-by-issuer :issuer-entity-id "...")
+  doc: List all share classes for an issuing entity
+  tier: reference

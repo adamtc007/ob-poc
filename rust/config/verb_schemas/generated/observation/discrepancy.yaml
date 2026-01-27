@@ -2,6 +2,58 @@ version: '2.0'
 domain: discrepancy
 description: Observation discrepancies - conflicts between attribute observations
 verbs:
+- verb: discrepancy.list-open
+  domain: discrepancy
+  action: list-open
+  aliases:
+  - list-open
+  args:
+    style: keyworded
+    optional:
+      entity-id:
+        type: entity_name
+      case-id:
+        type: entity_name
+      severity:
+        type: str
+  invocation_phrases:
+  - list open discrepancy
+  - list open the discrepancy
+  - discrepancy list open
+  examples:
+  - (discrepancy.list-open)
+  doc: List open discrepancies
+  tier: reference
+- verb: discrepancy.resolve
+  domain: discrepancy
+  action: resolve
+  aliases:
+  - resolve
+  args:
+    style: keyworded
+    required:
+      resolution-type:
+        type: str
+      discrepancy-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+      resolved-by:
+        type: str
+      accepted-observation-id:
+        type: entity_name
+  positional_sugar:
+  - discrepancy-id
+  - resolution-type
+  invocation_phrases:
+  - resolve discrepancy
+  - resolve the discrepancy
+  - discrepancy resolve
+  examples:
+  - (discrepancy.resolve :discrepancy-id "..." :resolution-type "...")
+  doc: Resolve a discrepancy
+  tier: intent
 - verb: discrepancy.record
   domain: discrepancy
   action: record
@@ -10,28 +62,28 @@ verbs:
   args:
     style: keyworded
     required:
+      severity:
+        type: str
       entity-id:
+        type: entity_name
+      observation-2-id:
         type: entity_name
       observation-1-id:
         type: entity_name
       description:
         type: str
-      type:
-        type: str
-      severity:
-        type: str
       attribute-id:
         type: entity_name
-      observation-2-id:
-        type: entity_name
+      type:
+        type: str
     optional:
       value-1-display:
         type: str
+      case-id:
+        type: entity_name
       value-2-display:
         type: str
       workstream-id:
-        type: entity_name
-      case-id:
         type: entity_name
   positional_sugar:
   - entity-id
@@ -44,28 +96,6 @@ verbs:
   - (discrepancy.record :entity-id "..." :attribute-id "..." :observation-1-id "..." :observation-2-id "..." :type "..." :severity "..." :description "...")
   doc: Record a discrepancy between observations
   tier: intent
-- verb: discrepancy.list-open
-  domain: discrepancy
-  action: list-open
-  aliases:
-  - list-open
-  args:
-    style: keyworded
-    optional:
-      case-id:
-        type: entity_name
-      severity:
-        type: str
-      entity-id:
-        type: entity_name
-  invocation_phrases:
-  - list open discrepancy
-  - list open the discrepancy
-  - discrepancy list open
-  examples:
-  - (discrepancy.list-open)
-  doc: List open discrepancies
-  tier: reference
 - verb: discrepancy.escalate
   domain: discrepancy
   action: escalate
@@ -88,34 +118,4 @@ verbs:
   examples:
   - (discrepancy.escalate :discrepancy-id "...")
   doc: Escalate a discrepancy
-  tier: intent
-- verb: discrepancy.resolve
-  domain: discrepancy
-  action: resolve
-  aliases:
-  - resolve
-  args:
-    style: keyworded
-    required:
-      resolution-type:
-        type: str
-      discrepancy-id:
-        type: entity_name
-    optional:
-      accepted-observation-id:
-        type: entity_name
-      resolved-by:
-        type: str
-      notes:
-        type: str
-  positional_sugar:
-  - discrepancy-id
-  - resolution-type
-  invocation_phrases:
-  - resolve discrepancy
-  - resolve the discrepancy
-  - discrepancy resolve
-  examples:
-  - (discrepancy.resolve :discrepancy-id "..." :resolution-type "...")
-  doc: Resolve a discrepancy
   tier: intent

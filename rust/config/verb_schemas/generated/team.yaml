@@ -25,121 +25,35 @@ verbs:
   - (team.update-member :membership "..." :new-role "...")
   doc: Update member's role key
   tier: intent
-- verb: team.list-cbus
+- verb: team.add-member
   domain: team
-  action: list-cbus
+  action: add-member
   aliases:
-  - list-cbus
+  - add-member
   args:
     style: keyworded
     required:
-      team:
-        type: entity_name
-  positional_sugar:
-  - team
-  invocation_phrases:
-  - list cbus team
-  - list cbus the team
-  - team list cbus
-  examples:
-  - (team.list-cbus :team "...")
-  doc: List CBUs team can access
-  tier: reference
-- verb: team.add-governance-member
-  domain: team
-  action: add-governance-member
-  aliases:
-  - add-governance-member
-  args:
-    style: keyworded
-    required:
-      role:
-        type: str
-      team:
-        type: entity_name
-      user:
-        type: entity_name
-    optional:
-      legal-appointment:
-        type: uuid
-      requires-legal-link:
-        type: bool
-  positional_sugar:
-  - team
-  - user
-  invocation_phrases:
-  - add governance member team
-  - add governance member the team
-  - team add governance member
-  examples:
-  - (team.add-governance-member :team "..." :user "..." :role "...")
-  doc: Add governance member with optional legal appointment link
-  tier: intent
-- verb: team.verify-governance-access
-  domain: team
-  action: verify-governance-access
-  aliases:
-  - verify-governance-access
-  args:
-    style: keyworded
-    optional:
-      team:
-        type: uuid
-  invocation_phrases:
-  - verify governance access team
-  - verify governance access the team
-  - team verify governance access
-  examples:
-  - (team.verify-governance-access)
-  doc: Audit governance access against legal appointments
-  tier: reference
-- verb: team.remove-cbu-access
-  domain: team
-  action: remove-cbu-access
-  aliases:
-  - remove-cbu-access
-  args:
-    style: keyworded
-    required:
-      team:
-        type: uuid
-      cbu:
-        type: uuid
-  positional_sugar:
-  - team
-  - cbu
-  invocation_phrases:
-  - remove cbu access team
-  - remove cbu access the team
-  - team remove cbu access
-  examples:
-  - (team.remove-cbu-access :team "..." :cbu "...")
-  doc: Remove CBU from team's access
-  tier: intent
-- verb: team.remove-member
-  domain: team
-  action: remove-member
-  aliases:
-  - remove-member
-  args:
-    style: keyworded
-    required:
-      user:
-        type: entity_name
       team:
         type: entity_name
       role:
         type: str
+      user:
+        type: entity_name
+    optional:
+      effective-from:
+        type: date
+      effective-to:
+        type: date
   positional_sugar:
   - team
   - user
   invocation_phrases:
-  - remove member team
-  - remove member the team
-  - team remove member
+  - add member team
+  - add member the team
+  - team add member
   examples:
-  - (team.remove-member :team "..." :user "..." :role "...")
-  doc: Remove user from team (specific role)
+  - (team.add-member :team "..." :user "..." :role "...")
+  doc: Add user to team with role
   tier: intent
 - verb: team.revoke-service
   domain: team
@@ -164,28 +78,169 @@ verbs:
   - (team.revoke-service :team "..." :service "...")
   doc: Revoke service entitlement
   tier: intent
-- verb: team.archive
+- verb: team.transfer-member
   domain: team
-  action: archive
+  action: transfer-member
   aliases:
-  - archive
+  - transfer-member
+  args:
+    style: keyworded
+    required:
+      user:
+        type: entity_name
+      to-team:
+        type: entity_name
+      new-role:
+        type: str
+      from-team:
+        type: entity_name
+  positional_sugar:
+  - from-team
+  - to-team
+  invocation_phrases:
+  - transfer member team
+  - transfer member the team
+  - team transfer member
+  examples:
+  - (team.transfer-member :from-team "..." :to-team "..." :user "..." :new-role "...")
+  doc: Move user from one team to another (end old, create new)
+  tier: intent
+- verb: team.create
+  domain: team
+  action: create
+  aliases:
+  - add
+  - create
+  - new
+  args:
+    style: keyworded
+    required:
+      team-type:
+        type: enum
+        values:
+        - fund-ops
+        - manco-oversight
+        - im-trading
+        - spv-admin
+        - client-service
+        - accounting
+        - reporting
+        - board
+        - investment-committee
+        - conducting-officers
+        - executive
+      access-mode:
+        type: enum
+        values:
+        - explicit
+        - by-manco
+        - by-im
+        - by-filter
+      authority-type:
+        type: enum
+        values:
+        - operational
+        - oversight
+        - trading
+        - administrative
+        - governance
+      name:
+        type: str
+      delegating-entity:
+        type: entity_name
+    optional:
+      authority-scope:
+        type: json
+  positional_sugar:
+  - name
+  - team-type
+  invocation_phrases:
+  - create team
+  - create the team
+  - add team
+  - new team
+  - team create
+  examples:
+  - (team.create :name "..." :team-type "..." :delegating-entity "..." :authority-type "..." :access-mode "...")
+  doc: Create a new team with delegated authority
+  tier: intent
+- verb: team.remove-member
+  domain: team
+  action: remove-member
+  aliases:
+  - remove-member
   args:
     style: keyworded
     required:
       team:
         type: entity_name
-      reason:
+      role:
         type: str
+      user:
+        type: entity_name
   positional_sugar:
   - team
-  - reason
+  - user
   invocation_phrases:
-  - archive team
-  - archive the team
-  - team archive
+  - remove member team
+  - remove member the team
+  - team remove member
   examples:
-  - (team.archive :team "..." :reason "...")
-  doc: Archive team (soft delete)
+  - (team.remove-member :team "..." :user "..." :role "...")
+  doc: Remove user from team (specific role)
+  tier: intent
+- verb: team.remove-cbu-access
+  domain: team
+  action: remove-cbu-access
+  aliases:
+  - remove-cbu-access
+  args:
+    style: keyworded
+    required:
+      team:
+        type: uuid
+      cbu:
+        type: uuid
+  positional_sugar:
+  - team
+  - cbu
+  invocation_phrases:
+  - remove cbu access team
+  - remove cbu access the team
+  - team remove cbu access
+  examples:
+  - (team.remove-cbu-access :team "..." :cbu "...")
+  doc: Remove CBU from team's access
+  tier: intent
+- verb: team.add-governance-member
+  domain: team
+  action: add-governance-member
+  aliases:
+  - add-governance-member
+  args:
+    style: keyworded
+    required:
+      role:
+        type: str
+      user:
+        type: entity_name
+      team:
+        type: entity_name
+    optional:
+      requires-legal-link:
+        type: bool
+      legal-appointment:
+        type: uuid
+  positional_sugar:
+  - team
+  - user
+  invocation_phrases:
+  - add governance member team
+  - add governance member the team
+  - team add governance member
+  examples:
+  - (team.add-governance-member :team "..." :user "..." :role "...")
+  doc: Add governance member with optional legal appointment link
   tier: intent
 - verb: team.list-members
   domain: team
@@ -212,64 +267,28 @@ verbs:
   - (team.list-members :team "...")
   doc: List team members
   tier: reference
-- verb: team.create
+- verb: team.archive
   domain: team
-  action: create
+  action: archive
   aliases:
-  - add
-  - create
-  - new
+  - archive
   args:
     style: keyworded
     required:
-      access-mode:
-        type: enum
-        values:
-        - explicit
-        - by-manco
-        - by-im
-        - by-filter
-      name:
-        type: str
-      delegating-entity:
+      team:
         type: entity_name
-      team-type:
-        type: enum
-        values:
-        - fund-ops
-        - manco-oversight
-        - im-trading
-        - spv-admin
-        - client-service
-        - accounting
-        - reporting
-        - board
-        - investment-committee
-        - conducting-officers
-        - executive
-      authority-type:
-        type: enum
-        values:
-        - operational
-        - oversight
-        - trading
-        - administrative
-        - governance
-    optional:
-      authority-scope:
-        type: json
+      reason:
+        type: str
   positional_sugar:
-  - name
-  - team-type
+  - team
+  - reason
   invocation_phrases:
-  - create team
-  - create the team
-  - add team
-  - new team
-  - team create
+  - archive team
+  - archive the team
+  - team archive
   examples:
-  - (team.create :name "..." :team-type "..." :delegating-entity "..." :authority-type "..." :access-mode "...")
-  doc: Create a new team with delegated authority
+  - (team.archive :team "..." :reason "...")
+  doc: Archive team (soft delete)
   tier: intent
 - verb: team.grant-service
   domain: team
@@ -302,63 +321,24 @@ verbs:
   - (team.grant-service :team "..." :service "...")
   doc: Grant service entitlement to team
   tier: intent
-- verb: team.transfer-member
+- verb: team.verify-governance-access
   domain: team
-  action: transfer-member
+  action: verify-governance-access
   aliases:
-  - transfer-member
+  - verify-governance-access
   args:
     style: keyworded
-    required:
-      user:
-        type: entity_name
-      to-team:
-        type: entity_name
-      new-role:
-        type: str
-      from-team:
-        type: entity_name
-  positional_sugar:
-  - from-team
-  - to-team
-  invocation_phrases:
-  - transfer member team
-  - transfer member the team
-  - team transfer member
-  examples:
-  - (team.transfer-member :from-team "..." :to-team "..." :user "..." :new-role "...")
-  doc: Move user from one team to another (end old, create new)
-  tier: intent
-- verb: team.add-member
-  domain: team
-  action: add-member
-  aliases:
-  - add-member
-  args:
-    style: keyworded
-    required:
-      team:
-        type: entity_name
-      user:
-        type: entity_name
-      role:
-        type: str
     optional:
-      effective-from:
-        type: date
-      effective-to:
-        type: date
-  positional_sugar:
-  - team
-  - user
+      team:
+        type: uuid
   invocation_phrases:
-  - add member team
-  - add member the team
-  - team add member
+  - verify governance access team
+  - verify governance access the team
+  - team verify governance access
   examples:
-  - (team.add-member :team "..." :user "..." :role "...")
-  doc: Add user to team with role
-  tier: intent
+  - (team.verify-governance-access)
+  doc: Audit governance access against legal appointments
+  tier: reference
 - verb: team.read
   domain: team
   action: read
@@ -406,3 +386,23 @@ verbs:
   - (team.add-cbu-access :team "..." :cbu "...")
   doc: Add CBU to team's explicit access list
   tier: intent
+- verb: team.list-cbus
+  domain: team
+  action: list-cbus
+  aliases:
+  - list-cbus
+  args:
+    style: keyworded
+    required:
+      team:
+        type: entity_name
+  positional_sugar:
+  - team
+  invocation_phrases:
+  - list cbus team
+  - list cbus the team
+  - team list cbus
+  examples:
+  - (team.list-cbus :team "...")
+  doc: List CBUs team can access
+  tier: reference

@@ -992,6 +992,16 @@ fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/batch/add-products", post(batch_add_products))
         // Learning/feedback (captures user corrections for continuous improvement)
         .route("/api/agent/correction", post(report_correction))
+        // Verb disambiguation selection (closes the learning loop)
+        .route(
+            "/api/session/:id/select-verb",
+            post(select_verb_disambiguation),
+        )
+        // Verb disambiguation abandonment (user bailed - all options were wrong)
+        .route(
+            "/api/session/:id/abandon-disambiguation",
+            post(abandon_disambiguation),
+        )
         .with_state(state)
 }
 
@@ -2127,6 +2137,7 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                verb_disambiguation: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2140,6 +2151,7 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                verb_disambiguation: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2153,6 +2165,7 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                verb_disambiguation: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2175,6 +2188,7 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                verb_disambiguation: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2204,6 +2218,7 @@ async fn chat_session(
                 session_state: to_session_state_enum(&session.state),
                 commands: None,
                 disambiguation_request: None,
+                verb_disambiguation: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2319,6 +2334,7 @@ async fn chat_session(
             .disambiguation
             .as_ref()
             .map(to_api_disambiguation_request),
+        verb_disambiguation: response.verb_disambiguation,
         unresolved_refs: response
             .unresolved_refs
             .as_ref()
@@ -6519,6 +6535,557 @@ async fn store_correction_event(
 
     tracing::debug!("Stored correction event with ID {}", event_id);
     Ok(event_id)
+}
+
+// ============================================================================
+// Verb Disambiguation Selection (closes the learning loop)
+// ============================================================================
+
+/// POST /api/session/:id/select-verb
+///
+/// Called when user clicks a verb option in disambiguation UI.
+/// This is GOLD-STANDARD training data - user explicitly chose from alternatives.
+///
+/// Flow:
+/// 1. Record learning signal (input → selected_verb, confidence=0.95)
+/// 2. Record negative signals for rejected alternatives
+/// 3. Re-run intent pipeline with selected verb to generate DSL
+/// 4. Return DSL ready for execution
+async fn select_verb_disambiguation(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<ob_poc_types::VerbSelectionRequest>,
+) -> Result<Json<ob_poc_types::VerbSelectionResponse>, StatusCode> {
+    tracing::info!(
+        session_id = %session_id,
+        selected_verb = %req.selected_verb,
+        original_input = %req.original_input,
+        num_candidates = req.all_candidates.len(),
+        "Recording verb disambiguation selection"
+    );
+
+    // 1. Record learning signal to database (gold-standard, confidence=0.95)
+    let learning_recorded = match record_verb_selection_signal(
+        &state.pool,
+        &req.original_input,
+        &req.selected_verb,
+        &req.all_candidates,
+    )
+    .await
+    {
+        Ok(_) => {
+            tracing::info!(
+                "Recorded gold-standard learning signal: '{}' → '{}'",
+                req.original_input,
+                req.selected_verb
+            );
+            true
+        }
+        Err(e) => {
+            tracing::error!("Failed to record learning signal: {}", e);
+            false
+        }
+    };
+
+    // 2. Get session and re-run pipeline with selected verb
+    let mut sessions = state.sessions.write().await;
+    let session = match sessions.get_mut(&session_id) {
+        Some(s) => s,
+        None => {
+            return Ok(Json(ob_poc_types::VerbSelectionResponse {
+                recorded: learning_recorded,
+                execution_result: None,
+                message: "Session not found".to_string(),
+            }));
+        }
+    };
+
+    // 3. Generate DSL for the selected verb using the original input
+    // This goes through the normal pipeline but we force the verb selection
+    let dsl_result = generate_dsl_for_selected_verb(
+        &state.pool,
+        &req.original_input,
+        &req.selected_verb,
+        session,
+    )
+    .await;
+
+    match dsl_result {
+        Ok(dsl) => {
+            // Stage the DSL in session
+            let ast = parse_program(&dsl)
+                .map(|p| p.statements)
+                .unwrap_or_default();
+            session.set_pending_dsl(dsl.clone(), ast, None, false);
+
+            let msg = format!(
+                "Selected '{}'. Staged: {}\n\nSay 'run' to execute.",
+                req.selected_verb, dsl
+            );
+            session.add_agent_message(msg.clone(), None, Some(dsl));
+
+            Ok(Json(ob_poc_types::VerbSelectionResponse {
+                recorded: learning_recorded,
+                execution_result: None,
+                message: msg,
+            }))
+        }
+        Err(e) => Ok(Json(ob_poc_types::VerbSelectionResponse {
+            recorded: learning_recorded,
+            execution_result: None,
+            message: format!("Failed to generate DSL: {}", e),
+        })),
+    }
+}
+
+/// Record verb selection as gold-standard learning signal
+///
+/// This is HIGH CONFIDENCE data (confidence=0.95) because:
+/// - User was shown multiple options
+/// - User explicitly clicked one
+/// - This is an active correction, not passive acceptance
+///
+/// Uses agent.user_learned_phrases table for immediate effect on verb search.
+/// Uses a "global" user_id (all zeros) since this is system-wide learning.
+///
+/// Also generates and stores phrase variants (confidence=0.85) to make learning
+/// more robust to phrasings like "show me the cbus" vs "list all cbus".
+async fn record_verb_selection_signal(
+    pool: &PgPool,
+    original_input: &str,
+    selected_verb: &str,
+    all_candidates: &[String],
+) -> Result<(), sqlx::Error> {
+    // Use a "global" user_id for system-wide disambiguation learning
+    // This allows the learning to benefit all users immediately
+    let global_user_id = Uuid::nil(); // 00000000-0000-0000-0000-000000000000
+
+    // Insert primary phrase with gold-standard confidence (0.95)
+    sqlx::query!(
+        r#"
+        INSERT INTO agent.user_learned_phrases (
+            user_id,
+            phrase,
+            verb,
+            occurrence_count,
+            confidence,
+            source,
+            created_at,
+            updated_at
+        )
+        VALUES ($1, $2, $3, 1, 0.95, 'user_disambiguation', NOW(), NOW())
+        ON CONFLICT (user_id, phrase)
+        DO UPDATE SET
+            occurrence_count = agent.user_learned_phrases.occurrence_count + 1,
+            confidence = GREATEST(agent.user_learned_phrases.confidence, 0.95),
+            verb = EXCLUDED.verb,
+            updated_at = NOW()
+        "#,
+        global_user_id,
+        original_input,
+        selected_verb,
+    )
+    .execute(pool)
+    .await?;
+
+    // Generate and store phrase variants with slightly lower confidence (0.85)
+    // This addresses the "too literal" learning failure case
+    let variants = generate_phrase_variants(original_input);
+    let mut variants_stored = 0;
+    for variant in &variants {
+        if variant != original_input {
+            sqlx::query!(
+                r#"
+                INSERT INTO agent.user_learned_phrases (
+                    user_id,
+                    phrase,
+                    verb,
+                    occurrence_count,
+                    confidence,
+                    source,
+                    created_at,
+                    updated_at
+                )
+                VALUES ($1, $2, $3, 1, 0.85, 'generated_variant', NOW(), NOW())
+                ON CONFLICT (user_id, phrase)
+                DO UPDATE SET
+                    occurrence_count = agent.user_learned_phrases.occurrence_count + 1,
+                    confidence = GREATEST(agent.user_learned_phrases.confidence, 0.85),
+                    updated_at = NOW()
+                "#,
+                global_user_id,
+                variant,
+                selected_verb,
+            )
+            .execute(pool)
+            .await?;
+            variants_stored += 1;
+        }
+    }
+
+    // Record to phrase_blocklist for rejected alternatives
+    // This prevents the same phrase from matching wrong verbs in future
+    for candidate in all_candidates {
+        if candidate != selected_verb {
+            // Add to blocklist with reason
+            // Schema: phrase, blocked_verb, user_id, reason, embedding, embedding_model, expires_at, created_at
+            sqlx::query!(
+                r#"
+                INSERT INTO agent.phrase_blocklist (
+                    phrase,
+                    blocked_verb,
+                    reason,
+                    created_at
+                )
+                VALUES ($1, $2, 'user_disambiguation_rejected', NOW())
+                ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid)) DO NOTHING
+                "#,
+                original_input,
+                candidate,
+            )
+            .execute(pool)
+            .await?;
+        }
+    }
+
+    tracing::info!(
+        "Recorded disambiguation learning: '{}' → '{}' ({} variants, blocked {} alternatives)",
+        original_input,
+        selected_verb,
+        variants_stored,
+        all_candidates.len() - 1
+    );
+
+    Ok(())
+}
+
+/// Generate phrase variants for more robust learning
+///
+/// Addresses the failure case where "list all cbus" was learned
+/// but "show me the cbus" wasn't recognized.
+///
+/// One disambiguation teaches multiple phrasings:
+/// - "list all cbus" → cbu.list (0.95 confidence)
+/// - "list cbu"      → cbu.list (0.85 confidence)  // generated
+/// - "show all cbus" → cbu.list (0.85 confidence)  // generated
+/// - "show cbus"     → cbu.list (0.85 confidence)  // generated
+fn generate_phrase_variants(phrase: &str) -> Vec<String> {
+    let mut variants = vec![phrase.to_string()];
+    let lower = phrase.to_lowercase();
+
+    // Plural normalization (cbus -> cbu, entities -> entity)
+    if lower.contains("cbus") {
+        variants.push(lower.replace("cbus", "cbu"));
+    }
+    if lower.contains("entities") {
+        variants.push(lower.replace("entities", "entity"));
+    }
+
+    // Common verb swaps
+    let verb_swaps = [
+        ("list", "show"),
+        ("show", "list"),
+        ("display", "show"),
+        ("get", "list"),
+        ("view", "show"),
+        ("find", "search"),
+        ("search", "find"),
+    ];
+    for (from, to) in verb_swaps {
+        if lower.starts_with(from) || lower.contains(&format!(" {}", from)) {
+            let swapped = lower.replace(from, to);
+            if !variants.contains(&swapped) {
+                variants.push(swapped);
+            }
+        }
+    }
+
+    // Article/quantifier removal
+    let stripped = lower
+        .replace(" the ", " ")
+        .replace(" all ", " ")
+        .replace(" my ", " ")
+        .replace("  ", " ")
+        .trim()
+        .to_string();
+    if stripped != lower && !variants.contains(&stripped) {
+        variants.push(stripped);
+    }
+
+    // Also try with articles removed at start
+    let prefixes_to_strip = ["show me ", "list all ", "get all ", "display all "];
+    for prefix in prefixes_to_strip {
+        if lower.starts_with(prefix) {
+            let without_prefix = lower.strip_prefix(prefix).unwrap_or(&lower).to_string();
+            if !without_prefix.is_empty() && !variants.contains(&without_prefix) {
+                variants.push(without_prefix);
+            }
+        }
+    }
+
+    // Dedupe and return
+    variants.sort();
+    variants.dedup();
+    variants
+}
+
+// ============================================================================
+// Disambiguation Abandonment (user bailed - negative signal for ALL candidates)
+// ============================================================================
+
+/// POST /api/session/:id/abandon-disambiguation
+///
+/// Called when user abandons disambiguation without selecting any option.
+/// This is a NEGATIVE signal for ALL candidates - they were all wrong.
+///
+/// Triggers:
+/// - User types new input instead of clicking an option
+/// - User closes session or navigates away
+/// - Timeout (>30s with no interaction)
+async fn abandon_disambiguation(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<ob_poc_types::AbandonDisambiguationRequest>,
+) -> Result<Json<ob_poc_types::AbandonDisambiguationResponse>, StatusCode> {
+    tracing::info!(
+        session_id = %session_id,
+        original_input = %req.original_input,
+        num_candidates = req.candidates.len(),
+        reason = ?req.abandon_reason,
+        "Recording disambiguation abandonment (all candidates rejected)"
+    );
+
+    let mut signals_recorded = 0;
+
+    // Record negative signals for ALL candidates - they were all wrong
+    for candidate in &req.candidates {
+        match record_abandon_negative_signal(
+            &state.pool,
+            &req.original_input,
+            candidate,
+            &req.abandon_reason,
+        )
+        .await
+        {
+            Ok(_) => signals_recorded += 1,
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to record abandon signal for '{}' → '{}': {}",
+                    req.original_input,
+                    candidate,
+                    e
+                );
+            }
+        }
+    }
+
+    // Also record to feedback log for analysis
+    if let Err(e) = record_abandon_event(&state.pool, &req).await {
+        tracing::warn!("Failed to record abandon event: {}", e);
+    }
+
+    tracing::info!(
+        "Recorded {} negative signals for abandoned disambiguation",
+        signals_recorded
+    );
+
+    Ok(Json(ob_poc_types::AbandonDisambiguationResponse {
+        recorded: signals_recorded > 0,
+        signals_recorded,
+    }))
+}
+
+/// Record a negative signal when user abandons disambiguation
+///
+/// Uses lower confidence (0.3) than explicit rejection (0.7) because:
+/// - User didn't explicitly say "this is wrong"
+/// - They just gave up - could be for other reasons
+/// - But still valuable signal that these options weren't helpful
+async fn record_abandon_negative_signal(
+    pool: &PgPool,
+    original_input: &str,
+    rejected_verb: &str,
+    reason: &Option<ob_poc_types::AbandonReason>,
+) -> Result<(), sqlx::Error> {
+    let reason_str = match reason {
+        Some(ob_poc_types::AbandonReason::TypedNewInput) => "abandon_typed_new",
+        Some(ob_poc_types::AbandonReason::ClosedSession) => "abandon_closed",
+        Some(ob_poc_types::AbandonReason::Timeout) => "abandon_timeout",
+        Some(ob_poc_types::AbandonReason::Cancelled) => "abandon_cancelled",
+        Some(ob_poc_types::AbandonReason::Other) | None => "abandon_other",
+    };
+
+    // Add to phrase_blocklist with lower-weight reason
+    // ON CONFLICT: accumulate evidence (increment a counter or update timestamp)
+    // Schema: phrase, blocked_verb, user_id, reason, embedding, embedding_model, expires_at, created_at
+    sqlx::query!(
+        r#"
+        INSERT INTO agent.phrase_blocklist (
+            phrase,
+            blocked_verb,
+            reason,
+            created_at
+        )
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (phrase, blocked_verb, COALESCE(user_id, '00000000-0000-0000-0000-000000000000'::uuid))
+        DO UPDATE SET
+            reason = EXCLUDED.reason,
+            created_at = NOW()
+        "#,
+        original_input,
+        rejected_verb,
+        reason_str,
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Record abandon event to feedback log for analysis
+async fn record_abandon_event(
+    pool: &PgPool,
+    req: &ob_poc_types::AbandonDisambiguationRequest,
+) -> Result<(), sqlx::Error> {
+    let reason_str = req
+        .abandon_reason
+        .as_ref()
+        .map(|r| format!("{:?}", r))
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let candidates_json = serde_json::to_value(&req.candidates).unwrap_or_default();
+
+    // Record to intent_feedback for analysis
+    // Schema: session_id, user_input, user_input_hash, matched_verb, outcome, alternatives, created_at
+    sqlx::query!(
+        r#"
+        INSERT INTO "ob-poc".intent_feedback (
+            session_id,
+            user_input,
+            user_input_hash,
+            matched_verb,
+            outcome,
+            alternatives,
+            created_at
+        )
+        VALUES (
+            '00000000-0000-0000-0000-000000000000'::uuid,
+            $1,
+            md5($1),
+            NULL,
+            'abandoned',
+            $2,
+            NOW()
+        )
+        "#,
+        req.original_input,
+        serde_json::json!({
+            "request_id": req.request_id,
+            "candidates": candidates_json,
+            "abandon_reason": reason_str,
+        }),
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Generate DSL for a user-selected verb
+///
+/// This bypasses verb search (we already know the verb) and goes straight
+/// to argument extraction and DSL building.
+async fn generate_dsl_for_selected_verb(
+    _pool: &PgPool,
+    original_input: &str,
+    selected_verb: &str,
+    _session: &mut AgentSession,
+) -> Result<String, String> {
+    use crate::dsl_v2::verb_registry::registry;
+
+    // Parse verb into domain.name format
+    let parts: Vec<&str> = selected_verb.splitn(2, '.').collect();
+    if parts.len() != 2 {
+        return Err(format!("Invalid verb format: {}", selected_verb));
+    }
+    let (domain, verb_name) = (parts[0], parts[1]);
+
+    // Get verb definition from registry
+    let reg = registry();
+    let verb_def = reg
+        .get_runtime_verb(domain, verb_name)
+        .ok_or_else(|| format!("Unknown verb: {}", selected_verb))?;
+
+    // For verbs with no required args, just generate the basic call
+    let required_args: Vec<_> = verb_def.args.iter().filter(|a| a.required).collect();
+
+    if required_args.is_empty() {
+        // No required args - generate simple verb call
+        return Ok(format!("({})", selected_verb));
+    }
+
+    // For verbs with required args, we need to extract them from the input
+    // This is a simplified version - full implementation would use LLM
+    // For now, generate a template with placeholders
+    let arg_placeholders: Vec<String> = required_args
+        .iter()
+        .map(|a| format!(":{} <{}>", a.name, a.name))
+        .collect();
+
+    // Try to extract simple values from input
+    // This handles cases like "list all cbus" → (cbu.list) with no args needed
+    // Or "create fund Alpha" → (cbu.create :name "Alpha")
+    let dsl = if arg_placeholders.is_empty() {
+        format!("({})", selected_verb)
+    } else {
+        // Check if we can extract any values from the input
+        let extracted_args = extract_simple_args(original_input, &required_args);
+        if extracted_args.is_empty() {
+            // Return template with placeholders for user to fill
+            format!("({} {})", selected_verb, arg_placeholders.join(" "))
+        } else {
+            format!("({} {})", selected_verb, extracted_args.join(" "))
+        }
+    };
+
+    Ok(dsl)
+}
+
+/// Extract simple argument values from user input
+fn extract_simple_args(
+    input: &str,
+    required_args: &[&crate::dsl_v2::runtime_registry::RuntimeArg],
+) -> Vec<String> {
+    use dsl_core::ArgType;
+
+    let mut args = Vec::new();
+    let words: Vec<&str> = input.split_whitespace().collect();
+
+    for arg in required_args {
+        match arg.arg_type {
+            ArgType::String => {
+                // Look for quoted strings or significant words
+                // Skip common words like "create", "add", "list", "show", etc.
+                let skip_words = [
+                    "create", "add", "list", "show", "get", "find", "search", "all", "the", "a",
+                    "an", "for", "to", "from", "with", "in", "on", "by",
+                ];
+                for word in &words {
+                    let lower = word.to_lowercase();
+                    if !skip_words.contains(&lower.as_str()) && word.len() > 2 {
+                        // Found a potential value
+                        args.push(format!(":{} \"{}\"", arg.name, word));
+                        break;
+                    }
+                }
+            }
+            _ => {
+                // For other types, leave as placeholder
+            }
+        }
+    }
+
+    args
 }
 
 #[cfg(test)]

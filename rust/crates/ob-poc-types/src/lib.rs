@@ -720,6 +720,12 @@ pub struct ChatResponse {
     #[serde(default)]
     pub disambiguation_request: Option<DisambiguationRequest>,
 
+    /// Verb disambiguation request if multiple verbs match user input
+    /// When present, UI should show clickable buttons for verb selection
+    /// User's selection = gold-standard training data for learning loop
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verb_disambiguation: Option<VerbDisambiguationRequest>,
+
     /// Unresolved entity references needing resolution (post-DSL parsing)
     /// When present, UI should trigger resolution modal before execution
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1619,6 +1625,111 @@ pub enum DisambiguationSelection {
         text: String,
         interpretation_id: String,
     },
+}
+
+// ============================================================================
+// VERB DISAMBIGUATION API (for ambiguous verb matches)
+// ============================================================================
+
+/// Verb disambiguation request - sent when multiple verbs match user input
+///
+/// This is separate from entity disambiguation because:
+/// 1. It happens earlier in the pipeline (verb search before DSL generation)
+/// 2. User selects from verbs, not entities
+/// 3. Selection is gold-standard training data (high confidence label)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbDisambiguationRequest {
+    /// Unique ID for this disambiguation request
+    pub request_id: String,
+    /// Original user input that triggered disambiguation
+    pub original_input: String,
+    /// Matching verbs to choose from (ordered by score, descending)
+    pub options: Vec<VerbOption>,
+    /// Human-readable prompt for the user
+    pub prompt: String,
+}
+
+/// A single verb option in disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbOption {
+    /// Fully qualified verb name (e.g., "cbu.create")
+    pub verb_fqn: String,
+    /// Human-readable description
+    pub description: String,
+    /// Example DSL showing this verb
+    pub example: String,
+    /// Match score (0.0 - 1.0)
+    pub score: f32,
+    /// The phrase that matched this verb (from verb search)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_phrase: Option<String>,
+}
+
+/// User's verb selection response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSelectionRequest {
+    /// The disambiguation request ID being responded to
+    pub request_id: String,
+    /// Original user input (for learning)
+    pub original_input: String,
+    /// Selected verb fully-qualified name
+    pub selected_verb: String,
+    /// All verbs that were shown as options (for negative learning)
+    pub all_candidates: Vec<String>,
+}
+
+/// Response after verb selection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSelectionResponse {
+    /// Whether the selection was recorded successfully
+    pub recorded: bool,
+    /// Execution result (if verb was executed)
+    #[serde(default)]
+    pub execution_result: Option<ExecuteResult>,
+    /// Message to display
+    pub message: String,
+}
+
+/// Request to record disambiguation abandonment
+///
+/// Called when user bails on disambiguation without selecting any option.
+/// This is valuable negative signal - ALL candidates were wrong.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AbandonDisambiguationRequest {
+    /// The disambiguation request ID being abandoned
+    pub request_id: String,
+    /// Original user input
+    pub original_input: String,
+    /// All verbs that were shown as options (all get negative signal)
+    pub candidates: Vec<String>,
+    /// Why the user abandoned
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub abandon_reason: Option<AbandonReason>,
+}
+
+/// Reason for abandoning disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AbandonReason {
+    /// User typed new input instead of selecting
+    TypedNewInput,
+    /// User closed session or navigated away
+    ClosedSession,
+    /// No interaction for >30 seconds
+    Timeout,
+    /// User explicitly cancelled
+    Cancelled,
+    /// Unknown/other
+    Other,
+}
+
+/// Response after recording abandonment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AbandonDisambiguationResponse {
+    /// Whether the abandonment was recorded
+    pub recorded: bool,
+    /// Number of negative signals recorded
+    pub signals_recorded: usize,
 }
 
 /// Extended chat response that can include disambiguation

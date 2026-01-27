@@ -2,1101 +2,6 @@ version: '2.0'
 domain: trading-profile
 description: Trading profile document management - single source of truth for CBU trading configuration
 verbs:
-- verb: trading-profile.remove-market
-  domain: trading-profile
-  action: remove-market
-  aliases:
-  - remove-market
-  args:
-    style: keyworded
-    required:
-      mic:
-        type: str
-      profile-id:
-        type: uuid
-      instrument-class:
-        type: str
-  positional_sugar:
-  - profile-id
-  - instrument-class
-  invocation_phrases:
-  - remove market from profile
-  - disable market access
-  - remove exchange
-  - exclude market
-  - drop trading venue
-  - remove market MIC
-  - disable market
-  - remove market trading profile
-  examples:
-  - (trading-profile.remove-market :profile-id "..." :instrument-class "..." :mic "...")
-  doc: Remove market from trading profile universe
-  tier: intent
-  tags:
-  - authoring
-  - universe
-  - market
-- verb: trading-profile.get-active
-  domain: trading-profile
-  action: get-active
-  aliases:
-  - get-active
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - get active profile
-  - show active trading profile
-  - current trading profile
-  - get active trading profile
-  - get active trading-profile
-  - get active the trading profile
-  - trading profile get active
-  examples:
-  - (trading-profile.get-active :cbu-id "...")
-  doc: Get the active trading profile for a CBU
-  tier: diagnostics
-  tags:
-  - read
-  - lookup
-- verb: trading-profile.create-draft
-  domain: trading-profile
-  action: create-draft
-  aliases:
-  - create-draft
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      notes:
-        type: str
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - create draft profile
-  - start new profile draft
-  - create trading draft
-  - new profile version
-  - draft new profile
-  - start profile edit
-  - create draft from active
-  - begin profile changes
-  examples:
-  - (trading-profile.create-draft :cbu-id "...")
-  doc: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
-  tier: intent
-  tags:
-  - lifecycle
-  - authoring
-- verb: trading-profile.remove-instrument-class
-  domain: trading-profile
-  action: remove-instrument-class
-  aliases:
-  - remove-instrument-class
-  args:
-    style: keyworded
-    required:
-      class-code:
-        type: str
-      profile-id:
-        type: uuid
-  positional_sugar:
-  - profile-id
-  - class-code
-  invocation_phrases:
-  - remove instrument class
-  - disable instrument class
-  - remove equity trading
-  - remove from profile
-  - disable asset class
-  - exclude instrument type
-  - drop instrument class
-  - remove instrument class trading profile
-  examples:
-  - (trading-profile.remove-instrument-class :profile-id "..." :class-code "...")
-  doc: Remove instrument class from trading profile universe
-  tier: intent
-  tags:
-  - authoring
-  - universe
-- verb: trading-profile.remove-standing-instruction
-  domain: trading-profile
-  action: remove-standing-instruction
-  aliases:
-  - remove-standing-instruction
-  args:
-    style: keyworded
-    required:
-      ssi-name:
-        type: str
-      profile-id:
-        type: uuid
-  positional_sugar:
-  - profile-id
-  - ssi-name
-  invocation_phrases:
-  - remove standing instruction
-  - delete SSI
-  - remove SSI
-  - delete settlement instruction
-  - deactivate SSI
-  - remove from SSIs
-  - drop standing instruction
-  - remove standing instruction trading profile
-  examples:
-  - (trading-profile.remove-standing-instruction :profile-id "..." :ssi-name "...")
-  doc: Remove SSI from trading profile
-  tier: intent
-  tags:
-  - authoring
-  - ssi
-- verb: trading-profile.add-csa-config
-  domain: trading-profile
-  action: add-csa-config
-  aliases:
-  - add-csa-config
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      isda-ref:
-        type: str
-      csa-type:
-        type: enum
-        values:
-        - VM
-        - VM_IM
-        - IM
-    optional:
-      threshold-currency:
-        type: str
-      threshold-amount:
-        type: decimal
-      collateral-ssi-ref:
-        type: str
-      minimum-transfer-amount:
-        type: decimal
-  positional_sugar:
-  - profile-id
-  - isda-ref
-  invocation_phrases:
-  - add CSA configuration
-  - configure CSA
-  - set up CSA agreement
-  - add credit support annex
-  - create CSA config
-  - add CSA settings
-  - configure collateral agreement
-  - add CSA
-  examples:
-  - (trading-profile.add-csa-config :profile-id "..." :isda-ref "..." :csa-type "...")
-  doc: Add CSA (Credit Support Annex) to ISDA agreement
-  tier: intent
-  tags:
-  - authoring
-  - csa
-  - otc
-  - collateral
-- verb: trading-profile.ca.remove-cutoff-rule
-  domain: trading-profile
-  action: ca.remove-cutoff-rule
-  aliases:
-  - ca.remove-cutoff-rule
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-    optional:
-      market-code:
-        type: str
-      depository-code:
-        type: str
-  positional_sugar:
-  - profile-id
-  invocation_phrases:
-  - ca.remove cutoff rule trading profile
-  - ca.remove cutoff rule trading-profile
-  - ca.remove cutoff rule the trading profile
-  - ca.remove cutoff rule profile
-  - trading profile ca.remove cutoff rule
-  examples:
-  - (trading-profile.ca.remove-cutoff-rule :profile-id "...")
-  doc: Remove cutoff rule by market/depository
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
-- verb: trading-profile.ca.get-policy
-  domain: trading-profile
-  action: ca.get-policy
-  aliases:
-  - ca.get-policy
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-  positional_sugar:
-  - profile-id
-  invocation_phrases:
-  - ca.get policy trading profile
-  - ca.get policy trading-profile
-  - ca.get policy the trading profile
-  - ca.get policy profile
-  - trading profile ca.get policy
-  examples:
-  - (trading-profile.ca.get-policy :profile-id "...")
-  doc: Get current CA policy configuration from trading profile
-  tier: diagnostics
-  tags:
-  - read
-  - ca-policy
-- verb: trading-profile.add-allowed-currency
-  domain: trading-profile
-  action: add-allowed-currency
-  aliases:
-  - add-allowed-currency
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      currency:
-        type: str
-  positional_sugar:
-  - profile-id
-  - currency
-  invocation_phrases:
-  - add allowed currency
-  - permit currency
-  - enable currency
-  - add settlement currency
-  - allow currency trading
-  - add currency to profile
-  - include currency
-  - add allowed currency trading profile
-  examples:
-  - (trading-profile.add-allowed-currency :profile-id "..." :currency "...")
-  doc: Add currency to allowed currencies list
-  tier: intent
-  tags:
-  - authoring
-  - currency
-- verb: trading-profile.ca.set-election-policy
-  domain: trading-profile
-  action: ca.set-election-policy
-  aliases:
-  - ca.set-election-policy
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      elector:
-        type: enum
-        values:
-        - investment_manager
-        - admin
-        - client
-    optional:
-      auto-instruct-threshold:
-        type: decimal
-      evidence-required:
-        type: bool
-  positional_sugar:
-  - profile-id
-  - elector
-  invocation_phrases:
-  - ca.set election policy trading profile
-  - ca.set election policy trading-profile
-  - ca.set election policy the trading profile
-  - ca.set election policy profile
-  - trading profile ca.set election policy
-  examples:
-  - (trading-profile.ca.set-election-policy :profile-id "..." :elector "...")
-  doc: Configure who makes CA elections and requirements
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
-- verb: trading-profile.list-versions
-  domain: trading-profile
-  action: list-versions
-  aliases:
-  - list-versions
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - list trading profile versions
-  - show profile version history
-  - view all profile versions
-  - list profile revisions
-  - show trading history
-  - get version history
-  - list CBU profile versions
-  - show profile changelog
-  examples:
-  - (trading-profile.list-versions :cbu-id "...")
-  doc: List all versions of trading profiles for a CBU
-  tier: diagnostics
-  tags:
-  - read
-  - versioning
-- verb: trading-profile.clone-to
-  domain: trading-profile
-  action: clone-to
-  aliases:
-  - clone-to
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      target-cbu-id:
-        type: entity_name
-    optional:
-      notes:
-        type: str
-      include-isda:
-        type: bool
-      adapt-base-currency:
-        type: str
-      cloned-by:
-        type: str
-  positional_sugar:
-  - profile-id
-  - target-cbu-id
-  invocation_phrases:
-  - clone profile to CBU
-  - copy trading profile
-  - clone profile
-  - duplicate profile to
-  - copy profile to new CBU
-  - replicate trading setup
-  - clone configuration
-  - copy to target CBU
-  examples:
-  - (trading-profile.clone-to :profile-id "..." :target-cbu-id "...")
-  doc: Clone a trading profile to another CBU, creating a new DRAFT profile
-  tier: intent
-  tags:
-  - lifecycle
-  - authoring
-  - cloning
-- verb: trading-profile.add-booking-rule
-  domain: trading-profile
-  action: add-booking-rule
-  aliases:
-  - add-booking-rule
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      priority:
-        type: int
-      ssi-ref:
-        type: str
-      rule-name:
-        type: str
-    optional:
-      match-security-type:
-        type: str
-      match-mic:
-        type: str
-      match-currency:
-        type: str
-      match-settlement-type:
-        type: str
-      match-instrument-class:
-        type: str
-      match-counterparty-id:
-        type: str
-  positional_sugar:
-  - profile-id
-  - rule-name
-  invocation_phrases:
-  - add booking rule
-  - create booking rule
-  - add settlement rule
-  - configure booking
-  - add SSI selection rule
-  - create routing rule
-  - add rule to profile
-  - define booking rule
-  examples:
-  - (trading-profile.add-booking-rule :profile-id "..." :rule-name "..." :priority "..." :ssi-ref "...")
-  doc: Add ALERT-style booking rule to trading profile
-  tier: intent
-  tags:
-  - authoring
-  - booking-rules
-- verb: trading-profile.diff
-  domain: trading-profile
-  action: diff
-  aliases:
-  - diff
-  args:
-    style: keyworded
-    required:
-      profile-id-1:
-        type: uuid
-      profile-id-2:
-        type: uuid
-  positional_sugar:
-  - profile-id-1
-  - profile-id-2
-  invocation_phrases:
-  - diff trading profiles
-  - compare profiles
-  - show profile differences
-  - compare two versions
-  - what changed between
-  - diff profile versions
-  - compare changes
-  - show profile delta
-  examples:
-  - (trading-profile.diff :profile-id-1 "..." :profile-id-2 "...")
-  doc: Compare two trading profile versions
-  tier: diagnostics
-  tags:
-  - read
-  - versioning
-  - comparison
-- verb: trading-profile.add-csa-collateral
-  domain: trading-profile
-  action: add-csa-collateral
-  aliases:
-  - add-csa-collateral
-  args:
-    style: keyworded
-    required:
-      collateral-type:
-        type: enum
-        values:
-        - CASH
-        - GOVT_BOND
-        - CORP_BOND
-        - EQUITY
-        - MONEY_MARKET
-      counterparty-ref:
-        type: str
-      haircut-pct:
-        type: decimal
-      profile-id:
-        type: uuid
-    optional:
-      issuers:
-        type: list
-      min-rating:
-        type: str
-      currencies:
-        type: list
-  positional_sugar:
-  - profile-id
-  - counterparty-ref
-  invocation_phrases:
-  - add CSA collateral
-  - configure eligible collateral
-  - add collateral type
-  - set collateral eligibility
-  - add eligible securities
-  - configure CSA margin
-  - add collateral assets
-  - add csa collateral trading profile
-  examples:
-  - (trading-profile.add-csa-collateral :profile-id "..." :counterparty-ref "..." :collateral-type "..." :haircut-pct "...")
-  doc: Add eligible collateral to CSA
-  tier: intent
-  tags:
-  - authoring
-  - csa
-  - collateral
-- verb: trading-profile.add-im-mandate
-  domain: trading-profile
-  action: add-im-mandate
-  aliases:
-  - add-im-mandate
-  args:
-    style: keyworded
-    required:
-      manager-ref-type:
-        type: enum
-        values:
-        - LEI
-        - BIC
-        - NAME
-        - UUID
-      priority:
-        type: int
-      profile-id:
-        type: uuid
-      manager-ref:
-        type: str
-    optional:
-      scope-instrument-classes:
-        type: list
-      instruction-method:
-        type: enum
-        values:
-        - SWIFT
-        - CTM
-        - FIX
-        - API
-        - ALERT
-        - MANUAL
-      role:
-        type: str
-      scope-mics:
-        type: list
-      can-trade:
-        type: bool
-      scope-all:
-        type: bool
-      can-settle:
-        type: bool
-  positional_sugar:
-  - profile-id
-  - manager-ref
-  invocation_phrases:
-  - add investment management mandate
-  - add IM mandate
-  - create management mandate
-  - add investment mandate
-  - configure IM relationship
-  - add discretionary mandate
-  - create IM agreement
-  - add im mandate trading profile
-  examples:
-  - (trading-profile.add-im-mandate :profile-id "..." :manager-ref "..." :manager-ref-type "..." :priority "...")
-  doc: Add investment manager mandate to trading profile
-  tier: intent
-  tags:
-  - authoring
-  - investment-manager
-- verb: trading-profile.ca.link-proceeds-ssi
-  domain: trading-profile
-  action: ca.link-proceeds-ssi
-  aliases:
-  - ca.link-proceeds-ssi
-  args:
-    style: keyworded
-    required:
-      ssi-name:
-        type: str
-      proceeds-type:
-        type: enum
-        values:
-        - cash
-        - stock
-      profile-id:
-        type: uuid
-    optional:
-      currency:
-        type: str
-  positional_sugar:
-  - profile-id
-  - proceeds-type
-  invocation_phrases:
-  - ca.link proceeds ssi trading profile
-  - ca.link proceeds ssi trading-profile
-  - ca.link proceeds ssi the trading profile
-  - ca.link proceeds ssi profile
-  - trading profile ca.link proceeds ssi
-  examples:
-  - (trading-profile.ca.link-proceeds-ssi :profile-id "..." :proceeds-type "..." :ssi-name "...")
-  doc: Map CA proceeds to settlement instruction
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
-  - ssi
-- verb: trading-profile.remove-csa-config
-  domain: trading-profile
-  action: remove-csa-config
-  aliases:
-  - remove-csa-config
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      counterparty-ref:
-        type: str
-    optional:
-      csa-type:
-        type: enum
-        values:
-        - VM
-        - VM_IM
-        - IM
-  positional_sugar:
-  - profile-id
-  - counterparty-ref
-  invocation_phrases:
-  - remove CSA configuration
-  - delete CSA config
-  - remove credit support
-  - deactivate CSA
-  - drop CSA settings
-  - remove CSA from profile
-  - remove csa config trading profile
-  - remove csa config trading-profile
-  examples:
-  - (trading-profile.remove-csa-config :profile-id "..." :counterparty-ref "...")
-  doc: Remove CSA from ISDA agreement in trading profile
-  tier: intent
-  tags:
-  - authoring
-  - csa
-  - otc
-- verb: trading-profile.import
-  domain: trading-profile
-  action: import
-  aliases:
-  - import
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      file-path:
-        type: str
-      status:
-        type: enum
-        values:
-        - DRAFT
-        - VALIDATED
-        - PENDING_REVIEW
-        - ACTIVE
-        - SUPERSEDED
-        - ARCHIVED
-      document:
-        type: json
-      version:
-        type: int
-      notes:
-        type: str
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - import trading profile
-  - load trading profile
-  - import profile for
-  - import trading-profile
-  - import the trading profile
-  - import profile
-  - trading profile import
-  examples:
-  - (trading-profile.import :cbu-id "...")
-  doc: Import a trading profile document from YAML/JSON file or inline content
-  tier: intent
-  tags:
-  - lifecycle
-  - authoring
-- verb: trading-profile.archive
-  domain: trading-profile
-  action: archive
-  aliases:
-  - archive
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-    optional:
-      archived-by:
-        type: str
-      notes:
-        type: str
-  positional_sugar:
-  - profile-id
-  invocation_phrases:
-  - archive trading profile
-  - archive profile
-  - archive old version
-  - move to archive
-  - archive superseded profile
-  - store in archive
-  - mark profile archived
-  - archive trading-profile
-  examples:
-  - (trading-profile.archive :profile-id "...")
-  doc: Archive a trading profile (soft delete, transitions to ARCHIVED status)
-  tier: intent
-  tags:
-  - lifecycle
-  - state-transition
-  - soft-delete
-- verb: trading-profile.ca.set-default-option
-  domain: trading-profile
-  action: ca.set-default-option
-  aliases:
-  - ca.set-default-option
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      event-type:
-        type: str
-      default-option:
-        type: enum
-        values:
-        - CASH
-        - STOCK
-        - ROLLOVER
-        - LAPSE
-        - DECLINE
-  positional_sugar:
-  - profile-id
-  - event-type
-  invocation_phrases:
-  - ca.set default option trading profile
-  - ca.set default option trading-profile
-  - ca.set default option the trading profile
-  - ca.set default option profile
-  - trading profile ca.set default option
-  examples:
-  - (trading-profile.ca.set-default-option :profile-id "..." :event-type "..." :default-option "...")
-  doc: Set default election for specific event type
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
-- verb: trading-profile.ca.add-cutoff-rule
-  domain: trading-profile
-  action: ca.add-cutoff-rule
-  aliases:
-  - ca.add-cutoff-rule
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      days-before:
-        type: int
-    optional:
-      escalation-days:
-        type: int
-      market-code:
-        type: str
-      warning-days:
-        type: int
-      event-type:
-        type: str
-      depository-code:
-        type: str
-  positional_sugar:
-  - profile-id
-  - days-before
-  invocation_phrases:
-  - ca.add cutoff rule trading profile
-  - ca.add cutoff rule trading-profile
-  - ca.add cutoff rule the trading profile
-  - ca.add cutoff rule profile
-  - trading profile ca.add cutoff rule
-  examples:
-  - (trading-profile.ca.add-cutoff-rule :profile-id "..." :days-before "...")
-  doc: Add deadline cutoff rule for market/depository
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
-- verb: trading-profile.materialize
-  domain: trading-profile
-  action: materialize
-  aliases:
-  - materialize
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-    optional:
-      dry-run:
-        type: bool
-      sections:
-        type: list
-      force:
-        type: bool
-  positional_sugar:
-  - profile-id
-  invocation_phrases:
-  - materialize trading profile
-  - materialize profile
-  - sync trading profile
-  - deploy profile
-  - apply trading profile
-  - materialize trading-profile
-  - materialize the trading profile
-  - trading profile materialize
-  examples:
-  - (trading-profile.materialize :profile-id "...")
-  doc: Materialize trading profile to operational tables (universe, SSIs, booking rules)
-  tier: composite
-  tags:
-  - projection
-  - sync
-  - critical
-- verb: trading-profile.remove-im-mandate
-  domain: trading-profile
-  action: remove-im-mandate
-  aliases:
-  - remove-im-mandate
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      manager-ref:
-        type: str
-  positional_sugar:
-  - profile-id
-  - manager-ref
-  invocation_phrases:
-  - remove IM mandate
-  - terminate mandate
-  - end investment mandate
-  - remove management mandate
-  - deactivate IM relationship
-  - delete IM mandate
-  - remove im mandate trading profile
-  - remove im mandate trading-profile
-  examples:
-  - (trading-profile.remove-im-mandate :profile-id "..." :manager-ref "...")
-  doc: Remove investment manager mandate from profile
-  tier: intent
-  tags:
-  - authoring
-  - investment-manager
-- verb: trading-profile.add-isda-config
-  domain: trading-profile
-  action: add-isda-config
-  aliases:
-  - add-isda-config
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      counterparty-name:
-        type: str
-      counterparty-entity-id:
-        type: str
-    optional:
-      counterparty-lei:
-        type: str
-      agreement-date:
-        type: str
-      governing-law:
-        type: enum
-        values:
-        - NY
-        - ENGLISH
-  positional_sugar:
-  - profile-id
-  - counterparty-entity-id
-  invocation_phrases:
-  - add ISDA configuration
-  - configure ISDA agreement
-  - set up ISDA
-  - add ISDA master
-  - create ISDA config
-  - add ISDA settings
-  - configure ISDA master
-  - add ISDA
-  examples:
-  - (trading-profile.add-isda-config :profile-id "..." :counterparty-entity-id "..." :counterparty-name "...")
-  doc: Add ISDA master agreement to trading profile
-  tier: intent
-  tags:
-  - authoring
-  - isda
-  - otc
-- verb: trading-profile.link-csa-ssi
-  domain: trading-profile
-  action: link-csa-ssi
-  aliases:
-  - link-csa-ssi
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      counterparty-ref:
-        type: str
-      ssi-name:
-        type: str
-  positional_sugar:
-  - profile-id
-  - counterparty-ref
-  invocation_phrases:
-  - link CSA to SSI
-  - connect CSA SSI
-  - associate CSA with SSI
-  - set CSA settlement
-  - link collateral SSI
-  - configure CSA settlement
-  - attach SSI to CSA
-  - link csa ssi trading profile
-  examples:
-  - (trading-profile.link-csa-ssi :profile-id "..." :counterparty-ref "..." :ssi-name "...")
-  doc: Link CSA to collateral SSI in standing instructions
-  tier: intent
-  tags:
-  - authoring
-  - csa
-  - ssi
-  - collateral
-- verb: trading-profile.ca.disable-event-types
-  domain: trading-profile
-  action: ca.disable-event-types
-  aliases:
-  - ca.disable-event-types
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      event-types:
-        type: list
-  positional_sugar:
-  - profile-id
-  - event-types
-  invocation_phrases:
-  - ca.disable event types trading profile
-  - ca.disable event types trading-profile
-  - ca.disable event types the trading profile
-  - ca.disable event types profile
-  - trading profile ca.disable event types
-  examples:
-  - (trading-profile.ca.disable-event-types :profile-id "..." :event-types "...")
-  doc: Disable CA event types for this trading profile
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
-- verb: trading-profile.add-market
-  domain: trading-profile
-  action: add-market
-  aliases:
-  - add-market
-  args:
-    style: keyworded
-    required:
-      instrument-class:
-        type: str
-      mic:
-        type: str
-      profile-id:
-        type: uuid
-    optional:
-      market-name:
-        type: str
-      country-code:
-        type: str
-  positional_sugar:
-  - profile-id
-  - instrument-class
-  invocation_phrases:
-  - add market to profile
-  - enable market access
-  - add exchange
-  - add trading venue
-  - enable market
-  - add market MIC
-  - permit market trading
-  - include market
-  examples:
-  - (trading-profile.add-market :profile-id "..." :instrument-class "..." :mic "...")
-  doc: Add market to trading profile universe under an instrument class
-  tier: intent
-  tags:
-  - authoring
-  - universe
-  - market
-- verb: trading-profile.create-new-version
-  domain: trading-profile
-  action: create-new-version
-  aliases:
-  - create-new-version
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      notes:
-        type: str
-      created-by:
-        type: str
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - create new profile version
-  - version this profile
-  - bump profile version
-  - new version from current
-  - create version
-  - increment profile version
-  - save as new version
-  - create new version trading profile
-  examples:
-  - (trading-profile.create-new-version :cbu-id "...")
-  doc: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
-  tier: intent
-  tags:
-  - lifecycle
-  - authoring
-  - versioning
-- verb: trading-profile.ca.set-notification-policy
-  domain: trading-profile
-  action: ca.set-notification-policy
-  aliases:
-  - ca.set-notification-policy
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      channels:
-        type: list
-    optional:
-      escalation-contact:
-        type: str
-      sla-hours:
-        type: int
-  positional_sugar:
-  - profile-id
-  - channels
-  invocation_phrases:
-  - ca.set notification policy trading profile
-  - ca.set notification policy trading-profile
-  - ca.set notification policy the trading profile
-  - ca.set notification policy profile
-  - trading profile ca.set notification policy
-  examples:
-  - (trading-profile.ca.set-notification-policy :profile-id "..." :channels "...")
-  doc: Configure CA notification settings
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
 - verb: trading-profile.remove-isda-config
   domain: trading-profile
   action: remove-isda-config
@@ -1105,10 +10,10 @@ verbs:
   args:
     style: keyworded
     required:
-      counterparty-ref:
-        type: str
       profile-id:
         type: uuid
+      counterparty-ref:
+        type: str
   positional_sugar:
   - profile-id
   - counterparty-ref
@@ -1121,6 +26,9 @@ verbs:
   - remove ISDA from profile
   - remove isda config trading profile
   - remove isda config trading-profile
+  - remove isda config the trading profile
+  - remove isda config profile
+  - trading profile remove isda config
   examples:
   - (trading-profile.remove-isda-config :profile-id "..." :counterparty-ref "...")
   doc: Remove ISDA master agreement from trading profile
@@ -1129,165 +37,6 @@ verbs:
   - authoring
   - isda
   - otc
-- verb: trading-profile.add-standing-instruction
-  domain: trading-profile
-  action: add-standing-instruction
-  aliases:
-  - add-standing-instruction
-  args:
-    style: keyworded
-    required:
-      ssi-name:
-        type: str
-      ssi-type:
-        type: enum
-        values:
-        - SECURITIES
-        - CASH
-        - OTC_COLLATERAL
-        - FUND_ACCOUNTING
-      profile-id:
-        type: uuid
-    optional:
-      cash-currency:
-        type: str
-      pset-bic:
-        type: str
-      cash-account:
-        type: str
-      cash-bic:
-        type: str
-      safekeeping-account:
-        type: str
-      safekeeping-bic:
-        type: str
-  positional_sugar:
-  - profile-id
-  - ssi-type
-  invocation_phrases:
-  - add standing instruction
-  - add SSI
-  - create SSI
-  - add settlement instruction
-  - configure SSI
-  - add new SSI
-  - set up standing instruction
-  - create settlement instruction
-  examples:
-  - (trading-profile.add-standing-instruction :profile-id "..." :ssi-type "..." :ssi-name "...")
-  doc: Add SSI to trading profile standing instructions
-  tier: intent
-  tags:
-  - authoring
-  - ssi
-- verb: trading-profile.update-im-scope
-  domain: trading-profile
-  action: update-im-scope
-  aliases:
-  - update-im-scope
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-      manager-ref:
-        type: str
-    optional:
-      scope-mics:
-        type: list
-      scope-all:
-        type: bool
-      scope-instrument-classes:
-        type: list
-  positional_sugar:
-  - profile-id
-  - manager-ref
-  invocation_phrases:
-  - update IM scope
-  - modify mandate scope
-  - change IM coverage
-  - update management scope
-  - adjust mandate scope
-  - change discretionary scope
-  - modify IM permissions
-  - update im scope trading profile
-  examples:
-  - (trading-profile.update-im-scope :profile-id "..." :manager-ref "...")
-  doc: Update scope for existing IM mandate
-  tier: intent
-  tags:
-  - authoring
-  - investment-manager
-- verb: trading-profile.add-isda-coverage
-  domain: trading-profile
-  action: add-isda-coverage
-  aliases:
-  - add-isda-coverage
-  args:
-    style: keyworded
-    required:
-      isda-ref:
-        type: str
-      profile-id:
-        type: uuid
-      asset-class:
-        type: str
-    optional:
-      base-products:
-        type: list
-  positional_sugar:
-  - profile-id
-  - isda-ref
-  invocation_phrases:
-  - add ISDA coverage
-  - extend ISDA coverage
-  - add product to ISDA
-  - include in ISDA scope
-  - add ISDA product coverage
-  - expand ISDA coverage
-  - add to ISDA products
-  - add isda coverage trading profile
-  examples:
-  - (trading-profile.add-isda-coverage :profile-id "..." :isda-ref "..." :asset-class "...")
-  doc: Add product coverage to ISDA config
-  tier: intent
-  tags:
-  - authoring
-  - isda
-  - otc
-- verb: trading-profile.activate
-  domain: trading-profile
-  action: activate
-  aliases:
-  - activate
-  - enable
-  - start
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-    optional:
-      activated-by:
-        type: str
-  positional_sugar:
-  - profile-id
-  invocation_phrases:
-  - activate trading profile
-  - make profile active
-  - activate this version
-  - switch to active profile
-  - enable trading profile
-  - set profile as active
-  - go live with profile
-  - activate CBU profile
-  examples:
-  - (trading-profile.activate :profile-id "...")
-  doc: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
-  tier: intent
-  tags:
-  - lifecycle
-  - activation
 - verb: trading-profile.reject
   domain: trading-profile
   action: reject
@@ -1317,6 +66,10 @@ verbs:
   - reject activation request
   - deny profile approval
   - reject trading-profile
+  - reject the trading profile
+  - decline trading profile
+  - deny trading profile
+  - trading profile reject
   examples:
   - (trading-profile.reject :profile-id "..." :rejection-reason "...")
   doc: Reject a pending trading profile (transitions PENDING_REVIEW -> DRAFT with rejection reason)
@@ -1324,6 +77,649 @@ verbs:
   tags:
   - lifecycle
   - state-transition
+- verb: trading-profile.archive
+  domain: trading-profile
+  action: archive
+  aliases:
+  - archive
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+    optional:
+      notes:
+        type: str
+      archived-by:
+        type: str
+  positional_sugar:
+  - profile-id
+  invocation_phrases:
+  - archive trading profile
+  - archive profile
+  - archive old version
+  - move to archive
+  - archive superseded profile
+  - store in archive
+  - mark profile archived
+  - archive trading-profile
+  - archive the trading profile
+  - trading profile archive
+  examples:
+  - (trading-profile.archive :profile-id "...")
+  doc: Archive a trading profile (soft delete, transitions to ARCHIVED status)
+  tier: intent
+  tags:
+  - lifecycle
+  - state-transition
+  - soft-delete
+- verb: trading-profile.ca.set-notification-policy
+  domain: trading-profile
+  action: ca.set-notification-policy
+  aliases:
+  - ca.set-notification-policy
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      channels:
+        type: list
+    optional:
+      sla-hours:
+        type: int
+      escalation-contact:
+        type: str
+  positional_sugar:
+  - profile-id
+  - channels
+  invocation_phrases:
+  - set CA notification policy
+  - configure CA notifications
+  - set notification preferences
+  - configure event alerts
+  - set CA alert policy
+  - notification settings
+  - configure CA alerts
+  - ca.set notification policy trading profile
+  - ca.set notification policy trading-profile
+  - ca.set notification policy the trading profile
+  - ca.set notification policy profile
+  - trading profile ca.set notification policy
+  examples:
+  - (trading-profile.ca.set-notification-policy :profile-id "..." :channels "...")
+  doc: Configure CA notification settings
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+- verb: trading-profile.ca.remove-default-option
+  domain: trading-profile
+  action: ca.remove-default-option
+  aliases:
+  - ca.remove-default-option
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      event-type:
+        type: str
+  positional_sugar:
+  - profile-id
+  - event-type
+  invocation_phrases:
+  - remove default CA option
+  - clear default election
+  - remove automatic election
+  - delete default option
+  - clear default choice
+  - remove CA default
+  - ca.remove default option trading profile
+  - ca.remove default option trading-profile
+  - ca.remove default option the trading profile
+  - ca.remove default option profile
+  - trading profile ca.remove default option
+  examples:
+  - (trading-profile.ca.remove-default-option :profile-id "..." :event-type "...")
+  doc: Remove default election for specific event type
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+- verb: trading-profile.ca.add-cutoff-rule
+  domain: trading-profile
+  action: ca.add-cutoff-rule
+  aliases:
+  - ca.add-cutoff-rule
+  args:
+    style: keyworded
+    required:
+      days-before:
+        type: int
+      profile-id:
+        type: uuid
+    optional:
+      escalation-days:
+        type: int
+      depository-code:
+        type: str
+      event-type:
+        type: str
+      market-code:
+        type: str
+      warning-days:
+        type: int
+  positional_sugar:
+  - profile-id
+  - days-before
+  invocation_phrases:
+  - add CA cutoff rule
+  - set election cutoff
+  - add deadline rule
+  - configure cutoff time
+  - add instruction deadline
+  - set CA deadline
+  - add cutoff configuration
+  - ca.add cutoff rule trading profile
+  - ca.add cutoff rule trading-profile
+  - ca.add cutoff rule the trading profile
+  - ca.add cutoff rule profile
+  - trading profile ca.add cutoff rule
+  examples:
+  - (trading-profile.ca.add-cutoff-rule :profile-id "..." :days-before "...")
+  doc: Add deadline cutoff rule for market/depository
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+- verb: trading-profile.ca.remove-cutoff-rule
+  domain: trading-profile
+  action: ca.remove-cutoff-rule
+  aliases:
+  - ca.remove-cutoff-rule
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+    optional:
+      market-code:
+        type: str
+      depository-code:
+        type: str
+  positional_sugar:
+  - profile-id
+  invocation_phrases:
+  - remove CA cutoff rule
+  - delete cutoff rule
+  - remove deadline rule
+  - clear cutoff configuration
+  - remove instruction deadline
+  - ca.remove cutoff rule trading profile
+  - ca.remove cutoff rule trading-profile
+  - ca.remove cutoff rule the trading profile
+  - ca.remove cutoff rule profile
+  - trading profile ca.remove cutoff rule
+  examples:
+  - (trading-profile.ca.remove-cutoff-rule :profile-id "...")
+  doc: Remove cutoff rule by market/depository
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+- verb: trading-profile.get-active
+  domain: trading-profile
+  action: get-active
+  aliases:
+  - get-active
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - get active profile
+  - show active trading profile
+  - current trading profile
+  - get active trading profile
+  - get active trading-profile
+  - get active the trading profile
+  - trading profile get active
+  examples:
+  - (trading-profile.get-active :cbu-id "...")
+  doc: Get the active trading profile for a CBU
+  tier: diagnostics
+  tags:
+  - read
+  - lookup
+- verb: trading-profile.set-base-currency
+  domain: trading-profile
+  action: set-base-currency
+  aliases:
+  - set-base-currency
+  args:
+    style: keyworded
+    required:
+      currency:
+        type: str
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  - currency
+  invocation_phrases:
+  - set base currency
+  - change base currency
+  - set profile currency
+  - update base currency
+  - set primary currency
+  - configure base currency
+  - set CBU base currency
+  - set base currency trading profile
+  - set base currency trading-profile
+  - set base currency the trading profile
+  - set base currency profile
+  - trading profile set base currency
+  examples:
+  - (trading-profile.set-base-currency :profile-id "..." :currency "...")
+  doc: Set base currency for trading profile
+  tier: intent
+  tags:
+  - authoring
+  - currency
+- verb: trading-profile.remove-instrument-class
+  domain: trading-profile
+  action: remove-instrument-class
+  aliases:
+  - remove-instrument-class
+  args:
+    style: keyworded
+    required:
+      class-code:
+        type: str
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  - class-code
+  invocation_phrases:
+  - remove instrument class
+  - remove equity instruments
+  - remove bond instruments
+  - disable instrument class
+  - remove equity trading
+  - remove from profile
+  - disable asset class
+  - exclude instrument type
+  - drop instrument class
+  - remove instrument class trading profile
+  - remove instrument class trading-profile
+  - remove instrument class the trading profile
+  - remove instrument class profile
+  - trading profile remove instrument class
+  examples:
+  - (trading-profile.remove-instrument-class :profile-id "..." :class-code "...")
+  doc: Remove instrument class from trading profile universe
+  tier: intent
+  tags:
+  - authoring
+  - universe
+- verb: trading-profile.update-im-scope
+  domain: trading-profile
+  action: update-im-scope
+  aliases:
+  - update-im-scope
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      manager-ref:
+        type: str
+    optional:
+      scope-all:
+        type: bool
+      scope-mics:
+        type: list
+      scope-instrument-classes:
+        type: list
+  positional_sugar:
+  - profile-id
+  - manager-ref
+  invocation_phrases:
+  - update IM scope
+  - modify mandate scope
+  - change IM coverage
+  - update management scope
+  - adjust mandate scope
+  - change discretionary scope
+  - modify IM permissions
+  - update im scope trading profile
+  - update im scope trading-profile
+  - update im scope the trading profile
+  - update im scope profile
+  - trading profile update im scope
+  examples:
+  - (trading-profile.update-im-scope :profile-id "..." :manager-ref "...")
+  doc: Update scope for existing IM mandate
+  tier: intent
+  tags:
+  - authoring
+  - investment-manager
+- verb: trading-profile.add-standing-instruction
+  domain: trading-profile
+  action: add-standing-instruction
+  aliases:
+  - add-standing-instruction
+  args:
+    style: keyworded
+    required:
+      ssi-type:
+        type: enum
+        values:
+        - SECURITIES
+        - CASH
+        - OTC_COLLATERAL
+        - FUND_ACCOUNTING
+      ssi-name:
+        type: str
+      profile-id:
+        type: uuid
+    optional:
+      cash-bic:
+        type: str
+      cash-account:
+        type: str
+      safekeeping-bic:
+        type: str
+      safekeeping-account:
+        type: str
+      cash-currency:
+        type: str
+      pset-bic:
+        type: str
+  positional_sugar:
+  - profile-id
+  - ssi-type
+  invocation_phrases:
+  - add standing instruction
+  - add SSI
+  - create SSI
+  - add settlement instruction
+  - configure SSI
+  - add new SSI
+  - set up standing instruction
+  - create settlement instruction
+  - add standing instruction trading profile
+  - add standing instruction trading-profile
+  - add standing instruction the trading profile
+  - add standing instruction profile
+  - trading profile add standing instruction
+  examples:
+  - (trading-profile.add-standing-instruction :profile-id "..." :ssi-type "..." :ssi-name "...")
+  doc: Add SSI to trading profile standing instructions
+  tier: intent
+  tags:
+  - authoring
+  - ssi
+- verb: trading-profile.validate-universe-coverage
+  domain: trading-profile
+  action: validate-universe-coverage
+  aliases:
+  - validate-universe-coverage
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  invocation_phrases:
+  - validate universe coverage
+  - check universe completeness
+  - verify instrument coverage
+  - check SSI coverage
+  - validate settlement coverage
+  - coverage validation
+  - check all markets covered
+  - validate universe coverage trading profile
+  - validate universe coverage trading-profile
+  - validate universe coverage the trading profile
+  - validate universe coverage profile
+  - trading profile validate universe coverage
+  examples:
+  - (trading-profile.validate-universe-coverage :profile-id "...")
+  doc: Validate all universe entries have required SSIs and booking rules
+  tier: diagnostics
+  tags:
+  - validation
+  - coverage-check
+- verb: trading-profile.ca.disable-event-types
+  domain: trading-profile
+  action: ca.disable-event-types
+  aliases:
+  - ca.disable-event-types
+  args:
+    style: keyworded
+    required:
+      event-types:
+        type: list
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  - event-types
+  invocation_phrases:
+  - disable corporate action types
+  - turn off CA events
+  - disable dividend events
+  - disable CA processing
+  - deactivate event types
+  - ca.disable event types trading profile
+  - ca.disable event types trading-profile
+  - ca.disable event types the trading profile
+  - ca.disable event types profile
+  - trading profile ca.disable event types
+  examples:
+  - (trading-profile.ca.disable-event-types :profile-id "..." :event-types "...")
+  doc: Disable CA event types for this trading profile
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+- verb: trading-profile.ca.set-election-policy
+  domain: trading-profile
+  action: ca.set-election-policy
+  aliases:
+  - ca.set-election-policy
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      elector:
+        type: enum
+        values:
+        - investment_manager
+        - admin
+        - client
+    optional:
+      auto-instruct-threshold:
+        type: decimal
+      evidence-required:
+        type: bool
+  positional_sugar:
+  - profile-id
+  - elector
+  invocation_phrases:
+  - set CA election policy
+  - configure election defaults
+  - set default elections
+  - election policy settings
+  - configure CA choices
+  - set election preferences
+  - configure automatic elections
+  - ca.set election policy trading profile
+  - ca.set election policy trading-profile
+  - ca.set election policy the trading profile
+  - ca.set election policy profile
+  - trading profile ca.set election policy
+  examples:
+  - (trading-profile.ca.set-election-policy :profile-id "..." :elector "...")
+  doc: Configure who makes CA elections and requirements
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+- verb: trading-profile.create-new-version
+  domain: trading-profile
+  action: create-new-version
+  aliases:
+  - create-new-version
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      created-by:
+        type: str
+      notes:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - create new profile version
+  - version this profile
+  - bump profile version
+  - new version from current
+  - create version
+  - increment profile version
+  - save as new version
+  - create new version trading profile
+  - create new version trading-profile
+  - create new version the trading profile
+  - create new version profile
+  - trading profile create new version
+  examples:
+  - (trading-profile.create-new-version :cbu-id "...")
+  doc: Create a new draft version from the current ACTIVE profile. Used when modifying a live trading matrix.
+  tier: intent
+  tags:
+  - lifecycle
+  - authoring
+  - versioning
+- verb: trading-profile.ca.get-policy
+  domain: trading-profile
+  action: ca.get-policy
+  aliases:
+  - ca.get-policy
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  invocation_phrases:
+  - get CA policy
+  - show CA configuration
+  - view CA settings
+  - display CA policy
+  - get corporate action policy
+  - show CA setup
+  - view event policy
+  - ca.get policy trading profile
+  - ca.get policy trading-profile
+  - ca.get policy the trading profile
+  - ca.get policy profile
+  - trading profile ca.get policy
+  examples:
+  - (trading-profile.ca.get-policy :profile-id "...")
+  doc: Get current CA policy configuration from trading profile
+  tier: diagnostics
+  tags:
+  - read
+  - ca-policy
+- verb: trading-profile.remove-csa-config
+  domain: trading-profile
+  action: remove-csa-config
+  aliases:
+  - remove-csa-config
+  args:
+    style: keyworded
+    required:
+      counterparty-ref:
+        type: str
+      profile-id:
+        type: uuid
+    optional:
+      csa-type:
+        type: enum
+        values:
+        - VM
+        - VM_IM
+        - IM
+  positional_sugar:
+  - profile-id
+  - counterparty-ref
+  invocation_phrases:
+  - remove CSA configuration
+  - delete CSA config
+  - remove credit support
+  - deactivate CSA
+  - drop CSA settings
+  - remove CSA from profile
+  - remove csa config trading profile
+  - remove csa config trading-profile
+  - remove csa config the trading profile
+  - remove csa config profile
+  - trading profile remove csa config
+  examples:
+  - (trading-profile.remove-csa-config :profile-id "..." :counterparty-ref "...")
+  doc: Remove CSA from ISDA agreement in trading profile
+  tier: intent
+  tags:
+  - authoring
+  - csa
+  - otc
+- verb: trading-profile.remove-im-mandate
+  domain: trading-profile
+  action: remove-im-mandate
+  aliases:
+  - remove-im-mandate
+  args:
+    style: keyworded
+    required:
+      manager-ref:
+        type: str
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  - manager-ref
+  invocation_phrases:
+  - remove IM mandate
+  - terminate mandate
+  - end investment mandate
+  - remove management mandate
+  - deactivate IM relationship
+  - delete IM mandate
+  - remove im mandate trading profile
+  - remove im mandate trading-profile
+  - remove im mandate the trading profile
+  - remove im mandate profile
+  - trading profile remove im mandate
+  examples:
+  - (trading-profile.remove-im-mandate :profile-id "..." :manager-ref "...")
+  doc: Remove investment manager mandate from profile
+  tier: intent
+  tags:
+  - authoring
+  - investment-manager
 - verb: trading-profile.submit
   domain: trading-profile
   action: submit
@@ -1337,9 +733,9 @@ verbs:
       profile-id:
         type: uuid
     optional:
-      notes:
-        type: str
       submitted-by:
+        type: str
+      notes:
         type: str
   positional_sugar:
   - profile-id
@@ -1352,6 +748,12 @@ verbs:
   - submit profile changes
   - request go-live approval
   - submit profile for review
+  - submit trading-profile
+  - submit the trading profile
+  - send trading profile
+  - complete trading profile
+  - submit profile
+  - trading profile submit
   examples:
   - (trading-profile.submit :profile-id "...")
   doc: Submit a validated trading profile for client review (transitions VALIDATED -> PENDING_REVIEW)
@@ -1359,46 +761,376 @@ verbs:
   tags:
   - lifecycle
   - state-transition
-- verb: trading-profile.add-instrument-class
+- verb: trading-profile.add-csa-collateral
   domain: trading-profile
-  action: add-instrument-class
+  action: add-csa-collateral
   aliases:
-  - add-instrument-class
+  - add-csa-collateral
+  args:
+    style: keyworded
+    required:
+      counterparty-ref:
+        type: str
+      profile-id:
+        type: uuid
+      collateral-type:
+        type: enum
+        values:
+        - CASH
+        - GOVT_BOND
+        - CORP_BOND
+        - EQUITY
+        - MONEY_MARKET
+      haircut-pct:
+        type: decimal
+    optional:
+      min-rating:
+        type: str
+      issuers:
+        type: list
+      currencies:
+        type: list
+  positional_sugar:
+  - profile-id
+  - counterparty-ref
+  invocation_phrases:
+  - add CSA collateral
+  - configure eligible collateral
+  - add collateral type
+  - set collateral eligibility
+  - add eligible securities
+  - configure CSA margin
+  - add collateral assets
+  - add csa collateral trading profile
+  - add csa collateral trading-profile
+  - add csa collateral the trading profile
+  - add csa collateral profile
+  - trading profile add csa collateral
+  examples:
+  - (trading-profile.add-csa-collateral :profile-id "..." :counterparty-ref "..." :collateral-type "..." :haircut-pct "...")
+  doc: Add eligible collateral to CSA
+  tier: intent
+  tags:
+  - authoring
+  - csa
+  - collateral
+- verb: trading-profile.add-im-mandate
+  domain: trading-profile
+  action: add-im-mandate
+  aliases:
+  - add-im-mandate
+  args:
+    style: keyworded
+    required:
+      priority:
+        type: int
+      manager-ref-type:
+        type: enum
+        values:
+        - LEI
+        - BIC
+        - NAME
+        - UUID
+      manager-ref:
+        type: str
+      profile-id:
+        type: uuid
+    optional:
+      scope-instrument-classes:
+        type: list
+      scope-mics:
+        type: list
+      can-trade:
+        type: bool
+      role:
+        type: str
+      scope-all:
+        type: bool
+      instruction-method:
+        type: enum
+        values:
+        - SWIFT
+        - CTM
+        - FIX
+        - API
+        - ALERT
+        - MANUAL
+      can-settle:
+        type: bool
+  positional_sugar:
+  - profile-id
+  - manager-ref
+  invocation_phrases:
+  - add investment management mandate
+  - add IM mandate
+  - create management mandate
+  - add investment mandate
+  - configure IM relationship
+  - add discretionary mandate
+  - create IM agreement
+  - add im mandate trading profile
+  - add im mandate trading-profile
+  - add im mandate the trading profile
+  - add im mandate profile
+  - trading profile add im mandate
+  examples:
+  - (trading-profile.add-im-mandate :profile-id "..." :manager-ref "..." :manager-ref-type "..." :priority "...")
+  doc: Add investment manager mandate to trading profile
+  tier: intent
+  tags:
+  - authoring
+  - investment-manager
+- verb: trading-profile.activate
+  domain: trading-profile
+  action: activate
+  aliases:
+  - activate
+  - enable
+  - start
   args:
     style: keyworded
     required:
       profile-id:
         type: uuid
-      class-code:
-        type: str
     optional:
-      is-traded:
-        type: bool
-      cfi-prefixes:
-        type: list
-      is-held:
-        type: bool
-      isda-asset-classes:
-        type: list
+      activated-by:
+        type: str
   positional_sugar:
   - profile-id
-  - class-code
   invocation_phrases:
-  - add instrument class
-  - enable instrument class
-  - add equity trading
-  - add bond trading
-  - enable instrument type
-  - add asset class
-  - permit instrument class
-  - include instrument in profile
+  - activate trading profile
+  - make profile active
+  - activate this version
+  - switch to active profile
+  - enable trading profile
+  - set profile as active
+  - go live with profile
+  - activate CBU profile
+  - activate trading-profile
+  - activate the trading profile
+  - start trading profile
+  - activate profile
+  - trading profile activate
   examples:
-  - (trading-profile.add-instrument-class :profile-id "..." :class-code "...")
-  doc: Add instrument class to trading profile universe
+  - (trading-profile.activate :profile-id "...")
+  doc: Activate a trading profile (sets status to ACTIVE, supersedes previous active)
+  tier: intent
+  tags:
+  - lifecycle
+  - activation
+- verb: trading-profile.create-draft
+  domain: trading-profile
+  action: create-draft
+  aliases:
+  - create-draft
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - create draft profile
+  - start new profile draft
+  - create trading draft
+  - new profile version
+  - draft new profile
+  - start profile edit
+  - create draft from active
+  - begin profile changes
+  - create draft trading profile
+  - create draft trading-profile
+  - create draft the trading profile
+  - trading profile create draft
+  examples:
+  - (trading-profile.create-draft :cbu-id "...")
+  doc: Create a new draft trading profile for a CBU (use clone-to to copy from existing)
+  tier: intent
+  tags:
+  - lifecycle
+  - authoring
+- verb: trading-profile.remove-standing-instruction
+  domain: trading-profile
+  action: remove-standing-instruction
+  aliases:
+  - remove-standing-instruction
+  args:
+    style: keyworded
+    required:
+      ssi-name:
+        type: str
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  - ssi-name
+  invocation_phrases:
+  - remove standing instruction
+  - delete SSI
+  - remove SSI
+  - delete settlement instruction
+  - deactivate SSI
+  - remove from SSIs
+  - drop standing instruction
+  - remove standing instruction trading profile
+  - remove standing instruction trading-profile
+  - remove standing instruction the trading profile
+  - remove standing instruction profile
+  - trading profile remove standing instruction
+  examples:
+  - (trading-profile.remove-standing-instruction :profile-id "..." :ssi-name "...")
+  doc: Remove SSI from trading profile
+  tier: intent
+  tags:
+  - authoring
+  - ssi
+- verb: trading-profile.add-isda-config
+  domain: trading-profile
+  action: add-isda-config
+  aliases:
+  - add-isda-config
+  args:
+    style: keyworded
+    required:
+      counterparty-name:
+        type: str
+      profile-id:
+        type: uuid
+      counterparty-entity-id:
+        type: str
+    optional:
+      governing-law:
+        type: enum
+        values:
+        - NY
+        - ENGLISH
+      agreement-date:
+        type: str
+      counterparty-lei:
+        type: str
+  positional_sugar:
+  - profile-id
+  - counterparty-entity-id
+  invocation_phrases:
+  - add ISDA configuration
+  - configure ISDA agreement
+  - set up ISDA
+  - add ISDA master
+  - create ISDA config
+  - add ISDA settings
+  - configure ISDA master
+  - add ISDA
+  - establish ISDA
+  - create ISDA
+  - add counterparty
+  - add counterparty for derivatives
+  - add isda config trading profile
+  - add isda config trading-profile
+  - add isda config the trading profile
+  examples:
+  - (trading-profile.add-isda-config :profile-id "..." :counterparty-entity-id "..." :counterparty-name "...")
+  doc: Add ISDA master agreement to trading profile
+  tier: intent
+  tags:
+  - authoring
+  - isda
+  - otc
+- verb: trading-profile.add-market
+  domain: trading-profile
+  action: add-market
+  aliases:
+  - add-market
+  args:
+    style: keyworded
+    required:
+      mic:
+        type: str
+      profile-id:
+        type: uuid
+      instrument-class:
+        type: str
+    optional:
+      market-name:
+        type: str
+      country-code:
+        type: str
+  positional_sugar:
+  - profile-id
+  - instrument-class
+  invocation_phrases:
+  - add market to profile
+  - enable market access
+  - add exchange
+  - add trading venue
+  - enable market
+  - add market MIC
+  - permit market trading
+  - include market
+  - add market
+  - add NYSE
+  - add LSE
+  - trade on
+  - add market trading profile
+  - add market trading-profile
+  - add market the trading profile
+  examples:
+  - (trading-profile.add-market :profile-id "..." :instrument-class "..." :mic "...")
+  doc: Add market to trading profile universe under an instrument class
   tier: intent
   tags:
   - authoring
   - universe
+  - market
+- verb: trading-profile.clone-to
+  domain: trading-profile
+  action: clone-to
+  aliases:
+  - clone-to
+  args:
+    style: keyworded
+    required:
+      target-cbu-id:
+        type: entity_name
+      profile-id:
+        type: uuid
+    optional:
+      adapt-base-currency:
+        type: str
+      include-isda:
+        type: bool
+      cloned-by:
+        type: str
+      notes:
+        type: str
+  positional_sugar:
+  - profile-id
+  - target-cbu-id
+  invocation_phrases:
+  - clone profile to CBU
+  - copy trading profile
+  - clone profile
+  - duplicate profile to
+  - copy profile to new CBU
+  - replicate trading setup
+  - clone configuration
+  - copy to target CBU
+  - clone to trading profile
+  - clone to trading-profile
+  - clone to the trading profile
+  - clone to profile
+  - trading profile clone to
+  examples:
+  - (trading-profile.clone-to :profile-id "..." :target-cbu-id "...")
+  doc: Clone a trading profile to another CBU, creating a new DRAFT profile
+  tier: intent
+  tags:
+  - lifecycle
+  - authoring
+  - cloning
 - verb: trading-profile.validate-go-live-ready
   domain: trading-profile
   action: validate-go-live-ready
@@ -1427,6 +1159,11 @@ verbs:
   - validate activation ready
   - run go live checks
   - pre-activation validation
+  - validate go live ready trading profile
+  - validate go live ready trading-profile
+  - validate go live ready the trading profile
+  - validate go live ready profile
+  - trading profile validate go live ready
   examples:
   - (trading-profile.validate-go-live-ready :profile-id "...")
   doc: Full validation for production readiness
@@ -1434,52 +1171,18 @@ verbs:
   tags:
   - validation
   - readiness-check
-- verb: trading-profile.approve
+- verb: trading-profile.ca.link-proceeds-ssi
   domain: trading-profile
-  action: approve
+  action: ca.link-proceeds-ssi
   aliases:
-  - accept
-  - approve
-  - confirm
+  - ca.link-proceeds-ssi
   args:
     style: keyworded
     required:
       profile-id:
         type: uuid
-    optional:
-      approved-by:
+      ssi-name:
         type: str
-      notes:
-        type: str
-  positional_sugar:
-  - profile-id
-  invocation_phrases:
-  - approve trading profile
-  - approve profile
-  - authorize profile
-  - approve go-live
-  - give profile approval
-  - approve activation
-  - authorize trading setup
-  - activate trading profile
-  examples:
-  - (trading-profile.approve :profile-id "...")
-  doc: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
-  tier: intent
-  tags:
-  - lifecycle
-  - state-transition
-  - activation
-- verb: trading-profile.ca.remove-proceeds-ssi
-  domain: trading-profile
-  action: ca.remove-proceeds-ssi
-  aliases:
-  - ca.remove-proceeds-ssi
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
       proceeds-type:
         type: enum
         values:
@@ -1492,106 +1195,26 @@ verbs:
   - profile-id
   - proceeds-type
   invocation_phrases:
-  - ca.remove proceeds ssi trading profile
-  - ca.remove proceeds ssi trading-profile
-  - ca.remove proceeds ssi the trading profile
-  - ca.remove proceeds ssi profile
-  - trading profile ca.remove proceeds ssi
+  - link proceeds SSI
+  - set CA proceeds account
+  - link dividend SSI
+  - configure proceeds settlement
+  - set proceeds destination
+  - link CA payout SSI
+  - configure proceeds routing
+  - ca.link proceeds ssi trading profile
+  - ca.link proceeds ssi trading-profile
+  - ca.link proceeds ssi the trading profile
+  - ca.link proceeds ssi profile
+  - trading profile ca.link proceeds ssi
   examples:
-  - (trading-profile.ca.remove-proceeds-ssi :profile-id "..." :proceeds-type "...")
-  doc: Remove CA proceeds SSI mapping
+  - (trading-profile.ca.link-proceeds-ssi :profile-id "..." :proceeds-type "..." :ssi-name "...")
+  doc: Map CA proceeds to settlement instruction
   tier: intent
   tags:
   - authoring
   - ca-policy
   - ssi
-- verb: trading-profile.set-base-currency
-  domain: trading-profile
-  action: set-base-currency
-  aliases:
-  - set-base-currency
-  args:
-    style: keyworded
-    required:
-      currency:
-        type: str
-      profile-id:
-        type: uuid
-  positional_sugar:
-  - profile-id
-  - currency
-  invocation_phrases:
-  - set base currency
-  - change base currency
-  - set profile currency
-  - update base currency
-  - set primary currency
-  - configure base currency
-  - set CBU base currency
-  - set base currency trading profile
-  examples:
-  - (trading-profile.set-base-currency :profile-id "..." :currency "...")
-  doc: Set base currency for trading profile
-  tier: intent
-  tags:
-  - authoring
-  - currency
-- verb: trading-profile.validate-universe-coverage
-  domain: trading-profile
-  action: validate-universe-coverage
-  aliases:
-  - validate-universe-coverage
-  args:
-    style: keyworded
-    required:
-      profile-id:
-        type: uuid
-  positional_sugar:
-  - profile-id
-  invocation_phrases:
-  - validate universe coverage
-  - check universe completeness
-  - verify instrument coverage
-  - check SSI coverage
-  - validate settlement coverage
-  - coverage validation
-  - check all markets covered
-  - validate universe coverage trading profile
-  examples:
-  - (trading-profile.validate-universe-coverage :profile-id "...")
-  doc: Validate all universe entries have required SSIs and booking rules
-  tier: diagnostics
-  tags:
-  - validation
-  - coverage-check
-- verb: trading-profile.ca.remove-default-option
-  domain: trading-profile
-  action: ca.remove-default-option
-  aliases:
-  - ca.remove-default-option
-  args:
-    style: keyworded
-    required:
-      event-type:
-        type: str
-      profile-id:
-        type: uuid
-  positional_sugar:
-  - profile-id
-  - event-type
-  invocation_phrases:
-  - ca.remove default option trading profile
-  - ca.remove default option trading-profile
-  - ca.remove default option the trading profile
-  - ca.remove default option profile
-  - trading profile ca.remove default option
-  examples:
-  - (trading-profile.ca.remove-default-option :profile-id "..." :event-type "...")
-  doc: Remove default election for specific event type
-  tier: intent
-  tags:
-  - authoring
-  - ca-policy
 - verb: trading-profile.remove-booking-rule
   domain: trading-profile
   action: remove-booking-rule
@@ -1618,6 +1241,9 @@ verbs:
   - remove rule
   - remove booking rule trading profile
   - remove booking rule trading-profile
+  - remove booking rule the trading profile
+  - remove booking rule profile
+  - trading profile remove booking rule
   examples:
   - (trading-profile.remove-booking-rule :profile-id "..." :ssi-ref "..." :rule-id "...")
   doc: Remove booking rule from trading profile
@@ -1625,6 +1251,456 @@ verbs:
   tags:
   - authoring
   - booking-rules
+- verb: trading-profile.add-instrument-class
+  domain: trading-profile
+  action: add-instrument-class
+  aliases:
+  - add-instrument-class
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      class-code:
+        type: str
+    optional:
+      isda-asset-classes:
+        type: list
+      is-traded:
+        type: bool
+      is-held:
+        type: bool
+      cfi-prefixes:
+        type: list
+  positional_sugar:
+  - profile-id
+  - class-code
+  invocation_phrases:
+  - add instrument class
+  - add equity instruments
+  - add bond instruments
+  - enable instrument class
+  - add equity trading
+  - add bond trading
+  - enable instrument type
+  - add asset class
+  - permit instrument class
+  - include instrument in profile
+  - add instruments
+  - enable trading
+  - add to universe
+  - add equities
+  - add bonds
+  examples:
+  - (trading-profile.add-instrument-class :profile-id "..." :class-code "...")
+  doc: Add instrument class to trading profile universe
+  tier: intent
+  tags:
+  - authoring
+  - universe
+- verb: trading-profile.add-isda-coverage
+  domain: trading-profile
+  action: add-isda-coverage
+  aliases:
+  - add-isda-coverage
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      isda-ref:
+        type: str
+      asset-class:
+        type: str
+    optional:
+      base-products:
+        type: list
+  positional_sugar:
+  - profile-id
+  - isda-ref
+  invocation_phrases:
+  - add ISDA coverage
+  - extend ISDA coverage
+  - add product to ISDA
+  - include in ISDA scope
+  - add ISDA product coverage
+  - expand ISDA coverage
+  - add to ISDA products
+  - add isda coverage trading profile
+  - add isda coverage trading-profile
+  - add isda coverage the trading profile
+  - add isda coverage profile
+  - trading profile add isda coverage
+  examples:
+  - (trading-profile.add-isda-coverage :profile-id "..." :isda-ref "..." :asset-class "...")
+  doc: Add product coverage to ISDA config
+  tier: intent
+  tags:
+  - authoring
+  - isda
+  - otc
+- verb: trading-profile.add-csa-config
+  domain: trading-profile
+  action: add-csa-config
+  aliases:
+  - add-csa-config
+  args:
+    style: keyworded
+    required:
+      csa-type:
+        type: enum
+        values:
+        - VM
+        - VM_IM
+        - IM
+      isda-ref:
+        type: str
+      profile-id:
+        type: uuid
+    optional:
+      collateral-ssi-ref:
+        type: str
+      threshold-amount:
+        type: decimal
+      minimum-transfer-amount:
+        type: decimal
+      threshold-currency:
+        type: str
+  positional_sugar:
+  - profile-id
+  - isda-ref
+  invocation_phrases:
+  - add CSA configuration
+  - configure CSA
+  - set up CSA agreement
+  - add credit support annex
+  - create CSA config
+  - add CSA settings
+  - configure collateral agreement
+  - add CSA
+  - add VM CSA
+  - add IM CSA
+  - add collateral agreement
+  - add csa config trading profile
+  - add csa config trading-profile
+  - add csa config the trading profile
+  - add csa config profile
+  examples:
+  - (trading-profile.add-csa-config :profile-id "..." :isda-ref "..." :csa-type "...")
+  doc: Add CSA (Credit Support Annex) to ISDA agreement
+  tier: intent
+  tags:
+  - authoring
+  - csa
+  - otc
+  - collateral
+- verb: trading-profile.remove-market
+  domain: trading-profile
+  action: remove-market
+  aliases:
+  - remove-market
+  args:
+    style: keyworded
+    required:
+      mic:
+        type: str
+      instrument-class:
+        type: str
+      profile-id:
+        type: uuid
+  positional_sugar:
+  - profile-id
+  - instrument-class
+  invocation_phrases:
+  - remove market from profile
+  - disable market access
+  - remove exchange
+  - exclude market
+  - drop trading venue
+  - remove market MIC
+  - disable market
+  - remove market trading profile
+  - remove market trading-profile
+  - remove market the trading profile
+  - remove market profile
+  - trading profile remove market
+  examples:
+  - (trading-profile.remove-market :profile-id "..." :instrument-class "..." :mic "...")
+  doc: Remove market from trading profile universe
+  tier: intent
+  tags:
+  - authoring
+  - universe
+  - market
+- verb: trading-profile.add-allowed-currency
+  domain: trading-profile
+  action: add-allowed-currency
+  aliases:
+  - add-allowed-currency
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      currency:
+        type: str
+  positional_sugar:
+  - profile-id
+  - currency
+  invocation_phrases:
+  - add allowed currency
+  - permit currency
+  - enable currency
+  - add settlement currency
+  - allow currency trading
+  - add currency to profile
+  - include currency
+  - add allowed currency trading profile
+  - add allowed currency trading-profile
+  - add allowed currency the trading profile
+  - add allowed currency profile
+  - trading profile add allowed currency
+  examples:
+  - (trading-profile.add-allowed-currency :profile-id "..." :currency "...")
+  doc: Add currency to allowed currencies list
+  tier: intent
+  tags:
+  - authoring
+  - currency
+- verb: trading-profile.ca.set-default-option
+  domain: trading-profile
+  action: ca.set-default-option
+  aliases:
+  - ca.set-default-option
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      default-option:
+        type: enum
+        values:
+        - CASH
+        - STOCK
+        - ROLLOVER
+        - LAPSE
+        - DECLINE
+      event-type:
+        type: str
+  positional_sugar:
+  - profile-id
+  - event-type
+  invocation_phrases:
+  - set default CA option
+  - configure default election
+  - set default choice
+  - set automatic election
+  - configure default option
+  - set fallback election
+  - default CA selection
+  - ca.set default option trading profile
+  - ca.set default option trading-profile
+  - ca.set default option the trading profile
+  - ca.set default option profile
+  - trading profile ca.set default option
+  examples:
+  - (trading-profile.ca.set-default-option :profile-id "..." :event-type "..." :default-option "...")
+  doc: Set default election for specific event type
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+- verb: trading-profile.list-versions
+  domain: trading-profile
+  action: list-versions
+  aliases:
+  - list-versions
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list trading profile versions
+  - show profile version history
+  - view all profile versions
+  - list profile revisions
+  - show trading history
+  - get version history
+  - list CBU profile versions
+  - show profile changelog
+  - list versions trading profile
+  - list versions trading-profile
+  - list versions the trading profile
+  - list versions profile
+  - trading profile list versions
+  examples:
+  - (trading-profile.list-versions :cbu-id "...")
+  doc: List all versions of trading profiles for a CBU
+  tier: diagnostics
+  tags:
+  - read
+  - versioning
+- verb: trading-profile.diff
+  domain: trading-profile
+  action: diff
+  aliases:
+  - diff
+  args:
+    style: keyworded
+    required:
+      profile-id-1:
+        type: uuid
+      profile-id-2:
+        type: uuid
+  positional_sugar:
+  - profile-id-1
+  - profile-id-2
+  invocation_phrases:
+  - diff trading profiles
+  - compare profiles
+  - show profile differences
+  - compare two versions
+  - what changed between
+  - diff profile versions
+  - compare changes
+  - show profile delta
+  - diff trading profile
+  - diff trading-profile
+  - diff the trading profile
+  - diff profile
+  - trading profile diff
+  examples:
+  - (trading-profile.diff :profile-id-1 "..." :profile-id-2 "...")
+  doc: Compare two trading profile versions
+  tier: diagnostics
+  tags:
+  - read
+  - versioning
+  - comparison
+- verb: trading-profile.link-csa-ssi
+  domain: trading-profile
+  action: link-csa-ssi
+  aliases:
+  - link-csa-ssi
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      ssi-name:
+        type: str
+      counterparty-ref:
+        type: str
+  positional_sugar:
+  - profile-id
+  - counterparty-ref
+  invocation_phrases:
+  - link CSA to SSI
+  - connect CSA SSI
+  - associate CSA with SSI
+  - set CSA settlement
+  - link collateral SSI
+  - configure CSA settlement
+  - attach SSI to CSA
+  - link csa ssi trading profile
+  - link csa ssi trading-profile
+  - link csa ssi the trading profile
+  - link csa ssi profile
+  - trading profile link csa ssi
+  examples:
+  - (trading-profile.link-csa-ssi :profile-id "..." :counterparty-ref "..." :ssi-name "...")
+  doc: Link CSA to collateral SSI in standing instructions
+  tier: intent
+  tags:
+  - authoring
+  - csa
+  - ssi
+  - collateral
+- verb: trading-profile.ca.remove-proceeds-ssi
+  domain: trading-profile
+  action: ca.remove-proceeds-ssi
+  aliases:
+  - ca.remove-proceeds-ssi
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+      proceeds-type:
+        type: enum
+        values:
+        - cash
+        - stock
+    optional:
+      currency:
+        type: str
+  positional_sugar:
+  - profile-id
+  - proceeds-type
+  invocation_phrases:
+  - remove proceeds SSI
+  - unlink proceeds account
+  - remove dividend SSI
+  - clear proceeds SSI
+  - remove payout routing
+  - delete proceeds link
+  - ca.remove proceeds ssi trading profile
+  - ca.remove proceeds ssi trading-profile
+  - ca.remove proceeds ssi the trading profile
+  - ca.remove proceeds ssi profile
+  - trading profile ca.remove proceeds ssi
+  examples:
+  - (trading-profile.ca.remove-proceeds-ssi :profile-id "..." :proceeds-type "...")
+  doc: Remove CA proceeds SSI mapping
+  tier: intent
+  tags:
+  - authoring
+  - ca-policy
+  - ssi
+- verb: trading-profile.approve
+  domain: trading-profile
+  action: approve
+  aliases:
+  - accept
+  - approve
+  - confirm
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+    optional:
+      notes:
+        type: str
+      approved-by:
+        type: str
+  positional_sugar:
+  - profile-id
+  invocation_phrases:
+  - approve trading profile
+  - approve profile
+  - authorize profile
+  - approve go-live
+  - give profile approval
+  - approve activation
+  - authorize trading setup
+  - activate trading profile
+  - approve trading-profile
+  - approve the trading profile
+  - accept trading profile
+  - confirm trading profile
+  - trading profile approve
+  examples:
+  - (trading-profile.approve :profile-id "...")
+  doc: Approve a pending trading profile, activating it (transitions PENDING_REVIEW -> ACTIVE)
+  tier: intent
+  tags:
+  - lifecycle
+  - state-transition
+  - activation
 - verb: trading-profile.ca.enable-event-types
   domain: trading-profile
   action: ca.enable-event-types
@@ -1641,6 +1717,13 @@ verbs:
   - profile-id
   - event-types
   invocation_phrases:
+  - enable corporate action types
+  - turn on CA events
+  - enable dividend events
+  - enable stock split
+  - activate CA event types
+  - enable CA processing
+  - turn on event types
   - ca.enable event types trading profile
   - ca.enable event types trading-profile
   - ca.enable event types the trading profile
@@ -1682,3 +1765,137 @@ verbs:
   tier: diagnostics
   tags:
   - read
+- verb: trading-profile.add-booking-rule
+  domain: trading-profile
+  action: add-booking-rule
+  aliases:
+  - add-booking-rule
+  args:
+    style: keyworded
+    required:
+      rule-name:
+        type: str
+      ssi-ref:
+        type: str
+      priority:
+        type: int
+      profile-id:
+        type: uuid
+    optional:
+      match-security-type:
+        type: str
+      match-counterparty-id:
+        type: str
+      match-instrument-class:
+        type: str
+      match-mic:
+        type: str
+      match-settlement-type:
+        type: str
+      match-currency:
+        type: str
+  positional_sugar:
+  - profile-id
+  - rule-name
+  invocation_phrases:
+  - add booking rule
+  - create booking rule
+  - add settlement rule
+  - configure booking
+  - add SSI selection rule
+  - create routing rule
+  - add rule to profile
+  - define booking rule
+  - add booking rule trading profile
+  - add booking rule trading-profile
+  - add booking rule the trading profile
+  - add booking rule profile
+  - trading profile add booking rule
+  examples:
+  - (trading-profile.add-booking-rule :profile-id "..." :rule-name "..." :priority "..." :ssi-ref "...")
+  doc: Add ALERT-style booking rule to trading profile
+  tier: intent
+  tags:
+  - authoring
+  - booking-rules
+- verb: trading-profile.materialize
+  domain: trading-profile
+  action: materialize
+  aliases:
+  - materialize
+  args:
+    style: keyworded
+    required:
+      profile-id:
+        type: uuid
+    optional:
+      dry-run:
+        type: bool
+      force:
+        type: bool
+      sections:
+        type: list
+  positional_sugar:
+  - profile-id
+  invocation_phrases:
+  - materialize trading profile
+  - materialize profile
+  - sync trading profile
+  - deploy profile
+  - apply trading profile
+  - materialize trading-profile
+  - materialize the trading profile
+  - trading profile materialize
+  examples:
+  - (trading-profile.materialize :profile-id "...")
+  doc: Materialize trading profile to operational tables (universe, SSIs, booking rules)
+  tier: composite
+  tags:
+  - projection
+  - sync
+  - critical
+- verb: trading-profile.import
+  domain: trading-profile
+  action: import
+  aliases:
+  - import
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      status:
+        type: enum
+        values:
+        - DRAFT
+        - VALIDATED
+        - PENDING_REVIEW
+        - ACTIVE
+        - SUPERSEDED
+        - ARCHIVED
+      notes:
+        type: str
+      document:
+        type: json
+      file-path:
+        type: str
+      version:
+        type: int
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - import trading profile
+  - load trading profile
+  - import profile for
+  - import trading-profile
+  - import the trading profile
+  - import profile
+  - trading profile import
+  examples:
+  - (trading-profile.import :cbu-id "...")
+  doc: Import a trading profile document from YAML/JSON file or inline content
+  tier: intent
+  tags:
+  - lifecycle
+  - authoring

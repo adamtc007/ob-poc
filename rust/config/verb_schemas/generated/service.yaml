@@ -2,33 +2,28 @@ version: '2.0'
 domain: service
 description: Service catalog operations (read-only - services are reference data)
 verbs:
-- verb: service.list
+- verb: service.list-by-product
   domain: service
-  action: list
+  action: list-by-product
   aliases:
-  - get all
-  - list
-  - show
+  - list-by-product
   args:
     style: keyworded
+    required:
+      product-id:
+        type: entity_name
     optional:
-      is-active:
+      is-mandatory:
         type: bool
-      offset:
-        type: int
-      limit:
-        type: int
-      service-type:
-        type: str
+  positional_sugar:
+  - product-id
   invocation_phrases:
-  - list service
-  - list the service
-  - show service
-  - get all service
-  - service list
+  - list by product service
+  - list by product the service
+  - service list by product
   examples:
-  - (service.list)
-  doc: List services with optional filters
+  - (service.list-by-product :product-id "...")
+  doc: List services for a product
   tier: reference
 - verb: service.read
   domain: service
@@ -54,26 +49,31 @@ verbs:
   - (service.read)
   doc: Read a service by ID or code
   tier: reference
-- verb: service.list-by-product
+- verb: service.list
   domain: service
-  action: list-by-product
+  action: list
   aliases:
-  - list-by-product
+  - get all
+  - list
+  - show
   args:
     style: keyworded
-    required:
-      product-id:
-        type: entity_name
     optional:
-      is-mandatory:
+      is-active:
         type: bool
-  positional_sugar:
-  - product-id
+      limit:
+        type: int
+      service-type:
+        type: str
+      offset:
+        type: int
   invocation_phrases:
-  - list by product service
-  - list by product the service
-  - service list by product
+  - list service
+  - list the service
+  - show service
+  - get all service
+  - service list
   examples:
-  - (service.list-by-product :product-id "...")
-  doc: List services for a product
+  - (service.list)
+  doc: List services with optional filters
   tier: reference

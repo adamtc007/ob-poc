@@ -2,6 +2,29 @@ version: '2.0'
 domain: red-flag
 description: Risk indicators and issues requiring attention
 verbs:
+- verb: red-flag.list-by-workstream
+  domain: red-flag
+  action: list-by-workstream
+  aliases:
+  - list-by-workstream
+  args:
+    style: keyworded
+    required:
+      workstream-id:
+        type: entity_name
+    optional:
+      status:
+        type: str
+  positional_sugar:
+  - workstream-id
+  invocation_phrases:
+  - list by workstream red-flag
+  - list by workstream the red-flag
+  - red-flag list by workstream
+  examples:
+  - (red-flag.list-by-workstream :workstream-id "...")
+  doc: List red flags for a workstream
+  tier: reference
 - verb: red-flag.dismiss
   domain: red-flag
   action: dismiss
@@ -10,10 +33,10 @@ verbs:
   args:
     style: keyworded
     required:
-      red-flag-id:
-        type: entity_name
       notes:
         type: str
+      red-flag-id:
+        type: entity_name
   positional_sugar:
   - red-flag-id
   - notes
@@ -25,56 +48,6 @@ verbs:
   - (red-flag.dismiss :red-flag-id "..." :notes "...")
   doc: Dismiss red flag as false positive
   tier: intent
-- verb: red-flag.list-by-case
-  domain: red-flag
-  action: list-by-case
-  aliases:
-  - list-by-case
-  args:
-    style: keyworded
-    required:
-      case-id:
-        type: entity_name
-    optional:
-      severity:
-        type: str
-      status:
-        type: str
-  positional_sugar:
-  - case-id
-  invocation_phrases:
-  - list by case red-flag
-  - list by case the red-flag
-  - red-flag list by case
-  examples:
-  - (red-flag.list-by-case :case-id "...")
-  doc: List red flags for a case
-  tier: reference
-- verb: red-flag.waive
-  domain: red-flag
-  action: waive
-  aliases:
-  - waive
-  args:
-    style: keyworded
-    required:
-      red-flag-id:
-        type: entity_name
-      approved-by:
-        type: uuid
-      justification:
-        type: str
-  positional_sugar:
-  - red-flag-id
-  - justification
-  invocation_phrases:
-  - waive red-flag
-  - waive the red-flag
-  - red-flag waive
-  examples:
-  - (red-flag.waive :red-flag-id "..." :justification "..." :approved-by "...")
-  doc: Waive red flag with justification
-  tier: intent
 - verb: red-flag.mitigate
   domain: red-flag
   action: mitigate
@@ -83,10 +56,10 @@ verbs:
   args:
     style: keyworded
     required:
-      notes:
-        type: str
       red-flag-id:
         type: entity_name
+      notes:
+        type: str
   positional_sugar:
   - red-flag-id
   - notes
@@ -118,6 +91,31 @@ verbs:
   - (red-flag.set-blocking :red-flag-id "...")
   doc: Set red flag as blocking the case
   tier: intent
+- verb: red-flag.waive
+  domain: red-flag
+  action: waive
+  aliases:
+  - waive
+  args:
+    style: keyworded
+    required:
+      justification:
+        type: str
+      approved-by:
+        type: uuid
+      red-flag-id:
+        type: entity_name
+  positional_sugar:
+  - red-flag-id
+  - justification
+  invocation_phrases:
+  - waive red-flag
+  - waive the red-flag
+  - red-flag waive
+  examples:
+  - (red-flag.waive :red-flag-id "..." :justification "..." :approved-by "...")
+  doc: Waive red flag with justification
+  tier: intent
 - verb: red-flag.raise
   domain: red-flag
   action: raise
@@ -134,8 +132,6 @@ verbs:
         - HARD_STOP
       case-id:
         type: entity_name
-      description:
-        type: str
       flag-type:
         type: enum
         values:
@@ -156,9 +152,9 @@ verbs:
         - REGULATORY_ACTION
         - DOCUMENT_OVERDUE
         - SLA_BREACH
-    optional:
-      source-reference:
+      description:
         type: str
+    optional:
       source:
         type: enum
         values:
@@ -168,6 +164,8 @@ verbs:
         - SYSTEM
         - RULE_ENGINE
         - EXTERNAL
+      source-reference:
+        type: str
       workstream-id:
         type: entity_name
   positional_sugar:
@@ -181,26 +179,28 @@ verbs:
   - (red-flag.raise :case-id "..." :flag-type "..." :severity "..." :description "...")
   doc: Raise a new red flag
   tier: intent
-- verb: red-flag.list-by-workstream
+- verb: red-flag.list-by-case
   domain: red-flag
-  action: list-by-workstream
+  action: list-by-case
   aliases:
-  - list-by-workstream
+  - list-by-case
   args:
     style: keyworded
     required:
-      workstream-id:
+      case-id:
         type: entity_name
     optional:
+      severity:
+        type: str
       status:
         type: str
   positional_sugar:
-  - workstream-id
+  - case-id
   invocation_phrases:
-  - list by workstream red-flag
-  - list by workstream the red-flag
-  - red-flag list by workstream
+  - list by case red-flag
+  - list by case the red-flag
+  - red-flag list by case
   examples:
-  - (red-flag.list-by-workstream :workstream-id "...")
-  doc: List red flags for a workstream
+  - (red-flag.list-by-case :case-id "...")
+  doc: List red flags for a case
   tier: reference

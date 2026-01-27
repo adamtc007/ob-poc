@@ -5,35 +5,38 @@ description: |
   CBU is the atomic unit. Clusters/galaxies derived from group edges.
   Viewport focus is client-side, not managed here.
 verbs:
-- verb: session.unload-system
+- verb: session.filter-jurisdiction
   domain: session
-  action: unload-system
+  action: filter-jurisdiction
   aliases:
-  - unload-system
+  - filter-jurisdiction
+  - only
   args:
     style: keyworded
     required:
-      cbu-id:
-        type: entity_name
+      jurisdiction:
+        type: str
   positional_sugar:
-  - cbu-id
+  - jurisdiction
   invocation_phrases:
-  - unload system
-  - unload cbu
-  - remove cbu
-  - close cbu
-  - unload system session
-  - unload system the session
-  - unload system scope
-  - session unload system
+  - filter to
+  - narrow to
+  - just the
+  - only
+  - switch to
+  - now use
+  - filter jurisdiction session
+  - filter jurisdiction the session
+  - filter jurisdiction scope
+  - session filter jurisdiction
   examples:
-  - (session.unload-system :cbu-id "...")
-  doc: Remove a single CBU from the session
+  - (session.filter-jurisdiction :jurisdiction "...")
+  doc: Narrow session to only CBUs in a specific jurisdiction
   tier: intent
   tags:
-  - unload
-  - system
-  - cbu
+  - filter
+  - narrow
+  - jurisdiction
   - session
 - verb: session.load-galaxy
   domain: session
@@ -56,6 +59,7 @@ verbs:
   - load galaxy session
   - load galaxy the session
   - load galaxy scope
+  - session load galaxy
   examples:
   - (session.load-galaxy :jurisdiction "...")
   doc: Load all CBUs in a region/jurisdiction (Galaxy = regional)
@@ -66,45 +70,37 @@ verbs:
   - jurisdiction
   - bulk
   - session
-- verb: session.clear
+- verb: session.unload-system
   domain: session
-  action: clear
+  action: unload-system
   aliases:
-  - clear
+  - unload-system
   args:
     style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
   invocation_phrases:
-  - clear session
-  - clear the session
-  - clear scope
-  - session clear
+  - unload system
+  - unload cbu
+  - unload cbu from session
+  - remove cbu
+  - remove cbu from session
+  - close cbu
+  - unload system session
+  - unload system the session
+  - unload system scope
+  - session unload system
   examples:
-  - (session.clear)
-  doc: Remove all CBUs from session
+  - (session.unload-system :cbu-id "...")
+  doc: Remove a single CBU from the session
   tier: intent
   tags:
-  - clear
-  - reset
-  - session
-- verb: session.undo
-  domain: session
-  action: undo
-  aliases:
-  - undo
-  args:
-    style: keyworded
-  invocation_phrases:
-  - undo session
-  - undo the session
-  - undo scope
-  - session undo
-  examples:
-  - (session.undo)
-  doc: Rollback to previous session state
-  tier: intent
-  tags:
-  - history
-  - undo
+  - unload
+  - system
+  - cbu
   - session
 - verb: session.info
   domain: session
@@ -126,6 +122,73 @@ verbs:
   - read
   - info
   - session
+- verb: session.load-cluster
+  domain: session
+  action: load-cluster
+  aliases:
+  - allianz
+  - aviva
+  - axa
+  - blackrock
+  - generali
+  - load-cluster
+  args:
+    style: keyworded
+    optional:
+      jurisdiction:
+        type: str
+      client:
+        type: entity_name
+      apex-entity-id:
+        type: entity_name
+  invocation_phrases:
+  - work on
+  - focus on
+  - set scope to
+  - switch to
+  - load book for
+  - load all funds under
+  - show all CBUs for
+  - load group
+  - load cluster
+  - load book
+  - show book
+  - show all cbus
+  - show cbu book
+  - cbu book
+  - show funds for
+  examples:
+  - (session.load-cluster)
+  doc: Load all CBUs under a GROUP entity (apex of ownership hierarchy)
+  tier: intent
+  tags:
+  - load
+  - cluster
+  - book
+  - client
+  - bulk
+  - scope
+  - session
+- verb: session.undo
+  domain: session
+  action: undo
+  aliases:
+  - undo
+  args:
+    style: keyworded
+  invocation_phrases:
+  - undo session
+  - undo the session
+  - undo scope
+  - session undo
+  examples:
+  - (session.undo)
+  doc: Rollback to previous session state
+  tier: intent
+  tags:
+  - history
+  - undo
+  - session
 - verb: session.list
   domain: session
   action: list
@@ -136,10 +199,10 @@ verbs:
   args:
     style: keyworded
     optional:
-      limit:
-        type: int
       jurisdiction:
         type: str
+      limit:
+        type: int
   invocation_phrases:
   - list session
   - list the session
@@ -154,6 +217,37 @@ verbs:
   tags:
   - read
   - list
+  - session
+- verb: session.set-client
+  domain: session
+  action: set-client
+  aliases:
+  - set-client
+  args:
+    style: keyworded
+    required:
+      client:
+        type: entity_name
+  positional_sugar:
+  - client
+  invocation_phrases:
+  - work on
+  - switch to
+  - I'm working with
+  - client is
+  - set client to
+  - working on
+  - set client session
+  - set client the session
+  - set client scope
+  - session set client
+  examples:
+  - (session.set-client :client "...")
+  doc: Set client group context for entity resolution
+  tier: intent
+  tags:
+  - context
+  - client
   - session
 - verb: session.set-persona
   domain: session
@@ -181,6 +275,9 @@ verbs:
   - trading mode
   - ops mode
   - set persona session
+  - set persona the session
+  - set persona scope
+  - session set persona
   examples:
   - (session.set-persona :persona "...")
   doc: Set persona context for tag filtering
@@ -188,6 +285,60 @@ verbs:
   tags:
   - context
   - persona
+  - session
+- verb: session.clear
+  domain: session
+  action: clear
+  aliases:
+  - clear
+  args:
+    style: keyworded
+  invocation_phrases:
+  - clear session
+  - clear the session
+  - clear scope
+  - session clear
+  examples:
+  - (session.clear)
+  doc: Remove all CBUs from session
+  tier: intent
+  tags:
+  - clear
+  - reset
+  - session
+- verb: session.load-system
+  domain: session
+  action: load-system
+  aliases:
+  - load-system
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - load system
+  - load cbu
+  - load cbu into session
+  - open cbu
+  - load fund
+  - switch to
+  - show cbu
+  - add cbu to session
+  - load system session
+  - load system the session
+  - load system scope
+  - session load system
+  examples:
+  - (session.load-system :cbu-id "...")
+  doc: Load a single CBU (Solar System = CBU container)
+  tier: intent
+  tags:
+  - load
+  - system
+  - cbu
   - session
 - verb: session.load-universe
   domain: session
@@ -217,65 +368,6 @@ verbs:
   - universe
   - bulk
   - session
-- verb: session.load-system
-  domain: session
-  action: load-system
-  aliases:
-  - load-system
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - load system
-  - load cbu
-  - open cbu
-  - load fund
-  - switch to
-  - show cbu
-  - load system session
-  - load system the session
-  examples:
-  - (session.load-system :cbu-id "...")
-  doc: Load a single CBU (Solar System = CBU container)
-  tier: intent
-  tags:
-  - load
-  - system
-  - cbu
-  - session
-- verb: session.set-client
-  domain: session
-  action: set-client
-  aliases:
-  - set-client
-  args:
-    style: keyworded
-    required:
-      client:
-        type: entity_name
-  positional_sugar:
-  - client
-  invocation_phrases:
-  - work on
-  - switch to
-  - I'm working with
-  - client is
-  - set client to
-  - working on
-  - set client session
-  - set client the session
-  examples:
-  - (session.set-client :client "...")
-  doc: Set client group context for entity resolution
-  tier: intent
-  tags:
-  - context
-  - client
-  - session
 - verb: session.redo
   domain: session
   action: redo
@@ -295,75 +387,4 @@ verbs:
   tags:
   - history
   - redo
-  - session
-- verb: session.load-cluster
-  domain: session
-  action: load-cluster
-  aliases:
-  - allianz
-  - aviva
-  - axa
-  - blackrock
-  - generali
-  - load-cluster
-  args:
-    style: keyworded
-    optional:
-      client:
-        type: entity_name
-      jurisdiction:
-        type: str
-      apex-entity-id:
-        type: entity_name
-  invocation_phrases:
-  - work on
-  - focus on
-  - set scope to
-  - switch to
-  - load book for
-  - load all funds under
-  - show all CBUs for
-  - load group
-  examples:
-  - (session.load-cluster)
-  doc: Load all CBUs under a GROUP entity (apex of ownership hierarchy)
-  tier: intent
-  tags:
-  - load
-  - cluster
-  - book
-  - client
-  - bulk
-  - scope
-  - session
-- verb: session.filter-jurisdiction
-  domain: session
-  action: filter-jurisdiction
-  aliases:
-  - filter-jurisdiction
-  - only
-  args:
-    style: keyworded
-    required:
-      jurisdiction:
-        type: str
-  positional_sugar:
-  - jurisdiction
-  invocation_phrases:
-  - filter to
-  - narrow to
-  - just the
-  - only
-  - switch to
-  - now use
-  - filter jurisdiction session
-  - filter jurisdiction the session
-  examples:
-  - (session.filter-jurisdiction :jurisdiction "...")
-  doc: Narrow session to only CBUs in a specific jurisdiction
-  tier: intent
-  tags:
-  - filter
-  - narrow
-  - jurisdiction
   - session

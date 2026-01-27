@@ -26,6 +26,54 @@ verbs:
   - (product-subscription.suspend :subscription-id "...")
   doc: Suspend a product subscription
   tier: intent
+- verb: product-subscription.subscribe
+  domain: product-subscription
+  action: subscribe
+  aliases:
+  - subscribe
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      product:
+        type: entity_name
+    optional:
+      config:
+        type: json
+      effective-from:
+        type: date
+  positional_sugar:
+  - cbu-id
+  - product
+  invocation_phrases:
+  - subscribe product-subscription
+  - subscribe the product-subscription
+  - product-subscription subscribe
+  examples:
+  - (product-subscription.subscribe :cbu-id "..." :product "...")
+  doc: Subscribe a CBU to a product
+  tier: intent
+- verb: product-subscription.reactivate
+  domain: product-subscription
+  action: reactivate
+  aliases:
+  - reactivate
+  args:
+    style: keyworded
+    required:
+      subscription-id:
+        type: uuid
+  positional_sugar:
+  - subscription-id
+  invocation_phrases:
+  - reactivate product-subscription
+  - reactivate the product-subscription
+  - product-subscription reactivate
+  examples:
+  - (product-subscription.reactivate :subscription-id "...")
+  doc: Reactivate a suspended subscription
+  tier: intent
 - verb: product-subscription.list
   domain: product-subscription
   action: list
@@ -58,26 +106,6 @@ verbs:
   - (product-subscription.list :cbu-id "...")
   doc: List product subscriptions for a CBU
   tier: reference
-- verb: product-subscription.reactivate
-  domain: product-subscription
-  action: reactivate
-  aliases:
-  - reactivate
-  args:
-    style: keyworded
-    required:
-      subscription-id:
-        type: uuid
-  positional_sugar:
-  - subscription-id
-  invocation_phrases:
-  - reactivate product-subscription
-  - reactivate the product-subscription
-  - product-subscription reactivate
-  examples:
-  - (product-subscription.reactivate :subscription-id "...")
-  doc: Reactivate a suspended subscription
-  tier: intent
 - verb: product-subscription.unsubscribe
   domain: product-subscription
   action: unsubscribe
@@ -97,32 +125,4 @@ verbs:
   examples:
   - (product-subscription.unsubscribe :subscription-id "...")
   doc: Terminate a product subscription
-  tier: intent
-- verb: product-subscription.subscribe
-  domain: product-subscription
-  action: subscribe
-  aliases:
-  - subscribe
-  args:
-    style: keyworded
-    required:
-      product:
-        type: entity_name
-      cbu-id:
-        type: entity_name
-    optional:
-      config:
-        type: json
-      effective-from:
-        type: date
-  positional_sugar:
-  - cbu-id
-  - product
-  invocation_phrases:
-  - subscribe product-subscription
-  - subscribe the product-subscription
-  - product-subscription subscribe
-  examples:
-  - (product-subscription.subscribe :cbu-id "..." :product "...")
-  doc: Subscribe a CBU to a product
   tier: intent

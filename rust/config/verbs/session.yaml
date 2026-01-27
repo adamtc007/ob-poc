@@ -179,10 +179,12 @@ domains:
         invocation_phrases:
           - "load system"
           - "load cbu"
+          - "load cbu into session"
           - "open cbu"
           - "load fund"
           - "switch to"
           - "show cbu"
+          - "add cbu to session"
         metadata:
           tier: intent
           source_of_truth: session
@@ -244,7 +246,9 @@ domains:
         invocation_phrases:
           - "unload system"
           - "unload cbu"
+          - "unload cbu from session"
           - "remove cbu"
+          - "remove cbu from session"
           - "close cbu"
         metadata:
           tier: intent

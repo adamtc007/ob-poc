@@ -2,38 +2,6 @@ version: '2.0'
 domain: market
 description: Market/Exchange reference data
 verbs:
-- verb: market.ensure
-  domain: market
-  action: ensure
-  aliases:
-  - ensure
-  args:
-    style: keyworded
-    required:
-      primary-currency:
-        type: str
-      name:
-        type: str
-      country-code:
-        type: str
-      mic:
-        type: str
-      timezone:
-        type: str
-    optional:
-      csd-bic:
-        type: str
-  positional_sugar:
-  - mic
-  - name
-  invocation_phrases:
-  - ensure market
-  - ensure the market
-  - market ensure
-  examples:
-  - (market.ensure :mic "..." :name "..." :country-code "..." :primary-currency "..." :timezone "...")
-  doc: Create or update market reference
-  tier: intent
 - verb: market.list
   domain: market
   action: list
@@ -56,6 +24,38 @@ verbs:
   - (market.list)
   doc: List markets
   tier: reference
+- verb: market.ensure
+  domain: market
+  action: ensure
+  aliases:
+  - ensure
+  args:
+    style: keyworded
+    required:
+      primary-currency:
+        type: str
+      country-code:
+        type: str
+      timezone:
+        type: str
+      mic:
+        type: str
+      name:
+        type: str
+    optional:
+      csd-bic:
+        type: str
+  positional_sugar:
+  - mic
+  - name
+  invocation_phrases:
+  - ensure market
+  - ensure the market
+  - market ensure
+  examples:
+  - (market.ensure :mic "..." :name "..." :country-code "..." :primary-currency "..." :timezone "...")
+  doc: Create or update market reference
+  tier: intent
 - verb: market.read
   domain: market
   action: read

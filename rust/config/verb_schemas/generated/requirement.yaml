@@ -2,30 +2,6 @@ version: '2.0'
 domain: requirement
 description: Document requirement management - what we need from entities
 verbs:
-- verb: requirement.mark-expired
-  domain: requirement
-  action: mark-expired
-  aliases:
-  - mark-expired
-  args:
-    style: keyworded
-    required:
-      requirement-id:
-        type: uuid
-  positional_sugar:
-  - requirement-id
-  invocation_phrases:
-  - mark expired requirement
-  - mark expired the requirement
-  - mark expired document requirement
-  - requirement mark expired
-  examples:
-  - (requirement.mark-expired :requirement-id "...")
-  doc: Mark a requirement as expired (document validity lapsed)
-  tier: diagnostics
-  tags:
-  - workflow
-  - write
 - verb: requirement.for-workflow
   domain: requirement
   action: for-workflow
@@ -80,30 +56,125 @@ verbs:
   tags:
   - read
   - query
-- verb: requirement.with-status
+- verb: requirement.get
   domain: requirement
-  action: with-status
+  action: get
   aliases:
-  - with-status
+  - fetch
+  - get
+  - show
   args:
     style: keyworded
-    optional:
-      workflow-instance-id:
+    required:
+      requirement-id:
         type: uuid
-      entity-id:
-        type: uuid
+  positional_sugar:
+  - requirement-id
   invocation_phrases:
-  - with status requirement
-  - with status the requirement
-  - with status document requirement
-  - requirement with status
+  - get requirement
+  - get the requirement
+  - show requirement
+  - fetch requirement
+  - get document requirement
+  - requirement get
   examples:
-  - (requirement.with-status)
-  doc: Get requirements with latest version status (joined view)
+  - (requirement.get :requirement-id "...")
+  doc: Get a requirement by ID
   tier: diagnostics
   tags:
   - read
-  - query
+- verb: requirement.reset
+  domain: requirement
+  action: reset
+  aliases:
+  - reset
+  args:
+    style: keyworded
+    required:
+      requirement-id:
+        type: uuid
+  positional_sugar:
+  - requirement-id
+  invocation_phrases:
+  - reset requirement
+  - restart document collection
+  - re-request document
+  - reset the requirement
+  - reset document requirement
+  - requirement reset
+  examples:
+  - (requirement.reset :requirement-id "...")
+  doc: Reset a requirement to missing (for re-collection)
+  tier: diagnostics
+  tags:
+  - workflow
+  - write
+- verb: requirement.create-set
+  domain: requirement
+  action: create-set
+  aliases:
+  - create-set
+  args:
+    style: keyworded
+    required:
+      subject-entity-id:
+        type: entity_name
+      doc-types:
+        type: list
+    optional:
+      due-date:
+        type: str
+      required-state:
+        type: enum
+        values:
+        - received
+        - verified
+      workflow-instance-id:
+        type: uuid
+  positional_sugar:
+  - subject-entity-id
+  - doc-types
+  invocation_phrases:
+  - create requirements
+  - add document requirements
+  - require documents
+  - set up KYC requirements
+  - create set requirement
+  - create set the requirement
+  - create set document requirement
+  - requirement create set
+  examples:
+  - (requirement.create-set :subject-entity-id "..." :doc-types "...")
+  doc: Create multiple document requirements for an entity
+  tier: intent
+  tags:
+  - workflow
+  - write
+  - batch
+- verb: requirement.mark-expired
+  domain: requirement
+  action: mark-expired
+  aliases:
+  - mark-expired
+  args:
+    style: keyworded
+    required:
+      requirement-id:
+        type: uuid
+  positional_sugar:
+  - requirement-id
+  invocation_phrases:
+  - mark expired requirement
+  - mark expired the requirement
+  - mark expired document requirement
+  - requirement mark expired
+  examples:
+  - (requirement.mark-expired :requirement-id "...")
+  doc: Mark a requirement as expired (document validity lapsed)
+  tier: diagnostics
+  tags:
+  - workflow
+  - write
 - verb: requirement.unsatisfied
   domain: requirement
   action: unsatisfied
@@ -133,32 +204,30 @@ verbs:
   - read
   - query
   - workflow
-- verb: requirement.reset
+- verb: requirement.with-status
   domain: requirement
-  action: reset
+  action: with-status
   aliases:
-  - reset
+  - with-status
   args:
     style: keyworded
-    required:
-      requirement-id:
+    optional:
+      workflow-instance-id:
         type: uuid
-  positional_sugar:
-  - requirement-id
+      entity-id:
+        type: uuid
   invocation_phrases:
-  - reset requirement
-  - restart document collection
-  - re-request document
-  - reset the requirement
-  - reset document requirement
-  - requirement reset
+  - with status requirement
+  - with status the requirement
+  - with status document requirement
+  - requirement with status
   examples:
-  - (requirement.reset :requirement-id "...")
-  doc: Reset a requirement to missing (for re-collection)
+  - (requirement.with-status)
+  doc: Get requirements with latest version status (joined view)
   tier: diagnostics
   tags:
-  - workflow
-  - write
+  - read
+  - query
 - verb: requirement.create
   domain: requirement
   action: create
@@ -187,8 +256,8 @@ verbs:
     optional:
       workflow-instance-id:
         type: uuid
-      max-attempts:
-        type: int
+      subject-cbu-id:
+        type: entity_name
       required-state:
         type: enum
         values:
@@ -196,8 +265,8 @@ verbs:
         - verified
       due-date:
         type: str
-      subject-cbu-id:
-        type: entity_name
+      max-attempts:
+        type: int
   positional_sugar:
   - subject-entity-id
   - doc-type
@@ -210,6 +279,7 @@ verbs:
   - add requirement
   - new requirement
   - create document requirement
+  - requirement create
   examples:
   - (requirement.create :subject-entity-id "..." :doc-type "...")
   doc: Create a document requirement for an entity
@@ -217,75 +287,6 @@ verbs:
   tags:
   - workflow
   - write
-- verb: requirement.get
-  domain: requirement
-  action: get
-  aliases:
-  - fetch
-  - get
-  - show
-  args:
-    style: keyworded
-    required:
-      requirement-id:
-        type: uuid
-  positional_sugar:
-  - requirement-id
-  invocation_phrases:
-  - get requirement
-  - get the requirement
-  - show requirement
-  - fetch requirement
-  - get document requirement
-  - requirement get
-  examples:
-  - (requirement.get :requirement-id "...")
-  doc: Get a requirement by ID
-  tier: diagnostics
-  tags:
-  - read
-- verb: requirement.create-set
-  domain: requirement
-  action: create-set
-  aliases:
-  - create-set
-  args:
-    style: keyworded
-    required:
-      subject-entity-id:
-        type: entity_name
-      doc-types:
-        type: list
-    optional:
-      required-state:
-        type: enum
-        values:
-        - received
-        - verified
-      due-date:
-        type: str
-      workflow-instance-id:
-        type: uuid
-  positional_sugar:
-  - subject-entity-id
-  - doc-types
-  invocation_phrases:
-  - create requirements
-  - add document requirements
-  - require documents
-  - set up KYC requirements
-  - create set requirement
-  - create set the requirement
-  - create set document requirement
-  - requirement create set
-  examples:
-  - (requirement.create-set :subject-entity-id "..." :doc-types "...")
-  doc: Create multiple document requirements for an entity
-  tier: intent
-  tags:
-  - workflow
-  - write
-  - batch
 - verb: requirement.waive
   domain: requirement
   action: waive

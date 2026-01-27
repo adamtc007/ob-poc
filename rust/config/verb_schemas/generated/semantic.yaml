@@ -65,21 +65,6 @@ verbs:
   - (semantic.prompt-context :cbu-id "...")
   doc: Get semantic state formatted for agent prompt injection
   tier: intent
-- verb: semantic.list-stages
-  domain: semantic
-  action: list-stages
-  aliases:
-  - list-stages
-  args:
-    style: keyworded
-  invocation_phrases:
-  - list stages semantic
-  - list stages the semantic
-  - semantic list stages
-  examples:
-  - (semantic.list-stages)
-  doc: List all defined semantic stages with their dependencies
-  tier: reference
 - verb: semantic.stages-for-product
   domain: semantic
   action: stages-for-product
@@ -119,4 +104,19 @@ verbs:
   examples:
   - (semantic.get-state :cbu-id "...")
   doc: Derive semantic state for a CBU - shows stage progress, gaps, and blockers
+  tier: reference
+- verb: semantic.list-stages
+  domain: semantic
+  action: list-stages
+  aliases:
+  - list-stages
+  args:
+    style: keyworded
+  invocation_phrases:
+  - list stages semantic
+  - list stages the semantic
+  - semantic list stages
+  examples:
+  - (semantic.list-stages)
+  doc: List all defined semantic stages with their dependencies
   tier: reference

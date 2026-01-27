@@ -2,46 +2,32 @@ version: '2.0'
 domain: subcustodian
 description: Bank's sub-custodian network (Omgeo Institution Network)
 verbs:
-- verb: subcustodian.ensure
+- verb: subcustodian.lookup
   domain: subcustodian
-  action: ensure
+  action: lookup
   aliases:
-  - ensure
+  - lookup
   args:
     style: keyworded
     required:
-      subcustodian-bic:
+      market:
         type: str
-      effective-date:
-        type: date
       currency:
         type: str
-      market:
-        type: entity_name
-      pset:
-        type: str
     optional:
-      subcustodian-name:
-        type: str
-      csd-participant:
-        type: str
-      local-agent-bic:
-        type: str
-      is-primary:
-        type: bool
-      local-agent-account:
-        type: str
+      as-of-date:
+        type: date
   positional_sugar:
   - market
   - currency
   invocation_phrases:
-  - ensure subcustodian
-  - ensure the subcustodian
-  - subcustodian ensure
+  - lookup subcustodian
+  - lookup the subcustodian
+  - subcustodian lookup
   examples:
-  - (subcustodian.ensure :market "..." :currency "..." :subcustodian-bic "..." :pset "..." :effective-date "...")
-  doc: Create or update sub-custodian entry for market/currency
-  tier: intent
+  - (subcustodian.lookup :market "..." :currency "...")
+  doc: Find sub-custodian for market/currency
+  tier: reference
 - verb: subcustodian.list-by-market
   domain: subcustodian
   action: list-by-market
@@ -65,29 +51,43 @@ verbs:
   - (subcustodian.list-by-market :market "...")
   doc: List sub-custodian entries for a market
   tier: reference
-- verb: subcustodian.lookup
+- verb: subcustodian.ensure
   domain: subcustodian
-  action: lookup
+  action: ensure
   aliases:
-  - lookup
+  - ensure
   args:
     style: keyworded
     required:
+      market:
+        type: entity_name
       currency:
         type: str
-      market:
+      subcustodian-bic:
         type: str
-    optional:
-      as-of-date:
+      pset:
+        type: str
+      effective-date:
         type: date
+    optional:
+      subcustodian-name:
+        type: str
+      local-agent-bic:
+        type: str
+      is-primary:
+        type: bool
+      csd-participant:
+        type: str
+      local-agent-account:
+        type: str
   positional_sugar:
   - market
   - currency
   invocation_phrases:
-  - lookup subcustodian
-  - lookup the subcustodian
-  - subcustodian lookup
+  - ensure subcustodian
+  - ensure the subcustodian
+  - subcustodian ensure
   examples:
-  - (subcustodian.lookup :market "..." :currency "...")
-  doc: Find sub-custodian for market/currency
-  tier: reference
+  - (subcustodian.ensure :market "..." :currency "..." :subcustodian-bic "..." :pset "..." :effective-date "...")
+  doc: Create or update sub-custodian entry for market/currency
+  tier: intent

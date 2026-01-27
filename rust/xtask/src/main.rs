@@ -340,6 +340,10 @@ enum Command {
         /// Explore a specific query interactively
         #[arg(long)]
         explore: Option<String>,
+
+        /// Dump mismatched results to JSON file for analysis
+        #[arg(long)]
+        dump_mismatch: Option<std::path::PathBuf>,
     },
 
     /// Lexicon test harness - stress test tokenizer and intent parser
@@ -702,7 +706,16 @@ fn main() -> Result<()> {
             sweep,
             hard_negatives,
             explore,
-        } => test_verbs(&sh, all, taught, sweep, hard_negatives, explore),
+            dump_mismatch,
+        } => test_verbs(
+            &sh,
+            all,
+            taught,
+            sweep,
+            hard_negatives,
+            explore,
+            dump_mismatch,
+        ),
         Command::TestRunbook {
             all,
             staging,
@@ -721,6 +734,7 @@ fn test_verbs(
     sweep: bool,
     hard_negatives: bool,
     explore: Option<String>,
+    dump_mismatch: Option<std::path::PathBuf>,
 ) -> Result<()> {
     println!("===========================================");
     println!("  Verb Search Test Harness");
@@ -747,6 +761,16 @@ fn test_verbs(
         sh.set_var("VERB_SEARCH_EXPLORE_QUERY", &query);
     }
 
+    // If dump_mismatch is specified, set env var for the test harness
+    if let Some(ref path) = dump_mismatch {
+        let path_str = path.to_string_lossy().to_string();
+        println!("Dumping mismatches to: {}\n", path_str);
+        sh.set_var("VERB_SEARCH_DUMP_MISMATCH", &path_str);
+        // Run the dump_mismatch test specifically
+        filters.clear();
+        filters.push("test_dump_mismatches");
+    }
+
     // Default to all if no specific flags
     let filter_arg = if filters.is_empty() || all {
         "verb_search".to_string()
@@ -759,7 +783,7 @@ fn test_verbs(
     // Run the integration tests with database feature
     cmd!(
         sh,
-        "cargo test --features database --test verb_search_integration {filter_arg} -- --nocapture"
+        "cargo test --features database --test verb_search_integration {filter_arg} -- --ignored --nocapture"
     )
     .run()
     .context("Verb search tests failed")?;

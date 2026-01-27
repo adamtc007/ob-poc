@@ -73,6 +73,165 @@ verbs:
     Use for regulatory audit trails, investigating classification changes,
     or understanding how holder treatment evolved over time.
   tier: diagnostics
+- verb: investor-role.set
+  domain: investor-role
+  action: set
+  aliases:
+  - set
+  args:
+    style: keyworded
+    required:
+      issuer:
+        type: entity_name
+      role-type:
+        type: str
+      holder:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+      is-ubo-eligible:
+        type: bool
+      group-container:
+        type: entity_name
+      group-label:
+        type: str
+      share-class:
+        type: entity_name
+      bo-data-available:
+        type: bool
+      holder-affiliation:
+        type: str
+      lookthrough-policy:
+        type: str
+      effective-from:
+        type: date
+      source:
+        type: str
+  positional_sugar:
+  - issuer
+  - holder
+  invocation_phrases:
+  - set investor role
+  - classify holder
+  - set holder type
+  - configure investor classification
+  - set shareholder role
+  - classify shareholder
+  - set unitholder type
+  - configure look-through policy
+  - set UBO eligibility
+  - mark as nominee
+  - mark as FoF
+  - mark as end investor
+  - set investor-role
+  - set the investor-role
+  - investor-role set
+  examples:
+  - (investor-role.set :issuer "..." :holder "..." :role-type "...")
+  doc: |
+    Set or update the investor role profile for a holder-issuer relationship.
+    Creates a new temporal version if effective_from differs from existing record.
+
+    Use this to classify how a shareholder/unitholder should be treated for UBO
+    determination and economic look-through. The classification affects:
+    1. Whether holdings create UBO edges (is_ubo_eligible)
+    2. Whether economic exposure computation traverses through this holder (lookthrough_policy)
+    3. How the holder appears in investor register visualization
+
+    EXAMPLES:
+    - Classify BlackRock as a fund-of-funds for Fund A
+    - Mark State Street as a nominee/custodian
+    - Set a pension fund as an end investor (terminal UBO)
+    - Configure look-through policy for institutional holders
+
+    TEMPORAL BEHAVIOR: If a profile already exists for this issuer-holder pair,
+    and you provide a different effective_from date, the old record gets closed
+    (effective_to set) and a new version is created. This preserves history.
+  tier: intent
+- verb: investor-role.mark-as-nominee
+  domain: investor-role
+  action: mark-as-nominee
+  aliases:
+  - mark-as-nominee
+  args:
+    style: keyworded
+    required:
+      issuer:
+        type: entity_name
+      holder:
+        type: entity_name
+    optional:
+      notes:
+        type: str
+  positional_sugar:
+  - issuer
+  - holder
+  invocation_phrases:
+  - mark as nominee
+  - classify as nominee
+  - set as custodian
+  - this is a nominee holding
+  - exclude from UBO
+  - custodial holding
+  - nominee company
+  - mark as nominee investor-role
+  - mark as nominee the investor-role
+  - investor-role mark as nominee
+  examples:
+  - (investor-role.mark-as-nominee :issuer "..." :holder "...")
+  doc: |
+    Mark a holder as a nominee (custodian, nominee company, etc.).
+
+    EFFECT: Sets role_type=NOMINEE, is_ubo_eligible=false, lookthrough_policy=NONE
+
+    Use when:
+    - Holder is a custodian bank holding on behalf of clients (State Street, BNY Mellon)
+    - Holder is a nominee company (e.g., "XYZ Nominees Ltd")
+    - Holder is a depositary/trustee holding assets for beneficial owners
+    - You want to exclude this holder from UBO graph entirely
+
+    This is the most common classification for custodial holdings. The beneficial
+    owners behind the nominee should be identified separately.
+  tier: intent
+- verb: investor-role.read
+  domain: investor-role
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      holder:
+        type: entity_name
+      issuer:
+        type: entity_name
+  positional_sugar:
+  - issuer
+  - holder
+  invocation_phrases:
+  - get investor role
+  - check holder classification
+  - what type of investor
+  - how is holder classified
+  - get shareholder role
+  - check UBO eligibility
+  - read investor-role
+  - read the investor-role
+  - get investor-role
+  - fetch investor-role
+  - investor-role read
+  examples:
+  - (investor-role.read :issuer "..." :holder "...")
+  doc: |
+    Read the current (active) role profile for a holder-issuer relationship.
+    Returns the profile where effective_to IS NULL (current version).
+
+    Use this to check how a holder is currently classified for a specific issuer.
+    For historical/point-in-time queries, use read-as-of instead.
+  tier: diagnostics
 - verb: investor-role.list-by-holder
   domain: investor-role
   action: list-by-holder
@@ -103,91 +262,6 @@ verbs:
     across different funds. The same holder may have different roles for
     different issuers - this shows the complete picture.
   tier: diagnostics
-- verb: investor-role.read-as-of
-  domain: investor-role
-  action: read-as-of
-  aliases:
-  - read-as-of
-  args:
-    style: keyworded
-    required:
-      issuer:
-        type: entity_name
-      holder:
-        type: entity_name
-      as-of-date:
-        type: date
-  positional_sugar:
-  - issuer
-  - holder
-  invocation_phrases:
-  - historical investor role
-  - investor role as of date
-  - holder classification at date
-  - point in time role
-  - what was holder type on date
-  - read as of investor-role
-  - read as of the investor-role
-  - investor-role read as of
-  examples:
-  - (investor-role.read-as-of :issuer "..." :holder "..." :as-of-date "...")
-  doc: |
-    Read the role profile as of a specific historical date (point-in-time query).
-
-    Use this when you need to know how a holder was classified at a specific point
-    in time, e.g., for historical UBO reports, audit trails, or regulatory filings
-    that require as-of-date accuracy.
-
-    EXAMPLE: If BlackRock was reclassified from END_INVESTOR to INTERMEDIARY_FOF
-    on July 1, 2024:
-    - read-as-of with date=2024-03-15 returns END_INVESTOR
-    - read-as-of with date=2024-09-15 returns INTERMEDIARY_FOF
-  tier: diagnostics
-- verb: investor-role.mark-as-fof
-  domain: investor-role
-  action: mark-as-fof
-  aliases:
-  - mark-as-fof
-  args:
-    style: keyworded
-    required:
-      issuer:
-        type: entity_name
-      holder:
-        type: entity_name
-    optional:
-      notes:
-        type: str
-      bo-data-available:
-        type: bool
-  positional_sugar:
-  - issuer
-  - holder
-  invocation_phrases:
-  - mark as fund of funds
-  - mark as FoF
-  - classify as feeder fund
-  - this is a FoF
-  - intermediary fund
-  - set look-through
-  - mark as fof investor-role
-  - mark as fof the investor-role
-  examples:
-  - (investor-role.mark-as-fof :issuer "..." :holder "...")
-  doc: |
-    Mark a holder as a fund-of-funds intermediary.
-
-    EFFECT: Sets role_type=INTERMEDIARY_FOF, is_ubo_eligible=false, lookthrough_policy=ON_DEMAND
-
-    Use when:
-    - Holder is itself a fund that invests in other funds
-    - You need to look through to find the ultimate LPs/investors
-    - Examples: feeder funds, fund-of-funds, multi-manager platforms
-
-    FoFs are not end investors - they're intermediaries. Economic exposure
-    computation can traverse through them to find underlying investors
-    when look-through is requested and BO data is available.
-  tier: intent
 - verb: investor-role.mark-as-master-pool
   domain: investor-role
   action: mark-as-master-pool
@@ -201,9 +275,9 @@ verbs:
       holder:
         type: entity_name
     optional:
-      notes:
-        type: str
       holder-affiliation:
+        type: str
+      notes:
         type: str
   positional_sugar:
   - issuer
@@ -243,10 +317,10 @@ verbs:
       issuer:
         type: entity_name
     optional:
-      is-ubo-eligible:
-        type: bool
       role-type:
         type: str
+      is-ubo-eligible:
+        type: bool
   positional_sugar:
   - issuer
   invocation_phrases:
@@ -258,6 +332,8 @@ verbs:
   - list end investors
   - show FoF intermediaries
   - list by issuer investor-role
+  - list by issuer the investor-role
+  - investor-role list by issuer
   examples:
   - (investor-role.list-by-issuer :issuer "...")
   doc: |
@@ -269,49 +345,6 @@ verbs:
 
     Can filter by role_type or is_ubo_eligible to find specific classifications.
   tier: diagnostics
-- verb: investor-role.mark-as-nominee
-  domain: investor-role
-  action: mark-as-nominee
-  aliases:
-  - mark-as-nominee
-  args:
-    style: keyworded
-    required:
-      holder:
-        type: entity_name
-      issuer:
-        type: entity_name
-    optional:
-      notes:
-        type: str
-  positional_sugar:
-  - issuer
-  - holder
-  invocation_phrases:
-  - mark as nominee
-  - classify as nominee
-  - set as custodian
-  - this is a nominee holding
-  - exclude from UBO
-  - custodial holding
-  - nominee company
-  - mark as nominee investor-role
-  examples:
-  - (investor-role.mark-as-nominee :issuer "..." :holder "...")
-  doc: |
-    Mark a holder as a nominee (custodian, nominee company, etc.).
-
-    EFFECT: Sets role_type=NOMINEE, is_ubo_eligible=false, lookthrough_policy=NONE
-
-    Use when:
-    - Holder is a custodian bank holding on behalf of clients (State Street, BNY Mellon)
-    - Holder is a nominee company (e.g., "XYZ Nominees Ltd")
-    - Holder is a depositary/trustee holding assets for beneficial owners
-    - You want to exclude this holder from UBO graph entirely
-
-    This is the most common classification for custodial holdings. The beneficial
-    owners behind the nominee should be identified separately.
-  tier: intent
 - verb: investor-role.mark-as-end-investor
   domain: investor-role
   action: mark-as-end-investor
@@ -341,6 +374,8 @@ verbs:
   - this is the actual owner
   - no look-through needed
   - mark as end investor investor-role
+  - mark as end investor the investor-role
+  - investor-role mark as end investor
   examples:
   - (investor-role.mark-as-end-investor :issuer "..." :holder "...")
   doc: |
@@ -357,107 +392,89 @@ verbs:
     End investors ARE UBO-eligible and WILL create UBO edges when their
     holdings exceed disclosure thresholds.
   tier: intent
-- verb: investor-role.set
+- verb: investor-role.mark-as-fof
   domain: investor-role
-  action: set
+  action: mark-as-fof
   aliases:
-  - set
+  - mark-as-fof
   args:
     style: keyworded
     required:
       holder:
         type: entity_name
-      role-type:
-        type: str
       issuer:
         type: entity_name
     optional:
-      share-class:
-        type: entity_name
-      effective-from:
-        type: date
-      group-container:
-        type: entity_name
-      notes:
-        type: str
       bo-data-available:
         type: bool
-      source:
+      notes:
         type: str
-      group-label:
-        type: str
-      lookthrough-policy:
-        type: str
-      holder-affiliation:
-        type: str
-      is-ubo-eligible:
-        type: bool
   positional_sugar:
   - issuer
   - holder
   invocation_phrases:
-  - set investor role
-  - classify holder
-  - set holder type
-  - configure investor classification
-  - set shareholder role
-  - classify shareholder
-  - set unitholder type
-  - configure look-through policy
+  - mark as fund of funds
+  - mark as FoF
+  - classify as feeder fund
+  - this is a FoF
+  - intermediary fund
+  - set look-through
+  - mark as fof investor-role
+  - mark as fof the investor-role
+  - investor-role mark as fof
   examples:
-  - (investor-role.set :issuer "..." :holder "..." :role-type "...")
+  - (investor-role.mark-as-fof :issuer "..." :holder "...")
   doc: |
-    Set or update the investor role profile for a holder-issuer relationship.
-    Creates a new temporal version if effective_from differs from existing record.
+    Mark a holder as a fund-of-funds intermediary.
 
-    Use this to classify how a shareholder/unitholder should be treated for UBO
-    determination and economic look-through. The classification affects:
-    1. Whether holdings create UBO edges (is_ubo_eligible)
-    2. Whether economic exposure computation traverses through this holder (lookthrough_policy)
-    3. How the holder appears in investor register visualization
+    EFFECT: Sets role_type=INTERMEDIARY_FOF, is_ubo_eligible=false, lookthrough_policy=ON_DEMAND
 
-    EXAMPLES:
-    - Classify BlackRock as a fund-of-funds for Fund A
-    - Mark State Street as a nominee/custodian
-    - Set a pension fund as an end investor (terminal UBO)
-    - Configure look-through policy for institutional holders
+    Use when:
+    - Holder is itself a fund that invests in other funds
+    - You need to look through to find the ultimate LPs/investors
+    - Examples: feeder funds, fund-of-funds, multi-manager platforms
 
-    TEMPORAL BEHAVIOR: If a profile already exists for this issuer-holder pair,
-    and you provide a different effective_from date, the old record gets closed
-    (effective_to set) and a new version is created. This preserves history.
+    FoFs are not end investors - they're intermediaries. Economic exposure
+    computation can traverse through them to find underlying investors
+    when look-through is requested and BO data is available.
   tier: intent
-- verb: investor-role.read
+- verb: investor-role.read-as-of
   domain: investor-role
-  action: read
+  action: read-as-of
   aliases:
-  - fetch
-  - get
-  - read
+  - read-as-of
   args:
     style: keyworded
     required:
-      holder:
-        type: entity_name
+      as-of-date:
+        type: date
       issuer:
+        type: entity_name
+      holder:
         type: entity_name
   positional_sugar:
   - issuer
   - holder
   invocation_phrases:
-  - get investor role
-  - check holder classification
-  - what type of investor
-  - how is holder classified
-  - get shareholder role
-  - check UBO eligibility
-  - read investor-role
-  - read the investor-role
+  - historical investor role
+  - investor role as of date
+  - holder classification at date
+  - point in time role
+  - what was holder type on date
+  - read as of investor-role
+  - read as of the investor-role
+  - investor-role read as of
   examples:
-  - (investor-role.read :issuer "..." :holder "...")
+  - (investor-role.read-as-of :issuer "..." :holder "..." :as-of-date "...")
   doc: |
-    Read the current (active) role profile for a holder-issuer relationship.
-    Returns the profile where effective_to IS NULL (current version).
+    Read the role profile as of a specific historical date (point-in-time query).
 
-    Use this to check how a holder is currently classified for a specific issuer.
-    For historical/point-in-time queries, use read-as-of instead.
+    Use this when you need to know how a holder was classified at a specific point
+    in time, e.g., for historical UBO reports, audit trails, or regulatory filings
+    that require as-of-date accuracy.
+
+    EXAMPLE: If BlackRock was reclassified from END_INVESTOR to INTERMEDIARY_FOF
+    on July 1, 2024:
+    - read-as-of with date=2024-03-15 returns END_INVESTOR
+    - read-as-of with date=2024-09-15 returns INTERMEDIARY_FOF
   tier: diagnostics

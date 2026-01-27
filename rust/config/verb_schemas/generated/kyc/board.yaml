@@ -5,6 +5,104 @@ description: |
   Tracks who sits on boards and who has power to appoint/remove.
   Key for control-based UBO analysis.
 verbs:
+- verb: board.list-by-entity
+  domain: board
+  action: list-by-entity
+  aliases:
+  - list-by-entity
+  args:
+    style: keyworded
+    required:
+      entity-id:
+        type: entity_name
+    optional:
+      include-inactive:
+        type: bool
+  positional_sugar:
+  - entity-id
+  invocation_phrases:
+  - list by entity board
+  - list by entity the board
+  - board list by entity
+  examples:
+  - (board.list-by-entity :entity-id "...")
+  doc: List current board composition for an entity
+  tier: reference
+- verb: board.grant-appointment-right
+  domain: board
+  action: grant-appointment-right
+  aliases:
+  - grant-appointment-right
+  args:
+    style: keyworded
+    required:
+      holder-entity-id:
+        type: entity_name
+      cbu-id:
+        type: entity_name
+      target-entity-id:
+        type: entity_name
+      right-type:
+        type: enum
+        values:
+        - APPOINT_DIRECTOR
+        - REMOVE_DIRECTOR
+        - APPOINT_AND_REMOVE
+        - VETO_APPOINTMENT
+        - CONSENT_REQUIRED
+        - OBSERVER_SEAT
+        - APPOINT_CHAIRMAN
+        - APPOINT_CEO
+        - APPOINT_AUDITOR
+    optional:
+      effective-from:
+        type: date
+      effective-to:
+        type: date
+      notes:
+        type: str
+      source-clause:
+        type: str
+      max-appointments:
+        type: int
+      appointable-role-id:
+        type: entity_name
+      source-document-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - target-entity-id
+  invocation_phrases:
+  - grant appointment right board
+  - grant appointment right the board
+  - board grant appointment right
+  examples:
+  - (board.grant-appointment-right :cbu-id "..." :target-entity-id "..." :holder-entity-id "..." :right-type "...")
+  doc: Record an appointment right from SHA/articles
+  tier: intent
+- verb: board.list-appointment-rights
+  domain: board
+  action: list-appointment-rights
+  aliases:
+  - list-appointment-rights
+  args:
+    style: keyworded
+    required:
+      target-entity-id:
+        type: entity_name
+    optional:
+      include-inactive:
+        type: bool
+  positional_sugar:
+  - target-entity-id
+  invocation_phrases:
+  - list appointment rights board
+  - list appointment rights the board
+  - board list appointment rights
+  examples:
+  - (board.list-appointment-rights :target-entity-id "...")
+  doc: List who has appointment rights over an entity's board
+  tier: reference
 - verb: board.resign
   domain: board
   action: resign
@@ -13,10 +111,10 @@ verbs:
   args:
     style: keyworded
     required:
-      appointment-id:
-        type: uuid
       resignation-date:
         type: date
+      appointment-id:
+        type: uuid
     optional:
       notes:
         type: str
@@ -31,6 +129,29 @@ verbs:
   - (board.resign :appointment-id "..." :resignation-date "...")
   doc: Record resignation/removal from board
   tier: intent
+- verb: board.list-rights-held
+  domain: board
+  action: list-rights-held
+  aliases:
+  - list-rights-held
+  args:
+    style: keyworded
+    required:
+      holder-entity-id:
+        type: entity_name
+    optional:
+      include-inactive:
+        type: bool
+  positional_sugar:
+  - holder-entity-id
+  invocation_phrases:
+  - list rights held board
+  - list rights held the board
+  - board list rights held
+  examples:
+  - (board.list-rights-held :holder-entity-id "...")
+  doc: List appointment rights held by an entity
+  tier: reference
 - verb: board.appoint
   domain: board
   action: appoint
@@ -39,15 +160,17 @@ verbs:
   args:
     style: keyworded
     required:
+      entity-id:
+        type: entity_name
+      cbu-id:
+        type: entity_name
       person-entity-id:
         type: entity_name
       role-id:
         type: entity_name
-      cbu-id:
-        type: entity_name
-      entity-id:
-        type: entity_name
     optional:
+      notes:
+        type: str
       appointed-by-entity-id:
         type: entity_name
       appointment-date:
@@ -64,8 +187,6 @@ verbs:
         - OTHER
       appointment-document-id:
         type: entity_name
-      notes:
-        type: str
   positional_sugar:
   - cbu-id
   - entity-id
@@ -102,29 +223,6 @@ verbs:
   - (board.revoke-appointment-right :appointment-right-id "...")
   doc: Revoke an appointment right
   tier: intent
-- verb: board.list-rights-held
-  domain: board
-  action: list-rights-held
-  aliases:
-  - list-rights-held
-  args:
-    style: keyworded
-    required:
-      holder-entity-id:
-        type: entity_name
-    optional:
-      include-inactive:
-        type: bool
-  positional_sugar:
-  - holder-entity-id
-  invocation_phrases:
-  - list rights held board
-  - list rights held the board
-  - board list rights held
-  examples:
-  - (board.list-rights-held :holder-entity-id "...")
-  doc: List appointment rights held by an entity
-  tier: reference
 - verb: board.analyze-control
   domain: board
   action: analyze-control
@@ -148,104 +246,6 @@ verbs:
     - Majority of appointments
     - Appointment/removal rights
     - Veto powers
-  tier: intent
-- verb: board.list-appointment-rights
-  domain: board
-  action: list-appointment-rights
-  aliases:
-  - list-appointment-rights
-  args:
-    style: keyworded
-    required:
-      target-entity-id:
-        type: entity_name
-    optional:
-      include-inactive:
-        type: bool
-  positional_sugar:
-  - target-entity-id
-  invocation_phrases:
-  - list appointment rights board
-  - list appointment rights the board
-  - board list appointment rights
-  examples:
-  - (board.list-appointment-rights :target-entity-id "...")
-  doc: List who has appointment rights over an entity's board
-  tier: reference
-- verb: board.list-by-entity
-  domain: board
-  action: list-by-entity
-  aliases:
-  - list-by-entity
-  args:
-    style: keyworded
-    required:
-      entity-id:
-        type: entity_name
-    optional:
-      include-inactive:
-        type: bool
-  positional_sugar:
-  - entity-id
-  invocation_phrases:
-  - list by entity board
-  - list by entity the board
-  - board list by entity
-  examples:
-  - (board.list-by-entity :entity-id "...")
-  doc: List current board composition for an entity
-  tier: reference
-- verb: board.grant-appointment-right
-  domain: board
-  action: grant-appointment-right
-  aliases:
-  - grant-appointment-right
-  args:
-    style: keyworded
-    required:
-      holder-entity-id:
-        type: entity_name
-      right-type:
-        type: enum
-        values:
-        - APPOINT_DIRECTOR
-        - REMOVE_DIRECTOR
-        - APPOINT_AND_REMOVE
-        - VETO_APPOINTMENT
-        - CONSENT_REQUIRED
-        - OBSERVER_SEAT
-        - APPOINT_CHAIRMAN
-        - APPOINT_CEO
-        - APPOINT_AUDITOR
-      cbu-id:
-        type: entity_name
-      target-entity-id:
-        type: entity_name
-    optional:
-      max-appointments:
-        type: int
-      source-document-id:
-        type: entity_name
-      appointable-role-id:
-        type: entity_name
-      effective-from:
-        type: date
-      notes:
-        type: str
-      effective-to:
-        type: date
-      source-clause:
-        type: str
-  positional_sugar:
-  - cbu-id
-  - target-entity-id
-  invocation_phrases:
-  - grant appointment right board
-  - grant appointment right the board
-  - board grant appointment right
-  examples:
-  - (board.grant-appointment-right :cbu-id "..." :target-entity-id "..." :holder-entity-id "..." :right-type "...")
-  doc: Record an appointment right from SHA/articles
   tier: intent
 - verb: board.list-by-person
   domain: board

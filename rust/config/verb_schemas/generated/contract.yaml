@@ -2,33 +2,6 @@ version: '2.0'
 domain: contract
 description: Legal contract management - master service agreements with product-level rate cards
 verbs:
-- verb: contract.list-subscriptions
-  domain: contract
-  action: list-subscriptions
-  aliases:
-  - list-subscriptions
-  args:
-    style: keyworded
-    optional:
-      cbu-id:
-        type: uuid
-      client:
-        type: str
-      product:
-        type: str
-  invocation_phrases:
-  - list subscriptions
-  - show cbu subscriptions
-  - what products is cbu subscribed to
-  - cbu product subscriptions
-  - list subscriptions contract
-  - list subscriptions the contract
-  - list subscriptions agreement
-  - contract list subscriptions
-  examples:
-  - (contract.list-subscriptions)
-  doc: List CBU subscriptions, optionally filtered
-  tier: intent
 - verb: contract.create-rate-card
   domain: contract
   action: create-rate-card
@@ -42,10 +15,10 @@ verbs:
     optional:
       currency:
         type: str
-      description:
-        type: str
       effective-date:
         type: date
+      description:
+        type: str
   positional_sugar:
   - name
   invocation_phrases:
@@ -59,6 +32,42 @@ verbs:
   examples:
   - (contract.create-rate-card :name "...")
   doc: Create a new rate card
+  tier: intent
+- verb: contract.update
+  domain: contract
+  action: update
+  aliases:
+  - edit
+  - modify
+  - update
+  args:
+    style: keyworded
+    required:
+      contract-id:
+        type: uuid
+    optional:
+      termination-date:
+        type: date
+      status:
+        type: enum
+        values:
+        - DRAFT
+        - ACTIVE
+        - TERMINATED
+        - EXPIRED
+  positional_sugar:
+  - contract-id
+  invocation_phrases:
+  - update contract
+  - modify contract
+  - change contract status
+  - update the contract
+  - edit contract
+  - update agreement
+  - contract update
+  examples:
+  - (contract.update :contract-id "...")
+  doc: Update contract details
   tier: intent
 - verb: contract.list
   domain: contract
@@ -88,9 +97,91 @@ verbs:
   - list the contract
   - show contract
   - get all contract
+  - list agreement
+  - contract list
   examples:
   - (contract.list)
   doc: List contracts, optionally filtered by client
+  tier: intent
+- verb: contract.add-product
+  domain: contract
+  action: add-product
+  aliases:
+  - add-product
+  args:
+    style: keyworded
+    required:
+      contract-id:
+        type: uuid
+      product:
+        type: str
+    optional:
+      rate-card-id:
+        type: uuid
+      effective-date:
+        type: date
+  positional_sugar:
+  - contract-id
+  - product
+  invocation_phrases:
+  - add product to contract
+  - add contract product
+  - assign rate card
+  - add custody to contract
+  - add fund admin to contract
+  - add product contract
+  - add product the contract
+  - add product agreement
+  - contract add product
+  examples:
+  - (contract.add-product :contract-id "..." :product "...")
+  doc: Add a product to a contract with rate card
+  tier: intent
+- verb: contract.list-rate-cards
+  domain: contract
+  action: list-rate-cards
+  aliases:
+  - list-rate-cards
+  args:
+    style: keyworded
+  invocation_phrases:
+  - list rate cards
+  - show rate cards
+  - all pricing schedules
+  - list rate cards contract
+  - list rate cards the contract
+  - list rate cards agreement
+  - contract list rate cards
+  examples:
+  - (contract.list-rate-cards)
+  doc: List all rate cards
+  tier: intent
+- verb: contract.list-subscriptions
+  domain: contract
+  action: list-subscriptions
+  aliases:
+  - list-subscriptions
+  args:
+    style: keyworded
+    optional:
+      cbu-id:
+        type: uuid
+      product:
+        type: str
+      client:
+        type: str
+  invocation_phrases:
+  - list subscriptions
+  - show cbu subscriptions
+  - what products is cbu subscribed to
+  - cbu product subscriptions
+  - list subscriptions contract
+  - list subscriptions the contract
+  - list subscriptions agreement
+  - contract list subscriptions
+  examples:
+  - (contract.list-subscriptions)
+  doc: List CBU subscriptions, optionally filtered
   tier: intent
 - verb: contract.for-client
   domain: contract
@@ -116,6 +207,33 @@ verbs:
   - (contract.for-client :client "...")
   doc: Get the active contract for a client
   tier: intent
+- verb: contract.remove-product
+  domain: contract
+  action: remove-product
+  aliases:
+  - remove-product
+  args:
+    style: keyworded
+    required:
+      product:
+        type: str
+      contract-id:
+        type: uuid
+  positional_sugar:
+  - contract-id
+  - product
+  invocation_phrases:
+  - remove product from contract
+  - remove contract product
+  - delete contract product
+  - remove product contract
+  - remove product the contract
+  - remove product agreement
+  - contract remove product
+  examples:
+  - (contract.remove-product :contract-id "..." :product "...")
+  doc: Remove a product from a contract
+  tier: intent
 - verb: contract.unsubscribe
   domain: contract
   action: unsubscribe
@@ -124,11 +242,11 @@ verbs:
   args:
     style: keyworded
     required:
-      contract-id:
-        type: uuid
       product:
         type: str
       cbu-id:
+        type: uuid
+      contract-id:
         type: uuid
   positional_sugar:
   - cbu-id
@@ -144,6 +262,58 @@ verbs:
   examples:
   - (contract.unsubscribe :cbu-id "..." :contract-id "..." :product "...")
   doc: Unsubscribe a CBU from a contract+product
+  tier: intent
+- verb: contract.terminate
+  domain: contract
+  action: terminate
+  aliases:
+  - terminate
+  args:
+    style: keyworded
+    required:
+      contract-id:
+        type: uuid
+    optional:
+      termination-date:
+        type: date
+  positional_sugar:
+  - contract-id
+  invocation_phrases:
+  - terminate contract
+  - end contract
+  - cancel contract
+  - terminate the contract
+  - terminate agreement
+  - contract terminate
+  examples:
+  - (contract.terminate :contract-id "...")
+  doc: Terminate a contract
+  tier: intent
+- verb: contract.get
+  domain: contract
+  action: get
+  aliases:
+  - fetch
+  - get
+  - show
+  args:
+    style: keyworded
+    required:
+      contract-id:
+        type: uuid
+  positional_sugar:
+  - contract-id
+  invocation_phrases:
+  - get contract
+  - show contract
+  - contract details
+  - get the contract
+  - fetch contract
+  - get agreement
+  - contract get
+  examples:
+  - (contract.get :contract-id "...")
+  doc: Get contract details by ID
   tier: intent
 - verb: contract.create
   domain: contract
@@ -185,184 +355,6 @@ verbs:
   - (contract.create :client "..." :effective-date "...")
   doc: Create a new legal contract for a client
   tier: intent
-- verb: contract.subscribe
-  domain: contract
-  action: subscribe
-  aliases:
-  - subscribe
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-      contract-id:
-        type: uuid
-      product:
-        type: str
-  positional_sugar:
-  - cbu-id
-  - contract-id
-  invocation_phrases:
-  - subscribe cbu to product
-  - onboard cbu to product
-  - add cbu to contract product
-  - subscribe to custody
-  - onboard to fund admin
-  - subscribe contract
-  - subscribe the contract
-  - subscribe agreement
-  examples:
-  - (contract.subscribe :cbu-id "..." :contract-id "..." :product "...")
-  doc: Subscribe a CBU to a contract+product (onboarding gate)
-  tier: intent
-- verb: contract.get
-  domain: contract
-  action: get
-  aliases:
-  - fetch
-  - get
-  - show
-  args:
-    style: keyworded
-    required:
-      contract-id:
-        type: uuid
-  positional_sugar:
-  - contract-id
-  invocation_phrases:
-  - get contract
-  - show contract
-  - contract details
-  - get the contract
-  - fetch contract
-  - get agreement
-  - contract get
-  examples:
-  - (contract.get :contract-id "...")
-  doc: Get contract details by ID
-  tier: intent
-- verb: contract.update
-  domain: contract
-  action: update
-  aliases:
-  - edit
-  - modify
-  - update
-  args:
-    style: keyworded
-    required:
-      contract-id:
-        type: uuid
-    optional:
-      status:
-        type: enum
-        values:
-        - DRAFT
-        - ACTIVE
-        - TERMINATED
-        - EXPIRED
-      termination-date:
-        type: date
-  positional_sugar:
-  - contract-id
-  invocation_phrases:
-  - update contract
-  - modify contract
-  - change contract status
-  - update the contract
-  - edit contract
-  - update agreement
-  - contract update
-  examples:
-  - (contract.update :contract-id "...")
-  doc: Update contract details
-  tier: intent
-- verb: contract.add-product
-  domain: contract
-  action: add-product
-  aliases:
-  - add-product
-  args:
-    style: keyworded
-    required:
-      contract-id:
-        type: uuid
-      product:
-        type: str
-    optional:
-      effective-date:
-        type: date
-      rate-card-id:
-        type: uuid
-  positional_sugar:
-  - contract-id
-  - product
-  invocation_phrases:
-  - add product to contract
-  - add contract product
-  - assign rate card
-  - add custody to contract
-  - add fund admin to contract
-  - add product contract
-  - add product the contract
-  - add product agreement
-  examples:
-  - (contract.add-product :contract-id "..." :product "...")
-  doc: Add a product to a contract with rate card
-  tier: intent
-- verb: contract.terminate
-  domain: contract
-  action: terminate
-  aliases:
-  - terminate
-  args:
-    style: keyworded
-    required:
-      contract-id:
-        type: uuid
-    optional:
-      termination-date:
-        type: date
-  positional_sugar:
-  - contract-id
-  invocation_phrases:
-  - terminate contract
-  - end contract
-  - cancel contract
-  - terminate the contract
-  - terminate agreement
-  - contract terminate
-  examples:
-  - (contract.terminate :contract-id "...")
-  doc: Terminate a contract
-  tier: intent
-- verb: contract.remove-product
-  domain: contract
-  action: remove-product
-  aliases:
-  - remove-product
-  args:
-    style: keyworded
-    required:
-      contract-id:
-        type: uuid
-      product:
-        type: str
-  positional_sugar:
-  - contract-id
-  - product
-  invocation_phrases:
-  - remove product from contract
-  - remove contract product
-  - delete contract product
-  - remove product contract
-  - remove product the contract
-  - remove product agreement
-  - contract remove product
-  examples:
-  - (contract.remove-product :contract-id "..." :product "...")
-  doc: Remove a product from a contract
-  tier: intent
 - verb: contract.list-products
   domain: contract
   action: list-products
@@ -387,22 +379,34 @@ verbs:
   - (contract.list-products :contract-id "...")
   doc: List products for a contract
   tier: intent
-- verb: contract.list-rate-cards
+- verb: contract.subscribe
   domain: contract
-  action: list-rate-cards
+  action: subscribe
   aliases:
-  - list-rate-cards
+  - subscribe
   args:
     style: keyworded
+    required:
+      product:
+        type: str
+      contract-id:
+        type: uuid
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  - contract-id
   invocation_phrases:
-  - list rate cards
-  - show rate cards
-  - all pricing schedules
-  - list rate cards contract
-  - list rate cards the contract
-  - list rate cards agreement
-  - contract list rate cards
+  - subscribe cbu to product
+  - onboard cbu to product
+  - add cbu to contract product
+  - subscribe to custody
+  - onboard to fund admin
+  - subscribe contract
+  - subscribe the contract
+  - subscribe agreement
+  - contract subscribe
   examples:
-  - (contract.list-rate-cards)
-  doc: List all rate cards
+  - (contract.subscribe :cbu-id "..." :contract-id "..." :product "...")
+  doc: Subscribe a CBU to a contract+product (onboarding gate)
   tier: intent

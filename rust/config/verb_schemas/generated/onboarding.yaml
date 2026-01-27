@@ -13,10 +13,10 @@ verbs:
       cbu-id:
         type: entity_name
     optional:
-      dry-run:
-        type: bool
       max-steps:
         type: int
+      dry-run:
+        type: bool
       target-stage:
         type: str
   positional_sugar:

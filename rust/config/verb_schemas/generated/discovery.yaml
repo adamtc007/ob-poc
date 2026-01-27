@@ -2,6 +2,26 @@ version: '2.0'
 domain: discovery
 description: Resource discovery operations
 verbs:
+- verb: discovery.run
+  domain: discovery
+  action: run
+  aliases:
+  - run
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - run discovery
+  - run the discovery
+  - discovery run
+  examples:
+  - (discovery.run :cbu-id "...")
+  doc: Run resource discovery - determines required SRDEFs from service intents
+  tier: composite
 - verb: discovery.explain
   domain: discovery
   action: explain
@@ -25,23 +45,3 @@ verbs:
   - (discovery.explain :cbu-id "...")
   doc: Explain why specific SRDEFs were discovered
   tier: diagnostics
-- verb: discovery.run
-  domain: discovery
-  action: run
-  aliases:
-  - run
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - run discovery
-  - run the discovery
-  - discovery run
-  examples:
-  - (discovery.run :cbu-id "...")
-  doc: Run resource discovery - determines required SRDEFs from service intents
-  tier: composite

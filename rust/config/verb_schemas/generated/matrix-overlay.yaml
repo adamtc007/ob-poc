@@ -2,30 +2,6 @@ version: '2.0'
 domain: matrix-overlay
 description: Trading matrix product overlay management
 verbs:
-- verb: matrix-overlay.remove
-  domain: matrix-overlay
-  action: remove
-  aliases:
-  - delete
-  - drop
-  - remove
-  args:
-    style: keyworded
-    required:
-      overlay-id:
-        type: uuid
-  positional_sugar:
-  - overlay-id
-  invocation_phrases:
-  - remove matrix-overlay
-  - remove the matrix-overlay
-  - delete matrix-overlay
-  - drop matrix-overlay
-  - matrix-overlay remove
-  examples:
-  - (matrix-overlay.remove :overlay-id "...")
-  doc: Remove a product overlay
-  tier: intent
 - verb: matrix-overlay.add
   domain: matrix-overlay
   action: add
@@ -34,27 +10,27 @@ verbs:
   args:
     style: keyworded
     required:
-      subscription-id:
-        type: uuid
       cbu-id:
         type: entity_name
+      subscription-id:
+        type: uuid
     optional:
-      additional-resources:
-        type: json
       config:
         type: json
       currency:
         type: str
-      instrument-class:
+      additional-services:
+        type: json
+      additional-slas:
+        type: json
+      counterparty:
         type: entity_name
       market:
         type: entity_name
-      counterparty:
+      additional-resources:
+        type: json
+      instrument-class:
         type: entity_name
-      additional-slas:
-        type: json
-      additional-services:
-        type: json
   positional_sugar:
   - cbu-id
   - subscription-id
@@ -65,79 +41,6 @@ verbs:
   examples:
   - (matrix-overlay.add :cbu-id "..." :subscription-id "...")
   doc: Add a product overlay to matrix entries
-  tier: intent
-- verb: matrix-overlay.list
-  domain: matrix-overlay
-  action: list
-  aliases:
-  - get all
-  - list
-  - show
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      status:
-        type: str
-      subscription-id:
-        type: uuid
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - list matrix-overlay
-  - list the matrix-overlay
-  - show matrix-overlay
-  - get all matrix-overlay
-  - matrix-overlay list
-  examples:
-  - (matrix-overlay.list :cbu-id "...")
-  doc: List overlays for a CBU
-  tier: reference
-- verb: matrix-overlay.list-by-subscription
-  domain: matrix-overlay
-  action: list-by-subscription
-  aliases:
-  - list-by-subscription
-  args:
-    style: keyworded
-    required:
-      subscription-id:
-        type: uuid
-  positional_sugar:
-  - subscription-id
-  invocation_phrases:
-  - list by subscription matrix-overlay
-  - list by subscription the matrix-overlay
-  - matrix-overlay list by subscription
-  examples:
-  - (matrix-overlay.list-by-subscription :subscription-id "...")
-  doc: List overlays for a product subscription
-  tier: reference
-- verb: matrix-overlay.activate
-  domain: matrix-overlay
-  action: activate
-  aliases:
-  - activate
-  - enable
-  - start
-  args:
-    style: keyworded
-    required:
-      overlay-id:
-        type: uuid
-  positional_sugar:
-  - overlay-id
-  invocation_phrases:
-  - activate matrix-overlay
-  - activate the matrix-overlay
-  - enable matrix-overlay
-  - start matrix-overlay
-  - matrix-overlay activate
-  examples:
-  - (matrix-overlay.activate :overlay-id "...")
-  doc: Activate a suspended overlay
   tier: intent
 - verb: matrix-overlay.suspend
   domain: matrix-overlay
@@ -171,12 +74,12 @@ verbs:
   args:
     style: keyworded
     required:
+      products:
+        type: list
       cbu-id:
         type: entity_name
       instrument-class:
         type: entity_name
-      products:
-        type: list
   positional_sugar:
   - cbu-id
   - instrument-class
@@ -188,30 +91,53 @@ verbs:
   - (matrix-overlay.compare-products :cbu-id "..." :instrument-class "..." :products "...")
   doc: Compare what different products add to a matrix entry
   tier: intent
-- verb: matrix-overlay.effective-matrix
+- verb: matrix-overlay.remove
   domain: matrix-overlay
-  action: effective-matrix
+  action: remove
   aliases:
-  - effective-matrix
+  - delete
+  - drop
+  - remove
   args:
     style: keyworded
     required:
-      cbu-id:
-        type: entity_name
-    optional:
-      instrument-class:
-        type: entity_name
-      market:
-        type: entity_name
+      overlay-id:
+        type: uuid
   positional_sugar:
-  - cbu-id
+  - overlay-id
   invocation_phrases:
-  - effective matrix matrix-overlay
-  - effective matrix the matrix-overlay
-  - matrix-overlay effective matrix
+  - remove matrix-overlay
+  - remove the matrix-overlay
+  - delete matrix-overlay
+  - drop matrix-overlay
+  - matrix-overlay remove
   examples:
-  - (matrix-overlay.effective-matrix :cbu-id "...")
-  doc: Get effective matrix with all product overlays
+  - (matrix-overlay.remove :overlay-id "...")
+  doc: Remove a product overlay
+  tier: intent
+- verb: matrix-overlay.activate
+  domain: matrix-overlay
+  action: activate
+  aliases:
+  - activate
+  - enable
+  - start
+  args:
+    style: keyworded
+    required:
+      overlay-id:
+        type: uuid
+  positional_sugar:
+  - overlay-id
+  invocation_phrases:
+  - activate matrix-overlay
+  - activate the matrix-overlay
+  - enable matrix-overlay
+  - start matrix-overlay
+  - matrix-overlay activate
+  examples:
+  - (matrix-overlay.activate :overlay-id "...")
+  doc: Activate a suspended overlay
   tier: intent
 - verb: matrix-overlay.unified-gaps
   domain: matrix-overlay
@@ -239,4 +165,78 @@ verbs:
   examples:
   - (matrix-overlay.unified-gaps :cbu-id "...")
   doc: Get all gaps from both lifecycle and service domains
+  tier: intent
+- verb: matrix-overlay.list-by-subscription
+  domain: matrix-overlay
+  action: list-by-subscription
+  aliases:
+  - list-by-subscription
+  args:
+    style: keyworded
+    required:
+      subscription-id:
+        type: uuid
+  positional_sugar:
+  - subscription-id
+  invocation_phrases:
+  - list by subscription matrix-overlay
+  - list by subscription the matrix-overlay
+  - matrix-overlay list by subscription
+  examples:
+  - (matrix-overlay.list-by-subscription :subscription-id "...")
+  doc: List overlays for a product subscription
+  tier: reference
+- verb: matrix-overlay.list
+  domain: matrix-overlay
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      subscription-id:
+        type: uuid
+      status:
+        type: str
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list matrix-overlay
+  - list the matrix-overlay
+  - show matrix-overlay
+  - get all matrix-overlay
+  - matrix-overlay list
+  examples:
+  - (matrix-overlay.list :cbu-id "...")
+  doc: List overlays for a CBU
+  tier: reference
+- verb: matrix-overlay.effective-matrix
+  domain: matrix-overlay
+  action: effective-matrix
+  aliases:
+  - effective-matrix
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      market:
+        type: entity_name
+      instrument-class:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - effective matrix matrix-overlay
+  - effective matrix the matrix-overlay
+  - matrix-overlay effective matrix
+  examples:
+  - (matrix-overlay.effective-matrix :cbu-id "...")
+  doc: Get effective matrix with all product overlays
   tier: intent

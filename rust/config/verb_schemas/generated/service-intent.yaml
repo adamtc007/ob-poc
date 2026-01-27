@@ -2,31 +2,6 @@ version: '2.0'
 domain: service-intent
 description: Service intent management - declares what products/services a CBU wants
 verbs:
-- verb: service-intent.supersede
-  domain: service-intent
-  action: supersede
-  aliases:
-  - supersede
-  args:
-    style: keyworded
-    required:
-      intent-id:
-        type: uuid
-      options:
-        type: json
-  positional_sugar:
-  - intent-id
-  - options
-  invocation_phrases:
-  - supersede service intent
-  - supersede service-intent
-  - supersede the service intent
-  - supersede intent
-  - service intent supersede
-  examples:
-  - (service-intent.supersede :intent-id "..." :options "...")
-  doc: Supersede an existing service intent with new options
-  tier: intent
 - verb: service-intent.list
   domain: service-intent
   action: list
@@ -53,6 +28,31 @@ verbs:
   - (service-intent.list :cbu-id "...")
   doc: List all service intents for a CBU
   tier: diagnostics
+- verb: service-intent.supersede
+  domain: service-intent
+  action: supersede
+  aliases:
+  - supersede
+  args:
+    style: keyworded
+    required:
+      options:
+        type: json
+      intent-id:
+        type: uuid
+  positional_sugar:
+  - intent-id
+  - options
+  invocation_phrases:
+  - supersede service intent
+  - supersede service-intent
+  - supersede the service intent
+  - supersede intent
+  - service intent supersede
+  examples:
+  - (service-intent.supersede :intent-id "..." :options "...")
+  doc: Supersede an existing service intent with new options
+  tier: intent
 - verb: service-intent.create
   domain: service-intent
   action: create

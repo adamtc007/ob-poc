@@ -10,11 +10,11 @@ verbs:
   args:
     style: keyworded
     required:
-      service:
-        type: entity_name
       product:
         type: entity_name
       cbu-id:
+        type: entity_name
+      service:
         type: entity_name
     optional:
       instance-id:
@@ -29,33 +29,6 @@ verbs:
   examples:
   - (delivery.complete :cbu-id "..." :product "..." :service "...")
   doc: Mark a service delivery as complete
-  tier: intent
-- verb: delivery.fail
-  domain: delivery
-  action: fail
-  aliases:
-  - fail
-  args:
-    style: keyworded
-    required:
-      reason:
-        type: str
-      product:
-        type: entity_name
-      cbu-id:
-        type: entity_name
-      service:
-        type: entity_name
-  positional_sugar:
-  - cbu-id
-  - product
-  invocation_phrases:
-  - fail delivery
-  - fail the delivery
-  - delivery fail
-  examples:
-  - (delivery.fail :cbu-id "..." :product "..." :service "..." :reason "...")
-  doc: Mark a service delivery as failed
   tier: intent
 - verb: delivery.record
   domain: delivery
@@ -86,4 +59,31 @@ verbs:
   examples:
   - (delivery.record :cbu-id "..." :product "..." :service "...")
   doc: Record a service delivery for a CBU (upsert by cbu+product+service)
+  tier: intent
+- verb: delivery.fail
+  domain: delivery
+  action: fail
+  aliases:
+  - fail
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+      service:
+        type: entity_name
+      product:
+        type: entity_name
+      reason:
+        type: str
+  positional_sugar:
+  - cbu-id
+  - product
+  invocation_phrases:
+  - fail delivery
+  - fail the delivery
+  - delivery fail
+  examples:
+  - (delivery.fail :cbu-id "..." :product "..." :service "..." :reason "...")
+  doc: Mark a service delivery as failed
   tier: intent

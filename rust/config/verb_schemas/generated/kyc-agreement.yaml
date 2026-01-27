@@ -2,6 +2,53 @@ version: '2.0'
 domain: kyc-agreement
 description: KYC service agreement management for sponsor relationships
 verbs:
+- verb: kyc-agreement.update-status
+  domain: kyc-agreement
+  action: update-status
+  aliases:
+  - update-status
+  args:
+    style: keyworded
+    required:
+      status:
+        type: str
+      agreement-id:
+        type: uuid
+  positional_sugar:
+  - agreement-id
+  - status
+  invocation_phrases:
+  - update status kyc-agreement
+  - update status the kyc-agreement
+  - kyc-agreement update status
+  examples:
+  - (kyc-agreement.update-status :agreement-id "..." :status "...")
+  doc: Update agreement status
+  tier: intent
+- verb: kyc-agreement.read
+  domain: kyc-agreement
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    optional:
+      sponsor-cbu-id:
+        type: uuid
+      agreement-id:
+        type: uuid
+  invocation_phrases:
+  - read kyc-agreement
+  - read the kyc-agreement
+  - get kyc-agreement
+  - fetch kyc-agreement
+  - kyc-agreement read
+  examples:
+  - (kyc-agreement.read)
+  doc: Get service agreement details
+  tier: reference
 - verb: kyc-agreement.create
   domain: kyc-agreement
   action: create
@@ -14,19 +61,19 @@ verbs:
     required:
       sponsor-cbu-id:
         type: entity_name
-      agreement-reference:
-        type: str
       kyc-standard:
+        type: str
+      agreement-reference:
         type: str
       effective-date:
         type: date
     optional:
       sponsor-entity-id:
         type: entity_name
-      auto-accept-threshold:
-        type: str
       sponsor-review-required:
         type: bool
+      auto-accept-threshold:
+        type: str
       target-turnaround-days:
         type: int
   positional_sugar:
@@ -41,53 +88,6 @@ verbs:
   examples:
   - (kyc-agreement.create :sponsor-cbu-id "..." :agreement-reference "..." :kyc-standard "..." :effective-date "...")
   doc: Create KYC service agreement with sponsor (idempotent by sponsor+reference)
-  tier: intent
-- verb: kyc-agreement.read
-  domain: kyc-agreement
-  action: read
-  aliases:
-  - fetch
-  - get
-  - read
-  args:
-    style: keyworded
-    optional:
-      agreement-id:
-        type: uuid
-      sponsor-cbu-id:
-        type: uuid
-  invocation_phrases:
-  - read kyc-agreement
-  - read the kyc-agreement
-  - get kyc-agreement
-  - fetch kyc-agreement
-  - kyc-agreement read
-  examples:
-  - (kyc-agreement.read)
-  doc: Get service agreement details
-  tier: reference
-- verb: kyc-agreement.update-status
-  domain: kyc-agreement
-  action: update-status
-  aliases:
-  - update-status
-  args:
-    style: keyworded
-    required:
-      agreement-id:
-        type: uuid
-      status:
-        type: str
-  positional_sugar:
-  - agreement-id
-  - status
-  invocation_phrases:
-  - update status kyc-agreement
-  - update status the kyc-agreement
-  - kyc-agreement update status
-  examples:
-  - (kyc-agreement.update-status :agreement-id "..." :status "...")
-  doc: Update agreement status
   tier: intent
 - verb: kyc-agreement.list
   domain: kyc-agreement

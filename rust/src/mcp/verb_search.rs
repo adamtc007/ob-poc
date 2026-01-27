@@ -98,7 +98,14 @@ pub enum VerbSearchOutcome {
         runner_up: VerbSearchResult,
         margin: f32,
     },
-    /// Nothing matched threshold
+    /// Low confidence but has suggestions - offer menu for user to select
+    /// This is the "Suggest" path for queries between fallback_threshold and semantic_threshold
+    /// Critical for learning: vague queries get a menu instead of "no match"
+    Suggest {
+        /// Top candidates to suggest (ordered by score)
+        candidates: Vec<VerbSearchResult>,
+    },
+    /// Nothing matched even fallback threshold
     NoMatch,
 }
 
@@ -110,9 +117,47 @@ pub enum VerbSearchOutcome {
 /// IMPORTANT: Run this AFTER union+dedupe+sort (Issue I), so margin
 /// reflects true best alternatives across all semantic sources.
 pub fn check_ambiguity(candidates: &[VerbSearchResult], threshold: f32) -> VerbSearchOutcome {
+    // Use default fallback threshold if not specified
+    check_ambiguity_with_fallback(candidates, threshold, DEFAULT_FALLBACK_THRESHOLD)
+}
+
+/// Default fallback threshold for suggestions
+const DEFAULT_FALLBACK_THRESHOLD: f32 = 0.55;
+
+/// Check for ambiguity with explicit fallback threshold for suggestions
+///
+/// Returns:
+/// - Matched: top >= threshold AND clear winner (margin > AMBIGUITY_MARGIN)
+/// - Ambiguous: top >= threshold AND runner_up close (margin <= AMBIGUITY_MARGIN)
+/// - Suggest: top < threshold BUT top >= fallback_threshold (has suggestions)
+/// - NoMatch: top < fallback_threshold (nothing useful)
+///
+/// The Suggest path is CRITICAL for learning: vague queries like "show me the cbus"
+/// get a menu instead of "no match", allowing user selection to create training data.
+pub fn check_ambiguity_with_fallback(
+    candidates: &[VerbSearchResult],
+    threshold: f32,
+    fallback_threshold: f32,
+) -> VerbSearchOutcome {
     match candidates.first() {
         None => VerbSearchOutcome::NoMatch,
-        Some(top) if top.score < threshold => VerbSearchOutcome::NoMatch,
+        Some(top) if top.score < fallback_threshold => {
+            // Below even fallback - nothing useful
+            VerbSearchOutcome::NoMatch
+        }
+        Some(top) if top.score < threshold => {
+            // Between fallback and semantic threshold - SUGGEST path
+            // This is where we capture "vague but close" queries for learning
+            let suggestion_candidates: Vec<VerbSearchResult> = candidates
+                .iter()
+                .filter(|c| c.score >= fallback_threshold)
+                .take(5)
+                .cloned()
+                .collect();
+            VerbSearchOutcome::Suggest {
+                candidates: suggestion_candidates,
+            }
+        }
         Some(top) => match candidates.get(1) {
             // Only one candidate above threshold
             None => VerbSearchOutcome::Matched(top.clone()),
@@ -176,6 +221,16 @@ pub fn normalize_candidates(
 /// Hybrid verb searcher combining all discovery strategies
 ///
 /// All DB access is through VerbService - no direct sqlx calls.
+///
+/// ## Two-Stage Centroid Search (Optimization)
+///
+/// When centroids are available (verb_centroids table populated), the global semantic
+/// search uses a two-stage approach:
+/// 1. Query ~500 centroids to get top-25 candidate verbs (fast, stable)
+/// 2. Refine with pattern-level matches within shortlist (precise, evidenced)
+/// 3. Combine scores: `0.4 * centroid + 0.6 * pattern` (tunable)
+///
+/// This reduces variance from noisy individual phrases and provides larger score gaps.
 pub struct HybridVerbSearcher {
     verb_service: Option<Arc<VerbService>>,
     learned_data: Option<SharedLearnedData>,
@@ -186,6 +241,14 @@ pub struct HybridVerbSearcher {
     fallback_threshold: f32,
     /// Similarity threshold for blocklist matches
     blocklist_threshold: f32,
+    /// Use centroid-based two-stage search (default: true if centroids available)
+    use_centroids: bool,
+    /// Centroid shortlist size (default: 25)
+    centroid_shortlist_size: i32,
+    /// Weight for centroid score in combined scoring (default: 0.4)
+    centroid_weight: f32,
+    /// Weight for pattern score in combined scoring (default: 0.6)
+    pattern_weight: f32,
 }
 
 impl Clone for HybridVerbSearcher {
@@ -197,6 +260,10 @@ impl Clone for HybridVerbSearcher {
             semantic_threshold: self.semantic_threshold,
             fallback_threshold: self.fallback_threshold,
             blocklist_threshold: self.blocklist_threshold,
+            use_centroids: self.use_centroids,
+            centroid_shortlist_size: self.centroid_shortlist_size,
+            centroid_weight: self.centroid_weight,
+            pattern_weight: self.pattern_weight,
         }
     }
 }
@@ -219,6 +286,12 @@ impl HybridVerbSearcher {
             semantic_threshold: 0.65,  // Decision gate for accepting match
             fallback_threshold: 0.55,  // Retrieval cutoff for DB queries
             blocklist_threshold: 0.80, // Collision detection
+            // Centroid optimization (DISABLED - Option A caused regression 79.2% → 77.4%)
+            // Infrastructure ready, but adding centroid candidates hurts more than helps
+            use_centroids: false,
+            centroid_shortlist_size: 25,
+            centroid_weight: 0.4,
+            pattern_weight: 0.6,
         }
     }
 
@@ -232,6 +305,11 @@ impl HybridVerbSearcher {
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
             blocklist_threshold: 0.80,
+            // Centroid optimization (disabled without DB)
+            use_centroids: false,
+            centroid_shortlist_size: 25,
+            centroid_weight: 0.4,
+            pattern_weight: 0.6,
         }
     }
 
@@ -245,6 +323,11 @@ impl HybridVerbSearcher {
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
             blocklist_threshold: 0.80,
+            // Centroid optimization (disabled without DB)
+            use_centroids: false,
+            centroid_shortlist_size: 25,
+            centroid_weight: 0.4,
+            pattern_weight: 0.6,
         }
     }
 
@@ -263,6 +346,25 @@ impl HybridVerbSearcher {
     /// Set custom fallback threshold (retrieval cutoff for DB queries)
     pub fn with_fallback_threshold(mut self, threshold: f32) -> Self {
         self.fallback_threshold = threshold;
+        self
+    }
+
+    /// Enable or disable centroid-based two-stage search
+    pub fn with_centroids(mut self, enabled: bool) -> Self {
+        self.use_centroids = enabled;
+        self
+    }
+
+    /// Set centroid shortlist size (how many verbs to consider in stage 1)
+    pub fn with_centroid_shortlist_size(mut self, size: i32) -> Self {
+        self.centroid_shortlist_size = size;
+        self
+    }
+
+    /// Set centroid vs pattern score weights (must sum to 1.0)
+    pub fn with_centroid_weights(mut self, centroid_weight: f32, pattern_weight: f32) -> Self {
+        self.centroid_weight = centroid_weight;
+        self.pattern_weight = pattern_weight;
         self
     }
 
@@ -581,22 +683,293 @@ impl HybridVerbSearcher {
     /// Takes pre-computed embedding to avoid redundant computation.
     /// Uses `fallback_threshold` (0.65) instead of hardcoded 0.5.
     ///
-    /// Issue I fix: Fetches from BOTH sources:
-    /// 1. agent.invocation_phrases (learned)
-    /// 2. ob-poc.verb_pattern_embeddings (cold start)
+    /// ## Two-Stage Centroid Search (when enabled)
     ///
-    /// Then unions and dedupes by verb, keeping highest score.
+    /// When `use_centroids` is true and centroids are available:
+    /// 1. Query centroids to get top-K candidate verbs (fast, stable)
+    /// 2. Refine with pattern-level matches within shortlist (precise, evidenced)
+    /// 3. Combine scores: `centroid_weight * centroid + pattern_weight * pattern`
+    ///
+    /// This reduces variance from noisy individual phrases and provides larger score gaps.
+    ///
+    /// Issue I fix: Also fetches from agent.invocation_phrases (learned) and unions.
     async fn search_global_semantic_with_embedding(
         &self,
         query_embedding: &[f32],
         limit: usize,
     ) -> Result<Vec<VerbSearchResult>> {
-        use std::collections::HashMap;
-
         let verb_service = match &self.verb_service {
             Some(s) => s,
             None => return Ok(Vec::new()),
         };
+
+        // Try centroid-based two-stage search first (if enabled)
+        if self.use_centroids {
+            match self
+                .search_with_centroids(verb_service, query_embedding, limit)
+                .await
+            {
+                Ok(results) if !results.is_empty() => {
+                    tracing::debug!(
+                        results_count = results.len(),
+                        "VerbSearch: centroid search returned results"
+                    );
+                    return Ok(results);
+                }
+                Ok(_) => {
+                    tracing::debug!(
+                        "VerbSearch: centroid search returned empty, falling back to pattern search"
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        "VerbSearch: centroid search failed, falling back to pattern search"
+                    );
+                }
+            }
+        }
+
+        // Fallback: direct pattern search (original behavior)
+        self.search_patterns_directly(verb_service, query_embedding, limit)
+            .await
+    }
+
+    /// Option A: Centroids as candidate generator only
+    ///
+    /// Strategy:
+    /// 1. Run pattern retrieval (existing) → get top-K verbs with pattern scores
+    /// 2. Run centroid retrieval → get top-M candidate verbs
+    /// 3. Union the candidate sets
+    /// 4. For centroid-only verbs (missing pattern evidence), rescore via restricted pattern search
+    /// 5. Rank ONLY by pattern score (centroids don't affect final score)
+    /// 6. Acceptance gate uses pattern score and pattern gap only
+    ///
+    /// This preserves baseline accuracy while using centroids to boost recall.
+    ///
+    /// ## Instrumentation (OB_INTENT_TRACE=1)
+    /// - PATTERN_TOP5: verb, pattern_score, best_phrase
+    /// - CENTROID_TOP5: verb, centroid_score
+    /// - ADDED_FROM_CENTROIDS: count of verbs not in pattern top-K
+    /// - RESCORED_FROM_CENTROIDS: verb, rescored_pattern_score, best_phrase
+    #[allow(clippy::type_complexity)]
+    async fn search_with_centroids(
+        &self,
+        verb_service: &VerbService,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<VerbSearchResult>> {
+        use std::collections::HashMap;
+
+        let trace_enabled = std::env::var("OB_INTENT_TRACE").is_ok();
+
+        // =====================================================================
+        // Stage 1: Get pattern top-K (existing baseline behavior)
+        // =====================================================================
+        let pattern_results = self
+            .search_patterns_directly(verb_service, query_embedding, limit)
+            .await?;
+
+        // Trace: PATTERN_TOP5
+        if trace_enabled {
+            eprintln!("=== CENTROID TRACE ===");
+            eprintln!("PATTERN_TOP5:");
+            for (i, pr) in pattern_results.iter().take(5).enumerate() {
+                eprintln!(
+                    "  {}: {} (score={:.3}) phrase=\"{}\"",
+                    i + 1,
+                    pr.verb,
+                    pr.score,
+                    pr.matched_phrase
+                );
+            }
+        }
+
+        // Build map of pattern results (verb -> result)
+        let mut candidates: HashMap<String, VerbSearchResult> = HashMap::new();
+        for pr in pattern_results {
+            candidates.insert(pr.verb.clone(), pr);
+        }
+
+        let pattern_verbs: HashSet<String> = candidates.keys().cloned().collect();
+
+        // =====================================================================
+        // Stage 2: Get centroid shortlist (candidate generator)
+        // =====================================================================
+        let centroid_matches = verb_service
+            .query_centroids(query_embedding, self.centroid_shortlist_size)
+            .await?;
+
+        // Trace: CENTROID_TOP5
+        if trace_enabled {
+            eprintln!("CENTROID_TOP5:");
+            for (i, cm) in centroid_matches.iter().take(5).enumerate() {
+                let in_pattern = if pattern_verbs.contains(&cm.verb_name) {
+                    " [in pattern]"
+                } else {
+                    ""
+                };
+                eprintln!(
+                    "  {}: {} (centroid_score={:.3}){}",
+                    i + 1,
+                    cm.verb_name,
+                    cm.score,
+                    in_pattern
+                );
+            }
+        }
+
+        if centroid_matches.is_empty() {
+            if trace_enabled {
+                eprintln!("ADDED_FROM_CENTROIDS: 0 (no centroids available)");
+                eprintln!("=== END TRACE ===");
+            }
+            // No centroids, just return pattern results
+            let mut results: Vec<VerbSearchResult> = candidates.into_values().collect();
+            results.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            return Ok(results);
+        }
+
+        // Find centroid-only verbs (not in pattern results)
+        let centroid_only: Vec<String> = centroid_matches
+            .iter()
+            .map(|m| m.verb_name.clone())
+            .filter(|v| !pattern_verbs.contains(v))
+            .collect();
+
+        let centroid_only_count = centroid_only.len();
+
+        if trace_enabled {
+            eprintln!("ADDED_FROM_CENTROIDS: {}", centroid_only_count);
+        }
+
+        tracing::debug!(
+            centroid_count = centroid_matches.len(),
+            centroid_only_count = centroid_only_count,
+            top_centroid = %centroid_matches.first().map(|m| &m.verb_name).unwrap_or(&"".to_string()),
+            "VerbSearch: centroid candidate generation"
+        );
+
+        // =====================================================================
+        // Stage 3: Rescore centroid-only verbs via restricted pattern search
+        // =====================================================================
+        let mut rescored_count = 0;
+        if !centroid_only.is_empty() {
+            let centroid_only_refs: Vec<&str> = centroid_only.iter().map(|s| s.as_str()).collect();
+
+            // Get pattern evidence for centroid-only verbs (RESTRICTED to these verbs only)
+            let rescored_patterns = verb_service
+                .search_patterns_for_verbs(
+                    query_embedding,
+                    &centroid_only_refs,
+                    (centroid_only.len() * 3) as i32,
+                )
+                .await?;
+
+            // Build best pattern score per verb
+            let mut best_patterns: HashMap<String, (f64, String)> = HashMap::new();
+            for pm in rescored_patterns {
+                best_patterns
+                    .entry(pm.verb.clone())
+                    .and_modify(|(score, phrase)| {
+                        if pm.similarity > *score {
+                            *score = pm.similarity;
+                            *phrase = pm.phrase.clone();
+                        }
+                    })
+                    .or_insert((pm.similarity, pm.phrase));
+            }
+
+            if trace_enabled {
+                eprintln!("RESCORED_FROM_CENTROIDS:");
+            }
+
+            // Add centroid-only verbs with their rescored pattern scores
+            for verb in &centroid_only {
+                if let Some((pattern_score, matched_phrase)) = best_patterns.get(verb) {
+                    let score = *pattern_score as f32;
+
+                    if trace_enabled {
+                        let status = if score >= self.fallback_threshold {
+                            "ADDED"
+                        } else {
+                            "BELOW_THRESHOLD"
+                        };
+                        eprintln!(
+                            "  {} (rescored={:.3}) phrase=\"{}\" [{}]",
+                            verb, score, matched_phrase, status
+                        );
+                    }
+
+                    // Only add if rescored pattern score meets threshold
+                    if score >= self.fallback_threshold {
+                        rescored_count += 1;
+                        tracing::debug!(
+                            verb = %verb,
+                            pattern_score = score,
+                            phrase = %matched_phrase,
+                            "VerbSearch: centroid-boosted candidate"
+                        );
+
+                        candidates.insert(
+                            verb.clone(),
+                            VerbSearchResult {
+                                verb: verb.clone(),
+                                score,
+                                source: VerbSearchSource::PatternEmbedding,
+                                matched_phrase: matched_phrase.clone(),
+                                description: None,
+                            },
+                        );
+                    }
+                } else if trace_enabled {
+                    eprintln!("  {} (NO_PATTERN_EVIDENCE) [SKIPPED]", verb);
+                }
+                // If no pattern evidence found, verb is NOT added (centroid alone insufficient)
+            }
+        }
+
+        if trace_enabled {
+            eprintln!(
+                "CENTROID_SUMMARY: {} centroid-only, {} rescored and added",
+                centroid_only_count, rescored_count
+            );
+            eprintln!("=== END TRACE ===");
+        }
+
+        // =====================================================================
+        // Stage 4: Rank by pattern score only
+        // =====================================================================
+        let mut results: Vec<VerbSearchResult> = candidates.into_values().collect();
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(limit);
+
+        // Add descriptions
+        for result in &mut results {
+            if result.description.is_none() {
+                result.description = self.get_verb_description(&result.verb).await;
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Direct pattern search (fallback when centroids unavailable)
+    async fn search_patterns_directly(
+        &self,
+        verb_service: &VerbService,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> Result<Vec<VerbSearchResult>> {
+        use std::collections::HashMap;
 
         // Fetch top-k from BOTH sources (Issue I)
         let learned_matches = verb_service

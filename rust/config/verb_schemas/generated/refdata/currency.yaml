@@ -2,60 +2,6 @@ version: '2.0'
 domain: currency
 description: Currency reference data (USD, EUR, GBP, etc.)
 verbs:
-- verb: currency.ensure
-  domain: currency
-  action: ensure
-  aliases:
-  - ensure
-  args:
-    style: keyworded
-    required:
-      iso-code:
-        type: str
-      name:
-        type: str
-    optional:
-      symbol:
-        type: str
-      decimal-places:
-        type: int
-      is-active:
-        type: bool
-  positional_sugar:
-  - iso-code
-  - name
-  invocation_phrases:
-  - ensure currency
-  - ensure the currency
-  - ensure money
-  - currency ensure
-  examples:
-  - (currency.ensure :iso-code "..." :name "...")
-  doc: Create or update a currency
-  tier: intent
-- verb: currency.list
-  domain: currency
-  action: list
-  aliases:
-  - get all
-  - list
-  - show
-  args:
-    style: keyworded
-    optional:
-      is-active:
-        type: bool
-  invocation_phrases:
-  - list currency
-  - list the currency
-  - show currency
-  - get all currency
-  - list money
-  - currency list
-  examples:
-  - (currency.list)
-  doc: List all currencies
-  tier: reference
 - verb: currency.deactivate
   domain: currency
   action: deactivate
@@ -83,6 +29,60 @@ verbs:
   examples:
   - (currency.deactivate :iso-code "...")
   doc: Deactivate a currency
+  tier: intent
+- verb: currency.list
+  domain: currency
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      is-active:
+        type: bool
+  invocation_phrases:
+  - list currency
+  - list the currency
+  - show currency
+  - get all currency
+  - list money
+  - currency list
+  examples:
+  - (currency.list)
+  doc: List all currencies
+  tier: reference
+- verb: currency.ensure
+  domain: currency
+  action: ensure
+  aliases:
+  - ensure
+  args:
+    style: keyworded
+    required:
+      iso-code:
+        type: str
+      name:
+        type: str
+    optional:
+      is-active:
+        type: bool
+      symbol:
+        type: str
+      decimal-places:
+        type: int
+  positional_sugar:
+  - iso-code
+  - name
+  invocation_phrases:
+  - ensure currency
+  - ensure the currency
+  - ensure money
+  - currency ensure
+  examples:
+  - (currency.ensure :iso-code "..." :name "...")
+  doc: Create or update a currency
   tier: intent
 - verb: currency.read
   domain: currency

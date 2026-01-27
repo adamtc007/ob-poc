@@ -2,6 +2,56 @@ version: '2.0'
 domain: cash-sweep
 description: Cash sweep and STIF configuration management
 verbs:
+- verb: cash-sweep.list
+  domain: cash-sweep
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+    optional:
+      is-active:
+        type: bool
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list cash-sweep
+  - list the cash-sweep
+  - show cash-sweep
+  - get all cash-sweep
+  - cash-sweep list
+  examples:
+  - (cash-sweep.list :cbu-id "...")
+  doc: List cash sweep configurations for CBU
+  tier: reference
+- verb: cash-sweep.link-resource
+  domain: cash-sweep
+  action: link-resource
+  aliases:
+  - link-resource
+  args:
+    style: keyworded
+    required:
+      sweep-resource-id:
+        type: entity_name
+      sweep-id:
+        type: uuid
+  positional_sugar:
+  - sweep-id
+  - sweep-resource-id
+  invocation_phrases:
+  - link resource cash-sweep
+  - link resource the cash-sweep
+  - cash-sweep link resource
+  examples:
+  - (cash-sweep.link-resource :sweep-id "..." :sweep-resource-id "...")
+  doc: Link sweep config to cash management resource
+  tier: intent
 - verb: cash-sweep.update-threshold
   domain: cash-sweep
   action: update-threshold
@@ -10,10 +60,10 @@ verbs:
   args:
     style: keyworded
     required:
-      threshold-amount:
-        type: decimal
       sweep-id:
         type: uuid
+      threshold-amount:
+        type: decimal
   positional_sugar:
   - sweep-id
   - threshold-amount
@@ -49,68 +99,6 @@ verbs:
   - (cash-sweep.remove :sweep-id "...")
   doc: Remove cash sweep configuration
   tier: intent
-- verb: cash-sweep.change-vehicle
-  domain: cash-sweep
-  action: change-vehicle
-  aliases:
-  - change-vehicle
-  args:
-    style: keyworded
-    required:
-      sweep-id:
-        type: uuid
-      vehicle-type:
-        type: enum
-        values:
-        - STIF
-        - MMF
-        - DEPOSIT
-        - OVERNIGHT_REPO
-        - TRI_PARTY_REPO
-        - MANUAL
-    optional:
-      vehicle-id:
-        type: str
-      vehicle-name:
-        type: str
-  positional_sugar:
-  - sweep-id
-  - vehicle-type
-  invocation_phrases:
-  - change vehicle cash-sweep
-  - change vehicle the cash-sweep
-  - cash-sweep change vehicle
-  examples:
-  - (cash-sweep.change-vehicle :sweep-id "..." :vehicle-type "...")
-  doc: Change sweep investment vehicle
-  tier: intent
-- verb: cash-sweep.list
-  domain: cash-sweep
-  action: list
-  aliases:
-  - get all
-  - list
-  - show
-  args:
-    style: keyworded
-    required:
-      cbu-id:
-        type: entity_name
-    optional:
-      is-active:
-        type: bool
-  positional_sugar:
-  - cbu-id
-  invocation_phrases:
-  - list cash-sweep
-  - list the cash-sweep
-  - show cash-sweep
-  - get all cash-sweep
-  - cash-sweep list
-  examples:
-  - (cash-sweep.list :cbu-id "...")
-  doc: List cash sweep configurations for CBU
-  tier: reference
 - verb: cash-sweep.reactivate
   domain: cash-sweep
   action: reactivate
@@ -131,6 +119,41 @@ verbs:
   - (cash-sweep.reactivate :sweep-id "...")
   doc: Reactivate cash sweep
   tier: intent
+- verb: cash-sweep.change-vehicle
+  domain: cash-sweep
+  action: change-vehicle
+  aliases:
+  - change-vehicle
+  args:
+    style: keyworded
+    required:
+      vehicle-type:
+        type: enum
+        values:
+        - STIF
+        - MMF
+        - DEPOSIT
+        - OVERNIGHT_REPO
+        - TRI_PARTY_REPO
+        - MANUAL
+      sweep-id:
+        type: uuid
+    optional:
+      vehicle-name:
+        type: str
+      vehicle-id:
+        type: str
+  positional_sugar:
+  - sweep-id
+  - vehicle-type
+  invocation_phrases:
+  - change vehicle cash-sweep
+  - change vehicle the cash-sweep
+  - cash-sweep change vehicle
+  examples:
+  - (cash-sweep.change-vehicle :sweep-id "..." :vehicle-type "...")
+  doc: Change sweep investment vehicle
+  tier: intent
 - verb: cash-sweep.configure
   domain: cash-sweep
   action: configure
@@ -139,12 +162,8 @@ verbs:
   args:
     style: keyworded
     required:
-      currency:
+      sweep-timezone:
         type: str
-      sweep-time:
-        type: str
-      cbu-id:
-        type: entity_name
       threshold-amount:
         type: decimal
       vehicle-type:
@@ -156,20 +175,13 @@ verbs:
         - OVERNIGHT_REPO
         - TRI_PARTY_REPO
         - MANUAL
-      sweep-timezone:
+      currency:
         type: str
+      sweep-time:
+        type: str
+      cbu-id:
+        type: entity_name
     optional:
-      vehicle-id:
-        type: str
-      vehicle-name:
-        type: str
-      interest-allocation:
-        type: enum
-        values:
-        - ACCRUED
-        - MONTHLY
-        - QUARTERLY
-        - REINVEST
       sweep-frequency:
         type: enum
         values:
@@ -177,10 +189,21 @@ verbs:
         - DAILY
         - WEEKLY
         - MONTHLY
+      interest-allocation:
+        type: enum
+        values:
+        - ACCRUED
+        - MONTHLY
+        - QUARTERLY
+        - REINVEST
+      vehicle-name:
+        type: str
       effective-date:
         type: date
       profile-id:
         type: entity_name
+      vehicle-id:
+        type: str
   positional_sugar:
   - cbu-id
   - currency
@@ -203,6 +226,10 @@ verbs:
       sweep-id:
         type: uuid
     optional:
+      sweep-time:
+        type: str
+      sweep-timezone:
+        type: str
       sweep-frequency:
         type: enum
         values:
@@ -210,10 +237,6 @@ verbs:
         - DAILY
         - WEEKLY
         - MONTHLY
-      sweep-time:
-        type: str
-      sweep-timezone:
-        type: str
   positional_sugar:
   - sweep-id
   invocation_phrases:
@@ -223,29 +246,6 @@ verbs:
   examples:
   - (cash-sweep.update-timing :sweep-id "...")
   doc: Update sweep timing
-  tier: intent
-- verb: cash-sweep.link-resource
-  domain: cash-sweep
-  action: link-resource
-  aliases:
-  - link-resource
-  args:
-    style: keyworded
-    required:
-      sweep-id:
-        type: uuid
-      sweep-resource-id:
-        type: entity_name
-  positional_sugar:
-  - sweep-id
-  - sweep-resource-id
-  invocation_phrases:
-  - link resource cash-sweep
-  - link resource the cash-sweep
-  - cash-sweep link resource
-  examples:
-  - (cash-sweep.link-resource :sweep-id "..." :sweep-resource-id "...")
-  doc: Link sweep config to cash management resource
   tier: intent
 - verb: cash-sweep.suspend
   domain: cash-sweep

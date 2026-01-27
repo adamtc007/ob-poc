@@ -2,6 +2,30 @@ version: '2.0'
 domain: ssi-type
 description: SSI type reference data (SECURITIES, CASH, COLLATERAL)
 verbs:
+- verb: ssi-type.read
+  domain: ssi-type
+  action: read
+  aliases:
+  - fetch
+  - get
+  - read
+  args:
+    style: keyworded
+    required:
+      code:
+        type: str
+  positional_sugar:
+  - code
+  invocation_phrases:
+  - read ssi-type
+  - read the ssi-type
+  - get ssi-type
+  - fetch ssi-type
+  - ssi-type read
+  examples:
+  - (ssi-type.read :code "...")
+  doc: Read an SSI type by code
+  tier: reference
 - verb: ssi-type.ensure
   domain: ssi-type
   action: ensure
@@ -53,30 +77,6 @@ verbs:
   examples:
   - (ssi-type.list)
   doc: List all SSI types
-  tier: reference
-- verb: ssi-type.read
-  domain: ssi-type
-  action: read
-  aliases:
-  - fetch
-  - get
-  - read
-  args:
-    style: keyworded
-    required:
-      code:
-        type: str
-  positional_sugar:
-  - code
-  invocation_phrases:
-  - read ssi-type
-  - read the ssi-type
-  - get ssi-type
-  - fetch ssi-type
-  - ssi-type read
-  examples:
-  - (ssi-type.read :code "...")
-  doc: Read an SSI type by code
   tier: reference
 - verb: ssi-type.deactivate
   domain: ssi-type

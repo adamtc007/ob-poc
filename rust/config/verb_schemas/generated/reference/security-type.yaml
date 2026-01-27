@@ -10,12 +10,12 @@ verbs:
   args:
     style: keyworded
     required:
-      code:
-        type: str
       name:
         type: str
       class:
         type: entity_name
+      code:
+        type: str
     optional:
       cfi-pattern:
         type: str

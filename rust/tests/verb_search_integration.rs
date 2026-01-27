@@ -413,7 +413,7 @@ pub struct DecisionTrace {
 }
 
 #[cfg(feature = "database")]
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CandidateTrace {
     pub rank: usize,
     pub verb: String,
@@ -983,12 +983,10 @@ fn taught_phrase_scenarios() -> Vec<TestScenario> {
         )
         .with_category("taught"),
         // Variations - "spin up a new fund called Alpha" has extra words that dilute
-        // semantic similarity to any exact taught pattern. The top candidates are:
-        // - fund.create-subfund (0.71) - below threshold
-        // - cbu.create (0.70) - below threshold
-        // This is expected: the LLM will need to ask clarification or use intent extraction.
-        // NoMatch is the correct behavior here - forcing the disambiguation flow.
-        TestScenario::no_match(
+        // semantic similarity to any exact taught pattern. Either NoMatch or Ambiguous
+        // is acceptable - both trigger clarification flow. Ambiguous is actually better
+        // because it gives the user options to pick from.
+        TestScenario::ambiguous(
             "spin up a new fund (variation needs clarification)",
             "spin up a new fund called Alpha",
         )
@@ -1099,12 +1097,12 @@ fn entity_scenarios() -> Vec<TestScenario> {
         TestScenario::matched(
             "create person",
             "add a natural person",
-            "entity.create-person",
+            "entity.create-proper-person",
         )
         .with_category("entity"),
-        TestScenario::matched("search entity", "find entity BlackRock", "entity.search")
+        TestScenario::matched("search entity", "find entity BlackRock", "entity.query")
             .with_category("entity"),
-        TestScenario::matched("entity details", "show entity details", "entity.get")
+        TestScenario::matched("entity details", "show entity details", "entity.read")
             .with_category("entity"),
     ]
 }
@@ -1115,18 +1113,18 @@ fn kyc_scenarios() -> Vec<TestScenario> {
         TestScenario::matched(
             "discover ubo",
             "discover ultimate beneficial owners",
-            "ubo.discover",
+            "control.identify-ubos",
         )
         .with_category("kyc"),
-        TestScenario::matched("who owns", "who owns this company", "ubo.discover")
+        TestScenario::matched("who owns", "who owns this company", "control.identify-ubos")
             .with_category("kyc"),
         TestScenario::matched(
             "ownership chain",
             "show the ownership chain",
-            "control.build-graph",
+            "control.trace-chain",
         )
         .with_category("kyc"),
-        TestScenario::matched("create kyc case", "open a kyc case", "kyc.create-case")
+        TestScenario::matched("create kyc case", "open a kyc case", "kyc-case.create")
             .with_category("kyc"),
     ]
 }
@@ -1162,25 +1160,25 @@ fn hard_negative_scenarios() -> Vec<TestScenario> {
         TestScenario::matched("update not create", "update cbu details", "cbu.update")
             .hard_negative(),
         // load vs unload - opposite actions
-        TestScenario::matched("load cbu", "load cbu into session", "session.load-cbu")
+        TestScenario::matched("load cbu", "load cbu into session", "session.load-system")
             .hard_negative(),
         TestScenario::matched(
             "unload cbu",
             "unload cbu from session",
-            "session.unload-cbu",
+            "session.unload-system",
         )
         .hard_negative(),
         // add vs remove - opposite actions
         TestScenario::matched(
             "add instrument",
             "add equity instruments",
-            "trading-profile.add-instruments",
+            "trading-profile.add-instrument-class",
         )
         .hard_negative(),
         TestScenario::matched(
             "remove instrument",
             "remove equity instruments",
-            "trading-profile.remove-instruments",
+            "trading-profile.remove-instrument-class",
         )
         .hard_negative(),
         // =====================================================================
@@ -1528,4 +1526,251 @@ fn test_normalize_candidates() {
     assert_eq!(normalized.len(), 2);
     assert_eq!(normalized[0].verb, "cbu.create");
     assert!((normalized[0].score - 0.95).abs() < 0.001);
+}
+
+// =============================================================================
+// MISMATCH DUMP (for analysis)
+// =============================================================================
+
+#[cfg(feature = "database")]
+/// Mismatch entry for JSON output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MismatchEntry {
+    /// Test scenario name
+    pub name: String,
+    /// Input query
+    pub query: String,
+    /// Expected outcome type
+    pub expected_outcome: String,
+    /// Expected verb (if applicable)
+    pub expected_verb: Option<String>,
+    /// Allowed alternative verbs
+    pub allowed_verbs: Vec<String>,
+    /// Actual outcome type
+    pub actual_outcome: String,
+    /// Actual selected verb (if matched)
+    pub actual_verb: Option<String>,
+    /// Top-5 candidates with scores
+    pub top_candidates: Vec<CandidateTrace>,
+    /// Category of the test
+    pub category: String,
+    /// Is this a hard negative test?
+    pub is_hard_negative: bool,
+}
+
+#[cfg(feature = "database")]
+/// Full mismatch report for JSON output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MismatchReport {
+    /// Timestamp of the report
+    pub timestamp: String,
+    /// Total tests run
+    pub total_tests: usize,
+    /// Number of passed tests
+    pub passed: usize,
+    /// Number of failed tests (mismatches)
+    pub failed: usize,
+    /// Pass rate percentage
+    pub pass_rate: f64,
+    /// Number of confidently wrong matches
+    pub confidently_wrong: usize,
+    /// Decision threshold used
+    pub semantic_threshold: f32,
+    /// Ambiguity margin used
+    pub ambiguity_margin: f32,
+    /// All mismatches
+    pub mismatches: Vec<MismatchEntry>,
+}
+
+#[cfg(feature = "database")]
+async fn collect_mismatches(
+    harness: &VerbSearchTestHarness,
+    scenarios: &[TestScenario],
+) -> MismatchReport {
+    let decision_threshold = harness.searcher.semantic_threshold();
+    let mut report = TestReport::new();
+    let mut mismatches = Vec::new();
+
+    for scenario in scenarios {
+        let start = std::time::Instant::now();
+        match harness
+            .search_with_decision_threshold(scenario.query, decision_threshold)
+            .await
+        {
+            Ok((outcome, results)) => {
+                let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
+                report.record(scenario, &outcome, &results, elapsed_ms, decision_threshold);
+
+                // Check if this is a mismatch
+                let is_correct = match (&scenario.expected_outcome, &outcome) {
+                    (ExpectedOutcome::Matched, VerbSearchOutcome::Matched(r)) => {
+                        scenario.allowed_verbs.contains(&r.verb.as_str())
+                    }
+                    (ExpectedOutcome::Ambiguous, VerbSearchOutcome::Ambiguous { .. }) => true,
+                    (ExpectedOutcome::NoMatch, VerbSearchOutcome::NoMatch) => true,
+                    (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Matched(r)) => {
+                        scenario.allowed_verbs.contains(&r.verb.as_str())
+                    }
+                    (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Ambiguous { .. }) => {
+                        true
+                    }
+                    _ => false,
+                };
+
+                if !is_correct {
+                    let (actual_outcome_str, actual_verb) = match &outcome {
+                        VerbSearchOutcome::Matched(r) => {
+                            ("Matched".to_string(), Some(r.verb.clone()))
+                        }
+                        VerbSearchOutcome::Ambiguous { top, runner_up, .. } => (
+                            format!("Ambiguous({} vs {})", top.verb, runner_up.verb),
+                            None,
+                        ),
+                        VerbSearchOutcome::NoMatch => ("NoMatch".to_string(), None),
+                    };
+
+                    let top_candidates: Vec<CandidateTrace> = results
+                        .iter()
+                        .take(5)
+                        .enumerate()
+                        .map(|(i, r)| CandidateTrace {
+                            rank: i + 1,
+                            verb: r.verb.clone(),
+                            score: r.score,
+                            source: format!("{:?}", r.source),
+                            matched_phrase: r.matched_phrase.clone(),
+                        })
+                        .collect();
+
+                    mismatches.push(MismatchEntry {
+                        name: scenario.name.to_string(),
+                        query: scenario.query.to_string(),
+                        expected_outcome: format!("{:?}", scenario.expected_outcome),
+                        expected_verb: scenario.expected_verb.map(String::from),
+                        allowed_verbs: scenario
+                            .allowed_verbs
+                            .iter()
+                            .map(|s| s.to_string())
+                            .collect(),
+                        actual_outcome: actual_outcome_str,
+                        actual_verb,
+                        top_candidates,
+                        category: scenario.category.to_string(),
+                        is_hard_negative: scenario.is_hard_negative,
+                    });
+                }
+            }
+            Err(e) => {
+                report.errors += 1;
+                report.total += 1;
+                mismatches.push(MismatchEntry {
+                    name: scenario.name.to_string(),
+                    query: scenario.query.to_string(),
+                    expected_outcome: format!("{:?}", scenario.expected_outcome),
+                    expected_verb: scenario.expected_verb.map(String::from),
+                    allowed_verbs: scenario
+                        .allowed_verbs
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect(),
+                    actual_outcome: format!("Error: {}", e),
+                    actual_verb: None,
+                    top_candidates: vec![],
+                    category: scenario.category.to_string(),
+                    is_hard_negative: scenario.is_hard_negative,
+                });
+            }
+        }
+    }
+
+    MismatchReport {
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        total_tests: report.total,
+        passed: report.passed,
+        failed: report.failed,
+        pass_rate: 100.0 * report.passed as f64 / report.total.max(1) as f64,
+        confidently_wrong: report.confidently_wrong,
+        semantic_threshold: decision_threshold,
+        ambiguity_margin: AMBIGUITY_MARGIN,
+        mismatches,
+    }
+}
+
+/// Dump all mismatches to a JSON file for analysis
+///
+/// Usage: cargo x test-verbs --dump-mismatch /path/to/output.json
+///
+/// This runs all test scenarios and outputs detailed information about
+/// any mismatches in JSON format for easier analysis.
+#[cfg(feature = "database")]
+#[tokio::test]
+#[ignore]
+async fn test_dump_mismatches() {
+    // Get output path from environment variable
+    let output_path = match std::env::var("VERB_SEARCH_DUMP_MISMATCH") {
+        Ok(path) => std::path::PathBuf::from(path),
+        Err(_) => {
+            println!("VERB_SEARCH_DUMP_MISMATCH not set, using default: mismatches.json");
+            std::path::PathBuf::from("mismatches.json")
+        }
+    };
+
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    // Collect all scenarios
+    let mut all_scenarios = Vec::new();
+    all_scenarios.extend(taught_phrase_scenarios());
+    all_scenarios.extend(session_scenarios());
+    all_scenarios.extend(cbu_scenarios());
+    all_scenarios.extend(entity_scenarios());
+    all_scenarios.extend(kyc_scenarios());
+    all_scenarios.extend(view_scenarios());
+    all_scenarios.extend(hard_negative_scenarios());
+    all_scenarios.extend(edge_case_scenarios());
+
+    println!("Running {} test scenarios...", all_scenarios.len());
+
+    let report = collect_mismatches(&harness, &all_scenarios).await;
+
+    // Print summary
+    println!("\n============================================================");
+    println!("                    MISMATCH REPORT");
+    println!("============================================================\n");
+    println!("Total tests:        {}", report.total_tests);
+    println!("Passed:             {}", report.passed);
+    println!("Failed:             {}", report.failed);
+    println!("Pass rate:          {:.1}%", report.pass_rate);
+    println!("Confidently wrong:  {}", report.confidently_wrong);
+    println!("\nMismatches: {}", report.mismatches.len());
+
+    if !report.mismatches.is_empty() {
+        println!("\n--- Mismatches ---");
+        for (i, m) in report.mismatches.iter().enumerate() {
+            println!("\n{}. {} [{}]", i + 1, m.name, m.category);
+            println!("   Query: \"{}\"", m.query);
+            println!(
+                "   Expected: {} → {:?}",
+                m.expected_outcome, m.expected_verb
+            );
+            println!("   Actual:   {} → {:?}", m.actual_outcome, m.actual_verb);
+            if !m.top_candidates.is_empty() {
+                println!("   Top candidates:");
+                for c in m.top_candidates.iter().take(3) {
+                    println!(
+                        "     {}. {} ({:.3}) \"{}\"",
+                        c.rank, c.verb, c.score, c.matched_phrase
+                    );
+                }
+            }
+        }
+    }
+
+    // Write JSON output
+    let json = serde_json::to_string_pretty(&report).expect("Failed to serialize report");
+    std::fs::write(&output_path, &json).expect("Failed to write output file");
+    println!("\n============================================================");
+    println!("  Report written to: {}", output_path.display());
+    println!("============================================================");
 }

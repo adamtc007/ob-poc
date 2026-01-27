@@ -5,26 +5,56 @@ description: |
   Manages the agent loop lifecycle: start, pause, resume, stop.
   Handles checkpoint confirmations for ambiguous decisions.
 verbs:
-- verb: agent.status
+- verb: agent.set-mode
   domain: agent
-  action: status
+  action: set-mode
   aliases:
-  - progress
-  - status
+  - set-mode
   args:
     style: keyworded
+    required:
+      mode:
+        type: str
+  positional_sugar:
+  - mode
   invocation_phrases:
-  - agent status
-  - what is the agent doing
-  - research status
-  - progress
-  - status agent
-  - status the agent
-  - status assistant
+  - set mode agent
+  - set mode the agent
+  - set mode assistant
+  - agent set mode
   examples:
-  - (agent.status)
-  doc: Get current agent status
-  tier: diagnostics
+  - (agent.set-mode :mode "...")
+  doc: Switch between agent and hybrid modes
+  tier: intent
+- verb: agent.select
+  domain: agent
+  action: select
+  aliases:
+  - pick
+  - select
+  args:
+    style: keyworded
+    required:
+      candidate-index:
+        type: int
+    optional:
+      checkpoint-id:
+        type: uuid
+  positional_sugar:
+  - candidate-index
+  invocation_phrases:
+  - select option
+  - use the first one
+  - use the second one
+  - pick
+  - select agent
+  - select the agent
+  - select assistant
+  - agent select
+  examples:
+  - (agent.select :candidate-index "...")
+  doc: Select a specific candidate from checkpoint options
+  tier: intent
 - verb: agent.teaching-status
   domain: agent
   action: teaching-status
@@ -50,51 +80,46 @@ verbs:
   - (agent.teaching-status)
   doc: Show recently taught patterns and their embedding status
   tier: diagnostics
-- verb: agent.confirm
+- verb: agent.stop
   domain: agent
-  action: confirm
+  action: stop
   aliases:
-  - accept
-  - confirm
+  - abort
+  - stop
+  args:
+    style: keyworded
+  invocation_phrases:
+  - stop the agent
+  - cancel research
+  - abort
+  - stop
+  - stop agent
+  - stop assistant
+  - agent stop
+  examples:
+  - (agent.stop)
+  doc: Stop the agent loop completely
+  tier: intent
+- verb: agent.set-threshold
+  domain: agent
+  action: set-threshold
+  aliases:
+  - set-threshold
   args:
     style: keyworded
     optional:
-      selected-candidate:
-        type: int
-      checkpoint-id:
-        type: uuid
+      auto-proceed:
+        type: decimal
+      ambiguous-floor:
+        type: decimal
   invocation_phrases:
-  - confirm
-  - yes, use that one
-  - proceed with
-  - that's correct
-  - accept
-  - confirm agent
-  - confirm the agent
-  - confirm assistant
+  - set threshold agent
+  - set threshold the agent
+  - set threshold assistant
+  - agent set threshold
   examples:
-  - (agent.confirm)
-  doc: Confirm a checkpoint decision
-  tier: intent
-- verb: agent.pause
-  domain: agent
-  action: pause
-  aliases:
-  - pause
-  - wait
-  args:
-    style: keyworded
-  invocation_phrases:
-  - pause the agent
-  - pause research
-  - hold on
-  - wait
-  - pause agent
-  - pause assistant
-  - agent pause
-  examples:
-  - (agent.pause)
-  doc: Pause the running agent loop
+  - (agent.set-threshold)
+  doc: Set confidence thresholds for auto-selection
   tier: intent
 - verb: agent.history
   domain: agent
@@ -118,151 +143,32 @@ verbs:
   - (agent.history)
   doc: Get agent decision and action history for current session
   tier: intent
-- verb: agent.learn
+- verb: agent.confirm
   domain: agent
-  action: learn
+  action: confirm
   aliases:
-  - learn
+  - accept
+  - confirm
   args:
     style: keyworded
-  invocation_phrases:
-  - learn
-  - learn new prompts
-  - activate taught patterns
-  - embed taught phrases
-  - done teaching
-  - learn agent
-  - learn the agent
-  - learn assistant
-  examples:
-  - (agent.learn)
-  doc: Activate taught patterns by generating embeddings for semantic search
-  tier: intent
-- verb: agent.set-mode
-  domain: agent
-  action: set-mode
-  aliases:
-  - set-mode
-  args:
-    style: keyworded
-    required:
-      mode:
-        type: str
-  positional_sugar:
-  - mode
-  invocation_phrases:
-  - set mode agent
-  - set mode the agent
-  - set mode assistant
-  - agent set mode
-  examples:
-  - (agent.set-mode :mode "...")
-  doc: Switch between agent and hybrid modes
-  tier: intent
-- verb: agent.start
-  domain: agent
-  action: start
-  aliases:
-  - enrich
-  - start
-  args:
-    style: keyworded
-    required:
-      task:
-        type: str
     optional:
-      max-iterations:
+      checkpoint-id:
+        type: uuid
+      selected-candidate:
         type: int
-      mode:
-        type: str
-      entity-id:
-        type: entity_name
-  positional_sugar:
-  - task
   invocation_phrases:
-  - start the agent
-  - run research automatically
-  - start autonomous mode
-  - resolve gaps for
-  - enrich
-  - research this entity
-  - start agent
-  - start assistant
+  - confirm
+  - yes, use that one
+  - proceed with
+  - that's correct
+  - accept
+  - confirm agent
+  - confirm the agent
+  - confirm assistant
+  - agent confirm
   examples:
-  - (agent.start :task "...")
-  doc: Start agent mode with a specific task
-  tier: intent
-- verb: agent.set-threshold
-  domain: agent
-  action: set-threshold
-  aliases:
-  - set-threshold
-  args:
-    style: keyworded
-    optional:
-      ambiguous-floor:
-        type: decimal
-      auto-proceed:
-        type: decimal
-  invocation_phrases:
-  - set threshold agent
-  - set threshold the agent
-  - set threshold assistant
-  - agent set threshold
-  examples:
-  - (agent.set-threshold)
-  doc: Set confidence thresholds for auto-selection
-  tier: intent
-- verb: agent.stop
-  domain: agent
-  action: stop
-  aliases:
-  - abort
-  - stop
-  args:
-    style: keyworded
-  invocation_phrases:
-  - stop the agent
-  - cancel research
-  - abort
-  - stop
-  - stop agent
-  - stop assistant
-  - agent stop
-  examples:
-  - (agent.stop)
-  doc: Stop the agent loop completely
-  tier: intent
-- verb: agent.unteach
-  domain: agent
-  action: unteach
-  aliases:
-  - unlearn
-  - unteach
-  args:
-    style: keyworded
-    required:
-      phrase:
-        type: str
-    optional:
-      verb:
-        type: str
-      reason:
-        type: str
-  positional_sugar:
-  - phrase
-  invocation_phrases:
-  - unteach
-  - forget this phrase
-  - remove this mapping
-  - unlearn
-  - unteach agent
-  - unteach the agent
-  - unteach assistant
-  - agent unteach
-  examples:
-  - (agent.unteach :phrase "...")
-  doc: Remove a previously taught phrase→verb mapping
+  - (agent.confirm)
+  doc: Confirm a checkpoint decision
   tier: intent
 - verb: agent.teach
   domain: agent
@@ -295,35 +201,6 @@ verbs:
   - (agent.teach :phrase "..." :verb "...")
   doc: Teach a phrase→verb mapping to improve intent recognition
   tier: intent
-- verb: agent.select
-  domain: agent
-  action: select
-  aliases:
-  - pick
-  - select
-  args:
-    style: keyworded
-    required:
-      candidate-index:
-        type: int
-    optional:
-      checkpoint-id:
-        type: uuid
-  positional_sugar:
-  - candidate-index
-  invocation_phrases:
-  - select option
-  - use the first one
-  - use the second one
-  - pick
-  - select agent
-  - select the agent
-  - select assistant
-  - agent select
-  examples:
-  - (agent.select :candidate-index "...")
-  doc: Select a specific candidate from checkpoint options
-  tier: intent
 - verb: agent.reject
   domain: agent
   action: reject
@@ -335,10 +212,10 @@ verbs:
   args:
     style: keyworded
     optional:
-      reason:
-        type: str
       checkpoint-id:
         type: uuid
+      reason:
+        type: str
   invocation_phrases:
   - reject
   - no, skip this
@@ -348,9 +225,31 @@ verbs:
   - reject the agent
   - decline agent
   - deny agent
+  - reject assistant
+  - agent reject
   examples:
   - (agent.reject)
   doc: Reject a checkpoint and skip this decision
+  tier: intent
+- verb: agent.pause
+  domain: agent
+  action: pause
+  aliases:
+  - pause
+  - wait
+  args:
+    style: keyworded
+  invocation_phrases:
+  - pause the agent
+  - pause research
+  - hold on
+  - wait
+  - pause agent
+  - pause assistant
+  - agent pause
+  examples:
+  - (agent.pause)
+  doc: Pause the running agent loop
   tier: intent
 - verb: agent.resume
   domain: agent
@@ -371,3 +270,109 @@ verbs:
   - (agent.resume)
   doc: Resume a paused agent loop
   tier: intent
+- verb: agent.start
+  domain: agent
+  action: start
+  aliases:
+  - enrich
+  - start
+  args:
+    style: keyworded
+    required:
+      task:
+        type: str
+    optional:
+      entity-id:
+        type: entity_name
+      mode:
+        type: str
+      max-iterations:
+        type: int
+  positional_sugar:
+  - task
+  invocation_phrases:
+  - start the agent
+  - run research automatically
+  - start autonomous mode
+  - resolve gaps for
+  - enrich
+  - research this entity
+  - start agent
+  - start assistant
+  - agent start
+  examples:
+  - (agent.start :task "...")
+  doc: Start agent mode with a specific task
+  tier: intent
+- verb: agent.unteach
+  domain: agent
+  action: unteach
+  aliases:
+  - unlearn
+  - unteach
+  args:
+    style: keyworded
+    required:
+      phrase:
+        type: str
+    optional:
+      verb:
+        type: str
+      reason:
+        type: str
+  positional_sugar:
+  - phrase
+  invocation_phrases:
+  - unteach
+  - forget this phrase
+  - remove this mapping
+  - unlearn
+  - unteach agent
+  - unteach the agent
+  - unteach assistant
+  - agent unteach
+  examples:
+  - (agent.unteach :phrase "...")
+  doc: Remove a previously taught phrase→verb mapping
+  tier: intent
+- verb: agent.learn
+  domain: agent
+  action: learn
+  aliases:
+  - learn
+  args:
+    style: keyworded
+  invocation_phrases:
+  - learn
+  - learn new prompts
+  - activate taught patterns
+  - embed taught phrases
+  - done teaching
+  - learn agent
+  - learn the agent
+  - learn assistant
+  - agent learn
+  examples:
+  - (agent.learn)
+  doc: Activate taught patterns by generating embeddings for semantic search
+  tier: intent
+- verb: agent.status
+  domain: agent
+  action: status
+  aliases:
+  - progress
+  - status
+  args:
+    style: keyworded
+  invocation_phrases:
+  - agent status
+  - what is the agent doing
+  - research status
+  - progress
+  - status agent
+  - status the agent
+  - status assistant
+  examples:
+  - (agent.status)
+  doc: Get current agent status
+  tier: diagnostics

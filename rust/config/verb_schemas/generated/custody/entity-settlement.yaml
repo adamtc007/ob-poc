@@ -15,11 +15,11 @@ verbs:
       bic:
         type: str
     optional:
-      alert-id:
-        type: str
       lei:
         type: str
       ctm-id:
+        type: str
+      alert-id:
         type: str
   positional_sugar:
   - entity-id
@@ -47,6 +47,10 @@ verbs:
       effective-date:
         type: date
     optional:
+      security-type:
+        type: entity_name
+      currency:
+        type: str
       safekeeping-account:
         type: str
       source:
@@ -55,15 +59,11 @@ verbs:
         - ALERT
         - MANUAL
         - CTM
-      market:
-        type: entity_name
       source-reference:
         type: str
-      security-type:
-        type: entity_name
-      currency:
-        type: str
       instrument-class:
+        type: entity_name
+      market:
         type: entity_name
   positional_sugar:
   - entity-id

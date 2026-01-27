@@ -2,72 +2,6 @@ version: '2.0'
 domain: instrument-class
 description: Instrument class with industry taxonomy mappings
 verbs:
-- verb: instrument-class.list
-  domain: instrument-class
-  action: list
-  aliases:
-  - get all
-  - list
-  - show
-  args:
-    style: keyworded
-    optional:
-      isda-asset-class:
-        type: str
-      requires-isda:
-        type: bool
-      smpg-group:
-        type: str
-  invocation_phrases:
-  - list instrument-class
-  - list the instrument-class
-  - show instrument-class
-  - get all instrument-class
-  - instrument-class list
-  examples:
-  - (instrument-class.list)
-  doc: List instrument classes with filters
-  tier: reference
-- verb: instrument-class.ensure
-  domain: instrument-class
-  action: ensure
-  aliases:
-  - ensure
-  args:
-    style: keyworded
-    required:
-      code:
-        type: str
-      name:
-        type: str
-      settlement-cycle:
-        type: str
-    optional:
-      isda-asset-class:
-        type: str
-      swift-family:
-        type: str
-      cfi-group:
-        type: str
-      cfi-category:
-        type: str
-      smpg-group:
-        type: str
-      requires-isda:
-        type: bool
-      parent:
-        type: entity_name
-  positional_sugar:
-  - code
-  - name
-  invocation_phrases:
-  - ensure instrument-class
-  - ensure the instrument-class
-  - instrument-class ensure
-  examples:
-  - (instrument-class.ensure :code "..." :name "..." :settlement-cycle "...")
-  doc: Create or update instrument class with CFI/SMPG/ISDA mappings
-  tier: intent
 - verb: instrument-class.read
   domain: instrument-class
   action: read
@@ -92,3 +26,69 @@ verbs:
   - (instrument-class.read :code "...")
   doc: Read instrument class by code
   tier: reference
+- verb: instrument-class.list
+  domain: instrument-class
+  action: list
+  aliases:
+  - get all
+  - list
+  - show
+  args:
+    style: keyworded
+    optional:
+      smpg-group:
+        type: str
+      isda-asset-class:
+        type: str
+      requires-isda:
+        type: bool
+  invocation_phrases:
+  - list instrument-class
+  - list the instrument-class
+  - show instrument-class
+  - get all instrument-class
+  - instrument-class list
+  examples:
+  - (instrument-class.list)
+  doc: List instrument classes with filters
+  tier: reference
+- verb: instrument-class.ensure
+  domain: instrument-class
+  action: ensure
+  aliases:
+  - ensure
+  args:
+    style: keyworded
+    required:
+      settlement-cycle:
+        type: str
+      name:
+        type: str
+      code:
+        type: str
+    optional:
+      parent:
+        type: entity_name
+      smpg-group:
+        type: str
+      isda-asset-class:
+        type: str
+      swift-family:
+        type: str
+      requires-isda:
+        type: bool
+      cfi-group:
+        type: str
+      cfi-category:
+        type: str
+  positional_sugar:
+  - code
+  - name
+  invocation_phrases:
+  - ensure instrument-class
+  - ensure the instrument-class
+  - instrument-class ensure
+  examples:
+  - (instrument-class.ensure :code "..." :name "..." :settlement-cycle "...")
+  doc: Create or update instrument class with CFI/SMPG/ISDA mappings
+  tier: intent

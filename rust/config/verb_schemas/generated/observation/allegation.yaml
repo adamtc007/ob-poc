@@ -10,25 +10,25 @@ verbs:
   args:
     style: keyworded
     required:
+      entity-id:
+        type: entity_name
       attribute-id:
         type: entity_name
       value:
         type: json
-      cbu-id:
-        type: entity_name
-      entity-id:
-        type: entity_name
       source:
         type: str
+      cbu-id:
+        type: entity_name
     optional:
-      source-reference:
-        type: str
-      display-value:
-        type: str
       workstream-id:
         type: entity_name
+      source-reference:
+        type: str
       case-id:
         type: entity_name
+      display-value:
+        type: str
   positional_sugar:
   - cbu-id
   - entity-id
@@ -40,26 +40,34 @@ verbs:
   - (allegation.record :cbu-id "..." :entity-id "..." :attribute-id "..." :value "..." :source "...")
   doc: Record a client allegation about an entity attribute
   tier: intent
-- verb: allegation.list-pending
+- verb: allegation.verify
   domain: allegation
-  action: list-pending
+  action: verify
   aliases:
-  - list-pending
+  - verify
   args:
     style: keyworded
     required:
-      cbu-id:
+      observation-id:
         type: entity_name
+      allegation-id:
+        type: entity_name
+    optional:
+      result:
+        type: str
+      notes:
+        type: str
   positional_sugar:
-  - cbu-id
+  - allegation-id
+  - observation-id
   invocation_phrases:
-  - list pending allegation
-  - list pending the allegation
-  - allegation list pending
+  - verify allegation
+  - verify the allegation
+  - allegation verify
   examples:
-  - (allegation.list-pending :cbu-id "...")
-  doc: List pending allegations for a CBU
-  tier: reference
+  - (allegation.verify :allegation-id "..." :observation-id "...")
+  doc: Mark allegation as verified by an observation
+  tier: intent
 - verb: allegation.contradict
   domain: allegation
   action: contradict
@@ -68,10 +76,10 @@ verbs:
   args:
     style: keyworded
     required:
-      notes:
-        type: str
       observation-id:
         type: entity_name
+      notes:
+        type: str
       allegation-id:
         type: entity_name
     optional:
@@ -87,59 +95,6 @@ verbs:
   examples:
   - (allegation.contradict :allegation-id "..." :observation-id "..." :notes "...")
   doc: Mark allegation as contradicted by evidence
-  tier: intent
-- verb: allegation.verify
-  domain: allegation
-  action: verify
-  aliases:
-  - verify
-  args:
-    style: keyworded
-    required:
-      allegation-id:
-        type: entity_name
-      observation-id:
-        type: entity_name
-    optional:
-      notes:
-        type: str
-      result:
-        type: str
-  positional_sugar:
-  - allegation-id
-  - observation-id
-  invocation_phrases:
-  - verify allegation
-  - verify the allegation
-  - allegation verify
-  examples:
-  - (allegation.verify :allegation-id "..." :observation-id "...")
-  doc: Mark allegation as verified by an observation
-  tier: intent
-- verb: allegation.mark-partial
-  domain: allegation
-  action: mark-partial
-  aliases:
-  - mark-partial
-  args:
-    style: keyworded
-    required:
-      notes:
-        type: str
-      allegation-id:
-        type: entity_name
-      observation-id:
-        type: entity_name
-  positional_sugar:
-  - allegation-id
-  - observation-id
-  invocation_phrases:
-  - mark partial allegation
-  - mark partial the allegation
-  - allegation mark partial
-  examples:
-  - (allegation.mark-partial :allegation-id "..." :observation-id "..." :notes "...")
-  doc: Mark allegation as partially verified
   tier: intent
 - verb: allegation.list-by-entity
   domain: allegation
@@ -163,4 +118,49 @@ verbs:
   examples:
   - (allegation.list-by-entity :entity-id "...")
   doc: List allegations for an entity
+  tier: reference
+- verb: allegation.mark-partial
+  domain: allegation
+  action: mark-partial
+  aliases:
+  - mark-partial
+  args:
+    style: keyworded
+    required:
+      notes:
+        type: str
+      observation-id:
+        type: entity_name
+      allegation-id:
+        type: entity_name
+  positional_sugar:
+  - allegation-id
+  - observation-id
+  invocation_phrases:
+  - mark partial allegation
+  - mark partial the allegation
+  - allegation mark partial
+  examples:
+  - (allegation.mark-partial :allegation-id "..." :observation-id "..." :notes "...")
+  doc: Mark allegation as partially verified
+  tier: intent
+- verb: allegation.list-pending
+  domain: allegation
+  action: list-pending
+  aliases:
+  - list-pending
+  args:
+    style: keyworded
+    required:
+      cbu-id:
+        type: entity_name
+  positional_sugar:
+  - cbu-id
+  invocation_phrases:
+  - list pending allegation
+  - list pending the allegation
+  - allegation list pending
+  examples:
+  - (allegation.list-pending :cbu-id "...")
+  doc: List pending allegations for a CBU
   tier: reference
