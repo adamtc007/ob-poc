@@ -9,8 +9,9 @@ domains:
       - portfolio
     verbs:
       create:
-        description: Create a new Client Business Unit (idempotent by name)
-        behavior: crud
+        description: Create a new Client Business Unit (idempotent by fund-entity-id if provided)
+        behavior: plugin
+        handler: CbuCreateOp
         invocation_phrases:
           - create CBU
           - create client
@@ -26,23 +27,14 @@ domains:
         produces:
           type: cbu
           resolved: false
-        crud:
-          operation: upsert
-          table: cbus
-          schema: ob-poc
-          returning: cbu_id
-          conflict_keys:
-            - name
-            - jurisdiction
         args:
           - name: name
             type: string
             required: true
-            maps_to: name
+            description: CBU name (typically the fund name)
           - name: jurisdiction
             type: string
             required: true
-            maps_to: jurisdiction
             description: Jurisdiction code (e.g., US, GB, LU, IE, KY)
             lookup:
               table: master_jurisdictions
@@ -50,34 +42,57 @@ domains:
               schema: ob-poc
               search_key: jurisdiction_code
               primary_key: jurisdiction_code
-              resolution_mode: reference # small static table - autocomplete
-          - name: client-type
-            type: string
-            required: false
-            maps_to: client_type
-          - name: nature-purpose
-            type: string
-            required: false
-            maps_to: nature_purpose
-          - name: description
-            type: string
-            required: false
-            maps_to: description
-          - name: commercial-client-entity-id
+              resolution_mode: reference
+          - name: fund-entity-id
             type: uuid
             required: false
-            maps_to: commercial_client_entity_id
+            description: Fund/SPV entity to link as ASSET_OWNER (idempotency key - skips if already on a CBU)
             lookup:
               table: entities
               entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-              resolution_mode: entity # growing table - search modal
+              resolution_mode: entity
+          - name: client-type
+            type: string
+            required: false
+            default: "FUND"
+            description: Client type (FUND, CORPORATE, etc.)
+          - name: nature-purpose
+            type: string
+            required: false
+          - name: description
+            type: string
+            required: false
+          - name: commercial-client-entity-id
+            type: uuid
+            required: false
+            description: Commercial client entity (apex/parent)
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
+          - name: manco-entity-id
+            type: uuid
+            required: false
+            description: Management company entity to assign MANAGEMENT_COMPANY role
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+              resolution_mode: entity
         returns:
-          type: uuid
-          name: cbu_id
-          capture: true
+          type: record
+          fields:
+            - cbu_id
+            - created
+            - skipped_reason
       read:
         description: Read a CBU by ID
         behavior: crud
@@ -800,9 +815,9 @@ domains:
         returns:
           type: record_set
 
-      # BULK CBU CREATION FROM CLIENT GROUP
+      # BULK CBU CREATION FROM CLIENT GROUP (DSL GENERATOR / MACRO)
       create-from-client-group:
-        description: Create CBUs from entities in a client group with GLEIF category and role filters
+        description: Generate DSL batch to create CBUs from client group entities (stages in runbook)
         invocation_phrases:
           - "create CBUs from client group"
           - "bulk create CBUs for funds"
@@ -810,6 +825,8 @@ domains:
           - "create CBUs from research"
           - "convert entities to CBUs"
           - "create CBUs from GLEIF funds"
+          - "onboard allianz funds"
+          - "create cbus for allianz"
         behavior: plugin
         handler: CbuCreateFromClientGroupOp
         metadata:
@@ -817,7 +834,7 @@ domains:
           source_of_truth: operational
           scope: global
           noun: cbu
-          tags: [bulk, lifecycle, write, client-group, onboarding, gleif]
+          tags: [bulk, lifecycle, write, client-group, onboarding, gleif, macro]
         args:
           - name: group-id
             type: uuid
@@ -860,31 +877,21 @@ domains:
               schema: ob-poc
               search_key: name
               primary_key: entity_id
-          - name: im-entity-id
-            type: uuid
-            required: false
-            description: Entity to assign INVESTMENT_MANAGER role on all created CBUs
-            lookup:
-              table: entities
-              entity_type: entity
-              schema: ob-poc
-              search_key: name
-              primary_key: entity_id
           - name: limit
             type: integer
             required: false
             default: 100
-            description: Maximum CBUs to create in one call
+            description: Maximum CBUs to generate in one call
           - name: dry-run
             type: boolean
             required: false
             default: false
-            description: If true, report what would be created without making changes
+            description: If true, preview DSL without returning for staging
         returns:
           type: record
           fields:
-            - cbus_created
-            - roles_assigned
-            - entities_processed
-            - skipped_existing
+            - entities_found
+            - dsl_batch
+            - combined_dsl
+            - message
             - gleif_category

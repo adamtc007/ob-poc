@@ -383,42 +383,53 @@ impl CustomOperation for SessionLoadClusterOp {
         .await?
         .unwrap_or_else(|| "Unknown".to_string());
 
-        // Find all CBUs under this apex entity via ownership hierarchy:
-        // 1. Traverse control_edges to find all subsidiaries (including ManCos)
-        // 2. Find cbu_groups where manco_entity_id is in that tree
-        // 3. Find CBUs via cbu_group_members
+        // Find all CBUs for this client group via client_group_entity.cbu_id
         //
-        // Path: apex → control_edges → ManCo → cbu_groups → cbu_group_members → CBUs
-        let cbu_ids: Vec<Uuid> = sqlx::query_scalar!(
-            r#"
-            WITH RECURSIVE entity_tree AS (
-                -- Start with the apex entity
-                SELECT entity_id
-                FROM "ob-poc".entities
-                WHERE entity_id = $1
+        // Path: client_group → client_group_entity (cbu_id) → cbus
+        //
+        // The cbu_id is set by cbu.create when linking a fund entity.
+        // This is the fast shorthand lookup - no tree walking required.
+        //
+        // We need the client_group_id to query. If we only have apex_entity_id,
+        // we reverse-lookup the group via client_group_anchor.
+        let client_group_id: Option<Uuid> = get_optional_uuid(verb_call, "client", ctx);
 
-                UNION ALL
-
-                -- Find entities controlled by entities in our tree
-                -- via control_edges: from_entity_id (owner) → to_entity_id (owned)
-                SELECT ce.to_entity_id
-                FROM "ob-poc".control_edges ce
-                JOIN entity_tree et ON ce.from_entity_id = et.entity_id
-                WHERE (ce.percentage IS NULL OR ce.percentage >= 50)  -- Majority-controlled or unknown %
-                  AND ce.end_date IS NULL  -- Only active edges
+        let group_id: Uuid = if let Some(gid) = client_group_id {
+            gid
+        } else {
+            // Reverse lookup: apex_entity_id → client_group via anchor
+            sqlx::query_scalar(
+                r#"
+                SELECT group_id
+                FROM "ob-poc".client_group_anchor
+                WHERE anchor_entity_id = $1
+                LIMIT 1
+                "#,
             )
-            SELECT DISTINCT c.cbu_id as "cbu_id!"
-            FROM "ob-poc".cbus c
-            JOIN "ob-poc".cbu_group_members gm ON gm.cbu_id = c.cbu_id
-                AND (gm.effective_to IS NULL OR gm.effective_to > CURRENT_DATE)
-            JOIN "ob-poc".cbu_groups g ON g.group_id = gm.group_id
-                AND g.effective_to IS NULL
-            WHERE g.manco_entity_id IN (SELECT entity_id FROM entity_tree)
+            .bind(apex_entity_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No client group found for anchor entity {} - use client_group_entity for CBU lookup",
+                    apex_entity_id
+                )
+            })?
+        };
+
+        let cbu_ids: Vec<Uuid> = sqlx::query_scalar(
+            r#"
+            SELECT DISTINCT cge.cbu_id
+            FROM "ob-poc".client_group_entity cge
+            JOIN "ob-poc".cbus c ON c.cbu_id = cge.cbu_id
+            WHERE cge.group_id = $1
+              AND cge.cbu_id IS NOT NULL
+              AND cge.membership_type NOT IN ('historical', 'rejected')
               AND ($2::text IS NULL OR c.jurisdiction = $2)
             "#,
-            apex_entity_id,
-            jurisdiction.as_deref()
         )
+        .bind(group_id)
+        .bind(jurisdiction.as_deref())
         .fetch_all(pool)
         .await?;
 

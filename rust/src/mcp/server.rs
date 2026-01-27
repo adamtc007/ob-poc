@@ -11,7 +11,6 @@ use super::handlers::ToolHandlers;
 use super::protocol::*;
 use super::tools::get_tools;
 use crate::agent::learning::embedder::SharedEmbedder;
-use crate::agent::learning::warmup::SharedLearnedData;
 
 /// MCP Server
 pub struct McpServer {
@@ -19,28 +18,12 @@ pub struct McpServer {
 }
 
 impl McpServer {
-    /// Create a new MCP server with database pool
-    pub fn new(pool: PgPool) -> Self {
+    /// Create a new MCP server with database pool and embedder (REQUIRED)
+    ///
+    /// There is only ONE path - all MCP tools require the Candle embedder.
+    pub fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
         Self {
-            handlers: ToolHandlers::new(pool),
-        }
-    }
-
-    /// Create a new MCP server with database pool and learned data
-    pub fn with_learned_data(pool: PgPool, learned_data: SharedLearnedData) -> Self {
-        Self {
-            handlers: ToolHandlers::with_learned_data(pool, learned_data),
-        }
-    }
-
-    /// Create a new MCP server with database pool, learned data, and embedder (full semantic)
-    pub fn with_learned_data_and_embedder(
-        pool: PgPool,
-        learned_data: SharedLearnedData,
-        embedder: SharedEmbedder,
-    ) -> Self {
-        Self {
-            handlers: ToolHandlers::with_learned_data_and_embedder(pool, learned_data, embedder),
+            handlers: ToolHandlers::new(pool, embedder),
         }
     }
 

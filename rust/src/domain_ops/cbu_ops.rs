@@ -18,6 +18,238 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 // ============================================================================
+// CBU Create (with entity-based idempotency)
+// ============================================================================
+
+/// Create a new CBU with optional fund entity linking
+///
+/// Idempotency:
+/// - If :fund-entity-id is provided, checks if that entity is already linked to ANY CBU
+///   as ASSET_OWNER. If so, returns the existing CBU (skipped).
+/// - If no :fund-entity-id, uses name+jurisdiction as fallback idempotency key.
+///
+/// Entity Linking:
+/// - If :fund-entity-id provided, links entity to CBU with ASSET_OWNER role
+/// - If :manco-entity-id provided, links entity with MANAGEMENT_COMPANY role
+#[register_custom_op]
+pub struct CbuCreateOp;
+
+#[async_trait]
+impl CustomOperation for CbuCreateOp {
+    fn domain(&self) -> &'static str {
+        "cbu"
+    }
+    fn verb(&self) -> &'static str {
+        "create"
+    }
+    fn rationale(&self) -> &'static str {
+        "Entity-based idempotency: skips if fund entity already on a CBU"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let name = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "name")
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| anyhow::anyhow!("cbu.create: Missing required argument :name"))?;
+
+        let jurisdiction = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "jurisdiction")
+            .and_then(|a| a.value.as_string())
+            .ok_or_else(|| {
+                anyhow::anyhow!("cbu.create: Missing required argument :jurisdiction")
+            })?;
+
+        let fund_entity_id = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "fund-entity-id")
+            .and_then(|a| a.value.as_uuid());
+
+        let manco_entity_id = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "manco-entity-id")
+            .and_then(|a| a.value.as_uuid());
+
+        let client_type =
+            extract_string_opt(verb_call, "client-type").unwrap_or_else(|| "FUND".to_string());
+
+        let nature_purpose = extract_string_opt(verb_call, "nature-purpose");
+        let description = extract_string_opt(verb_call, "description");
+        let commercial_client_entity_id = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "commercial-client-entity-id")
+            .and_then(|a| a.value.as_uuid());
+
+        // =====================================================================
+        // Step 1: Entity-based idempotency check (if fund-entity-id provided)
+        // =====================================================================
+        if let Some(fund_id) = fund_entity_id {
+            // Check if this entity is already linked to a CBU as ASSET_OWNER
+            let existing: Option<(Uuid, String)> = sqlx::query_as(
+                r#"
+                SELECT c.cbu_id, c.name
+                FROM "ob-poc".cbu_entity_roles cer
+                JOIN "ob-poc".cbus c ON c.cbu_id = cer.cbu_id
+                JOIN "ob-poc".roles r ON r.role_id = cer.role_id
+                WHERE cer.entity_id = $1
+                  AND r.name = 'ASSET_OWNER'
+                  AND (cer.effective_to IS NULL OR cer.effective_to > CURRENT_DATE)
+                LIMIT 1
+                "#,
+            )
+            .bind(fund_id)
+            .fetch_optional(pool)
+            .await?;
+
+            if let Some((existing_cbu_id, existing_cbu_name)) = existing {
+                // Entity already on a CBU - return existing, don't create
+                return Ok(ExecutionResult::Record(serde_json::json!({
+                    "cbu_id": existing_cbu_id,
+                    "name": existing_cbu_name,
+                    "created": false,
+                    "skipped_reason": format!("Entity {} already linked to CBU '{}'", fund_id, existing_cbu_name)
+                })));
+            }
+        }
+
+        // =====================================================================
+        // Step 2: Create CBU (upsert by name+jurisdiction as fallback)
+        // =====================================================================
+        let (cbu_id, is_new): (Uuid, bool) = sqlx::query_as(
+            r#"
+            INSERT INTO "ob-poc".cbus (name, jurisdiction, client_type, nature_purpose, description, commercial_client_entity_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (name, jurisdiction)
+            DO UPDATE SET updated_at = NOW()
+            RETURNING cbu_id, (xmax = 0) as is_insert
+            "#,
+        )
+        .bind(name)
+        .bind(jurisdiction)
+        .bind(&client_type)
+        .bind(&nature_purpose)
+        .bind(&description)
+        .bind(commercial_client_entity_id)
+        .fetch_one(pool)
+        .await?;
+
+        // =====================================================================
+        // Step 3: Link fund entity as ASSET_OWNER (if provided and CBU is new)
+        // =====================================================================
+        if let Some(fund_id) = fund_entity_id {
+            // Get ASSET_OWNER role_id
+            let asset_owner_role_id: Option<Uuid> = sqlx::query_scalar(
+                r#"SELECT role_id FROM "ob-poc".roles WHERE name = 'ASSET_OWNER'"#,
+            )
+            .fetch_optional(pool)
+            .await?;
+
+            if let Some(role_id) = asset_owner_role_id {
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (cbu_id, entity_id, role_id) DO NOTHING
+                    "#,
+                )
+                .bind(cbu_id)
+                .bind(fund_id)
+                .bind(role_id)
+                .execute(pool)
+                .await?;
+            }
+
+            // =====================================================================
+            // Step 3b: Link CBU to client_group_entity (if entity is in a group)
+            // =====================================================================
+            // This enables fast lookup via session.load-cluster without tree walking.
+            // Sets cbu_id on client_group_entity for direct CBU → group mapping.
+            sqlx::query(
+                r#"
+                UPDATE "ob-poc".client_group_entity
+                SET cbu_id = $1, updated_at = NOW()
+                WHERE entity_id = $2
+                  AND membership_type NOT IN ('historical', 'rejected')
+                  AND cbu_id IS NULL
+                "#,
+            )
+            .bind(cbu_id)
+            .bind(fund_id)
+            .execute(pool)
+            .await?;
+        }
+
+        // =====================================================================
+        // Step 4: Link manco entity as MANAGEMENT_COMPANY (if provided)
+        // =====================================================================
+        if let Some(manco_id) = manco_entity_id {
+            let manco_role_id: Option<Uuid> = sqlx::query_scalar(
+                r#"SELECT role_id FROM "ob-poc".roles WHERE name = 'MANAGEMENT_COMPANY'"#,
+            )
+            .fetch_optional(pool)
+            .await?;
+
+            if let Some(role_id) = manco_role_id {
+                sqlx::query(
+                    r#"
+                    INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (cbu_id, entity_id, role_id) DO NOTHING
+                    "#,
+                )
+                .bind(cbu_id)
+                .bind(manco_id)
+                .bind(role_id)
+                .execute(pool)
+                .await?;
+            }
+        }
+
+        // Bind result to context if :as provided
+        if let Some(binding) = &verb_call.binding {
+            ctx.bind(binding, cbu_id);
+        }
+
+        let skipped_reason: Option<&str> = if is_new {
+            None
+        } else {
+            Some("CBU with same name+jurisdiction already exists")
+        };
+
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "cbu_id": cbu_id,
+            "name": name,
+            "jurisdiction": jurisdiction,
+            "created": is_new,
+            "skipped_reason": skipped_reason
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Record(serde_json::json!({
+            "error": "Database feature required for cbu.create"
+        })))
+    }
+}
+
+// ============================================================================
 // CBU Product Assignment
 // ============================================================================
 
@@ -1466,11 +1698,7 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
             .iter()
             .find(|a| a.key == "manco-entity-id")
             .and_then(|a| a.value.as_uuid());
-        let im_entity_id = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "im-entity-id")
-            .and_then(|a| a.value.as_uuid());
+        // Note: im-entity-id removed - can be added to cbu.create if needed
         let limit = extract_int_opt(verb_call, "limit").unwrap_or(100) as i64;
         let dry_run = extract_bool_opt(verb_call, "dry-run").unwrap_or(false);
 
@@ -1524,21 +1752,42 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
             )
             .collect();
 
-        if dry_run {
-            let entity_info: Vec<serde_json::Value> = entities
-                .iter()
-                .map(|ent| {
-                    serde_json::json!({
-                        "entity_id": ent.entity_id,
-                        "name": ent.name,
-                        "jurisdiction": ent.jurisdiction.as_deref().unwrap_or(&default_jurisdiction),
-                        "gleif_category": ent.gleif_category,
-                        "group_role": ent.group_role,
-                        "cbu_role_mapping": map_to_cbu_role(&ent.gleif_category, &ent.group_role),
-                    })
-                })
-                .collect();
+        // Generate DSL statements for each entity (don't execute directly)
+        // This allows the batch to be staged in the runbook for user review
+        let mut dsl_statements: Vec<String> = Vec::new();
+        let mut entity_info: Vec<serde_json::Value> = Vec::new();
 
+        for ent in &entities {
+            let jurisdiction = ent.jurisdiction.as_deref().unwrap_or(&default_jurisdiction);
+
+            // Build the cbu.create DSL statement with :fund-entity-id for idempotency
+            let mut dsl = format!(
+                "(cbu.create :name \"{}\" :jurisdiction \"{}\" :fund-entity-id \"{}\"",
+                ent.name.replace('\"', "\\\""), // Escape quotes in name
+                jurisdiction,
+                ent.entity_id
+            );
+
+            // Add manco if provided
+            if let Some(manco_id) = manco_entity_id {
+                dsl.push_str(&format!(" :manco-entity-id \"{}\"", manco_id));
+            }
+
+            dsl.push(')');
+            dsl_statements.push(dsl.clone());
+
+            entity_info.push(serde_json::json!({
+                "entity_id": ent.entity_id,
+                "name": ent.name,
+                "jurisdiction": jurisdiction,
+                "gleif_category": ent.gleif_category,
+                "group_role": ent.group_role,
+                "dsl": dsl,
+            }));
+        }
+
+        if dry_run {
+            // Dry run: just return what would be generated
             return Ok(ExecutionResult::Record(serde_json::json!({
                 "dry_run": true,
                 "group_id": group_id,
@@ -1547,71 +1796,23 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
                 "jurisdiction_filter": jurisdiction_filter,
                 "entities_found": entities.len(),
                 "entities": entity_info,
+                "dsl_batch": dsl_statements,
             })));
         }
 
-        let mut cbus_created = 0i64;
-        let mut roles_assigned = 0i64;
-        let mut skipped_existing = 0i64;
-
-        // Pre-fetch role IDs for CBU entity role assignment
-        let role_ids = fetch_cbu_role_ids(pool).await?;
-
-        for ent in entities {
-            let jurisdiction = ent.jurisdiction.as_deref().unwrap_or(&default_jurisdiction);
-
-            // Try to create CBU (upsert by name+jurisdiction)
-            let result: (Uuid, bool) = sqlx::query_as(
-                r#"
-                INSERT INTO "ob-poc".cbus (name, jurisdiction, client_type)
-                VALUES ($1, $2, 'FUND')
-                ON CONFLICT (name, jurisdiction)
-                DO UPDATE SET updated_at = NOW()
-                RETURNING cbu_id, (xmax = 0) as is_insert
-                "#,
-            )
-            .bind(&ent.name)
-            .bind(jurisdiction)
-            .fetch_one(pool)
-            .await?;
-
-            let (cbu_id, is_new) = result;
-
-            if is_new {
-                cbus_created += 1;
-            } else {
-                skipped_existing += 1;
-            }
-
-            // Map GLEIF category/role to CBU entity role and assign
-            let cbu_role = map_to_cbu_role(&ent.gleif_category, &ent.group_role);
-            if let Some(role_id) = role_ids.get(&cbu_role) {
-                roles_assigned += assign_cbu_role(pool, cbu_id, ent.entity_id, *role_id).await?;
-            }
-
-            // Assign MANAGEMENT_COMPANY role if manco provided
-            if let Some(manco_id) = manco_entity_id {
-                if let Some(role_id) = role_ids.get("MANAGEMENT_COMPANY") {
-                    roles_assigned += assign_cbu_role(pool, cbu_id, manco_id, *role_id).await?;
-                }
-            }
-
-            // Assign INVESTMENT_MANAGER role if im provided
-            if let Some(im_id) = im_entity_id {
-                if let Some(role_id) = role_ids.get("INVESTMENT_MANAGER") {
-                    roles_assigned += assign_cbu_role(pool, cbu_id, im_id, *role_id).await?;
-                }
-            }
-        }
+        // Return DSL batch for staging (macro behavior)
+        // The caller (agent) should stage these in the runbook
+        let combined_dsl = dsl_statements.join("\n");
 
         Ok(ExecutionResult::Record(serde_json::json!({
             "group_id": group_id,
             "gleif_category": gleif_category,
             "role_filter": role_filter,
             "jurisdiction_filter": jurisdiction_filter,
-            "cbus_created": cbus_created,
-            "skipped_existing": skipped_existing,
-            "roles_assigned": roles_assigned,
+            "entities_found": entities.len(),
+            "dsl_batch": dsl_statements,
+            "combined_dsl": combined_dsl,
+            "message": format!("Generated {} cbu.create statements. Stage in runbook and say 'run' to execute.", entities.len())
         })))
     }
 
@@ -1627,70 +1828,5 @@ impl CustomOperation for CbuCreateFromClientGroupOp {
     }
 }
 
-/// Map GLEIF category and group role to the appropriate CBU entity role
-///
-/// Mapping logic:
-/// - GLEIF category FUND → ASSET_OWNER (the fund entity owns its CBU)
-/// - Group role ULTIMATE_PARENT → HOLDING_COMPANY
-/// - Group role SUBSIDIARY with no GLEIF category → SUBSIDIARY (pass-through)
-/// - Default → ASSET_OWNER (safe default for onboarding)
-fn map_to_cbu_role(gleif_category: &Option<String>, group_role: &Option<String>) -> String {
-    // GLEIF category takes precedence - FUND entities are asset owners
-    if let Some(cat) = gleif_category {
-        if cat.eq_ignore_ascii_case("FUND") {
-            return "ASSET_OWNER".to_string();
-        }
-    }
-
-    // Map corporate hierarchy roles
-    if let Some(role) = group_role {
-        match role.to_uppercase().as_str() {
-            "ULTIMATE_PARENT" => return "HOLDING_COMPANY".to_string(),
-            "SUBSIDIARY" => return "SUBSIDIARY".to_string(),
-            _ => {}
-        }
-    }
-
-    // Default to ASSET_OWNER for fund onboarding
-    "ASSET_OWNER".to_string()
-}
-
-/// Pre-fetch commonly used CBU role IDs
-#[cfg(feature = "database")]
-async fn fetch_cbu_role_ids(pool: &PgPool) -> Result<std::collections::HashMap<String, Uuid>> {
-    let roles: Vec<(String, Uuid)> = sqlx::query_as(
-        r#"
-        SELECT name, role_id FROM "ob-poc".roles
-        WHERE name IN ('ASSET_OWNER', 'MANAGEMENT_COMPANY', 'INVESTMENT_MANAGER', 'HOLDING_COMPANY', 'SUBSIDIARY')
-        "#,
-    )
-    .fetch_all(pool)
-    .await?;
-
-    Ok(roles.into_iter().collect())
-}
-
-/// Assign a role to an entity on a CBU (idempotent via ON CONFLICT DO NOTHING)
-#[cfg(feature = "database")]
-async fn assign_cbu_role(
-    pool: &PgPool,
-    cbu_id: Uuid,
-    entity_id: Uuid,
-    role_id: Uuid,
-) -> Result<i64> {
-    let rows = sqlx::query(
-        r#"
-        INSERT INTO "ob-poc".cbu_entity_roles (cbu_id, entity_id, role_id)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (cbu_id, entity_id, role_id) DO NOTHING
-        "#,
-    )
-    .bind(cbu_id)
-    .bind(entity_id)
-    .bind(role_id)
-    .execute(pool)
-    .await?
-    .rows_affected();
-
-    Ok(rows as i64)
-}
+// Note: map_to_cbu_role, fetch_cbu_role_ids, assign_cbu_role removed
+// Role assignment is now handled by cbu.create plugin via :fund-entity-id arg

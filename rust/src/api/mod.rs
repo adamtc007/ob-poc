@@ -82,9 +82,7 @@ pub use attribute_routes::create_attribute_router;
 pub use entity_routes::create_entity_router;
 
 #[cfg(feature = "server")]
-pub use agent_routes::{
-    create_agent_router, create_agent_router_with_semantic, create_agent_router_with_sessions,
-};
+pub use agent_routes::create_agent_router_with_semantic;
 
 #[cfg(feature = "server")]
 pub use dsl_viewer_routes::create_dsl_viewer_router;
@@ -102,9 +100,7 @@ pub use session_manager::{SessionManager, SessionSnapshot, SessionWatcher};
 pub use intent::{AssembledDsl, IntentSequence, VerbIntent};
 
 #[cfg(feature = "server")]
-pub use agent_service::{
-    AgentChatRequest, AgentChatResponse, AgentCommand, AgentService, ClientScope,
-};
+pub use agent_service::{AgentChatResponse, AgentCommand, AgentService, ChatRequest, ClientScope};
 
 #[cfg(feature = "server")]
 pub use resolution_routes::create_resolution_router;

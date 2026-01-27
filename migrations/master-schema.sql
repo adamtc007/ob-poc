@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hQ8dFSC7vajxm0ywrQwnDiRZP7TZamXFqR1hwdxNeUGI5kVqb4KcbYh1hxXsZ26
+\restrict 4xSu6PamGDjAveBT1eAl2D1DSb0tHPD98X54m1ZCQFBWxefpiAaERRjGD8jJPvi
 
 -- Dumped from database version 17.6 (Homebrew)
 -- Dumped by pg_dump version 17.6 (Homebrew)
@@ -14040,6 +14040,7 @@ CREATE TABLE "ob-poc".client_group_entity (
     reviewed_by character varying(100),
     reviewed_at timestamp with time zone,
     review_notes text,
+    cbu_id uuid,
     CONSTRAINT chk_cge_membership_type CHECK ((membership_type = ANY (ARRAY['in_group'::text, 'confirmed'::text, 'suspected'::text, 'external_partner'::text, 'counterparty'::text, 'service_provider'::text, 'historical'::text]))),
     CONSTRAINT chk_cge_review_status CHECK (((review_status)::text = ANY ((ARRAY['pending'::character varying, 'confirmed'::character varying, 'rejected'::character varying, 'needs_update'::character varying])::text[])))
 );
@@ -28281,6 +28282,13 @@ CREATE INDEX idx_cgae_embedding ON "ob-poc".client_group_alias_embedding USING i
 
 
 --
+-- Name: idx_cge_cbu; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cge_cbu ON "ob-poc".client_group_entity USING btree (cbu_id) WHERE (cbu_id IS NOT NULL);
+
+
+--
 -- Name: idx_cge_entity; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -34052,6 +34060,14 @@ ALTER TABLE ONLY "ob-poc".client_group_anchor
 
 
 --
+-- Name: client_group_entity client_group_entity_cbu_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_group_entity
+    ADD CONSTRAINT client_group_entity_cbu_id_fkey FOREIGN KEY (cbu_id) REFERENCES "ob-poc".cbus(cbu_id) ON DELETE SET NULL;
+
+
+--
 -- Name: client_group_entity client_group_entity_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -35911,5 +35927,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hQ8dFSC7vajxm0ywrQwnDiRZP7TZamXFqR1hwdxNeUGI5kVqb4KcbYh1hxXsZ26
+\unrestrict 4xSu6PamGDjAveBT1eAl2D1DSb0tHPD98X54m1ZCQFBWxefpiAaERRjGD8jJPvi
 

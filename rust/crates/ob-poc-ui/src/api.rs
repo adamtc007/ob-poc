@@ -263,6 +263,7 @@ pub async fn send_chat(session_id: Uuid, message: &str) -> Result<ChatResponse, 
         &ChatRequest {
             message: message.to_string(),
             cbu_id: None,
+            disambiguation_response: None,
         },
     )
     .await

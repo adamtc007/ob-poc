@@ -70,82 +70,6 @@ enum MpcExecutionOutcome {
     BestEffort(BestEffortExecutionResult),
 }
 
-/// Configuration for ToolHandlers construction
-///
-/// Use the builder pattern: `ToolHandlersConfig::new(pool).with_sessions(s).build()`
-#[derive(Clone)]
-pub struct ToolHandlersConfig {
-    pub pool: PgPool,
-    pub sessions: Option<SessionStore>,
-    pub cbu_sessions: Option<CbuSessionStore>,
-    pub learned_data: Option<SharedLearnedData>,
-    pub embedder: Option<SharedEmbedder>,
-    pub feedback_service: Option<Arc<ob_semantic_matcher::FeedbackService>>,
-}
-
-impl ToolHandlersConfig {
-    /// Create config with required pool
-    pub fn new(pool: PgPool) -> Self {
-        Self {
-            pool,
-            sessions: None,
-            cbu_sessions: None,
-            learned_data: None,
-            embedder: None,
-            feedback_service: None,
-        }
-    }
-
-    /// Add UI session store
-    pub fn with_sessions(mut self, sessions: SessionStore) -> Self {
-        self.sessions = Some(sessions);
-        self
-    }
-
-    /// Add CBU session store
-    pub fn with_cbu_sessions(mut self, cbu_sessions: CbuSessionStore) -> Self {
-        self.cbu_sessions = Some(cbu_sessions);
-        self
-    }
-
-    /// Add learned data for semantic pipeline
-    pub fn with_learned_data(mut self, learned_data: SharedLearnedData) -> Self {
-        self.learned_data = Some(learned_data);
-        self
-    }
-
-    /// Add embedder for semantic operations
-    pub fn with_embedder(mut self, embedder: SharedEmbedder) -> Self {
-        self.embedder = Some(embedder);
-        self
-    }
-
-    /// Build ToolHandlers from config
-    pub fn build(self) -> ToolHandlers {
-        ToolHandlers {
-            generation_log: GenerationLogRepository::new(self.pool.clone()),
-            repo: VisualizationRepository::new(self.pool.clone()),
-            pool: self.pool,
-            gateway_client: Arc::new(Mutex::new(None)),
-            sessions: self.sessions,
-            cbu_sessions: self.cbu_sessions,
-            verb_searcher: Arc::new(Mutex::new(None)),
-            learned_data: self.learned_data,
-            embedder: self.embedder,
-            feedback_service: self.feedback_service,
-        }
-    }
-
-    /// Add feedback service for learning loop
-    pub fn with_feedback_service(
-        mut self,
-        feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
-    ) -> Self {
-        self.feedback_service = Some(feedback_service);
-        self
-    }
-}
-
 /// Tool handlers with database access, EntityGateway client, and UI session store
 pub struct ToolHandlers {
     pool: PgPool,
@@ -161,73 +85,29 @@ pub struct ToolHandlers {
     verb_searcher: Arc<Mutex<Option<HybridVerbSearcher>>>,
     /// Learned data from agent learning system (shared reference)
     learned_data: Option<SharedLearnedData>,
-    /// Embedder for semantic operations (optional)
-    embedder: Option<SharedEmbedder>,
+    /// Embedder for semantic operations - REQUIRED, no fallback
+    embedder: SharedEmbedder,
     /// Feedback service for learning loop
     feedback_service: Option<Arc<ob_semantic_matcher::FeedbackService>>,
 }
 
 impl ToolHandlers {
-    /// Create handlers from config (preferred)
-    pub fn from_config(config: ToolHandlersConfig) -> Self {
-        config.build()
-    }
-
-    /// Create handlers without session store (standalone MCP mode)
-    pub fn new(pool: PgPool) -> Self {
-        ToolHandlersConfig::new(pool).build()
-    }
-
-    /// Create handlers with UI session store (integrated mode)
-    pub fn with_sessions(pool: PgPool, sessions: SessionStore) -> Self {
-        ToolHandlersConfig::new(pool)
-            .with_sessions(sessions)
-            .build()
-    }
-
-    /// Create handlers with both session stores (full integrated mode)
-    pub fn with_all_sessions(
-        pool: PgPool,
-        sessions: SessionStore,
-        cbu_sessions: CbuSessionStore,
-    ) -> Self {
-        ToolHandlersConfig::new(pool)
-            .with_sessions(sessions)
-            .with_cbu_sessions(cbu_sessions)
-            .build()
-    }
-
-    /// Create handlers with learned data for semantic intent pipeline (standalone MCP mode)
-    pub fn with_learned_data(pool: PgPool, learned_data: SharedLearnedData) -> Self {
-        ToolHandlersConfig::new(pool)
-            .with_learned_data(learned_data)
-            .build()
-    }
-
-    /// Create handlers with learned data and embedder (full semantic pipeline)
-    pub fn with_learned_data_and_embedder(
-        pool: PgPool,
-        learned_data: SharedLearnedData,
-        embedder: SharedEmbedder,
-    ) -> Self {
-        ToolHandlersConfig::new(pool)
-            .with_learned_data(learned_data)
-            .with_embedder(embedder)
-            .build()
-    }
-
-    /// Create handlers with all session stores and learned data (full integrated mode)
-    pub fn with_all_sessions_and_learned_data(
-        pool: PgPool,
-        sessions: SessionStore,
-        cbu_sessions: CbuSessionStore,
-        learned_data: SharedLearnedData,
-    ) -> Self {
-        ToolHandlersConfig::new(pool)
-            .with_sessions(sessions)
-            .with_cbu_sessions(cbu_sessions)
-            .with_learned_data(learned_data)
-            .build()
+    /// Create handlers with embedder (REQUIRED for semantic pipeline)
+    ///
+    /// There is only ONE path - all tools require the Candle embedder for semantic search.
+    pub fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
+        ToolHandlers {
+            generation_log: GenerationLogRepository::new(pool.clone()),
+            repo: VisualizationRepository::new(pool.clone()),
+            pool,
+            gateway_client: Arc::new(Mutex::new(None)),
+            sessions: None,
+            cbu_sessions: None,
+            verb_searcher: Arc::new(Mutex::new(None)),
+            learned_data: None,
+            embedder,
+            feedback_service: None,
+        }
     }
 
     /// Get the session store, or error if not configured
@@ -277,13 +157,9 @@ impl ToolHandlers {
         // Create VerbService for centralized DB access
         let verb_service = Arc::new(VerbService::new(self.pool.clone()));
 
-        // Create searcher with VerbService
-        let mut searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone());
-
-        // Add embedder if available
-        if let Some(embedder) = &self.embedder {
-            searcher = searcher.with_embedder(embedder.clone());
-        }
+        // Create searcher with VerbService and embedder (REQUIRED)
+        let searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone())
+            .with_embedder(self.embedder.clone());
 
         *guard = Some(searcher.clone());
         Ok(searcher)
@@ -1732,12 +1608,8 @@ impl ToolHandlers {
 
         let pool = self.require_pool()?;
 
-        // Generate embedding if embedder available (target mode - storing in DB)
-        let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-            embedder.embed_target(phrase).await.ok()
-        } else {
-            None
-        };
+        // Generate embedding (target mode - storing in DB)
+        let embedding: Option<Vec<f32>> = self.embedder.embed_target(phrase).await.ok();
 
         let id = sqlx::query_scalar::<_, Uuid>(
             r#"
@@ -1845,19 +1717,17 @@ impl ToolHandlers {
         let mut imported = 0;
         let mut errors = Vec::new();
 
-        // Batch embed if embedder available (target mode - storing in DB)
-        let embeddings: Vec<Option<Vec<f32>>> = if let Some(embedder) = &self.embedder {
+        // Batch embed (target mode - storing in DB)
+        let embeddings: Vec<Option<Vec<f32>>> = {
             let texts: Vec<&str> = import_data
                 .phrases
                 .iter()
                 .map(|p| p.phrase.as_str())
                 .collect();
-            match embedder.embed_batch_targets(&texts).await {
+            match self.embedder.embed_batch_targets(&texts).await {
                 Ok(embs) => embs.into_iter().map(Some).collect(),
                 Err(_) => vec![None; import_data.phrases.len()],
             }
-        } else {
-            vec![None; import_data.phrases.len()]
         };
 
         for (phrase_data, embedding) in import_data.phrases.iter().zip(embeddings) {
@@ -2016,12 +1886,12 @@ impl ToolHandlers {
 
         let mut applied = false;
         if apply_immediately {
-            // Generate embedding if available (target mode - storing in DB)
-            let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-                embedder.embed_target(&candidate.input_pattern).await.ok()
-            } else {
-                None
-            };
+            // Generate embedding (target mode - storing in DB)
+            let embedding: Option<Vec<f32>> = self
+                .embedder
+                .embed_target(&candidate.input_pattern)
+                .await
+                .ok();
 
             let result = match candidate.learning_type.as_str() {
                 "invocation_phrase" => {
@@ -2112,11 +1982,11 @@ impl ToolHandlers {
 
         // Optionally add to blocklist (target mode - storing in DB)
         let blocked = if add_to_blocklist && candidate.learning_type.contains("phrase") {
-            let embedding: Option<Vec<f32>> = if let Some(embedder) = &self.embedder {
-                embedder.embed_target(&candidate.input_pattern).await.ok()
-            } else {
-                None
-            };
+            let embedding: Option<Vec<f32>> = self
+                .embedder
+                .embed_target(&candidate.input_pattern)
+                .await
+                .ok();
 
             sqlx::query(
                 r#"

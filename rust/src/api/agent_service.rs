@@ -107,20 +107,22 @@ use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{
-    AgentSession, ClientGroupCandidate, DisambiguationItem, DisambiguationRequest,
-    EntityMatchOption, ResolutionSubSession, SessionState, UnresolvedRefInfo,
+    AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption,
+    ResolutionSubSession, SessionState, UnresolvedRefInfo,
 };
 use crate::database::{derive_semantic_state, VerbService};
+use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::semantic_validator::SemanticValidator;
 use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, ValidationRequest};
 use crate::dsl_v2::verb_registry::registry;
-use crate::dsl_v2::Statement;
+use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
+use crate::graph::GraphScope;
 use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
-use crate::mcp::scope_resolution::ScopeResolver;
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::ontology::SemanticStageRegistry;
+use crate::session::SessionScope;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -229,18 +231,8 @@ pub enum UnifiedResolution {
     Error(String),
 }
 
-/// Chat request with optional disambiguation response
-#[derive(Debug, Clone, Deserialize)]
-pub struct AgentChatRequest {
-    /// User's message
-    pub message: String,
-    /// Optional CBU context
-    #[serde(default)]
-    pub cbu_id: Option<Uuid>,
-    /// Optional disambiguation response (if responding to disambiguation request)
-    #[serde(default)]
-    pub disambiguation_response: Option<crate::api::session::DisambiguationResponse>,
-}
+// ChatRequest is now the SINGLE source of truth - imported from ob-poc-types
+pub use ob_poc_types::ChatRequest;
 
 /// Extended chat response that includes disambiguation status
 #[derive(Debug, Serialize)]
@@ -450,83 +442,31 @@ pub fn get_confidence_tier(
 pub struct AgentService {
     pool: PgPool,
     config: AgentServiceConfig,
-    client_scope: Option<ClientScope>,
-    /// Embedder for semantic verb search (None = exact match only)
-    embedder: Option<Arc<CandleEmbedder>>,
+    /// Embedder for semantic verb search - REQUIRED, no fallback path
+    embedder: Arc<CandleEmbedder>,
 }
 
 #[allow(dead_code)]
 impl AgentService {
-    /// Create agent service with pool and optional embedder
-    pub fn new(pool: PgPool, embedder: Option<Arc<CandleEmbedder>>) -> Self {
+    /// Create agent service with pool and embedder
+    ///
+    /// The embedder is REQUIRED for semantic verb search. All prompts go through
+    /// the Candle intent pipeline - there is no fallback path.
+    pub fn new(pool: PgPool, embedder: Arc<CandleEmbedder>) -> Self {
         Self {
             pool,
             config: AgentServiceConfig::default(),
-            client_scope: None,
             embedder,
         }
     }
 
-    /// Create with database pool only (no semantic search)
-    pub fn with_pool(pool: PgPool) -> Self {
-        Self::new(pool, None)
-    }
-
-    /// Check if semantic search is available
-    pub fn has_semantic_search(&self) -> bool {
-        self.embedder.is_some()
-    }
-
     /// Create IntentPipeline for processing user input
-    fn get_intent_pipeline(&self) -> Result<IntentPipeline, String> {
+    fn get_intent_pipeline(&self) -> IntentPipeline {
         let verb_service = Arc::new(VerbService::new(self.pool.clone()));
-        let mut searcher = HybridVerbSearcher::new(verb_service, None);
-
-        if let Some(ref embedder) = self.embedder {
-            // Cast Arc<CandleEmbedder> to Arc<dyn Embedder>
-            let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
-                embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
-            searcher = searcher.with_embedder(dyn_embedder);
-        }
-
-        Ok(IntentPipeline::new(searcher))
-    }
-
-    /// Create a client-scoped agent service
-    pub fn for_client(pool: PgPool, client_id: Uuid, accessible_cbus: Vec<Uuid>) -> Self {
-        Self {
-            pool,
-            config: AgentServiceConfig::default(),
-            client_scope: Some(ClientScope::new(client_id, accessible_cbus)),
-            embedder: None,
-        }
-    }
-
-    /// Create a client-scoped agent service with name
-    pub fn for_client_named(
-        pool: PgPool,
-        client_id: Uuid,
-        accessible_cbus: Vec<Uuid>,
-        client_name: String,
-    ) -> Self {
-        let mut scope = ClientScope::new(client_id, accessible_cbus);
-        scope.client_name = Some(client_name);
-        Self {
-            pool,
-            config: AgentServiceConfig::default(),
-            client_scope: Some(scope),
-            embedder: None,
-        }
-    }
-
-    /// Check if operating in client mode
-    pub fn is_client_mode(&self) -> bool {
-        self.client_scope.is_some()
-    }
-
-    /// Get the client scope (if in client mode)
-    pub fn client_scope(&self) -> Option<&ClientScope> {
-        self.client_scope.as_ref()
+        let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
+            self.embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
+        let searcher = HybridVerbSearcher::new(verb_service, None).with_embedder(dyn_embedder);
+        IntentPipeline::with_pool(searcher, self.pool.clone())
     }
 
     /// Pre-resolve available entities from EntityGateway before LLM call
@@ -898,457 +838,496 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         Some(context)
     }
 
-    /// Process a chat message and return response (with disambiguation if needed)
-    ///
-    /// This is the main entry point for agent chat. It:
-    /// 1. Checks for special commands (show/load/select CBU)
-    /// 2. Handles disambiguation responses
-    /// 3. Extracts intents from natural language via LLM
-    /// 4. Resolves entity references via EntityGateway
-    /// 5. Validates and generates DSL with retry loop
+    /// ONE PATH - all user prompts:
+    /// 1. "run"/"execute"/"do it" → execute staged runbook
+    /// 2. Intent pipeline → DSL
+    ///    - Session/view verbs → execute immediately (navigation)
+    ///    - Data mutation verbs → stage for user confirmation
+    /// 3. Ambiguous? → "Did you mean X or Y?"
     pub async fn process_chat(
         &self,
         session: &mut AgentSession,
-        request: &AgentChatRequest,
-        llm_client: Arc<dyn LlmClient>,
+        request: &ChatRequest,
+        _llm_client: Arc<dyn LlmClient>,
     ) -> Result<AgentChatResponse, String> {
-        tracing::info!("=== AGENT SERVICE process_chat START ===");
-        tracing::info!("User message: {:?}", request.message);
-        tracing::info!("CBU ID: {:?}", request.cbu_id);
-        tracing::info!("Session ID: {}", session.id);
+        use crate::dsl_v2::parse_program;
+        use crate::mcp::intent_pipeline::PipelineOutcome;
+        session.add_user_message(request.message.clone());
 
-        // If this is a disambiguation response, handle it
-        if let Some(disambig_response) = &request.disambiguation_response {
-            return self
-                .handle_disambiguation_response(session, disambig_response, llm_client.clone())
-                .await;
+        let input = request.message.trim().to_lowercase();
+
+        // 1. Check for RUN command - execute staged runbook
+        if matches!(
+            input.as_str(),
+            "run" | "execute" | "do it" | "go" | "run it" | "execute it"
+        ) {
+            return self.execute_runbook(session).await;
         }
 
-        // Process via IntentPipeline: user input → semantic verb search → LLM arg extraction → DSL
-        if let Ok(pipeline) = self.get_intent_pipeline() {
-            // Pass existing scope context from session (for subsequent commands after scope is set)
-            let existing_scope = session.context.client_scope.clone();
-            let pipeline_result = pipeline
-                .process_with_scope(&request.message, None, existing_scope)
-                .await;
+        // ONE PIPELINE - generate/validate DSL
+        let result = self
+            .get_intent_pipeline()
+            .process_with_scope(&request.message, None, session.context.client_scope.clone())
+            .await;
 
-            match pipeline_result {
-                Ok(result) => {
-                    // =========================================================
-                    // STAGE 0: Handle Scope Resolution (before verb processing)
-                    // =========================================================
-                    // If scope was resolved, store it in session and return success
-                    // This consumes the input - no verb processing happens
-                    use crate::mcp::intent_pipeline::PipelineOutcome;
+        match result {
+            Ok(r) => {
+                // Got valid DSL?
+                if r.valid && !r.dsl.is_empty() {
+                    // Stage in runbook (SINGLE LOOP - all DSL goes through here)
+                    let ast = parse_program(&r.dsl)
+                        .map(|p| p.statements)
+                        .unwrap_or_default();
 
-                    if let PipelineOutcome::ScopeResolved {
-                        group_id,
-                        group_name,
-                        entity_count,
-                    } = &result.outcome
-                    {
-                        tracing::info!(
-                            "Scope resolved: {} ({}, {} entities)",
-                            group_name,
-                            group_id,
-                            entity_count
-                        );
+                    session.set_pending_dsl(r.dsl.clone(), ast, None, false);
 
-                        // Store scope context in session
-                        if let Some(scope_ctx) = result.scope_context.clone() {
-                            session.context.set_client_scope(scope_ctx);
-                        }
+                    // Check if this is a session/view verb (navigation)
+                    let verb = &r.intent.verb;
+                    let is_navigation = Self::is_navigation_verb(verb);
 
-                        session.add_user_message(request.message.clone());
-                        let response_msg = format!(
-                            "Now working on **{}** ({} entities)",
-                            group_name, entity_count
-                        );
-                        session.add_agent_message(response_msg.clone(), None, None);
-
-                        // Transition to scoped state
-                        session.transition(crate::api::session::SessionEvent::ScopeSet);
-
-                        return Ok(AgentChatResponse {
-                            message: response_msg,
-                            intents: vec![],
-                            validation_results: vec![],
-                            session_state: session.state.clone(),
-                            can_execute: false,
-                            dsl_source: None,
-                            ast: None,
-                            disambiguation: None,
-                            commands: None,
-                            unresolved_refs: None,
-                            current_ref_index: None,
-                            dsl_hash: None,
-                        });
+                    if is_navigation {
+                        // Auto-trigger run for navigation verbs (goes through runbook)
+                        tracing::debug!(verb = %verb, dsl = %r.dsl, "Auto-running navigation verb");
+                        return self.execute_runbook(session).await;
                     }
 
-                    // Handle scope candidates (user needs to pick)
-                    if let PipelineOutcome::ScopeCandidates = &result.outcome {
-                        use crate::mcp::scope_resolution::ScopeResolutionOutcome;
-
-                        session.add_user_message(request.message.clone());
-
-                        // Build disambiguation for client group selection
-                        let candidates: Vec<ClientGroupCandidate> =
-                            if let Some(ScopeResolutionOutcome::Candidates(c)) =
-                                &result.scope_resolution
-                            {
-                                c.iter()
-                                    .map(|sc| ClientGroupCandidate {
-                                        group_id: sc.group_id,
-                                        group_name: sc.group_name.clone(),
-                                        matched_alias: sc.matched_alias.clone(),
-                                        confidence: sc.confidence,
-                                        entity_count: None, // Could fetch if needed
-                                    })
-                                    .collect()
-                            } else {
-                                vec![]
-                            };
-
-                        let search_text = ScopeResolver::extract_client_name(&request.message)
-                            .unwrap_or_else(|| request.message.clone());
-
-                        let disambig = DisambiguationRequest {
-                            request_id: Uuid::new_v4(),
-                            items: vec![DisambiguationItem::ClientGroupMatch {
-                                search_text: search_text.clone(),
-                                candidates,
-                            }],
-                            prompt: format!(
-                                "Multiple clients match '{}'. Which did you mean?",
-                                search_text
-                            ),
-                            original_intents: None,
-                        };
-
-                        let message = "Multiple clients match. Please select:".to_string();
-                        session.add_agent_message(message.clone(), None, None);
-
-                        return Ok(AgentChatResponse {
-                            message,
-                            intents: vec![],
-                            validation_results: vec![],
-                            session_state: SessionState::PendingValidation,
-                            can_execute: false,
-                            dsl_source: None,
-                            ast: None,
-                            disambiguation: Some(disambig),
-                            commands: None,
-                            unresolved_refs: None,
-                            current_ref_index: None,
-                            dsl_hash: None,
-                        });
-                    }
-
-                    // =========================================================
-                    // Normal verb processing (scope context passed through)
-                    // =========================================================
-
-                    // Store scope context in session if present (for subsequent operations)
-                    if let Some(scope_ctx) = result.scope_context.clone() {
-                        if scope_ctx.has_scope() {
-                            session.context.set_client_scope(scope_ctx);
-                        }
-                    }
-
-                    tracing::info!(
-                        "IntentPipeline matched verb: {} (score: {:.2})",
-                        result.intent.verb,
-                        result
-                            .verb_candidates
-                            .first()
-                            .map(|c| c.score)
-                            .unwrap_or(0.0)
-                    );
-
-                    // If we have unresolved entity refs, trigger disambiguation using pipeline result
-                    if !result.unresolved_refs.is_empty() {
-                        tracing::info!(
-                            "Pipeline has {} unresolved refs, triggering disambiguation",
-                            result.unresolved_refs.len()
-                        );
-
-                        session.add_user_message(request.message.clone());
-
-                        // Convert pipeline unresolved refs to disambiguation items (Fix K)
-                        // Pre-populate matches with actual entity search results
-                        let mut disambig_items: Vec<DisambiguationItem> = Vec::new();
-                        // Get client_group_id from session scope for scoped entity search
-                        let scope_group_id = session.context.client_group_id();
-                        for r in &result.unresolved_refs {
-                            // Search for matching entities within scope (if scope is set)
-                            let entity_type_str = r.entity_type.as_deref().unwrap_or("entity");
-                            let matches = self
-                                .search_entities_in_scope(
-                                    entity_type_str,
-                                    &r.search_value,
-                                    10,
-                                    scope_group_id,
-                                )
-                                .await
-                                .unwrap_or_default();
-
-                            tracing::info!(
-                                "Pre-populated {} matches for '{}' (type: {}, scope: {:?})",
-                                matches.len(),
-                                r.search_value,
-                                entity_type_str,
-                                scope_group_id
-                            );
-
-                            disambig_items.push(DisambiguationItem::EntityMatch {
-                                param: r.param_name.clone(),
-                                search_text: r.search_value.clone(),
-                                matches,
-                                entity_type: r.entity_type.clone(),
-                                search_column: r.search_column.clone(),
-                                ref_id: r.ref_id.clone(),
-                            });
-                        }
-
-                        // Build VerbIntent from pipeline result
-                        let mut params: HashMap<String, ParamValue> = HashMap::new();
-                        for arg in &result.intent.arguments {
-                            let value = intent_arg_to_param_value(&arg.value);
-                            params.insert(arg.name.clone(), value);
-                        }
-
-                        let intent = VerbIntent {
-                            verb: result.intent.verb.clone(),
-                            params,
-                            refs: HashMap::new(),
-                            lookups: None,
-                            sequence: None,
-                        };
-
-                        // Store intent in session for after disambiguation
-                        session.pending_intents = vec![intent.clone()];
-
-                        // Parse and ENRICH DSL to AST - enrichment converts strings to EntityRef
-                        // based on verb arg lookup config. Without enrichment, resolve-by-ref-id
-                        // won't find any EntityRef nodes to update.
-                        let dsl_hash = if let Ok(program) =
-                            dsl_core::parser::parse_program(&result.dsl)
-                        {
-                            // Enrich to convert String literals to EntityRef where lookup config exists
-                            let registry = crate::dsl_v2::runtime_registry::runtime_registry_arc();
-                            let enriched =
-                                crate::dsl_v2::enrichment::enrich_program(program, &registry);
-                            session.context.ast = enriched.program.statements;
-                            tracing::info!(
-                                    "Stored {} statements in session.context.ast for disambiguation (enriched)",
-                                    session.context.ast.len()
-                                );
-                            // Hash the re-serialized DSL to ensure consistency
-                            Some(compute_dsl_hash(&session.context.to_dsl_source()))
-                        } else {
-                            // Fallback to pipeline DSL if parsing fails
-                            Some(compute_dsl_hash(&result.dsl))
-                        };
-
-                        let disambig = DisambiguationRequest {
-                            request_id: Uuid::new_v4(),
-                            items: disambig_items,
-                            prompt: format!(
-                                "Please select the correct entities for {}:",
-                                result.intent.verb
-                            ),
-                            original_intents: Some(vec![intent.clone()]),
-                        };
-
-                        let response_msg = format!(
-                            "I need to resolve some entities for `{}`",
-                            result.intent.verb
-                        );
-                        session.add_agent_message(response_msg.clone(), None, None);
-                        session.state = SessionState::PendingValidation;
-
-                        return Ok(AgentChatResponse {
-                            message: response_msg,
-                            intents: vec![intent],
-                            validation_results: vec![],
-                            session_state: SessionState::PendingValidation,
-                            can_execute: false,
-                            dsl_source: Some(result.dsl),
-                            ast: None,
-                            disambiguation: Some(disambig),
-                            commands: None,
-                            unresolved_refs: None,
-                            current_ref_index: None,
-                            dsl_hash,
-                        });
-                    } else if result.valid {
-                        // Valid DSL with all refs resolved - ready to execute
-                        session.add_user_message(request.message.clone());
-
-                        // Parse to AST for response - extract statements
-                        let ast = dsl_core::parser::parse_program(&result.dsl)
-                            .ok()
-                            .map(|p| p.statements);
-
-                        // Build response with the pipeline result
-                        let response_msg = if result.intent.notes.is_empty() {
-                            format!("Generated: {}", result.dsl)
-                        } else {
-                            result.intent.notes.join("\n")
-                        };
-                        // Build VerbIntent with proper params HashMap
-                        let mut params: HashMap<String, ParamValue> = HashMap::new();
-                        for arg in &result.intent.arguments {
-                            let value = intent_arg_to_param_value(&arg.value);
-                            params.insert(arg.name.clone(), value);
-                        }
-
-                        let intent = VerbIntent {
-                            verb: result.intent.verb.clone(),
-                            params,
-                            refs: HashMap::new(),
-                            lookups: None,
-                            sequence: None,
-                        };
-
-                        session.add_agent_message(
-                            response_msg.clone(),
-                            Some(vec![intent.clone()]),
-                            Some(result.dsl.clone()),
-                        );
-
-                        // Add DSL to run_sheet so /execute can find it
-                        session.set_pending_dsl(
-                            result.dsl.clone(),
-                            ast.clone().unwrap_or_default(),
-                            None, // No pre-compiled plan
-                            false,
-                        );
-
-                        // Auto-execute safe navigation commands (session.*, view.* verbs)
-                        // These don't modify data, just change what the user is viewing
-                        let domain = result.intent.verb.split('.').next().unwrap_or("");
-                        let should_auto_execute = matches!(domain, "session" | "view");
-                        let commands = if should_auto_execute {
-                            Some(vec![AgentCommand::Execute])
-                        } else {
-                            None
-                        };
-
-                        return Ok(AgentChatResponse {
-                            message: response_msg,
-                            intents: vec![intent.clone()],
-                            validation_results: vec![IntentValidation {
-                                valid: true,
-                                intent,
-                                errors: vec![],
-                                warnings: vec![],
-                            }],
-                            session_state: SessionState::ReadyToExecute,
-                            can_execute: true,
-                            dsl_source: Some(result.dsl),
-                            ast,
-                            disambiguation: None,
-                            commands,
-                            unresolved_refs: None,
-                            current_ref_index: None,
-                            dsl_hash: None,
-                        });
-                    } else if !result.missing_required.is_empty() {
-                        // Missing required arguments - ask user to clarify
-                        let verb = &result.intent.verb;
-                        let missing = result.missing_required.join(", ");
-
-                        tracing::info!(
-                            "Verb {} matched but missing required args: {}",
-                            verb,
-                            missing
-                        );
-
-                        session.add_user_message(request.message.clone());
-
-                        let clarification_msg = format!(
-                            "I understood you want to use `{}`, but I need more information.\n\nPlease specify: {}",
-                            verb, missing
-                        );
-                        session.add_agent_message(clarification_msg.clone(), None, None);
-
-                        return Ok(AgentChatResponse {
-                            message: clarification_msg,
-                            intents: vec![],
-                            validation_results: vec![],
-                            session_state: SessionState::New,
-                            can_execute: false,
-                            dsl_source: None,
-                            ast: None,
-                            disambiguation: None,
-                            commands: None,
-                            unresolved_refs: None,
-                            current_ref_index: None,
-                            dsl_hash: None,
-                        });
-                    } else {
-                        // DSL validation failed - return error with details
-                        let error_msg = result
-                            .validation_error
-                            .unwrap_or_else(|| "DSL validation failed".to_string());
-                        tracing::warn!("Pipeline DSL validation failed: {}", error_msg);
-
-                        session.add_user_message(request.message.clone());
-                        session.add_agent_message(error_msg.clone(), None, None);
-
-                        return Ok(AgentChatResponse {
-                            message: format!(
-                                "I understood `{}` but the DSL is invalid: {}",
-                                result.intent.verb, error_msg
-                            ),
-                            intents: vec![],
-                            validation_results: vec![],
-                            session_state: SessionState::New,
-                            can_execute: false,
-                            dsl_source: Some(result.dsl),
-                            ast: None,
-                            disambiguation: None,
-                            commands: None,
-                            unresolved_refs: None,
-                            current_ref_index: None,
-                            dsl_hash: None,
-                        });
-                    }
+                    // Data mutation - wait for user to say "run"
+                    let msg = format!("Staged: {}\n\nSay 'run' to execute.", r.dsl);
+                    session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
+                    return Ok(self.staged_response(r.dsl, msg));
                 }
-                Err(e) => {
-                    // Pipeline failed - return error, don't fall through
-                    tracing::error!("IntentPipeline error: {}", e);
 
-                    session.add_user_message(request.message.clone());
-                    let error_msg = format!("I couldn't understand that request: {}", e);
-                    session.add_agent_message(error_msg.clone(), None, None);
+                // Ambiguous? Ask clarification
+                if matches!(r.outcome, PipelineOutcome::NeedsClarification)
+                    && r.verb_candidates.len() >= 2
+                {
+                    let msg = format!(
+                        "Did you mean '{}' or '{}'?",
+                        r.verb_candidates[0].verb, r.verb_candidates[1].verb
+                    );
+                    return Ok(self.fail(&msg, session));
+                }
 
-                    return Ok(AgentChatResponse {
-                        message: error_msg,
-                        intents: vec![],
-                        validation_results: vec![],
-                        session_state: SessionState::New,
-                        can_execute: false,
-                        dsl_source: None,
-                        ast: None,
-                        disambiguation: None,
-                        commands: None,
-                        unresolved_refs: None,
-                        current_ref_index: None,
-                        dsl_hash: None,
-                    });
+                // Pipeline gave an error message? Return it
+                if let Some(err) = r.validation_error {
+                    return Ok(self.fail(&err, session));
+                }
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Pipeline error");
+            }
+        }
+
+        // Fallback
+        Ok(self.fail("I don't understand. Try /commands for help.", session))
+    }
+
+    /// Check if a verb is a navigation/session verb that should auto-run
+    fn is_navigation_verb(verb: &str) -> bool {
+        // Session verbs - scope/navigation
+        if verb.starts_with("session.") {
+            return true;
+        }
+        // View verbs - viewport navigation
+        if verb.starts_with("view.") {
+            return true;
+        }
+        false
+    }
+
+    /// Execute all pending DSL in the session runbook
+    ///
+    /// Pipeline: Parse → Enrich → Resolve EntityRefs → Execute
+    async fn execute_runbook(
+        &self,
+        session: &mut AgentSession,
+    ) -> Result<AgentChatResponse, String> {
+        use crate::dsl_v2::{DslExecutor, ExecutionContext};
+
+        // Check if there's anything to run
+        if !session.run_sheet.has_runnable() {
+            return Ok(self.fail("Nothing staged to run. Send a command first.", session));
+        }
+
+        // Get all pending DSL
+        let dsl = match session.run_sheet.combined_dsl() {
+            Some(d) if !d.is_empty() => d,
+            _ => return Ok(self.fail("No DSL to execute.", session)),
+        };
+
+        // 1. Parse DSL
+        let raw_program = match parse_program(&dsl) {
+            Ok(p) => p,
+            Err(e) => return Ok(self.fail(&format!("Parse error: {}", e), session)),
+        };
+
+        // 2. Enrich: convert string literals to EntityRefs based on YAML verb config
+        let registry = runtime_registry();
+        let enrichment_result = enrich_program(raw_program, registry);
+        let mut program = enrichment_result.program;
+
+        // 3. Resolve all EntityRefs before execution
+        // This is where we look up "Allianz" → client_group UUID
+        for stmt in &mut program.statements {
+            if let Statement::VerbCall(vc) = stmt {
+                for arg in &mut vc.arguments {
+                    self.resolve_ast_node(&mut arg.value).await;
                 }
             }
         }
 
-        // =========================================================================
-        // ERROR: IntentPipeline unavailable - system is down
-        // =========================================================================
-        // If we reach here, the database pool is unavailable. This is a critical
-        // system failure - return error rather than pretending to work.
-        tracing::error!("IntentPipeline unavailable - database pool not configured");
-        Err("Service unavailable: database connection required".to_string())
+        // 4. Check for any remaining unresolved refs
+        let mut unresolved = Vec::new();
+        for stmt in &program.statements {
+            if let Statement::VerbCall(vc) = stmt {
+                for arg in &vc.arguments {
+                    Self::collect_unresolved(&arg.value, &mut unresolved);
+                }
+            }
+        }
+
+        if !unresolved.is_empty() {
+            let details: Vec<String> = unresolved
+                .iter()
+                .map(|(et, val)| format!("{}: '{}'", et, val))
+                .collect();
+            let msg = format!(
+                "Cannot execute: {} unresolved reference(s):\n  - {}",
+                unresolved.len(),
+                details.join("\n  - ")
+            );
+            return Ok(self.fail(&msg, session));
+        }
+
+        // 5. Convert resolved AST back to DSL string for execution
+        let resolved_dsl = program.to_dsl_string();
+        tracing::debug!(resolved_dsl = %resolved_dsl, "Executing resolved DSL");
+
+        // 6. Execute
+        let executor = DslExecutor::new(self.pool.clone());
+        let mut exec_ctx = ExecutionContext::new();
+        match executor.execute_dsl(&resolved_dsl, &mut exec_ctx).await {
+            Ok(results) => {
+                // Check if any result is a macro that returned combined_dsl to stage
+                // This handles verbs like cbu.create-from-client-group that generate DSL batches
+                for result in &results {
+                    if let crate::dsl_v2::ExecutionResult::Record(json) = result {
+                        if let Some(combined_dsl) =
+                            json.get("combined_dsl").and_then(|v| v.as_str())
+                        {
+                            if !combined_dsl.is_empty() {
+                                // Macro returned DSL to stage - clear current runsheet and stage the new DSL
+                                session.run_sheet.entries.clear();
+
+                                let ast = parse_program(combined_dsl)
+                                    .map(|p| p.statements)
+                                    .unwrap_or_default();
+                                session.set_pending_dsl(combined_dsl.to_string(), ast, None, false);
+
+                                let entities_found = json
+                                    .get("entities_found")
+                                    .and_then(|v| v.as_i64())
+                                    .unwrap_or(0);
+                                let msg = json
+                                    .get("message")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("DSL batch generated");
+
+                                let response_msg = format!(
+                                    "{}\n\nStaged {} cbu.create statements. Say 'run' to execute.",
+                                    msg, entities_found
+                                );
+                                session.add_agent_message(
+                                    response_msg.clone(),
+                                    None,
+                                    Some(combined_dsl.to_string()),
+                                );
+
+                                return Ok(AgentChatResponse {
+                                    message: response_msg,
+                                    dsl_source: Some(combined_dsl.to_string()),
+                                    can_execute: true, // Ready to run
+                                    session_state: SessionState::ReadyToExecute,
+                                    intents: vec![],
+                                    validation_results: vec![],
+                                    ast: None,
+                                    disambiguation: None,
+                                    commands: None,
+                                    unresolved_refs: None,
+                                    current_ref_index: None,
+                                    dsl_hash: None,
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Normal execution - mark as executed
+                session.run_sheet.mark_all_executed();
+
+                // Sync CBU session if any CBUs were loaded
+                // This propagates scope to session.context so the watch endpoint
+                // returns scope_type, which triggers UI viewport refresh
+                if let Some(cbu_session) = exec_ctx.take_pending_cbu_session() {
+                    let loaded = cbu_session.cbu_ids_vec();
+                    let cbu_count = loaded.len();
+
+                    // Merge loaded CBUs into context
+                    for cbu_id in &loaded {
+                        if !session.context.cbu_ids.contains(cbu_id) {
+                            session.context.cbu_ids.push(*cbu_id);
+                        }
+                    }
+
+                    // Set scope definition so UI knows to trigger scope_graph refetch
+                    // Use Custom scope for multi-CBU loads, SingleCbu for single CBU
+                    let scope_def = if cbu_count == 1 {
+                        GraphScope::SingleCbu {
+                            cbu_id: loaded[0],
+                            cbu_name: cbu_session.name.clone().unwrap_or_default(),
+                        }
+                    } else if cbu_count > 1 {
+                        // Multi-CBU scope - use Custom with session name or description
+                        GraphScope::Custom {
+                            description: cbu_session
+                                .name
+                                .clone()
+                                .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
+                        }
+                    } else {
+                        GraphScope::Empty
+                    };
+
+                    session.context.scope = Some(SessionScope::from_graph_scope(scope_def));
+                    tracing::info!(
+                        "[EXEC] Set context.scope with {} CBUs, scope_type={:?}",
+                        cbu_count,
+                        session.context.scope.as_ref().map(|s| &s.definition)
+                    );
+                }
+
+                let msg = format!(
+                    "Executed {} statement(s). {} CBUs in scope.",
+                    results.len(),
+                    session.context.cbu_ids.len()
+                );
+                session.add_agent_message(msg.clone(), None, None);
+                Ok(AgentChatResponse {
+                    message: msg,
+                    dsl_source: Some(resolved_dsl),
+                    can_execute: false, // Already executed
+                    session_state: SessionState::Executed,
+                    intents: vec![],
+                    validation_results: vec![],
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                    dsl_hash: None,
+                })
+            }
+            Err(e) => {
+                let msg = format!("Execution failed: {}", e);
+                session.add_agent_message(msg.clone(), None, None);
+                Ok(self.fail(&msg, session))
+            }
+        }
+    }
+
+    /// Recursively resolve EntityRefs in an AST node
+    async fn resolve_ast_node(&self, node: &mut AstNode) {
+        match node {
+            AstNode::EntityRef {
+                entity_type,
+                value,
+                resolved_key,
+                ..
+            } => {
+                // Skip if already resolved
+                if resolved_key.is_some() {
+                    return;
+                }
+
+                // Resolve using AgentService.resolve_entity (handles client_group specially)
+                match self.resolve_entity(entity_type, value).await {
+                    Ok(ResolveResult::Found {
+                        id,
+                        display: display_name,
+                    }) => {
+                        tracing::debug!(
+                            entity_type = %entity_type,
+                            value = %value,
+                            resolved_id = %id,
+                            display_name = %display_name,
+                            "Resolved EntityRef"
+                        );
+                        *resolved_key = Some(id.to_string());
+                    }
+                    Ok(ResolveResult::FoundByCode {
+                        code,
+                        uuid,
+                        display: display_name,
+                    }) => {
+                        // For code-based PKs, use UUID if available, otherwise the code
+                        let resolved = uuid.map(|u| u.to_string()).unwrap_or_else(|| code.clone());
+                        tracing::debug!(
+                            entity_type = %entity_type,
+                            value = %value,
+                            resolved_key = %resolved,
+                            display_name = %display_name,
+                            "Resolved EntityRef by code"
+                        );
+                        *resolved_key = Some(resolved);
+                    }
+                    Ok(ResolveResult::NotFound { suggestions }) => {
+                        if !suggestions.is_empty() {
+                            tracing::warn!(
+                                entity_type = %entity_type,
+                                value = %value,
+                                suggestions = ?suggestions.iter().map(|s| &s.display).collect::<Vec<_>>(),
+                                "Ambiguous EntityRef - suggestions available"
+                            );
+                        } else {
+                            tracing::warn!(
+                                entity_type = %entity_type,
+                                value = %value,
+                                "EntityRef not found"
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            entity_type = %entity_type,
+                            value = %value,
+                            error = %e,
+                            "EntityRef resolution error"
+                        );
+                    }
+                }
+            }
+            AstNode::List { items, .. } => {
+                for item in items {
+                    Box::pin(self.resolve_ast_node(item)).await;
+                }
+            }
+            AstNode::Map { entries, .. } => {
+                for (_, v) in entries {
+                    Box::pin(self.resolve_ast_node(v)).await;
+                }
+            }
+            AstNode::Nested(vc) => {
+                for arg in &mut vc.arguments {
+                    Box::pin(self.resolve_ast_node(&mut arg.value)).await;
+                }
+            }
+            // Literals and SymbolRefs don't need resolution
+            AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+        }
+    }
+
+    /// Collect unresolved EntityRefs from an AST node
+    fn collect_unresolved(node: &AstNode, unresolved: &mut Vec<(String, String)>) {
+        use crate::dsl_v2::ast::AstNode;
+
+        match node {
+            AstNode::EntityRef {
+                entity_type,
+                value,
+                resolved_key,
+                ..
+            } => {
+                if resolved_key.is_none() {
+                    unresolved.push((entity_type.clone(), value.clone()));
+                }
+            }
+            AstNode::List { items, .. } => {
+                for item in items {
+                    Self::collect_unresolved(item, unresolved);
+                }
+            }
+            AstNode::Map { entries, .. } => {
+                for (_, v) in entries {
+                    Self::collect_unresolved(v, unresolved);
+                }
+            }
+            AstNode::Nested(vc) => {
+                for arg in &vc.arguments {
+                    Self::collect_unresolved(&arg.value, unresolved);
+                }
+            }
+            AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+        }
+    }
+
+    fn staged_response(&self, dsl: String, msg: String) -> AgentChatResponse {
+        AgentChatResponse {
+            message: msg,
+            dsl_source: Some(dsl),
+            can_execute: true,
+            session_state: SessionState::ReadyToExecute,
+            intents: vec![],
+            validation_results: vec![],
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+        }
+    }
+
+    fn ok_response(&self, dsl: String) -> AgentChatResponse {
+        AgentChatResponse {
+            message: dsl.clone(),
+            dsl_source: Some(dsl),
+            can_execute: true,
+            session_state: SessionState::ReadyToExecute,
+            intents: vec![],
+            validation_results: vec![],
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+        }
+    }
+
+    /// Fail: return message to user
+    fn fail(&self, msg: &str, session: &mut AgentSession) -> AgentChatResponse {
+        session.add_agent_message(msg.to_string(), None, None);
+        AgentChatResponse {
+            message: msg.to_string(),
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::New,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+        }
+    }
+
+    /// Build VerbIntent from pipeline result
+    fn build_intent(&self, result: &crate::mcp::intent_pipeline::PipelineResult) -> VerbIntent {
+        let params = result
+            .intent
+            .arguments
+            .iter()
+            .map(|arg| (arg.name.clone(), intent_arg_to_param_value(&arg.value)))
+            .collect();
+        VerbIntent {
+            verb: result.intent.verb.clone(),
+            params,
+            refs: HashMap::new(),
+            lookups: None,
+            sequence: None,
+        }
     }
 
     /// Run semantic validation on DSL
@@ -2161,15 +2140,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     ) -> Result<Vec<EntityMatchOption>, String> {
         use ob_semantic_matcher::client_group_resolver::ClientGroupAliasResolver;
 
-        // Need embedder for semantic search
-        let embedder = match &self.embedder {
-            Some(e) => e.clone(),
-            None => {
-                return Err("Client group search requires embedder (semantic search)".to_string())
-            }
-        };
-
-        let adapter = ClientGroupEmbedderAdapter(embedder);
+        let adapter = ClientGroupEmbedderAdapter(self.embedder.clone());
         let resolver = ob_semantic_matcher::client_group_resolver::PgClientGroupResolver::new(
             self.pool.clone(),
             Arc::new(adapter),
@@ -2237,14 +2208,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             ClientGroupAliasResolver, ClientGroupResolveError, ResolutionConfig,
         };
 
-        let embedder = match &self.embedder {
-            Some(e) => e.clone(),
-            None => {
-                return Err("Client group resolution requires embedder".to_string());
-            }
-        };
-
-        let adapter = ClientGroupEmbedderAdapter(embedder);
+        let adapter = ClientGroupEmbedderAdapter(self.embedder.clone());
         let resolver = ob_semantic_matcher::client_group_resolver::PgClientGroupResolver::new(
             self.pool.clone(),
             Arc::new(adapter),

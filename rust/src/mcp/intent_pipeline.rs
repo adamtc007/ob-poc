@@ -123,6 +123,8 @@ pub enum PipelineOutcome {
     NeedsClarification,
     /// No matching verb found
     NoMatch,
+    /// Semantic search not ready - embedder still initializing
+    SemanticNotReady,
     /// Scope was resolved - session context set, no DSL generated
     /// This is Stage 0: scope phrase consumed the input
     ScopeResolved {
@@ -450,22 +452,35 @@ impl IntentPipeline {
             .await?;
 
         if candidates.is_empty() {
-            // Provide helpful message indicating if semantic search is available
-            let semantic_status = if self.verb_searcher.has_semantic_search() {
-                "" // Semantic is available, just no match
-            } else {
-                " (semantic search still initializing - try again in a moment)"
-            };
+            // Check if semantic search is available
+            if !self.verb_searcher.has_semantic_search() {
+                // Semantic search not ready - return explicit status
+                return Ok(PipelineResult {
+                    intent: StructuredIntent::empty(),
+                    verb_candidates: vec![],
+                    dsl: String::new(),
+                    dsl_hash: None,
+                    valid: false,
+                    validation_error: Some(
+                        "Semantic search is not ready. Please wait a moment and try again."
+                            .to_string(),
+                    ),
+                    unresolved_refs: vec![],
+                    missing_required: vec![],
+                    outcome: PipelineOutcome::SemanticNotReady,
+                    scope_resolution: None,
+                    scope_context: None,
+                });
+            }
+
+            // Semantic is available, just no match
             return Ok(PipelineResult {
                 intent: StructuredIntent::empty(),
                 verb_candidates: vec![],
                 dsl: String::new(),
                 dsl_hash: None,
                 valid: false,
-                validation_error: Some(format!(
-                    "No matching verbs found for: {}{}",
-                    instruction, semantic_status
-                )),
+                validation_error: Some(format!("No matching verbs found for: {}", instruction)),
                 unresolved_refs: vec![],
                 missing_required: vec![],
                 outcome: PipelineOutcome::NoMatch,

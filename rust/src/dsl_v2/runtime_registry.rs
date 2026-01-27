@@ -904,6 +904,8 @@ mod tests {
                     description: None,
                     validation: None,
                     fuzzy_check: None,
+                    slot_type: None,
+                    preferred_roles: vec![],
                 }],
                 returns: Some(ReturnsConfig {
                     return_type: ReturnTypeConfig::Uuid,

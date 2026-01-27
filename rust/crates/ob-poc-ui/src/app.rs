@@ -3296,7 +3296,6 @@ impl App {
     /// Render runbook / run sheet with chat history (for Simplified layout bottom section)
     fn render_runbook(&mut self, ui: &mut egui::Ui) {
         use egui::{Color32, RichText, ScrollArea};
-        use ob_poc_types::{RunSheet, RunSheetEntry};
 
         // Extract data from state (Rule 3)
         let run_sheet = self

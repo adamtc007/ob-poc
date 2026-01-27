@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-25
+> **Last reviewed:** 2026-01-27
 > **Crates:** 15 Rust crates (includes ob-poc-macros)
 > **Verbs:** 968 verbs, 7505 intent patterns (DB-sourced)
 > **Migrations:** 56 schema migrations
@@ -21,6 +21,7 @@
 > **CustomOp Auto-Registration (051):** ✅ Complete - `#[register_custom_op]` macro, inventory-based registration
 > **Staged Runbook REPL (054):** ✅ Complete - Anti-hallucination staging, entity resolution, DAG ordering
 > **Client Group Research Integration (055):** ✅ Complete - GLEIF import → client_group_entity staging → CBU creation with role mapping
+> **REPL Viewport Feedback Loop (056):** ✅ Complete - Scope propagation in execute_runbook triggers UI refresh
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

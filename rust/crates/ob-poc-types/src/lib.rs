@@ -438,12 +438,17 @@ pub enum ChatMessageRole {
 // CHAT API
 // ============================================================================
 
-/// Chat request from user
+/// Chat request from user - SINGLE source of truth for all chat endpoints
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatRequest {
+    /// User's message
     pub message: String,
+    /// Optional CBU context
     #[serde(default)]
     pub cbu_id: Option<String>, // UUID as string
+    /// Optional disambiguation response (if responding to disambiguation request)
+    #[serde(default)]
+    pub disambiguation_response: Option<DisambiguationResponse>,
 }
 
 // ============================================================================

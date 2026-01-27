@@ -23,8 +23,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::api::agent_service::{AgentChatResponse, AgentService};
-use crate::api::session::{AgentSession, SessionStore};
+use crate::api::session::SessionStore;
 
 // ============================================================================
 // Client State
@@ -186,13 +185,6 @@ pub struct SuccessResponse {
     pub id: Option<Uuid>,
 }
 
-/// Chat request for client
-#[derive(Debug, Deserialize)]
-pub struct ClientChatRequest {
-    pub message: String,
-    pub cbu_id: Option<Uuid>,
-}
-
 // ============================================================================
 // Router Creation
 // ============================================================================
@@ -205,7 +197,6 @@ pub fn create_client_router(pool: PgPool, agent_sessions: SessionStore) -> Route
         // Public routes (no auth required)
         .route("/api/client/auth/login", post(login))
         // Protected routes (require client auth)
-        .route("/api/client/chat", post(client_chat))
         .route("/api/client/status", get(get_status))
         .route("/api/client/outstanding", get(get_outstanding))
         .route(
@@ -301,46 +292,6 @@ async fn login(
         accessible_cbus: cbus,
         expires_at: Utc::now() + chrono::Duration::hours(24),
     }))
-}
-
-/// Client chat endpoint
-async fn client_chat(
-    State(state): State<ClientState>,
-    Extension(client): Extension<AuthenticatedClient>,
-    Json(request): Json<ClientChatRequest>,
-) -> Result<Json<AgentChatResponse>, (StatusCode, String)> {
-    // Validate CBU access if specified
-    if let Some(cbu_id) = request.cbu_id {
-        if !client.accessible_cbus.contains(&cbu_id) {
-            return Err((
-                StatusCode::FORBIDDEN,
-                "Access denied to this CBU".to_string(),
-            ));
-        }
-    }
-
-    // Create client-scoped agent service
-    let _service = AgentService::for_client_named(
-        state.pool.clone(),
-        client.client_id,
-        client.accessible_cbus.clone(),
-        client.client_name.clone(),
-    );
-
-    // Get or create agent session for this client
-    let session_id = client.client_id; // Use client_id as session_id for simplicity
-    let mut sessions = state.agent_sessions.write().await;
-    let _session = sessions
-        .entry(session_id)
-        .or_insert_with(|| AgentSession::new(Some("client".to_string())));
-
-    // Process chat (same pipeline, but client-scoped)
-    // Note: This would need an LLM client - for now return a placeholder
-    // In production, inject the LLM client via state
-    Err((
-        StatusCode::NOT_IMPLEMENTED,
-        "Chat requires LLM client - use with full server setup".to_string(),
-    ))
 }
 
 /// Get onboarding status for client's CBUs

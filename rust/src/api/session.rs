@@ -761,6 +761,17 @@ impl ServerRunSheet {
         }
     }
 
+    /// Mark all runnable entries as executed
+    pub fn mark_all_executed(&mut self) {
+        let now = Utc::now();
+        for entry in &mut self.entries {
+            if entry.status.is_runnable() {
+                entry.status = DslStatus::Executed;
+                entry.executed_at = Some(now);
+            }
+        }
+    }
+
     /// Get all executed entries
     pub fn executed(&self) -> impl Iterator<Item = &ServerRunSheetEntry> {
         self.entries
@@ -2951,15 +2962,7 @@ pub struct CreateSessionResponse {
     pub welcome_message: String,
 }
 
-/// Request to send a chat message
-#[derive(Debug, Deserialize)]
-pub struct ChatRequest {
-    /// The user's message
-    pub message: String,
-    /// Optional CBU context (selected in UI)
-    #[serde(default)]
-    pub cbu_id: Option<uuid::Uuid>,
-}
+// ChatRequest is now in ob-poc-types - SINGLE source of truth
 
 /// Response from a chat message (intent-based)
 #[derive(Debug, Serialize)]

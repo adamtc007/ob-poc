@@ -18,10 +18,11 @@
 //! - GET    /api/agent/onboard/templates - List available onboarding templates
 //! - POST   /api/agent/onboard/render    - Render an onboarding template with parameters
 
+use crate::api::agent_service::ChatRequest;
 use crate::api::session::{
-    create_session_store, AgentSession, ChatRequest, CreateSessionRequest, CreateSessionResponse,
-    ExecuteResponse, ExecutionResult, MessageRole, ResolutionSubSession, SessionState,
-    SessionStateResponse, SessionStore, SubSessionType, UnresolvedRefInfo,
+    AgentSession, CreateSessionRequest, CreateSessionResponse, ExecuteResponse, ExecutionResult,
+    MessageRole, ResolutionSubSession, SessionState, SessionStateResponse, SessionStore,
+    SubSessionType, UnresolvedRefInfo,
 };
 
 // API types - SINGLE SOURCE OF TRUTH for HTTP boundary
@@ -867,37 +868,6 @@ pub struct AgentState {
 }
 
 impl AgentState {
-    pub fn new(pool: PgPool) -> Self {
-        Self::with_sessions(pool, create_session_store())
-    }
-
-    /// Create with a shared session store (no semantic search)
-    pub fn with_sessions(pool: PgPool, sessions: SessionStore) -> Self {
-        let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
-        let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
-        let session_repo = Arc::new(crate::database::SessionRepository::new(pool.clone()));
-        let dsl_repo = Arc::new(crate::database::DslRepository::new(pool.clone()));
-        let agent_service = Arc::new(crate::api::agent_service::AgentService::with_pool(
-            pool.clone(),
-        ));
-        let feedback_service = Arc::new(ob_semantic_matcher::FeedbackService::new(pool.clone()));
-        let expansion_audit =
-            Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
-        let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
-        Self {
-            pool,
-            dsl_v2_executor,
-            sessions,
-            session_manager,
-            generation_log,
-            session_repo,
-            dsl_repo,
-            agent_service,
-            feedback_service,
-            expansion_audit,
-        }
-    }
-
     /// Create with semantic verb search (blocks on embedder init ~3-5s)
     ///
     /// This is the primary constructor. Initializes Candle embedder synchronously
@@ -913,26 +883,26 @@ impl AgentState {
         let session_manager = crate::api::session_manager::SessionManager::new(sessions.clone());
 
         // Initialize embedder synchronously (blocks ~3-5s, but only at startup)
+        // This is REQUIRED - server cannot start without semantic search
         tracing::info!("Initializing Candle embedder...");
         let start = std::time::Instant::now();
 
-        let embedder: Option<Arc<CandleEmbedder>> =
-            match tokio::task::spawn_blocking(CandleEmbedder::new).await {
-                Ok(Ok(e)) => {
-                    tracing::info!("Candle embedder ready in {}ms", start.elapsed().as_millis());
-                    Some(Arc::new(e))
-                }
-                Ok(Err(e)) => {
-                    tracing::error!("Failed to initialize Candle embedder: {}", e);
-                    None
-                }
-                Err(e) => {
-                    tracing::error!("Candle embedder task panicked: {}", e);
-                    None
-                }
-            };
+        let embedder: Arc<CandleEmbedder> = match tokio::task::spawn_blocking(CandleEmbedder::new)
+            .await
+        {
+            Ok(Ok(e)) => {
+                tracing::info!("Candle embedder ready in {}ms", start.elapsed().as_millis());
+                Arc::new(e)
+            }
+            Ok(Err(e)) => {
+                panic!("FATAL: Failed to initialize Candle embedder: {}. Server cannot start without semantic search.", e);
+            }
+            Err(e) => {
+                panic!("FATAL: Candle embedder task panicked: {}. Server cannot start without semantic search.", e);
+            }
+        };
 
-        // Build agent service with embedder
+        // Build agent service with embedder - REQUIRED, no fallback
         let agent_service = crate::api::agent_service::AgentService::new(pool.clone(), embedder);
         let expansion_audit =
             Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
@@ -956,20 +926,11 @@ impl AgentState {
 // Router
 // ============================================================================
 
-pub fn create_agent_router(pool: PgPool) -> Router {
-    create_agent_router_with_sessions(pool, create_session_store())
-}
-
-/// Create agent router with a shared session store
-pub fn create_agent_router_with_sessions(pool: PgPool, sessions: SessionStore) -> Router {
-    let state = AgentState::with_sessions(pool, sessions);
-    create_agent_router_with_state(state)
-}
-
-/// Create agent router with semantic verb search (async)
+/// Create agent router with semantic verb search
 ///
-/// This is the recommended constructor - initializes Candle embedder in background
-/// for semantic verb matching. Server starts immediately, embedder ready in ~3-5s.
+/// This is the ONLY constructor. Initializes Candle embedder synchronously
+/// so semantic search is available immediately when server starts accepting requests.
+/// There is no non-semantic path - all chat goes through the IntentPipeline.
 pub async fn create_agent_router_with_semantic(pool: PgPool, sessions: SessionStore) -> Router {
     let state = AgentState::with_semantic(pool, sessions).await;
     create_agent_router_with_state(state)
@@ -992,13 +953,9 @@ fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/session/:id/view-mode", post(set_session_view_mode))
         .route("/api/session/:id/dsl/enrich", get(get_enriched_dsl))
         .route("/api/session/:id/watch", get(watch_session))
-        // Sub-session management
+        // Sub-session management (create/get/complete/cancel only - chat goes through main pipeline)
         .route("/api/session/:id/subsession", post(create_subsession))
         .route("/api/session/:id/subsession/:child_id", get(get_subsession))
-        .route(
-            "/api/session/:id/subsession/:child_id/chat",
-            post(chat_subsession),
-        )
         .route(
             "/api/session/:id/subsession/:child_id/complete",
             post(complete_subsession),
@@ -1484,356 +1441,6 @@ pub struct SubSessionChatRequest {
 }
 
 /// POST /api/session/:id/subsession/:child_id/chat - Chat in sub-session
-async fn chat_subsession(
-    State(state): State<AgentState>,
-    Path((parent_id, child_id)): Path<(Uuid, Uuid)>,
-    Json(req): Json<SubSessionChatRequest>,
-) -> Result<Json<ChatResponse>, (StatusCode, String)> {
-    tracing::info!("Sub-session chat: {} -> {}", parent_id, child_id);
-
-    // Get and verify sub-session
-    let mut child = {
-        let sessions = state.sessions.read().await;
-        sessions.get(&child_id).cloned()
-    }
-    .ok_or_else(|| {
-        (
-            StatusCode::NOT_FOUND,
-            format!("Sub-session {} not found", child_id),
-        )
-    })?;
-
-    if child.parent_session_id != Some(parent_id) {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            "Invalid parent-child relationship".to_string(),
-        ));
-    }
-
-    // Add user message
-    child.add_user_message(req.message.clone());
-
-    // Process based on sub-session type
-    let response = match &child.sub_session_type {
-        SubSessionType::Resolution(_) => {
-            process_resolution_message(&mut child, &req.message, &state).await?
-        }
-        SubSessionType::Research(_) => {
-            // TODO: Implement research chat
-            ChatResponse {
-                message: "Research sub-session chat not yet implemented".to_string(),
-                dsl: None,
-                session_state: to_session_state_enum(&child.state),
-                commands: None,
-                disambiguation_request: None,
-                unresolved_refs: None,
-                current_ref_index: None,
-                dsl_hash: None,
-            }
-        }
-        SubSessionType::Review(_) => {
-            // TODO: Implement review chat
-            ChatResponse {
-                message: "Review sub-session chat not yet implemented".to_string(),
-                dsl: None,
-                session_state: to_session_state_enum(&child.state),
-                commands: None,
-                disambiguation_request: None,
-                unresolved_refs: None,
-                current_ref_index: None,
-                dsl_hash: None,
-            }
-        }
-        _ => {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                "Invalid sub-session type for chat".to_string(),
-            ));
-        }
-    };
-
-    // Update session in store
-    {
-        let mut sessions = state.sessions.write().await;
-        sessions.insert(child_id, child);
-    }
-
-    Ok(Json(response))
-}
-
-/// Process a message in a resolution sub-session
-async fn process_resolution_message(
-    session: &mut AgentSession,
-    message: &str,
-    _state: &AgentState,
-) -> Result<ChatResponse, (StatusCode, String)> {
-    let message_lower = message.trim().to_lowercase();
-
-    // Check for selection patterns: "1", "first", "the first one", "select 1"
-    if let Some(selection) = parse_selection(&message_lower) {
-        return handle_resolution_selection(session, selection);
-    }
-
-    // Check for skip pattern
-    if message_lower == "skip" || message_lower == "next" {
-        return handle_resolution_skip(session);
-    }
-
-    // Otherwise treat as refinement/search query
-    // For now, just echo back - full implementation would do discriminator parsing
-    let response_text = if let SubSessionType::Resolution(resolution) = &session.sub_session_type {
-        let current_ref = resolution.unresolved_refs.get(resolution.current_ref_index);
-        if let Some(cref) = current_ref {
-            format!(
-                "I understand you're trying to refine the search for \"{}\".\n\n\
-                 Current matches:\n{}\n\n\
-                 Please select a number (1-{}) or provide more details like:\n\
-                 - \"UK citizen\"\n\
-                 - \"born 1965\"\n\
-                 - \"director at BlackRock\"",
-                cref.search_value,
-                cref.initial_matches
-                    .iter()
-                    .enumerate()
-                    .map(|(i, m)| format!(
-                        "{}. {} ({}%){}",
-                        i + 1,
-                        m.display,
-                        m.score_pct,
-                        m.detail
-                            .as_ref()
-                            .map(|d| format!(" - {}", d))
-                            .unwrap_or_default()
-                    ))
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                cref.initial_matches.len()
-            )
-        } else {
-            "No more entities to resolve.".to_string()
-        }
-    } else {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Expected resolution sub-session".to_string(),
-        ));
-    };
-
-    session.add_agent_message(response_text.clone(), None, None);
-
-    Ok(ChatResponse {
-        message: response_text,
-        dsl: None,
-        session_state: to_session_state_enum(&session.state),
-        commands: None,
-        disambiguation_request: None,
-        unresolved_refs: None,
-        current_ref_index: None,
-        dsl_hash: None,
-    })
-}
-
-/// Parse selection patterns from user input
-fn parse_selection(input: &str) -> Option<usize> {
-    // Direct number: "1", "2", etc.
-    if let Ok(n) = input.parse::<usize>() {
-        if n >= 1 {
-            return Some(n - 1); // Convert to 0-indexed
-        }
-    }
-
-    // "select N"
-    if let Some(rest) = input.strip_prefix("select ") {
-        if let Ok(n) = rest.trim().parse::<usize>() {
-            if n >= 1 {
-                return Some(n - 1);
-            }
-        }
-    }
-
-    // Ordinals
-    let ordinals = [
-        ("first", 0),
-        ("1st", 0),
-        ("second", 1),
-        ("2nd", 1),
-        ("third", 2),
-        ("3rd", 2),
-        ("fourth", 3),
-        ("4th", 3),
-        ("fifth", 4),
-        ("5th", 4),
-    ];
-
-    for (word, idx) in ordinals {
-        if input.contains(word) {
-            return Some(idx);
-        }
-    }
-
-    None
-}
-
-/// Handle user selecting a match in resolution
-fn handle_resolution_selection(
-    session: &mut AgentSession,
-    selection: usize,
-) -> Result<ChatResponse, (StatusCode, String)> {
-    let SubSessionType::Resolution(resolution) = &mut session.sub_session_type else {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Expected resolution sub-session".to_string(),
-        ));
-    };
-
-    let current_ref = resolution
-        .unresolved_refs
-        .get(resolution.current_ref_index)
-        .ok_or_else(|| {
-            (
-                StatusCode::BAD_REQUEST,
-                "No current ref to resolve".to_string(),
-            )
-        })?;
-
-    // Validate selection
-    if selection >= current_ref.initial_matches.len() {
-        let msg = format!(
-            "Please select a number between 1 and {}",
-            current_ref.initial_matches.len()
-        );
-        session.add_agent_message(msg.clone(), None, None);
-        return Ok(ChatResponse {
-            message: msg,
-            dsl: None,
-            session_state: to_session_state_enum(&session.state),
-            commands: None,
-            disambiguation_request: None,
-            unresolved_refs: None,
-            current_ref_index: None,
-            dsl_hash: None,
-        });
-    }
-
-    let selected = &current_ref.initial_matches[selection];
-
-    // Capture values before mutating
-    let ref_id = current_ref.ref_id.clone();
-    let selected_value = selected.value.clone();
-    let selected_display = selected.display.clone();
-    let selected_detail = selected.detail.clone();
-
-    // Record resolution
-    resolution.resolutions.insert(ref_id, selected_value);
-
-    // Move to next ref
-    resolution.current_ref_index += 1;
-
-    let response_text = if resolution.current_ref_index < resolution.unresolved_refs.len() {
-        let next_ref = &resolution.unresolved_refs[resolution.current_ref_index];
-        format!(
-            "Selected: {} {}\n\n\
-             Next: Which {}?\n\n{}\n\n\
-             Select a number or provide details to refine.",
-            selected_display,
-            selected_detail
-                .map(|d| format!("({})", d))
-                .unwrap_or_default(),
-            next_ref.entity_type,
-            next_ref
-                .initial_matches
-                .iter()
-                .enumerate()
-                .map(|(i, m)| format!(
-                    "{}. {} ({}%){}",
-                    i + 1,
-                    m.display,
-                    m.score_pct,
-                    m.detail
-                        .as_ref()
-                        .map(|d| format!(" - {}", d))
-                        .unwrap_or_default()
-                ))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
-    } else {
-        // All resolved
-        session.state = SessionState::Executed;
-        format!(
-            "Selected: {} {}\n\n\
-             All {} entities resolved. Ready to apply changes?",
-            selected_display,
-            selected_detail
-                .map(|d| format!("({})", d))
-                .unwrap_or_default(),
-            resolution.resolutions.len()
-        )
-    };
-
-    session.add_agent_message(response_text.clone(), None, None);
-
-    Ok(ChatResponse {
-        message: response_text,
-        dsl: None,
-        session_state: to_session_state_enum(&session.state),
-        commands: None,
-        disambiguation_request: None,
-        unresolved_refs: None,
-        current_ref_index: None,
-        dsl_hash: None,
-    })
-}
-
-/// Handle skipping current ref in resolution
-fn handle_resolution_skip(
-    session: &mut AgentSession,
-) -> Result<ChatResponse, (StatusCode, String)> {
-    let SubSessionType::Resolution(resolution) = &mut session.sub_session_type else {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Expected resolution sub-session".to_string(),
-        ));
-    };
-
-    resolution.current_ref_index += 1;
-
-    let response_text = if resolution.current_ref_index < resolution.unresolved_refs.len() {
-        let next_ref = &resolution.unresolved_refs[resolution.current_ref_index];
-        format!(
-            "Skipped.\n\nNext: Which {}?\n\n{}\n\nSelect a number or provide details.",
-            next_ref.entity_type,
-            next_ref
-                .initial_matches
-                .iter()
-                .enumerate()
-                .map(|(i, m)| format!("{}. {} ({}%)", i + 1, m.display, m.score_pct))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
-    } else {
-        session.state = SessionState::Executed;
-        format!(
-            "Skipped.\n\n{} entities resolved, {} skipped. Ready to apply?",
-            resolution.resolutions.len(),
-            resolution.unresolved_refs.len() - resolution.resolutions.len()
-        )
-    };
-
-    session.add_agent_message(response_text.clone(), None, None);
-
-    Ok(ChatResponse {
-        message: response_text,
-        dsl: None,
-        session_state: to_session_state_enum(&session.state),
-        commands: None,
-        disambiguation_request: None,
-        unresolved_refs: None,
-        current_ref_index: None,
-        dsl_hash: None,
-    })
-}
-
 /// Request to complete a resolution sub-session
 #[derive(Debug, Deserialize)]
 pub struct CompleteSubSessionRequest {
@@ -2481,8 +2088,6 @@ async fn chat_session(
     Path(session_id): Path<Uuid>,
     Json(req): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, StatusCode> {
-    use crate::api::agent_service::AgentChatRequest;
-
     tracing::info!("=== CHAT SESSION START ===");
     tracing::info!("Session ID: {}", session_id);
     tracing::info!("Message: {:?}", req.message);
@@ -2583,17 +2188,10 @@ async fn chat_session(
         llm_client.model_name()
     );
 
-    // Build request for AgentService
-    let agent_request = AgentChatRequest {
-        message: req.message.clone(),
-        cbu_id: req.cbu_id,
-        disambiguation_response: None,
-    };
-
-    // Delegate to centralized AgentService
+    // Delegate to centralized AgentService (single pipeline)
     let response = match state
         .agent_service
-        .process_chat(&mut session, &agent_request, llm_client)
+        .process_chat(&mut session, &req, llm_client)
         .await
     {
         Ok(r) => r,
