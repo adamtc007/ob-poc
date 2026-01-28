@@ -84,6 +84,9 @@ pub mod verification;
 // Taxonomy module - generic taxonomy pattern for Product/Instrument domains
 pub mod taxonomy;
 
+// Lint module - schema validation for macro and verb definitions
+pub mod lint;
+
 // GLEIF integration - LEI data enrichment and corporate tree traversal
 #[cfg(feature = "database")]
 pub mod gleif;

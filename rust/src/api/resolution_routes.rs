@@ -26,11 +26,11 @@ use ob_poc_types::resolution::*;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::api::session::{
-    EntityMatchInfo, ResolutionSubSession, SessionStore, SubSessionType, UnresolvedRefInfo,
-};
+use crate::api::session::SessionStore;
+// Use unified session types
 use crate::dsl_v2::gateway_resolver::GatewayRefResolver;
 use crate::dsl_v2::semantic_validator::entity_type_to_ref_type;
+use crate::session::{EntityMatchInfo, ResolutionSubSession, SubSessionType, UnresolvedRefInfo};
 
 /// Shared state for resolution routes
 #[derive(Clone)]
@@ -296,10 +296,10 @@ async fn build_session_response_enriched(
         auto_resolved: vec![],
         resolved,
         summary: ResolutionSummary {
-            total_refs: progress.total,
-            resolved_count: progress.resolved,
+            total_refs: progress.1,
+            resolved_count: progress.0,
             warnings_count: 0,
-            required_review_count: progress.total - progress.resolved,
+            required_review_count: progress.1 - progress.0,
             can_commit: resolution.is_complete(),
         },
     }
@@ -360,10 +360,10 @@ fn build_session_response(
         auto_resolved: vec![],
         resolved,
         summary: ResolutionSummary {
-            total_refs: progress.total,
-            resolved_count: progress.resolved,
+            total_refs: progress.1,
+            resolved_count: progress.0,
             warnings_count: 0,
-            required_review_count: progress.total - progress.resolved,
+            required_review_count: progress.1 - progress.0,
             can_commit: resolution.is_complete(),
         },
     }
@@ -795,7 +795,7 @@ pub async fn commit_resolution(
             StatusCode::BAD_REQUEST,
             format!(
                 "Cannot commit: only {}/{} references resolved",
-                progress.resolved, progress.total
+                progress.0, progress.1
             ),
         ));
     }

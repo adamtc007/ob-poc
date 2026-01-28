@@ -2525,7 +2525,7 @@ impl ToolHandlers {
 
     /// Load a single CBU into the session scope
     async fn session_load_cbu(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
 
         let pool = self.require_pool()?;
 
@@ -2559,23 +2559,23 @@ impl ToolHandlers {
         let mut guard = sessions.write().await;
 
         // Use default session for now (could be parameterized)
-        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
 
         session.load_cbu(id);
-        session.maybe_save(pool);
+        let _ = session.save(pool).await;
 
         Ok(json!({
             "loaded": true,
             "cbu_id": id,
             "name": name,
             "jurisdiction": jurisdiction,
-            "scope_size": session.count()
+            "scope_size": session.cbu_count()
         }))
     }
 
     /// Load all CBUs in a jurisdiction
     async fn session_load_jurisdiction(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
 
         let pool = self.require_pool()?;
         let jurisdiction = args["jurisdiction"]
@@ -2599,13 +2599,11 @@ impl ToolHandlers {
         // Get or create session
         let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
 
         // Load all CBUs
-        for id in &cbu_ids {
-            session.load_cbu(*id);
-        }
-        session.maybe_save(pool);
+        session.load_cbus(cbu_ids.clone());
+        let _ = session.save(pool).await;
 
         Ok(json!({
             "loaded": true,
@@ -2618,7 +2616,7 @@ impl ToolHandlers {
 
     /// Load all CBUs under a commercial client (galaxy)
     async fn session_load_galaxy(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
 
         let pool = self.require_pool()?;
 
@@ -2663,13 +2661,11 @@ impl ToolHandlers {
         // Get or create session
         let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
 
         // Load all CBUs
-        for id in &cbu_ids {
-            session.load_cbu(*id);
-        }
-        session.maybe_save(pool);
+        session.load_cbus(cbu_ids.clone());
+        let _ = session.save(pool).await;
 
         Ok(json!({
             "loaded": true,
@@ -2683,7 +2679,7 @@ impl ToolHandlers {
 
     /// Remove a CBU from the current session scope
     async fn session_unload_cbu(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
 
         let pool = self.require_pool()?;
         let cbu_id = args["cbu_id"]
@@ -2693,31 +2689,31 @@ impl ToolHandlers {
 
         let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
 
         session.unload_cbu(cbu_id);
-        session.maybe_save(pool);
+        let _ = session.save(pool).await;
 
         Ok(json!({
             "unloaded": true,
             "cbu_id": cbu_id,
-            "scope_size": session.count()
+            "scope_size": session.cbu_count()
         }))
     }
 
     /// Clear session scope to empty (universe view)
     async fn session_clear(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
         let _ = args; // unused but kept for consistent signature
 
         let pool = self.require_pool()?;
 
         let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
 
-        session.clear();
-        session.maybe_save(pool);
+        session.clear_cbus_with_history();
+        let _ = session.save(pool).await;
 
         Ok(json!({
             "cleared": true,
@@ -2727,49 +2723,49 @@ impl ToolHandlers {
 
     /// Undo the last scope change
     async fn session_undo(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
         let _ = args;
 
         let pool = self.require_pool()?;
 
         let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
 
-        let success = session.undo();
+        let success = session.undo_cbu();
         if success {
-            session.maybe_save(pool);
+            let _ = session.save(pool).await;
         }
 
         Ok(json!({
             "success": success,
-            "scope_size": session.count(),
-            "history_depth": session.history_depth(),
-            "future_depth": session.future_depth()
+            "scope_size": session.cbu_count(),
+            "history_depth": session.cbu_history_depth(),
+            "future_depth": session.cbu_future_depth()
         }))
     }
 
     /// Redo a previously undone scope change
     async fn session_redo(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
         let _ = args;
 
         let pool = self.require_pool()?;
 
         let sessions = self.require_cbu_sessions()?;
         let mut guard = sessions.write().await;
-        let session = guard.entry(Uuid::nil()).or_insert_with(CbuSession::new);
+        let session = guard.entry(Uuid::nil()).or_insert_with(UnifiedSession::new);
 
-        let success = session.redo();
+        let success = session.redo_cbu();
         if success {
-            session.maybe_save(pool);
+            let _ = session.save(pool).await;
         }
 
         Ok(json!({
             "success": success,
-            "scope_size": session.count(),
-            "history_depth": session.history_depth(),
-            "future_depth": session.future_depth()
+            "scope_size": session.cbu_count(),
+            "history_depth": session.cbu_history_depth(),
+            "future_depth": session.cbu_future_depth()
         }))
     }
 
@@ -2800,14 +2796,14 @@ impl ToolHandlers {
             };
 
             Ok(json!({
-                "id": session.id(),
-                "name": session.name(),
+                "id": session.id,
+                "name": session.name,
                 "cbu_count": cbu_ids.len(),
                 "cbu_ids": cbu_ids,
                 "cbu_names": cbu_names,
-                "history_depth": session.history_depth(),
-                "future_depth": session.future_depth(),
-                "dirty": session.is_dirty()
+                "history_depth": session.cbu_history_depth(),
+                "future_depth": session.cbu_future_depth(),
+                "dirty": session.dirty
             }))
         } else {
             Ok(json!({
@@ -2825,20 +2821,21 @@ impl ToolHandlers {
 
     /// List saved sessions
     async fn session_list(&self, args: Value) -> Result<Value> {
-        use crate::session::CbuSession;
+        use crate::session::UnifiedSession;
 
         let pool = self.require_pool()?;
         let limit = args["limit"].as_i64().unwrap_or(20);
 
-        let sessions = CbuSession::list_all(pool, limit as usize).await;
+        let sessions = UnifiedSession::list_recent(None, limit, pool)
+            .await
+            .unwrap_or_default();
 
         Ok(json!({
             "sessions": sessions.iter().map(|s| json!({
                 "id": s.id,
                 "name": s.name,
                 "cbu_count": s.cbu_count,
-                "updated_at": s.updated_at.to_rfc3339(),
-                "expires_at": s.expires_at.to_rfc3339()
+                "updated_at": s.updated_at.to_rfc3339()
             })).collect::<Vec<_>>()
         }))
     }
@@ -2963,8 +2960,9 @@ impl ToolHandlers {
 
     /// Start a resolution sub-session
     async fn resolution_start(&self, args: Value) -> Result<Value> {
-        use crate::api::session::{
-            AgentSession, EntityMatchInfo, ResolutionSubSession, SubSessionType, UnresolvedRefInfo,
+        use crate::session::{
+            EntityMatchInfo, ResolutionSubSession, SubSessionType, UnifiedSession,
+            UnresolvedRefInfo,
         };
 
         let sessions = self.require_sessions()?;
@@ -3005,11 +3003,6 @@ impl ToolHandlers {
                     entity_type: r["entity_type"].as_str().unwrap_or("entity").to_string(),
                     context_line: r["context_line"].as_str().unwrap_or("").to_string(),
                     initial_matches,
-                    // Fields with defaults
-                    search_keys: Vec::new(),
-                    discriminators: Vec::new(),
-                    resolution_mode: Default::default(),
-                    verb_context: None,
                     resolved_key: None,
                     resolved_display: None,
                 }
@@ -3032,7 +3025,7 @@ impl ToolHandlers {
         };
 
         let child =
-            AgentSession::new_subsession(&parent, SubSessionType::Resolution(resolution_state));
+            UnifiedSession::new_subsession(&parent, SubSessionType::Resolution(resolution_state));
         let child_id = child.id;
 
         // Store child session
@@ -3062,7 +3055,7 @@ impl ToolHandlers {
 
     /// Refine search using discriminators
     async fn resolution_search(&self, args: Value) -> Result<Value> {
-        use crate::api::session::SubSessionType;
+        use crate::session::SubSessionType;
 
         let sessions = self.require_sessions()?;
 
@@ -3138,7 +3131,7 @@ impl ToolHandlers {
 
     /// Select a match to resolve current reference
     async fn resolution_select(&self, args: Value) -> Result<Value> {
-        use crate::api::session::SubSessionType;
+        use crate::session::SubSessionType;
 
         let sessions = self.require_sessions()?;
 
@@ -3256,7 +3249,8 @@ impl ToolHandlers {
 
     /// Complete resolution sub-session
     async fn resolution_complete(&self, args: Value) -> Result<Value> {
-        use crate::api::session::{BoundEntity, SubSessionType};
+        use crate::api::session::BoundEntity;
+        use crate::session::SubSessionType;
 
         let sessions = self.require_sessions()?;
 

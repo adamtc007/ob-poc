@@ -2928,7 +2928,10 @@ pub struct ExecutionResult {
 // ============================================================================
 
 /// Thread-safe in-memory session store
-pub type SessionStore = Arc<RwLock<HashMap<Uuid, AgentSession>>>;
+///
+/// NOTE: This now uses `UnifiedSession` as the single session type.
+/// `AgentSession` is deprecated and will be removed in a future version.
+pub type SessionStore = Arc<RwLock<HashMap<Uuid, crate::session::UnifiedSession>>>;
 
 /// Create a new session store
 pub fn create_session_store() -> SessionStore {
@@ -3042,6 +3045,30 @@ pub struct ExecuteRequest {
     /// Whether to execute in dry-run mode
     #[serde(default)]
     pub dry_run: bool,
+}
+
+// ============================================================================
+// Run Sheet Response Types
+// ============================================================================
+
+/// Response for run sheet state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunSheetResponse {
+    pub entries: Vec<RunSheetEntryResponse>,
+    pub cursor: usize,
+}
+
+/// Response for a single run sheet entry
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunSheetEntryResponse {
+    pub id: Uuid,
+    pub dsl_source: String,
+    pub display_dsl: String,
+    pub status: String,
+    pub created_at: DateTime<Utc>,
+    pub executed_at: Option<DateTime<Utc>>,
+    pub affected_entities: Vec<Uuid>,
+    pub error: Option<String>,
 }
 
 /// Response from executing DSL
@@ -3329,8 +3356,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_store() {
+        use crate::session::UnifiedSession;
+
         let store = create_session_store();
-        let session = AgentSession::new(None);
+        let session = UnifiedSession::new();
         let id = session.id;
 
         // Insert
@@ -3343,7 +3372,11 @@ mod tests {
         {
             let read = store.read().await;
             assert!(read.contains_key(&id));
-            assert_eq!(read.get(&id).unwrap().state, SessionState::New);
+            // UnifiedSession uses crate::session::unified::SessionState
+            assert_eq!(
+                read.get(&id).unwrap().state,
+                crate::session::unified::SessionState::New
+            );
         }
     }
 }

@@ -480,7 +480,7 @@ impl CustomOperation for TemplateBatchOp {
             pending_scope_change: None, // Batch operations don't produce scope changes
             source_attribution: ctx.source_attribution.clone(),
             session_id: ctx.session_id,
-            pending_cbu_session: None, // Batch operations don't modify session
+            pending_session: None, // Batch operations don't modify session
             session_cbu_ids: ctx.session_cbu_ids.clone(), // Inherit for bulk ops
             // Inherit client group context for entity resolution
             client_group_id: ctx.client_group_id,

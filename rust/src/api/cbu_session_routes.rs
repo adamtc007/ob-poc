@@ -29,10 +29,14 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::session::CbuSession;
+// Unified session types
+use crate::session::unified::{
+    EntryStatus, ExecutionPhase, ReplState, RunSheet, RunSheetEntry, SheetExecutionResult,
+    SheetStatus, UnifiedSession,
+};
 
-/// Shared state for CBU session endpoints
-pub type CbuSessionStore = Arc<RwLock<HashMap<Uuid, CbuSession>>>;
+/// Shared state for CBU session endpoints (uses UnifiedSession)
+pub type CbuSessionStore = Arc<RwLock<HashMap<Uuid, UnifiedSession>>>;
 
 /// Create a new CBU session store
 pub fn new_cbu_session_store() -> CbuSessionStore {
@@ -47,7 +51,7 @@ pub struct CbuSessionState {
 }
 
 /// Get session from memory or load from DB if not present (read-only)
-async fn get_or_load_session(session_id: Uuid, state: &CbuSessionState) -> Option<CbuSession> {
+async fn get_or_load_session(session_id: Uuid, state: &CbuSessionState) -> Option<UnifiedSession> {
     // Check memory first
     {
         let sessions = state.sessions.read().await;
@@ -57,10 +61,10 @@ async fn get_or_load_session(session_id: Uuid, state: &CbuSessionState) -> Optio
     }
 
     // Try to load from DB
-    let session = CbuSession::load_or_new(Some(session_id), &state.pool).await;
+    let session = UnifiedSession::load_or_new(Some(session_id), &state.pool).await;
 
     // If loaded successfully (has the right ID), cache it
-    if session.id() == session_id {
+    if session.id == session_id {
         let mut sessions = state.sessions.write().await;
         sessions.insert(session_id, session.clone());
         Some(session)
@@ -82,7 +86,7 @@ async fn ensure_session_in_store(session_id: Uuid, state: &CbuSessionState) {
     }
 
     // Try to load from DB, or create new
-    let session = CbuSession::load_or_new(Some(session_id), &state.pool).await;
+    let session = UnifiedSession::load_or_new(Some(session_id), &state.pool).await;
 
     // Insert into store (even if new - will have session_id set)
     let mut sessions = state.sessions.write().await;
@@ -163,19 +167,19 @@ async fn create_session(
     State(state): State<CbuSessionState>,
     Json(req): Json<CreateSessionRequest>,
 ) -> Result<Json<SessionResponse>, (StatusCode, String)> {
-    let mut session = CbuSession::new();
+    let mut session = UnifiedSession::new();
     if let Some(name) = req.name {
         session.name = Some(name);
     }
 
-    let id = session.id();
+    let id = session.id;
     let response = SessionResponse {
         id,
         name: session.name.clone(),
-        cbu_count: session.count(),
+        cbu_count: session.cbu_count(),
         cbu_ids: session.cbu_ids_vec(),
-        history_depth: session.history_depth(),
-        future_depth: session.future_depth(),
+        history_depth: session.cbu_history_depth(),
+        future_depth: session.cbu_future_depth(),
     };
 
     // Save to store
@@ -199,12 +203,12 @@ async fn get_session(
         })?;
 
     Ok(Json(SessionResponse {
-        id: session.id(),
+        id: session.id,
         name: session.name.clone(),
-        cbu_count: session.count(),
+        cbu_count: session.cbu_count(),
         cbu_ids: session.cbu_ids_vec(),
-        history_depth: session.history_depth(),
-        future_depth: session.future_depth(),
+        history_depth: session.cbu_history_depth(),
+        future_depth: session.cbu_future_depth(),
     }))
 }
 
@@ -212,10 +216,12 @@ async fn get_session(
 async fn list_sessions(
     Query(query): Query<ListQuery>,
     State(state): State<CbuSessionState>,
-) -> Result<Json<Vec<crate::session::SessionSummary>>, (StatusCode, String)> {
-    let limit = query.limit.unwrap_or(20) as usize;
-    let summaries = CbuSession::list_all(&state.pool, limit).await;
-    Ok(Json(summaries))
+) -> Result<Json<Vec<crate::session::SessionListItem>>, (StatusCode, String)> {
+    let limit = query.limit.unwrap_or(20);
+    let items = UnifiedSession::list_recent(None, limit, &state.pool)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(items))
 }
 
 /// POST /api/cbu-session/:id/load-cbu - Load a CBU into scope
@@ -257,12 +263,12 @@ async fn load_cbu(
     })?;
 
     let was_new = session.load_cbu(cbu_id);
-    session.maybe_save(&state.pool);
+    let _ = session.save(&state.pool).await;
 
     Ok(Json(LoadResult {
         loaded: was_new,
         count: if was_new { 1 } else { 0 },
-        scope_size: session.count(),
+        scope_size: session.cbu_count(),
     }))
 }
 
@@ -301,13 +307,13 @@ async fn load_jurisdiction(
         )
     })?;
 
-    let count = session.load_many(cbu_ids);
-    session.maybe_save(&state.pool);
+    let count = session.load_cbus(cbu_ids);
+    let _ = session.save(&state.pool).await;
 
     Ok(Json(LoadResult {
         loaded: count > 0,
         count,
-        scope_size: session.count(),
+        scope_size: session.cbu_count(),
     }))
 }
 
@@ -368,13 +374,13 @@ async fn load_galaxy(
         )
     })?;
 
-    let count = session.load_many(cbu_ids);
-    session.maybe_save(&state.pool);
+    let count = session.load_cbus(cbu_ids);
+    let _ = session.save(&state.pool).await;
 
     Ok(Json(LoadResult {
         loaded: count > 0,
         count,
-        scope_size: session.count(),
+        scope_size: session.cbu_count(),
     }))
 }
 
@@ -396,12 +402,12 @@ async fn unload_cbu(
     })?;
 
     let was_present = session.unload_cbu(req.cbu_id);
-    session.maybe_save(&state.pool);
+    let _ = session.save(&state.pool).await;
 
     Ok(Json(LoadResult {
         loaded: false,
         count: if was_present { 1 } else { 0 },
-        scope_size: session.count(),
+        scope_size: session.cbu_count(),
     }))
 }
 
@@ -421,8 +427,8 @@ async fn clear_session(
         )
     })?;
 
-    let count = session.clear();
-    session.maybe_save(&state.pool);
+    let count = session.clear_cbus_with_history();
+    let _ = session.save(&state.pool).await;
 
     Ok(Json(LoadResult {
         loaded: false,
@@ -447,16 +453,16 @@ async fn undo(
         )
     })?;
 
-    let success = session.undo();
+    let success = session.undo_cbu();
     if success {
-        session.maybe_save(&state.pool);
+        let _ = session.save(&state.pool).await;
     }
 
     Ok(Json(HistoryResult {
         success,
-        scope_size: session.count(),
-        history_depth: session.history_depth(),
-        future_depth: session.future_depth(),
+        scope_size: session.cbu_count(),
+        history_depth: session.cbu_history_depth(),
+        future_depth: session.cbu_future_depth(),
     }))
 }
 
@@ -476,16 +482,16 @@ async fn redo(
         )
     })?;
 
-    let success = session.redo();
+    let success = session.redo_cbu();
     if success {
-        session.maybe_save(&state.pool);
+        let _ = session.save(&state.pool).await;
     }
 
     Ok(Json(HistoryResult {
         success,
-        scope_size: session.count(),
-        history_depth: session.history_depth(),
-        future_depth: session.future_depth(),
+        scope_size: session.cbu_count(),
+        history_depth: session.cbu_history_depth(),
+        future_depth: session.cbu_future_depth(),
     }))
 }
 
@@ -498,7 +504,7 @@ async fn delete_session(
     state.sessions.write().await.remove(&session_id);
 
     // Remove from DB
-    let deleted = CbuSession::delete(session_id, &state.pool)
+    let deleted = UnifiedSession::delete(session_id, &state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -556,12 +562,12 @@ async fn set_scope(
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
 
     session
-        .set_scope(request.scope_dsl)
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .set_repl_scope(request.scope_dsl)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
 
     // Persist to DB
     session
-        .force_save(&state.pool)
+        .save(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -586,12 +592,12 @@ async fn set_template(
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
 
     session
-        .set_template(request.template_dsl, request.target_entity_type)
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .set_repl_template(request.template_dsl, request.target_entity_type)
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
 
     // Persist to DB
     session
-        .force_save(&state.pool)
+        .save(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -623,12 +629,12 @@ async fn confirm_intent(
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
 
     session
-        .confirm_intent()
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .confirm_repl_intent()
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
 
     // Persist to DB
     session
-        .force_save(&state.pool)
+        .save(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -643,9 +649,7 @@ async fn confirm_intent(
 async fn generate_sheet(
     Path(session_id): Path<Uuid>,
     State(state): State<CbuSessionState>,
-) -> Result<Json<crate::session::dsl_sheet::DslSheet>, (StatusCode, String)> {
-    use crate::session::dsl_sheet::{DslSheet, SessionDslStatement, StatementStatus};
-
+) -> Result<Json<RunSheet>, (StatusCode, String)> {
     ensure_session_in_store(session_id, &state).await;
 
     let mut sessions = state.sessions.write().await;
@@ -667,7 +671,7 @@ async fn generate_sheet(
         .ok_or((StatusCode::BAD_REQUEST, "No template DSL set".to_string()))?;
 
     // Get entities from current scope
-    let entity_ids: Vec<Uuid> = session.cbu_ids().copied().collect();
+    let entity_ids: Vec<Uuid> = session.cbu_ids_vec();
     if entity_ids.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -675,37 +679,41 @@ async fn generate_sheet(
         ));
     }
 
-    // Generate statements by expanding template for each entity
-    let mut statements = Vec::with_capacity(entity_ids.len());
-    for (idx, entity_id) in entity_ids.iter().enumerate() {
+    // Generate entries by expanding template for each entity
+    let now = chrono::Utc::now();
+    let mut entries = Vec::with_capacity(entity_ids.len());
+    for entity_id in entity_ids.iter() {
         // Replace @cbu placeholder with actual UUID
         let populated = template.replace("@cbu", &format!("\"{}\"", entity_id));
-        statements.push(SessionDslStatement {
-            index: idx,
-            source: populated,
+        entries.push(RunSheetEntry {
+            id: Uuid::new_v4(),
+            dsl_source: populated.clone(),
+            display_dsl: populated,
+            status: EntryStatus::Ready,
+            created_at: now,
+            executed_at: None,
+            affected_entities: vec![*entity_id],
+            error: None,
             dag_depth: 0, // Will be computed after DAG analysis
-            produces: None,
-            consumes: vec!["cbu".to_string()],
-            resolved_args: std::collections::HashMap::new(),
-            returned_pk: None,
-            status: StatementStatus::Pending,
+            dependencies: vec![],
+            validation_errors: vec![],
         });
     }
 
-    let sheet = DslSheet::with_statements(session_id, statements);
+    let run_sheet = RunSheet { entries, cursor: 0 };
 
-    // Update session state
+    // Update session state - UnifiedSession uses RunSheet directly
     session
-        .set_generated(sheet.clone())
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .set_repl_generated(run_sheet.clone())
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     // Persist to DB
     session
-        .force_save(&state.pool)
+        .save(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    Ok(Json(sheet))
+    Ok(Json(run_sheet))
 }
 
 /// POST /api/cbu-session/:id/sheet/submit - Submit sheet for execution
@@ -713,9 +721,8 @@ async fn submit_sheet(
     Path(session_id): Path<Uuid>,
     State(state): State<CbuSessionState>,
     Json(request): Json<SubmitSheetRequest>,
-) -> Result<Json<crate::session::dsl_sheet::SheetExecutionResult>, (StatusCode, String)> {
+) -> Result<Json<SheetExecutionResult>, (StatusCode, String)> {
     use crate::dsl_v2::SheetExecutor;
-    use crate::session::dsl_sheet::SheetStatus;
 
     if !request.confirm {
         return Err((
@@ -727,18 +734,16 @@ async fn submit_sheet(
     ensure_session_in_store(session_id, &state).await;
 
     // Get session and validate state
-    let (mut sheet, phases, scope_dsl, template_dsl) = {
+    let (mut run_sheet, scope_dsl, template_dsl) = {
         let sessions = state.sessions.read().await;
         let session = sessions
             .get(&session_id)
             .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
 
-        // Validate state - must be Ready
+        // Validate state - must be Ready/Generated/Parsed
         if !matches!(
             session.repl_state,
-            crate::session::ReplSessionState::Ready
-                | crate::session::ReplSessionState::Generated
-                | crate::session::ReplSessionState::Parsed
+            ReplState::Ready | ReplState::Generated | ReplState::Parsed
         ) {
             return Err((
                 StatusCode::BAD_REQUEST,
@@ -749,29 +754,28 @@ async fn submit_sheet(
             ));
         }
 
-        let sheet = session.sheet.clone().ok_or((
-            StatusCode::BAD_REQUEST,
-            "No sheet generated. Call /sheet/generate first.".to_string(),
-        ))?;
+        let sheet = session.run_sheet.clone();
 
-        let phases = sheet.phases.clone();
         let scope_dsl = session.scope_dsl.clone();
         let template_dsl = session.template_dsl.clone();
 
-        (sheet, phases, scope_dsl, template_dsl)
+        (sheet, scope_dsl, template_dsl)
     };
 
-    // Execute the sheet
+    // Build execution phases from run sheet
+    let phases = build_execution_phases(&run_sheet);
+
+    // Execute the sheet using unified API
     let executor = SheetExecutor::new(&state.pool, None);
     let result = executor
-        .execute_phased(&mut sheet, &phases)
+        .execute_run_sheet(session_id, &mut run_sheet, &phases)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // Persist audit trail
+    // Persist audit trail using unified types
     let _ = executor
-        .persist_audit(
-            &sheet,
+        .persist_audit_unified(
+            &run_sheet,
             &result,
             &scope_dsl,
             template_dsl.as_deref(),
@@ -784,14 +788,36 @@ async fn submit_sheet(
         let mut sessions = state.sessions.write().await;
         if let Some(session) = sessions.get_mut(&session_id) {
             let success = result.overall_status == SheetStatus::Success;
-            let _ = session.mark_executed(success);
+            let _ = session.mark_repl_executed(success);
 
             // Persist to DB
-            let _ = session.force_save(&state.pool).await;
+            let _ = session.save(&state.pool).await;
         }
     }
 
     Ok(Json(result))
+}
+
+/// Build execution phases from RunSheet entries grouped by dag_depth
+fn build_execution_phases(run_sheet: &RunSheet) -> Vec<ExecutionPhase> {
+    use std::collections::BTreeMap;
+
+    // Group entries by dag_depth
+    let mut by_depth: BTreeMap<u32, Vec<Uuid>> = BTreeMap::new();
+    for entry in &run_sheet.entries {
+        by_depth.entry(entry.dag_depth).or_default().push(entry.id);
+    }
+
+    // Build phases in order
+    by_depth
+        .into_iter()
+        .map(|(depth, entry_ids)| ExecutionPhase {
+            depth,
+            entry_ids,
+            produces: vec![],
+            consumes: vec![],
+        })
+        .collect()
 }
 
 /// GET /api/cbu-session/:id/state - Get REPL state machine info
@@ -810,12 +836,12 @@ async fn get_repl_state(
         "template_set": session.template_dsl.is_some(),
         "target_entity_type": session.target_entity_type,
         "intent_confirmed": session.intent_confirmed,
-        "sheet": session.sheet.as_ref().map(|s| serde_json::json!({
-            "id": s.id,
-            "statement_count": s.statement_count(),
-            "phase_count": s.phase_count(),
-        })),
-        "cbu_count": session.count(),
+        "sheet": {
+            "entry_count": session.run_sheet.entries.len(),
+            "max_depth": session.run_sheet.max_depth(),
+            "cursor": session.run_sheet.cursor,
+        },
+        "cbu_count": session.cbu_count(),
     })))
 }
 
@@ -832,12 +858,12 @@ async fn reset_session(
         .ok_or((StatusCode::NOT_FOUND, "Session not found".to_string()))?;
 
     session
-        .reset_to_scoped()
-        .map_err(|e| (StatusCode::BAD_REQUEST, e.to_string()))?;
+        .reset_repl_to_scoped()
+        .map_err(|e| (StatusCode::BAD_REQUEST, e))?;
 
     // Persist to DB
     session
-        .force_save(&state.pool)
+        .save(&state.pool)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

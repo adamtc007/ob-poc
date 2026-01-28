@@ -20,9 +20,13 @@
 
 use crate::api::agent_service::ChatRequest;
 use crate::api::session::{
-    AgentSession, CreateSessionRequest, CreateSessionResponse, ExecuteResponse, ExecutionResult,
-    MessageRole, ResolutionSubSession, SessionState, SessionStateResponse, SessionStore,
-    SubSessionType, UnresolvedRefInfo,
+    CreateSessionRequest, CreateSessionResponse, ExecuteResponse, ExecutionResult,
+    SessionStateResponse, SessionStore,
+};
+// Use unified session types - single source of truth
+use crate::session::{
+    MessageRole, ResearchSubSession, ResolutionSubSession, ReviewStatus, ReviewSubSession,
+    SessionState, SubSessionType, UnifiedSession, UnresolvedRefInfo,
 };
 
 // API types - SINGLE SOURCE OF TRUTH for HTTP boundary
@@ -39,7 +43,7 @@ use crate::dsl_v2::{
 use crate::ontology::SemanticStageRegistry;
 use ob_poc_types::{
     resolution::{
-        DiscriminatorField as ApiDiscriminatorField, DiscriminatorFieldType, RefContext,
+        DiscriminatorField as ApiDiscriminatorField, RefContext,
         ResolutionModeHint as ApiResolutionModeHint, ReviewRequirement,
         SearchKeyField as ApiSearchKeyField, SearchKeyFieldType,
         UnresolvedRefResponse as ApiUnresolvedRefResponse,
@@ -64,7 +68,7 @@ use uuid::Uuid;
 // Type Converters - Internal types to API types (ob_poc_types)
 // ============================================================================
 
-/// Convert internal SessionState to API SessionStateEnum
+/// Convert internal SessionState to API SessionStateEnum (unified version)
 fn to_session_state_enum(state: &SessionState) -> SessionStateEnum {
     match state {
         SessionState::New => SessionStateEnum::New,
@@ -74,6 +78,19 @@ fn to_session_state_enum(state: &SessionState) -> SessionStateEnum {
         SessionState::Executing => SessionStateEnum::Executing,
         SessionState::Executed => SessionStateEnum::Executed,
         SessionState::Closed => SessionStateEnum::Executed, // Map closed to executed for API
+    }
+}
+
+/// Convert api::session::SessionState to API SessionStateEnum (for backward compat)
+fn api_session_state_to_enum(state: &crate::session::SessionState) -> SessionStateEnum {
+    match state {
+        crate::session::SessionState::New => SessionStateEnum::New,
+        crate::session::SessionState::Scoped => SessionStateEnum::Scoped,
+        crate::session::SessionState::PendingValidation => SessionStateEnum::PendingValidation,
+        crate::session::SessionState::ReadyToExecute => SessionStateEnum::ReadyToExecute,
+        crate::session::SessionState::Executing => SessionStateEnum::Executing,
+        crate::session::SessionState::Executed => SessionStateEnum::Executed,
+        crate::session::SessionState::Closed => SessionStateEnum::Executed,
     }
 }
 
@@ -376,62 +393,42 @@ fn build_dsl_state(
     })
 }
 
-/// Convert internal UnresolvedRefInfo to API UnresolvedRefResponse
+/// Convert unified UnresolvedRefInfo to API UnresolvedRefResponse
+#[allow(dead_code)]
 fn to_api_unresolved_ref(info: &UnresolvedRefInfo) -> ApiUnresolvedRefResponse {
-    use crate::api::session::ResolutionModeHint;
+    // Create a simple search key from the entity_type and search_value
+    let search_keys: Vec<ApiSearchKeyField> = vec![ApiSearchKeyField {
+        name: "name".to_string(),
+        label: "Name".to_string(),
+        is_default: true,
+        field_type: SearchKeyFieldType::Text,
+        enum_values: None,
+    }];
 
-    // Convert search keys
-    let search_keys: Vec<ApiSearchKeyField> = info
-        .search_keys
-        .iter()
-        .map(|sk| ApiSearchKeyField {
-            name: sk.key.clone(),
-            label: sk.label.clone(),
-            is_default: sk.is_primary,
-            field_type: SearchKeyFieldType::Text, // Default to text
-            enum_values: None,
-        })
-        .collect();
+    // No discriminator fields in simplified unified type
+    let discriminator_fields: Vec<ApiDiscriminatorField> = vec![];
 
-    // Convert discriminators
-    let discriminator_fields: Vec<ApiDiscriminatorField> = info
-        .discriminators
-        .iter()
-        .map(|d| ApiDiscriminatorField {
-            name: d.key.clone(),
-            label: d.label.clone(),
-            selectivity: 0.5, // Default selectivity
-            field_type: DiscriminatorFieldType::String,
-            enum_values: None,
-            value: d.value.clone(),
-        })
-        .collect();
+    // Default to picker/modal for resolution
+    let resolution_mode = ApiResolutionModeHint::SearchModal;
 
-    // Convert resolution mode
-    let resolution_mode = match info.resolution_mode {
-        ResolutionModeHint::SearchModal => ApiResolutionModeHint::SearchModal,
-        ResolutionModeHint::InlineAutocomplete => ApiResolutionModeHint::Autocomplete,
-        ResolutionModeHint::Dropdown => ApiResolutionModeHint::Autocomplete, // Map dropdown to autocomplete
-    };
-
-    // Build context from verb_context
-    let context = if let Some(vc) = &info.verb_context {
-        RefContext {
-            statement_index: vc.stmt_index,
-            verb: vc.verb.clone(),
-            arg_name: vc.arg_name.clone(),
-            dsl_snippet: Some(info.context_line.clone()),
-        }
+    // Parse ref_id to get statement index (format: "stmt_idx:arg_name")
+    let (stmt_idx, arg_name) = if let Some(colon_pos) = info.ref_id.find(':') {
+        let stmt_str = &info.ref_id[..colon_pos];
+        let arg = info.ref_id[colon_pos + 1..].to_string();
+        (stmt_str.parse::<usize>().unwrap_or(0), arg)
     } else {
-        RefContext {
-            statement_index: 0,
-            verb: String::new(),
-            arg_name: String::new(),
-            dsl_snippet: Some(info.context_line.clone()),
-        }
+        (0, info.ref_id.clone())
     };
 
-    // Convert initial matches
+    // Build context from ref_id
+    let context = RefContext {
+        statement_index: stmt_idx,
+        verb: String::new(), // Not available in simplified type
+        arg_name,
+        dsl_snippet: Some(info.context_line.clone()),
+    };
+
+    // Convert initial matches from unified EntityMatchInfo
     let initial_matches: Vec<ob_poc_types::resolution::EntityMatchResponse> = info
         .initial_matches
         .iter()
@@ -463,9 +460,83 @@ fn to_api_unresolved_ref(info: &UnresolvedRefInfo) -> ApiUnresolvedRefResponse {
     }
 }
 
-/// Convert a list of UnresolvedRefInfo to API types
+/// Convert a list of UnresolvedRefInfo (unified) to API types
+#[allow(dead_code)]
 fn to_api_unresolved_refs(refs: &[UnresolvedRefInfo]) -> Vec<ApiUnresolvedRefResponse> {
     refs.iter().map(to_api_unresolved_ref).collect()
+}
+
+/// Convert a list of UnresolvedRefInfo (unified) to API types
+fn api_unresolved_refs_to_api(
+    refs: &[crate::session::UnresolvedRefInfo],
+) -> Vec<ApiUnresolvedRefResponse> {
+    refs.iter().map(api_unresolved_ref_to_api).collect()
+}
+
+/// Convert unified::UnresolvedRefInfo to API response
+fn api_unresolved_ref_to_api(info: &crate::session::UnresolvedRefInfo) -> ApiUnresolvedRefResponse {
+    // Create a simple search key from the entity_type and search_value
+    let search_keys: Vec<ApiSearchKeyField> = vec![ApiSearchKeyField {
+        name: "name".to_string(),
+        label: "Name".to_string(),
+        is_default: true,
+        field_type: SearchKeyFieldType::Text,
+        enum_values: None,
+    }];
+
+    // No discriminator fields in simplified unified type
+    let discriminator_fields: Vec<ApiDiscriminatorField> = vec![];
+
+    // Default to picker/modal for resolution
+    let resolution_mode = ApiResolutionModeHint::SearchModal;
+
+    // Parse ref_id to get statement index (format: "stmt_idx:arg_name")
+    let (stmt_idx, arg_name) = if let Some(colon_pos) = info.ref_id.find(':') {
+        let stmt_str = &info.ref_id[..colon_pos];
+        let arg = info.ref_id[colon_pos + 1..].to_string();
+        (stmt_str.parse::<usize>().unwrap_or(0), arg)
+    } else {
+        (0, info.ref_id.clone())
+    };
+
+    // Build context from ref_id
+    let context = RefContext {
+        statement_index: stmt_idx,
+        verb: String::new(), // Not available in simplified type
+        arg_name,
+        dsl_snippet: Some(info.context_line.clone()),
+    };
+
+    // Convert initial matches from unified EntityMatchInfo
+    let initial_matches: Vec<ob_poc_types::resolution::EntityMatchResponse> = info
+        .initial_matches
+        .iter()
+        .map(|m| ob_poc_types::resolution::EntityMatchResponse {
+            id: m.value.clone(),
+            display: m.display.clone(),
+            entity_type: info.entity_type.clone(),
+            score: (m.score_pct as f32) / 100.0,
+            discriminators: std::collections::HashMap::new(),
+            status: ob_poc_types::resolution::EntityStatus::Unknown,
+            context: m.detail.clone(),
+        })
+        .collect();
+
+    ApiUnresolvedRefResponse {
+        ref_id: info.ref_id.clone(),
+        entity_type: info.entity_type.clone(),
+        entity_subtype: None,
+        search_value: info.search_value.clone(),
+        context,
+        initial_matches,
+        agent_suggestion: None,
+        suggestion_reason: None,
+        review_requirement: ReviewRequirement::Optional,
+        search_keys,
+        discriminator_fields,
+        resolution_mode,
+        return_key_type: Some("uuid".to_string()),
+    }
 }
 
 // ============================================================================
@@ -1017,7 +1088,7 @@ async fn create_session(
     tracing::info!("=== CREATE SESSION ===");
     tracing::info!("Domain hint: {:?}", req.domain_hint);
 
-    let session = crate::api::session::AgentSession::new(req.domain_hint.clone());
+    let session = UnifiedSession::new_for_entity(None, "cbu", None, req.domain_hint.clone());
     let session_id = session.id;
     let created_at = session.created_at;
 
@@ -1047,7 +1118,7 @@ async fn create_session(
     let response = CreateSessionResponse {
         session_id,
         created_at,
-        state: SessionState::New,
+        state: SessionState::New.into(),
         welcome_message: crate::api::session::WELCOME_MESSAGE.to_string(),
     };
     tracing::info!(
@@ -1074,7 +1145,8 @@ async fn get_session(
         Some(s) => s,
         None => {
             // Create new session with the requested ID
-            let new_session = AgentSession::new(None);
+            let mut new_session = UnifiedSession::new_for_entity(None, "cbu", None, None);
+            new_session.id = session_id; // Use the requested ID
             let mut sessions = state.sessions.write().await;
             sessions.insert(session_id, new_session.clone());
             new_session
@@ -1085,13 +1157,13 @@ async fn get_session(
         session_id,
         entity_type: session.entity_type.clone(),
         entity_id: session.entity_id,
-        state: session.state.clone(),
+        state: session.state.clone().into(),
         message_count: session.messages.len(),
         pending_intents: vec![], // Legacy - now in run_sheet
         assembled_dsl: vec![],   // Legacy - now in run_sheet
         combined_dsl: session.run_sheet.combined_dsl(),
         context: session.context.clone(),
-        messages: session.messages.clone(),
+        messages: session.messages.iter().cloned().map(|m| m.into()).collect(),
         can_execute: session.run_sheet.has_runnable(),
         version: Some(session.updated_at.to_rfc3339()),
         run_sheet: Some(session.run_sheet.to_api()),
@@ -1278,17 +1350,15 @@ async fn create_subsession(
         CreateSubSessionType::Research {
             target_entity_id,
             research_type,
-        } => SubSessionType::Research(crate::api::session::ResearchSubSession {
+        } => SubSessionType::Research(ResearchSubSession {
             target_entity_id,
             research_type,
             search_query: None,
         }),
-        CreateSubSessionType::Review { pending_dsl } => {
-            SubSessionType::Review(crate::api::session::ReviewSubSession {
-                pending_dsl,
-                review_status: crate::api::session::ReviewStatus::Pending,
-            })
-        }
+        CreateSubSessionType::Review { pending_dsl } => SubSessionType::Review(ReviewSubSession {
+            pending_dsl,
+            review_status: ReviewStatus::Pending,
+        }),
     };
 
     let session_type_name = match &sub_session_type {
@@ -1301,7 +1371,7 @@ async fn create_subsession(
     .to_string();
 
     // Create sub-session
-    let child = AgentSession::new_subsession(&parent, sub_session_type);
+    let child = UnifiedSession::new_subsession(&parent, sub_session_type);
     let child_id = child.id;
     let inherited_symbols: Vec<String> = child.inherited_symbols.keys().cloned().collect();
 
@@ -1380,7 +1450,7 @@ pub struct ResolutionState {
 }
 
 impl SubSessionStateResponse {
-    fn from_session(session: &AgentSession) -> Self {
+    fn from_session(session: &UnifiedSession) -> Self {
         let session_type = match &session.sub_session_type {
             SubSessionType::Root => "root",
             SubSessionType::Resolution(_) => "resolution",
@@ -2115,7 +2185,8 @@ async fn chat_session(
             None => {
                 tracing::info!("Session not found, creating new session: {}", session_id);
                 drop(sessions); // Release read lock before acquiring write lock
-                let new_session = AgentSession::new(None);
+                let mut new_session = UnifiedSession::new_for_entity(None, "cbu", None, None);
+                new_session.id = session_id; // Use the requested ID
                 let mut sessions = state.sessions.write().await;
                 sessions.insert(session_id, new_session.clone());
                 tracing::info!("Session created: {}", session_id);
@@ -2328,7 +2399,7 @@ async fn chat_session(
     Ok(Json(ChatResponse {
         message: response.message,
         dsl: dsl_state,
-        session_state: to_session_state_enum(&response.session_state),
+        session_state: api_session_state_to_enum(&response.session_state),
         commands: response.commands,
         disambiguation_request: response
             .disambiguation
@@ -2338,7 +2409,7 @@ async fn chat_session(
         unresolved_refs: response
             .unresolved_refs
             .as_ref()
-            .map(|refs| to_api_unresolved_refs(refs)),
+            .map(|refs| api_unresolved_refs_to_api(refs)),
         current_ref_index: response.current_ref_index,
         dsl_hash: response.dsl_hash,
     }))
@@ -2393,22 +2464,11 @@ async fn execute_session_dsl(
             session.run_sheet.combined_dsl().unwrap_or_default()
         };
 
-        // Check if we have a pre-compiled plan that matches this DSL
-        let (plan, ast) = session
-            .run_sheet
-            .current()
-            .and_then(|entry| {
-                if entry.dsl_source == dsl_source && entry.plan.is_some() {
-                    tracing::debug!("[EXEC] Using pre-compiled plan from run_sheet");
-                    Some((entry.plan.clone(), Some(entry.ast.clone())))
-                } else {
-                    tracing::debug!(
-                        "[EXEC] DSL changed or no pre-compiled plan, will run full pipeline"
-                    );
-                    None
-                }
-            })
-            .unwrap_or((None, None));
+        // Note: UnifiedSession.RunSheetEntry doesn't store pre-compiled plan/ast
+        // Always run full pipeline. In the future, we could add optional caching.
+        let plan: Option<crate::dsl_v2::ExecutionPlan> = None;
+        let ast: Option<Vec<dsl_core::ast::Statement>> = None;
+        tracing::debug!("[EXEC] Running full pipeline (UnifiedSession doesn't cache plans)");
 
         (dsl_source, plan, ast)
     };
@@ -2418,7 +2478,7 @@ async fn execute_session_dsl(
             success: false,
             results: Vec::new(),
             errors: vec!["No DSL to execute".to_string()],
-            new_state: current_state,
+            new_state: current_state.into(),
             bindings: None,
         }));
     }
@@ -2547,7 +2607,7 @@ async fn execute_session_dsl(
                     success: false,
                     results: Vec::new(),
                     errors: vec![parse_error],
-                    new_state: current_state,
+                    new_state: current_state.into(),
                     bindings: None,
                 }));
             }
@@ -2627,7 +2687,7 @@ async fn execute_session_dsl(
                         success: false,
                         results: Vec::new(),
                         errors: csg_errors,
-                        new_state: current_state,
+                        new_state: current_state.into(),
                         bindings: None,
                     }));
                 }
@@ -2677,7 +2737,7 @@ async fn execute_session_dsl(
                     success: false,
                     results: Vec::new(),
                     errors: vec![compile_error],
-                    new_state: current_state,
+                    new_state: current_state.into(),
                     bindings: None,
                 }));
             }
@@ -3037,16 +3097,16 @@ async fn execute_session_dsl(
             }
 
             // =========================================================================
-            // PROPAGATE CBU SESSION FROM EXECUTION CONTEXT
+            // PROPAGATE UNIFIED SESSION FROM EXECUTION CONTEXT
             // =========================================================================
             // Session load operations (session.load-galaxy, session.load-cbu, etc.) store
-            // loaded CBU IDs in ExecutionContext.pending_cbu_session. Sync these to
+            // loaded CBU IDs in ExecutionContext.pending_session. Sync these to
             // SessionContext.cbu_ids so the scope-graph endpoint can build the multi-CBU view.
-            if let Some(cbu_session) = exec_ctx.take_pending_cbu_session() {
-                let loaded_cbu_ids = cbu_session.cbu_ids_vec();
+            if let Some(unified_session) = exec_ctx.take_pending_session() {
+                let loaded_cbu_ids = unified_session.cbu_ids_vec();
                 let cbu_count = loaded_cbu_ids.len();
                 tracing::info!(
-                    "[EXEC] Propagating {} CBU IDs from CbuSession to context.cbu_ids",
+                    "[EXEC] Propagating {} CBU IDs from UnifiedSession to context.cbu_ids",
                     cbu_count
                 );
                 // Merge loaded CBUs into context (avoid duplicates)
@@ -3061,12 +3121,12 @@ async fn execute_session_dsl(
                 let scope_def = if cbu_count == 1 {
                     crate::graph::GraphScope::SingleCbu {
                         cbu_id: loaded_cbu_ids[0],
-                        cbu_name: cbu_session.name.clone().unwrap_or_default(),
+                        cbu_name: unified_session.name.clone().unwrap_or_default(),
                     }
                 } else {
                     // Multi-CBU scope - use Custom with session name or description
                     crate::graph::GraphScope::Custom {
-                        description: cbu_session
+                        description: unified_session
                             .name
                             .clone()
                             .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
@@ -3428,23 +3488,12 @@ async fn execute_session_dsl(
 
             // Mark current run_sheet entry as executed with affected entities
             if let Some(entry) = session.run_sheet.current_mut() {
-                entry.status = crate::api::session::DslStatus::Executed;
+                entry.status = crate::session::EntryStatus::Executed;
                 entry.executed_at = Some(chrono::Utc::now());
                 // Collect all entity IDs affected by this execution
                 entry.affected_entities = results.iter().filter_map(|r| r.entity_id).collect();
-                // Copy bindings created during this execution
-                for (name, id) in &session.context.named_refs {
-                    if let Some(binding_info) = session.context.bindings.get(name) {
-                        entry.bindings.insert(
-                            name.clone(),
-                            crate::api::session::BoundEntity {
-                                id: *id,
-                                entity_type: binding_info.entity_type.clone(),
-                                display_name: binding_info.display_name.clone(),
-                            },
-                        );
-                    }
-                }
+                // Note: UnifiedSession.RunSheetEntry doesn't have bindings field
+                // Bindings are stored in session.bindings and session.context.bindings
             }
 
             session.state.clone()
@@ -3460,7 +3509,7 @@ async fn execute_session_dsl(
         success: all_success,
         results,
         errors,
-        new_state,
+        new_state: new_state.into(),
         bindings: if bindings_map.is_empty() {
             None
         } else {
@@ -3525,8 +3574,8 @@ async fn clear_session_dsl(
 
     // Cancel any pending/draft entries in run_sheet
     for entry in session.run_sheet.entries.iter_mut() {
-        if entry.status == crate::api::session::DslStatus::Draft {
-            entry.status = crate::api::session::DslStatus::Cancelled;
+        if entry.status == crate::session::EntryStatus::Draft {
+            entry.status = crate::session::EntryStatus::Cancelled;
         }
     }
 
@@ -3534,13 +3583,13 @@ async fn clear_session_dsl(
         session_id,
         entity_type: session.entity_type.clone(),
         entity_id: session.entity_id,
-        state: session.state.clone(),
+        state: session.state.clone().into(),
         message_count: session.messages.len(),
         pending_intents: vec![],
         assembled_dsl: vec![],
         combined_dsl: None,
         context: session.context.clone(),
-        messages: session.messages.clone(),
+        messages: session.messages.iter().cloned().map(|m| m.into()).collect(),
         can_execute: false,
         version: Some(session.updated_at.to_rfc3339()),
         run_sheet: Some(session.run_sheet.to_api()),
@@ -6999,7 +7048,7 @@ async fn generate_dsl_for_selected_verb(
     _pool: &PgPool,
     original_input: &str,
     selected_verb: &str,
-    _session: &mut AgentSession,
+    _session: &mut UnifiedSession,
 ) -> Result<String, String> {
     use crate::dsl_v2::verb_registry::registry;
 

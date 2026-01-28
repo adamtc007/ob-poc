@@ -29,7 +29,8 @@
 //! 3. **Atomic updates with notification** - `update_session()` handles lock + notify
 //! 4. **Backward compatible** - Existing `sessions.read()/write()` code still works
 
-use crate::api::session::{AgentSession, SessionStore};
+use crate::api::session::SessionStore;
+use crate::session::UnifiedSession;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{watch, RwLock};
@@ -64,7 +65,7 @@ pub struct SessionSnapshot {
 
 impl SessionSnapshot {
     /// Create a snapshot from a session
-    pub fn from_session(session: &AgentSession) -> Self {
+    pub fn from_session(session: &UnifiedSession) -> Self {
         // Extract scope info from session context
         let (scope_definition, scope_loaded) = session
             .context
@@ -149,7 +150,7 @@ impl SessionManager {
     }
 
     /// Get a session by ID (read-only clone)
-    pub async fn get_session(&self, id: Uuid) -> Option<AgentSession> {
+    pub async fn get_session(&self, id: Uuid) -> Option<UnifiedSession> {
         self.store.read().await.get(&id).cloned()
     }
 
@@ -159,7 +160,7 @@ impl SessionManager {
     }
 
     /// Insert a new session
-    pub async fn insert_session(&self, session: AgentSession) {
+    pub async fn insert_session(&self, session: UnifiedSession) {
         let id = session.id;
         let snapshot = SessionSnapshot::from_session(&session);
 
@@ -184,7 +185,7 @@ impl SessionManager {
     /// Returns `None` if the session doesn't exist.
     pub async fn update_session<F>(&self, id: Uuid, f: F) -> Option<()>
     where
-        F: FnOnce(&mut AgentSession),
+        F: FnOnce(&mut UnifiedSession),
     {
         let snapshot = {
             let mut store = self.store.write().await;
@@ -210,7 +211,7 @@ impl SessionManager {
     /// Like `update_session` but allows returning a value from the callback.
     pub async fn update_session_with<F, T>(&self, id: Uuid, f: F) -> Option<T>
     where
-        F: FnOnce(&mut AgentSession) -> T,
+        F: FnOnce(&mut UnifiedSession) -> T,
     {
         let (result, snapshot) = {
             let mut store = self.store.write().await;
@@ -237,7 +238,7 @@ impl SessionManager {
     /// This acquires only a read lock.
     pub async fn query_session<F, T>(&self, id: Uuid, f: F) -> Option<T>
     where
-        F: FnOnce(&AgentSession) -> T,
+        F: FnOnce(&UnifiedSession) -> T,
     {
         let store = self.store.read().await;
         store.get(&id).map(f)
@@ -299,7 +300,7 @@ impl SessionManager {
     }
 
     /// Remove a session and clean up its watchers
-    pub async fn remove_session(&self, id: Uuid) -> Option<AgentSession> {
+    pub async fn remove_session(&self, id: Uuid) -> Option<UnifiedSession> {
         // Remove watcher first
         {
             let mut watchers = self.watchers.write().await;
@@ -554,7 +555,7 @@ mod tests {
         let manager = SessionManager::new(store);
 
         // Create a session
-        let session = AgentSession::new(None);
+        let session = UnifiedSession::new();
         let id = session.id;
         manager.insert_session(session).await;
 
@@ -577,7 +578,7 @@ mod tests {
         let store = create_session_store();
         let manager = SessionManager::new(store);
 
-        let session = AgentSession::new(None);
+        let session = UnifiedSession::new();
         let id = session.id;
         manager.insert_session(session).await;
 
@@ -598,7 +599,7 @@ mod tests {
         let store = create_session_store();
         let manager = SessionManager::new(store);
 
-        let session = AgentSession::new(None);
+        let session = UnifiedSession::new();
         let id = session.id;
         manager.insert_session(session).await;
 
@@ -621,7 +622,7 @@ mod tests {
         let store = create_session_store();
         let manager = SessionManager::new(store);
 
-        let session = AgentSession::new(None);
+        let session = UnifiedSession::new();
         let id = session.id;
         manager.insert_session(session).await;
 

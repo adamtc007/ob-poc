@@ -1,5 +1,14 @@
 //! DSL Sheet - Batch DSL execution with DAG-based phasing
 //!
+//! **DEPRECATED:** This module is superseded by `unified::RunSheet` and `unified::RunSheetEntry`.
+//! New code should use `UnifiedSession.run_sheet` instead of `DslSheet`.
+//!
+//! Migration path:
+//! - `DslSheet` → `UnifiedSession.run_sheet: RunSheet`
+//! - `SessionDslStatement` → `RunSheetEntry`
+//! - `StatementStatus` → `EntryStatus`
+//! - `ExecutionPhase` → Use `RunSheet.by_phase(depth)`
+//!
 //! A DslSheet holds multiple DSL statements that form a "run sheet" for execution.
 //! The sheet is analyzed for dependencies (DAG), split into phases, and executed
 //! in order with symbol resolution between phases.

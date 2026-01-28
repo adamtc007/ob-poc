@@ -19,7 +19,7 @@
 pub mod agent_context;
 pub mod agent_mode;
 pub mod canonical_hash;
-pub mod cbu_session;
+pub mod constraint_cascade;
 pub mod dsl_sheet;
 pub mod enhanced_context;
 pub mod research_context;
@@ -50,11 +50,34 @@ pub use agent_mode::{
     CheckpointType, DecisionRef, SessionMode,
 };
 pub use canonical_hash::{canonical_json_hash, hash_to_hex, hex_to_hash, sha256};
-pub use cbu_session::{
-    CbuSession, CbuSessionState, CbuSummary, ClearResult, HistoryResult, JurisdictionCount,
-    LoadCbuResult, LoadGalaxyResult, LoadJurisdictionResult, ReplSessionState, SessionInfo,
-    SessionSummary, UnloadCbuResult,
+pub use constraint_cascade::{
+    derive_extended_scope, derive_search_scope, set_case, set_client, set_structure,
+    set_structure_type, update_dag_from_cascade, validate_set_case, validate_set_client,
+    validate_set_structure, validate_set_structure_type, verb_available_for_persona, CascadeError,
+    CascadeUpdateResult, ExtendedSearchScope,
 };
+// =============================================================================
+// DEPRECATED: dsl_sheet types - use unified.rs types instead
+// =============================================================================
+// Migration guide:
+// - DslSheet → RunSheet (unified.rs)
+// - SessionDslStatement → RunSheetEntry (unified.rs)
+// - StatementStatus → EntryStatus (unified.rs)
+// - ErrorCode → UnifiedErrorCode (unified.rs)
+// - ExecutionPhase → UnifiedExecutionPhase (unified.rs)
+// - SheetExecutionResult → UnifiedSheetExecutionResult (unified.rs)
+// - SheetStatus → UnifiedSheetStatus (unified.rs)
+// - StatementError → EntryError (unified.rs)
+// - StatementResult → EntryResult (unified.rs)
+//
+// These re-exports are kept for backward compatibility with legacy code paths
+// (SheetExecutor.execute_phased, SheetExecutor.persist_audit).
+// New code should use the unified types from the `unified` module.
+#[allow(deprecated)]
+#[deprecated(
+    since = "0.1.0",
+    note = "Use unified types from session::unified instead (RunSheet, EntryStatus, etc.)"
+)]
 pub use dsl_sheet::{
     CyclicDependency, DslSheet, EntityCandidate, ErrorCode, ExecutionPhase, SessionDslStatement,
     SheetExecutionResult, SheetStatus, SourceSpan, StatementError, StatementResult,
@@ -71,10 +94,70 @@ pub use struct_mass::{
     MassBreakdown, MassContributions, MassThresholds, MassViewMode, MassWeights, StructMass,
 };
 pub use unified::{
-    BoundEntity, ChatMessage, DiscriminatorField, EntityMatch, EntityScope, EntryStatus, EnumValue,
-    FieldType, MessageRole, ResolutionState, ResolvedRef, RunSheet, RunSheetEntry, SearchKeyField,
-    StateSnapshot, StateStack, TargetUniverse, UnifiedSession, UniverseDefinition, UnresolvedRef,
-    ViewState as UnifiedViewState, ZoomLevel,
+    BoundEntity,
+    CaseRef,
+    // CBU undo/redo (migrated from CbuSession)
+    CbuSnapshot,
+    ChatMessage,
+    ClientRef,
+    // Correction sub-session
+    CorrectionSubSession,
+    DagState,
+    DiscriminatorField,
+    EntityMatch,
+    // Entity match info for resolution UI
+    EntityMatchInfo,
+    EntityScope,
+    // Sheet execution types (migrated from dsl_sheet)
+    EntryError,
+    EntryResult,
+    EntryStatus,
+    EnumValue,
+    ErrorCode as UnifiedErrorCode,
+    ExecutionPhase as UnifiedExecutionPhase,
+    FieldType,
+    MessageRole,
+    Persona,
+    PrereqCondition,
+    // REPL state machine (migrated from CbuSession)
+    ReplState,
+    // Research sub-session
+    ResearchSubSession,
+    ResolutionState,
+    // Resolution sub-session (full metadata for disambiguation)
+    ResolutionSubSession,
+    ResolvedRef,
+    // Review status enum
+    ReviewStatus,
+    // Review sub-session
+    ReviewSubSession,
+    RunSheet,
+    RunSheetEntry,
+    SearchKeyField,
+    SearchScope,
+    // Session state machine (migrated from AgentSession)
+    SessionEvent,
+    // Session list item for API responses
+    SessionListItem,
+    // Session lifecycle states
+    SessionState,
+    SheetExecutionResult as UnifiedSheetExecutionResult,
+    SheetStatus as UnifiedSheetStatus,
+    StateSnapshot,
+    StateStack,
+    StructureRef,
+    StructureType,
+    // Sub-session types
+    SubSessionType,
+    TargetUniverse,
+    UnifiedSession,
+    UniverseDefinition,
+    UnresolvedRef,
+    // Unresolved ref info (full metadata for resolution UI)
+    UnresolvedRefInfo,
+    ValidationError as UnifiedValidationError,
+    ViewState as UnifiedViewState,
+    ZoomLevel,
 };
 pub use verb_contract::{codes as diagnostic_codes, VerbDiagnostic, VerbDiagnostics};
 pub use verb_discovery::{
@@ -93,7 +176,29 @@ pub use view_state::{
     TemporalMode, TraceMode, ViewState,
 };
 
-/// Unified session context - handles REPL + Visualization + Navigation
+/// Unified session context - handles Visualization + Navigation
+///
+/// # Deprecation Notice
+///
+/// **This struct is deprecated for new code.** Use `UnifiedSession` from `session::unified`
+/// for DSL execution, run sheet management, and constraint cascade context.
+///
+/// `UnifiedSessionContext` is retained for:
+/// - Graph/viewport/navigation state (visualization layer)
+/// - Agent mode orchestration (`agent`, `mode` fields)
+/// - Research workflows via `AgentController`
+///
+/// **Why kept separate:**
+/// - `UnifiedSession` is fully serializable; this struct has `#[serde(skip)]` fields
+/// - Agent/visualization state is complex and well-isolated
+/// - Incremental consolidation preferred over big-bang refactor
+///
+/// **Consumers:**
+/// - `EnhancedContextBuilder::from_session_context()` - verb suggestions
+/// - `AgentGraphContext::from_session()` - agent prompts
+/// - `AgentController` - research loop orchestration
+///
+/// For new DSL/REPL features, prefer `UnifiedSession`.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UnifiedSessionContext {
     /// Session identity

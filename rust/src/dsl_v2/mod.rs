@@ -77,6 +77,7 @@ pub mod applicability_rules;
 #[cfg(feature = "database")]
 pub mod batch_executor;
 pub mod csg_linter;
+pub mod display_nouns;
 pub mod domain_context;
 pub mod enrichment;
 pub mod entity_deps;
@@ -96,6 +97,7 @@ pub mod idempotency;
 pub mod intent;
 #[cfg(feature = "database")]
 pub mod lsp_validator;
+pub mod operator_types;
 pub mod planning_facade;
 #[cfg(feature = "database")]
 pub mod ref_resolver;
@@ -119,6 +121,10 @@ pub use batch_executor::{
     BatchExecutionResult, BatchExecutor, BatchResultAccumulator, OnErrorMode,
 };
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
+pub use display_nouns::{
+    contains_forbidden_token, display_noun, display_noun_or_self, has_display_noun, pluralize,
+    FORBIDDEN_UI_TOKENS,
+};
 pub use domain_context::{ActiveDomain, DomainContext, IterationContext};
 pub use enrichment::{enrich_program, EnrichmentError, EnrichmentResult};
 #[cfg(feature = "database")]
@@ -151,6 +157,7 @@ pub use idempotency::{compute_idempotency_key, IdempotencyManager};
 pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
 #[cfg(feature = "database")]
 pub use lsp_validator::LspValidator;
+pub use operator_types::{OperatorRole, OperatorType};
 pub use planning_facade::{
     analyse_and_plan, quick_validate, ImplicitCreateMode, PlannedExecution, PlanningInput,
     PlanningOutput, SyntheticStep as FacadeSyntheticStep,

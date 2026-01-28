@@ -1,0 +1,476 @@
+# Case Domain Macros
+#
+# Operator vocabulary for KYC case operations.
+# These macros wrap DSL primitives (kyc-case.*) with business terminology.
+#
+# INVARIANTS:
+# - UI labels NEVER contain: kyc-case, entity_ref
+# - Case lifecycle: open → submit → review → approve/reject
+
+case.open:
+  kind: macro
+
+  ui:
+    label: "Open Case"
+    description: "Open a new KYC case for a structure"
+    target_label: "Case"
+
+  routing:
+    mode_tags: [kyc, onboarding]
+    operator_domain: case
+
+  target:
+    operates_on: structure_ref
+    produces: case_ref
+
+  args:
+    style: keyworded
+    required:
+      structure:
+        type: structure_ref
+        ui_label: "Structure"
+        autofill_from: session.current_structure
+        picker: structure_picker
+    optional:
+      case_type:
+        type: enum
+        ui_label: "Case Type"
+        values:
+          - key: initial
+            label: "Initial Onboarding"
+            internal: initial-onboarding
+          - key: periodic
+            label: "Periodic Review"
+            internal: periodic-review
+          - key: event
+            label: "Event-Driven Review"
+            internal: event-driven
+        default_key: initial
+      priority:
+        type: enum
+        ui_label: "Priority"
+        values:
+          - key: normal
+            label: "Normal"
+            internal: normal
+          - key: high
+            label: "High"
+            internal: high
+          - key: urgent
+            label: "Urgent"
+            internal: urgent
+        default_key: normal
+
+  prereqs:
+    - type: state_exists
+      key: structure.exists
+
+  expands_to:
+    - verb: kyc-case.create
+      args:
+        cbu_id: "${arg.structure}"
+        case_type: "${arg.case_type.internal}"
+        priority: "${arg.priority.internal}"
+
+  sets_state:
+    - key: case.exists
+      value: true
+
+  unlocks:
+    - case.add-party
+    - case.solicit-document
+    - case.submit
+
+case.add-party:
+  kind: macro
+
+  ui:
+    label: "Add Party to Case"
+    description: "Add a party to the KYC case for review"
+    target_label: "Party"
+
+  routing:
+    mode_tags: [kyc]
+    operator_domain: case
+
+  target:
+    operates_on: case_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case_ref
+        ui_label: "Case"
+        autofill_from: session.current_case
+      party:
+        type: party_ref
+        ui_label: "Party"
+        picker: party_picker
+    optional:
+      role:
+        type: enum
+        ui_label: "Role in Case"
+        values:
+          - key: subject
+            label: "Subject"
+            internal: subject
+          - key: ubo
+            label: "Beneficial Owner"
+            internal: beneficial-owner
+          - key: controller
+            label: "Controller"
+            internal: controller
+          - key: signatory
+            label: "Signatory"
+            internal: signatory
+        default_key: subject
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands_to:
+    - verb: kyc-case.add-party
+      args:
+        case_id: "${arg.case}"
+        entity_id: "${arg.party}"
+        role: "${arg.role.internal}"
+
+  unlocks: []
+
+case.solicit-document:
+  kind: macro
+
+  ui:
+    label: "Request Document"
+    description: "Request a document from a party"
+    target_label: "Document Request"
+
+  routing:
+    mode_tags: [kyc]
+    operator_domain: case
+
+  target:
+    operates_on: case_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case_ref
+        ui_label: "Case"
+        autofill_from: session.current_case
+      party:
+        type: party_ref
+        ui_label: "From Party"
+        picker: party_picker
+      document_type:
+        type: enum
+        ui_label: "Document Type"
+        values:
+          - key: passport
+            label: "Passport"
+            internal: passport
+          - key: id_card
+            label: "ID Card"
+            internal: national-id
+          - key: poa
+            label: "Proof of Address"
+            internal: proof-of-address
+          - key: incorporation
+            label: "Certificate of Incorporation"
+            internal: certificate-incorporation
+          - key: register
+            label: "Register Extract"
+            internal: register-extract
+          - key: financials
+            label: "Financial Statements"
+            internal: financial-statements
+          - key: sow
+            label: "Source of Wealth"
+            internal: source-of-wealth
+    optional:
+      due_date:
+        type: date
+        ui_label: "Due Date"
+      notes:
+        type: str
+        ui_label: "Notes"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands_to:
+    - verb: document.solicit
+      args:
+        case_id: "${arg.case}"
+        entity_id: "${arg.party}"
+        doc_type: "${arg.document_type.internal}"
+        due_date: "${arg.due_date}"
+        notes: "${arg.notes}"
+
+  unlocks: []
+
+case.submit:
+  kind: macro
+
+  ui:
+    label: "Submit Case"
+    description: "Submit case for review"
+    target_label: "Case"
+
+  routing:
+    mode_tags: [kyc]
+    operator_domain: case
+
+  target:
+    operates_on: case_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case_ref
+        ui_label: "Case"
+        autofill_from: session.current_case
+    optional:
+      notes:
+        type: str
+        ui_label: "Submission Notes"
+
+  prereqs:
+    - type: state_exists
+      key: case.exists
+
+  expands_to:
+    - verb: kyc-case.submit
+      args:
+        case_id: "${arg.case}"
+        notes: "${arg.notes}"
+
+  sets_state:
+    - key: case.submitted
+      value: true
+
+  unlocks:
+    - case.approve
+    - case.reject
+    - case.request-info
+
+case.approve:
+  kind: macro
+
+  ui:
+    label: "Approve Case"
+    description: "Approve the KYC case"
+    target_label: "Case"
+
+  routing:
+    mode_tags: [kyc]
+    operator_domain: case
+
+  target:
+    operates_on: case_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case_ref
+        ui_label: "Case"
+        autofill_from: session.current_case
+    optional:
+      notes:
+        type: str
+        ui_label: "Approval Notes"
+      next_review_date:
+        type: date
+        ui_label: "Next Review Date"
+
+  prereqs:
+    - type: state_exists
+      key: case.submitted
+
+  expands_to:
+    - verb: kyc-case.approve
+      args:
+        case_id: "${arg.case}"
+        notes: "${arg.notes}"
+        next_review_date: "${arg.next_review_date}"
+
+  sets_state:
+    - key: case.approved
+      value: true
+
+  unlocks:
+    - mandate.create
+    - structure.assign-role
+
+case.reject:
+  kind: macro
+
+  ui:
+    label: "Reject Case"
+    description: "Reject the KYC case"
+    target_label: "Case"
+
+  routing:
+    mode_tags: [kyc]
+    operator_domain: case
+
+  target:
+    operates_on: case_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case_ref
+        ui_label: "Case"
+        autofill_from: session.current_case
+      reason:
+        type: enum
+        ui_label: "Rejection Reason"
+        values:
+          - key: incomplete
+            label: "Incomplete Documentation"
+            internal: incomplete-documentation
+          - key: inconsistent
+            label: "Inconsistent Information"
+            internal: inconsistent-information
+          - key: high_risk
+            label: "Unacceptable Risk"
+            internal: unacceptable-risk
+          - key: sanctions
+            label: "Sanctions Hit"
+            internal: sanctions-match
+          - key: other
+            label: "Other"
+            internal: other
+    optional:
+      notes:
+        type: str
+        ui_label: "Rejection Notes"
+
+  prereqs:
+    - type: state_exists
+      key: case.submitted
+
+  expands_to:
+    - verb: kyc-case.reject
+      args:
+        case_id: "${arg.case}"
+        reason: "${arg.reason.internal}"
+        notes: "${arg.notes}"
+
+  sets_state:
+    - key: case.rejected
+      value: true
+
+  unlocks: []
+
+case.list:
+  kind: macro
+
+  ui:
+    label: "List Cases"
+    description: "Show KYC cases"
+    target_label: "Cases"
+
+  routing:
+    mode_tags: [kyc, onboarding]
+    operator_domain: case
+
+  target:
+    operates_on: client_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      structure:
+        type: structure_ref
+        ui_label: "For Structure"
+        picker: structure_picker
+      status:
+        type: enum
+        ui_label: "Status"
+        values:
+          - key: open
+            label: "Open"
+            internal: open
+          - key: submitted
+            label: "Submitted"
+            internal: submitted
+          - key: approved
+            label: "Approved"
+            internal: approved
+          - key: rejected
+            label: "Rejected"
+            internal: rejected
+          - key: all
+            label: "All"
+            internal: null
+        default_key: all
+
+  prereqs: []
+
+  expands_to:
+    - verb: kyc-case.list
+      args:
+        client_id: "${scope.client_id}"
+        cbu_id: "${arg.structure}"
+        status: "${arg.status.internal}"
+
+  unlocks: []
+
+case.select:
+  kind: macro
+
+  ui:
+    label: "Select Case"
+    description: "Set the current working case"
+    target_label: "Case"
+
+  routing:
+    mode_tags: [kyc]
+    operator_domain: case
+
+  target:
+    operates_on: case_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      case:
+        type: case_ref
+        ui_label: "Case"
+        picker: case_picker
+    optional: {}
+
+  prereqs: []
+
+  expands_to:
+    - verb: session.set-case
+      args:
+        case_id: "${arg.case}"
+
+  sets_state:
+    - key: case.selected
+      value: true
+    - key: case.exists
+      value: true
+
+  unlocks:
+    - case.add-party
+    - case.solicit-document
+    - case.submit

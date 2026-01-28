@@ -1,0 +1,287 @@
+# Structure Domain Macros
+#
+# Operator vocabulary for fund/mandate structure operations.
+# These macros wrap DSL primitives (cbu.*, cbu-role.*) with business terminology.
+#
+# INVARIANTS:
+# - UI labels NEVER contain: cbu, entity_ref, trading-profile, kyc-case
+# - Enum keys (pe, gp) map to internal tokens (private-equity, general-partner)
+# - All args use operator types (structure_ref, party_ref), not entity_ref
+
+structure.setup:
+  kind: macro
+
+  ui:
+    label: "Set up Structure"
+    description: "Create a new fund or mandate structure"
+    target_label: "Structure"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+
+  args:
+    style: keyworded
+    required:
+      structure_type:
+        type: enum
+        ui_label: "Type"
+        values:
+          - key: pe
+            label: "Private Equity"
+            internal: private-equity
+          - key: sicav
+            label: "SICAV"
+            internal: sicav
+          - key: hedge
+            label: "Hedge Fund"
+            internal: hedge
+          - key: etf
+            label: "ETF"
+            internal: etf
+          - key: pension
+            label: "Pension"
+            internal: pension
+          - key: trust
+            label: "Trust"
+            internal: trust
+          - key: fof
+            label: "Fund of Funds"
+            internal: fund-of-funds
+        default_key: pe
+      name:
+        type: str
+        ui_label: "Structure name"
+    optional:
+      jurisdiction:
+        type: str
+        ui_label: "Jurisdiction"
+        valid_values: [LU, IE, DE, UK, US, CH, SG, HK]
+        autofill_from: session.client.jurisdiction
+
+  prereqs: []
+
+  expands_to:
+    - verb: cbu.create
+      args:
+        client_id: "${scope.client_id}"
+        kind: "${arg.structure_type.internal}"
+        name: "${arg.name}"
+        jurisdiction: "${arg.jurisdiction}"
+
+  unlocks:
+    - structure.assign-role
+    - case.open
+
+structure.assign-role:
+  kind: macro
+
+  ui:
+    label: "Assign Role"
+    description: "Assign a party to a role on the structure"
+    target_label: "Role Assignment"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: structure
+
+  target:
+    operates_on: structure_ref
+    produces: role_ref
+
+  args:
+    style: keyworded
+    required:
+      structure:
+        type: structure_ref
+        ui_label: "Structure"
+        autofill_from: session.current_structure
+        picker: structure_picker
+      role:
+        type: enum
+        ui_label: "Role"
+        values:
+          - key: gp
+            label: "General Partner"
+            internal: general-partner
+            valid_for: [pe, hedge]
+          - key: lp
+            label: "Limited Partner"
+            internal: limited-partner
+            valid_for: [pe, hedge]
+          - key: im
+            label: "Investment Manager"
+            internal: investment-manager
+          - key: manco
+            label: "Management Company"
+            internal: management-company
+          - key: custodian
+            label: "Custodian"
+            internal: custodian
+          - key: admin
+            label: "Administrator"
+            internal: administrator
+          - key: director
+            label: "Director"
+            internal: director
+      party:
+        type: party_ref
+        ui_label: "Party"
+        picker: party_picker
+    optional:
+      effective_date:
+        type: date
+        ui_label: "Effective Date"
+        default: today
+
+  prereqs:
+    - type: state_exists
+      key: structure.exists
+
+  expands_to:
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "${arg.structure}"
+        role: "${arg.role.internal}"
+        entity_id: "${arg.party}"
+        effective_date: "${arg.effective_date}"
+
+  unlocks:
+    - case.open
+    - mandate.create
+
+structure.list:
+  kind: macro
+
+  ui:
+    label: "List Structures"
+    description: "Show structures for the current client"
+    target_label: "Structures"
+
+  routing:
+    mode_tags: [onboarding, kyc, trading]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      structure_type:
+        type: enum
+        ui_label: "Filter by Type"
+        values:
+          - key: pe
+            label: "Private Equity"
+            internal: private-equity
+          - key: sicav
+            label: "SICAV"
+            internal: sicav
+          - key: hedge
+            label: "Hedge Fund"
+            internal: hedge
+          - key: all
+            label: "All Types"
+            internal: null
+        default_key: all
+      jurisdiction:
+        type: str
+        ui_label: "Filter by Jurisdiction"
+
+  prereqs: []
+
+  expands_to:
+    - verb: cbu.list
+      args:
+        client_id: "${scope.client_id}"
+        kind: "${arg.structure_type.internal}"
+        jurisdiction: "${arg.jurisdiction}"
+
+  unlocks: []
+
+structure.select:
+  kind: macro
+
+  ui:
+    label: "Select Structure"
+    description: "Set the current working structure"
+    target_label: "Structure"
+
+  routing:
+    mode_tags: [onboarding, kyc, trading]
+    operator_domain: structure
+
+  target:
+    operates_on: structure_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      structure:
+        type: structure_ref
+        ui_label: "Structure"
+        picker: structure_picker
+    optional: {}
+
+  prereqs: []
+
+  expands_to:
+    - verb: session.set-structure
+      args:
+        structure_id: "${arg.structure}"
+
+  # Sets state flag for prereq checking
+  sets_state:
+    - key: structure.selected
+      value: true
+    - key: structure.exists
+      value: true
+
+  unlocks:
+    - structure.assign-role
+    - case.open
+    - mandate.create
+
+structure.roles:
+  kind: macro
+
+  ui:
+    label: "Show Roles"
+    description: "List all role assignments for a structure"
+    target_label: "Roles"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: structure
+
+  target:
+    operates_on: structure_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      structure:
+        type: structure_ref
+        ui_label: "Structure"
+        autofill_from: session.current_structure
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: structure.exists
+
+  expands_to:
+    - verb: cbu-role.list
+      args:
+        cbu_id: "${arg.structure}"
+
+  unlocks: []

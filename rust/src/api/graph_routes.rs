@@ -1003,7 +1003,7 @@ async fn get_session_scope_graph(
             .run_sheet
             .entries
             .iter()
-            .filter(|e| e.status == crate::api::session::DslStatus::Executed)
+            .filter(|e| e.status == crate::session::EntryStatus::Executed)
             .flat_map(|e| e.affected_entities.iter().copied())
             .collect();
 

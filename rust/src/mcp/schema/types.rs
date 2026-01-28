@@ -28,8 +28,7 @@ use std::collections::HashMap;
 // ============================================================================
 
 /// Complete specification for a verb (V2 format)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VerbSpec {
     /// FQN for V2 format OR name for V1-style registry
     #[serde(alias = "verb")]
@@ -103,7 +102,6 @@ impl VerbSpec {
             .chain(self.args.optional.iter().map(|a| &a.name))
     }
 }
-
 
 /// Schema for verb arguments
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -208,7 +206,6 @@ pub enum ArgShape {
         item: Box<ArgShape>,
     },
 }
-
 
 impl ArgShape {
     /// Human-readable type name

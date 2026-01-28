@@ -106,10 +106,7 @@ use crate::agentic::llm_client::LlmClient;
 use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
-use crate::api::session::{
-    AgentSession, DisambiguationItem, DisambiguationRequest, EntityMatchOption,
-    ResolutionSubSession, SessionState, UnresolvedRefInfo,
-};
+use crate::api::session::{DisambiguationItem, DisambiguationRequest, EntityMatchOption};
 use crate::database::{derive_semantic_state, VerbService};
 use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
@@ -123,6 +120,7 @@ use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeli
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::ontology::SemanticStageRegistry;
 use crate::session::SessionScope;
+use crate::session::{ResolutionSubSession, SessionState, UnifiedSession, UnresolvedRefInfo};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -643,7 +641,7 @@ impl AgentService {
     /// - Current position in the taxonomy (breadcrumb trail)
     /// - Available navigation actions (drill down, zoom out)
     /// - Visible entities at this level
-    fn derive_taxonomy_context(&self, session: &AgentSession) -> Option<String> {
+    fn derive_taxonomy_context(&self, session: &UnifiedSession) -> Option<String> {
         let stack = &session.context.taxonomy_stack;
 
         if stack.is_empty() {
@@ -851,7 +849,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     /// 3. Ambiguous? → "Did you mean X or Y?"
     pub async fn process_chat(
         &self,
-        session: &mut AgentSession,
+        session: &mut UnifiedSession,
         request: &ChatRequest,
         _llm_client: Arc<dyn LlmClient>,
     ) -> Result<AgentChatResponse, String> {
@@ -946,7 +944,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     /// Pipeline: Parse → Enrich → Resolve EntityRefs → Execute
     async fn execute_runbook(
         &self,
-        session: &mut AgentSession,
+        session: &mut UnifiedSession,
     ) -> Result<AgentChatResponse, String> {
         use crate::dsl_v2::{DslExecutor, ExecutionContext};
 
@@ -1072,11 +1070,11 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 // Normal execution - mark as executed
                 session.run_sheet.mark_all_executed();
 
-                // Sync CBU session if any CBUs were loaded
+                // Sync unified session if any CBUs were loaded
                 // This propagates scope to session.context so the watch endpoint
                 // returns scope_type, which triggers UI viewport refresh
-                if let Some(cbu_session) = exec_ctx.take_pending_cbu_session() {
-                    let loaded = cbu_session.cbu_ids_vec();
+                if let Some(unified_session) = exec_ctx.take_pending_session() {
+                    let loaded = unified_session.cbu_ids_vec();
                     let cbu_count = loaded.len();
 
                     // Merge loaded CBUs into context
@@ -1091,12 +1089,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     let scope_def = if cbu_count == 1 {
                         GraphScope::SingleCbu {
                             cbu_id: loaded[0],
-                            cbu_name: cbu_session.name.clone().unwrap_or_default(),
+                            cbu_name: unified_session.name.clone().unwrap_or_default(),
                         }
                     } else if cbu_count > 1 {
                         // Multi-CBU scope - use Custom with session name or description
                         GraphScope::Custom {
-                            description: cbu_session
+                            description: unified_session
                                 .name
                                 .clone()
                                 .unwrap_or_else(|| format!("{} CBUs", cbu_count)),
@@ -1305,7 +1303,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     }
 
     /// Fail: return message to user
-    fn fail(&self, msg: &str, session: &mut AgentSession) -> AgentChatResponse {
+    fn fail(&self, msg: &str, session: &mut UnifiedSession) -> AgentChatResponse {
         session.add_agent_message(msg.to_string(), None, None);
         AgentChatResponse {
             message: msg.to_string(),
@@ -1335,7 +1333,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         &self,
         original_input: &str,
         candidates: &[crate::mcp::verb_search::VerbSearchResult],
-        session: &mut AgentSession,
+        session: &mut UnifiedSession,
     ) -> AgentChatResponse {
         use ob_poc_types::{VerbDisambiguationRequest, VerbOption};
 
@@ -1474,7 +1472,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     /// Handle disambiguation response from user
     async fn handle_disambiguation_response(
         &self,
-        session: &mut AgentSession,
+        session: &mut UnifiedSession,
         response: &crate::api::session::DisambiguationResponse,
         _llm_client: Arc<dyn LlmClient>,
     ) -> Result<AgentChatResponse, String> {
@@ -1590,7 +1588,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     fn handle_repl_command(
         &self,
         message: &str,
-        session: &AgentSession,
+        session: &UnifiedSession,
     ) -> Option<AgentChatResponse> {
         let msg = message.trim().to_lowercase();
 
@@ -1975,7 +1973,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     /// Takes both execution DSL (with UUIDs for DB) and user DSL (with display names for chat)
     async fn build_response(
         &self,
-        session: &mut AgentSession,
+        session: &mut UnifiedSession,
         intents: Vec<VerbIntent>,
         validation_results: Vec<IntentValidation>,
         exec_dsl: Option<String>,

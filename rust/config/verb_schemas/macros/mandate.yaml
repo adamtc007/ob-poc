@@ -1,0 +1,396 @@
+# Mandate Domain Macros
+#
+# Operator vocabulary for investment mandate operations.
+# These macros wrap DSL primitives (trading-profile.*) with business terminology.
+#
+# INVARIANTS:
+# - UI labels NEVER contain: trading-profile, trading_profile
+# - Mandate = the investment mandate/trading authority
+# - Products, instruments, markets attached to mandates
+
+mandate.create:
+  kind: macro
+
+  ui:
+    label: "Create Mandate"
+    description: "Create an investment mandate for a structure"
+    target_label: "Mandate"
+
+  routing:
+    mode_tags: [trading, onboarding]
+    operator_domain: mandate
+
+  target:
+    operates_on: structure_ref
+    produces: mandate_ref
+
+  args:
+    style: keyworded
+    required:
+      structure:
+        type: structure_ref
+        ui_label: "Structure"
+        autofill_from: session.current_structure
+        picker: structure_picker
+      name:
+        type: str
+        ui_label: "Mandate Name"
+    optional:
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+      strategy:
+        type: enum
+        ui_label: "Strategy"
+        values:
+          - key: equity
+            label: "Equity"
+            internal: equity
+          - key: fixed_income
+            label: "Fixed Income"
+            internal: fixed-income
+          - key: multi_asset
+            label: "Multi-Asset"
+            internal: multi-asset
+          - key: alternatives
+            label: "Alternatives"
+            internal: alternatives
+          - key: quant
+            label: "Quantitative"
+            internal: quantitative
+        default_key: multi_asset
+
+  prereqs:
+    - type: state_exists
+      key: structure.exists
+
+  expands_to:
+    - verb: trading-profile.create
+      args:
+        cbu_id: "${arg.structure}"
+        name: "${arg.name}"
+        investment_manager_id: "${arg.investment_manager}"
+        strategy: "${arg.strategy.internal}"
+
+  sets_state:
+    - key: mandate.exists
+      value: true
+
+  unlocks:
+    - mandate.add-product
+    - mandate.set-instruments
+    - mandate.set-markets
+
+mandate.add-product:
+  kind: macro
+
+  ui:
+    label: "Add Product"
+    description: "Add a product to the mandate"
+    target_label: "Product"
+
+  routing:
+    mode_tags: [trading]
+    operator_domain: mandate
+
+  target:
+    operates_on: mandate_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      mandate:
+        type: mandate_ref
+        ui_label: "Mandate"
+        autofill_from: session.current_mandate
+        picker: mandate_picker
+      product:
+        type: enum
+        ui_label: "Product"
+        values:
+          - key: custody
+            label: "Custody"
+            internal: CUSTODY
+          - key: execution
+            label: "Execution"
+            internal: EXECUTION
+          - key: clearing
+            label: "Clearing"
+            internal: CLEARING
+          - key: prime_brokerage
+            label: "Prime Brokerage"
+            internal: PRIME_BROKERAGE
+          - key: securities_lending
+            label: "Securities Lending"
+            internal: SECURITIES_LENDING
+          - key: fx
+            label: "FX"
+            internal: FX
+          - key: otc
+            label: "OTC Derivatives"
+            internal: OTC_DERIVATIVES
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: mandate.exists
+
+  expands_to:
+    - verb: trading-profile.add-product
+      args:
+        trading_profile_id: "${arg.mandate}"
+        product_code: "${arg.product.internal}"
+
+  unlocks: []
+
+mandate.set-instruments:
+  kind: macro
+
+  ui:
+    label: "Set Instruments"
+    description: "Configure permitted instruments for the mandate"
+    target_label: "Instruments"
+
+  routing:
+    mode_tags: [trading]
+    operator_domain: mandate
+
+  target:
+    operates_on: mandate_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      mandate:
+        type: mandate_ref
+        ui_label: "Mandate"
+        autofill_from: session.current_mandate
+        picker: mandate_picker
+      instruments:
+        type: list
+        item_type: enum
+        ui_label: "Instruments"
+        values:
+          - key: equities
+            label: "Equities"
+            internal: EQUITIES
+          - key: government_bonds
+            label: "Government Bonds"
+            internal: GOVERNMENT_BONDS
+          - key: corporate_bonds
+            label: "Corporate Bonds"
+            internal: CORPORATE_BONDS
+          - key: etfs
+            label: "ETFs"
+            internal: ETFS
+          - key: futures
+            label: "Futures"
+            internal: FUTURES
+          - key: options
+            label: "Options"
+            internal: OPTIONS
+          - key: swaps
+            label: "Swaps"
+            internal: SWAPS
+          - key: fx_spot
+            label: "FX Spot"
+            internal: FX_SPOT
+          - key: fx_forward
+            label: "FX Forward"
+            internal: FX_FORWARD
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: mandate.exists
+
+  expands_to:
+    - verb: trading-profile.set-instruments
+      args:
+        trading_profile_id: "${arg.mandate}"
+        instruments: "${arg.instruments.internal}"
+
+  unlocks: []
+
+mandate.set-markets:
+  kind: macro
+
+  ui:
+    label: "Set Markets"
+    description: "Configure permitted markets for the mandate"
+    target_label: "Markets"
+
+  routing:
+    mode_tags: [trading]
+    operator_domain: mandate
+
+  target:
+    operates_on: mandate_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      mandate:
+        type: mandate_ref
+        ui_label: "Mandate"
+        autofill_from: session.current_mandate
+        picker: mandate_picker
+      markets:
+        type: list
+        item_type: enum
+        ui_label: "Markets"
+        values:
+          - key: us
+            label: "United States"
+            internal: US
+          - key: uk
+            label: "United Kingdom"
+            internal: UK
+          - key: eu
+            label: "European Union"
+            internal: EU
+          - key: jp
+            label: "Japan"
+            internal: JP
+          - key: hk
+            label: "Hong Kong"
+            internal: HK
+          - key: sg
+            label: "Singapore"
+            internal: SG
+          - key: au
+            label: "Australia"
+            internal: AU
+          - key: ch
+            label: "Switzerland"
+            internal: CH
+    optional: {}
+
+  prereqs:
+    - type: state_exists
+      key: mandate.exists
+
+  expands_to:
+    - verb: trading-profile.set-markets
+      args:
+        trading_profile_id: "${arg.mandate}"
+        markets: "${arg.markets.internal}"
+
+  unlocks: []
+
+mandate.list:
+  kind: macro
+
+  ui:
+    label: "List Mandates"
+    description: "Show mandates for a structure"
+    target_label: "Mandates"
+
+  routing:
+    mode_tags: [trading, onboarding]
+    operator_domain: mandate
+
+  target:
+    operates_on: structure_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      structure:
+        type: structure_ref
+        ui_label: "For Structure"
+        autofill_from: session.current_structure
+        picker: structure_picker
+
+  prereqs: []
+
+  expands_to:
+    - verb: trading-profile.list
+      args:
+        cbu_id: "${arg.structure}"
+
+  unlocks: []
+
+mandate.select:
+  kind: macro
+
+  ui:
+    label: "Select Mandate"
+    description: "Set the current working mandate"
+    target_label: "Mandate"
+
+  routing:
+    mode_tags: [trading]
+    operator_domain: mandate
+
+  target:
+    operates_on: mandate_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      mandate:
+        type: mandate_ref
+        ui_label: "Mandate"
+        picker: mandate_picker
+    optional: {}
+
+  prereqs: []
+
+  expands_to:
+    - verb: session.set-mandate
+      args:
+        mandate_id: "${arg.mandate}"
+
+  sets_state:
+    - key: mandate.selected
+      value: true
+    - key: mandate.exists
+      value: true
+
+  unlocks:
+    - mandate.add-product
+    - mandate.set-instruments
+    - mandate.set-markets
+
+mandate.details:
+  kind: macro
+
+  ui:
+    label: "Mandate Details"
+    description: "Show details of a mandate"
+    target_label: "Mandate"
+
+  routing:
+    mode_tags: [trading]
+    operator_domain: mandate
+
+  target:
+    operates_on: mandate_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      mandate:
+        type: mandate_ref
+        ui_label: "Mandate"
+        autofill_from: session.current_mandate
+        picker: mandate_picker
+    optional: {}
+
+  prereqs: []
+
+  expands_to:
+    - verb: trading-profile.get
+      args:
+        trading_profile_id: "${arg.mandate}"
+
+  unlocks: []

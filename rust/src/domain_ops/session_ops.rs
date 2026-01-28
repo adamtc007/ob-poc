@@ -34,7 +34,6 @@ use uuid::Uuid;
 use super::CustomOperation;
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
-use crate::session::{CbuSummary, ClearResult, HistoryResult, JurisdictionCount, SessionInfo};
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -42,6 +41,49 @@ use sqlx::PgPool;
 // =============================================================================
 // RESULT TYPES
 // =============================================================================
+
+/// Summary of a CBU for list responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "database", derive(sqlx::FromRow))]
+pub struct CbuSummary {
+    pub cbu_id: Uuid,
+    pub name: String,
+    pub jurisdiction: Option<String>,
+}
+
+/// Result of clearing session scope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClearResult {
+    pub cleared: bool,
+    pub count: usize,
+}
+
+/// Result of undo/redo operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HistoryResult {
+    pub success: bool,
+    pub scope_size: usize,
+    pub history_depth: usize,
+    pub future_depth: usize,
+}
+
+/// Jurisdiction count for session info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JurisdictionCount {
+    pub jurisdiction: String,
+    pub count: i64,
+}
+
+/// Session info response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionInfo {
+    pub session_id: Uuid,
+    pub name: Option<String>,
+    pub total_cbus: usize,
+    pub jurisdictions: Vec<JurisdictionCount>,
+    pub history_depth: usize,
+    pub future_depth: usize,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoadUniverseResult {
@@ -215,12 +257,12 @@ impl CustomOperation for SessionLoadUniverseOp {
                 .await?
         };
 
-        let session = ctx.get_or_create_cbu_session_mut();
-        let count_added = session.load_many(cbu_ids);
+        let session = ctx.get_or_create_session_mut();
+        let count_added = session.load_cbus(cbu_ids);
 
         let result = LoadUniverseResult {
             count_added,
-            total_loaded: session.count(),
+            total_loaded: session.cbu_count(),
         };
 
         Ok(ExecutionResult::Record(json!(result)))
@@ -275,13 +317,13 @@ impl CustomOperation for SessionLoadGalaxyOp {
         .fetch_all(pool)
         .await?;
 
-        let session = ctx.get_or_create_cbu_session_mut();
-        let count_added = session.load_many(cbu_ids);
+        let session = ctx.get_or_create_session_mut();
+        let count_added = session.load_cbus(cbu_ids);
 
         let result = LoadGalaxyResult {
             jurisdiction,
             count_added,
-            total_loaded: session.count(),
+            total_loaded: session.cbu_count(),
         };
 
         Ok(ExecutionResult::Record(json!(result)))
@@ -441,16 +483,16 @@ impl CustomOperation for SessionLoadClusterOp {
             ));
         }
 
-        let session = ctx.get_or_create_cbu_session_mut();
+        let session = ctx.get_or_create_session_mut();
         session.name = Some(format!("{} Book", apex_name));
-        let count_added = session.load_many(cbu_ids);
+        let count_added = session.load_cbus(cbu_ids);
 
         let result = LoadClusterResult {
             manco_name: apex_name,
             manco_entity_id: apex_entity_id,
             jurisdiction,
             count_added,
-            total_loaded: session.count(),
+            total_loaded: session.cbu_count(),
         };
 
         Ok(ExecutionResult::Record(json!(result)))
@@ -506,14 +548,14 @@ impl CustomOperation for SessionLoadSystemOp {
         .await?
         .ok_or_else(|| anyhow::anyhow!("CBU not found: {}", cbu_id))?;
 
-        let session = ctx.get_or_create_cbu_session_mut();
+        let session = ctx.get_or_create_session_mut();
         let was_new = session.load_cbu(cbu_id);
 
         let result = LoadSystemResult {
             cbu_id,
             name: cbu.name,
             jurisdiction: cbu.jurisdiction,
-            total_loaded: session.count(),
+            total_loaded: session.cbu_count(),
             was_new,
         };
 
@@ -570,13 +612,13 @@ impl CustomOperation for SessionUnloadSystemOp {
         .await?
         .unwrap_or_default();
 
-        let session = ctx.get_or_create_cbu_session_mut();
+        let session = ctx.get_or_create_session_mut();
         let was_present = session.unload_cbu(cbu_id);
 
         let result = UnloadSystemResult {
             cbu_id,
             name,
-            total_loaded: session.count(),
+            total_loaded: session.cbu_count(),
             was_present,
         };
 
@@ -625,8 +667,8 @@ impl CustomOperation for SessionFilterJurisdictionOp {
     ) -> Result<ExecutionResult> {
         let jurisdiction = get_required_string(verb_call, "jurisdiction")?;
 
-        let session = ctx.get_or_create_cbu_session_mut();
-        let before_count = session.count();
+        let session = ctx.get_or_create_session_mut();
+        let before_count = session.cbu_count();
         let current_cbu_ids = session.cbu_ids_vec();
 
         if current_cbu_ids.is_empty() {
@@ -646,15 +688,15 @@ impl CustomOperation for SessionFilterJurisdictionOp {
         .fetch_all(pool)
         .await?;
 
-        session.clear();
-        let count_kept = session.load_many(matching_cbu_ids);
+        session.clear_cbus_with_history();
+        let count_kept = session.load_cbus(matching_cbu_ids);
         let count_removed = before_count - count_kept;
 
         let result = FilterJurisdictionResult {
             jurisdiction,
             count_kept,
             count_removed,
-            total_loaded: session.count(),
+            total_loaded: session.cbu_count(),
         };
 
         Ok(ExecutionResult::Record(json!(result)))
@@ -700,10 +742,11 @@ impl CustomOperation for SessionClearOp {
         ctx: &mut ExecutionContext,
         _pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let session = ctx.get_or_create_cbu_session_mut();
-        let count_removed = session.clear();
+        let session = ctx.get_or_create_session_mut();
+        let count = session.clear_cbus_with_history();
         Ok(ExecutionResult::Record(json!(ClearResult {
-            count_removed
+            cleared: true,
+            count
         })))
     }
 
@@ -747,14 +790,14 @@ impl CustomOperation for SessionUndoOp {
         ctx: &mut ExecutionContext,
         _pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let session = ctx.get_or_create_cbu_session_mut();
-        let success = session.undo();
+        let session = ctx.get_or_create_session_mut();
+        let success = session.undo_cbu();
 
         let result = HistoryResult {
             success,
-            total_loaded: session.count(),
-            history_depth: session.history_depth(),
-            future_depth: session.future_depth(),
+            scope_size: session.cbu_count(),
+            history_depth: session.cbu_history_depth(),
+            future_depth: session.cbu_future_depth(),
         };
 
         Ok(ExecutionResult::Record(json!(result)))
@@ -800,14 +843,14 @@ impl CustomOperation for SessionRedoOp {
         ctx: &mut ExecutionContext,
         _pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let session = ctx.get_or_create_cbu_session_mut();
-        let success = session.redo();
+        let session = ctx.get_or_create_session_mut();
+        let success = session.redo_cbu();
 
         let result = HistoryResult {
             success,
-            total_loaded: session.count(),
-            history_depth: session.history_depth(),
-            future_depth: session.future_depth(),
+            scope_size: session.cbu_count(),
+            history_depth: session.cbu_history_depth(),
+            future_depth: session.cbu_future_depth(),
         };
 
         Ok(ExecutionResult::Record(json!(result)))
@@ -853,7 +896,7 @@ impl CustomOperation for SessionInfoOp {
         ctx: &mut ExecutionContext,
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
-        let session = ctx.get_or_create_cbu_session_mut();
+        let session = ctx.get_or_create_session_mut();
         let cbu_ids = session.cbu_ids_vec();
 
         let jurisdictions: Vec<JurisdictionCount> = if cbu_ids.is_empty() {
@@ -882,10 +925,10 @@ impl CustomOperation for SessionInfoOp {
         let result = SessionInfo {
             session_id: session.id,
             name: session.name.clone(),
-            total_cbus: session.count(),
+            total_cbus: session.cbu_count(),
             jurisdictions,
-            history_depth: session.history_depth(),
-            future_depth: session.future_depth(),
+            history_depth: session.cbu_history_depth(),
+            future_depth: session.cbu_future_depth(),
         };
 
         Ok(ExecutionResult::Record(json!(result)))
@@ -934,7 +977,7 @@ impl CustomOperation for SessionListOp {
         let limit = get_optional_integer(verb_call, "limit").unwrap_or(100) as i64;
         let jurisdiction_filter = get_optional_string(verb_call, "jurisdiction");
 
-        let session = ctx.get_or_create_cbu_session_mut();
+        let session = ctx.get_or_create_session_mut();
         let cbu_ids = session.cbu_ids_vec();
 
         let cbus: Vec<CbuSummary> = if cbu_ids.is_empty() {
@@ -961,7 +1004,7 @@ impl CustomOperation for SessionListOp {
         Ok(ExecutionResult::Record(json!({
             "cbus": cbus,
             "count": cbus.len(),
-            "total_in_session": session.count()
+            "total_in_session": session.cbu_count()
         })))
     }
 

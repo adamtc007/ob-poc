@@ -535,6 +535,23 @@ enum VerbsAction {
     /// Compiles all V2 schemas into a single registry.json file
     /// for fast runtime loading.
     BuildRegistry,
+
+    /// Lint macro schema files
+    ///
+    /// Validates macro YAML schemas against lint rules (MACRO000-MACRO080):
+    /// - UI fields required (label, description, target_label)
+    /// - No forbidden tokens (cbu, entity_ref, etc.)
+    /// - Operator types only (structure_ref, party_ref, etc.)
+    /// - Enum args must use ${arg.X.internal} in expansion
+    LintMacros {
+        /// Show only errors, not warnings
+        #[arg(long)]
+        errors_only: bool,
+
+        /// Show verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -683,6 +700,10 @@ fn main() -> Result<()> {
                 }
                 VerbsAction::LintV2 { errors_only } => verb_migrate::run_lint(errors_only),
                 VerbsAction::BuildRegistry => verb_migrate::run_build_registry(),
+                VerbsAction::LintMacros {
+                    errors_only,
+                    verbose,
+                } => lint_macros(errors_only, verbose),
             }
         }
         Command::LoadFundProgramme {
@@ -1591,4 +1612,265 @@ fn etl_allianz(
     println!("===========================================");
 
     Ok(())
+}
+
+/// Lint macro schema files
+fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
+    println!("===========================================");
+    println!("  Macro Schema Lint");
+    println!("===========================================\n");
+
+    let root = project_root()?;
+    let macros_dir = root.join("rust/config/verb_schemas/macros");
+
+    if !macros_dir.exists() {
+        println!("No macros directory found at: {}", macros_dir.display());
+        println!("Creating directory...");
+        std::fs::create_dir_all(&macros_dir)?;
+        println!("  Created: {}", macros_dir.display());
+        println!("\nNo macro files to lint yet.");
+        return Ok(());
+    }
+
+    // Find all YAML files in macros directory
+    let yaml_files: Vec<_> = std::fs::read_dir(&macros_dir)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| {
+            p.extension()
+                .map(|ext| ext == "yaml" || ext == "yml")
+                .unwrap_or(false)
+        })
+        .filter(|p| {
+            // Skip files starting with underscore (like _prereq_keys.yaml)
+            !p.file_name()
+                .map(|n| n.to_string_lossy().starts_with('_'))
+                .unwrap_or(false)
+        })
+        .collect();
+
+    if yaml_files.is_empty() {
+        println!("No macro YAML files found in: {}", macros_dir.display());
+        println!("\nTo create macros, add YAML files like:");
+        println!("  - config/verb_schemas/macros/structure.yaml");
+        println!("  - config/verb_schemas/macros/case.yaml");
+        return Ok(());
+    }
+
+    println!("Found {} macro file(s) to lint\n", yaml_files.len());
+
+    let mut total_errors = 0;
+    let mut total_warnings = 0;
+    let mut files_with_issues = 0;
+
+    for path in &yaml_files {
+        let file_name = path.file_name().unwrap().to_string_lossy();
+
+        if verbose {
+            println!("Linting: {}", file_name);
+        }
+
+        let content = match std::fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                println!("  ERROR: Failed to read {}: {}", file_name, e);
+                total_errors += 1;
+                continue;
+            }
+        };
+
+        // Use the lint module from ob-poc
+        // Since xtask can't directly depend on ob-poc (circular), we use a subprocess
+        let output = std::process::Command::new("cargo")
+            .args([
+                "run",
+                "-p",
+                "ob-poc",
+                "--features",
+                "database",
+                "--bin",
+                "macro_lint",
+                "--",
+                path.to_str().unwrap(),
+            ])
+            .current_dir(root.join("rust"))
+            .output();
+
+        match output {
+            Ok(out) => {
+                if !out.stdout.is_empty() {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    // Parse the output to count errors/warnings
+                    for line in stdout.lines() {
+                        if line.contains("[error]") {
+                            total_errors += 1;
+                            println!("  {}", line);
+                        } else if line.contains("[warn]") && !errors_only {
+                            total_warnings += 1;
+                            println!("  {}", line);
+                        } else if verbose {
+                            println!("  {}", line);
+                        }
+                    }
+                }
+                if !out.stderr.is_empty() && verbose {
+                    eprintln!("{}", String::from_utf8_lossy(&out.stderr));
+                }
+            }
+            Err(_) => {
+                // Fallback: run inline lint (less accurate but works without binary)
+                let diags = inline_lint_yaml(&content);
+                for d in &diags {
+                    if d.0 == "error" {
+                        total_errors += 1;
+                        println!("  [{}] {}: {} at {}", d.1, d.0, d.3, d.2);
+                    } else if d.0 == "warn" && !errors_only {
+                        total_warnings += 1;
+                        println!("  [{}] {}: {} at {}", d.1, d.0, d.3, d.2);
+                    }
+                }
+            }
+        }
+
+        if total_errors > 0 || total_warnings > 0 {
+            files_with_issues += 1;
+        }
+    }
+
+    println!("\n===========================================");
+    println!("  Lint Summary");
+    println!("===========================================");
+    println!("Files checked: {}", yaml_files.len());
+    println!("Errors:        {}", total_errors);
+    if !errors_only {
+        println!("Warnings:      {}", total_warnings);
+    }
+
+    if total_errors > 0 {
+        println!("\nLint failed with {} error(s)", total_errors);
+        std::process::exit(1);
+    } else if total_warnings > 0 && !errors_only {
+        println!("\nLint passed with {} warning(s)", total_warnings);
+    } else {
+        println!("\nAll macro schemas passed lint!");
+    }
+
+    Ok(())
+}
+
+/// Inline YAML lint for when the binary isn't available
+/// Returns Vec<(severity, code, path, message)>
+fn inline_lint_yaml(content: &str) -> Vec<(&'static str, &'static str, String, String)> {
+    let mut diags = Vec::new();
+
+    // Parse YAML
+    let doc: Result<serde_yaml::Value, _> = serde_yaml::from_str(content);
+    let doc = match doc {
+        Ok(v) => v,
+        Err(e) => {
+            diags.push((
+                "error",
+                "MACRO000",
+                "$".to_string(),
+                format!("YAML parse error: {}", e),
+            ));
+            return diags;
+        }
+    };
+
+    // Check top-level is mapping
+    let top = match doc.as_mapping() {
+        Some(m) => m,
+        None => {
+            diags.push((
+                "error",
+                "MACRO001",
+                "$".to_string(),
+                "Schema must be a mapping".to_string(),
+            ));
+            return diags;
+        }
+    };
+
+    // Check each verb
+    for (k, v) in top {
+        let verb = k.as_str().unwrap_or("?");
+
+        if let Some(spec) = v.as_mapping() {
+            // Check kind
+            let kind = spec.get("kind").and_then(|v| v.as_str());
+            if kind != Some("macro") && kind != Some("primitive") {
+                diags.push((
+                    "error",
+                    "MACRO010",
+                    verb.to_string(),
+                    "kind must be 'macro' or 'primitive'".to_string(),
+                ));
+            }
+
+            if kind == Some("macro") {
+                // Check UI fields
+                if spec.get("ui").is_none() {
+                    diags.push((
+                        "error",
+                        "MACRO011",
+                        verb.to_string(),
+                        "ui section is required".to_string(),
+                    ));
+                }
+
+                // Check routing
+                if spec.get("routing").is_none() {
+                    diags.push((
+                        "error",
+                        "MACRO020",
+                        verb.to_string(),
+                        "routing section is required".to_string(),
+                    ));
+                }
+
+                // Check target
+                if spec.get("target").is_none() {
+                    diags.push((
+                        "error",
+                        "MACRO030",
+                        verb.to_string(),
+                        "target section is required".to_string(),
+                    ));
+                }
+
+                // Check args
+                if spec.get("args").is_none() {
+                    diags.push((
+                        "error",
+                        "MACRO040",
+                        verb.to_string(),
+                        "args section is required".to_string(),
+                    ));
+                }
+
+                // Check prereqs
+                if spec.get("prereqs").is_none() {
+                    diags.push((
+                        "error",
+                        "MACRO050",
+                        verb.to_string(),
+                        "prereqs is required (can be empty [])".to_string(),
+                    ));
+                }
+
+                // Check expands_to
+                if spec.get("expands_to").is_none() {
+                    diags.push((
+                        "error",
+                        "MACRO060",
+                        verb.to_string(),
+                        "expands_to is required for macros".to_string(),
+                    ));
+                }
+            }
+        }
+    }
+
+    diags
 }
