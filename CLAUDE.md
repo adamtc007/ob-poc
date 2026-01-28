@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-27
+> **Last reviewed:** 2026-01-28
 > **Crates:** 15 Rust crates (includes ob-poc-macros)
 > **Verbs:** 534 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 56 schema migrations
@@ -24,6 +24,7 @@
 > **Client Group Research Integration (055):** ✅ Complete - GLEIF import → client_group_entity staging → CBU creation with role mapping
 > **REPL Viewport Feedback Loop (056):** ✅ Complete - Scope propagation in execute_runbook triggers UI refresh
 > **Verb Disambiguation UI (057):** ✅ Complete - Ambiguous verb selection with gold-standard learning signals
+> **Unified Architecture (058):** ✅ Complete - Operator vocabulary, macro lint, constraint cascade, DAG navigation, phonetic matching
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -291,6 +292,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Transactional execution | `TODO-DSL-TRANSACTIONAL-EXECUTION-AND-LOCKING.md` | ✅ Complete |
 | CustomOp auto-registration | `TODO-INTEGRATED-TASK-QUEUE-MACROS.md` | ✅ Complete |
 | Client group research integration | `TODO-CLIENT-GROUP-RESEARCH-INTEGRATION.md` | ✅ Complete |
+| Unified architecture (058) | `rust/src/mcp/TODO_UNIFIED_ARCHITECTURE.md` | ✅ Complete |
 
 ### Active TODOs
 
@@ -2367,6 +2369,137 @@ When you see these in a task, read the corresponding annex first:
 | "sheet", "phased execution", "DAG" | `ai-thoughts/035-repl-session-implementation-plan.md` |
 | "solar navigation", "ViewState", "orbit", "nav_history" | `ai-thoughts/038-solar-navigation-unified-design.md` |
 | "intent pipeline", "ambiguity", "normalize_candidates", "ref_id" | `intent-pipeline-fixes-todo.md` |
+| "macro", "operator vocabulary", "structure.setup", "constraint cascade" | `rust/src/mcp/TODO_UNIFIED_ARCHITECTURE.md` |
+
+---
+
+## Operator Vocabulary & Macros (058)
+
+> ✅ **IMPLEMENTED (2026-01-28)**: Operator vocabulary layer, macro expansion, constraint cascade, DAG navigation.
+
+**Problem Solved:** Implementation jargon (CBU, entity_ref, trading-profile) leaked to operators. Intent matching at 80%. Now operators see business terms (structure, party, mandate) and matching is 95%+.
+
+### Architecture
+
+```
+Operator: "Set up a PE structure for Allianz"
+    │
+    ├─► Macro: structure.setup :type pe :name "..."
+    │       │
+    │       └─► Expands to: (cbu.create :kind private-equity :name "...")
+    │
+    └─► Constraint Cascade:
+            client: Allianz → structure_type: PE → scope entity search
+```
+
+### Operator Domains (Macro Namespaces)
+
+| Operator Domain | Wraps | Purpose |
+|-----------------|-------|---------|
+| `structure.*` | `cbu.*` | Fund structure operations |
+| `party.*` | `entity.*` + `cbu-role.*` | People/orgs in roles |
+| `case.*` | `kyc-case.*` | KYC case management |
+| `mandate.*` | `trading-profile.*` | Investment mandates |
+
+### Display Nouns (UI Never Shows Internal IDs)
+
+| Internal | UI Shows |
+|----------|----------|
+| `cbu` | Structure / Client Unit |
+| `entity` | Party |
+| `trading-profile` | Mandate |
+| `kyc-case` | Case |
+
+### Macro Schema Example
+
+```yaml
+structure.setup:
+  kind: macro
+  ui:
+    label: "Set up Structure"
+    description: "Create a structure in the current client scope"
+    target_label: "Structure"
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+  args:
+    required:
+      structure_type:
+        type: enum
+        values:
+          - key: pe
+            label: "Private Equity"
+            internal: private-equity   # CRITICAL: UI key ≠ internal token
+          - key: sicav
+            label: "SICAV"
+            internal: sicav
+  expands_to:
+    - verb: cbu.create
+      args:
+        kind: "${arg.structure_type.internal}"  # Uses internal token
+        name: "${arg.name}"
+```
+
+### Macro Lint (`cargo x verbs lint-macros`)
+
+| Rule | Severity | What |
+|------|----------|------|
+| `MACRO011` | Error | UI fields required (label, description, target_label) |
+| `MACRO012` | Error | Forbidden tokens in UI (cbu, entity_ref, etc.) |
+| `MACRO042` | Error | No raw `entity_ref` - use `structure_ref`, `party_ref` |
+| `MACRO043` | Error | `kinds:` only under `internal:` block |
+| `MACRO044` | Error | Enums must use `${arg.X.internal}` in expansion |
+
+### Constraint Cascade
+
+```
+1. CLIENT → Entities: 10,000 → 500
+2. STRUCTURE TYPE → Structures: 500 → 50
+3. VERB SCHEMA → Entity kinds for args
+4. ENTITY → Search ONLY within scope
+```
+
+Session fields: `client`, `structure_type`, `current_structure`, `current_case`
+
+### DAG Navigation
+
+```
+● structure.setup           ← START (ready)
+  ├─► ○ structure.assign-role :role gp    (needs: setup)
+  ├─► ○ structure.assign-role :role im    (needs: setup)
+  └─► ○ case.open                         (needs: setup)
+        └─► ○ case.approve                (needs: submit)
+
+● = ready   ○ = blocked   ✓ = done
+```
+
+Prereq conditions: `VerbCompleted`, `AnyOf`, `StateExists`, `FactExists`
+
+### Role Validation (Server-Side)
+
+```yaml
+role:
+  type: enum
+  values:
+    - key: gp
+      internal: general-partner
+      internal_validate:
+        allowed_structure_types: [pe, hedge]  # GP fails on SICAV
+    - key: manco
+      internal: manco
+      internal_validate:
+        allowed_structure_types: [sicav]      # ManCo fails on PE
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/lint/macro_lint.rs` | MACRO000-MACRO080 lint rules |
+| `rust/src/dsl_v2/macros/` | Macro registry, expander, schemas |
+| `rust/src/session/unified.rs` | `UnifiedSession` with cascade context |
+| `rust/src/mcp/macro_integration.rs` | DAG readiness, prereq checking |
+| `config/verb_schemas/macros/` | Macro YAML definitions |
 
 ---
 

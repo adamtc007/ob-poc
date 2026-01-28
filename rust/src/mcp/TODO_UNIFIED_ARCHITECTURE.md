@@ -1112,30 +1112,30 @@ Input
 - [x] Merge `CbuSession` into `UnifiedSession` ✅ COMPLETE - functionality migrated, CbuSession deprecated
 
 ## Phase 3: Macro Schemas
-- [ ] `structure.setup`, `structure.assign-role`
-- [ ] `case.open`, `case.submit`, `case.approve`
-- [ ] `mandate.create`, `mandate.set-instruments`
-- [ ] Build macro expander with `${arg.*.internal}` support
+- [x] `structure.setup`, `structure.assign-role` ✅ YAML schemas in `config/verb_schemas/macros/structure.yaml`
+- [x] `case.open`, `case.submit`, `case.approve` ✅ YAML schemas in `config/verb_schemas/macros/case.yaml`
+- [x] `mandate.create`, `mandate.set-instruments` ✅ YAML schemas in `config/verb_schemas/macros/mandate.yaml`
+- [x] Build macro expander with `${arg.*.internal}` support ✅ `rust/src/dsl_v2/macros/` module
 
 ## Phase 4: Constraint Cascade
 - [x] `SearchScope` type added ✅
 - [x] `derive_search_scope()` method on session ✅
-- [ ] Client picker at session start (mandatory)
-- [ ] Entity search scoped by context
+- [x] Client picker at session start (mandatory) ✅ (2026-01-28)
+- [x] Entity search scoped by context ✅ (2026-01-28) - `create_scoped_entity_router()` in `entity_routes.rs`
 
 ## Phase 5: DAG Navigation
 - [x] `DagState` tracks verb completions and state flags ✅
 - [x] `PrereqCondition.is_satisfied()` checks prereqs ✅
 - [x] `RunSheet.ready_for_execution()` computes ready entries ✅
 - [x] `RunSheet.cascade_skip()` propagates failures ✅
-- [ ] Compute verb readiness from prereqs (integrate with verb schemas)
-- [ ] Context flows down on execution
+- [x] Compute verb readiness from prereqs ✅ (2026-01-28) - `get_ready_verbs()`, `is_verb_ready()` in `macro_integration.rs`
+- [x] Context flows down on execution ✅ (2026-01-28) - `update_dag_after_execution()` called in MCP handlers + agent_routes
 
 ## Phase 6: Learning Loop
 - [x] Disambiguation UI complete (057) ✅
 - [x] `/select-verb` captures selection ✅
-- [ ] Variant generation (max 5)
-- [ ] Negative signals with decay
+- [x] Variant generation (max 5) ✅ (2026-01-28) - `generate_phrase_variants()` with MAX_VARIANTS=5, MIN_TOKENS=2
+- [x] Negative signals with decay ✅ (2026-01-28) - Blocklist uses `POWER(0.95, days_old)` decay in SQL
 - [ ] Promotion: user → team → global
 
 ## Phase 7: Testing
@@ -1144,7 +1144,7 @@ Input
 - [x] Unit tests for prereq conditions ✅
 - [ ] Golden expansion snapshot tests
 - [ ] Determinism property tests
-- [ ] Role validation (GP fails on SICAV)
+- [x] Role validation (GP fails on SICAV) ✅ (2026-01-28) - 5 tests in `expander.rs`, uses `StructureType::short_key()`
 - [ ] Idempotency key collision tests
 - [ ] Concurrency lock test: N parallel executions on same structure/case → no deadlocks, no duplicates
 - [ ] Crash/retry test: fail mid-plan, rerun with same execution_id → safe resume/no-op
@@ -1429,17 +1429,77 @@ impl SheetExecutor {
 
 ---
 
+## 2026-01-28: Phase 3 - Macro Expander Complete
+
+### Completed
+1. **Macro YAML Schemas** (`rust/config/verb_schemas/macros/`)
+   - `structure.yaml` - 5 macros: setup, assign-role, list, select, roles
+   - `case.yaml` - 9 macros: open, add-party, solicit-document, submit, approve, reject, list, select
+   - `mandate.yaml` - 7 macros: create, add-product, set-instruments, set-markets, list, select, details
+
+2. **Macro Expander Module** (`rust/src/dsl_v2/macros/`)
+   - `mod.rs` - Module exports and documentation
+   - `schema.rs` - MacroSchema, MacroArg, MacroEnumValue, MacroPrereq types
+   - `variable.rs` - Variable substitution (`${arg.*}`, `${scope.*}`, `${session.*}`)
+   - `registry.rs` - MacroRegistry with domain/mode_tag indexing
+   - `expander.rs` - expand_macro() with prereq checking and constraint validation
+
+3. **Intent Pipeline Integration** (`rust/src/mcp/macro_integration.rs`)
+   - Global macro registry singleton
+   - `is_macro()`, `try_expand_macro()` for pipeline integration
+   - `intent_args_to_macro_args()` for argument conversion
+   - `list_macros()`, `macros_by_mode()` for UI
+
+4. **Server Startup** (`rust/crates/ob-poc-web/src/main.rs`)
+   - Macro registry initialization on startup
+   - Logging of macro count and domain count
+
+### Key Types
+```rust
+// Variable substitution context
+pub struct VariableContext {
+    pub args: HashMap<String, ArgValue>,   // ${arg.name}, ${arg.name.internal}
+    pub scope: HashMap<String, String>,    // ${scope.client_id}
+    pub session: HashMap<String, Value>,   // ${session.current_structure}
+}
+
+// Expansion output
+pub struct MacroExpansionOutput {
+    pub statements: Vec<String>,           // Primitive DSL statements
+    pub sets_state: Vec<(String, Value)>,  // State flags to set
+    pub unlocks: Vec<String>,              // Verbs that become available
+    pub audit: MacroExpansionAudit,        // Audit trail
+}
+
+// Pipeline integration
+pub enum MacroAttemptResult {
+    NotAMacro,                             // Continue normal processing
+    Expanded(MacroExpansionOutput),        // Use expanded statements
+    Failed(MacroExpansionError),           // Expansion failed
+}
+```
+
+### Tests
+- 16 unit tests covering schema parsing, variable substitution, expansion, and error cases
+- All tests passing
+
+---
+
 # Part 12: Files to Create/Modify
 
 | File | Change |
 |------|--------|
-| `config/verb_schemas/macros/structure.yaml` | NEW |
-| `config/verb_schemas/macros/case.yaml` | NEW |
-| `config/verb_schemas/macros/mandate.yaml` | NEW |
-| `rust/src/session/unified.rs` | NEW |
-| `rust/src/dsl/macro_expander.rs` | NEW |
-| `rust/src/dsl/dag.rs` | NEW |
-| `rust/src/lint/macro_lint.rs` | NEW |
+| `config/verb_schemas/macros/structure.yaml` | ✅ CREATED |
+| `config/verb_schemas/macros/case.yaml` | ✅ CREATED |
+| `config/verb_schemas/macros/mandate.yaml` | ✅ CREATED |
+| `rust/src/session/unified.rs` | ✅ EXISTS (extended) |
+| `rust/src/dsl_v2/macros/mod.rs` | ✅ CREATED |
+| `rust/src/dsl_v2/macros/schema.rs` | ✅ CREATED |
+| `rust/src/dsl_v2/macros/variable.rs` | ✅ CREATED |
+| `rust/src/dsl_v2/macros/registry.rs` | ✅ CREATED |
+| `rust/src/dsl_v2/macros/expander.rs` | ✅ CREATED |
+| `rust/src/mcp/macro_integration.rs` | ✅ CREATED |
+| `rust/src/lint/macro_lint.rs` | ✅ EXISTS |
 
 ---
 

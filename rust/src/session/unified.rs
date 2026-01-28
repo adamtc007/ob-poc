@@ -782,6 +782,19 @@ impl StructureType {
         }
     }
 
+    /// Short key (for macro valid_for matching)
+    pub fn short_key(&self) -> &'static str {
+        match self {
+            Self::Pe => "pe",
+            Self::Sicav => "sicav",
+            Self::Hedge => "hedge",
+            Self::Etf => "etf",
+            Self::Pension => "pension",
+            Self::Trust => "trust",
+            Self::Fof => "fof",
+        }
+    }
+
     /// Internal token (what DSL uses)
     pub fn internal_token(&self) -> &'static str {
         match self {

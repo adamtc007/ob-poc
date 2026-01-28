@@ -44,6 +44,7 @@
 pub mod enrichment;
 pub mod handlers;
 pub mod intent_pipeline;
+pub mod macro_integration;
 pub mod protocol;
 pub mod resolution;
 pub mod schema;
@@ -55,6 +56,12 @@ pub mod types;
 pub mod verb_search;
 
 pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
+pub use macro_integration::{
+    check_macro_prereqs, get_all_verb_readiness, get_macro_schema, get_ready_verbs,
+    get_verb_readiness, init_macro_registry, is_macro, is_verb_ready, list_macros, macro_registry,
+    macros_by_mode, try_expand_macro, update_dag_after_execution, MacroAttemptResult, MacroInfo,
+    VerbReadiness, VerbReadinessInfo,
+};
 pub use resolution::{
     ConversationContext, EnrichedMatch, ResolutionConfidence, ResolutionResult, ResolutionStrategy,
     SuggestedAction,

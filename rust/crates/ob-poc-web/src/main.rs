@@ -27,9 +27,9 @@ use ob_poc::api::{
     control_routes, create_agent_router_with_semantic, create_attribute_router,
     create_cbu_session_router_with_pool, create_client_router, create_dsl_viewer_router,
     create_entity_router, create_graph_router, create_resolution_router,
-    create_session_graph_router, create_session_store, create_taxonomy_router,
-    create_trading_matrix_router, create_universe_router, create_verb_discovery_router,
-    service_resource_router,
+    create_scoped_entity_router, create_session_graph_router, create_session_store,
+    create_taxonomy_router, create_trading_matrix_router, create_universe_router,
+    create_verb_discovery_router, service_resource_router,
 };
 
 // Import gateway resolver for resolution routes
@@ -401,6 +401,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_universe_router(pool.clone()))
         // Control/ownership routes (board controller, control sphere)
         .merge(control_routes(pool.clone()))
+        // Session-scoped entity search (constraint cascade)
+        .merge(create_scoped_entity_router(sessions.clone()))
         // Service resource pipeline (intents, discovery, readiness)
         .merge(service_resource_router(pool.clone()))
         // CBU session management (load/unload CBUs, undo/redo)
@@ -498,6 +500,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(format!("Failed to bind to {}: {}", addr, e).into());
         }
     };
+
+    // =========================================================================
+    // Initialize macro registry (operator vocabulary layer)
+    // =========================================================================
+    match ob_poc::mcp::init_macro_registry() {
+        Ok(()) => {
+            let registry = ob_poc::mcp::macro_registry();
+            tracing::info!(
+                "Macro registry initialized: {} macros, {} domains",
+                registry.len(),
+                registry.domains().count()
+            );
+        }
+        Err(e) => {
+            tracing::warn!("Macro registry initialization failed (non-fatal): {}", e);
+            tracing::warn!("Operator macros will not be available");
+        }
+    }
 
     // =========================================================================
     // Spawn background learning task (non-blocking)

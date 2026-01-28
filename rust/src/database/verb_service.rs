@@ -357,6 +357,10 @@ impl VerbService {
     // ========================================================================
 
     /// Check if a verb is blocked for the given query
+    ///
+    /// Uses time-based decay: negative signals decay at ~50% after 2 weeks.
+    /// Decay formula: weight * 0.95^days_old (from TODO spec)
+    /// Default base weight is 1.0, threshold is compared against decayed similarity.
     pub async fn check_blocklist(
         &self,
         query_embedding: &[f32],
@@ -366,6 +370,16 @@ impl VerbService {
     ) -> Result<bool, sqlx::Error> {
         let embedding_vec = Vector::from(query_embedding.to_vec());
 
+        // Decay-aware blocklist check:
+        // - Compute days_old from created_at
+        // - Apply decay: base_weight * 0.95^days_old
+        // - Match is blocked if decayed_similarity > threshold
+        //
+        // For example:
+        //   Day 0:  1.0 * 0.95^0  = 1.0   (full weight)
+        //   Day 7:  1.0 * 0.95^7  = 0.70  (70% weight)
+        //   Day 14: 1.0 * 0.95^14 = 0.49  (~50% weight)
+        //   Day 30: 1.0 * 0.95^30 = 0.21  (21% weight)
         let blocked = sqlx::query_scalar::<_, bool>(
             r#"
             SELECT EXISTS (
@@ -374,7 +388,12 @@ impl VerbService {
                   AND (user_id IS NULL OR user_id = $2)
                   AND (expires_at IS NULL OR expires_at > now())
                   AND embedding IS NOT NULL
-                  AND 1 - (embedding <=> $3::vector) > $4
+                  AND (
+                    -- Compute decayed similarity: similarity * decay_factor
+                    -- decay_factor = 0.95^days_old
+                    (1 - (embedding <=> $3::vector)) *
+                    POWER(0.95, GREATEST(0, EXTRACT(EPOCH FROM (now() - created_at)) / 86400))
+                  ) > $4
             )
             "#,
         )

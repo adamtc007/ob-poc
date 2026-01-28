@@ -917,6 +917,14 @@ impl ToolHandlers {
                                 Some(crate::session::SessionScope::from_graph_scope(sc.clone()));
                         }
 
+                        // Update DAG state for executed verbs (Phase 5: context flows down)
+                        // Extract executed verbs from the plan and update session's DAG
+                        for step in &plan.steps {
+                            let verb_fqn =
+                                format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+                            crate::mcp::update_dag_after_execution(session, &verb_fqn);
+                        }
+
                         // Touch updated_at to trigger watch notification
                         session.updated_at = chrono::Utc::now();
 
@@ -926,7 +934,8 @@ impl ToolHandlers {
                             has_view_state = view_state.is_some(),
                             has_viewport_state = viewport_state.is_some(),
                             has_scope_change = scope_change.is_some(),
-                            "MCP execution persisted to session"
+                            executed_verbs = plan.steps.len(),
+                            "MCP execution persisted to session with DAG update"
                         );
                     }
                 }

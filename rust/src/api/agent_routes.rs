@@ -1085,12 +1085,72 @@ async fn create_session(
     State(state): State<AgentState>,
     Json(req): Json<CreateSessionRequest>,
 ) -> Result<Json<CreateSessionResponse>, StatusCode> {
+    use crate::session::constraint_cascade::update_dag_from_cascade;
+    use crate::session::unified::StructureType;
+
     tracing::info!("=== CREATE SESSION ===");
     tracing::info!("Domain hint: {:?}", req.domain_hint);
+    tracing::info!("Initial client: {:?}", req.initial_client);
+    tracing::info!("Structure type: {:?}", req.structure_type);
 
-    let session = UnifiedSession::new_for_entity(None, "cbu", None, req.domain_hint.clone());
+    let mut session = UnifiedSession::new_for_entity(None, "cbu", None, req.domain_hint.clone());
     let session_id = session.id;
     let created_at = session.created_at;
+
+    // Wire initial client constraint if provided
+    let (final_state, welcome_message) = if let Some(ref client_ref) = req.initial_client {
+        // Try to resolve client from client_id or client_name
+        let resolved_client = resolve_initial_client(&state.pool, client_ref).await;
+
+        match resolved_client {
+            Ok(client) => {
+                tracing::info!(
+                    "Setting initial client constraint: {} ({})",
+                    client.display_name,
+                    client.client_id
+                );
+
+                // Set client context on session (constraint cascade level 1)
+                session.client = Some(client.clone());
+
+                // Set structure type if provided (constraint cascade level 2)
+                if let Some(ref st) = req.structure_type {
+                    if let Some(structure_type) = StructureType::from_internal(st) {
+                        session.structure_type = Some(structure_type);
+                        tracing::info!("Setting structure type: {:?}", structure_type);
+                    }
+                }
+
+                // Update DAG state from cascade
+                update_dag_from_cascade(&mut session);
+
+                // Transition to Scoped state
+                session.transition(crate::session::unified::SessionEvent::ScopeSet);
+
+                (
+                    SessionState::Scoped,
+                    format!(
+                        "Session scoped to {}. What would you like to do?",
+                        client.display_name
+                    ),
+                )
+            }
+            Err(e) => {
+                tracing::warn!("Failed to resolve initial client: {}", e);
+                // Fall back to prompting for client
+                (
+                    SessionState::New,
+                    crate::api::session::WELCOME_MESSAGE.to_string(),
+                )
+            }
+        }
+    } else {
+        // No initial client - prompt for client selection
+        (
+            SessionState::New,
+            crate::api::session::WELCOME_MESSAGE.to_string(),
+        )
+    };
 
     tracing::info!("Created session ID: {}", session_id);
 
@@ -1118,8 +1178,8 @@ async fn create_session(
     let response = CreateSessionResponse {
         session_id,
         created_at,
-        state: SessionState::New.into(),
-        welcome_message: crate::api::session::WELCOME_MESSAGE.to_string(),
+        state: final_state.into(),
+        welcome_message,
     };
     tracing::info!(
         "Returning CreateSessionResponse: session_id={}, state={:?}, welcome_message={}",
@@ -1128,6 +1188,85 @@ async fn create_session(
         response.welcome_message
     );
     Ok(Json(response))
+}
+
+/// Resolve initial client from client_id or client_name
+async fn resolve_initial_client(
+    pool: &sqlx::PgPool,
+    client_ref: &crate::api::session::InitialClientRef,
+) -> Result<crate::session::unified::ClientRef, String> {
+    use crate::session::unified::ClientRef;
+
+    // If client_id is provided, look it up directly
+    if let Some(client_id) = client_ref.client_id {
+        let row: Option<(Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT id, canonical_name
+            FROM "ob-poc".client_group
+            WHERE id = $1
+            "#,
+        )
+        .bind(client_id)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        match row {
+            Some((id, name)) => Ok(ClientRef {
+                client_id: id,
+                display_name: name,
+            }),
+            None => Err(format!("Client group not found: {}", client_id)),
+        }
+    }
+    // If client_name is provided, search for it
+    else if let Some(ref client_name) = client_ref.client_name {
+        // Search by alias first (exact match)
+        let row: Option<(Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT cg.id, cg.canonical_name
+            FROM "ob-poc".client_group cg
+            JOIN "ob-poc".client_group_alias cga ON cg.id = cga.client_group_id
+            WHERE LOWER(cga.alias) = LOWER($1)
+            LIMIT 1
+            "#,
+        )
+        .bind(client_name)
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        if let Some((id, name)) = row {
+            return Ok(ClientRef {
+                client_id: id,
+                display_name: name,
+            });
+        }
+
+        // Fallback: search by canonical name (case-insensitive)
+        let row: Option<(Uuid, String)> = sqlx::query_as(
+            r#"
+            SELECT id, canonical_name
+            FROM "ob-poc".client_group
+            WHERE LOWER(canonical_name) LIKE LOWER($1)
+            LIMIT 1
+            "#,
+        )
+        .bind(format!("%{}%", client_name))
+        .fetch_optional(pool)
+        .await
+        .map_err(|e| format!("Database error: {}", e))?;
+
+        match row {
+            Some((id, name)) => Ok(ClientRef {
+                client_id: id,
+                display_name: name,
+            }),
+            None => Err(format!("Client not found: {}", client_name)),
+        }
+    } else {
+        Err("Either client_id or client_name must be provided".to_string())
+    }
 }
 
 /// GET /api/session/:id - Get session state (creates if not found)
@@ -3472,6 +3611,19 @@ async fn execute_session_dsl(
                 "[EXEC] Session context after save, named_refs: {:?}",
                 session.context.named_refs
             );
+
+            // Update DAG state for executed verbs (Phase 5: context flows down)
+            // This enables prereq-based verb readiness checking
+            for step in &plan.steps {
+                let verb_fqn = format!("{}.{}", step.verb_call.domain, step.verb_call.verb);
+                crate::mcp::update_dag_after_execution(session, &verb_fqn);
+            }
+            tracing::debug!(
+                "[EXEC] Updated DAG state with {} executed verbs, completed={:?}",
+                plan.steps.len(),
+                session.dag_state.completed
+            );
+
             let session_results: Vec<crate::api::session::ExecutionResult> = results
                 .iter()
                 .map(|r| crate::api::session::ExecutionResult {
@@ -6819,6 +6971,11 @@ async fn record_verb_selection_signal(
 /// - "show all cbus" → cbu.list (0.85 confidence)  // generated
 /// - "show cbus"     → cbu.list (0.85 confidence)  // generated
 fn generate_phrase_variants(phrase: &str) -> Vec<String> {
+    // MAX 5 VARIANTS (prevent pollution per TODO spec)
+    const MAX_VARIANTS: usize = 5;
+    // MIN 2 tokens (quality filter per TODO spec)
+    const MIN_TOKENS: usize = 2;
+
     let mut variants = vec![phrase.to_string()];
     let lower = phrase.to_lowercase();
 
@@ -6872,10 +7029,62 @@ fn generate_phrase_variants(phrase: &str) -> Vec<String> {
         }
     }
 
-    // Dedupe and return
+    // Dedupe and sort
     variants.sort();
     variants.dedup();
-    variants
+
+    // Quality filter: Min 2 tokens, not generic alone
+    let filtered: Vec<String> = variants
+        .into_iter()
+        .filter(|v| {
+            let tokens: Vec<&str> = v.split_whitespace().collect();
+            // Must have at least MIN_TOKENS words
+            if tokens.len() < MIN_TOKENS {
+                return false;
+            }
+            // Not just generic stopwords
+            let generic_only = tokens.iter().all(|t| {
+                matches!(
+                    *t,
+                    "the"
+                        | "a"
+                        | "an"
+                        | "all"
+                        | "my"
+                        | "this"
+                        | "that"
+                        | "please"
+                        | "can"
+                        | "you"
+                        | "i"
+                        | "me"
+                        | "show"
+                        | "list"
+                        | "get"
+                )
+            });
+            !generic_only
+        })
+        .collect();
+
+    // Apply MAX_VARIANTS limit - always include original if it passed filter
+    let result: Vec<String> = filtered.into_iter().take(MAX_VARIANTS).collect();
+
+    // If original passed filter, ensure it's first
+    if result.contains(&phrase.to_string()) {
+        let mut final_result = vec![phrase.to_string()];
+        for v in result {
+            if v != phrase && final_result.len() < MAX_VARIANTS {
+                final_result.push(v);
+            }
+        }
+        final_result
+    } else if result.is_empty() {
+        // Fallback: return original even if short
+        vec![phrase.to_string()]
+    } else {
+        result
+    }
 }
 
 // ============================================================================

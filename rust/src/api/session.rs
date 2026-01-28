@@ -2942,11 +2942,28 @@ pub fn create_session_store() -> SessionStore {
 // API Request/Response Types
 // ============================================================================
 
+/// Reference to a client for session scope initialization
+#[derive(Debug, Clone, Deserialize)]
+pub struct InitialClientRef {
+    /// Client group ID (if known)
+    pub client_id: Option<Uuid>,
+    /// Client name/alias to search for (if client_id not known)
+    pub client_name: Option<String>,
+}
+
 /// Request to create a new session
 #[derive(Debug, Deserialize)]
 pub struct CreateSessionRequest {
     /// Optional domain hint to focus generation
     pub domain_hint: Option<String>,
+    /// Optional initial client to set session scope
+    /// If provided, the session starts in Scoped state with the client context set
+    /// If not provided, session starts in New state and prompts for client selection
+    #[serde(default)]
+    pub initial_client: Option<InitialClientRef>,
+    /// Optional structure type to filter by (pe, sicav, hedge, etc.)
+    #[serde(default)]
+    pub structure_type: Option<String>,
 }
 
 /// Welcome message constant - agent's opening question

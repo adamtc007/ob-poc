@@ -78,6 +78,8 @@ pub mod applicability_rules;
 pub mod batch_executor;
 pub mod csg_linter;
 pub mod display_nouns;
+
+// Macro expansion (operator vocabulary layer)
 pub mod domain_context;
 pub mod enrichment;
 pub mod entity_deps;
@@ -97,6 +99,7 @@ pub mod idempotency;
 pub mod intent;
 #[cfg(feature = "database")]
 pub mod lsp_validator;
+pub mod macros;
 pub mod operator_types;
 pub mod planning_facade;
 #[cfg(feature = "database")]
@@ -197,4 +200,11 @@ pub use expansion::{
 // Re-export error aggregation types
 pub use errors::{
     AffectedVerb, CauseDetails, CausedErrors, ErrorCause, ExecutionErrors, FailureTiming,
+};
+
+// Re-export macro expansion types
+pub use macros::{
+    expand_macro, load_macro_registry, load_macro_registry_from_dir, MacroArg, MacroArgType,
+    MacroEnumValue, MacroExpansionError, MacroExpansionOutput, MacroExpansionStep, MacroPrereq,
+    MacroRegistry, MacroRouting, MacroSchema, MacroTarget, MacroUi, SetState,
 };

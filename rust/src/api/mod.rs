@@ -79,7 +79,7 @@ pub mod workflow_routes;
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
-pub use entity_routes::create_entity_router;
+pub use entity_routes::{create_entity_router, create_scoped_entity_router};
 
 #[cfg(feature = "server")]
 pub use agent_routes::create_agent_router_with_semantic;
