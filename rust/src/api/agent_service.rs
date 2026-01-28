@@ -117,6 +117,7 @@ use crate::dsl_v2::verb_registry::registry;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
 use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
+use crate::macros::OperatorMacroRegistry;
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::ontology::SemanticStageRegistry;
 use crate::session::SessionScope;
@@ -468,7 +469,20 @@ impl AgentService {
         let verb_service = Arc::new(VerbService::new(self.pool.clone()));
         let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
             self.embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
-        let searcher = HybridVerbSearcher::new(verb_service, None).with_embedder(dyn_embedder);
+        
+        // Build verb searcher with macro registry for operator vocabulary
+        let macro_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("config/verb_schemas/macros");
+        let macro_reg = OperatorMacroRegistry::load_from_dir(&macro_dir)
+            .unwrap_or_else(|e| {
+                tracing::warn!("Failed to load operator macros: {}, using empty registry", e);
+                OperatorMacroRegistry::new()
+            });
+        
+        let searcher = HybridVerbSearcher::new(verb_service, None)
+            .with_embedder(dyn_embedder)
+            .with_macro_registry(Arc::new(macro_reg));
+        
         IntentPipeline::with_pool(searcher, self.pool.clone())
     }
 
