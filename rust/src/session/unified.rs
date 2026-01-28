@@ -63,6 +63,8 @@ pub struct UnifiedSession {
     pub current_structure: Option<StructureRef>,
     /// Current KYC case being worked on
     pub current_case: Option<CaseRef>,
+    /// Current mandate (trading profile) being worked on
+    pub current_mandate: Option<MandateRef>,
 
     // === Persona (filters available verbs) ===
     pub persona: Persona,
@@ -844,6 +846,13 @@ pub struct CaseRef {
     pub display_name: String,
 }
 
+/// Reference to a mandate (trading profile)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MandateRef {
+    pub mandate_id: Uuid,
+    pub display_name: String,
+}
+
 /// Persona - filters available verbs by user role
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -1482,6 +1491,7 @@ impl UnifiedSession {
             structure_type: None,
             current_structure: None,
             current_case: None,
+            current_mandate: None,
             // Persona (defaults to Ops)
             persona: Persona::default(),
             // DAG state (tracks verb completions)
@@ -1552,6 +1562,7 @@ impl UnifiedSession {
         session.structure_type = parent.structure_type;
         session.current_structure = parent.current_structure.clone();
         session.current_case = parent.current_case.clone();
+        session.current_mandate = parent.current_mandate.clone();
         session
     }
 
@@ -2087,6 +2098,23 @@ impl UnifiedSession {
     pub fn clear_current_case(&mut self) {
         if self.current_case.is_some() {
             self.current_case = None;
+            self.updated_at = Utc::now();
+        }
+    }
+
+    /// Set current mandate (trading profile)
+    pub fn set_current_mandate(&mut self, mandate_id: Uuid, display_name: String) {
+        self.current_mandate = Some(MandateRef {
+            mandate_id,
+            display_name,
+        });
+        self.updated_at = Utc::now();
+    }
+
+    /// Clear current mandate
+    pub fn clear_current_mandate(&mut self) {
+        if self.current_mandate.is_some() {
+            self.current_mandate = None;
             self.updated_at = Utc::now();
         }
     }
