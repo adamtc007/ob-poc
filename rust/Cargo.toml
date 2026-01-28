@@ -210,5 +210,5 @@ members = [
     "crates/ob-semantic-matcher",
     "crates/viewport",
     "crates/ob-poc-macros",
-    "xtask",
+    "xtask", "crates/playbook-core", "crates/playbook-lower",
 ]

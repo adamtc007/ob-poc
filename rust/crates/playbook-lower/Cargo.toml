@@ -1,0 +1,9 @@
+[package]
+name = "playbook-lower"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+playbook-core = { path = "../playbook-core" }
+uuid = { version = "1", features = ["v4"] }
+serde_yaml = "0.9"

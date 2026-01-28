@@ -24,6 +24,10 @@ tokio = { version = "1", features = ["full", "sync"] }
 # Main library (for parser, schema, vocabulary) - with database feature for full schema support
 ob-poc = { path = "../..", features = ["database"] }
 
+# Playbook support
+playbook-core = { path = "../playbook-core" }
+playbook-lower = { path = "../playbook-lower" }
+
 # Entity Gateway client (gRPC)
 entity-gateway = { path = "../entity-gateway" }
 tonic = "0.12"

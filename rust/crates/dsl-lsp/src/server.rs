@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
+use tokio::time::Duration;
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
@@ -11,6 +13,24 @@ use crate::analysis::{DocumentState, SymbolTable};
 use crate::entity_client::{gateway_addr, EntityLookupClient};
 use crate::handlers;
 use ob_poc::dsl_v2::planning_facade::PlanningOutput;
+
+/// File type detection for dispatch
+enum FileType {
+    Dsl,
+    Playbook,
+    Unknown,
+}
+
+fn file_type(uri: &Url) -> FileType {
+    let path = uri.path();
+    if path.ends_with(".playbook.yaml") || path.ends_with(".playbook.yml") {
+        FileType::Playbook
+    } else if path.ends_with(".dsl") {
+        FileType::Dsl
+    } else {
+        FileType::Unknown
+    }
+}
 
 /// DSL Language Server state.
 pub struct DslLanguageServer {
@@ -26,6 +46,8 @@ pub struct DslLanguageServer {
     symbols: Arc<RwLock<SymbolTable>>,
     /// Entity Gateway client for lookups (replaces direct DB access)
     entity_client: Arc<RwLock<Option<EntityLookupClient>>>,
+    /// Pending changes for debouncing (uri -> timestamp)
+    pending_changes: Arc<RwLock<HashMap<Url, Instant>>>,
 }
 
 impl DslLanguageServer {
@@ -38,6 +60,7 @@ impl DslLanguageServer {
             semantic_diagnostics: Arc::new(RwLock::new(HashMap::new())),
             symbols: Arc::new(RwLock::new(SymbolTable::new())),
             entity_client: Arc::new(RwLock::new(None)),
+            pending_changes: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -81,6 +104,21 @@ impl DslLanguageServer {
 
     /// Analyze a document and publish diagnostics.
     async fn analyze_document(&self, uri: &Url, text: &str) {
+        match file_type(uri) {
+            FileType::Playbook => {
+                let diagnostics = handlers::playbook::analyze_playbook(text).await;
+                self.publish_diagnostics(uri.clone(), diagnostics).await;
+                return;
+            }
+            FileType::Unknown => {
+                // No analysis for unknown file types
+                return;
+            }
+            FileType::Dsl => {
+                // Continue with DSL analysis below
+            }
+        }
+        
         // Use full analysis to get planning output for code actions
         let result = handlers::diagnostics::analyze_document_full(text).await;
 
@@ -129,6 +167,38 @@ impl DslLanguageServer {
             .get(uri)
             .cloned()
             .unwrap_or_default()
+    }
+    /// Static version of analyze_document for use in spawned tasks
+    async fn analyze_document_static(
+        uri: &Url,
+        text: &str,
+        documents: &Arc<RwLock<HashMap<Url, DocumentState>>>,
+        planning_outputs: &Arc<RwLock<HashMap<Url, PlanningOutput>>>,
+        semantic_diagnostics: &Arc<RwLock<HashMap<Url, Vec<ob_poc::dsl_v2::validation::Diagnostic>>>>,
+        client: &Client,
+    ) {
+        let result = handlers::diagnostics::analyze_document_full(text).await;
+
+        // Store document state
+        {
+            let mut docs = documents.write().await;
+            docs.insert(uri.clone(), result.state.clone());
+        }
+
+        // Store planning output for code actions
+        {
+            let mut planning = planning_outputs.write().await;
+            planning.insert(uri.clone(), result.planning_output);
+        }
+
+        // Store semantic diagnostics for entity suggestion code actions
+        {
+            let mut sem_diag = semantic_diagnostics.write().await;
+            sem_diag.insert(uri.clone(), result.semantic_diagnostics);
+        }
+
+        // Publish diagnostics
+        client.publish_diagnostics(uri.clone(), result.diagnostics, None).await;
     }
 }
 
@@ -220,24 +290,56 @@ impl LanguageServer for DslLanguageServer {
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
         tracing::debug!("Document changed: {}", params.text_document.uri);
 
+        let uri = params.text_document.uri.clone();
+        
         // Get full text from incremental changes
-        if let Some(doc) = self.get_document(&params.text_document.uri).await {
+        let text = if let Some(doc) = self.get_document(&uri).await {
             let mut text = doc.text.clone();
             for change in params.content_changes {
                 if let Some(range) = change.range {
-                    // Apply incremental change
                     let start_offset = offset_from_position(&text, range.start);
                     let end_offset = offset_from_position(&text, range.end);
                     text.replace_range(start_offset..end_offset, &change.text);
                 } else {
-                    // Full document replacement
                     text = change.text;
                 }
             }
-            self.analyze_document(&params.text_document.uri, &text)
-                .await;
-        }
+            text
+        } else {
+            params.content_changes.into_iter()
+                .last()
+                .map(|c| c.text)
+                .unwrap_or_default()
+        };
+        
+        // Debounce: record timestamp and spawn delayed analysis
+        let now = Instant::now();
+        self.pending_changes.write().await.insert(uri.clone(), now);
+        
+        let pending = self.pending_changes.clone();
+        let docs = self.documents.clone();
+        let client = self.client.clone();
+        let planning_outputs = self.planning_outputs.clone();
+        let semantic_diagnostics = self.semantic_diagnostics.clone();
+        let uri2 = uri.clone();
+        let text2 = text.clone();
+        
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            
+            // Check if this is still the most recent change
+            let pending_time = pending.read().await.get(&uri2).cloned();
+            if pending_time == Some(now) {
+                // Still current - run analysis
+                Self::analyze_document_static(
+                    &uri2, &text2, &docs, &planning_outputs, 
+                    &semantic_diagnostics, &client
+                ).await;
+            }
+        });
     }
+    
+
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         tracing::debug!("Document closed: {}", params.text_document.uri);

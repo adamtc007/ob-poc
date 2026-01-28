@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-01-28
-> **Crates:** 15 Rust crates (includes ob-poc-macros)
+> **Crates:** 17 Rust crates (includes ob-poc-macros)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 56 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
@@ -25,6 +25,7 @@
 > **REPL Viewport Feedback Loop (056):** ✅ Complete - Scope propagation in execute_runbook triggers UI refresh
 > **Verb Disambiguation UI (057):** ✅ Complete - Ambiguous verb selection with gold-standard learning signals
 > **Unified Architecture (058):** ✅ Complete - Operator vocabulary, macro lint, constraint cascade, DAG navigation, phonetic matching
+> **Playbook System (059):** ✅ Complete - YAML playbooks, marked-yaml source mapping, LSP validation, xtask CLI
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -1529,6 +1530,124 @@ CREATE TABLE "ob-poc".expansion_reports (
 ```
 
 ---
+
+
+---
+
+## Playbook System (059)
+
+> ✅ **IMPLEMENTED (2026-01-28)**: YAML-based playbook specs with LSP validation, source mapping, and CLI tooling.
+
+**Purpose:** Define reusable multi-step workflows as YAML playbooks that lower to DSL statements with slot substitution.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    PLAYBOOK PIPELINE                                         │
+│                                                                              │
+│  .playbook.yaml file                                                        │
+│         │                                                                    │
+│         ▼                                                                    │
+│  playbook-core::parse_playbook()                                            │
+│         │   - Pass 1: serde_yaml → PlaybookSpec (typed)                     │
+│         │   - Pass 2: marked-yaml → SourceMap (line:col positions)          │
+│         │                                                                    │
+│         ▼                                                                    │
+│  playbook-lower::lower_playbook()                                           │
+│         │   - Substitutes ${slot} references                                │
+│         │   - Reports missing required slots                                │
+│         │   - Generates DSL statements                                      │
+│         │                                                                    │
+│         ▼                                                                    │
+│  DSL statements ready for execution                                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Playbook Spec Format
+
+```yaml
+id: setup-pe-fund
+version: 1
+name: "Set Up PE Fund Structure"
+slots:
+  fund_name:
+    type: string
+    required: true
+  fund_type:
+    type: string
+    required: false
+    default: "private-equity"
+steps:
+  - id: create-fund
+    verb: cbu.create
+    args:
+      name: "${fund_name}"
+      kind: "${fund_type}"
+  - id: assign-gp
+    verb: cbu-role.assign
+    after: [create-fund]
+    args:
+      cbu_id: "${create-fund.result}"
+      role: general-partner
+```
+
+### Crates
+
+| Crate | Purpose |
+|-------|---------|
+| `playbook-core` | Spec types, parser with marked-yaml source mapping |
+| `playbook-lower` | Slot state management, DSL lowering |
+
+### Parser (Two-Pass with marked-yaml)
+
+```rust
+// Pass 1: Typed deserialization
+let spec: PlaybookSpec = serde_yaml::from_str(source)?;
+
+// Pass 2: AST walk with source positions
+let node = marked_yaml::parse_yaml(0, source)?;
+let marker = verb_node.span().start()?;  // Marker{line, col}
+```
+
+No string scanning or regex - pure AST traversal with exact source positions.
+
+### LSP Support
+
+- **File detection:** `.playbook.yaml`, `.playbook.yml`
+- **Diagnostics:** Parse errors, missing slots reported with exact positions
+- **Debouncing:** 100ms delay before analysis (avoids thrashing)
+- **Completion:** Verb completions from macro registry
+
+### CLI Tool
+
+```bash
+# Check playbook(s)
+cargo run -p xtask -- playbook-check <files> [-v|--verbose]
+
+# Example
+cargo run -p xtask -- playbook-check data/playbooks/*.playbook.yaml -v
+```
+
+### Zed Extension
+
+Extension updated to recognize `.playbook.yaml` files:
+- Syntax highlighting via tree-sitter-yaml
+- Language server integration for diagnostics
+- Verb completion in `verb:` context
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/playbook-core/src/spec.rs` | PlaybookSpec, SlotSpec, StepSpec |
+| `rust/crates/playbook-core/src/parser.rs` | Two-pass parser with marked-yaml |
+| `rust/crates/playbook-core/src/source_map.rs` | SourceSpan, StepSpan |
+| `rust/crates/playbook-lower/src/lower.rs` | lower_playbook(), MissingSlot |
+| `rust/crates/playbook-lower/src/slots.rs` | SlotState, SlotValue |
+| `rust/crates/dsl-lsp/src/handlers/playbook.rs` | LSP playbook analysis |
+| `rust/crates/dsl-lsp/zed-extension/languages/playbook/` | Zed language config |
+| `rust/xtask/src/main.rs` | PlaybookCheck command |
 
 ## Staged Runbook REPL (054)
 

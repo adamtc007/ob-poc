@@ -431,6 +431,23 @@ enum Command {
         #[arg(long, short = 'x')]
         execute: bool,
     },
+
+    /// Check and validate playbook files
+    ///
+    /// Parses playbook YAML files and reports any errors or missing slots.
+    PlaybookCheck {
+        /// Path to playbook file(s) to check (glob patterns supported)
+        #[arg(required = true)]
+        files: Vec<std::path::PathBuf>,
+
+        /// Output format: text (default) or json
+        #[arg(long, short = 'f', default_value = "text")]
+        format: String,
+
+        /// Show verbose output including slot analysis
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -714,6 +731,11 @@ fn main() -> Result<()> {
             dry_run,
             execute,
         } => run_load_fund_programme(&config, &input, output.as_deref(), limit, dry_run, execute),
+        Command::PlaybookCheck {
+            files,
+            format,
+            verbose,
+        } => playbook_check(files, &format, verbose),
         Command::LexiconHarness {
             prompts,
             standard,
@@ -1873,4 +1895,119 @@ fn inline_lint_yaml(content: &str) -> Vec<(&'static str, &'static str, String, S
     }
 
     diags
+}
+
+
+// ============================================================================
+// Playbook Check
+// ============================================================================
+
+
+
+// ============================================================================
+// Playbook Check
+// ============================================================================
+
+fn playbook_check(files: Vec<std::path::PathBuf>, format: &str, verbose: bool) -> Result<()> {
+    use playbook_core::parse_playbook;
+    use playbook_lower::{lower_playbook, SlotState};
+
+    let _ = format; // unused for now
+
+    println!("==========================================");
+    println!("  Playbook Check");
+    println!("==========================================");
+    println!();
+
+    let mut total_errors = 0;
+    let mut total_warnings = 0;
+    let mut checked_files = 0;
+
+    for path in &files {
+        let paths: Vec<std::path::PathBuf> = if path.to_string_lossy().contains('*') {
+            glob::glob(&path.to_string_lossy())
+                .map(|paths| paths.filter_map(|p| p.ok()).collect())
+                .unwrap_or_else(|_| vec![path.clone()])
+        } else {
+            vec![path.clone()]
+        };
+
+        for file_path in paths {
+            if !file_path.exists() {
+                eprintln!("Error: File not found: {}", file_path.display());
+                total_errors += 1;
+                continue;
+            }
+
+            let source = match std::fs::read_to_string(&file_path) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Error reading {}: {}", file_path.display(), e);
+                    total_errors += 1;
+                    continue;
+                }
+            };
+
+            checked_files += 1;
+            println!("Checking: {}", file_path.display());
+
+            let output = match parse_playbook(&source) {
+                Ok(result) => result,
+                Err(e) => {
+                    println!("  ERROR: Parse failed: {}", e);
+                    total_errors += 1;
+                    continue;
+                }
+            };
+
+            let spec = output.spec;
+
+            if verbose {
+                println!("  Playbook: {}", spec.name);
+                println!("  Slots: {}", spec.slots.len());
+                println!("  Steps: {}", spec.steps.len());
+                
+                if !spec.slots.is_empty() {
+                    println!("  Slot details:");
+                    for (name, slot) in &spec.slots {
+                        let req = if slot.required { "required" } else { "optional" };
+                        let default = slot.default.as_ref().map(|d| format!(" = {:?}", d)).unwrap_or_default();
+                        println!("    - {} ({}){}", name, req, default);
+                    }
+                }
+            }
+
+            // Lower with empty slot state to find missing slots
+            let slots = SlotState::new();
+            let result = lower_playbook(&spec, &slots);
+            
+            if !result.missing_slots.is_empty() {
+                println!("  WARNING: Missing required slots:");
+                for missing in &result.missing_slots {
+                    println!("    - slot in step {} ({})", missing.step_index, missing.step_id);
+                }
+                total_warnings += result.missing_slots.len();
+            }
+
+            if verbose && !result.dsl_statements.is_empty() {
+                println!("  Generated {} DSL statements", result.dsl_statements.len());
+            }
+
+            if result.missing_slots.is_empty() {
+                println!("  OK");
+            }
+            println!();
+        }
+    }
+
+    println!("==========================================");
+    println!("Summary: {} files checked, {} errors, {} warnings", 
+             checked_files, total_errors, total_warnings);
+    println!("==========================================");
+
+    if total_errors > 0 {
+        anyhow::bail!("Playbook check failed with {} errors", total_errors);
+    }
+
+    Ok(())
 }

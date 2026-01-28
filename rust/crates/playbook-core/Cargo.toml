@@ -1,0 +1,10 @@
+[package]
+name = "playbook-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+marked-yaml = "0.6"
+thiserror = "1"

@@ -320,8 +320,6 @@ impl IntentPipeline {
         }
     }
 
-    /// Get or create LLM client
-
     /// Set session for macro expansion
     pub fn with_session(mut self, session: Arc<std::sync::RwLock<UnifiedSession>>) -> Self {
         self.session = Some(session);

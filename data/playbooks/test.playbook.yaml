@@ -1,0 +1,17 @@
+id: test-playbook
+version: 1
+name: Test Playbook
+slots:
+  fund_name:
+    type: string
+    required: true
+  fund_type:
+    type: string
+    required: false
+    default: "UCITS"
+steps:
+  - id: create-fund
+    verb: fund.create
+    args:
+      name: "${fund_name}"
+      type: "${fund_type}"

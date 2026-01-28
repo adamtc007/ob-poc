@@ -8,6 +8,7 @@ use crate::entity_client::EntityLookupClient;
 use ob_poc::dsl_v2::{
     find_unified_verb, parse_program, registry, runtime_registry, suggestions::predict_next_steps,
     BindingContext, BindingInfo,
+    macros::load_macro_registry,
 };
 
 /// Generate completions based on cursor position.
@@ -544,4 +545,40 @@ mod tests {
     // The get_lookup_entity_type function now dynamically looks up entity_type
     // from the verb registry based on verbs.yaml configuration, so tests
     // need the full config loaded.
+}
+
+
+/// Get verb completions for playbook files (macro verbs + primitive verbs)
+pub fn playbook_verb_completions() -> Vec<CompletionItem> {
+    let mut items = Vec::new();
+    
+    // First, add macro verbs (operator vocabulary)
+    if let Ok(macro_reg) = load_macro_registry() {
+        for (fqn, schema) in macro_reg.all() {
+            items.push(CompletionItem {
+                label: fqn.clone(),
+                kind: Some(CompletionItemKind::FUNCTION),
+                detail: Some(schema.ui.label.clone()),
+                documentation: Some(Documentation::String(schema.ui.description.clone())),
+                insert_text: Some(fqn.clone()),
+                insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+                ..Default::default()
+            });
+        }
+    }
+    
+    // Then add primitive verbs from the registry
+    let reg = registry();
+    for verb in reg.all_verbs() {
+        items.push(CompletionItem {
+            label: verb.full_name(),
+            kind: Some(CompletionItemKind::METHOD),
+            detail: Some(verb.description.clone()),
+            insert_text: Some(verb.full_name()),
+            insert_text_format: Some(InsertTextFormat::PLAIN_TEXT),
+            ..Default::default()
+        });
+    }
+    
+    items
 }

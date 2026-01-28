@@ -7,3 +7,4 @@ pub mod goto_definition;
 pub mod hover;
 pub mod signature;
 pub mod symbols;
+pub mod playbook;
