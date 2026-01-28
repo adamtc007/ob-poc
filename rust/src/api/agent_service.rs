@@ -124,7 +124,7 @@ use crate::session::{ResolutionSubSession, SessionState, UnifiedSession, Unresol
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 // ============================================================================
@@ -868,13 +868,48 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         }
 
         // ONE PIPELINE - generate/validate DSL
+        // Wrap session for macro expansion (macros need session state for prereqs/context)
+        let session_arc = Arc::new(RwLock::new(session.clone()));
         let result = self
             .get_intent_pipeline()
+            .with_session(session_arc)
             .process_with_scope(&request.message, None, session.context.client_scope.clone())
             .await;
 
         match result {
             Ok(r) => {
+                // Handle macro expansion with explicit feedback
+                if let PipelineOutcome::MacroExpanded { ref macro_verb, ref unlocks } = r.outcome {
+                    tracing::info!(
+                        macro_verb = %macro_verb,
+                        expanded_dsl = %r.dsl,
+                        unlocks = ?unlocks,
+                        "Macro expanded to primitive DSL"
+                    );
+                    // Stage the expanded primitive DSL
+                    let ast = parse_program(&r.dsl)
+                        .map(|p| p.statements)
+                        .unwrap_or_default();
+                    session.set_pending_dsl(r.dsl.clone(), ast, None, false);
+                    
+                    // Macro verbs that are structure/case/mandate operations auto-run
+                    let is_setup_macro = macro_verb.ends_with(".setup") 
+                        || macro_verb.ends_with(".select")
+                        || macro_verb.ends_with(".list");
+                    
+                    if is_setup_macro {
+                        tracing::debug!(macro_verb = %macro_verb, "Auto-running setup macro");
+                        return self.execute_runbook(session).await;
+                    }
+                    
+                    let msg = format!(
+                        "Macro '{}' expanded to:\n{}\n\nSay 'run' to execute.",
+                        macro_verb, r.dsl
+                    );
+                    session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
+                    return Ok(self.staged_response(r.dsl, msg));
+                }
+                
                 // Got valid DSL?
                 if r.valid && !r.dsl.is_empty() {
                     // Stage in runbook (SINGLE LOOP - all DSL goes through here)
