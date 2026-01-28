@@ -513,7 +513,10 @@ mod tests {
         let tokens = Tokenizer::tokenize("(foo 42 -10 3.14)").unwrap();
         assert!(matches!(tokens[2].kind, TokenKind::Integer(42)));
         assert!(matches!(tokens[3].kind, TokenKind::Integer(-10)));
-        assert!(matches!(tokens[4].kind, TokenKind::Float(f) if (f - 3.14).abs() < 0.001));
+        #[allow(clippy::approx_constant)]
+        {
+            assert!(matches!(tokens[4].kind, TokenKind::Float(f) if (f - 3.14).abs() < 0.001));
+        }
     }
 
     #[test]

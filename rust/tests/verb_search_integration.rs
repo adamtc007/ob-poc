@@ -450,6 +450,10 @@ impl DecisionTrace {
                 format!("Ambiguous({} vs {})", top.verb, runner_up.verb),
                 None,
             ),
+            VerbSearchOutcome::Suggest { candidates } => {
+                let verbs: Vec<_> = candidates.iter().take(3).map(|c| c.verb.as_str()).collect();
+                (format!("Suggest({})", verbs.join(", ")), None)
+            }
             VerbSearchOutcome::NoMatch => ("NoMatch".to_string(), None),
         };
 
@@ -545,7 +549,7 @@ impl TestReport {
                     self.confidently_wrong += 1;
                 }
             }
-            VerbSearchOutcome::Ambiguous { .. } => {
+            VerbSearchOutcome::Ambiguous { .. } | VerbSearchOutcome::Suggest { .. } => {
                 self.ambiguity_triggered += 1;
             }
             VerbSearchOutcome::NoMatch => {
@@ -850,7 +854,8 @@ async fn run_threshold_sweep(
                                     confidently_wrong += 1;
                                 }
                             }
-                            VerbSearchOutcome::Ambiguous { .. } => {
+                            VerbSearchOutcome::Ambiguous { .. }
+                            | VerbSearchOutcome::Suggest { .. } => {
                                 ambiguity_count += 1;
                             }
                             VerbSearchOutcome::NoMatch => {
@@ -1606,12 +1611,14 @@ async fn collect_mismatches(
                     (ExpectedOutcome::Matched, VerbSearchOutcome::Matched(r)) => {
                         scenario.allowed_verbs.contains(&r.verb.as_str())
                     }
-                    (ExpectedOutcome::Ambiguous, VerbSearchOutcome::Ambiguous { .. }) => true,
+                    (ExpectedOutcome::Ambiguous, VerbSearchOutcome::Ambiguous { .. })
+                    | (ExpectedOutcome::Ambiguous, VerbSearchOutcome::Suggest { .. }) => true,
                     (ExpectedOutcome::NoMatch, VerbSearchOutcome::NoMatch) => true,
                     (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Matched(r)) => {
                         scenario.allowed_verbs.contains(&r.verb.as_str())
                     }
-                    (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Ambiguous { .. }) => {
+                    (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Ambiguous { .. })
+                    | (ExpectedOutcome::MatchedOrAmbiguous, VerbSearchOutcome::Suggest { .. }) => {
                         true
                     }
                     _ => false,
@@ -1626,6 +1633,11 @@ async fn collect_mismatches(
                             format!("Ambiguous({} vs {})", top.verb, runner_up.verb),
                             None,
                         ),
+                        VerbSearchOutcome::Suggest { candidates } => {
+                            let verbs: Vec<_> =
+                                candidates.iter().take(3).map(|c| c.verb.as_str()).collect();
+                            (format!("Suggest({})", verbs.join(", ")), None)
+                        }
                         VerbSearchOutcome::NoMatch => ("NoMatch".to_string(), None),
                     };
 
