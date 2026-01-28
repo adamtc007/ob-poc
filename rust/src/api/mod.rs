@@ -76,6 +76,9 @@ pub mod service_resource_routes;
 pub mod workflow_routes;
 
 #[cfg(feature = "server")]
+pub mod display_nouns;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -137,3 +140,6 @@ pub use service_resource_routes::{service_resource_router, ServiceResourceState}
 
 #[cfg(feature = "server")]
 pub use workflow_routes::{create_workflow_router, WorkflowState};
+
+#[cfg(feature = "server")]
+pub use display_nouns::{translate_json, translate_string, DisplayNounTranslator};

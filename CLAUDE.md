@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-27
+> **Last reviewed:** 2026-01-28
 > **Crates:** 15 Rust crates (includes ob-poc-macros)
-> **Verbs:** 534 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
+> **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 56 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
 > **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
@@ -24,6 +24,7 @@
 > **Client Group Research Integration (055):** ✅ Complete - GLEIF import → client_group_entity staging → CBU creation with role mapping
 > **REPL Viewport Feedback Loop (056):** ✅ Complete - Scope propagation in execute_runbook triggers UI refresh
 > **Verb Disambiguation UI (057):** ✅ Complete - Ambiguous verb selection with gold-standard learning signals
+> **Operator Macro Vocabulary (058):** ✅ Complete - Business vocabulary layer, macro registry, verb picker integration
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -1029,6 +1030,89 @@ When user selects a verb:
    - Lowercase normalized
    - Common prefix variations ("please", "can you", "I want to")
 3. **Negative signals** for rejected candidates
+
+---
+
+## Operator Macro Vocabulary (058)
+
+> ✅ **IMPLEMENTED (2026-01-28)**: Business-friendly vocabulary layer over technical DSL.
+
+The Operator Macro system provides business-friendly terms (structure, case, mandate) that map to technical DSL verbs (cbu, kyc-case, trading-profile). This enables the UI verb picker to show operator-friendly labels.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  OPERATOR VOCABULARY LAYER                                                   │
+│                                                                              │
+│  User types: "set up structure"                                             │
+│      │                                                                       │
+│      ▼                                                                       │
+│  HybridVerbSearcher.search() - Tier 0: Macro Search (HIGHEST PRIORITY)      │
+│      │                                                                       │
+│      ├─► Exact FQN match (structure.setup) → score 1.0                      │
+│      ├─► Exact label match ("Set up Structure") → score 1.0                 │
+│      └─► Fuzzy label/desc match → score 0.95                                │
+│      │                                                                       │
+│      ▼                                                                       │
+│  Macro found → Expands to DSL: (session.set-structure :structure-id ...)    │
+│                                                                              │
+│  Display Noun Translation:                                                   │
+│  - cbu → structure                                                          │
+│  - kyc-case → case                                                          │
+│  - trading-profile → mandate                                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| Macro Definitions | `rust/src/macros/definition.rs` | Type definitions for operator macros |
+| Macro Registry | `rust/src/macros/registry.rs` | Load/index macros from YAML, build taxonomy |
+| Display Nouns | `rust/src/api/display_nouns.rs` | Translate internal→operator vocabulary |
+| Verb Search Integration | `rust/src/mcp/verb_search.rs` | Tier 0 macro search in `HybridVerbSearcher` |
+
+### Session Context Verbs
+
+New primitive verbs for macro expansion targets:
+
+| Verb | Purpose | Handler |
+|------|---------|---------|
+| `session.set-structure` | Set current CBU context | `SessionSetStructureOp` |
+| `session.set-case` | Set current KYC case context | `SessionSetCaseOp` |
+| `session.set-mandate` | Set current trading profile context | `SessionSetMandateOp` |
+
+### API Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/verbs/taxonomy` | Hierarchical macro taxonomy for UI verb picker |
+| `GET /api/verbs/:fqn/schema` | Full macro definition (args, prereqs, expansion) |
+
+### Verb Search Priority (Updated)
+
+```
+0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy  ← NEW
+1. User-specific learned (exact) - score 1.0
+2. Global learned (exact) - score 1.0
+3. User-specific learned (semantic) - score 0.8-0.99
+4. [REMOVED]
+5. Blocklist filter
+6. Global semantic (cold start) - score 0.55-0.95
+7. Phonetic fallback (typo handling)
+```
+
+### Display Noun Mapping
+
+| Internal Term | Operator Term |
+|---------------|---------------|
+| `cbu` | `structure` |
+| `cbu_id` | `structure_id` |
+| `kyc-case` | `case` |
+| `kyc_case_id` | `case_id` |
+| `trading-profile` | `mandate` |
+| `trading_profile_id` | `mandate_id` |
 
 ---
 

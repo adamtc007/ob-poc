@@ -1,7 +1,8 @@
 //! Hybrid Verb Search
 //!
 //! Combines multiple verb discovery strategies in priority order:
-//! 1. User-specific learned phrases (exact match) - highest priority
+//! 0. Operator macros (business vocabulary) - highest priority for UI verb picker
+//! 1. User-specific learned phrases (exact match)
 //! 2. Global learned phrases (exact match)
 //! 3. User-specific learned phrases (semantic match via pgvector, top-k)
 //! 4. [REMOVED] - was redundant with step 6, see Issue I/J
@@ -46,6 +47,7 @@ use uuid::Uuid;
 use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
+use crate::macros::OperatorMacroRegistry;
 
 /// A unified verb search result
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -79,6 +81,8 @@ pub enum VerbSearchSource {
     PatternEmbedding,
     /// Phonetic (dmetaphone) match - fallback for typos
     Phonetic,
+    /// Operator macro match (business vocabulary layer)
+    Macro,
 }
 
 // ============================================================================
@@ -237,6 +241,8 @@ pub struct HybridVerbSearcher {
     verb_service: Option<Arc<VerbService>>,
     learned_data: Option<SharedLearnedData>,
     embedder: Option<SharedEmbedder>,
+    /// Operator macro registry for business vocabulary search
+    macro_registry: Option<Arc<OperatorMacroRegistry>>,
     /// Similarity threshold for learned semantic matches (high confidence, 0.80)
     semantic_threshold: f32,
     /// Similarity threshold for cold start / fallback semantic matches (0.65)
@@ -259,6 +265,7 @@ impl Clone for HybridVerbSearcher {
             verb_service: self.verb_service.clone(),
             learned_data: self.learned_data.clone(),
             embedder: self.embedder.clone(),
+            macro_registry: self.macro_registry.clone(),
             semantic_threshold: self.semantic_threshold,
             fallback_threshold: self.fallback_threshold,
             blocklist_threshold: self.blocklist_threshold,
@@ -283,7 +290,8 @@ impl HybridVerbSearcher {
         Self {
             verb_service: Some(verb_service),
             learned_data,
-            embedder: None, // Embedder added separately via with_embedder
+            embedder: None,       // Embedder added separately via with_embedder
+            macro_registry: None, // Macro registry added separately via with_macro_registry
             // BGE asymmetric mode thresholds (query→target is lower than target→target)
             semantic_threshold: 0.65,  // Decision gate for accepting match
             fallback_threshold: 0.55,  // Retrieval cutoff for DB queries
@@ -303,6 +311,7 @@ impl HybridVerbSearcher {
             verb_service: None,
             learned_data: Some(learned_data),
             embedder: None,
+            macro_registry: None,
             // BGE asymmetric mode thresholds
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
@@ -321,6 +330,7 @@ impl HybridVerbSearcher {
             verb_service: None,
             learned_data: None,
             embedder: None,
+            macro_registry: None,
             // BGE asymmetric mode thresholds
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
@@ -336,6 +346,12 @@ impl HybridVerbSearcher {
     /// Add embedder for semantic search capabilities
     pub fn with_embedder(mut self, embedder: SharedEmbedder) -> Self {
         self.embedder = Some(embedder);
+        self
+    }
+
+    /// Add macro registry for operator vocabulary search
+    pub fn with_macro_registry(mut self, registry: Arc<OperatorMacroRegistry>) -> Self {
+        self.macro_registry = Some(registry);
         self
     }
 
@@ -388,6 +404,7 @@ impl HybridVerbSearcher {
     /// Search for verbs matching user intent
     ///
     /// Priority order:
+    /// 0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy
     /// 1. User-specific learned (exact) - score 1.0
     /// 2. Global learned (exact) - score 1.0
     /// 3. User-specific learned (semantic) - score 0.8-0.99
@@ -441,6 +458,36 @@ impl HybridVerbSearcher {
             );
             None
         };
+
+        // 0. Operator macro search (business vocabulary layer - HIGHEST PRIORITY)
+        // Macros are the PRIMARY UI mechanism (verb picker). If a macro matches,
+        // it takes precedence over verb patterns.
+        {
+            let macro_results = self.search_macros(query, limit);
+            for result in macro_results {
+                if self.matches_domain(&result.verb, domain_filter)
+                    && !seen_verbs.contains(&result.verb)
+                {
+                    tracing::debug!(
+                        verb = %result.verb,
+                        score = result.score,
+                        label = %result.matched_phrase,
+                        "VerbSearch: macro match"
+                    );
+                    seen_verbs.insert(result.verb.clone());
+                    results.push(result);
+                }
+            }
+        }
+
+        // If we got a high-confidence macro match (exact label/FQN), return early
+        if !results.is_empty() && results[0].score >= 1.0 {
+            tracing::debug!(
+                verb = %results[0].verb,
+                "VerbSearch: returning early with exact macro match"
+            );
+            return Ok(results);
+        }
 
         // 1. User-specific learned phrases (exact match)
         if let Some(uid) = user_id {
@@ -1116,6 +1163,89 @@ impl HybridVerbSearcher {
         }
     }
 
+    /// Search operator macros by label/FQN match
+    ///
+    /// Macros are the PRIMARY UI mechanism (verb picker). This search:
+    /// 1. Exact FQN match (e.g., "structure.setup")
+    /// 2. Exact label match (case-insensitive, e.g., "Set up Structure")
+    /// 3. Fuzzy label match (contains query, e.g., "structure" matches "Set up Structure")
+    ///
+    /// Returns matches with score 1.0 for exact, 0.95 for fuzzy.
+    fn search_macros(&self, query: &str, limit: usize) -> Vec<VerbSearchResult> {
+        let registry = match &self.macro_registry {
+            Some(r) => r,
+            None => return vec![],
+        };
+
+        if registry.is_empty() {
+            return vec![];
+        }
+
+        let query_lower = query.trim().to_lowercase();
+        let mut results = Vec::new();
+
+        // 1. Exact FQN match
+        if let Some(macro_def) = registry.get(&query_lower) {
+            results.push(VerbSearchResult {
+                verb: macro_def.fqn.clone(),
+                score: 1.0,
+                source: VerbSearchSource::Macro,
+                matched_phrase: macro_def.ui.label.clone(),
+                description: Some(macro_def.ui.description.clone()),
+            });
+            return results; // Exact FQN is definitive
+        }
+
+        // 2. Exact label match (case-insensitive)
+        for macro_def in registry.list(None) {
+            if macro_def.ui.label.to_lowercase() == query_lower {
+                results.push(VerbSearchResult {
+                    verb: macro_def.fqn.clone(),
+                    score: 1.0,
+                    source: VerbSearchSource::Macro,
+                    matched_phrase: macro_def.ui.label.clone(),
+                    description: Some(macro_def.ui.description.clone()),
+                });
+            }
+        }
+
+        if !results.is_empty() {
+            results.truncate(limit);
+            return results;
+        }
+
+        // 3. Fuzzy label match (label contains query OR query contains label words)
+        for macro_def in registry.list(None) {
+            let label_lower = macro_def.ui.label.to_lowercase();
+            let desc_lower = macro_def.ui.description.to_lowercase();
+
+            // Check if label contains query or query contains significant label words
+            let is_match = label_lower.contains(&query_lower)
+                || query_lower.contains(&label_lower)
+                || desc_lower.contains(&query_lower);
+
+            if is_match {
+                results.push(VerbSearchResult {
+                    verb: macro_def.fqn.clone(),
+                    score: 0.95, // Fuzzy match gets slightly lower score
+                    source: VerbSearchSource::Macro,
+                    matched_phrase: macro_def.ui.label.clone(),
+                    description: Some(macro_def.ui.description.clone()),
+                });
+            }
+        }
+
+        // Sort by score descending (all same score, but be consistent)
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(limit);
+
+        results
+    }
+
     async fn get_verb_description(&self, verb: &str) -> Option<String> {
         match &self.verb_service {
             Some(s) => s.get_verb_description(verb).await.ok().flatten(),
@@ -1277,13 +1407,33 @@ mod tests {
     }
 
     #[test]
-    fn test_check_ambiguity_no_match_below_threshold() {
+    fn test_check_ambiguity_suggest_below_threshold() {
         let threshold = 0.80;
 
-        // All candidates below threshold
+        // Candidate below semantic threshold but above fallback threshold (0.55)
+        // should trigger Suggest path, not NoMatch
         let candidates = vec![VerbSearchResult {
             verb: "cbu.create".to_string(),
-            score: 0.75, // below threshold
+            score: 0.75, // below semantic threshold, above fallback
+            source: VerbSearchSource::Semantic,
+            matched_phrase: "create cbu".to_string(),
+            description: None,
+        }];
+
+        let outcome = check_ambiguity(&candidates, threshold);
+
+        // With fallback_threshold=0.55, score 0.75 falls into Suggest range
+        assert!(matches!(outcome, VerbSearchOutcome::Suggest { .. }));
+    }
+
+    #[test]
+    fn test_check_ambiguity_no_match_below_fallback() {
+        let threshold = 0.80;
+
+        // Candidate below BOTH thresholds should be NoMatch
+        let candidates = vec![VerbSearchResult {
+            verb: "cbu.create".to_string(),
+            score: 0.50, // below fallback threshold (0.55)
             source: VerbSearchSource::Semantic,
             matched_phrase: "create cbu".to_string(),
             description: None,
@@ -1324,5 +1474,175 @@ mod tests {
             }
             other => panic!("Expected Matched, got {:?}", other),
         }
+    }
+
+    // =========================================================================
+    // Macro Search Tests
+    // =========================================================================
+
+    #[test]
+    fn test_macro_search_exact_fqn() {
+        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
+
+        let mut registry = OperatorMacroRegistry::new();
+        registry.register(OperatorMacroDef {
+            fqn: "structure.setup".to_string(),
+            kind: "macro".to_string(),
+            ui: MacroUi {
+                label: "Set up Structure".to_string(),
+                description: "Create a new fund or mandate structure".to_string(),
+                target_label: None,
+            },
+            routing: MacroRouting {
+                mode_tags: vec!["onboarding".to_string()],
+                operator_domain: "structure".to_string(),
+            },
+            target: MacroTarget {
+                operates_on: "client_ref".to_string(),
+                produces: Some("structure_ref".to_string()),
+            },
+            args: MacroArgs {
+                style: "keyworded".to_string(),
+                required: Default::default(),
+                optional: Default::default(),
+            },
+            prereqs: vec![],
+            expands_to: vec![],
+            sets_state: vec![],
+            unlocks: vec![],
+        });
+
+        let searcher =
+            HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
+
+        let results = searcher.search_macros("structure.setup", 5);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verb, "structure.setup");
+        assert_eq!(results[0].score, 1.0);
+        assert!(matches!(results[0].source, VerbSearchSource::Macro));
+    }
+
+    #[test]
+    fn test_macro_search_exact_label() {
+        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
+
+        let mut registry = OperatorMacroRegistry::new();
+        registry.register(OperatorMacroDef {
+            fqn: "structure.setup".to_string(),
+            kind: "macro".to_string(),
+            ui: MacroUi {
+                label: "Set up Structure".to_string(),
+                description: "Create a new fund or mandate structure".to_string(),
+                target_label: None,
+            },
+            routing: MacroRouting {
+                mode_tags: vec!["onboarding".to_string()],
+                operator_domain: "structure".to_string(),
+            },
+            target: MacroTarget {
+                operates_on: "client_ref".to_string(),
+                produces: Some("structure_ref".to_string()),
+            },
+            args: MacroArgs {
+                style: "keyworded".to_string(),
+                required: Default::default(),
+                optional: Default::default(),
+            },
+            prereqs: vec![],
+            expands_to: vec![],
+            sets_state: vec![],
+            unlocks: vec![],
+        });
+
+        let searcher =
+            HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
+
+        // Exact label match (case-insensitive)
+        let results = searcher.search_macros("set up structure", 5);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verb, "structure.setup");
+        assert_eq!(results[0].score, 1.0);
+    }
+
+    #[test]
+    fn test_macro_search_fuzzy_label() {
+        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
+
+        let mut registry = OperatorMacroRegistry::new();
+        registry.register(OperatorMacroDef {
+            fqn: "structure.setup".to_string(),
+            kind: "macro".to_string(),
+            ui: MacroUi {
+                label: "Set up Structure".to_string(),
+                description: "Create a new fund or mandate structure".to_string(),
+                target_label: None,
+            },
+            routing: MacroRouting {
+                mode_tags: vec!["onboarding".to_string()],
+                operator_domain: "structure".to_string(),
+            },
+            target: MacroTarget {
+                operates_on: "client_ref".to_string(),
+                produces: Some("structure_ref".to_string()),
+            },
+            args: MacroArgs {
+                style: "keyworded".to_string(),
+                required: Default::default(),
+                optional: Default::default(),
+            },
+            prereqs: vec![],
+            expands_to: vec![],
+            sets_state: vec![],
+            unlocks: vec![],
+        });
+
+        let searcher =
+            HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
+
+        // Fuzzy match - query contains "structure"
+        let results = searcher.search_macros("structure", 5);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].verb, "structure.setup");
+        assert_eq!(results[0].score, 0.95); // Fuzzy match score
+    }
+
+    #[test]
+    fn test_macro_search_no_match() {
+        use crate::macros::{MacroArgs, MacroRouting, MacroTarget, MacroUi, OperatorMacroDef};
+
+        let mut registry = OperatorMacroRegistry::new();
+        registry.register(OperatorMacroDef {
+            fqn: "structure.setup".to_string(),
+            kind: "macro".to_string(),
+            ui: MacroUi {
+                label: "Set up Structure".to_string(),
+                description: "Create a new fund or mandate structure".to_string(),
+                target_label: None,
+            },
+            routing: MacroRouting {
+                mode_tags: vec!["onboarding".to_string()],
+                operator_domain: "structure".to_string(),
+            },
+            target: MacroTarget {
+                operates_on: "client_ref".to_string(),
+                produces: Some("structure_ref".to_string()),
+            },
+            args: MacroArgs {
+                style: "keyworded".to_string(),
+                required: Default::default(),
+                optional: Default::default(),
+            },
+            prereqs: vec![],
+            expands_to: vec![],
+            sets_state: vec![],
+            unlocks: vec![],
+        });
+
+        let searcher =
+            HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
+
+        // No match - completely different query
+        let results = searcher.search_macros("something completely different", 5);
+        assert!(results.is_empty());
     }
 }

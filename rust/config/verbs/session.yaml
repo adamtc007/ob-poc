@@ -428,3 +428,117 @@ domains:
         returns:
           type: affected
           description: "1 if persona was set"
+
+      # ============================================
+      # Macro Expansion Targets (set-structure, set-case, set-mandate)
+      # These are the primitive verbs that macros expand to.
+      # ============================================
+
+      set-structure:
+        description: "Set current structure (CBU) context for subsequent operations"
+        behavior: plugin
+        handler: SessionSetStructureOp
+        invocation_phrases:
+          - "select structure"
+          - "use structure"
+          - "work on structure"
+          - "set structure"
+          - "focus on fund"
+          - "select fund"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_context
+          tags: [context, structure, macro_target]
+        args:
+          - name: structure-id
+            type: uuid
+            required: true
+            description: "CBU ID to set as current structure"
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: structure-type
+            type: string
+            required: false
+            valid_values:
+              ["pe", "sicav", "hedge", "etf", "pension", "trust", "fof"]
+            description: "Structure type (PE, SICAV, etc.)"
+        returns:
+          type: record
+          fields: [structure_id, structure_name, structure_type]
+        effects:
+          - "Sets session.current_structure"
+          - "Sets session.structure_type if provided"
+          - "Sets dag_state flag 'structure.selected' = true"
+
+      set-case:
+        description: "Set current KYC case context for subsequent operations"
+        behavior: plugin
+        handler: SessionSetCaseOp
+        invocation_phrases:
+          - "select case"
+          - "use case"
+          - "work on case"
+          - "set case"
+          - "focus on case"
+          - "open case"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_context
+          tags: [context, case, macro_target]
+        args:
+          - name: case-id
+            type: uuid
+            required: true
+            description: "KYC case ID to set as current case"
+            lookup:
+              table: cases
+              entity_type: kyc_case
+              schema: kyc
+              search_key: case_id
+              primary_key: case_id
+        returns:
+          type: record
+          fields: [case_id, case_reference, status]
+        effects:
+          - "Sets session.current_case"
+          - "Sets dag_state flag 'case.selected' = true"
+
+      set-mandate:
+        description: "Set current mandate (trading profile) context for subsequent operations"
+        behavior: plugin
+        handler: SessionSetMandateOp
+        invocation_phrases:
+          - "select mandate"
+          - "use mandate"
+          - "work on mandate"
+          - "set mandate"
+          - "focus on trading profile"
+          - "select trading profile"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: session_context
+          tags: [context, mandate, macro_target]
+        args:
+          - name: mandate-id
+            type: uuid
+            required: true
+            description: "Trading profile ID to set as current mandate"
+            lookup:
+              table: cbu_trading_profiles
+              entity_type: trading_profile
+              schema: ob-poc
+              search_key: profile_id
+              primary_key: profile_id
+        returns:
+          type: record
+          fields: [mandate_id, mandate_name, structure_id]
+        effects:
+          - "Sets session.current_mandate"
+          - "Sets dag_state flag 'mandate.selected' = true"

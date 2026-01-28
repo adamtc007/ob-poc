@@ -1234,5 +1234,257 @@ impl CustomOperation for SessionSetPersonaOp {
 }
 
 // =============================================================================
+// SET-STRUCTURE (Macro Expansion Target)
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetStructureResult {
+    pub structure_id: Uuid,
+    pub structure_name: String,
+    pub structure_type: Option<String>,
+}
+
+#[register_custom_op]
+pub struct SessionSetStructureOp;
+
+#[async_trait]
+impl CustomOperation for SessionSetStructureOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-structure"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Sets current structure (CBU) context for subsequent operations"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use crate::session::unified::StructureType;
+
+        let structure_id = get_required_uuid(verb_call, "structure-id", ctx)?;
+        let structure_type_str = get_optional_string(verb_call, "structure-type");
+
+        // Fetch CBU details
+        let cbu = sqlx::query!(
+            r#"SELECT cbu_id, name, jurisdiction FROM "ob-poc".cbus WHERE cbu_id = $1"#,
+            structure_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Structure (CBU) not found: {}", structure_id))?;
+
+        // Parse structure type if provided
+        let structure_type = structure_type_str
+            .as_ref()
+            .and_then(|s| StructureType::from_internal(s));
+
+        // Update session context
+        let session = ctx.get_or_create_session_mut();
+
+        if let Some(st) = structure_type {
+            session.set_current_structure(structure_id, cbu.name.clone(), st);
+        } else {
+            // Default to PE if not specified
+            session.set_current_structure(structure_id, cbu.name.clone(), StructureType::Pe);
+        }
+
+        // Set DAG state flag
+        session.set_dag_flag("structure.selected", true);
+        session.set_dag_flag("structure.exists", true);
+
+        let result = SetStructureResult {
+            structure_id,
+            structure_name: cbu.name,
+            structure_type: structure_type_str,
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
+// SET-CASE (Macro Expansion Target)
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetCaseResult {
+    pub case_id: Uuid,
+    pub case_reference: String,
+    pub status: String,
+}
+
+#[register_custom_op]
+pub struct SessionSetCaseOp;
+
+#[async_trait]
+impl CustomOperation for SessionSetCaseOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-case"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Sets current KYC case context for subsequent operations"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let case_id = get_required_uuid(verb_call, "case-id", ctx)?;
+
+        // Fetch KYC case details from kyc.cases
+        let case = sqlx::query!(
+            r#"SELECT case_id, status, case_type FROM kyc.cases WHERE case_id = $1"#,
+            case_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("KYC case not found: {}", case_id))?;
+
+        // Generate display name from case_id and type
+        let display_name = format!(
+            "Case {} ({})",
+            &case_id.to_string()[..8],
+            case.case_type.as_deref().unwrap_or("NEW_CLIENT")
+        );
+
+        // Update session context
+        let session = ctx.get_or_create_session_mut();
+        session.set_current_case(case_id, display_name.clone());
+
+        // Set DAG state flags
+        session.set_dag_flag("case.selected", true);
+        session.set_dag_flag("case.exists", true);
+
+        let result = SetCaseResult {
+            case_id,
+            case_reference: display_name,
+            status: case.status,
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
+// SET-MANDATE (Macro Expansion Target)
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetMandateResult {
+    pub mandate_id: Uuid,
+    pub mandate_name: String,
+    pub structure_id: Option<Uuid>,
+}
+
+#[register_custom_op]
+pub struct SessionSetMandateOp;
+
+#[async_trait]
+impl CustomOperation for SessionSetMandateOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "set-mandate"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Sets current mandate (trading profile) context for subsequent operations"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let mandate_id = get_required_uuid(verb_call, "mandate-id", ctx)?;
+
+        // Fetch trading profile details from cbu_trading_profiles
+        let profile = sqlx::query!(
+            r#"SELECT profile_id, cbu_id, status, version FROM "ob-poc".cbu_trading_profiles WHERE profile_id = $1"#,
+            mandate_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Mandate (trading profile) not found: {}", mandate_id))?;
+
+        // Generate display name from profile_id and version
+        let display_name = format!(
+            "Profile {} v{}",
+            &profile.profile_id.to_string()[..8],
+            profile.version
+        );
+
+        // Update session context
+        let session = ctx.get_or_create_session_mut();
+        session.set_current_mandate(mandate_id, display_name.clone());
+
+        // Set DAG state flag
+        session.set_dag_flag("mandate.selected", true);
+
+        let result = SetMandateResult {
+            mandate_id,
+            mandate_name: display_name,
+            structure_id: Some(profile.cbu_id),
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
 // REGISTRATION
 // =============================================================================

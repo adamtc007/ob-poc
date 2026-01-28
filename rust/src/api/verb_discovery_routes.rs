@@ -6,15 +6,20 @@
 //! - Workflow phase (KYC lifecycle state)
 //! - Recent verb history (category matching, typical next)
 //!
+//! Also provides:
+//! - Macro taxonomy endpoint for verb picker UI
+//! - Macro schema endpoint for form generation
+//!
 //! These endpoints are used by the agent to get contextually relevant
 //! verb suggestions during DSL generation.
 
+use crate::macros::{MacroFilter, MacroTaxonomy, OperatorMacroRegistry};
 use crate::session::{
     AgentVerbContext, CategoryInfo, DiscoveryQuery, VerbDiscoveryService, VerbSuggestion,
     WorkflowPhaseInfo,
 };
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::Json,
     routing::get,
@@ -31,12 +36,31 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct VerbDiscoveryState {
     pub service: Arc<VerbDiscoveryService>,
+    pub macro_registry: Arc<OperatorMacroRegistry>,
 }
 
 impl VerbDiscoveryState {
     pub fn new(pool: PgPool) -> Self {
+        // Load macro registry from config directory
+        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| "config".to_string());
+        let macros_dir = std::path::Path::new(&config_dir).join("verb_schemas/macros");
+
+        let macro_registry =
+            OperatorMacroRegistry::load_from_dir(&macros_dir).unwrap_or_else(|e| {
+                tracing::warn!("Failed to load operator macros: {}", e);
+                OperatorMacroRegistry::new()
+            });
+
         Self {
             service: Arc::new(VerbDiscoveryService::new(Arc::new(pool))),
+            macro_registry: Arc::new(macro_registry),
+        }
+    }
+
+    pub fn with_macro_registry(pool: PgPool, registry: OperatorMacroRegistry) -> Self {
+        Self {
+            service: Arc::new(VerbDiscoveryService::new(Arc::new(pool))),
+            macro_registry: Arc::new(registry),
         }
     }
 }
@@ -143,6 +167,107 @@ pub struct VerbExampleResponse {
 }
 
 // ============================================================================
+// Macro Taxonomy Types (P2/P3)
+// ============================================================================
+
+/// Query parameters for macro taxonomy
+#[derive(Debug, Deserialize)]
+pub struct MacroTaxonomyQuery {
+    /// Filter by mode tag (e.g., "onboarding", "kyc", "trading")
+    pub mode_tag: Option<String>,
+    /// Filter by domain (e.g., "structure", "case", "mandate")
+    pub domain: Option<String>,
+    /// Search term (searches FQN, label, description)
+    pub search: Option<String>,
+}
+
+/// Response containing macro taxonomy tree
+#[derive(Debug, Serialize)]
+pub struct MacroTaxonomyResponse {
+    /// Taxonomy tree organized by domain
+    pub taxonomy: MacroTaxonomy,
+    /// Total count of macros
+    pub total_macros: usize,
+    /// Available domains
+    pub domains: Vec<String>,
+    /// Available mode tags
+    pub mode_tags: Vec<String>,
+}
+
+/// Response containing a single macro schema
+#[derive(Debug, Serialize)]
+pub struct MacroSchemaResponse {
+    /// Fully qualified name
+    pub fqn: String,
+    /// UI metadata
+    pub ui: MacroSchemaUi,
+    /// Routing info
+    pub routing: MacroSchemaRouting,
+    /// Arguments
+    pub args: MacroSchemaArgs,
+    /// Prerequisites
+    pub prereqs: Vec<MacroSchemaPrereq>,
+    /// Macros unlocked after this one
+    pub unlocks: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MacroSchemaUi {
+    pub label: String,
+    pub description: String,
+    pub target_label: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MacroSchemaRouting {
+    pub mode_tags: Vec<String>,
+    pub operator_domain: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MacroSchemaArgs {
+    pub style: String,
+    pub required: Vec<MacroSchemaArg>,
+    pub optional: Vec<MacroSchemaArg>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MacroSchemaArg {
+    pub name: String,
+    pub arg_type: String,
+    pub ui_label: String,
+    pub required: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub valid_values: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub enum_values: Vec<MacroSchemaEnumValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub autofill_from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub picker: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MacroSchemaEnumValue {
+    pub key: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub internal: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MacroSchemaPrereq {
+    #[serde(rename = "type")]
+    pub prereq_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verb: Option<String>,
+}
+
+// ============================================================================
 // Router
 // ============================================================================
 
@@ -162,6 +287,10 @@ pub fn create_verb_discovery_router(pool: PgPool) -> Router {
         .route("/api/verbs/by-phase", get(get_verbs_by_phase))
         // Example lookup
         .route("/api/verbs/example", get(get_verb_example))
+        // Macro taxonomy (P2) - for verb picker UI
+        .route("/api/verbs/taxonomy", get(get_macro_taxonomy))
+        // Macro schema (P3) - for form generation
+        .route("/api/verbs/:fqn/schema", get(get_macro_schema))
         .with_state(state)
 }
 
@@ -356,6 +485,159 @@ async fn get_verb_example(
         verb: params.verb,
         example,
     }))
+}
+
+/// GET /api/verbs/taxonomy - Get macro taxonomy tree for verb picker UI
+///
+/// Query params:
+/// - mode_tag: Filter by mode tag (e.g., "onboarding", "kyc", "trading")
+/// - domain: Filter by domain (e.g., "structure", "case", "mandate")
+/// - search: Search term (searches FQN, label, description)
+///
+/// Returns a tree structure organized by domain for rendering in the verb picker.
+async fn get_macro_taxonomy(
+    State(state): State<VerbDiscoveryState>,
+    Query(params): Query<MacroTaxonomyQuery>,
+) -> Result<Json<MacroTaxonomyResponse>, StatusCode> {
+    let registry = &state.macro_registry;
+
+    // Build filter from query params
+    let filter = if params.mode_tag.is_some() || params.domain.is_some() || params.search.is_some()
+    {
+        Some(MacroFilter {
+            mode_tag: params.mode_tag,
+            domain: params.domain,
+            search: params.search,
+        })
+    } else {
+        None
+    };
+
+    // Get filtered macros
+    let macros = registry.list(filter);
+    let total_macros = macros.len();
+
+    // Build taxonomy tree
+    let taxonomy = registry.build_taxonomy();
+
+    // Get available domains and mode tags
+    let domains: Vec<String> = registry.domains().iter().map(|s| s.to_string()).collect();
+    let mode_tags: Vec<String> = registry.mode_tags().iter().map(|s| s.to_string()).collect();
+
+    Ok(Json(MacroTaxonomyResponse {
+        taxonomy,
+        total_macros,
+        domains,
+        mode_tags,
+    }))
+}
+
+/// GET /api/verbs/:fqn/schema - Get schema for a specific macro
+///
+/// Path params:
+/// - fqn: Fully qualified name (e.g., "structure.setup")
+///
+/// Returns the full schema including UI metadata, arguments, prerequisites,
+/// suitable for generating a form in the verb picker.
+async fn get_macro_schema(
+    State(state): State<VerbDiscoveryState>,
+    Path(fqn): Path<String>,
+) -> Result<Json<MacroSchemaResponse>, StatusCode> {
+    let registry = &state.macro_registry;
+
+    let macro_def = registry.get(&fqn).ok_or_else(|| {
+        tracing::warn!("Macro not found: {}", fqn);
+        StatusCode::NOT_FOUND
+    })?;
+
+    // Convert to response format
+    let response = MacroSchemaResponse {
+        fqn: macro_def.fqn.clone(),
+        ui: MacroSchemaUi {
+            label: macro_def.ui.label.clone(),
+            description: macro_def.ui.description.clone(),
+            target_label: macro_def.ui.target_label.clone(),
+        },
+        routing: MacroSchemaRouting {
+            mode_tags: macro_def.routing.mode_tags.clone(),
+            operator_domain: macro_def.routing.operator_domain.clone(),
+        },
+        args: MacroSchemaArgs {
+            style: macro_def.args.style.clone(),
+            required: macro_def
+                .args
+                .required
+                .iter()
+                .map(|(name, arg)| MacroSchemaArg {
+                    name: name.clone(),
+                    arg_type: arg.arg_type.clone(),
+                    ui_label: arg.ui_label.clone(),
+                    required: true,
+                    valid_values: arg.valid_values.clone(),
+                    enum_values: arg
+                        .values
+                        .iter()
+                        .map(|v| MacroSchemaEnumValue {
+                            key: v.key.clone(),
+                            label: v.label.clone(),
+                            internal: v.internal.clone(),
+                        })
+                        .collect(),
+                    default_value: arg.default_key.clone().or_else(|| arg.default.clone()),
+                    autofill_from: arg.autofill_from.clone(),
+                    picker: arg.picker.clone(),
+                })
+                .collect(),
+            optional: macro_def
+                .args
+                .optional
+                .iter()
+                .map(|(name, arg)| MacroSchemaArg {
+                    name: name.clone(),
+                    arg_type: arg.arg_type.clone(),
+                    ui_label: arg.ui_label.clone(),
+                    required: false,
+                    valid_values: arg.valid_values.clone(),
+                    enum_values: arg
+                        .values
+                        .iter()
+                        .map(|v| MacroSchemaEnumValue {
+                            key: v.key.clone(),
+                            label: v.label.clone(),
+                            internal: v.internal.clone(),
+                        })
+                        .collect(),
+                    default_value: arg.default_key.clone().or_else(|| arg.default.clone()),
+                    autofill_from: arg.autofill_from.clone(),
+                    picker: arg.picker.clone(),
+                })
+                .collect(),
+        },
+        prereqs: macro_def
+            .prereqs
+            .iter()
+            .map(|p| match p {
+                crate::macros::MacroPrereq::StateExists { key } => MacroSchemaPrereq {
+                    prereq_type: "state_exists".to_string(),
+                    key: Some(key.clone()),
+                    verb: None,
+                },
+                crate::macros::MacroPrereq::VerbCompleted { verb } => MacroSchemaPrereq {
+                    prereq_type: "verb_completed".to_string(),
+                    key: None,
+                    verb: Some(verb.clone()),
+                },
+                crate::macros::MacroPrereq::AnyOf { .. } => MacroSchemaPrereq {
+                    prereq_type: "any_of".to_string(),
+                    key: None,
+                    verb: None,
+                },
+            })
+            .collect(),
+        unlocks: macro_def.unlocks.clone(),
+    };
+
+    Ok(Json(response))
 }
 
 #[cfg(test)]
