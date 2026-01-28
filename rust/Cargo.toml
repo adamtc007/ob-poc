@@ -176,16 +176,6 @@ name = "batch_test_harness"
 path = "src/bin/batch_test_harness.rs"
 required-features = ["database", "cli"]
 
-[[bin]]
-name = "research_harness"
-path = "src/bin/research_harness.rs"
-required-features = ["database"]
-
-[[bin]]
-name = "agent_chat_harness"
-path = "src/bin/agent_chat_harness.rs"
-required-features = ["database", "cli", "mcp"]
-
 # Features for conditional compilation
 [features]
 default = ["server"]  # Enable for sqlx prepare; use --no-default-features to disable
