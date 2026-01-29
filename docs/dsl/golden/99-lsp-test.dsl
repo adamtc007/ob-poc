@@ -48,12 +48,12 @@
 ;; intent: Create entity inline within role assignment
 ;; macro: primitive
 ;; constraints: @demo-fund must exist
-;; NOTE: Nested calls may not be supported - test this!
-;; (cbu-role.assign
-;;   :cbu-id @demo-fund
-;;   :entity-id (entity.create :name "Demo Director" :type "NATURAL" :as @director)
-;;   :role "DIRECTOR"
-;;   :effective-date "2024-01-01")
+;; NOTE: Nested calls ARE supported - entity created inline
+(cbu-role.assign
+  :cbu-id @demo-fund
+  :entity-id (entity.create :name "Demo Director" :type "NATURAL" :as @director)
+  :role "DIRECTOR"
+  :effective-date "2024-01-01")
 
 ;; Alternative: separate calls (always works)
 (entity.create :name "Demo Director" :type "NATURAL" :as @director)

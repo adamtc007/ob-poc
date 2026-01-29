@@ -1,7 +1,7 @@
-mod spec;
-mod source_map;
 mod parser;
+mod source_map;
+mod spec;
 
-pub use spec::*;
-pub use source_map::*;
 pub use parser::*;
+pub use source_map::*;
+pub use spec::*;

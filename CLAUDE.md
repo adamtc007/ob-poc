@@ -27,6 +27,8 @@
 > **Unified Architecture (058):** ✅ Complete - Operator vocabulary, macro lint, constraint cascade, DAG navigation, phonetic matching
 > **Playbook System (059):** ✅ Complete - YAML playbooks, marked-yaml source mapping, LSP validation, xtask CLI
 > **LSP Alignment (060):** ✅ Complete - UTF-16 encoding, multiline context, tree-sitter binding rule, rename handler
+> **LSP Test Harness (063):** ✅ Complete - 150+ parser tests, golden file validation, syntax edge cases
+> **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

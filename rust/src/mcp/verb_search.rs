@@ -1220,54 +1220,56 @@ impl HybridVerbSearcher {
             .split_whitespace()
             .filter(|w| w.len() > 2) // Skip tiny words like "a", "to"
             .collect();
-        
+
         for macro_def in registry.list(None) {
             let label_lower = macro_def.ui.label.to_lowercase();
             let desc_lower = macro_def.ui.description.to_lowercase();
             let fqn_lower = macro_def.fqn.to_lowercase();
-            
+
             // Combine label, description, and domain for matching
             let combined = format!("{} {} {}", label_lower, desc_lower, fqn_lower);
             let combined_words: std::collections::HashSet<&str> = combined
                 .split(|c: char| !c.is_alphanumeric())
                 .filter(|w| w.len() > 2)
                 .collect();
-            
+
             // Count matching words
             let matching_words = query_words.intersection(&combined_words).count();
-            
+
             // Also check for key phrases
             let has_setup = query_lower.contains("setup") || query_lower.contains("set up");
             let has_create = query_lower.contains("create") || query_lower.contains("new");
             let has_structure = query_lower.contains("structure") || query_lower.contains("fund");
-            
+
             // Score based on word overlap and phrase matching
             let is_structure_macro = fqn_lower.starts_with("structure.");
             let is_case_macro = fqn_lower.starts_with("case.");
             let is_mandate_macro = fqn_lower.starts_with("mandate.");
-            
+
             let mut score = 0.0;
-            
+
             // Word overlap scoring
             if matching_words > 0 {
                 score = 0.7 + (matching_words as f32 * 0.05).min(0.2);
             }
-            
+
             // Boost for setup/create + structure domain match
             if (has_setup || has_create) && has_structure && is_structure_macro {
                 score = score.max(0.92);
             }
-            
+
             // Boost for case-related queries
             if (query_lower.contains("case") || query_lower.contains("kyc")) && is_case_macro {
                 score = score.max(0.92);
             }
-            
+
             // Boost for mandate/trading queries
-            if (query_lower.contains("mandate") || query_lower.contains("trading")) && is_mandate_macro {
+            if (query_lower.contains("mandate") || query_lower.contains("trading"))
+                && is_mandate_macro
+            {
                 score = score.max(0.92);
             }
-            
+
             if score > 0.7 {
                 results.push(VerbSearchResult {
                     verb: macro_def.fqn.clone(),

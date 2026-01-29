@@ -13,12 +13,14 @@ pub enum SlotValue {
 }
 
 impl SlotState {
-    pub fn new() -> Self { Self::default() }
-    
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn set(&mut self, name: &str, value: SlotValue) {
         self.values.insert(name.to_string(), value);
     }
-    
+
     pub fn get(&self, name: &str) -> Option<&SlotValue> {
         self.values.get(name)
     }

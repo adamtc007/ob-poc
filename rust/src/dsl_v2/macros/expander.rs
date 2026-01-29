@@ -421,13 +421,14 @@ mod tests {
     use crate::session::unified::{ClientRef, StructureType};
 
     fn mock_session() -> UnifiedSession {
-        let mut session = UnifiedSession::default();
-        session.client = Some(ClientRef {
-            client_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
-            display_name: "Test Client".to_string(),
-        });
-        session.structure_type = Some(StructureType::Pe);
-        session
+        UnifiedSession {
+            client: Some(ClientRef {
+                client_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
+                display_name: "Test Client".to_string(),
+            }),
+            structure_type: Some(StructureType::Pe),
+            ..Default::default()
+        }
     }
 
     fn mock_registry() -> MacroRegistry {
@@ -621,23 +622,25 @@ structure.assign-role:
     }
 
     fn mock_session_pe() -> UnifiedSession {
-        let mut session = UnifiedSession::default();
-        session.client = Some(ClientRef {
-            client_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
-            display_name: "Test Client".to_string(),
-        });
-        session.structure_type = Some(StructureType::Pe);
-        session
+        UnifiedSession {
+            client: Some(ClientRef {
+                client_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
+                display_name: "Test Client".to_string(),
+            }),
+            structure_type: Some(StructureType::Pe),
+            ..Default::default()
+        }
     }
 
     fn mock_session_sicav() -> UnifiedSession {
-        let mut session = UnifiedSession::default();
-        session.client = Some(ClientRef {
-            client_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
-            display_name: "Test Client".to_string(),
-        });
-        session.structure_type = Some(StructureType::Sicav);
-        session
+        UnifiedSession {
+            client: Some(ClientRef {
+                client_id: Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap(),
+                display_name: "Test Client".to_string(),
+            }),
+            structure_type: Some(StructureType::Sicav),
+            ..Default::default()
+        }
     }
 
     #[test]

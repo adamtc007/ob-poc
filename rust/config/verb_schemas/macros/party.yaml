@@ -1,0 +1,549 @@
+# Party Domain Macros
+#
+# Operator vocabulary for entity/party operations.
+# These macros wrap DSL primitives (entity.*) with business terminology.
+#
+# INVARIANTS:
+# - UI labels NEVER contain: entity, entity_ref, entity_id
+# - Party = person or organization involved in the structure
+# - Operators work with parties, not entities
+
+party.add:
+  kind: macro
+
+  ui:
+    label: "Add Party"
+    description: "Add a new party (person or organization)"
+    target_label: "Party"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: party
+
+  target:
+    operates_on: client_ref
+    produces: party_ref
+
+  args:
+    style: keyworded
+    required:
+      party_type:
+        type: enum
+        ui_label: "Type"
+        values:
+          - key: person
+            label: "Person"
+            internal: person
+          - key: company
+            label: "Company"
+            internal: company
+          - key: trust
+            label: "Trust"
+            internal: trust
+          - key: foundation
+            label: "Foundation"
+            internal: foundation
+        default_key: person
+      name:
+        type: str
+        ui_label: "Name"
+        description: "Full name (person) or legal name (organization)"
+    optional:
+      jurisdiction:
+        type: str
+        ui_label: "Jurisdiction"
+        valid_values: [LU, IE, DE, UK, US, CH, SG, HK, FR, NL, BE]
+      nationality:
+        type: str
+        ui_label: "Nationality"
+        description: "For persons only"
+      date_of_birth:
+        type: date
+        ui_label: "Date of Birth"
+        description: "For persons only"
+      registration_number:
+        type: str
+        ui_label: "Registration Number"
+        description: "For organizations only"
+
+  prereqs: []
+
+  expands_to:
+    - verb: entity.create-${arg.party_type.internal}
+      args:
+        name: "${arg.name}"
+        jurisdiction: "${arg.jurisdiction}"
+        nationality: "${arg.nationality}"
+        date_of_birth: "${arg.date_of_birth}"
+        registration_number: "${arg.registration_number}"
+
+  unlocks:
+    - party.assign-role
+    - case.add-party
+
+party.add-person:
+  kind: macro
+
+  ui:
+    label: "Add Person"
+    description: "Add a natural person"
+    target_label: "Person"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: party
+
+  target:
+    operates_on: client_ref
+    produces: party_ref
+
+  args:
+    style: keyworded
+    required:
+      given_names:
+        type: str
+        ui_label: "Given Names"
+      family_name:
+        type: str
+        ui_label: "Family Name"
+    optional:
+      nationality:
+        type: str
+        ui_label: "Nationality"
+      date_of_birth:
+        type: date
+        ui_label: "Date of Birth"
+      tax_residence:
+        type: str
+        ui_label: "Tax Residence"
+
+  prereqs: []
+
+  expands_to:
+    - verb: entity.create-person
+      args:
+        given_names: "${arg.given_names}"
+        family_name: "${arg.family_name}"
+        nationality: "${arg.nationality}"
+        date_of_birth: "${arg.date_of_birth}"
+        tax_residence: "${arg.tax_residence}"
+
+  unlocks:
+    - party.assign-role
+    - case.add-party
+
+party.add-company:
+  kind: macro
+
+  ui:
+    label: "Add Company"
+    description: "Add a legal entity/company"
+    target_label: "Company"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: party
+
+  target:
+    operates_on: client_ref
+    produces: party_ref
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Legal Name"
+      jurisdiction:
+        type: str
+        ui_label: "Jurisdiction"
+        valid_values: [LU, IE, DE, UK, US, CH, SG, HK, FR, NL, BE]
+    optional:
+      registration_number:
+        type: str
+        ui_label: "Registration Number"
+      lei:
+        type: str
+        ui_label: "LEI"
+        description: "Legal Entity Identifier"
+      incorporation_date:
+        type: date
+        ui_label: "Incorporation Date"
+      legal_form:
+        type: enum
+        ui_label: "Legal Form"
+        values:
+          - key: corp
+            label: "Corporation"
+            internal: corporation
+          - key: llc
+            label: "LLC"
+            internal: limited-liability-company
+          - key: partnership
+            label: "Partnership"
+            internal: partnership
+          - key: sarl
+            label: "SARL"
+            internal: sarl
+          - key: gmbh
+            label: "GmbH"
+            internal: gmbh
+          - key: sa
+            label: "SA"
+            internal: societe-anonyme
+          - key: plc
+            label: "PLC"
+            internal: public-limited-company
+
+  prereqs: []
+
+  expands_to:
+    - verb: entity.create-company
+      args:
+        name: "${arg.name}"
+        jurisdiction: "${arg.jurisdiction}"
+        registration_number: "${arg.registration_number}"
+        lei: "${arg.lei}"
+        incorporation_date: "${arg.incorporation_date}"
+        legal_form: "${arg.legal_form.internal}"
+
+  unlocks:
+    - party.assign-role
+    - case.add-party
+
+party.search:
+  kind: macro
+
+  ui:
+    label: "Search Parties"
+    description: "Search for existing parties"
+    target_label: "Parties"
+
+  routing:
+    mode_tags: [onboarding, kyc, trading]
+    operator_domain: party
+
+  target:
+    operates_on: client_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      query:
+        type: str
+        ui_label: "Search"
+        description: "Name or identifier to search for"
+    optional:
+      party_type:
+        type: enum
+        ui_label: "Type Filter"
+        values:
+          - key: person
+            label: "People"
+            internal: person
+          - key: company
+            label: "Companies"
+            internal: company
+          - key: all
+            label: "All"
+            internal: null
+        default_key: all
+      jurisdiction:
+        type: str
+        ui_label: "Jurisdiction Filter"
+
+  prereqs: []
+
+  expands_to:
+    - verb: entity.search
+      args:
+        query: "${arg.query}"
+        entity_type: "${arg.party_type.internal}"
+        jurisdiction: "${arg.jurisdiction}"
+
+  unlocks: []
+
+party.details:
+  kind: macro
+
+  ui:
+    label: "Party Details"
+    description: "View details of a party"
+    target_label: "Party"
+
+  routing:
+    mode_tags: [onboarding, kyc, trading]
+    operator_domain: party
+
+  target:
+    operates_on: party_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party_ref
+        ui_label: "Party"
+        picker: party_picker
+    optional: {}
+
+  prereqs: []
+
+  expands_to:
+    - verb: entity.get
+      args:
+        entity_id: "${arg.party}"
+
+  unlocks: []
+
+party.update:
+  kind: macro
+
+  ui:
+    label: "Update Party"
+    description: "Update party information"
+    target_label: "Party"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: party
+
+  target:
+    operates_on: party_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party_ref
+        ui_label: "Party"
+        picker: party_picker
+    optional:
+      name:
+        type: str
+        ui_label: "Name"
+      address:
+        type: str
+        ui_label: "Address"
+      tax_residence:
+        type: str
+        ui_label: "Tax Residence"
+
+  prereqs: []
+
+  expands_to:
+    - verb: entity.update
+      args:
+        entity_id: "${arg.party}"
+        name: "${arg.name}"
+        address: "${arg.address}"
+        tax_residence: "${arg.tax_residence}"
+
+  unlocks: []
+
+party.list:
+  kind: macro
+
+  ui:
+    label: "List Parties"
+    description: "List all parties for the current client"
+    target_label: "Parties"
+
+  routing:
+    mode_tags: [onboarding, kyc, trading]
+    operator_domain: party
+
+  target:
+    operates_on: client_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required: {}
+    optional:
+      party_type:
+        type: enum
+        ui_label: "Type Filter"
+        values:
+          - key: person
+            label: "People"
+            internal: person
+          - key: company
+            label: "Companies"
+            internal: company
+          - key: all
+            label: "All"
+            internal: null
+        default_key: all
+      role:
+        type: enum
+        ui_label: "Role Filter"
+        values:
+          - key: gp
+            label: "General Partners"
+            internal: general-partner
+          - key: lp
+            label: "Limited Partners"
+            internal: limited-partner
+          - key: ubo
+            label: "Beneficial Owners"
+            internal: beneficial-owner
+          - key: director
+            label: "Directors"
+            internal: director
+          - key: all
+            label: "All Roles"
+            internal: null
+        default_key: all
+
+  prereqs: []
+
+  expands_to:
+    - verb: entity.list
+      args:
+        client_id: "${scope.client_id}"
+        entity_type: "${arg.party_type.internal}"
+        role: "${arg.role.internal}"
+
+  unlocks: []
+
+party.assign-identifier:
+  kind: macro
+
+  ui:
+    label: "Add Identifier"
+    description: "Add an identifier to a party (LEI, tax ID, passport)"
+    target_label: "Identifier"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: party
+
+  target:
+    operates_on: party_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party_ref
+        ui_label: "Party"
+        picker: party_picker
+      identifier_type:
+        type: enum
+        ui_label: "Type"
+        values:
+          - key: lei
+            label: "LEI"
+            internal: lei
+          - key: tax_id
+            label: "Tax ID"
+            internal: tax-id
+          - key: passport
+            label: "Passport"
+            internal: passport
+          - key: national_id
+            label: "National ID"
+            internal: national-id
+          - key: company_reg
+            label: "Company Registration"
+            internal: company-registration
+      value:
+        type: str
+        ui_label: "Value"
+    optional:
+      issuing_country:
+        type: str
+        ui_label: "Issuing Country"
+      expiry_date:
+        type: date
+        ui_label: "Expiry Date"
+
+  prereqs: []
+
+  expands_to:
+    - verb: identifier.add
+      args:
+        entity_id: "${arg.party}"
+        identifier_type: "${arg.identifier_type.internal}"
+        value: "${arg.value}"
+        issuing_country: "${arg.issuing_country}"
+        expiry_date: "${arg.expiry_date}"
+
+  unlocks: []
+
+party.set-address:
+  kind: macro
+
+  ui:
+    label: "Set Address"
+    description: "Set or update party address"
+    target_label: "Address"
+
+  routing:
+    mode_tags: [onboarding, kyc]
+    operator_domain: party
+
+  target:
+    operates_on: party_ref
+    produces: null
+
+  args:
+    style: keyworded
+    required:
+      party:
+        type: party_ref
+        ui_label: "Party"
+        picker: party_picker
+      address_type:
+        type: enum
+        ui_label: "Type"
+        values:
+          - key: registered
+            label: "Registered Address"
+            internal: registered
+          - key: business
+            label: "Business Address"
+            internal: business
+          - key: residential
+            label: "Residential Address"
+            internal: residential
+          - key: mailing
+            label: "Mailing Address"
+            internal: mailing
+        default_key: registered
+      country:
+        type: str
+        ui_label: "Country"
+    optional:
+      street:
+        type: str
+        ui_label: "Street"
+      city:
+        type: str
+        ui_label: "City"
+      postal_code:
+        type: str
+        ui_label: "Postal Code"
+      region:
+        type: str
+        ui_label: "Region/State"
+
+  prereqs: []
+
+  expands_to:
+    - verb: address.set
+      args:
+        entity_id: "${arg.party}"
+        address_type: "${arg.address_type.internal}"
+        country: "${arg.country}"
+        street: "${arg.street}"
+        city: "${arg.city}"
+        postal_code: "${arg.postal_code}"
+        region: "${arg.region}"
+
+  unlocks: []

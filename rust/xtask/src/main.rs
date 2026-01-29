@@ -1897,12 +1897,9 @@ fn inline_lint_yaml(content: &str) -> Vec<(&'static str, &'static str, String, S
     diags
 }
 
-
 // ============================================================================
 // Playbook Check
 // ============================================================================
-
-
 
 // ============================================================================
 // Playbook Check
@@ -1966,12 +1963,20 @@ fn playbook_check(files: Vec<std::path::PathBuf>, format: &str, verbose: bool) -
                 println!("  Playbook: {}", spec.name);
                 println!("  Slots: {}", spec.slots.len());
                 println!("  Steps: {}", spec.steps.len());
-                
+
                 if !spec.slots.is_empty() {
                     println!("  Slot details:");
                     for (name, slot) in &spec.slots {
-                        let req = if slot.required { "required" } else { "optional" };
-                        let default = slot.default.as_ref().map(|d| format!(" = {:?}", d)).unwrap_or_default();
+                        let req = if slot.required {
+                            "required"
+                        } else {
+                            "optional"
+                        };
+                        let default = slot
+                            .default
+                            .as_ref()
+                            .map(|d| format!(" = {:?}", d))
+                            .unwrap_or_default();
                         println!("    - {} ({}){}", name, req, default);
                     }
                 }
@@ -1980,11 +1985,14 @@ fn playbook_check(files: Vec<std::path::PathBuf>, format: &str, verbose: bool) -
             // Lower with empty slot state to find missing slots
             let slots = SlotState::new();
             let result = lower_playbook(&spec, &slots);
-            
+
             if !result.missing_slots.is_empty() {
                 println!("  WARNING: Missing required slots:");
                 for missing in &result.missing_slots {
-                    println!("    - slot in step {} ({})", missing.step_index, missing.step_id);
+                    println!(
+                        "    - slot in step {} ({})",
+                        missing.step_index, missing.step_id
+                    );
                 }
                 total_warnings += result.missing_slots.len();
             }
@@ -2001,8 +2009,10 @@ fn playbook_check(files: Vec<std::path::PathBuf>, format: &str, verbose: bool) -
     }
 
     println!("==========================================");
-    println!("Summary: {} files checked, {} errors, {} warnings", 
-             checked_files, total_errors, total_warnings);
+    println!(
+        "Summary: {} files checked, {} errors, {} warnings",
+        checked_files, total_errors, total_warnings
+    );
     println!("==========================================");
 
     if total_errors > 0 {

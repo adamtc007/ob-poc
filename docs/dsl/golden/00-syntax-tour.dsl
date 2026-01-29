@@ -32,14 +32,15 @@
 ;; intent: Boolean values
 (cbu.update :id @fund :active true :archived false)
 
-;; intent: Null literal
-(entity.update :id @person :middle-name null)
+;; intent: Null literal (nil, not null)
+(entity.update :id @person :middle-name nil)
 
 ;; intent: Symbol references (bindings from previous calls)
 (cbu-role.assign :cbu-id @fund :entity-id @person :role "DIRECTOR")
 
-;; intent: Entity references (resolved by lookup)
-(session.load-galaxy :apex-name <Allianz>)
+;; intent: Entity references (strings resolved post-parse via EntityGateway)
+;; NOTE: <Allianz> is a UI convention, not valid DSL - use string literals
+(session.load-galaxy :apex-name "Allianz")
 
 ;; ----------------------------------------------------------------------------
 ;; 3. Collections
@@ -53,18 +54,18 @@
 ;; intent: Nested arrays
 (batch.process :items [["A" 1] ["B" 2] ["C" 3]])
 
-;; intent: Map values
-(config.set :settings {"theme" "dark" "locale" "en-US" "debug" false})
+;; intent: Map values (maps use keyword keys, not string keys)
+(config.set :settings {:theme "dark" :locale "en-US" :debug false})
 
 ;; intent: Nested structures
 (workflow.create
   :template "onboarding"
   :params {
-    "client" "Acme Corp"
-    "products" ["CUSTODY" "TRADING"]
-    "contacts" [
-      {"name" "Alice" "role" "primary"}
-      {"name" "Bob" "role" "backup"}
+    :client "Acme Corp"
+    :products ["CUSTODY" "TRADING"]
+    :contacts [
+      {:name "Alice" :role "primary"}
+      {:name "Bob" :role "backup"}
     ]
   })
 

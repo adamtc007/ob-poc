@@ -116,8 +116,8 @@ use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, Validation
 use crate::dsl_v2::verb_registry::registry;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
-use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
 use crate::macros::OperatorMacroRegistry;
+use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::ontology::SemanticStageRegistry;
 use crate::session::SessionScope;
@@ -469,20 +469,22 @@ impl AgentService {
         let verb_service = Arc::new(VerbService::new(self.pool.clone()));
         let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
             self.embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
-        
+
         // Build verb searcher with macro registry for operator vocabulary
-        let macro_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("config/verb_schemas/macros");
-        let macro_reg = OperatorMacroRegistry::load_from_dir(&macro_dir)
-            .unwrap_or_else(|e| {
-                tracing::warn!("Failed to load operator macros: {}, using empty registry", e);
-                OperatorMacroRegistry::new()
-            });
-        
+        let macro_dir =
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/verb_schemas/macros");
+        let macro_reg = OperatorMacroRegistry::load_from_dir(&macro_dir).unwrap_or_else(|e| {
+            tracing::warn!(
+                "Failed to load operator macros: {}, using empty registry",
+                e
+            );
+            OperatorMacroRegistry::new()
+        });
+
         let searcher = HybridVerbSearcher::new(verb_service, None)
             .with_embedder(dyn_embedder)
             .with_macro_registry(Arc::new(macro_reg));
-        
+
         IntentPipeline::with_pool(searcher, self.pool.clone())
     }
 
@@ -893,7 +895,11 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         match result {
             Ok(r) => {
                 // Handle macro expansion with explicit feedback
-                if let PipelineOutcome::MacroExpanded { ref macro_verb, ref unlocks } = r.outcome {
+                if let PipelineOutcome::MacroExpanded {
+                    ref macro_verb,
+                    ref unlocks,
+                } = r.outcome
+                {
                     tracing::info!(
                         macro_verb = %macro_verb,
                         expanded_dsl = %r.dsl,
@@ -905,17 +911,17 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         .map(|p| p.statements)
                         .unwrap_or_default();
                     session.set_pending_dsl(r.dsl.clone(), ast, None, false);
-                    
+
                     // Macro verbs that are structure/case/mandate operations auto-run
-                    let is_setup_macro = macro_verb.ends_with(".setup") 
+                    let is_setup_macro = macro_verb.ends_with(".setup")
                         || macro_verb.ends_with(".select")
                         || macro_verb.ends_with(".list");
-                    
+
                     if is_setup_macro {
                         tracing::debug!(macro_verb = %macro_verb, "Auto-running setup macro");
                         return self.execute_runbook(session).await;
                     }
-                    
+
                     let msg = format!(
                         "Macro '{}' expanded to:\n{}\n\nSay 'run' to execute.",
                         macro_verb, r.dsl
@@ -923,7 +929,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
                     return Ok(self.staged_response(r.dsl, msg));
                 }
-                
+
                 // Got valid DSL?
                 if r.valid && !r.dsl.is_empty() {
                     // Stage in runbook (SINGLE LOOP - all DSL goes through here)
