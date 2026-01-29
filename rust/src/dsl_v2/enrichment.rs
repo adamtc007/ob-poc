@@ -149,7 +149,7 @@ impl<'a> Enricher<'a> {
     ) -> AstNode {
         match node {
             // String literal - potentially convert to EntityRef
-            AstNode::Literal(Literal::String(s)) => {
+            AstNode::Literal(Literal::String(s), _) => {
                 if let Some(config) = lookup_config {
                     // Convert to EntityRef
                     let entity_type = config
@@ -178,12 +178,12 @@ impl<'a> Enricher<'a> {
                     }
                 } else {
                     // Keep as string literal
-                    AstNode::Literal(Literal::String(s))
+                    AstNode::Literal(Literal::String(s), Span::synthetic())
                 }
             }
 
             // UUID literal - if this arg has lookup config, it's already resolved
-            AstNode::Literal(Literal::Uuid(uuid)) => {
+            AstNode::Literal(Literal::Uuid(uuid), _) => {
                 if let Some(config) = lookup_config {
                     let entity_type = config
                         .entity_type
@@ -209,7 +209,7 @@ impl<'a> Enricher<'a> {
                         explain: None, // Already resolved, no explain needed
                     }
                 } else {
-                    AstNode::Literal(Literal::Uuid(uuid))
+                    AstNode::Literal(Literal::Uuid(uuid), Span::synthetic())
                 }
             }
 
@@ -220,7 +220,7 @@ impl<'a> Enricher<'a> {
             AstNode::EntityRef { .. } => node,
 
             // Other literals pass through
-            AstNode::Literal(lit) => AstNode::Literal(lit),
+            AstNode::Literal(lit, span) => AstNode::Literal(lit, span),
 
             // Lists - enrich each item (with same lookup config for homogeneous lists)
             // Pass index to each item for unique ref_id generation
@@ -504,12 +504,15 @@ mod tests {
                 arguments: vec![
                     Argument {
                         key: "name".to_string(),
-                        value: AstNode::Literal(Literal::String("Test Fund".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("Test Fund".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::default(),
                     },
                     Argument {
                         key: "jurisdiction".to_string(),
-                        value: AstNode::Literal(Literal::String("LU".to_string())),
+                        value: AstNode::Literal(Literal::String("LU".to_string()), Span::default()),
                         span: Span::default(),
                     },
                 ],
@@ -571,12 +574,18 @@ mod tests {
                     },
                     Argument {
                         key: "entity-id".to_string(),
-                        value: AstNode::Literal(Literal::String("John Smith".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("John Smith".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::default(),
                     },
                     Argument {
                         key: "role".to_string(),
-                        value: AstNode::Literal(Literal::String("DIRECTOR".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("DIRECTOR".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::default(),
                     },
                 ],
@@ -639,8 +648,14 @@ mod tests {
                         key: "entity-id".to_string(),
                         value: AstNode::List {
                             items: vec![
-                                AstNode::Literal(Literal::String("Alice".to_string())),
-                                AstNode::Literal(Literal::String("Bob".to_string())),
+                                AstNode::Literal(
+                                    Literal::String("Alice".to_string()),
+                                    Span::default(),
+                                ),
+                                AstNode::Literal(
+                                    Literal::String("Bob".to_string()),
+                                    Span::default(),
+                                ),
                             ],
                             span: Span::default(),
                         },
@@ -648,7 +663,10 @@ mod tests {
                     },
                     Argument {
                         key: "role".to_string(),
-                        value: AstNode::Literal(Literal::String("DIRECTOR".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("DIRECTOR".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::default(),
                     },
                 ],
@@ -690,7 +708,7 @@ mod tests {
                 verb: "verb".to_string(),
                 arguments: vec![Argument {
                     key: "name".to_string(),
-                    value: AstNode::Literal(Literal::String("Test".to_string())),
+                    value: AstNode::Literal(Literal::String("Test".to_string()), Span::default()),
                     span: Span::default(),
                 }],
                 binding: None,
@@ -732,9 +750,18 @@ mod tests {
                         key: "entity-id".to_string(),
                         value: AstNode::List {
                             items: vec![
-                                AstNode::Literal(Literal::String("Alice".to_string())),
-                                AstNode::Literal(Literal::String("Bob".to_string())),
-                                AstNode::Literal(Literal::String("Charlie".to_string())),
+                                AstNode::Literal(
+                                    Literal::String("Alice".to_string()),
+                                    Span::default(),
+                                ),
+                                AstNode::Literal(
+                                    Literal::String("Bob".to_string()),
+                                    Span::default(),
+                                ),
+                                AstNode::Literal(
+                                    Literal::String("Charlie".to_string()),
+                                    Span::default(),
+                                ),
                             ],
                             span: Span { start: 20, end: 55 }, // Simulate real span
                         },
@@ -742,7 +769,10 @@ mod tests {
                     },
                     Argument {
                         key: "role".to_string(),
-                        value: AstNode::Literal(Literal::String("DIRECTOR".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("DIRECTOR".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::default(),
                     },
                 ],

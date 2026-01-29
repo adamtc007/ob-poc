@@ -1270,7 +1270,7 @@ impl ResolutionSubSession {
                     );
                 }
             }
-            AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+            AstNode::Literal(_, _) | AstNode::SymbolRef { .. } => {}
         }
     }
 
@@ -1367,7 +1367,7 @@ impl ResolutionSubSession {
                     self.apply_to_node(&mut nested_arg.value, stmt_idx, &nested_arg_name)?;
                 }
             }
-            AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+            AstNode::Literal(_, _) | AstNode::SymbolRef { .. } => {}
         }
         Ok(())
     }

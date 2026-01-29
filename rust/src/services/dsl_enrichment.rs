@@ -301,7 +301,7 @@ fn collect_from_node(node: &AstNode, arg_name: &str, regions: &mut Vec<SpecialRe
         AstNode::Nested(vc) => {
             collect_from_verb_call(vc, regions);
         }
-        AstNode::Literal(_) => {
+        AstNode::Literal(_, _) => {
             // Literals don't need enrichment
         }
     }

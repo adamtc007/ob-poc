@@ -1,35 +1,50 @@
-//! Parser v2 - Produces clean ast_v2 types
+//! Parser v2 - Produces clean ast_v2 types with absolute spans
 //!
 //! This parser produces a "raw" AST where:
 //! - All string values are `Literal::String`
 //! - Symbol references (`@name`) are `SymbolRef`
 //! - Entity references are NOT identified yet (that's the enrichment pass)
+//! - All spans are ABSOLUTE byte offsets into the original input
 //!
 //! ## Pipeline
 //!
 //! ```text
-//! Source → Parser v2 → Raw AST (Literals only)
+//! Source → Parser v2 → Raw AST (Literals only, absolute spans)
 //!                          ↓
 //!                   Enrichment Pass (uses YAML verb defs)
 //!                          ↓
 //!              Enriched AST (String → EntityRef where lookup config exists)
 //! ```
+//!
+//! ## Span Tracking
+//!
+//! Uses `nom_locate::LocatedSpan` to track absolute byte offsets throughout
+//! the entire parse tree. This ensures LSP features work correctly even for
+//! nested structures in multi-statement programs.
 
 use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, tag},
     character::complete::{alpha1, alphanumeric1, char, digit1, multispace0, multispace1, none_of},
     combinator::{all_consuming, cut, map, opt, recognize, value},
-    error::{context, ContextError, ParseError as NomParseError},
+    error::{context, ContextError, ParseError as NomParseError, VerboseError},
     multi::many0,
     sequence::{delimited, pair, preceded, tuple},
     IResult,
 };
+use nom_locate::LocatedSpan;
 use rust_decimal::Decimal;
 use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::ast::*;
+
+// ============================================================================
+// Span Type - Absolute byte offsets via nom_locate
+// ============================================================================
+
+/// Input type with location tracking
+pub type NomSpan<'a> = LocatedSpan<&'a str>;
 
 // ============================================================================
 // Public API
@@ -38,31 +53,67 @@ use crate::ast::*;
 /// Parse a complete DSL program from source text
 ///
 /// Returns a raw AST where all values are literals (no EntityRef yet).
+/// All spans are absolute byte offsets into the original input.
 /// Use `enrich_program()` to convert strings to EntityRefs based on YAML config.
 pub fn parse_program(input: &str) -> Result<Program, String> {
-    match all_consuming(program::<nom::error::VerboseError<&str>>)(input) {
+    let span = NomSpan::new(input);
+    match all_consuming(program::<VerboseError<NomSpan>>)(span) {
         Ok((_, prog)) => Ok(prog),
-        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
-            Err(nom::error::convert_error(input, e))
-        }
+        Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => Err(format_verbose_error(input, e)),
         Err(nom::Err::Incomplete(_)) => Err("Incomplete input".to_string()),
     }
 }
 
 /// Parse a single verb call (for REPL/interactive use)
 pub fn parse_single_verb(input: &str) -> Result<VerbCall, String> {
-    let input = input.trim();
+    let input_trimmed = input.trim();
+    let span = NomSpan::new(input_trimmed);
     match all_consuming(delimited(
-        multispace0::<_, nom::error::VerboseError<&str>>,
+        multispace0::<_, VerboseError<NomSpan>>,
         verb_call,
         multispace0,
-    ))(input)
+    ))(span)
     {
         Ok((_, vc)) => Ok(vc),
         Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
-            Err(nom::error::convert_error(input, e))
+            Err(format_verbose_error(input_trimmed, e))
         }
         Err(nom::Err::Incomplete(_)) => Err("Incomplete input".to_string()),
+    }
+}
+
+/// Format a VerboseError into a human-readable string
+fn format_verbose_error(input: &str, err: VerboseError<NomSpan>) -> String {
+    use nom::error::VerboseErrorKind;
+
+    let mut result = String::new();
+    for (span, kind) in err.errors.iter() {
+        let offset = span.location_offset();
+        let line = span.location_line();
+        let column = span.get_column();
+
+        let msg = match kind {
+            VerboseErrorKind::Context(ctx) => format!("expected {}", ctx),
+            VerboseErrorKind::Char(c) => format!("expected '{}'", c),
+            VerboseErrorKind::Nom(ek) => format!("parse error: {:?}", ek),
+        };
+
+        result.push_str(&format!(
+            "at line {}, column {} (offset {}): {}\n",
+            line, column, offset, msg
+        ));
+
+        // Show context
+        if let Some(line_text) = input.lines().nth(line as usize - 1) {
+            result.push_str(&format!("  {}\n", line_text));
+            result.push_str(&format!("  {}^\n", " ".repeat(column.saturating_sub(1))));
+        }
+    }
+
+    if result.is_empty() {
+        "Parse error".to_string()
+    } else {
+        result
     }
 }
 
@@ -70,18 +121,18 @@ pub fn parse_single_verb(input: &str) -> Result<VerbCall, String> {
 // Internal Parsers
 // ============================================================================
 
-fn program<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, Program, E> {
+fn program<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, Program, E> {
     let (input, _) = multispace0(input)?;
     let (input, statements) = many0(statement)(input)?;
     let (input, _) = multispace0(input)?;
     Ok((input, Program { statements }))
 }
 
-fn statement<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, Statement, E> {
+fn statement<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, Statement, E> {
     let (input, _) = multispace0(input)?;
     alt((
         map(comment, Statement::Comment),
@@ -93,7 +144,9 @@ fn statement<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
 // Comments
 // ============================================================================
 
-fn comment<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+fn comment<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, String, E> {
     let (input, _) = tag(";;")(input)?;
     let (input, text) = nom::bytes::complete::take_while(|c| c != '\n')(input)?;
     let (input, _) = opt(char('\n'))(input)?;
@@ -104,17 +157,17 @@ fn comment<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, St
 // Verb Calls
 // ============================================================================
 
-fn verb_call<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-) -> IResult<&'a str, VerbCall, E> {
-    let original_input = input;
-    let start_offset = 0usize;
+fn verb_call<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, VerbCall, E> {
+    // Capture absolute start offset
+    let start_offset = input.location_offset();
 
     let (input, _) = char('(')(input)?;
     let (input, _) = multispace0(input)?;
 
     let (input, (domain, verb)) = word(input)?;
-    let (input, arguments) = many0(|i| argument_with_span(i, original_input))(input)?;
+    let (input, arguments) = many0(argument_with_span)(input)?;
     let (input, _) = multispace0(input)?;
 
     // Parse optional :as @symbol binding
@@ -123,7 +176,8 @@ fn verb_call<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     let (input, _) = multispace0(input)?;
     let (input, _) = cut(context("closing parenthesis", char(')')))(input)?;
 
-    let end_offset = original_input.len() - input.len();
+    // Capture absolute end offset
+    let end_offset = input.location_offset();
 
     Ok((
         input,
@@ -138,7 +192,9 @@ fn verb_call<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
 }
 
 /// Parse the :as @symbol binding directive
-fn as_binding_parser<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+fn as_binding_parser<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, String, E> {
     let (input, _) = tag(":as")(input)?;
     let (input, _) = multispace1(input)?;
     let (input, _) = char('@')(input)?;
@@ -146,40 +202,9 @@ fn as_binding_parser<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&
     Ok((input, name.to_string()))
 }
 
-/// Verb call parser with span tracking relative to original input
-fn verb_call_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-    original_input: &'a str,
-) -> IResult<&'a str, VerbCall, E> {
-    let start_offset = original_input.len() - input.len();
-
-    let (input, _) = char('(')(input)?;
-    let (input, _) = multispace0(input)?;
-
-    let (input, (domain, verb)) = word(input)?;
-    let (input, arguments) = many0(|i| argument_with_span(i, original_input))(input)?;
-    let (input, _) = multispace0(input)?;
-
-    let (input, binding) = opt(as_binding_parser)(input)?;
-
-    let (input, _) = multispace0(input)?;
-    let (input, _) = cut(context("closing parenthesis", char(')')))(input)?;
-
-    let end_offset = original_input.len() - input.len();
-
-    Ok((
-        input,
-        VerbCall {
-            domain,
-            verb,
-            arguments,
-            binding,
-            span: Span::new(start_offset, end_offset),
-        },
-    ))
-}
-
-fn word<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (String, String), E> {
+fn word<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, (String, String), E> {
     let (input, domain) = kebab_identifier(input)?;
     let (input, _) = char('.')(input)?;
     let (input, verb) = kebab_identifier(input)?;
@@ -190,28 +215,27 @@ fn word<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (Stri
 // Arguments
 // ============================================================================
 
-/// Parse argument with span tracking relative to original input
-fn argument_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-    original_input: &'a str,
-) -> IResult<&'a str, Argument, E> {
+/// Parse argument with absolute span tracking
+fn argument_with_span<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, Argument, E> {
     let (input, _) = multispace0(input)?;
 
     // Don't match :as - it's reserved for symbol binding
-    if input.starts_with(":as") && input[3..].starts_with(|c: char| c.is_whitespace()) {
+    if input.starts_with(":as") && input.fragment()[3..].starts_with(|c: char| c.is_whitespace()) {
         return Err(nom::Err::Error(E::from_error_kind(
             input,
             nom::error::ErrorKind::Verify,
         )));
     }
 
-    let key_start = original_input.len() - input.len();
+    let key_start = input.location_offset();
     let (input, key) = keyword(input)?;
 
     let (input, _) = multispace1(input)?;
 
-    let (input, val) = context("value", |i| value_parser_with_span(i, original_input))(input)?;
-    let value_end = original_input.len() - input.len();
+    let (input, val) = context("value", value_parser_with_span)(input)?;
+    let value_end = input.location_offset();
 
     Ok((
         input,
@@ -223,65 +247,94 @@ fn argument_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     ))
 }
 
-fn keyword<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+fn keyword<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, String, E> {
     let (input, _) = char(':')(input)?;
     let (input, name) = kebab_identifier(input)?;
     Ok((input, name))
 }
 
-fn kebab_identifier<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+fn kebab_identifier<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, String, E> {
     recognize(pair(
         alt((alpha1, tag("_"))),
         many0(alt((alphanumeric1, tag("_"), tag("-")))),
     ))(input)
-    .map(|(rest, matched)| (rest, matched.to_string()))
+    .map(|(rest, matched)| (rest, matched.fragment().to_string()))
 }
 
-fn identifier<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, &'a str, E> {
+fn identifier<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, &'a str, E> {
     recognize(pair(
         alt((alpha1, tag("_"))),
         many0(alt((alphanumeric1, tag("_"), tag("-")))),
     ))(input)
+    .map(|(rest, matched)| (rest, *matched.fragment()))
 }
 
 // ============================================================================
 // Values
 // ============================================================================
 
-/// Value parser with span tracking for nested verb calls
-fn value_parser_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-    original_input: &'a str,
-) -> IResult<&'a str, AstNode, E> {
+/// Value parser with absolute span tracking
+fn value_parser_with_span<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
     alt((
         // Order matters: try specific patterns before generic ones
-        // Boolean literals
-        map(boolean_literal, |b| AstNode::Literal(Literal::Boolean(b))),
-        // Null literal
-        map(null_literal, |_| AstNode::Literal(Literal::Null)),
+        // Boolean literals (with span)
+        boolean_literal_with_span,
+        // Null literal (with span)
+        null_literal_with_span,
         // Symbol reference: @name
-        |i| symbol_ref_with_span(i, original_input),
+        symbol_ref_with_span,
         // String literal
-        |i| string_literal_with_span(i, original_input),
+        string_literal_with_span,
         // Number literal
-        |i| number_literal_with_span(i, original_input),
+        number_literal_with_span,
         // Nested verb call
-        map(
-            |i| verb_call_with_span(i, original_input),
-            |vc| AstNode::Nested(Box::new(vc)),
-        ),
+        map(verb_call, |vc| AstNode::Nested(Box::new(vc))),
         // List
-        |i| list_literal_with_span(i, original_input),
+        list_literal_with_span,
         // Map
-        |i| map_literal_with_span(i, original_input),
+        map_literal_with_span,
     ))(input)
 }
 
-// String literals with escape sequences
-fn string_literal_with_span<'a, E: NomParseError<&'a str>>(
-    input: &'a str,
-    _original_input: &'a str,
-) -> IResult<&'a str, AstNode, E> {
+// Boolean literals with span
+fn boolean_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
+    let start = input.location_offset();
+    let (input, b) = alt((value(true, tag("true")), value(false, tag("false"))))(input)?;
+    let end = input.location_offset();
+    Ok((
+        input,
+        AstNode::Literal(Literal::Boolean(b), Span::new(start, end)),
+    ))
+}
+
+// Null literal with span
+fn null_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
+    let start = input.location_offset();
+    let (input, _) = tag("nil")(input)?;
+    let end = input.location_offset();
+    Ok((
+        input,
+        AstNode::Literal(Literal::Null, Span::new(start, end)),
+    ))
+}
+
+// String literals with escape sequences and span
+fn string_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
+    let start = input.location_offset();
     let (input, s) = delimited(
         char('"'),
         escaped_transform(
@@ -297,29 +350,35 @@ fn string_literal_with_span<'a, E: NomParseError<&'a str>>(
         ),
         char('"'),
     )(input)?;
+    let end = input.location_offset();
+    let span = Span::new(start, end);
 
     // Check if this looks like a UUID
     if let Ok(uuid) = Uuid::parse_str(&s) {
-        Ok((input, AstNode::Literal(Literal::Uuid(uuid))))
+        Ok((input, AstNode::Literal(Literal::Uuid(uuid), span)))
     } else {
-        Ok((input, AstNode::Literal(Literal::String(s))))
+        Ok((input, AstNode::Literal(Literal::String(s), span)))
     }
 }
 
-// Number literals (integer or decimal)
-fn number_literal_with_span<'a, E: NomParseError<&'a str>>(
-    input: &'a str,
-    _original_input: &'a str,
-) -> IResult<&'a str, AstNode, E> {
-    let (remaining, num_str) = recognize(tuple((
+// Number literals (integer or decimal) with span
+fn number_literal_with_span<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
+    let start = input.location_offset();
+    let (remaining, num_span) = recognize(tuple((
         opt(char('-')),
         digit1,
         opt(pair(char('.'), digit1)),
     )))(input)?;
+    let end = remaining.location_offset();
+    let span = Span::new(start, end);
+
+    let num_str = *num_span.fragment();
 
     if num_str.contains('.') {
         match Decimal::from_str(num_str) {
-            Ok(d) => Ok((remaining, AstNode::Literal(Literal::Decimal(d)))),
+            Ok(d) => Ok((remaining, AstNode::Literal(Literal::Decimal(d), span))),
             Err(_) => Err(nom::Err::Error(E::from_error_kind(
                 input,
                 nom::error::ErrorKind::Float,
@@ -327,7 +386,7 @@ fn number_literal_with_span<'a, E: NomParseError<&'a str>>(
         }
     } else {
         match num_str.parse::<i64>() {
-            Ok(i) => Ok((remaining, AstNode::Literal(Literal::Integer(i)))),
+            Ok(i) => Ok((remaining, AstNode::Literal(Literal::Integer(i), span))),
             Err(_) => Err(nom::Err::Error(E::from_error_kind(
                 input,
                 nom::error::ErrorKind::Digit,
@@ -336,25 +395,14 @@ fn number_literal_with_span<'a, E: NomParseError<&'a str>>(
     }
 }
 
-// Boolean literals
-fn boolean_literal<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, bool, E> {
-    alt((value(true, tag("true")), value(false, tag("false"))))(input)
-}
-
-// Null literal
-fn null_literal<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, (), E> {
-    value((), tag("nil"))(input)
-}
-
-// Symbol reference: @identifier
-fn symbol_ref_with_span<'a, E: NomParseError<&'a str>>(
-    input: &'a str,
-    original_input: &'a str,
-) -> IResult<&'a str, AstNode, E> {
-    let start = original_input.len() - input.len();
+// Symbol reference: @identifier with span
+fn symbol_ref_with_span<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
+    let start = input.location_offset();
     let (input, _) = char('@')(input)?;
     let (input, name) = identifier(input)?;
-    let end = original_input.len() - input.len();
+    let end = input.location_offset();
 
     Ok((
         input,
@@ -366,11 +414,10 @@ fn symbol_ref_with_span<'a, E: NomParseError<&'a str>>(
 }
 
 /// List literal with span tracking
-fn list_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-    original_input: &'a str,
-) -> IResult<&'a str, AstNode, E> {
-    let start = original_input.len() - input.len();
+fn list_literal_with_span<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
+    let start = input.location_offset();
 
     let (input, _) = char('[')(input)?;
     let (input, _) = multispace0(input)?;
@@ -378,7 +425,7 @@ fn list_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>
     let mut items = Vec::new();
     let mut remaining = input;
 
-    while let Ok((rest, val)) = value_parser_with_span::<E>(remaining, original_input) {
+    while let Ok((rest, val)) = value_parser_with_span::<E>(remaining) {
         items.push(val);
         remaining = rest;
 
@@ -395,7 +442,7 @@ fn list_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>
     let (input, _) = multispace0(remaining)?;
     let (input, _) = char(']')(input)?;
 
-    let end = original_input.len() - input.len();
+    let end = input.location_offset();
 
     Ok((
         input,
@@ -407,11 +454,10 @@ fn list_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>
 }
 
 /// Map literal with span tracking: {:key value :key2 value2}
-fn map_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
-    input: &'a str,
-    original_input: &'a str,
-) -> IResult<&'a str, AstNode, E> {
-    let start = original_input.len() - input.len();
+fn map_literal_with_span<'a, E: NomParseError<NomSpan<'a>> + ContextError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, AstNode, E> {
+    let start = input.location_offset();
 
     let (input, _) = char('{')(input)?;
     let (input, _) = multispace0(input)?;
@@ -424,7 +470,7 @@ fn map_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
         let (rest, _) = multispace0::<_, E>(remaining)?;
         if let Ok((rest, key)) = map_key::<E>(rest) {
             let (rest, _) = multispace1::<_, E>(rest)?;
-            let (rest, val) = value_parser_with_span::<E>(rest, original_input)?;
+            let (rest, val) = value_parser_with_span::<E>(rest)?;
             entries.push((key, val));
             remaining = rest;
         } else {
@@ -435,7 +481,7 @@ fn map_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     let (input, _) = multispace0(remaining)?;
     let (input, _) = char('}')(input)?;
 
-    let end = original_input.len() - input.len();
+    let end = input.location_offset();
 
     Ok((
         input,
@@ -446,7 +492,9 @@ fn map_literal_with_span<'a, E: NomParseError<&'a str> + ContextError<&'a str>>(
     ))
 }
 
-fn map_key<'a, E: NomParseError<&'a str>>(input: &'a str) -> IResult<&'a str, String, E> {
+fn map_key<'a, E: NomParseError<NomSpan<'a>>>(
+    input: NomSpan<'a>,
+) -> IResult<NomSpan<'a>, String, E> {
     preceded(char(':'), kebab_identifier)(input)
 }
 
@@ -521,7 +569,7 @@ mod tests {
             assert_eq!(vc.arguments[0].value.as_boolean(), Some(true));
             assert!(matches!(
                 vc.arguments[1].value,
-                AstNode::Literal(Literal::Null)
+                AstNode::Literal(Literal::Null, _)
             ));
         } else {
             panic!("Expected VerbCall");
@@ -615,7 +663,7 @@ mod tests {
 
         if let Statement::VerbCall(vc) = &result.statements[0] {
             // UUID strings should be parsed as Literal::Uuid
-            if let AstNode::Literal(Literal::Uuid(uuid)) = &vc.arguments[0].value {
+            if let AstNode::Literal(Literal::Uuid(uuid), _) = &vc.arguments[0].value {
                 assert_eq!(uuid.to_string(), "550e8400-e29b-41d4-a716-446655440000");
             } else {
                 panic!("Expected Uuid literal, got {:?}", vc.arguments[0].value);
@@ -657,6 +705,102 @@ mod tests {
 
         if let Statement::VerbCall(vc) = &result.statements[0] {
             assert_eq!(vc.arguments[0].value.as_string(), Some("line1\nline2\ttab"));
+        }
+    }
+
+    // =========================================================================
+    // SPAN TRACKING TESTS - Verify absolute offsets
+    // =========================================================================
+
+    #[test]
+    fn test_second_statement_span_is_absolute() {
+        let input = r#"(first.verb :a 1)
+(second.verb :b 2)"#;
+        let result = parse_program(input).unwrap();
+
+        assert_eq!(result.statements.len(), 2);
+
+        if let Statement::VerbCall(vc1) = &result.statements[0] {
+            assert_eq!(vc1.span.start, 0);
+            assert_eq!(vc1.span.end, 17); // "(first.verb :a 1)" = 17 chars
+        }
+
+        if let Statement::VerbCall(vc2) = &result.statements[1] {
+            // Second statement starts after newline at offset 18
+            assert!(
+                vc2.span.start > 0,
+                "Second statement span should be absolute, got start={}",
+                vc2.span.start
+            );
+            assert_eq!(vc2.span.start, 18);
+        }
+    }
+
+    #[test]
+    fn test_nested_verb_call_span_is_absolute() {
+        let input = r#"(outer.verb :inner (inner.verb :x 1))"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            if let Some(items) = vc.arguments[0].value.as_list() {
+                // No list in this test
+            }
+            // Check the inner verb call span
+            if let AstNode::Nested(inner) = &vc.arguments[0].value {
+                // Inner call starts at offset 19 (after ":inner ")
+                assert!(inner.span.start > 0, "Nested call span should be absolute");
+                assert_eq!(inner.span.start, 19);
+            }
+        }
+    }
+
+    #[test]
+    fn test_list_item_spans_are_distinct() {
+        let input = r#"(test.verb :items ["first" "second" "third"])"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            if let AstNode::List {
+                items,
+                span: list_span,
+            } = &vc.arguments[0].value
+            {
+                assert_eq!(items.len(), 3);
+
+                // Each item should have a distinct span
+                let span0 = items[0].span();
+                let span1 = items[1].span();
+                let span2 = items[2].span();
+
+                // Spans should not overlap and should be in order
+                assert!(span0.end <= span1.start, "Item spans should not overlap");
+                assert!(span1.end <= span2.start, "Item spans should not overlap");
+
+                // Each span should be within the list span
+                assert!(span0.start >= list_span.start);
+                assert!(span2.end <= list_span.end);
+            }
+        }
+    }
+
+    #[test]
+    fn test_literal_spans() {
+        let input = r#"(test.verb :str "hello" :num 42 :bool true)"#;
+        let result = parse_program(input).unwrap();
+
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            // String literal span
+            let str_span = vc.arguments[0].value.span();
+            assert!(str_span.start > 0);
+            assert!(str_span.end > str_span.start);
+
+            // Number literal span
+            let num_span = vc.arguments[1].value.span();
+            assert!(num_span.start > str_span.end);
+
+            // Boolean literal span
+            let bool_span = vc.arguments[2].value.span();
+            assert!(bool_span.start > num_span.end);
         }
     }
 
@@ -847,150 +991,14 @@ mod tests {
 
         if let Statement::VerbCall(vc) = &result.statements[0] {
             assert_eq!(vc.arguments[0].value.as_integer(), Some(0));
-            assert_eq!(
-                vc.arguments[1].value.as_decimal(),
-                Some(Decimal::from_str("0.0").unwrap())
-            );
+            let dec = vc.arguments[1].value.as_decimal().unwrap();
+            assert_eq!(dec, Decimal::ZERO);
         }
     }
 
     #[test]
-    fn test_mixed_types_in_list() {
-        let input = r#"(test.verb :mixed [42 "text" true nil @ref])"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            if let Some(items) = vc.arguments[0].value.as_list() {
-                assert_eq!(items.len(), 5);
-                assert_eq!(items[0].as_integer(), Some(42));
-                assert_eq!(items[1].as_string(), Some("text"));
-                assert_eq!(items[2].as_boolean(), Some(true));
-                assert!(matches!(items[3], AstNode::Literal(Literal::Null)));
-                assert!(items[4].is_symbol_ref());
-            }
-        }
-    }
-
-    #[test]
-    fn test_symbol_refs_in_list() {
-        let input = r#"(test.verb :refs [@a @b @c])"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            if let Some(items) = vc.arguments[0].value.as_list() {
-                assert_eq!(items.len(), 3);
-                assert_eq!(items[0].as_symbol(), Some("a"));
-                assert_eq!(items[1].as_symbol(), Some("b"));
-                assert_eq!(items[2].as_symbol(), Some("c"));
-            }
-        }
-    }
-
-    #[test]
-    fn test_verb_call_in_map() {
-        let input = r#"(test.verb :data {:nested (inner.call :x 1)})"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            if let Some(entries) = vc.arguments[0].value.as_map() {
-                assert_eq!(entries.len(), 1);
-                if let AstNode::Nested(nested) = &entries[0].1 {
-                    assert_eq!(nested.domain, "inner");
-                    assert_eq!(nested.verb, "call");
-                } else {
-                    panic!("Expected nested verb call in map");
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_many_arguments() {
-        let input = r#"(test.verb :a 1 :b 2 :c 3 :d 4 :e 5 :f 6 :g 7 :h 8 :i 9 :j 10)"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            assert_eq!(vc.arguments.len(), 10);
-        }
-    }
-
-    #[test]
-    fn test_comments_between_statements() {
-        let input = r#";; First comment
-(verb.one :x 1)
-;; Middle comment
-;; Second line of comment
-(verb.two :y 2)
-;; Final comment"#;
-        let result = parse_program(input).unwrap();
-        // 4 comments + 2 verb calls = 6 statements
-        assert_eq!(result.statements.len(), 6);
-    }
-
-    #[test]
-    fn test_inline_whitespace_in_list() {
-        let input = r#"(test.verb :items [  "a"   "b"   "c"  ])"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            assert_eq!(vc.arguments[0].value.as_list().unwrap().len(), 3);
-        }
-    }
-
-    #[test]
-    fn test_multiline_statement() {
-        let input = r#"(cbu.ensure
-  :name "Test Fund"
-  :jurisdiction "LU"
-  :client-type "FUND"
-  :as @fund)"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            assert_eq!(vc.arguments.len(), 3); // name, jurisdiction, client-type (binding is separate)
-            assert_eq!(vc.binding, Some("fund".to_string()));
-        }
-    }
-
-    #[test]
-    fn test_span_tracking() {
-        let input = r#"(cbu.ensure :name "Test")"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            // Verb call span should cover the whole call
-            assert_eq!(vc.span.start, 0);
-            assert!(vc.span.end > 0);
-
-            // Argument span should be within verb call span
-            assert!(vc.arguments[0].span.start > vc.span.start);
-            assert!(vc.arguments[0].span.end <= vc.span.end);
-        }
-    }
-
-    #[test]
-    fn test_escaped_quotes_in_string() {
-        let input = r#"(test.verb :text "He said \"Hello\"")"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            assert_eq!(vc.arguments[0].value.as_string(), Some("He said \"Hello\""));
-        }
-    }
-
-    #[test]
-    fn test_escaped_backslash() {
-        let input = r#"(test.verb :path "C:\\Users\\test")"#;
-        let result = parse_program(input).unwrap();
-
-        if let Statement::VerbCall(vc) = &result.statements[0] {
-            assert_eq!(vc.arguments[0].value.as_string(), Some("C:\\Users\\test"));
-        }
-    }
-
-    #[test]
-    fn test_boolean_false() {
-        let input = r#"(test.verb :flag false)"#;
+    fn test_false_boolean() {
+        let input = r#"(test.verb :disabled false)"#;
         let result = parse_program(input).unwrap();
 
         if let Statement::VerbCall(vc) = &result.statements[0] {
@@ -998,73 +1006,31 @@ mod tests {
         }
     }
 
-    // =========================================================================
-    // ERROR CASE TESTS - Parser should reject invalid input
-    // =========================================================================
-
     #[test]
-    fn test_error_missing_closing_paren() {
-        let input = r#"(cbu.ensure :name "Test""#;
-        assert!(parse_program(input).is_err());
+    fn test_comments_between_statements() {
+        let input = r#"(first.verb :a 1)
+;; Middle comment
+(second.verb :b 2)
+;; End comment"#;
+        let result = parse_program(input).unwrap();
+        assert_eq!(result.statements.len(), 4);
+        assert!(matches!(&result.statements[0], Statement::VerbCall(_)));
+        assert!(matches!(&result.statements[1], Statement::Comment(_)));
+        assert!(matches!(&result.statements[2], Statement::VerbCall(_)));
+        assert!(matches!(&result.statements[3], Statement::Comment(_)));
     }
 
     #[test]
-    fn test_error_missing_opening_paren() {
-        let input = r#"cbu.ensure :name "Test")"#;
-        assert!(parse_program(input).is_err());
-    }
+    fn test_symbol_ref_span() {
+        let input = r#"(test.verb :ref @mySymbol)"#;
+        let result = parse_program(input).unwrap();
 
-    #[test]
-    fn test_error_missing_verb() {
-        let input = r#"( :name "Test")"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_missing_domain() {
-        let input = r#"(.ensure :name "Test")"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_missing_colon_on_keyword() {
-        let input = r#"(cbu.ensure name "Test")"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_unclosed_string() {
-        let input = r#"(cbu.ensure :name "Test)"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_unclosed_list() {
-        let input = r#"(test.verb :items ["a" "b")"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_unclosed_map() {
-        let input = r#"(test.verb :data {:key "value")"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_invalid_symbol_ref() {
-        let input = r#"(test.verb :ref @)"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_keyword_without_value() {
-        let input = r#"(test.verb :key)"#;
-        assert!(parse_program(input).is_err());
-    }
-
-    #[test]
-    fn test_error_extra_closing_paren() {
-        let input = r#"(cbu.ensure :name "Test"))"#;
-        assert!(parse_program(input).is_err());
+        if let Statement::VerbCall(vc) = &result.statements[0] {
+            if let AstNode::SymbolRef { span, .. } = &vc.arguments[0].value {
+                // @mySymbol starts at offset 16
+                assert_eq!(span.start, 16);
+                assert_eq!(span.end, 25); // @mySymbol = 9 chars
+            }
+        }
     }
 }

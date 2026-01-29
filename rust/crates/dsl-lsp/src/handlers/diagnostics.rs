@@ -10,6 +10,7 @@ use tower_lsp::lsp_types::*;
 
 use crate::analysis::document::DocumentState;
 use crate::analysis::parse_with_v2;
+use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding};
 
 use ob_poc::dsl_v2::config::ConfigLoader;
 use ob_poc::dsl_v2::planning_facade::{analyse_and_plan, PlanningInput};
@@ -207,50 +208,14 @@ fn convert_planning_diagnostic(
     }
 }
 
-/// Convert SourceSpan to LSP Range
+/// Convert SourceSpan to LSP Range using proper UTF-16 encoding
 fn span_to_range(span: &ob_poc::dsl_v2::validation::SourceSpan, source: &str) -> Range {
-    // Calculate end position
-    let start_line = span.line.saturating_sub(1); // LSP is 0-indexed
-    let start_char = span.column;
-
-    // Find end line and column
-    let mut end_line = start_line;
-    let mut end_char = start_char + span.length;
-
-    // Check if span crosses lines
+    // Use byte offsets directly with the encoding module for proper UTF-16 handling
     let start_offset = span.offset as usize;
     let end_offset = start_offset + span.length as usize;
 
-    if end_offset <= source.len() {
-        let span_text = &source[start_offset..end_offset];
-        for ch in span_text.chars() {
-            if ch == '\n' {
-                end_line += 1;
-                end_char = 0;
-            } else {
-                end_char += 1;
-            }
-        }
-        // Reset to start of span text for correct end_char
-        if span_text.contains('\n') {
-            end_char = span_text
-                .lines()
-                .last()
-                .map(|l| l.len() as u32)
-                .unwrap_or(0);
-        }
-    }
-
-    Range {
-        start: Position {
-            line: start_line,
-            character: start_char,
-        },
-        end: Position {
-            line: end_line,
-            character: end_char,
-        },
-    }
+    // Use the encoding module for proper UTF-16 position calculation
+    encoding_span_to_range(start_offset, end_offset, source, PositionEncoding::Utf16)
 }
 
 #[cfg(test)]

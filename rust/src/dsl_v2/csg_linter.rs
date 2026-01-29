@@ -654,8 +654,8 @@ impl CsgLinter {
             if let Statement::VerbCall(vc) = stmt {
                 for arg in &vc.arguments {
                     let is_uuid = match &arg.value {
-                        AstNode::Literal(crate::dsl_v2::ast::Literal::Uuid(_)) => true,
-                        AstNode::Literal(crate::dsl_v2::ast::Literal::String(s)) => {
+                        AstNode::Literal(crate::dsl_v2::ast::Literal::Uuid(_), _) => true,
+                        AstNode::Literal(crate::dsl_v2::ast::Literal::String(s), _) => {
                             uuid::Uuid::parse_str(s).is_ok()
                         }
                         _ => false,

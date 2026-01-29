@@ -809,7 +809,7 @@ fn collect_references_from_node<'a>(node: &'a AstNode, refs: &mut Vec<&'a str>) 
             }
         }
         // Other nodes don't contain references
-        AstNode::Literal(_) | AstNode::EntityRef { .. } => {}
+        AstNode::Literal(_, _) | AstNode::EntityRef { .. } => {}
     }
 }
 
@@ -1151,7 +1151,7 @@ mod tests {
                     "create",
                     vec![(
                         "name",
-                        AstNode::Literal(Literal::String("Test Fund".into())),
+                        AstNode::Literal(Literal::String("Test Fund".into()), Span::default()),
                     )],
                 )),
                 Statement::VerbCall(make_verb_call(
@@ -1159,7 +1159,7 @@ mod tests {
                     "read",
                     vec![(
                         "entity-id",
-                        AstNode::Literal(Literal::String("some-uuid".into())),
+                        AstNode::Literal(Literal::String("some-uuid".into()), Span::default()),
                     )],
                 )),
             ],
@@ -1184,9 +1184,12 @@ mod tests {
             vec![
                 (
                     "entity-id",
-                    AstNode::Literal(Literal::String("entity-uuid-1".into())),
+                    AstNode::Literal(Literal::String("entity-uuid-1".into()), Span::default()),
                 ),
-                ("role", AstNode::Literal(Literal::String("Manager".into()))),
+                (
+                    "role",
+                    AstNode::Literal(Literal::String("Manager".into()), Span::default()),
+                ),
             ],
         );
         let child2 = make_verb_call(
@@ -1195,9 +1198,12 @@ mod tests {
             vec![
                 (
                     "entity-id",
-                    AstNode::Literal(Literal::String("entity-uuid-2".into())),
+                    AstNode::Literal(Literal::String("entity-uuid-2".into()), Span::default()),
                 ),
-                ("role", AstNode::Literal(Literal::String("Director".into()))),
+                (
+                    "role",
+                    AstNode::Literal(Literal::String("Director".into()), Span::default()),
+                ),
             ],
         );
 
@@ -1207,7 +1213,7 @@ mod tests {
             arguments: vec![
                 Argument {
                     key: "name".into(),
-                    value: AstNode::Literal(Literal::String("Test Fund".into())),
+                    value: AstNode::Literal(Literal::String("Test Fund".into()), Span::default()),
                     span: Span::default(),
                 },
                 Argument {
@@ -1278,9 +1284,10 @@ mod tests {
                 "read",
                 vec![(
                     "product-id",
-                    AstNode::Literal(Literal::String(
-                        "00000000-0000-0000-0000-000000000001".into(),
-                    )),
+                    AstNode::Literal(
+                        Literal::String("00000000-0000-0000-0000-000000000001".into()),
+                        Span::default(),
+                    ),
                 )],
             ))],
         };
@@ -1352,7 +1359,10 @@ mod tests {
                 Statement::VerbCall(make_verb_call_with_binding(
                     "cbu",
                     "create",
-                    vec![("name", AstNode::Literal(Literal::String("Test".into())))],
+                    vec![(
+                        "name",
+                        AstNode::Literal(Literal::String("Test".into()), Span::default()),
+                    )],
                     Some("fund"),
                 )),
                 Statement::VerbCall(make_verb_call(
@@ -1368,9 +1378,12 @@ mod tests {
                         ),
                         (
                             "entity-id",
-                            AstNode::Literal(Literal::String("some-uuid".into())),
+                            AstNode::Literal(Literal::String("some-uuid".into()), Span::default()),
                         ),
-                        ("role", AstNode::Literal(Literal::String("DIRECTOR".into()))),
+                        (
+                            "role",
+                            AstNode::Literal(Literal::String("DIRECTOR".into()), Span::default()),
+                        ),
                     ],
                 )),
             ],
@@ -1408,9 +1421,12 @@ mod tests {
                     ),
                     (
                         "entity-id",
-                        AstNode::Literal(Literal::String("some-uuid".into())),
+                        AstNode::Literal(Literal::String("some-uuid".into()), Span::default()),
                     ),
-                    ("role", AstNode::Literal(Literal::String("DIRECTOR".into()))),
+                    (
+                        "role",
+                        AstNode::Literal(Literal::String("DIRECTOR".into()), Span::default()),
+                    ),
                 ],
             ))],
         };
@@ -1450,7 +1466,10 @@ mod tests {
         let vc = make_verb_call(
             "cbu",
             "create",
-            vec![("name", AstNode::Literal(Literal::String("Test".into())))],
+            vec![(
+                "name",
+                AstNode::Literal(Literal::String("Test".into()), Span::default()),
+            )],
         );
         let produced = get_produced_type(&vc);
         assert_eq!(produced, "cbu");
@@ -1521,9 +1540,15 @@ mod tests {
                     ),
                     (
                         "entity-id",
-                        AstNode::Literal(Literal::String("some-entity-uuid".into())),
+                        AstNode::Literal(
+                            Literal::String("some-entity-uuid".into()),
+                            Span::default(),
+                        ),
                     ),
-                    ("role", AstNode::Literal(Literal::String("DIRECTOR".into()))),
+                    (
+                        "role",
+                        AstNode::Literal(Literal::String("DIRECTOR".into()), Span::default()),
+                    ),
                 ],
             ))],
         };
@@ -1565,7 +1590,7 @@ mod tests {
                     "create",
                     vec![(
                         "name",
-                        AstNode::Literal(Literal::String("Test Fund".into())),
+                        AstNode::Literal(Literal::String("Test Fund".into()), Span::default()),
                     )],
                     Some("fund"),
                 )),
@@ -1587,7 +1612,10 @@ mod tests {
                                 span: Span::default(),
                             },
                         ),
-                        ("role", AstNode::Literal(Literal::String("DIRECTOR".into()))),
+                        (
+                            "role",
+                            AstNode::Literal(Literal::String("DIRECTOR".into()), Span::default()),
+                        ),
                     ],
                 )),
             ],
@@ -1620,7 +1648,7 @@ mod tests {
                     "create",
                     vec![(
                         "name",
-                        AstNode::Literal(Literal::String("Test Fund".into())),
+                        AstNode::Literal(Literal::String("Test Fund".into()), Span::default()),
                     )],
                     Some("fund"),
                 )),
@@ -1630,11 +1658,11 @@ mod tests {
                     vec![
                         (
                             "first-name",
-                            AstNode::Literal(Literal::String("John".into())),
+                            AstNode::Literal(Literal::String("John".into()), Span::default()),
                         ),
                         (
                             "last-name",
-                            AstNode::Literal(Literal::String("Smith".into())),
+                            AstNode::Literal(Literal::String("Smith".into()), Span::default()),
                         ),
                     ],
                     Some("john"),
@@ -1657,7 +1685,10 @@ mod tests {
                                 span: Span::default(),
                             },
                         ),
-                        ("role", AstNode::Literal(Literal::String("DIRECTOR".into()))),
+                        (
+                            "role",
+                            AstNode::Literal(Literal::String("DIRECTOR".into()), Span::default()),
+                        ),
                     ],
                 )),
             ],
@@ -1701,9 +1732,15 @@ mod tests {
                     ),
                     (
                         "entity-id",
-                        AstNode::Literal(Literal::String("some-entity-uuid".into())),
+                        AstNode::Literal(
+                            Literal::String("some-entity-uuid".into()),
+                            Span::default(),
+                        ),
                     ),
-                    ("role", AstNode::Literal(Literal::String("DIRECTOR".into()))),
+                    (
+                        "role",
+                        AstNode::Literal(Literal::String("DIRECTOR".into()), Span::default()),
+                    ),
                 ],
             ))],
         };
@@ -1749,7 +1786,10 @@ mod tests {
                             span: Span::default(),
                         },
                     ),
-                    ("role", AstNode::Literal(Literal::String("DIRECTOR".into()))),
+                    (
+                        "role",
+                        AstNode::Literal(Literal::String("DIRECTOR".into()), Span::default()),
+                    ),
                 ],
             ))],
         };

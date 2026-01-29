@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-28
+> **Last reviewed:** 2026-01-29
 > **Crates:** 17 Rust crates (includes ob-poc-macros)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 56 schema migrations
@@ -26,6 +26,7 @@
 > **Verb Disambiguation UI (057):** ✅ Complete - Ambiguous verb selection with gold-standard learning signals
 > **Unified Architecture (058):** ✅ Complete - Operator vocabulary, macro lint, constraint cascade, DAG navigation, phonetic matching
 > **Playbook System (059):** ✅ Complete - YAML playbooks, marked-yaml source mapping, LSP validation, xtask CLI
+> **LSP Alignment (060):** ✅ Complete - UTF-16 encoding, multiline context, tree-sitter binding rule, rename handler
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

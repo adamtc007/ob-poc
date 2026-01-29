@@ -6,9 +6,8 @@ use crate::analysis::{detect_completion_context, CompletionContext, DocumentStat
 use crate::entity_client::EntityLookupClient;
 
 use ob_poc::dsl_v2::{
-    find_unified_verb, parse_program, registry, runtime_registry, suggestions::predict_next_steps,
-    BindingContext, BindingInfo,
-    macros::load_macro_registry,
+    find_unified_verb, macros::load_macro_registry, parse_program, registry, runtime_registry,
+    suggestions::predict_next_steps, BindingContext, BindingInfo,
 };
 
 /// Generate completions based on cursor position.
@@ -444,6 +443,9 @@ fn get_lookup_entity_type(verb_name: &str, keyword: &str) -> Option<String> {
 ///
 /// When verb_name and keyword are provided, symbols matching the expected type
 /// are ranked higher. For example, `:cbu-id @` will rank cbu-type symbols first.
+///
+/// Uses `get_lookup_entity_type()` for dynamic type inference from the verb registry,
+/// falling back to keyword pattern matching for backwards compatibility.
 fn complete_symbols(
     prefix: &str,
     symbols: &SymbolTable,
@@ -452,8 +454,15 @@ fn complete_symbols(
 ) -> Vec<CompletionItem> {
     let prefix_lower = prefix.to_lowercase();
 
-    // Determine expected type from keyword (if any)
-    let expected_type = keyword.and_then(infer_expected_type_from_keyword);
+    // Determine expected type from verb registry (preferred) or keyword patterns (fallback)
+    let expected_type = match (verb_name, keyword) {
+        (Some(v), Some(k)) => {
+            // Try dynamic lookup from verb registry first
+            get_lookup_entity_type(v, k).or_else(|| infer_type_from_keyword_pattern(k))
+        }
+        (_, Some(k)) => infer_type_from_keyword_pattern(k),
+        _ => None,
+    };
 
     let mut completions: Vec<_> = symbols
         .all()
@@ -506,9 +515,11 @@ fn complete_symbols(
     completions
 }
 
-/// Infer expected symbol type from keyword name.
-/// Maps common keyword patterns to their expected binding types.
-fn infer_expected_type_from_keyword(keyword: &str) -> Option<String> {
+/// Infer expected symbol type from keyword naming patterns.
+///
+/// This is a fallback for when the verb registry doesn't have lookup config.
+/// Kept for backwards compatibility but `get_lookup_entity_type()` is preferred.
+fn infer_type_from_keyword_pattern(keyword: &str) -> Option<String> {
     let kw_lower = keyword.to_lowercase();
 
     if kw_lower.contains("cbu") {
@@ -547,11 +558,10 @@ mod tests {
     // need the full config loaded.
 }
 
-
 /// Get verb completions for playbook files (macro verbs + primitive verbs)
 pub fn playbook_verb_completions() -> Vec<CompletionItem> {
     let mut items = Vec::new();
-    
+
     // First, add macro verbs (operator vocabulary)
     if let Ok(macro_reg) = load_macro_registry() {
         for (fqn, schema) in macro_reg.all() {
@@ -566,7 +576,7 @@ pub fn playbook_verb_completions() -> Vec<CompletionItem> {
             });
         }
     }
-    
+
     // Then add primitive verbs from the registry
     let reg = registry();
     for verb in reg.all_verbs() {
@@ -579,6 +589,6 @@ pub fn playbook_verb_completions() -> Vec<CompletionItem> {
             ..Default::default()
         });
     }
-    
+
     items
 }

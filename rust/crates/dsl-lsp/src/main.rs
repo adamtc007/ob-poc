@@ -12,6 +12,7 @@ use tower_lsp::{LspService, Server};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod analysis;
+mod encoding;
 mod entity_client;
 mod handlers;
 mod server;

@@ -7,6 +7,7 @@ description = "Core DSL parser, AST, and compiler for OB-POC - no database depen
 [dependencies]
 # Parsing
 nom = "7"
+nom_locate = "4"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

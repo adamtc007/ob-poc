@@ -1059,12 +1059,12 @@ fn create_load_call(verb: &str, file_path: &str, mode: &str) -> VerbCall {
         arguments: vec![
             Argument {
                 key: "file-path".to_string(),
-                value: AstNode::Literal(Literal::String(file_path.to_string())),
+                value: AstNode::Literal(Literal::String(file_path.to_string()), Span::synthetic()),
                 span: Span { start: 0, end: 0 },
             },
             Argument {
                 key: "mode".to_string(),
-                value: AstNode::Literal(Literal::String(mode.to_string())),
+                value: AstNode::Literal(Literal::String(mode.to_string()), Span::synthetic()),
                 span: Span { start: 0, end: 0 },
             },
         ],

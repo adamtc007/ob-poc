@@ -538,7 +538,7 @@ impl SemanticValidator {
             // Capture values for fuzzy checking (from YAML fuzzy_check config)
             for check in &fuzzy_checks {
                 if key == check.arg_name {
-                    if let AstNode::Literal(Literal::String(s)) = &arg.value {
+                    if let AstNode::Literal(Literal::String(s), _) = &arg.value {
                         fuzzy_values.push((
                             FuzzyCheckInfo {
                                 arg_name: check.arg_name.clone(),
@@ -774,7 +774,7 @@ impl SemanticValidator {
 
         match node {
             // Literal values
-            AstNode::Literal(lit) => match lit {
+            AstNode::Literal(lit, _) => match lit {
                 Literal::String(s) => {
                     // Check if this arg needs DB validation
                     let key_with_colon = format!(":{}", key);
@@ -1212,7 +1212,7 @@ pub fn entity_type_to_ref_type(entity_type: &str) -> RefType {
 /// Extract string value from AstNode for batch collection
 fn extract_string_value(node: &AstNode) -> Option<String> {
     match node {
-        AstNode::Literal(Literal::String(s)) => Some(s.clone()),
+        AstNode::Literal(Literal::String(s), _) => Some(s.clone()),
         AstNode::EntityRef { value, .. } => Some(value.clone()),
         _ => None,
     }

@@ -10,6 +10,7 @@
 
 use ob_poc::dsl_v2::ast::{AstNode, Literal, Statement};
 use ob_poc::dsl_v2::parse_program;
+use rust_decimal::Decimal;
 
 const VALID_INPUTS: &[&str] = &[
     // Basic verb calls
@@ -210,7 +211,7 @@ fn v2_parser_handles_literals() {
 
         // Null
         let null_arg = vc.arguments.iter().find(|a| a.key == "null").unwrap();
-        assert!(matches!(null_arg.value, AstNode::Literal(Literal::Null)));
+        assert!(matches!(null_arg.value, AstNode::Literal(Literal::Null, _)));
     } else {
         panic!("Expected VerbCall");
     }
@@ -224,7 +225,7 @@ fn v2_parser_handles_uuid_strings() {
     if let Statement::VerbCall(vc) = &program.statements[0] {
         let id_arg = vc.arguments.iter().find(|a| a.key == "id").unwrap();
         // UUID strings should be parsed as Literal::Uuid
-        if let AstNode::Literal(Literal::Uuid(uuid)) = &id_arg.value {
+        if let AstNode::Literal(Literal::Uuid(uuid), _) = &id_arg.value {
             assert_eq!(uuid.to_string(), "550e8400-e29b-41d4-a716-446655440000");
         } else {
             panic!("Expected Uuid literal, got {:?}", id_arg.value);
@@ -322,6 +323,238 @@ fn v2_parser_preserves_string_content() {
         let text = text_arg.value.as_string().unwrap();
         assert!(text.contains("World"));
         assert!(text.contains('\n'));
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+// =============================================================================
+// EBNF / NOM / LSP ALIGNMENT TESTS
+// These tests verify alignment between the EBNF grammar, NOM parser, and LSP
+// =============================================================================
+
+#[test]
+fn v2_parser_requires_double_semicolon_comments() {
+    // EBNF: comment = ";;" , { character - newline } , [ newline ] ;
+    // The parser requires ;; (double semicolon), NOT single ;
+
+    // Double semicolon should work
+    let input = r#"
+;; This is a valid comment
+(cbu.create :name "Fund")
+"#;
+    let program = parse_program(input).unwrap();
+    let has_comment = program
+        .statements
+        .iter()
+        .any(|s| matches!(s, Statement::Comment(c) if c.contains("valid comment")));
+    assert!(has_comment, "Parser should accept ;; comments");
+
+    // The parser treats everything after ;; as comment text
+    let input2 = r#";;Comment without space
+(cbu.create :name "Fund")"#;
+    let program2 = parse_program(input2).unwrap();
+    assert!(
+        program2.statements.len() >= 2,
+        "Should have comment and verb call"
+    );
+}
+
+#[test]
+fn v2_parser_handles_all_boolean_literals() {
+    // EBNF: boolean-literal = "true" | "false" ;
+    let input = r#"(test.verb :a true :b false)"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let a_arg = vc.arguments.iter().find(|a| a.key == "a").unwrap();
+        assert!(
+            matches!(a_arg.value, AstNode::Literal(Literal::Boolean(true), _)),
+            "Expected true literal"
+        );
+
+        let b_arg = vc.arguments.iter().find(|a| a.key == "b").unwrap();
+        assert!(
+            matches!(b_arg.value, AstNode::Literal(Literal::Boolean(false), _)),
+            "Expected false literal"
+        );
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_nil_literal() {
+    // EBNF: null-literal = "nil" ;
+    let input = r#"(test.verb :value nil)"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let value_arg = vc.arguments.iter().find(|a| a.key == "value").unwrap();
+        assert!(
+            matches!(value_arg.value, AstNode::Literal(Literal::Null, _)),
+            "Expected nil literal"
+        );
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_list_with_optional_commas() {
+    // EBNF: list-literal = "[" , [ value , { [ "," ] , value } ] , "]" ;
+    // Both space-separated and comma-separated should work
+
+    // Space-separated
+    let input1 = r#"(test.verb :items ["a" "b" "c"])"#;
+    let program1 = parse_program(input1).unwrap();
+    if let Statement::VerbCall(vc) = &program1.statements[0] {
+        let items = vc.arguments[0].value.as_list().unwrap();
+        assert_eq!(items.len(), 3);
+    }
+
+    // Comma-separated
+    let input2 = r#"(test.verb :items ["a", "b", "c"])"#;
+    let program2 = parse_program(input2).unwrap();
+    if let Statement::VerbCall(vc) = &program2.statements[0] {
+        let items = vc.arguments[0].value.as_list().unwrap();
+        assert_eq!(items.len(), 3);
+    }
+
+    // Mixed (some commas, some spaces)
+    let input3 = r#"(test.verb :items ["a" "b", "c"])"#;
+    let program3 = parse_program(input3).unwrap();
+    if let Statement::VerbCall(vc) = &program3.statements[0] {
+        let items = vc.arguments[0].value.as_list().unwrap();
+        assert_eq!(items.len(), 3);
+    }
+}
+
+#[test]
+fn v2_parser_handles_map_literal() {
+    // EBNF: map-literal = "{" , { keyword , whitespace+ , value } , "}" ;
+    let input = r#"(test.verb :config {:name "Test" :count 42 :active true})"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let config_arg = vc.arguments.iter().find(|a| a.key == "config").unwrap();
+        if let AstNode::Map { entries, .. } = &config_arg.value {
+            assert_eq!(entries.len(), 3, "Map should have 3 entries");
+
+            // Check each entry
+            assert!(entries.iter().any(|(k, _)| k == "name"));
+            assert!(entries.iter().any(|(k, _)| k == "count"));
+            assert!(entries.iter().any(|(k, _)| k == "active"));
+        } else {
+            panic!("Expected Map for :config");
+        }
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_nested_map_in_list() {
+    // Complex nesting: list containing maps
+    let input = r#"(test.verb :data [{:x 1} {:y 2}])"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let data_arg = vc.arguments.iter().find(|a| a.key == "data").unwrap();
+        if let AstNode::List { items, .. } = &data_arg.value {
+            assert_eq!(items.len(), 2, "List should have 2 maps");
+            assert!(matches!(items[0], AstNode::Map { .. }));
+            assert!(matches!(items[1], AstNode::Map { .. }));
+        } else {
+            panic!("Expected List for :data");
+        }
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_empty_map() {
+    // Empty map literal
+    let input = r#"(test.verb :config {})"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let config_arg = vc.arguments.iter().find(|a| a.key == "config").unwrap();
+        if let AstNode::Map { entries, .. } = &config_arg.value {
+            assert!(entries.is_empty(), "Map should be empty");
+        } else {
+            panic!("Expected Map for :config");
+        }
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_kebab_case_identifiers() {
+    // EBNF: kebab-identifier = ( letter | "_" ) , { letter | digit | "_" | "-" } ;
+    // Verbs, keywords, and symbols should all support kebab-case
+
+    let input = r#"(my-domain.my-verb :some-keyword "value" :as @my-symbol)"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        assert_eq!(vc.domain, "my-domain");
+        assert_eq!(vc.verb, "my-verb");
+        assert_eq!(vc.arguments[0].key, "some-keyword");
+        assert_eq!(vc.binding, Some("my-symbol".to_string()));
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_symbol_ref_with_hyphens() {
+    // Symbol references should support hyphens
+    let input = r#"(test.verb :ref @my-complex-symbol-name)"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let ref_arg = vc.arguments.iter().find(|a| a.key == "ref").unwrap();
+        assert!(ref_arg.value.is_symbol_ref());
+        assert_eq!(ref_arg.value.as_symbol(), Some("my-complex-symbol-name"));
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_negative_numbers() {
+    // EBNF: number-literal = [ "-" ] , digit+ , [ "." , digit+ ] ;
+    let input = r#"(test.verb :int -42 :dec -3.14)"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let int_arg = vc.arguments.iter().find(|a| a.key == "int").unwrap();
+        assert_eq!(int_arg.value.as_integer(), Some(-42));
+
+        let dec_arg = vc.arguments.iter().find(|a| a.key == "dec").unwrap();
+        let dec = dec_arg.value.as_decimal().unwrap();
+        assert!(dec < Decimal::ZERO, "Decimal should be negative");
+    } else {
+        panic!("Expected VerbCall");
+    }
+}
+
+#[test]
+fn v2_parser_handles_escape_sequences() {
+    // EBNF: escape-sequence = "\" , ( "n" | "r" | "t" | "\" | '"' ) ;
+    let input = r#"(test.verb :text "line1\nline2\ttab\\backslash\"quote")"#;
+    let program = parse_program(input).unwrap();
+
+    if let Statement::VerbCall(vc) = &program.statements[0] {
+        let text_arg = vc.arguments.iter().find(|a| a.key == "text").unwrap();
+        let text = text_arg.value.as_string().unwrap();
+        assert!(text.contains('\n'), "Should have newline");
+        assert!(text.contains('\t'), "Should have tab");
+        assert!(text.contains('\\'), "Should have backslash");
+        assert!(text.contains('"'), "Should have quote");
     } else {
         panic!("Expected VerbCall");
     }

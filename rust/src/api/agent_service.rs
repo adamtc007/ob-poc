@@ -1277,7 +1277,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 }
             }
             // Literals and SymbolRefs don't need resolution
-            AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+            AstNode::Literal(_, _) | AstNode::SymbolRef { .. } => {}
         }
     }
 
@@ -1311,7 +1311,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     Self::collect_unresolved(&arg.value, unresolved);
                 }
             }
-            AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+            AstNode::Literal(_, _) | AstNode::SymbolRef { .. } => {}
         }
     }
 

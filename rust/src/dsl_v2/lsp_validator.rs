@@ -306,7 +306,7 @@ impl LspValidator {
 
         match value {
             // Literal values
-            AstNode::Literal(lit) => match lit {
+            AstNode::Literal(lit, _) => match lit {
                 Literal::String(s) => {
                     let key_with_colon = format!(":{}", key);
                     if let Some(ref_type) = arg_to_ref_type(verb, &key_with_colon) {

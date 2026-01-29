@@ -41,10 +41,10 @@ use crate::mcp::macro_integration::{
     intent_args_to_macro_args, is_macro, try_expand_macro, MacroAttemptResult,
 };
 use crate::mcp::scope_resolution::{ScopeContext, ScopeResolutionOutcome, ScopeResolver};
-use crate::session::unified::UnifiedSession;
 use crate::mcp::verb_search::{
     check_ambiguity, HybridVerbSearcher, VerbSearchOutcome, VerbSearchResult,
 };
+use crate::session::unified::UnifiedSession;
 
 #[cfg(feature = "database")]
 use sqlx::PgPool;
@@ -644,30 +644,32 @@ impl IntentPipeline {
         // Step 3b: Check if this is a macro verb and expand it
         if is_macro(&top_verb) {
             tracing::info!(verb = top_verb, "Detected macro verb, attempting expansion");
-            
+
             // Convert intent args to macro args (HashMap<String, String>)
             let macro_args = intent_args_to_macro_args(&intent);
-            
+
             // We need a session for macro expansion
             if let Some(session_lock) = &self.session {
-                let session = session_lock.read().map_err(|e| anyhow!("Session lock poisoned: {}", e))?;
-                
+                let session = session_lock
+                    .read()
+                    .map_err(|e| anyhow!("Session lock poisoned: {}", e))?;
+
                 match try_expand_macro(&top_verb, &macro_args, &session) {
                     MacroAttemptResult::Expanded(expansion) => {
                         // Join expanded statements into single DSL block
                         let expanded_dsl = expansion.statements.join("\n");
-                        
+
                         tracing::info!(
                             macro_verb = top_verb,
                             expanded_count = expansion.statements.len(),
                             unlocks = ?expansion.unlocks,
                             "Macro expanded successfully"
                         );
-                        
+
                         // Validate the expanded DSL
                         let (valid, validation_error) = self.validate_dsl(&expanded_dsl);
                         let dsl_hash = Some(compute_dsl_hash(&expanded_dsl));
-                        
+
                         return Ok(PipelineResult {
                             intent,
                             verb_candidates: candidates,
@@ -711,7 +713,10 @@ impl IntentPipeline {
                     }
                     MacroAttemptResult::NotAMacro => {
                         // Should not happen since we checked is_macro, but handle gracefully
-                        tracing::warn!(verb = top_verb, "is_macro returned true but try_expand_macro returned NotAMacro");
+                        tracing::warn!(
+                            verb = top_verb,
+                            "is_macro returned true but try_expand_macro returned NotAMacro"
+                        );
                     }
                 }
             } else {
@@ -1405,7 +1410,10 @@ mod tests {
                 arguments: vec![
                     Argument {
                         key: "cbu-id".to_string(),
-                        value: AstNode::Literal(Literal::String("test-cbu-uuid".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("test-cbu-uuid".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::new(10, 30),
                     },
                     // entity-id as a list - each will become EntityRef after enrichment
@@ -1413,9 +1421,18 @@ mod tests {
                         key: "entity-id".to_string(),
                         value: AstNode::List {
                             items: vec![
-                                AstNode::Literal(Literal::String("Allianz".to_string())),
-                                AstNode::Literal(Literal::String("BlackRock".to_string())),
-                                AstNode::Literal(Literal::String("Vanguard".to_string())),
+                                AstNode::Literal(
+                                    Literal::String("Allianz".to_string()),
+                                    Span::default(),
+                                ),
+                                AstNode::Literal(
+                                    Literal::String("BlackRock".to_string()),
+                                    Span::default(),
+                                ),
+                                AstNode::Literal(
+                                    Literal::String("Vanguard".to_string()),
+                                    Span::default(),
+                                ),
                             ],
                             span: Span::new(40, 80),
                         },
@@ -1423,7 +1440,10 @@ mod tests {
                     },
                     Argument {
                         key: "role".to_string(),
-                        value: AstNode::Literal(Literal::String("DIRECTOR".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("DIRECTOR".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::new(90, 110),
                     },
                 ],
@@ -1523,7 +1543,10 @@ mod tests {
                 arguments: vec![
                     Argument {
                         key: "cbu-id".to_string(),
-                        value: AstNode::Literal(Literal::String("test-cbu".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("test-cbu".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::new(10, 30),
                     },
                     // entity-id as a list - each becomes EntityRef after enrichment
@@ -1531,9 +1554,18 @@ mod tests {
                         key: "entity-id".to_string(),
                         value: AstNode::List {
                             items: vec![
-                                AstNode::Literal(Literal::String("Allianz".to_string())),
-                                AstNode::Literal(Literal::String("BlackRock".to_string())),
-                                AstNode::Literal(Literal::String("Vanguard".to_string())),
+                                AstNode::Literal(
+                                    Literal::String("Allianz".to_string()),
+                                    Span::default(),
+                                ),
+                                AstNode::Literal(
+                                    Literal::String("BlackRock".to_string()),
+                                    Span::default(),
+                                ),
+                                AstNode::Literal(
+                                    Literal::String("Vanguard".to_string()),
+                                    Span::default(),
+                                ),
                             ],
                             span: Span::new(40, 80),
                         },
@@ -1541,7 +1573,10 @@ mod tests {
                     },
                     Argument {
                         key: "role".to_string(),
-                        value: AstNode::Literal(Literal::String("DIRECTOR".to_string())),
+                        value: AstNode::Literal(
+                            Literal::String("DIRECTOR".to_string()),
+                            Span::default(),
+                        ),
                         span: Span::new(90, 110),
                     },
                 ],

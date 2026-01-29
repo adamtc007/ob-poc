@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "description": "Tree-sitter grammar for Onboarding DSL",
   "main": "bindings/node",
-  "keywords": ["parser", "tree-sitter", "dsl", "lisp"],
+  "keywords": [
+    "parser",
+    "tree-sitter",
+    "dsl",
+    "lisp"
+  ],
   "author": "OB-POC Team",
   "license": "MIT",
   "dependencies": {
@@ -20,7 +25,11 @@
     {
       "scope": "source.dsl",
       "injection-regex": "dsl",
-      "file-types": ["dsl", "obl", "onboard"],
+      "file-types": [
+        "dsl",
+        "obl",
+        "onboard"
+      ],
       "highlights": "queries/highlights.scm"
     }
   ]

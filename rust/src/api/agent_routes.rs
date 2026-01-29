@@ -209,7 +209,7 @@ fn to_api_ast_statement(stmt: &dsl_core::Statement) -> AstStatement {
 /// Convert internal dsl_core::AstNode to API AstValue
 fn to_api_ast_value(node: &dsl_core::AstNode) -> AstValue {
     match node {
-        dsl_core::AstNode::Literal(lit) => match lit {
+        dsl_core::AstNode::Literal(lit, _) => match lit {
             dsl_core::ast::Literal::String(s) => AstValue::String { value: s.clone() },
             dsl_core::ast::Literal::Integer(n) => AstValue::Number { value: *n as f64 },
             dsl_core::ast::Literal::Decimal(d) => {
@@ -3035,6 +3035,7 @@ async fn execute_session_dsl(
                                     .and_then(|arg| {
                                         if let crate::dsl_v2::ast::AstNode::Literal(
                                             crate::dsl_v2::ast::Literal::String(s),
+                                            _,
                                         ) = &arg.value
                                         {
                                             Some(s.clone())
@@ -3148,6 +3149,7 @@ async fn execute_session_dsl(
                                 .and_then(|arg| {
                                     if let crate::dsl_v2::ast::AstNode::Literal(
                                         crate::dsl_v2::ast::Literal::String(s),
+                                        _,
                                     ) = &arg.value
                                     {
                                         Some(s.clone())

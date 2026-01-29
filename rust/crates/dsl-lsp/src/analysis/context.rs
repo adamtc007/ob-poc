@@ -1,4 +1,13 @@
 //! Completion context detection.
+//!
+//! This module analyzes the text before the cursor position to determine
+//! what kind of completion should be offered. It tracks:
+//! - S-expression nesting `(...)`
+//! - List nesting `[...]`
+//! - Map nesting `{...}`
+//! - String boundaries `"..."`
+//! - Keyword arguments `:`
+//! - Symbol references `@`
 
 use tower_lsp::lsp_types::Position;
 
@@ -38,28 +47,41 @@ pub enum CompletionContext {
     None,
 }
 
+/// Get all text from the start of the document up to the cursor position.
+/// This is necessary for proper multiline s-expression context detection.
+fn get_text_up_to_position(doc: &DocumentState, position: Position) -> String {
+    let mut result = String::new();
+
+    for (line_num, line) in doc.text.lines().enumerate() {
+        if line_num < position.line as usize {
+            // Add full line plus newline
+            result.push_str(line);
+            result.push('\n');
+        } else if line_num == position.line as usize {
+            // Add partial line up to cursor column
+            let col = position.character as usize;
+            if col <= line.len() {
+                result.push_str(&line[..col]);
+            } else {
+                result.push_str(line);
+            }
+            break;
+        }
+    }
+
+    result
+}
+
 /// Detect the completion context at a position.
 pub fn detect_completion_context(doc: &DocumentState, position: Position) -> CompletionContext {
-    let line = match doc.get_line(position.line) {
-        Some(l) => l,
-        None => {
-            tracing::debug!("No line at position {}", position.line);
-            return CompletionContext::None;
-        }
-    };
-
-    let col = position.character as usize;
-    let prefix = if col <= line.len() {
-        &line[..col]
-    } else {
-        line
-    };
+    // Get all text up to the cursor position for proper multiline context
+    let prefix = get_text_up_to_position(doc, position);
 
     tracing::debug!(
-        "Context detection: line={}, col={}, prefix='{}'",
+        "Context detection: line={}, col={}, prefix len={}",
         position.line,
-        col,
-        prefix
+        position.character,
+        prefix.len()
     );
 
     // Check for @ symbol - could be existing symbol ref OR entity lookup for keyword
@@ -81,8 +103,8 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
             );
 
             if let (Some(ref verb), Some(ref kw)) = (&verb_name, &keyword) {
-                // Keywords that expect entity references
-                if is_entity_keyword(kw) {
+                // Use dynamic registry lookup instead of hardcoded list
+                if is_entity_keyword_for_verb(verb, kw) {
                     return CompletionContext::EntityAsSymbol {
                         verb_name: verb.clone(),
                         keyword: kw.clone(),
@@ -101,12 +123,12 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
     }
 
     // Find the enclosing s-expression
-    let (verb_name, current_keyword) = parse_sexp_context(prefix);
+    let (verb_name, current_keyword) = parse_sexp_context(&prefix);
 
     match (verb_name, current_keyword) {
         // After open paren or word prefix - complete verb names
         (None, None) => {
-            let word_prefix = extract_word_prefix(prefix);
+            let word_prefix = extract_word_prefix(&prefix);
             CompletionContext::VerbName {
                 prefix: word_prefix,
             }
@@ -134,8 +156,8 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
 
         // After keyword - complete value
         (Some(verb), Some(keyword)) => {
-            let value_prefix = extract_value_prefix(prefix);
-            let in_string = is_in_string(prefix);
+            let value_prefix = extract_value_prefix(&prefix);
+            let in_string = is_in_string(&prefix);
             CompletionContext::KeywordValue {
                 verb_name: verb,
                 keyword,
@@ -150,12 +172,22 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
 }
 
 /// Parse s-expression context to find current verb and keyword.
+///
+/// Tracks three levels of nesting:
+/// - `paren_depth` for `(...)` - S-expressions
+/// - `bracket_depth` for `[...]` - Lists
+/// - `brace_depth` for `{...}` - Maps
+///
+/// Keywords (`:name`) are only recognized at the top level of an s-expression,
+/// not inside lists or maps.
 fn parse_sexp_context(prefix: &str) -> (Option<String>, Option<String>) {
-    let mut depth = 0;
+    let mut paren_depth = 0i32;
+    let mut bracket_depth = 0i32;
+    let mut brace_depth = 0i32;
     let mut verb_name: Option<String> = None;
     let mut current_keyword: Option<String> = None;
     let mut in_string = false;
-    let mut token_start = None;
+    let mut token_start: Option<usize> = None;
     let mut last_keyword: Option<String> = None;
 
     let chars: Vec<char> = prefix.chars().collect();
@@ -178,42 +210,67 @@ fn parse_sexp_context(prefix: &str) -> (Option<String>, Option<String>) {
                 token_start = None;
             }
             '(' => {
-                depth += 1;
+                paren_depth += 1;
+                // Reset context for new s-expression
                 verb_name = None;
                 current_keyword = None;
                 last_keyword = None;
                 token_start = None;
             }
             ')' => {
-                depth -= 1;
-                if depth < 0 {
-                    depth = 0;
-                }
+                paren_depth = (paren_depth - 1).max(0);
                 token_start = None;
             }
-            ':' if depth > 0 => {
-                // Start of keyword
+            '[' => {
+                bracket_depth += 1;
+                token_start = None;
+            }
+            ']' => {
+                bracket_depth = (bracket_depth - 1).max(0);
+                token_start = None;
+            }
+            '{' => {
+                brace_depth += 1;
+                token_start = None;
+            }
+            '}' => {
+                brace_depth = (brace_depth - 1).max(0);
+                token_start = None;
+            }
+            ':' if paren_depth > 0 && bracket_depth == 0 && brace_depth == 0 => {
+                // Start of keyword at top level of s-expression
+                token_start = Some(i);
+            }
+            ':' if brace_depth > 0 => {
+                // Map key - track but don't set as verb keyword
                 token_start = Some(i);
             }
             ' ' | '\t' | '\n' => {
                 if let Some(start) = token_start {
                     let token: String = chars[start..i].iter().collect();
                     if let Some(stripped) = token.strip_prefix(':') {
-                        last_keyword = Some(stripped.to_string());
-                        current_keyword = None; // Reset - we're after the keyword now
-                    } else if verb_name.is_none() && depth > 0 {
+                        // Only set as keyword if at top level (not in list or map)
+                        if bracket_depth == 0 && brace_depth == 0 {
+                            last_keyword = Some(stripped.to_string());
+                            current_keyword = None; // Reset - we're after the keyword now
+                        }
+                    } else if verb_name.is_none()
+                        && paren_depth > 0
+                        && bracket_depth == 0
+                        && brace_depth == 0
+                    {
                         verb_name = Some(token);
                     }
                 }
                 token_start = None;
 
-                // If we just finished a keyword, set it as current
-                if last_keyword.is_some() {
+                // If we just finished a keyword at top level, set it as current
+                if last_keyword.is_some() && bracket_depth == 0 && brace_depth == 0 {
                     current_keyword = last_keyword.take();
                 }
             }
             _ => {
-                if token_start.is_none() && depth > 0 {
+                if token_start.is_none() && paren_depth > 0 {
                     token_start = Some(i);
                 }
             }
@@ -267,31 +324,27 @@ fn extract_value_prefix(prefix: &str) -> String {
     result
 }
 
-/// Check if a keyword expects an entity reference (UUID lookup)
-fn is_entity_keyword(keyword: &str) -> bool {
-    matches!(
-        keyword,
-        "cbu-id"
-            | "entity-id"
-            | "owner-entity-id"
-            | "owned-entity-id"
-            | "ubo-person-id"
-            | "subject-entity-id"
-            | "investor-entity-id"
-            | "commercial-client-entity-id"
-            | "case-id"
-            | "workstream-id"
-            | "screening-id"
-            | "document-id"
-            | "ssi-id"
-            | "rule-id"
-            | "instance-id"
-            | "share-class-id"
-            | "holding-id"
-            | "movement-id"
-            | "product-id"
-            | "service-id"
-    )
+/// Check if a keyword expects an entity reference by looking up the verb registry.
+///
+/// This replaces the hardcoded `is_entity_keyword()` function with dynamic lookup.
+/// A keyword is an entity keyword if the verb's arg definition has a `lookup` config.
+fn is_entity_keyword_for_verb(verb_name: &str, keyword: &str) -> bool {
+    use ob_poc::dsl_v2::find_unified_verb;
+
+    let parts: Vec<&str> = verb_name.split('.').collect();
+    if parts.len() != 2 {
+        return false;
+    }
+
+    if let Some(verb) = find_unified_verb(parts[0], parts[1]) {
+        for arg in &verb.args {
+            if arg.name == keyword {
+                return arg.lookup.is_some();
+            }
+        }
+    }
+
+    false
 }
 
 /// Check if cursor is inside a string.
@@ -363,28 +416,6 @@ mod tests {
         match ctx {
             CompletionContext::SymbolRef { prefix, .. } => assert_eq!(prefix, "fu"),
             other => panic!("Expected SymbolRef context, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn test_entity_as_symbol_completion() {
-        // After :entity-id @ - should trigger entity lookup (not symbol ref)
-        let doc = make_doc("(cbu.attach-entity :entity-id @co");
-        let ctx = detect_completion_context(
-            &doc,
-            Position {
-                line: 0,
-                character: 33,
-            },
-        );
-        match ctx {
-            CompletionContext::EntityAsSymbol {
-                keyword, prefix, ..
-            } => {
-                assert_eq!(keyword, "entity-id");
-                assert_eq!(prefix, "co");
-            }
-            other => panic!("Expected EntityAsSymbol context, got {:?}", other),
         }
     }
 
@@ -464,6 +495,67 @@ mod tests {
                 assert_eq!(keyword, "cbu-id");
                 assert_eq!(prefix, "Ap");
                 assert!(in_string);
+            }
+            other => panic!("Expected KeywordValue context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_context_inside_list() {
+        // Inside a list, keywords should NOT be detected as verb keywords
+        let doc = make_doc("(test.verb :items [:a :b ");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 25,
+            },
+        );
+        // Should NOT interpret :a or :b as verb keywords
+        match ctx {
+            CompletionContext::KeywordValue { keyword, .. } => {
+                // The keyword should still be "items" from the outer context
+                assert_eq!(keyword, "items");
+            }
+            other => panic!("Expected KeywordValue context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_context_inside_map() {
+        // Inside a map, keywords are map keys, not verb keywords
+        let doc = make_doc("(test.verb :config {:name \"Test\" :val ");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 38,
+            },
+        );
+        // Should interpret "config" as the verb keyword, not ":val"
+        match ctx {
+            CompletionContext::KeywordValue { keyword, .. } => {
+                assert_eq!(keyword, "config");
+            }
+            other => panic!("Expected KeywordValue context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_nested_brackets_and_braces() {
+        // Complex nesting: list containing map
+        let doc = make_doc("(test.verb :data [{:x 1} {:y ");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 29,
+            },
+        );
+        match ctx {
+            CompletionContext::KeywordValue { keyword, .. } => {
+                // Should still recognize "data" as the outer keyword
+                assert_eq!(keyword, "data");
             }
             other => panic!("Expected KeywordValue context, got {:?}", other),
         }

@@ -160,7 +160,7 @@ fn collect_unresolved_from_node(node: &AstNode, unresolved: &mut Vec<UnresolvedR
             collect_unresolved_from_verb_call(vc, unresolved);
         }
         // Literals and SymbolRefs don't contain EntityRefs
-        AstNode::Literal(_) | AstNode::SymbolRef { .. } => {}
+        AstNode::Literal(_, _) | AstNode::SymbolRef { .. } => {}
     }
 }
 
@@ -1238,7 +1238,7 @@ impl DslExecutor {
     #[cfg(feature = "database")]
     fn node_to_json(node: &AstNode, ctx: &ExecutionContext) -> Result<JsonValue> {
         match node {
-            AstNode::Literal(lit) => Self::literal_to_json(lit),
+            AstNode::Literal(lit, _) => Self::literal_to_json(lit),
             AstNode::SymbolRef { name, .. } => {
                 let uuid = ctx
                     .resolve(name)
@@ -1554,7 +1554,7 @@ impl DslExecutor {
                     // Add the injected argument
                     vc.arguments.push(super::ast::Argument {
                         key: inj.into_arg.clone(),
-                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        value: AstNode::string(id.to_string()),
                         span: super::ast::Span::default(),
                     });
                 }
@@ -1713,7 +1713,7 @@ impl DslExecutor {
                 if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
                     vc.arguments.push(super::ast::Argument {
                         key: inj.into_arg.clone(),
-                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        value: AstNode::string(id.to_string()),
                         span: super::ast::Span::default(),
                     });
                 }
@@ -1894,7 +1894,7 @@ impl DslExecutor {
                 if let Some(ExecutionResult::Uuid(id)) = results.get(inj.from_step) {
                     vc.arguments.push(super::ast::Argument {
                         key: inj.into_arg.clone(),
-                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        value: AstNode::string(id.to_string()),
                         span: super::ast::Span::default(),
                     });
                 }
@@ -2025,7 +2025,7 @@ impl DslExecutor {
                 if let Some(Some(ExecutionResult::Uuid(id))) = verb_results.get(inj.from_step) {
                     vc.arguments.push(super::ast::Argument {
                         key: inj.into_arg.clone(),
-                        value: AstNode::Literal(Literal::String(id.to_string())),
+                        value: AstNode::string(id.to_string()),
                         span: super::ast::Span::default(),
                     });
                 } else if verb_results.get(inj.from_step).is_some_and(|r| r.is_none()) {
@@ -2089,8 +2089,8 @@ impl DslExecutor {
                     let target = vc.arguments.iter().find_map(|arg| {
                         if arg.key.ends_with("-id") || arg.key.ends_with("_id") {
                             match &arg.value {
-                                AstNode::Literal(Literal::String(s)) => Some(s.clone()),
-                                AstNode::Literal(Literal::Uuid(u)) => Some(u.to_string()),
+                                AstNode::Literal(Literal::String(s), _) => Some(s.clone()),
+                                AstNode::Literal(Literal::Uuid(u), _) => Some(u.to_string()),
                                 _ => None,
                             }
                         } else {
@@ -2649,22 +2649,29 @@ impl DslExecutor {
     /// Convert JSON value to AST node
     #[allow(clippy::only_used_in_recursion)]
     fn json_to_ast(&self, value: &JsonValue) -> Result<AstNode> {
+        use super::ast::Span;
         match value {
-            JsonValue::String(s) => Ok(AstNode::Literal(Literal::String(s.clone()))),
+            JsonValue::String(s) => Ok(AstNode::Literal(
+                Literal::String(s.clone()),
+                Span::synthetic(),
+            )),
             JsonValue::Number(n) => {
                 if let Some(i) = n.as_i64() {
-                    Ok(AstNode::Literal(Literal::Integer(i)))
+                    Ok(AstNode::Literal(Literal::Integer(i), Span::synthetic()))
                 } else if let Some(f) = n.as_f64() {
-                    Ok(AstNode::Literal(Literal::Decimal(
-                        rust_decimal::Decimal::from_f64_retain(f)
-                            .ok_or_else(|| anyhow!("Invalid decimal: {}", f))?,
-                    )))
+                    Ok(AstNode::Literal(
+                        Literal::Decimal(
+                            rust_decimal::Decimal::from_f64_retain(f)
+                                .ok_or_else(|| anyhow!("Invalid decimal: {}", f))?,
+                        ),
+                        Span::synthetic(),
+                    ))
                 } else {
                     bail!("Invalid number: {}", n)
                 }
             }
-            JsonValue::Bool(b) => Ok(AstNode::Literal(Literal::Boolean(*b))),
-            JsonValue::Null => Ok(AstNode::Literal(Literal::Null)),
+            JsonValue::Bool(b) => Ok(AstNode::Literal(Literal::Boolean(*b), Span::synthetic())),
+            JsonValue::Null => Ok(AstNode::Literal(Literal::Null, Span::synthetic())),
             JsonValue::Array(arr) => {
                 let items: Result<Vec<AstNode>> = arr.iter().map(|v| self.json_to_ast(v)).collect();
                 Ok(AstNode::List {

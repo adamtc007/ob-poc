@@ -461,7 +461,7 @@ impl<'a> RunbookService<'a> {
     /// Convert AST node to string for resolution
     fn ast_node_to_string(node: &AstNode) -> String {
         match node {
-            AstNode::Literal(lit) => Self::literal_to_string(lit),
+            AstNode::Literal(lit, _) => Self::literal_to_string(lit),
             AstNode::SymbolRef { name, .. } => format!("@{}", name),
             AstNode::EntityRef { value, .. } => value.clone(),
             AstNode::List { items, .. } => items

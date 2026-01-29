@@ -11,14 +11,31 @@
 //! 3. `LspValidator` - EntityGateway resolution → Resolved AST
 //!
 //! This adapter converts the raw AST to LSP's DocumentState for editor features.
+//!
+//! ## Type Mapping
+//!
+//! | AST Type | LSP ExprKind |
+//! |----------|--------------|
+//! | `Literal::String` | `String` |
+//! | `Literal::Integer` | `Number` |
+//! | `Literal::Decimal` | `Number` |
+//! | `Literal::Boolean` | `Boolean` |
+//! | `Literal::Null` | `Null` |
+//! | `Literal::Uuid` | `String` |
+//! | `SymbolRef` | `SymbolRef` |
+//! | `EntityRef` | `EntityRef` |
+//! | `List` | `List` |
+//! | `Map` | `Map` |
+//! | `Nested` | `Call` |
 
 use ob_poc::dsl_v2::{
     ast::{Argument, AstNode, Literal, Program, Span as V2Span, Statement, VerbCall},
     parse_program,
 };
-use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range};
+use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, NumberOrString, Range};
 
 use super::document::{DocumentState, ExprKind, ParsedArg, ParsedExpr, SymbolDef, SymbolRef};
+use crate::encoding::{span_to_range as encoding_span_to_range, PositionEncoding};
 
 /// Parse document using v2 parser and convert to LSP types.
 ///
@@ -136,9 +153,8 @@ fn convert_argument(arg: &Argument, text: &str) -> ParsedArg {
     let key_end = arg.span.start + 1 + arg.key.len(); // +1 for ':'
     let keyword_range = span_to_range(&V2Span::new(arg.span.start, key_end), text);
 
-    // Value span is the rest of the argument span
-    let value_span = V2Span::new(key_end + 1, arg.span.end); // +1 for space
-    let value = Some(Box::new(convert_node(&arg.value, &value_span, text)));
+    // Value uses its own span (from the AstNode)
+    let value = Some(Box::new(convert_node(&arg.value, text)));
 
     ParsedArg {
         keyword,
@@ -148,11 +164,17 @@ fn convert_argument(arg: &Argument, text: &str) -> ParsedArg {
 }
 
 /// Convert v2 AstNode to LSP ParsedExpr.
-fn convert_node(node: &AstNode, span: &V2Span, text: &str) -> ParsedExpr {
-    let range = span_to_range(span, text);
+///
+/// Uses each node's own span for accurate LSP positioning.
+/// This ensures list items, map entries, and nested structures
+/// have correct ranges for hover, go-to-definition, etc.
+fn convert_node(node: &AstNode, text: &str) -> ParsedExpr {
+    // Use the node's own span, not a parent span
+    let node_span = node.span();
+    let range = span_to_range(&node_span, text);
 
     let kind = match node {
-        AstNode::Literal(lit) => match lit {
+        AstNode::Literal(lit, _span) => match lit {
             Literal::String(s) => ExprKind::String { value: s.clone() },
             Literal::Integer(n) => ExprKind::Number {
                 value: n.to_string(),
@@ -160,12 +182,8 @@ fn convert_node(node: &AstNode, span: &V2Span, text: &str) -> ParsedExpr {
             Literal::Decimal(d) => ExprKind::Number {
                 value: d.to_string(),
             },
-            Literal::Boolean(b) => ExprKind::Identifier {
-                value: b.to_string(),
-            },
-            Literal::Null => ExprKind::Identifier {
-                value: "nil".to_string(),
-            },
+            Literal::Boolean(b) => ExprKind::Boolean { value: *b },
+            Literal::Null => ExprKind::Null,
             Literal::Uuid(uuid) => ExprKind::String {
                 value: uuid.to_string(),
             },
@@ -173,29 +191,35 @@ fn convert_node(node: &AstNode, span: &V2Span, text: &str) -> ParsedExpr {
 
         AstNode::SymbolRef { name, .. } => ExprKind::SymbolRef { name: name.clone() },
 
-        AstNode::EntityRef { value, .. } => {
-            // Display the human-readable value (resolution happens later)
-            ExprKind::String {
-                value: value.clone(),
-            }
-        }
+        AstNode::EntityRef {
+            entity_type,
+            search_column,
+            value,
+            resolved_key,
+            ..
+        } => ExprKind::EntityRef {
+            entity_type: entity_type.clone(),
+            search_column: search_column.clone(),
+            value: value.clone(),
+            resolved: resolved_key.is_some(),
+        },
 
-        AstNode::List {
-            items,
-            span: list_span,
-        } => {
-            let converted: Vec<ParsedExpr> = items
-                .iter()
-                .map(|v| convert_node(v, list_span, text))
-                .collect();
+        AstNode::List { items, .. } => {
+            // Each item uses its own span
+            let converted: Vec<ParsedExpr> = items.iter().map(|v| convert_node(v, text)).collect();
             ExprKind::List { items: converted }
         }
 
-        AstNode::Map { .. } => {
-            // Maps are rare in DSL, represent as identifier for now
-            ExprKind::Identifier {
-                value: "{...}".to_string(),
-            }
+        AstNode::Map { entries, .. } => {
+            // Each entry value uses its own span
+            let converted: Vec<(String, ParsedExpr)> = entries
+                .iter()
+                .map(|(key, val)| {
+                    let value_expr = convert_node(val, text);
+                    (key.clone(), value_expr)
+                })
+                .collect();
+            ExprKind::Map { entries: converted }
         }
 
         AstNode::Nested(vc) => {
@@ -208,34 +232,11 @@ fn convert_node(node: &AstNode, span: &V2Span, text: &str) -> ParsedExpr {
 }
 
 /// Convert v2 byte-offset Span to LSP line/column Range.
+///
+/// Uses UTF-16 encoding by default (LSP standard, used by Zed).
 fn span_to_range(span: &V2Span, text: &str) -> Range {
-    Range {
-        start: offset_to_position(span.start, text),
-        end: offset_to_position(span.end, text),
-    }
-}
-
-/// Convert byte offset to LSP Position (line, character).
-fn offset_to_position(offset: usize, text: &str) -> Position {
-    let mut line = 0u32;
-    let mut col = 0u32;
-
-    for (i, ch) in text.chars().enumerate() {
-        if i >= offset {
-            break;
-        }
-        if ch == '\n' {
-            line += 1;
-            col = 0;
-        } else {
-            col += 1;
-        }
-    }
-
-    Position {
-        line,
-        character: col,
-    }
+    // Default to UTF-16 for Zed compatibility
+    encoding_span_to_range(span.start, span.end, text, PositionEncoding::Utf16)
 }
 
 /// Extract symbol definitions and references from converted expressions.
@@ -285,6 +286,11 @@ fn extract_symbols_from_expr(
         ExprKind::List { items } => {
             for item in items {
                 extract_symbols_from_expr(item, defs, refs);
+            }
+        }
+        ExprKind::Map { entries } => {
+            for (_, value) in entries {
+                extract_symbols_from_expr(value, defs, refs);
             }
         }
         _ => {}
@@ -429,5 +435,63 @@ mod tests {
         assert_eq!(state.expressions.len(), 3);
         assert_eq!(state.symbol_defs.len(), 2);
         assert_eq!(state.symbol_refs.len(), 2); // @fund and @co in attach-entity
+    }
+
+    #[test]
+    fn test_boolean_conversion() {
+        let input = r#"(test.verb :flag true :empty false)"#;
+        let (state, diags) = parse_with_v2(input);
+
+        assert!(diags.is_empty());
+        if let ExprKind::Call { args, .. } = &state.expressions[0].kind {
+            if let Some(val) = &args[0].value {
+                assert!(matches!(val.kind, ExprKind::Boolean { value: true }));
+            }
+            if let Some(val) = &args[1].value {
+                assert!(matches!(val.kind, ExprKind::Boolean { value: false }));
+            }
+        }
+    }
+
+    #[test]
+    fn test_null_conversion() {
+        let input = r#"(test.verb :empty nil)"#;
+        let (state, diags) = parse_with_v2(input);
+
+        assert!(diags.is_empty());
+        if let ExprKind::Call { args, .. } = &state.expressions[0].kind {
+            if let Some(val) = &args[0].value {
+                assert!(matches!(val.kind, ExprKind::Null));
+            }
+        }
+    }
+
+    #[test]
+    fn test_map_conversion() {
+        let input = r#"(test.verb :config {:name "Test" :value 42})"#;
+        let (state, diags) = parse_with_v2(input);
+
+        assert!(diags.is_empty());
+        if let ExprKind::Call { args, .. } = &state.expressions[0].kind {
+            if let Some(val) = &args[0].value {
+                if let ExprKind::Map { entries } = &val.kind {
+                    assert_eq!(entries.len(), 2);
+                    assert!(entries.iter().any(|(k, _)| k == "name"));
+                    assert!(entries.iter().any(|(k, _)| k == "value"));
+                } else {
+                    panic!("Expected Map, got {:?}", val.kind);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_list_with_symbols() {
+        let input = r#"(test.verb :items [@a @b @c])"#;
+        let (state, diags) = parse_with_v2(input);
+
+        assert!(diags.is_empty());
+        // Should have 3 symbol references
+        assert_eq!(state.symbol_refs.len(), 3);
     }
 }

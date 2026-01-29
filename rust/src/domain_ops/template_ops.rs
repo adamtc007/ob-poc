@@ -224,7 +224,7 @@ fn resolve_value_to_string(
     use crate::dsl_v2::ast::AstNode;
 
     match node {
-        AstNode::Literal(lit) => Ok(literal_to_string(lit)),
+        AstNode::Literal(lit, _) => Ok(literal_to_string(lit)),
         AstNode::SymbolRef { name, .. } => {
             let uuid = ctx
                 .resolve(name)

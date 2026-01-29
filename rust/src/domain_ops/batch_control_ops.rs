@@ -385,8 +385,8 @@ impl CustomOperation for BatchAddProductsOp {
                     .iter()
                     .filter_map(|item| match item {
                         AstNode::SymbolRef { name, .. } => ctx.resolve(name),
-                        AstNode::Literal(Literal::String(s)) => s.parse().ok(),
-                        AstNode::Literal(Literal::Uuid(u)) => Some(*u),
+                        AstNode::Literal(Literal::String(s), _) => s.parse().ok(),
+                        AstNode::Literal(Literal::Uuid(u), _) => Some(*u),
                         AstNode::EntityRef {
                             resolved_key: Some(key),
                             ..
@@ -417,7 +417,7 @@ impl CustomOperation for BatchAddProductsOp {
                         items
                             .iter()
                             .filter_map(|item| match item {
-                                AstNode::Literal(Literal::String(s)) => Some(s.clone()),
+                                AstNode::Literal(Literal::String(s), _) => Some(s.clone()),
                                 AstNode::EntityRef { value, .. } => Some(value.clone()),
                                 _ => None,
                             })

@@ -723,15 +723,15 @@ fn collect_symbol_refs(
             }
         }
         // Literals, EntityRefs, and Nested don't contain symbol references we need to track
-        AstNode::Literal(_) | AstNode::EntityRef { .. } | AstNode::Nested(_) => {}
+        AstNode::Literal(_, _) | AstNode::EntityRef { .. } | AstNode::Nested(_) => {}
     }
 }
 
 /// Extract string representation from a literal (String or UUID)
 fn extract_literal_string_or_uuid(node: &AstNode) -> Option<String> {
     match node {
-        AstNode::Literal(Literal::String(s)) => Some(s.clone()),
-        AstNode::Literal(Literal::Uuid(u)) => Some(u.to_string()),
+        AstNode::Literal(Literal::String(s), _) => Some(s.clone()),
+        AstNode::Literal(Literal::Uuid(u), _) => Some(u.to_string()),
         _ => None,
     }
 }
@@ -744,7 +744,7 @@ fn collect_implicit_refs(
     deps: &mut HashMap<usize, HashSet<usize>>,
 ) {
     match node {
-        AstNode::Literal(Literal::String(s)) => {
+        AstNode::Literal(Literal::String(s), _) => {
             if let Some(&producer_idx) = pk_to_stmt.get(s) {
                 if producer_idx != current_idx {
                     if let Some(dep_set) = deps.get_mut(&current_idx) {
@@ -753,7 +753,7 @@ fn collect_implicit_refs(
                 }
             }
         }
-        AstNode::Literal(Literal::Uuid(u)) => {
+        AstNode::Literal(Literal::Uuid(u), _) => {
             let s = u.to_string();
             if let Some(&producer_idx) = pk_to_stmt.get(&s) {
                 if producer_idx != current_idx {
@@ -817,7 +817,7 @@ pub fn emit_dsl(program: &Program) -> String {
 /// Format an AST node back to DSL text
 fn format_ast_node(node: &AstNode) -> String {
     match node {
-        AstNode::Literal(lit) => match lit {
+        AstNode::Literal(lit, _) => match lit {
             Literal::String(s) => format!("\"{}\"", s.replace('\"', "\\\"")),
             Literal::Integer(n) => n.to_string(),
             Literal::Decimal(d) => d.to_string(),

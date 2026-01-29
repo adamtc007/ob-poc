@@ -667,7 +667,7 @@ fn resolve_to_entity_key(
             .ok_or_else(|| format!("undefined symbol '@{}'", name)),
 
         // String literal → create entity key from value
-        AstNode::Literal(Literal::String(s)) => Ok(EntityKey::new("entity", s)),
+        AstNode::Literal(Literal::String(s), _) => Ok(EntityKey::new("entity", s)),
 
         // EntityRef → use resolved key or value
         AstNode::EntityRef {
@@ -687,7 +687,7 @@ fn resolve_to_entity_key(
 /// Extract string from AstNode
 fn extract_string(node: &AstNode) -> Result<String, String> {
     match node {
-        AstNode::Literal(Literal::String(s)) => Ok(s.clone()),
+        AstNode::Literal(Literal::String(s), _) => Ok(s.clone()),
         AstNode::EntityRef { value, .. } => Ok(value.clone()),
         _ => Err(format!("expected string, got {:?}", node)),
     }
@@ -696,9 +696,9 @@ fn extract_string(node: &AstNode) -> Result<String, String> {
 /// Extract decimal from AstNode
 fn extract_decimal(node: &AstNode) -> Result<Decimal, String> {
     match node {
-        AstNode::Literal(Literal::Decimal(d)) => Ok(*d),
-        AstNode::Literal(Literal::Integer(i)) => Ok(Decimal::from(*i)),
-        AstNode::Literal(Literal::String(s)) => {
+        AstNode::Literal(Literal::Decimal(d), _) => Ok(*d),
+        AstNode::Literal(Literal::Integer(i), _) => Ok(Decimal::from(*i)),
+        AstNode::Literal(Literal::String(s), _) => {
             Decimal::from_str(s).map_err(|e| format!("invalid decimal '{}': {}", s, e))
         }
         _ => Err(format!("expected number, got {:?}", node)),
@@ -708,16 +708,16 @@ fn extract_decimal(node: &AstNode) -> Result<Decimal, String> {
 /// Extract integer from AstNode
 fn extract_int(node: &AstNode) -> Result<i32, String> {
     match node {
-        AstNode::Literal(Literal::Integer(i)) => (*i)
+        AstNode::Literal(Literal::Integer(i), _) => (*i)
             .try_into()
             .map_err(|_| format!("integer {} out of i32 range", i)),
-        AstNode::Literal(Literal::Decimal(d)) => {
+        AstNode::Literal(Literal::Decimal(d), _) => {
             // Try to convert decimal to i32 if it's a whole number
             use rust_decimal::prelude::ToPrimitive;
             d.to_i32()
                 .ok_or_else(|| format!("decimal {} cannot be converted to i32", d))
         }
-        AstNode::Literal(Literal::String(s)) => s
+        AstNode::Literal(Literal::String(s), _) => s
             .parse::<i32>()
             .map_err(|e| format!("invalid integer '{}': {}", s, e)),
         _ => Err(format!("expected integer, got {:?}", node)),
@@ -727,8 +727,8 @@ fn extract_int(node: &AstNode) -> Result<i32, String> {
 /// Extract boolean from AstNode
 fn extract_bool(node: &AstNode) -> Result<bool, String> {
     match node {
-        AstNode::Literal(Literal::Boolean(b)) => Ok(*b),
-        AstNode::Literal(Literal::String(s)) => match s.to_lowercase().as_str() {
+        AstNode::Literal(Literal::Boolean(b), _) => Ok(*b),
+        AstNode::Literal(Literal::String(s), _) => match s.to_lowercase().as_str() {
             "true" | "yes" | "1" => Ok(true),
             "false" | "no" | "0" => Ok(false),
             _ => Err(format!("invalid boolean '{}'", s)),
@@ -748,7 +748,7 @@ fn extract_string_list(node: &AstNode) -> Result<Vec<String>, String> {
             Ok(result)
         }
         // Single string becomes single-element list
-        AstNode::Literal(Literal::String(s)) => Ok(vec![s.clone()]),
+        AstNode::Literal(Literal::String(s), _) => Ok(vec![s.clone()]),
         _ => Err(format!("expected list, got {:?}", node)),
     }
 }

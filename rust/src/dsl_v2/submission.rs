@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use dsl_core::ast::{Argument, AstNode, Literal, Statement, VerbCall};
+use dsl_core::ast::{Argument, AstNode, Literal, Span, Statement, VerbCall};
 
 // ============================================================================
 // Part 2: SymbolBinding
@@ -544,7 +544,7 @@ fn substitute_node(node: &AstNode, bindings: &HashMap<String, Uuid>) -> AstNode 
     match node {
         AstNode::SymbolRef { name, span } => {
             if let Some(id) = bindings.get(name) {
-                AstNode::Literal(Literal::Uuid(*id))
+                AstNode::Literal(Literal::Uuid(*id), Span::synthetic())
             } else {
                 // Keep as symbol if not in bindings
                 AstNode::SymbolRef {

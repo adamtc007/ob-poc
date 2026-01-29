@@ -1,4 +1,10 @@
 //! Document state tracking.
+//!
+//! This module defines the LSP's internal representation of parsed DSL documents.
+//! The types here are designed to:
+//! - Preserve source positions for editor features (go-to-def, hover, etc.)
+//! - Support all DSL constructs from the EBNF grammar
+//! - Enable efficient lookup by position
 
 #![allow(dead_code)]
 
@@ -14,6 +20,15 @@ pub struct ParsedExpr {
 }
 
 /// Kind of expression.
+///
+/// This enum is aligned with the AST in `dsl-core/src/ast.rs`:
+/// - `AstNode::Literal` → `String`, `Number`, `Boolean`, `Null`, `Identifier`
+/// - `AstNode::SymbolRef` → `SymbolRef`
+/// - `AstNode::EntityRef` → `EntityRef`
+/// - `AstNode::List` → `List`
+/// - `AstNode::Map` → `Map`
+/// - `AstNode::Nested` → `Call` (nested verb calls)
+/// - `Statement::Comment` → `Comment`
 #[derive(Debug, Clone)]
 pub enum ExprKind {
     /// S-expression: (verb-name :arg value ...)
@@ -24,15 +39,33 @@ pub enum ExprKind {
     },
     /// Symbol reference: @name
     SymbolRef { name: String },
-    /// String literal
+    /// String literal: "hello"
     String { value: String },
-    /// Number literal
+    /// Number literal: 42, 3.14
     Number { value: String },
-    /// Identifier (true, false, nil, etc.)
+    /// Boolean literal: true, false
+    Boolean { value: bool },
+    /// Null literal: nil
+    Null,
+    /// Generic identifier (for backward compatibility)
     Identifier { value: String },
-    /// List: [...]
+    /// List literal: [item1, item2]
     List { items: Vec<ParsedExpr> },
-    /// Comment
+    /// Map literal: {:key value :key2 value2}
+    Map { entries: Vec<(String, ParsedExpr)> },
+    /// Entity reference with resolution metadata
+    /// Preserves information from `AstNode::EntityRef` for LSP features
+    EntityRef {
+        /// Entity type from YAML lookup.entity_type (e.g., "entity", "cbu")
+        entity_type: String,
+        /// Column to search from YAML lookup.search_key (e.g., "name")
+        search_column: String,
+        /// The user's input value (e.g., "Acme Corp")
+        value: String,
+        /// Whether this reference has been resolved to a UUID
+        resolved: bool,
+    },
+    /// Comment: ;; text
     Comment { text: String },
 }
 

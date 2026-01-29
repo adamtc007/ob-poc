@@ -276,7 +276,7 @@ fn get_optional_arg<'a>(verb_call: &'a VerbCall, key: &str) -> Option<&'a crate:
 /// Extract a string value from an AstNode
 fn extract_string_value(node: &AstNode, arg_name: &str) -> ViewportParseResult<String> {
     match node {
-        AstNode::Literal(Literal::String(s)) => Ok(s.clone()),
+        AstNode::Literal(Literal::String(s), _) => Ok(s.clone()),
         AstNode::SymbolRef { name, .. } => Ok(format!("@{}", name)),
         _ => Err(ViewportParseError::new(format!(
             "Expected string value for ':{}'",

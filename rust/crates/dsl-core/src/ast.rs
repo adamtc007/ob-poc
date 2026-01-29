@@ -224,15 +224,17 @@ pub struct ResolutionExplain {
 /// AST Node - all possible node types in the tree
 ///
 /// This enum cleanly separates:
-/// - Literals: Terminal values that don't need resolution
+/// - Literals: Terminal values that don't need resolution (with span)
 /// - SymbolRef: `@name` bindings resolved at execution time
 /// - EntityRef: External references that need gateway resolution
 /// - Containers: Lists and Maps
 /// - Nested: Nested verb calls
+///
+/// All variants carry a Span for LSP features (hover, go-to-definition, etc.)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AstNode {
-    /// Literal value - no resolution needed
-    Literal(Literal),
+    /// Literal value with span - no resolution needed
+    Literal(Literal, Span),
 
     /// Symbol reference: @name
     /// Resolved at execution time from :as bindings
@@ -292,7 +294,7 @@ impl AstNode {
     /// Render the node back to DSL source (for execution - shows UUIDs when resolved)
     pub fn to_dsl_string(&self) -> String {
         match self {
-            AstNode::Literal(lit) => lit.to_dsl_string(),
+            AstNode::Literal(lit, _) => lit.to_dsl_string(),
             AstNode::SymbolRef { name, .. } => format!("@{}", name),
             AstNode::EntityRef {
                 value,
@@ -328,7 +330,7 @@ impl AstNode {
     /// never the resolved UUID. This lets users review intent, not implementation.
     pub fn to_user_dsl_string(&self) -> String {
         match self {
-            AstNode::Literal(lit) => lit.to_dsl_string(),
+            AstNode::Literal(lit, _) => lit.to_dsl_string(),
             AstNode::SymbolRef { name, .. } => format!("@{}", name),
             AstNode::EntityRef { value, .. } => {
                 // Always show the human-readable search value, never the UUID
@@ -353,14 +355,14 @@ impl AstNode {
     // CONSTRUCTORS
     // =========================================================================
 
-    /// Create a string literal
+    /// Create a string literal (with synthetic span)
     pub fn string(s: impl Into<String>) -> Self {
-        AstNode::Literal(Literal::String(s.into()))
+        AstNode::Literal(Literal::String(s.into()), Span::synthetic())
     }
 
-    /// Create an integer literal
+    /// Create an integer literal (with synthetic span)
     pub fn integer(i: i64) -> Self {
-        AstNode::Literal(Literal::Integer(i))
+        AstNode::Literal(Literal::Integer(i), Span::synthetic())
     }
 
     /// Create an unresolved entity reference
@@ -446,7 +448,7 @@ impl AstNode {
 
     /// Is this a literal?
     pub fn is_literal(&self) -> bool {
-        matches!(self, AstNode::Literal(_))
+        matches!(self, AstNode::Literal(_, _))
     }
 
     // =========================================================================
@@ -456,7 +458,7 @@ impl AstNode {
     /// Get as string (from literal or entity ref value)
     pub fn as_string(&self) -> Option<&str> {
         match self {
-            AstNode::Literal(Literal::String(s)) => Some(s),
+            AstNode::Literal(Literal::String(s), _) => Some(s),
             AstNode::EntityRef { value, .. } => Some(value),
             _ => None,
         }
@@ -469,8 +471,8 @@ impl AstNode {
                 resolved_key: Some(key),
                 ..
             } => Uuid::parse_str(key).ok(),
-            AstNode::Literal(Literal::String(s)) => Uuid::parse_str(s).ok(),
-            AstNode::Literal(Literal::Uuid(u)) => Some(*u),
+            AstNode::Literal(Literal::String(s), _) => Uuid::parse_str(s).ok(),
+            AstNode::Literal(Literal::Uuid(u), _) => Some(*u),
             _ => None,
         }
     }
@@ -494,7 +496,7 @@ impl AstNode {
     /// Get integer value
     pub fn as_integer(&self) -> Option<i64> {
         match self {
-            AstNode::Literal(Literal::Integer(i)) => Some(*i),
+            AstNode::Literal(Literal::Integer(i), _) => Some(*i),
             _ => None,
         }
     }
@@ -502,8 +504,8 @@ impl AstNode {
     /// Get decimal value
     pub fn as_decimal(&self) -> Option<Decimal> {
         match self {
-            AstNode::Literal(Literal::Decimal(d)) => Some(*d),
-            AstNode::Literal(Literal::Integer(i)) => Some(Decimal::from(*i)),
+            AstNode::Literal(Literal::Decimal(d), _) => Some(*d),
+            AstNode::Literal(Literal::Integer(i), _) => Some(Decimal::from(*i)),
             _ => None,
         }
     }
@@ -511,7 +513,7 @@ impl AstNode {
     /// Get boolean value
     pub fn as_boolean(&self) -> Option<bool> {
         match self {
-            AstNode::Literal(Literal::Boolean(b)) => Some(*b),
+            AstNode::Literal(Literal::Boolean(b), _) => Some(*b),
             _ => None,
         }
     }
@@ -535,7 +537,7 @@ impl AstNode {
     /// Get the span of this node
     pub fn span(&self) -> Span {
         match self {
-            AstNode::Literal(lit) => lit.span(),
+            AstNode::Literal(_, span) => *span,
             AstNode::SymbolRef { span, .. } => *span,
             AstNode::EntityRef { span, .. } => *span,
             AstNode::List { span, .. } => *span,
@@ -626,11 +628,6 @@ pub enum Literal {
 }
 
 impl Literal {
-    /// Get the span (literals don't track span individually, return default)
-    pub fn span(&self) -> Span {
-        Span::default()
-    }
-
     /// Render the literal back to DSL source
     pub fn to_dsl_string(&self) -> String {
         match self {
@@ -726,7 +723,7 @@ pub trait AstVisitor {
     /// Visit an AST node
     fn visit_node(&mut self, node: &AstNode) {
         match node {
-            AstNode::Literal(_) => {}
+            AstNode::Literal(_, _) => {}
             AstNode::SymbolRef { .. } => self.visit_symbol_ref(node),
             AstNode::EntityRef { .. } => self.visit_entity_ref(node),
             AstNode::List { items, .. } => {
