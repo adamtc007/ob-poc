@@ -1,44 +1,48 @@
 [
   {
-    "label": "Build (with database)",
-    "command": "cargo build --features database",
-    "cwd": "${ZED_WORKTREE_ROOT}/rust",
-    "tags": ["build"]
+    "label": "DSL: Validate Form",
+    "command": "cargo",
+    "args": [
+      "run",
+      "-p",
+      "ob-poc-web",
+      "--",
+      "dsl",
+      "validate",
+      "--file",
+      "$ZED_FILE",
+      "--row",
+      "$ZED_ROW",
+      "--column",
+      "$ZED_COLUMN",
+    ],
+    "tags": ["dsl-form", "dsl-form-with-binding"],
+    "reveal": "always",
   },
   {
-    "label": "Test (lib)",
-    "command": "cargo test --features database --lib",
-    "cwd": "${ZED_WORKTREE_ROOT}/rust",
-    "tags": ["test"]
+    "label": "DSL: Format File",
+    "command": "cargo",
+    "args": ["run", "-p", "ob-poc-web", "--", "dsl", "fmt", "$ZED_FILE"],
+    "reveal": "never",
   },
   {
-    "label": "Clippy",
-    "command": "cargo clippy --features database",
-    "cwd": "${ZED_WORKTREE_ROOT}/rust",
-    "tags": ["lint"]
+    "label": "DSL: Dump Tree-sitter AST",
+    "command": "npx",
+    "args": ["tree-sitter", "parse", "$ZED_FILE"],
+    "reveal": "always",
   },
   {
-    "label": "Build LSP",
-    "command": "cargo build -p dsl-lsp",
-    "cwd": "${ZED_WORKTREE_ROOT}/rust",
-    "tags": ["build"]
+    "label": "DSL: Run Tree-sitter Corpus Tests",
+    "command": "npx",
+    "args": ["tree-sitter", "test"],
+    "cwd": "rust/crates/dsl-lsp/tree-sitter-dsl",
+    "reveal": "always",
   },
   {
-    "label": "Dead Code Sweep",
-    "command": "bash scripts/dead-code-sweep.sh",
-    "cwd": "${ZED_WORKTREE_ROOT}",
-    "tags": ["cleanup", "analysis"]
+    "label": "DSL: Regenerate Tree-sitter Grammar",
+    "command": "npx",
+    "args": ["tree-sitter", "generate"],
+    "cwd": "rust/crates/dsl-lsp/tree-sitter-dsl",
+    "reveal": "always",
   },
-  {
-    "label": "Check Unused Dependencies",
-    "command": "cargo machete",
-    "cwd": "${ZED_WORKTREE_ROOT}/rust",
-    "tags": ["dependencies"]
-  },
-  {
-    "label": "Test All",
-    "command": "cargo test --workspace --all-targets --all-features",
-    "cwd": "${ZED_WORKTREE_ROOT}/rust",
-    "tags": ["test"]
-  }
 ]

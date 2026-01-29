@@ -1,29 +1,39 @@
-; Symbols (verb names, identifiers)
-(sym_lit) @function
+;; highlights.scm - Syntax highlighting for OB-POC DSL
+;;
+;; Uses DSL-specific node names from tree-sitter-dsl/grammar.js
 
-; Keywords (:arg-name)
-(kwd_lit) @property
-
-; Strings
-(str_lit) @string
-
-; Numbers
-(num_lit) @number
-
-; Booleans
-(bool_lit) @constant.builtin
-
-; Nil
-(nil_lit) @constant.builtin
-
-; Comments
+;; Comments (;; to end of line)
 (comment) @comment
 
-; Lists (S-expressions)
-(list_lit) @punctuation.bracket
+;; Verb names (domain.verb)
+(verb_name) @function
 
-; Brackets
-["(" ")" "[" "]" "{" "}"] @punctuation.bracket
+;; Keywords (:arg-name)
+(keyword) @property
 
-; Deref (@symbol)
-(derefing_lit) @variable.special
+;; Binding (:as @symbol) - special highlighting
+(binding ":as" @keyword.special)
+(binding (symbol_ref) @variable.special)
+
+;; Symbol references (@name)
+(symbol_ref) @variable
+
+;; String literals
+(string) @string
+
+;; Number literals
+(number) @number
+
+;; Boolean literals (true, false)
+(boolean) @constant.builtin
+
+;; Null literal (nil)
+(null_literal) @constant.builtin
+
+;; Brackets
+"(" @punctuation.bracket
+")" @punctuation.bracket
+"[" @punctuation.bracket
+"]" @punctuation.bracket
+"{" @punctuation.bracket
+"}" @punctuation.bracket

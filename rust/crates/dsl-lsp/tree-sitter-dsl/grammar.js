@@ -49,7 +49,8 @@ module.exports = grammar({
 
     // Binding: :as @symbol-name (special syntax for symbol definitions)
     // This is distinct from regular keyword arguments
-    binding: ($) => seq(":as", $.symbol_ref),
+    // prec.right ensures :as greedily consumes following symbol_ref when present
+    binding: ($) => prec.right(1, seq(":as", optional($.symbol_ref))),
 
     // Verb name: domain.verb (only appears as first element of list)
     // Supports kebab-case: cbu.create, entity.create-limited-company

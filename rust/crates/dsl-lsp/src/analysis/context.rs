@@ -6,12 +6,14 @@
 //! - List nesting `[...]`
 //! - Map nesting `{...}`
 //! - String boundaries `"..."`
+//! - Comment boundaries `;;...`
 //! - Keyword arguments `:`
 //! - Symbol references `@`
 
 use tower_lsp::lsp_types::Position;
 
 use super::document::DocumentState;
+use crate::encoding::{position_to_offset, PositionEncoding};
 
 /// Context for completion.
 #[derive(Debug, Clone)]
@@ -48,28 +50,26 @@ pub enum CompletionContext {
 }
 
 /// Get all text from the start of the document up to the cursor position.
-/// This is necessary for proper multiline s-expression context detection.
+/// Uses encoding-aware position conversion to handle UTF-16 properly.
 fn get_text_up_to_position(doc: &DocumentState, position: Position) -> String {
-    let mut result = String::new();
-
-    for (line_num, line) in doc.text.lines().enumerate() {
-        if line_num < position.line as usize {
-            // Add full line plus newline
-            result.push_str(line);
-            result.push('\n');
-        } else if line_num == position.line as usize {
-            // Add partial line up to cursor column
-            let col = position.character as usize;
-            if col <= line.len() {
-                result.push_str(&line[..col]);
-            } else {
+    // Use encoding-aware conversion (UTF-16 by default for LSP)
+    if let Some(offset) = position_to_offset(&doc.text, position, PositionEncoding::Utf16) {
+        doc.text[..offset.min(doc.text.len())].to_string()
+    } else {
+        // Fallback: use line-based approach
+        let mut result = String::new();
+        for (line_num, line) in doc.text.lines().enumerate() {
+            if line_num < position.line as usize {
                 result.push_str(line);
+                result.push('\n');
+            } else if line_num == position.line as usize {
+                // For fallback, be conservative and take whole line
+                result.push_str(line);
+                break;
             }
-            break;
         }
+        result
     }
-
-    result
 }
 
 /// Detect the completion context at a position.
@@ -84,8 +84,14 @@ pub fn detect_completion_context(doc: &DocumentState, position: Position) -> Com
         prefix.len()
     );
 
+    // Check if we're inside a comment - no completion in comments
+    if is_in_comment(&prefix) {
+        return CompletionContext::None;
+    }
+
     // Check for @ symbol - could be existing symbol ref OR entity lookup for keyword
-    if let Some(at_pos) = prefix.rfind('@') {
+    // But first verify the @ is not inside a comment
+    if let Some(at_pos) = find_at_outside_comment(&prefix) {
         let after_at = &prefix[at_pos + 1..];
         if after_at
             .chars()
@@ -359,6 +365,80 @@ fn is_in_string(prefix: &str) -> bool {
     in_string
 }
 
+/// Check if cursor is inside a comment (;; to end of line).
+fn is_in_comment(prefix: &str) -> bool {
+    let mut in_string = false;
+    let mut in_comment = false;
+    let chars: Vec<char> = prefix.chars().collect();
+
+    for (i, &c) in chars.iter().enumerate() {
+        if in_comment {
+            if c == '\n' {
+                in_comment = false;
+            }
+            continue;
+        }
+
+        if in_string {
+            if c == '"' && (i == 0 || chars[i - 1] != '\\') {
+                in_string = false;
+            }
+            continue;
+        }
+
+        match c {
+            '"' => in_string = true,
+            ';' if i + 1 < chars.len() && chars[i + 1] == ';' => {
+                in_comment = true;
+            }
+            _ => {}
+        }
+    }
+
+    in_comment
+}
+
+/// Find the last @ that is not inside a string or comment.
+fn find_at_outside_comment(prefix: &str) -> Option<usize> {
+    let mut in_string = false;
+    let mut in_comment = false;
+    let mut last_at: Option<usize> = None;
+    let chars: Vec<char> = prefix.chars().collect();
+    let mut byte_offset = 0usize;
+
+    for (i, &c) in chars.iter().enumerate() {
+        if in_comment {
+            if c == '\n' {
+                in_comment = false;
+            }
+            byte_offset += c.len_utf8();
+            continue;
+        }
+
+        if in_string {
+            if c == '"' && (i == 0 || chars[i - 1] != '\\') {
+                in_string = false;
+            }
+            byte_offset += c.len_utf8();
+            continue;
+        }
+
+        match c {
+            '"' => in_string = true,
+            ';' if i + 1 < chars.len() && chars[i + 1] == ';' => {
+                in_comment = true;
+            }
+            '@' => {
+                last_at = Some(byte_offset);
+            }
+            _ => {}
+        }
+        byte_offset += c.len_utf8();
+    }
+
+    last_at
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -559,5 +639,64 @@ mod tests {
             }
             other => panic!("Expected KeywordValue context, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_no_completion_in_comment() {
+        // Cursor inside a comment - should return None
+        let doc = make_doc(";; comment mentioning @fund");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 0,
+                character: 27,
+            },
+        );
+        assert!(matches!(ctx, CompletionContext::None));
+    }
+
+    #[test]
+    fn test_no_completion_in_comment_multiline() {
+        // Comment on first line, code on second
+        let doc = make_doc(";; @fund mentioned here\n(cbu.create :as @");
+        let ctx = detect_completion_context(
+            &doc,
+            Position {
+                line: 1,
+                character: 20,
+            },
+        );
+        // Should detect SymbolRef on second line, not be confused by comment
+        match ctx {
+            CompletionContext::SymbolRef { prefix, .. } => {
+                assert_eq!(prefix, "");
+            }
+            other => panic!("Expected SymbolRef context, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_is_in_comment() {
+        assert!(is_in_comment(";; this is a comment"));
+        assert!(is_in_comment(";; comment with @symbol"));
+        assert!(!is_in_comment("(cbu.create :name \"test\")"));
+        assert!(!is_in_comment(";; comment\n(code after)"));
+        assert!(is_in_comment("(code) ;; trailing comment"));
+    }
+
+    #[test]
+    fn test_find_at_outside_comment() {
+        // @ in code
+        assert!(find_at_outside_comment("(cbu.create :as @fund)").is_some());
+        // @ in comment - should return None
+        assert!(find_at_outside_comment(";; @fund").is_none());
+        // @ in string - also returns None (we filter both strings and comments)
+        assert!(find_at_outside_comment("\"email@domain.com\"").is_none());
+        // @ after comment ends
+        let result = find_at_outside_comment(";; comment\n@fund");
+        assert!(result.is_some());
+        // @ in code after string with @
+        let result = find_at_outside_comment("\"email@domain.com\" :as @fund");
+        assert!(result.is_some());
     }
 }

@@ -1650,6 +1650,161 @@ Extension updated to recognize `.playbook.yaml` files:
 | `rust/crates/dsl-lsp/zed-extension/languages/playbook/` | Zed language config |
 | `rust/xtask/src/main.rs` | PlaybookCheck command |
 
+---
+
+## Zed Extension: DSL Tree-sitter Grammar (Dev Install)
+
+> **Critical for local development** - Installing the custom DSL grammar in Zed.
+> This was painful to get working. Follow these steps EXACTLY.
+
+### Directory Structure
+
+```
+rust/crates/dsl-lsp/
+├── zed-extension/           # Extension root (select THIS for dev install)
+│   ├── extension.toml       # Must be at root of selected directory
+│   ├── Cargo.toml           # Rust extension for LSP launch
+│   ├── src/lib.rs           # LSP command provider
+│   ├── languages/
+│   │   ├── dsl/
+│   │   │   ├── config.toml      # grammar = "dsl" (must match [grammars.dsl])
+│   │   │   ├── highlights.scm
+│   │   │   ├── brackets.scm
+│   │   │   ├── indents.scm
+│   │   │   ├── outline.scm
+│   │   │   ├── textobjects.scm
+│   │   │   ├── overrides.scm
+│   │   │   └── runnables.scm
+│   │   └── playbook/
+│   │       └── config.toml      # grammar = "yaml"
+│   └── snippets/
+│       └── dsl.json
+└── tree-sitter-dsl/         # Grammar source
+    ├── grammar.js
+    ├── package.json         # tree-sitter-cli devDependency
+    ├── src/parser.c         # Generated - run `npx tree-sitter generate`
+    └── tree-sitter-dsl.wasm # Generated - run `npx tree-sitter build --wasm`
+```
+
+### Installation Steps
+
+1. **Upgrade tree-sitter CLI** (0.22+ required for Docker-free WASM build):
+   ```bash
+   cd rust/crates/dsl-lsp/tree-sitter-dsl
+   npm install tree-sitter-cli@latest --save-dev
+   ```
+
+2. **Generate grammar artifacts:**
+   ```bash
+   npx tree-sitter generate
+   npx tree-sitter build --wasm   # Downloads wasi-sdk automatically, no Docker
+   ```
+
+3. **Verify config alignment:**
+   - `languages/dsl/config.toml`: `grammar = "dsl"` (NOT "clojure")
+   - `extension.toml`: `[grammars.dsl]` section exists with proper config
+
+4. **Clean any stale grammar cache** (if reinstalling):
+   ```bash
+   rm -rf rust/crates/dsl-lsp/zed-extension/grammars/
+   ```
+
+5. **Install in Zed:**
+   - Open Extensions panel (Cmd+Shift+X or `zed: extensions`)
+   - Click **"Install Dev Extension"**
+   - Select: `rust/crates/dsl-lsp/zed-extension/` (the directory with `extension.toml`)
+
+6. **Verify:**
+   - Open any `.dsl` file
+   - Status bar should show "DSL" (not Clojure/Plain Text)
+   - Syntax highlighting should work (verb names, keywords, symbols)
+
+### extension.toml Grammar Config (EXACT FORMAT)
+
+```toml
+# For local development - file:// URL to REPO ROOT + path to grammar
+# BOTH repository AND rev are REQUIRED (even for file://)
+[grammars.dsl]
+repository = "file:///Users/adamtc007/Developer/ob-poc"
+rev = "c50cd396ac861ee21c8db56de664ed55b3a9b1f0"  # Must be actual commit SHA
+path = "rust/crates/dsl-lsp/tree-sitter-dsl"
+
+# For publishing - use https:// with commit SHA + path
+[grammars.dsl]
+repository = "https://github.com/your-org/ob-poc"
+rev = "abc123def456"  # Must be commit SHA, NOT "main" or "HEAD"
+path = "rust/crates/dsl-lsp/tree-sitter-dsl"
+```
+
+**To get current commit SHA:**
+```bash
+git rev-parse HEAD
+```
+
+### Common Failure Modes (Battle-Tested)
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| `.dsl` shows as Clojure | `grammar = "clojure"` in config.toml | Change to `grammar = "dsl"` |
+| No highlighting | Grammar name mismatch | `config.toml` grammar must match `[grammars.X]` key |
+| "missing field `rev`" | `rev` not specified | Add `rev = "<commit-sha>"` (required even for file://) |
+| "pathspec 'HEAD' did not match" | `rev = "HEAD"` doesn't work | Use actual commit SHA from `git rev-parse HEAD` |
+| "grammar directory already exists" | Stale cache | Delete `zed-extension/grammars/` and reinstall |
+| "Failed to fetch grammar" | Wrong file:// path | Point to repo root, use `path` for subdirectory |
+| "parser.c missing" | Grammar not generated | Run `npx tree-sitter generate` |
+| WASM build needs Docker | Old tree-sitter CLI (<0.22) | `npm install tree-sitter-cli@latest` |
+| Extension not found | Wrong folder selected | Must select folder containing `extension.toml` |
+| TOML parse error with curly quotes | Copy-paste from docs | Replace `""` with `"`, `''` with `'` |
+| "expected newline" in TOML | Malformed string escaping | Check `autoclose_before` and bracket strings |
+
+### config.toml Gotchas
+
+**NEVER use curly/smart quotes** - they break TOML parsing:
+```toml
+# WRONG - curly quotes from copy-paste
+autoclose_before = "]"'"
+brackets = [{ start = """, end = """ }]
+
+# CORRECT - straight quotes
+autoclose_before = "]'\""
+brackets = [{ start = "\"", end = "\"" }]
+```
+
+### Debug
+
+1. Open Zed log: `zed: open log` command
+2. Search for "grammar", "extension", "TOML", or "dsl"
+3. Look for specific error messages
+
+Common log patterns:
+- `compiled grammar dsl` = SUCCESS
+- `TOML parse error at line X` = config.toml syntax error
+- `missing field 'rev'` = extension.toml needs rev
+- `failed to checkout revision` = wrong rev or stale cache
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `zed-extension/extension.toml` | Extension manifest + grammar registration |
+| `zed-extension/languages/dsl/config.toml` | Language config (grammar binding) |
+| `zed-extension/languages/playbook/config.toml` | Playbook YAML config |
+| `zed-extension/languages/dsl/highlights.scm` | Syntax highlighting queries |
+| `tree-sitter-dsl/grammar.js` | Grammar definition |
+| `tree-sitter-dsl/package.json` | tree-sitter-cli version (keep at 0.22+) |
+| `tree-sitter-dsl/src/parser.c` | Generated parser (commit this) |
+| `tree-sitter-dsl/tree-sitter-dsl.wasm` | Compiled WASM (Zed compiles this itself) |
+
+### After Making Changes
+
+If you modify the grammar or extension config:
+1. Re-run `npx tree-sitter generate` (if grammar.js changed)
+2. Delete `zed-extension/grammars/` to clear cache
+3. Re-run "Install Dev Extension" in Zed
+4. Check `zed: open log` for errors
+
+---
+
 ## Staged Runbook REPL (054)
 
 > ✅ **IMPLEMENTED (2026-01-25)**: Anti-hallucination execution model with staged commands, entity resolution, DAG ordering.

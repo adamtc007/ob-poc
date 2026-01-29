@@ -1,2 +1,3 @@
-(list_lit) @indent
-")" @outdent
+(list ")" @end) @indent
+(array "]" @end) @indent
+(map "}" @end) @indent

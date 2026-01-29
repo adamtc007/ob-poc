@@ -99,17 +99,29 @@
       ]
     },
     "binding": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": ":as"
-        },
-        {
-          "type": "SYMBOL",
-          "name": "symbol_ref"
-        }
-      ]
+      "type": "PREC_RIGHT",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": ":as"
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "symbol_ref"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          }
+        ]
+      }
     },
     "verb_name": {
       "type": "PATTERN",

@@ -1,6 +1,6 @@
 {
   "file_types": {
-    "Clojure": ["dsl", "obdsl"],
+    "DSL": ["dsl", "obl", "onboard", "obdsl"],
   },
   "lsp": {
     "rust-analyzer": {
@@ -20,18 +20,10 @@
         },
       },
     },
-    "dsl-lsp": {
-      "binary": {
-        "path": "/Users/adamtc007/Developer/ob-poc/rust/target/release/dsl-lsp",
-        "env": {
-          "DSL_CONFIG_DIR": "/Users/adamtc007/Developer/ob-poc/rust/config",
-        },
-      },
-    },
   },
   "languages": {
-    "Clojure": {
-      "language_servers": ["dsl-lsp", "!clojure-lsp"],
+    "DSL": {
+      "language_servers": ["dsl-lsp"],
     },
   },
   "assistant": {

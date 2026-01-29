@@ -1,0 +1,76 @@
+{
+  "CBU Create": {
+    "prefix": "cbu",
+    "body": [
+      ";; intent: ${1:Create custody banking unit}",
+      "(cbu.ensure",
+      "  :name \"${2:Fund Name}\"",
+      "  :jurisdiction \"${3|LU,IE,US,GB|}\"",
+      "  :as @${4:cbu})"
+    ]
+  },
+  "CBU Ensure": {
+    "prefix": "cbu.ensure",
+    "body": [
+      ";; intent: ${1:Create custody banking unit}",
+      "(cbu.ensure",
+      "  :name \"${2:Fund Name}\"",
+      "  :jurisdiction \"${3|LU,IE,US,GB|}\"",
+      "  :as @${4:cbu})"
+    ]
+  },
+  "Entity Person": {
+    "prefix": "person",
+    "body": [
+      ";; intent: ${1:Create natural person}",
+      "(entity.create-proper-person",
+      "  :first-name \"${2:First}\"",
+      "  :last-name \"${3:Last}\"",
+      "  :as @${4:person})"
+    ]
+  },
+  "Entity Company": {
+    "prefix": "company",
+    "body": [
+      ";; intent: ${1:Create legal entity}",
+      "(entity.create-limited-company",
+      "  :name \"${2:Company Name}\"",
+      "  :jurisdiction \"${3|LU,IE,US,GB,DE|}\"",
+      "  :as @${4:company})"
+    ]
+  },
+  "Assign Role": {
+    "prefix": "role",
+    "body": [
+      ";; intent: ${1:Assign role to entity}",
+      "(cbu.assign-role",
+      "  :cbu-id @${2:cbu}",
+      "  :entity-id @${3:entity}",
+      "  :role \"${4|Investment Manager,Manco,Custodian,Fund Admin|}\")"
+    ]
+  },
+  "KYC Case": {
+    "prefix": "kyc",
+    "body": [
+      ";; intent: ${1:Create KYC case}",
+      "(kyc.create-case",
+      "  :entity-id @${2:entity}",
+      "  :case-type \"${3|standard,enhanced,simplified|}\"",
+      "  :as @${4:case})"
+    ]
+  },
+  "Intent Block": {
+    "prefix": "intent",
+    "body": [
+      ";; intent: ${1:What this accomplishes}",
+      ";; macro: ${2:operator.verb-name}"
+    ]
+  },
+  "Session Load": {
+    "prefix": "load",
+    "body": [
+      ";; intent: Load ${1:scope} into session",
+      "(session.load-galaxy :apex-name \"${2:Client Name}\")"
+    ]
+  }
+}

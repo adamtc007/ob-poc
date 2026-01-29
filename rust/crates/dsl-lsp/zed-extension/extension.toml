@@ -15,9 +15,12 @@ version = "0.1.0"
 name = "DSL Language Server"
 languages = ["DSL", "Playbook"]
 
-[grammars.clojure]
-repository = "https://github.com/sogaiu/tree-sitter-clojure"
-rev = "e43eff80d17cf34852dcd92ca5e6986d23a7040f"
+# DSL grammar - local file:// URL for development
+# Points to repo root, path specifies subdirectory
+[grammars.dsl]
+repository = "file:///Users/adamtc007/Developer/ob-poc"
+rev = "c50cd396ac861ee21c8db56de664ed55b3a9b1f0"
+path = "rust/crates/dsl-lsp/tree-sitter-dsl"
 
 [grammars.yaml]
 repository = "https://github.com/tree-sitter-grammars/tree-sitter-yaml"
