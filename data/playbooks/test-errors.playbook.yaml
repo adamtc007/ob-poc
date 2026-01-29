@@ -1,0 +1,44 @@
+id: test-errors
+version: 1
+name: "Test Playbook with Errors"
+
+slots:
+  client_name:
+    type: string
+    required: true
+  
+  optional_value:
+    type: string
+    required: false
+    default: "default-value"
+
+steps:
+  # This step references a slot that exists
+  - id: step-ok
+    verb: cbu.create
+    args:
+      name: "${client_name}"
+      kind: "fund"
+
+  # This step references a slot that does NOT exist - should show warning
+  - id: step-missing-slot
+    verb: entity.create-legal-entity
+    args:
+      name: "${missing_slot_name}"
+      jurisdiction: "${also_missing}"
+
+  # This step references the optional slot with default
+  - id: step-with-default
+    verb: trading-profile.create
+    after: [step-ok]
+    args:
+      profile_name: "${optional_value}"
+      cbu_id: "${step-ok.result}"
+
+  # Another missing slot reference
+  - id: step-more-missing
+    verb: kyc-case.open
+    after: [step-ok]
+    args:
+      cbu_id: "${step-ok.result}"
+      case_type: "${undefined_case_type}"

@@ -1,0 +1,75 @@
+id: pe-fund-setup
+version: 1
+name: "Private Equity Fund Setup"
+
+slots:
+  fund_name:
+    type: string
+    required: true
+  
+  fund_jurisdiction:
+    type: string
+    required: true
+    default: "LU"
+  
+  gp_entity_name:
+    type: string
+    required: true
+  
+  management_fee_bps:
+    type: number
+    required: false
+    default: 200
+  
+  target_size_usd:
+    type: number
+    required: false
+
+steps:
+  - id: create-fund-structure
+    verb: cbu.create
+    args:
+      name: "${fund_name}"
+      kind: "private-equity"
+      jurisdiction: "${fund_jurisdiction}"
+
+  - id: create-gp-entity
+    verb: entity.create-legal-entity
+    args:
+      name: "${gp_entity_name}"
+      entity_type: "general-partner"
+      jurisdiction: "${fund_jurisdiction}"
+
+  - id: assign-gp-role
+    verb: cbu-role.assign
+    after: [create-fund-structure, create-gp-entity]
+    args:
+      cbu_id: "${create-fund-structure.result}"
+      entity_id: "${create-gp-entity.result}"
+      role: "general-partner"
+
+  - id: create-trading-profile
+    verb: trading-profile.create
+    after: [create-fund-structure]
+    args:
+      cbu_id: "${create-fund-structure.result}"
+      profile_type: "private-equity"
+      management_fee_bps: "${management_fee_bps}"
+
+  - id: open-kyc-case
+    verb: kyc-case.open
+    after: [create-fund-structure, assign-gp-role]
+    args:
+      cbu_id: "${create-fund-structure.result}"
+      case_type: "initial-onboarding"
+      priority: "standard"
+
+  - id: request-documents
+    verb: document.solicit
+    after: [open-kyc-case]
+    args:
+      case_id: "${open-kyc-case.result}"
+      document_types:
+        - "certificate-of-incorporation"
+        - "partnership-agreement"
+        - "aml-policy"
