@@ -22,17 +22,29 @@ use ob_poc::dsl_v2::LspValidator;
 
 /// Create a planning registry from config
 /// This is cached after first call via lazy_static pattern
-fn create_planning_registry() -> Arc<RuntimeVerbRegistry> {
+/// Returns None if config can't be loaded (e.g., LSP launched without proper working dir)
+fn create_planning_registry() -> Option<Arc<RuntimeVerbRegistry>> {
     use std::sync::OnceLock;
-    static REGISTRY: OnceLock<Arc<RuntimeVerbRegistry>> = OnceLock::new();
+    static REGISTRY: OnceLock<Option<Arc<RuntimeVerbRegistry>>> = OnceLock::new();
 
     REGISTRY
         .get_or_init(|| {
             let loader = ConfigLoader::from_env();
-            let config = loader
-                .load_verbs()
-                .expect("Failed to load verbs config for planning");
-            Arc::new(RuntimeVerbRegistry::from_config(&config))
+            match loader.load_verbs() {
+                Ok(config) => {
+                    let registry = RuntimeVerbRegistry::from_config(&config);
+                    tracing::info!("Loaded {} verbs for planning", registry.all_verbs().count());
+                    Some(Arc::new(registry))
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Could not load verb config for planning diagnostics: {}. \
+                         Planning diagnostics will be disabled.",
+                        e
+                    );
+                    None
+                }
+            }
         })
         .clone()
 }
@@ -87,15 +99,31 @@ pub async fn analyze_document_full(text: &str) -> AnalysisResult {
 
     // Step 3: Run planning facade for DAG-based analysis
     // This catches reordering issues, cycle detection, and provides plan info
-    // Create a fresh registry from config (same as server startup)
-    let registry = create_planning_registry();
-    let planning_input = PlanningInput::new(text, registry);
-    let planning_output = analyse_and_plan(planning_input);
+    // ONLY run if:
+    // - There are no parse errors (incomplete code generates false positives)
+    // - Verb config was loaded successfully
+    let has_parse_errors = diagnostics
+        .iter()
+        .any(|d| d.severity == Some(DiagnosticSeverity::ERROR));
 
-    // Convert planning diagnostics to LSP format
-    for diag in &planning_output.diagnostics {
-        diagnostics.push(convert_planning_diagnostic(diag, text));
-    }
+    let planning_output = if !has_parse_errors {
+        if let Some(registry) = create_planning_registry() {
+            let planning_input = PlanningInput::new(text, registry);
+            let output = analyse_and_plan(planning_input);
+
+            // Convert planning diagnostics to LSP format
+            for diag in &output.diagnostics {
+                diagnostics.push(convert_planning_diagnostic(diag, text));
+            }
+            output
+        } else {
+            // No registry available - skip planning diagnostics
+            ob_poc::dsl_v2::planning_facade::PlanningOutput::default()
+        }
+    } else {
+        // Return empty planning output for incomplete code
+        ob_poc::dsl_v2::planning_facade::PlanningOutput::default()
+    };
 
     AnalysisResult {
         state,
