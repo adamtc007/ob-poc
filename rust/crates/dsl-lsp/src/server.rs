@@ -118,7 +118,7 @@ impl DslLanguageServer {
                 // Continue with DSL analysis below
             }
         }
-        
+
         // Use full analysis to get planning output for code actions
         let result = handlers::diagnostics::analyze_document_full(text).await;
 
@@ -174,7 +174,9 @@ impl DslLanguageServer {
         text: &str,
         documents: &Arc<RwLock<HashMap<Url, DocumentState>>>,
         planning_outputs: &Arc<RwLock<HashMap<Url, PlanningOutput>>>,
-        semantic_diagnostics: &Arc<RwLock<HashMap<Url, Vec<ob_poc::dsl_v2::validation::Diagnostic>>>>,
+        semantic_diagnostics: &Arc<
+            RwLock<HashMap<Url, Vec<ob_poc::dsl_v2::validation::Diagnostic>>>,
+        >,
         client: &Client,
     ) {
         let result = handlers::diagnostics::analyze_document_full(text).await;
@@ -198,7 +200,9 @@ impl DslLanguageServer {
         }
 
         // Publish diagnostics
-        client.publish_diagnostics(uri.clone(), result.diagnostics, None).await;
+        client
+            .publish_diagnostics(uri.clone(), result.diagnostics, None)
+            .await;
     }
 }
 
@@ -256,6 +260,12 @@ impl LanguageServer for DslLanguageServer {
                     },
                 )),
 
+                // Rename support (prepare + execute)
+                rename_provider: Some(OneOf::Right(RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: Default::default(),
+                })),
+
                 ..Default::default()
             },
             server_info: Some(ServerInfo {
@@ -291,7 +301,7 @@ impl LanguageServer for DslLanguageServer {
         tracing::debug!("Document changed: {}", params.text_document.uri);
 
         let uri = params.text_document.uri.clone();
-        
+
         // Get full text from incremental changes
         let text = if let Some(doc) = self.get_document(&uri).await {
             let mut text = doc.text.clone();
@@ -306,16 +316,18 @@ impl LanguageServer for DslLanguageServer {
             }
             text
         } else {
-            params.content_changes.into_iter()
+            params
+                .content_changes
+                .into_iter()
                 .last()
                 .map(|c| c.text)
                 .unwrap_or_default()
         };
-        
+
         // Debounce: record timestamp and spawn delayed analysis
         let now = Instant::now();
         self.pending_changes.write().await.insert(uri.clone(), now);
-        
+
         let pending = self.pending_changes.clone();
         let docs = self.documents.clone();
         let client = self.client.clone();
@@ -323,23 +335,26 @@ impl LanguageServer for DslLanguageServer {
         let semantic_diagnostics = self.semantic_diagnostics.clone();
         let uri2 = uri.clone();
         let text2 = text.clone();
-        
+
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_millis(100)).await;
-            
+
             // Check if this is still the most recent change
             let pending_time = pending.read().await.get(&uri2).cloned();
             if pending_time == Some(now) {
                 // Still current - run analysis
                 Self::analyze_document_static(
-                    &uri2, &text2, &docs, &planning_outputs, 
-                    &semantic_diagnostics, &client
-                ).await;
+                    &uri2,
+                    &text2,
+                    &docs,
+                    &planning_outputs,
+                    &semantic_diagnostics,
+                    &client,
+                )
+                .await;
             }
         });
     }
-    
-
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         tracing::debug!("Document closed: {}", params.text_document.uri);
@@ -407,8 +422,8 @@ impl LanguageServer for DslLanguageServer {
 
         if let Some(doc) = self.get_document(uri).await {
             let symbols = self.symbols.read().await;
-            return Ok(handlers::goto_definition::get_definition(
-                &doc, position, &symbols,
+            return Ok(handlers::goto_definition::get_definition_with_uri(
+                &doc, position, &symbols, uri,
             ));
         }
 
@@ -421,8 +436,8 @@ impl LanguageServer for DslLanguageServer {
 
         if let Some(doc) = self.get_document(uri).await {
             let symbols = self.symbols.read().await;
-            return Ok(handlers::goto_definition::get_references(
-                &doc, position, &symbols,
+            return Ok(handlers::goto_definition::get_references_with_uri(
+                &doc, position, &symbols, uri,
             ));
         }
 
@@ -449,6 +464,34 @@ impl LanguageServer for DslLanguageServer {
         if let Some(doc) = self.get_document(uri).await {
             let symbols = handlers::symbols::get_document_symbols(&doc);
             return Ok(Some(DocumentSymbolResponse::Flat(symbols)));
+        }
+
+        Ok(None)
+    }
+
+    async fn prepare_rename(
+        &self,
+        params: TextDocumentPositionParams,
+    ) -> Result<Option<PrepareRenameResponse>> {
+        let uri = &params.text_document.uri;
+        let position = params.position;
+
+        if let Some(doc) = self.get_document(uri).await {
+            return Ok(handlers::rename::prepare_rename(&doc, position));
+        }
+
+        Ok(None)
+    }
+
+    async fn rename(&self, params: RenameParams) -> Result<Option<WorkspaceEdit>> {
+        let uri = &params.text_document_position.text_document.uri;
+        let position = params.text_document_position.position;
+        let new_name = &params.new_name;
+
+        if let Some(doc) = self.get_document(uri).await {
+            return Ok(handlers::rename::rename_symbol(
+                &doc, position, new_name, uri,
+            ));
         }
 
         Ok(None)

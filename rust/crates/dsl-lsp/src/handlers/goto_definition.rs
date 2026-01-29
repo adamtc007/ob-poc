@@ -1,10 +1,15 @@
 //! Go-to-definition and find-references handler.
 
+#![allow(dead_code)] // Public API - functions may be used by LSP server
+
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::{DocumentState, SymbolTable};
 
 /// Get definition location for symbol at position.
+///
+/// The `uri` parameter is the document URI, passed by the caller
+/// so we can build proper Location objects.
 pub fn get_definition(
     doc: &DocumentState,
     position: Position,
@@ -18,7 +23,40 @@ pub fn get_definition(
 
     // Check if it's a symbol reference
     if let Some(symbol_name) = word.strip_prefix('@') {
-        // Look up in symbol table
+        // Look up in symbol table (cross-document)
+        if let Some(info) = symbols.get(symbol_name) {
+            return Some(GotoDefinitionResponse::Scalar(info.definition.clone()));
+        }
+
+        // Fall back to document-local symbols
+        // Note: URI is placeholder - server must fix it
+        if let Some(def) = doc.get_symbol_def(symbol_name) {
+            return Some(GotoDefinitionResponse::Scalar(Location {
+                uri: Url::parse("file:///placeholder").unwrap(),
+                range: def.range,
+            }));
+        }
+    }
+
+    None
+}
+
+/// Get definition with proper URI (called from server with document URI).
+pub fn get_definition_with_uri(
+    doc: &DocumentState,
+    position: Position,
+    symbols: &SymbolTable,
+    uri: &Url,
+) -> Option<GotoDefinitionResponse> {
+    let line = doc.get_line(position.line)?;
+    let col = position.character as usize;
+
+    // Find word at cursor
+    let word = find_word_at_position(line, col)?;
+
+    // Check if it's a symbol reference
+    if let Some(symbol_name) = word.strip_prefix('@') {
+        // Look up in symbol table (cross-document)
         if let Some(info) = symbols.get(symbol_name) {
             return Some(GotoDefinitionResponse::Scalar(info.definition.clone()));
         }
@@ -26,7 +64,7 @@ pub fn get_definition(
         // Fall back to document-local symbols
         if let Some(def) = doc.get_symbol_def(symbol_name) {
             return Some(GotoDefinitionResponse::Scalar(Location {
-                uri: Url::parse("file:///").unwrap(), // Will be replaced by caller
+                uri: uri.clone(),
                 range: def.range,
             }));
         }
@@ -50,7 +88,33 @@ pub fn get_references(
     // Check if it's a symbol reference or definition
     let symbol_name = word.strip_prefix('@')?;
 
-    // Look up in symbol table
+    // Look up in symbol table (cross-document)
+    if let Some(info) = symbols.get(symbol_name) {
+        let mut locations = vec![info.definition.clone()];
+        locations.extend(info.references.iter().cloned());
+        return Some(locations);
+    }
+
+    None
+}
+
+/// Get all references with proper URI for document-local fallback.
+pub fn get_references_with_uri(
+    doc: &DocumentState,
+    position: Position,
+    symbols: &SymbolTable,
+    uri: &Url,
+) -> Option<Vec<Location>> {
+    let line = doc.get_line(position.line)?;
+    let col = position.character as usize;
+
+    // Find word at cursor
+    let word = find_word_at_position(line, col)?;
+
+    // Check if it's a symbol reference or definition
+    let symbol_name = word.strip_prefix('@')?;
+
+    // Look up in symbol table (cross-document)
     if let Some(info) = symbols.get(symbol_name) {
         let mut locations = vec![info.definition.clone()];
         locations.extend(info.references.iter().cloned());
@@ -63,7 +127,7 @@ pub fn get_references(
     // Add definition
     if let Some(def) = doc.get_symbol_def(symbol_name) {
         locations.push(Location {
-            uri: Url::parse("file:///").unwrap(),
+            uri: uri.clone(),
             range: def.range,
         });
     }
@@ -72,7 +136,7 @@ pub fn get_references(
     for sym_ref in &doc.symbol_refs {
         if sym_ref.name == symbol_name {
             locations.push(Location {
-                uri: Url::parse("file:///").unwrap(),
+                uri: uri.clone(),
                 range: sym_ref.range,
             });
         }

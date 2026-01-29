@@ -5,6 +5,8 @@
 //!
 //! This ensures LSP and Server use the SAME validation pipeline.
 
+#![allow(dead_code)] // Public API - functions may be used by LSP server
+
 use std::sync::Arc;
 use tower_lsp::lsp_types::*;
 

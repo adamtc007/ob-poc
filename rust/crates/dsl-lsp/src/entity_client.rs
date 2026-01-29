@@ -3,6 +3,8 @@
 //! This module provides a client that connects to the EntityGateway gRPC
 //! service for fast fuzzy entity lookups used in autocomplete.
 
+#![allow(dead_code)] // Public API - functions may be used by LSP server
+
 use entity_gateway::proto::ob::gateway::v1::{
     entity_gateway_client::EntityGatewayClient, SearchMode, SearchRequest,
 };

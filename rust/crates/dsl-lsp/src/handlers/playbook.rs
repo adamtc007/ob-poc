@@ -7,7 +7,7 @@ use tower_lsp::lsp_types::*;
 /// Analyze a playbook YAML file and return diagnostics
 pub async fn analyze_playbook(source: &str) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    
+
     // Parse the playbook
     let output = match parse_playbook(source) {
         Ok(o) => o,
@@ -22,23 +22,23 @@ pub async fn analyze_playbook(source: &str) -> Vec<Diagnostic> {
             return diagnostics;
         }
     };
-    
+
     // Lower to DSL (validates structure)
     let slots = SlotState::new();
     let result = lower_playbook(&output.spec, &slots);
-    
+
     // Report missing slots as warnings
     for m in &result.missing_slots {
         if let Some(span) = output.source_map.verb_span(m.step_index) {
             diagnostics.push(Diagnostic {
                 range: Range {
-                    start: Position { 
-                        line: span.line - 1, 
-                        character: span.column 
+                    start: Position {
+                        line: span.line - 1,
+                        character: span.column,
                     },
-                    end: Position { 
-                        line: span.line - 1, 
-                        character: span.column + span.length 
+                    end: Position {
+                        line: span.line - 1,
+                        character: span.column + span.length,
                     },
                 },
                 severity: Some(DiagnosticSeverity::WARNING),
@@ -48,9 +48,9 @@ pub async fn analyze_playbook(source: &str) -> Vec<Diagnostic> {
             });
         }
     }
-    
+
     // TODO: Validate verbs exist in registry
     // TODO: Run DAG validation on lowered DSL
-    
+
     diagnostics
 }

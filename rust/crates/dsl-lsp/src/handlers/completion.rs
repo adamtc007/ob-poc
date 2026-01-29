@@ -1,5 +1,7 @@
 //! Completion handler for the DSL Language Server.
 
+#![allow(dead_code)] // Public API - functions may be used by LSP server
+
 use tower_lsp::lsp_types::*;
 
 use crate::analysis::{detect_completion_context, CompletionContext, DocumentState, SymbolTable};
