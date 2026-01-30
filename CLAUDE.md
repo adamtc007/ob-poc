@@ -606,6 +606,192 @@ SELECT * FROM "ob-poc".v_verb_embedding_stats;
 
 ---
 
+## Structured Onboarding Pipeline (ob-agentic)
+
+The `ob-agentic` crate provides a **three-layer pipeline** for converting natural language custody onboarding requests into validated DSL. This is distinct from the single-verb MCP pipeline above—it handles complex multi-entity onboarding workflows.
+
+**Crate:** `rust/crates/ob-agentic/` (no database dependency)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    STRUCTURED ONBOARDING PIPELINE                            │
+│                                                                              │
+│  User: "Set up a PE fund trading US equities with IRS with Morgan Stanley"  │
+│                                                                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  LAYER 1: INTENT EXTRACTION (LLM)                                   │    │
+│  │  IntentExtractor.extract() → OnboardingIntent                       │    │
+│  │                                                                     │    │
+│  │  Output: {                                                          │    │
+│  │    client: { name: "PE Fund", type: "fund", jurisdiction: "US" },  │    │
+│  │    instruments: [EQUITY, OTC_IRS],                                 │    │
+│  │    markets: [{ code: XNYS, currencies: [USD] }],                   │    │
+│  │    otc_counterparties: [{ name: "Morgan Stanley", law: "NY" }]     │    │
+│  │  }                                                                  │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                              │                                               │
+│                              ▼                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  LAYER 2: REQUIREMENT PLANNING (Deterministic Rust)                 │    │
+│  │  RequirementPlanner::plan(intent) → OnboardingPlan                  │    │
+│  │                                                                     │    │
+│  │  • Classify pattern (SimpleEquity / MultiMarket / WithOtc)         │    │
+│  │  • Plan CBU creation                                                │    │
+│  │  • Plan entity lookups (counterparties)                            │    │
+│  │  • Derive universe (instruments × markets × currencies)            │    │
+│  │  • Derive SSIs (settlement routes)                                 │    │
+│  │  • Derive booking rules (priority-ordered)                         │    │
+│  │  • Plan ISDAs + CSAs (if OTC)                                      │    │
+│  │                                                                     │    │
+│  │  NO LLM - pure business logic expansion                            │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                              │                                               │
+│                              ▼                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  LAYER 3: DSL GENERATION (LLM)                                      │    │
+│  │  DslGenerator.generate(plan) → DSL source string                    │    │
+│  │                                                                     │    │
+│  │  • System prompt: DSL syntax, verb schemas, pattern example        │    │
+│  │  • User prompt: structured plan (CBU, entities, universe, rules)   │    │
+│  │  • LLM renders plan as s-expression DSL                            │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                              │                                               │
+│                              ▼                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  VALIDATION & RETRY (FeedbackLoop)                                  │    │
+│  │  FeedbackLoop.generate_valid_dsl(plan)                              │    │
+│  │                                                                     │    │
+│  │  • AgentValidator checks syntax                                    │    │
+│  │  • If invalid: collect errors → ask LLM to fix                     │    │
+│  │  • Retry up to max_retries                                         │    │
+│  │  • Return ValidatedDsl { source, attempts, validation }            │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                              │                                               │
+│                              ▼                                               │
+│                    dsl-core parser → execution                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Types
+
+| Type | Module | Purpose |
+|------|--------|---------|
+| `OnboardingIntent` | `ob_agentic::intent` | Structured NL extraction (client, instruments, markets, counterparties) |
+| `IntentResult` | `ob_agentic::intent` | Either `Clear(intent)` or `NeedsClarification(request)` |
+| `OnboardingPlan` | `ob_agentic::planner` | Complete requirements (CBU, entities, universe, SSIs, rules, ISDAs) |
+| `OnboardingPattern` | `ob_agentic::patterns` | Classification: `SimpleEquity`, `MultiMarket`, `WithOtc` |
+| `DslGenerator` | `ob_agentic::generator` | LLM-based DSL rendering from plan |
+| `FeedbackLoop` | `ob_agentic::feedback` | Retry loop with error correction |
+| `ValidatedDsl` | `ob_agentic::feedback` | Final output with attempt count |
+
+### Onboarding Patterns
+
+| Pattern | Criteria | Complexity |
+|---------|----------|------------|
+| `SimpleEquity` | Single market, single currency, no OTC | CBU + profile + 1 SSI + basic rules |
+| `MultiMarket` | Multiple markets or cross-currency | Multiple SSIs + complex routing rules |
+| `WithOtc` | Has OTC counterparties | Adds entities + ISDAs + CSAs + collateral SSI |
+
+### OnboardingPlan Structure
+
+```rust
+pub struct OnboardingPlan {
+    pub pattern: OnboardingPattern,       // Classification
+    pub cbu: CbuPlan,                     // CBU creation spec
+    pub entities: Vec<EntityPlan>,        // Counterparty lookups
+    pub universe: Vec<UniverseEntry>,     // What client trades
+    pub ssis: Vec<SsiPlan>,               // Settlement identifiers  
+    pub booking_rules: Vec<BookingRulePlan>, // Routing (priority-ordered)
+    pub isdas: Vec<IsdaPlan>,             // OTC agreements
+}
+
+// Universe entry: instruments × markets × currencies
+pub struct UniverseEntry {
+    pub instrument_class: String,         // EQUITY, OTC_IRS
+    pub market: Option<String>,           // XNYS, None for OTC
+    pub currencies: Vec<String>,          // USD, EUR
+    pub settlement_types: Vec<String>,    // DVP, FOP
+    pub counterparty_var: Option<String>, // @morgan for OTC
+}
+
+// Booking rules derived from universe
+pub struct BookingRulePlan {
+    pub priority: u32,                    // 10, 15, 50, 100
+    pub instrument_class: Option<String>,
+    pub market: Option<String>,
+    pub currency: Option<String>,
+    pub counterparty_var: Option<String>,
+    pub ssi_variable: String,             // @ssi-xnys-usd
+}
+```
+
+### Call Stack
+
+```rust
+// 1. Extract intent from NL (async, LLM)
+let extractor = IntentExtractor::from_env()?;
+let result = extractor.extract("Set up PE fund...").await?;
+
+match result {
+    IntentResult::NeedsClarification(req) => {
+        // Show req.ambiguity.question to user
+        // Call extract_with_clarification() with their choice
+    }
+    IntentResult::Clear(intent) => {
+        // 2. Plan requirements (sync, deterministic)
+        let plan = RequirementPlanner::plan(&intent);
+        
+        // 3. Generate validated DSL (async, LLM with retry)
+        let feedback = FeedbackLoop::from_env(3)?;
+        let validated = feedback.generate_valid_dsl(&plan).await?;
+        
+        // validated.source contains DSL ready for dsl-core
+    }
+}
+```
+
+### Lexicon Pipeline (Alternative Path)
+
+The `ob_agentic::lexicon` module provides a **formal grammar** approach as an alternative to LLM-based intent extraction:
+
+```
+User Input → Tokenizer (lexicon + EntityGateway) → Nom Parser → IntentAst → Plan → DSL
+```
+
+| Module | Purpose |
+|--------|---------|
+| `lexicon::Tokenizer` | Classifies words against YAML lexicon + DB entities |
+| `lexicon::parse_tokens` | Nom grammar parser → `IntentAst` |
+| `lexicon::intent_to_plan` | AST → `Plan` with `SemanticAction` |
+| `lexicon::render_plan` | Plan → DSL source string |
+
+This path is deterministic end-to-end (no LLM) but requires the lexicon to cover the input vocabulary.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/ob-agentic/src/intent.rs` | `OnboardingIntent`, `IntentResult`, `ClarificationRequest` |
+| `rust/crates/ob-agentic/src/planner.rs` | `RequirementPlanner::plan()`, `OnboardingPlan` |
+| `rust/crates/ob-agentic/src/generator.rs` | `DslGenerator`, `IntentExtractor` |
+| `rust/crates/ob-agentic/src/feedback.rs` | `FeedbackLoop`, `ValidatedDsl` |
+| `rust/crates/ob-agentic/src/patterns.rs` | `OnboardingPattern` enum |
+| `rust/crates/ob-agentic/src/validator.rs` | `AgentValidator` for DSL syntax |
+| `rust/crates/ob-agentic/src/lexicon/` | Formal grammar tokenizer + parser |
+| `rust/crates/ob-agentic/src/schemas/` | Verb schemas + reference data for prompts |
+
+### When to Use Which Pipeline
+
+| Pipeline | Use Case |
+|----------|----------|
+| **MCP Pipeline** (verb_search → dsl_generate) | Single-verb commands, navigation, CRUD operations |
+| **ob-agentic Pipeline** (Intent → Plan → DSL) | Complex custody onboarding with multiple entities, SSIs, booking rules |
+| **Lexicon Pipeline** | Deterministic parsing when vocabulary is constrained |
+
+---
+
 ## V2 Verb Schema Pipeline (057)
 
 > ✅ **IMPLEMENTED (2026-01-27)**: Canonical V2 YAML schema with deterministic phrase generation and compiled registry.
@@ -1807,6 +1993,189 @@ If you modify the grammar or extension config:
 
 ---
 
+## DSL Language Server (dsl-lsp)
+
+> ✅ **IMPLEMENTED (060-063)**: Full LSP with completions, hover, rename, diagnostics, code actions, and EntityGateway integration.
+
+**Crate:** `rust/crates/dsl-lsp/` — Language Server Protocol implementation for the Onboarding DSL.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    DSL LANGUAGE SERVER                                       │
+│                                                                              │
+│  Editor (Zed/VS Code)         LSP Server (tower-lsp)        External        │
+│  ───────────────────          ──────────────────────        ────────        │
+│                                                                              │
+│  .dsl file opened    ───►    did_open()                                     │
+│                               │                                              │
+│                               ├─► parse_with_v2() (dsl-core)                │
+│                               ├─► Extract symbols (@bindings)               │
+│                               ├─► LspValidator.validate()                   │
+│                               ├─► analyse_and_plan() (DAG)    ◄─── ob-poc  │
+│                               └─► publish_diagnostics()                     │
+│                                                                              │
+│  User types          ───►    did_change() [debounced 100ms]                 │
+│                               └─► Re-analyze + re-publish                   │
+│                                                                              │
+│  Ctrl+Space          ───►    completion()                                   │
+│                               ├─► detect_completion_context()               │
+│                               ├─► complete_verbs / keywords / symbols       │
+│                               └─► EntityGateway lookup  ◄─── gRPC          │
+│                                                                              │
+│  Hover               ───►    hover()                                        │
+│                               └─► Verb docs, symbol info, error suggestions │
+│                                                                              │
+│  F2 Rename           ───►    rename()                                       │
+│                               └─► Find all symbol refs, apply edits         │
+│                                                                              │
+│  Cmd+.               ───►    code_action()                                  │
+│                               ├─► Implicit creates (PlanningOutput)         │
+│                               ├─► Reorder suggestions                       │
+│                               └─► Entity "did you mean?" fixes              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### LSP Capabilities
+
+| Capability | Handler | Features |
+|------------|---------|----------|
+| **Diagnostics** | `diagnostics.rs` | Syntax errors, semantic validation, DAG warnings |
+| **Completion** | `completion.rs` | Verbs, `:keywords`, `@symbols`, entity lookups, next-step suggestions |
+| **Hover** | `hover.rs` | Verb documentation, symbol info, error suggestions |
+| **Go to Definition** | `goto_definition.rs` | Jump to `@symbol` definitions |
+| **Find References** | `goto_definition.rs` | Find all uses of `@symbol` |
+| **Rename** | `rename.rs` | Rename symbols across document |
+| **Signature Help** | `signature.rs` | Verb argument hints while typing |
+| **Document Symbols** | `symbols.rs` | Outline view of verbs and bindings |
+| **Code Actions** | `code_actions.rs` | Quick fixes, implicit creates, reordering |
+
+### Completion Contexts
+
+The LSP detects context and routes to appropriate completer:
+
+| Context | Trigger | Completions |
+|---------|---------|-------------|
+| `VerbName` | After `(` | All verbs from registry |
+| `Keyword` | After verb name | Valid `:args` for that verb |
+| `KeywordValue` | After `:keyword` | Enum values, entity lookups |
+| `SymbolRef` | After `@` | Defined `@bindings` in document |
+| `None` | Empty line | DAG-based next-step suggestions |
+
+### Entity Gateway Integration
+
+For entity completion (e.g., `:counterparty <...>`), the LSP connects to EntityGateway via gRPC:
+
+```bash
+# Environment variables
+ENTITY_GATEWAY_URL=http://localhost:50051   # Default: [::1]:50051
+DSL_CONFIG_DIR=/path/to/config/verbs/       # Verb YAML directory
+```
+
+If EntityGateway is unavailable, LSP falls back to syntax-only mode.
+
+### Code Actions
+
+Three sources of code actions from `PlanningOutput`:
+
+| Source | Example Action |
+|--------|----------------|
+| `synthetic_steps` | "Create @cbu with cbu.create" (implicit binding) |
+| `was_reordered` | "Reorder statements for dependencies" |
+| `SemanticDiagnostic.suggestions` | "Did you mean 'John Smith'?" |
+
+### Document Analysis Pipeline
+
+```
+DSL Source
+    │
+    ▼
+parse_with_v2() ──► DocumentState { text, expressions, symbol_defs, symbol_refs }
+    │
+    ▼
+LspValidator.validate() ──► SemanticDiagnostics (entity resolution errors)
+    │
+    ▼
+analyse_and_plan() ──► PlanningOutput { phases, synthetic_steps, was_reordered }
+    │
+    ▼
+publish_diagnostics() ──► Editor shows errors/warnings
+```
+
+### Shared Validation with Server
+
+The LSP uses the **same validation code** as the server:
+
+```rust
+// Both LSP and server use:
+ob_poc::parse_program()           // Parser
+ob_poc::LspValidator              // Semantic validation
+ob_poc::planning_facade           // DAG analysis
+ob_poc::RuntimeVerbRegistry       // Verb metadata
+```
+
+This ensures LSP diagnostics match server behavior 100%.
+
+### Playbook Support
+
+Files matching `*.playbook.yaml` / `*.playbook.yml` get specialized handling:
+
+- Parse with `playbook-core`
+- Lower with `playbook-lower`
+- Report missing required slots as warnings
+- Validate verb references
+
+### Running the LSP
+
+```bash
+# Direct execution
+cargo run --release -p dsl-lsp
+
+# Zed auto-launches via extension config
+# VS Code: configure in settings.json
+```
+
+### Logging
+
+LSP logs to file (stdout reserved for protocol):
+
+```bash
+tail -f /tmp/dsl-lsp.log
+
+# Control verbosity
+DSL_LSP=trace cargo run -p dsl-lsp   # Max verbosity
+DSL_LSP=warn cargo run -p dsl-lsp    # Errors only
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/main.rs` | Entry point, stdio setup |
+| `src/server.rs` | Core LSP state machine, lifecycle |
+| `src/analysis/document.rs` | `DocumentState` - parsed document representation |
+| `src/analysis/context.rs` | `detect_completion_context()` |
+| `src/handlers/completion.rs` | Completion logic with sub-completers |
+| `src/handlers/diagnostics.rs` | Validation pipeline |
+| `src/handlers/code_actions.rs` | Code action generation |
+| `src/handlers/hover.rs` | Hover information |
+| `src/handlers/rename.rs` | Symbol rename |
+| `src/encoding.rs` | UTF-16/UTF-8 position conversion |
+| `src/entity_client.rs` | gRPC client for EntityGateway |
+
+### Performance
+
+| Optimization | Implementation |
+|--------------|----------------|
+| Debouncing | 100ms delay on `did_change` |
+| Incremental sync | Clients send deltas, not full text |
+| Lazy EntityGateway | Only connects when completion needs entities |
+| Lazy planning | Only runs if no parse errors |
+| Caching | Verb registry and macro registry cached in `OnceLock` |
+
+---
+
 ## Staged Runbook REPL (054)
 
 > ✅ **IMPLEMENTED (2026-01-25)**: Anti-hallucination execution model with staged commands, entity resolution, DAG ordering.
@@ -2641,8 +3010,8 @@ ob-poc/
 │   ├── config/verbs/           # 103 YAML verb definitions
 │   ├── crates/
 │   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
-│   │   ├── dsl-lsp/            # Language Server for DSL
-│   │   ├── ob-agentic/         # LLM agent
+│   │   ├── dsl-lsp/            # LSP server + Zed extension + tree-sitter grammar
+│   │   ├── ob-agentic/         # Onboarding pipeline (Intent→Plan→DSL)
 │   │   ├── ob-poc-macros/      # Proc macros (#[register_custom_op], #[derive(IdType)])
 │   │   ├── ob-poc-ui/          # egui/WASM UI
 │   │   └── ob-poc-graph/       # Graph visualization
@@ -2730,6 +3099,8 @@ When you see these in a task, read the corresponding annex first:
 | "solar navigation", "ViewState", "orbit", "nav_history" | `ai-thoughts/038-solar-navigation-unified-design.md` |
 | "intent pipeline", "ambiguity", "normalize_candidates", "ref_id" | `intent-pipeline-fixes-todo.md` |
 | "macro", "operator vocabulary", "structure.setup", "constraint cascade" | `rust/src/mcp/TODO_UNIFIED_ARCHITECTURE.md` |
+| "onboarding pipeline", "RequirementPlanner", "OnboardingPlan", "ob-agentic" | CLAUDE.md §Structured Onboarding Pipeline |
+| "LSP", "language server", "completion", "diagnostics", "dsl-lsp" | CLAUDE.md §DSL Language Server |
 
 ---
 
@@ -2871,7 +3242,7 @@ role:
 | `OpenAIEmbedder` | `CandleEmbedder` (local) |
 | `all-MiniLM-L6-v2` model | `bge-small-en-v1.5` (retrieval-optimized) |
 | `embed()` / `embed_batch()` | `embed_query()` / `embed_target()` (asymmetric) |
-| `IntentExtractor` | MCP `verb_search` + `dsl_generate` |
+| `IntentExtractor` (old MCP path) | MCP `verb_search` + `dsl_generate` |
 | `AgentOrchestrator` | MCP pipeline |
 | `verb_rag_metadata.rs` | YAML `invocation_phrases` + pgvector |
 | `FeedbackLoop.generate_valid_dsl()` | MCP `dsl_generate` |
