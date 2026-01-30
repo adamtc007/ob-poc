@@ -288,22 +288,6 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Session-runsheet-viewport | `ai-thoughts/035-session-runsheet-viewport-integration.md` | ✅ Done |
 | Session rip-and-replace | `ai-thoughts/036-session-rip-and-replace.md` | ✅ Done |
 | Solar navigation | `ai-thoughts/038-solar-navigation-unified-design.md` | ✅ Done |
-| Candle embeddings | `docs/TODO-CANDLE-MIGRATION.md` | ✅ Complete |
-| Candle pipeline | `docs/TODO-CANDLE-PIPELINE-CONSOLIDATION.md` | ✅ Complete |
-| Intent pipeline fixes | `ai-thoughts/Intent-Pipeline-Fixes-todo.md` | ✅ Complete |
-| Promotion pipeline | `TODO-feedback-loop-promotion.md` | ✅ Complete |
-| Client group resolver | `TODO-CLIENT-GROUP-IMPL.md` | ✅ Complete |
-| Workflow task queue | `TODO-WORKFLOW-TASK-QUEUE.md` | ✅ Complete |
-| Transactional execution | `TODO-DSL-TRANSACTIONAL-EXECUTION-AND-LOCKING.md` | ✅ Complete |
-| CustomOp auto-registration | `TODO-INTEGRATED-TASK-QUEUE-MACROS.md` | ✅ Complete |
-| Client group research integration | `TODO-CLIENT-GROUP-RESEARCH-INTEGRATION.md` | ✅ Complete |
-| Unified architecture (058) | `rust/src/mcp/TODO_UNIFIED_ARCHITECTURE.md` | ✅ Complete |
-
-### Active TODOs
-
-| Topic | Document | Status |
-|-------|----------|--------|
-| **ESPER Navigation** | `TODO-ESPER-NAVIGATION-FULL.md` | ✅ Complete - Trie + semantic fallback |
 
 ---
 
@@ -1306,6 +1290,31 @@ New primitive verbs for macro expansion targets:
 | `trading-profile` | `mandate` |
 | `trading_profile_id` | `mandate_id` |
 
+### Macro Lint Rules
+
+Key lint rules enforced by `cargo x verbs lint-macros`:
+
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `MACRO011` | Error | UI fields required (label, description, target_label) |
+| `MACRO012` | Error | Forbidden tokens in UI (cbu, entity_ref, etc.) |
+| `MACRO042` | Error | No raw `entity_ref` - use `structure_ref`, `party_ref` |
+| `MACRO043` | Error | `kinds:` only under `internal:` block |
+| `MACRO044` | Error | Enums must use `${arg.X.internal}` in expansion |
+| `MACRO063` | Error | Variable grammar validation (only `${arg.*}`, `${scope.*}`, `${session.*}`) |
+| `MACRO080a-c` | Warning | UX friction (missing autofill, picker, short description) |
+
+### Operator Enum Keys vs Internal Tokens
+
+UI keys are not the same as internal tokens - expansion MUST use `${arg.X.internal}`:
+
+| UI Key | Label (user sees) | Internal Token |
+|--------|-------------------|----------------|
+| `pe` | "Private Equity" | `private-equity` |
+| `sicav` | "SICAV" | `sicav` |
+| `gp` | "General Partner" | `general-partner` |
+| `manco` | "Management Company" | `manco` |
+
 ---
 
 ## Legal Contracts & Onboarding Gate (045)
@@ -1510,6 +1519,47 @@ missing → requested → received → in_qa → verified
 waived (manual override)    expired (validity lapsed)
 ```
 
+### Rejection Reason Codes
+
+Standardized codes for document QA rejection with client messaging:
+
+| Category | Codes | Next Action |
+|----------|-------|-------------|
+| Quality | `UNREADABLE`, `CUTOFF`, `GLARE`, `LOW_RESOLUTION` | Re-upload |
+| Mismatch | `WRONG_DOC_TYPE`, `WRONG_PERSON`, `SAMPLE_DOC` | Upload correct doc |
+| Validity | `EXPIRED`, `NOT_YET_VALID`, `UNDATED` | Upload valid doc |
+| Data | `DOB_MISMATCH`, `NAME_MISMATCH`, `ADDRESS_MISMATCH` | Verify details |
+| Authenticity | `SUSPECTED_ALTERATION`, `INCONSISTENT_FONTS` | Escalate |
+
+### CargoRef URI Scheme
+
+Typed reference URIs for document/entity tracking:
+
+```
+document://ob-poc/{uuid}     # Document identity
+version://ob-poc/{uuid}      # Specific version (preferred for callbacks)
+entity://ob-poc/{uuid}       # Entity reference
+screening://ob-poc/{uuid}    # Screening result
+external://{system}/{id}     # Vendor passthrough
+```
+
+### Bundle Payload Format
+
+External systems return bundles (even for single documents):
+
+```json
+{
+  "task_id": "uuid",
+  "status": "completed",
+  "idempotency_key": "vendor-event-12345",
+  "items": [
+    { "cargo_ref": "version://ob-poc/...", "doc_type": "passport", "status": "completed" }
+  ]
+}
+```
+
+Listener uses atomic CTE-based queue pop (`FOR UPDATE SKIP LOCKED`) with deduplication by `(task_id, idempotency_key)`.
+
 ### Key Tables
 
 | Table | Purpose |
@@ -1642,9 +1692,29 @@ pub struct DerivedLock {
     pub access: LockAccess,   // Read or Write
 }
 
+// Lock key derivation: deterministic i64 from (entity_type, entity_id) using DefaultHasher
 // Locks acquired in sorted order (entity_id) to prevent deadlocks
 // Released automatically when transaction commits/rolls back
 ```
+
+### Error Aggregation
+
+Errors grouped by root cause for clear diagnostics:
+
+| ErrorCause | Description |
+|------------|-------------|
+| `EntityDeleted` | Entity was deleted mid-execution |
+| `EntityNotFound` | Referenced entity doesn't exist |
+| `VersionConflict` | Optimistic lock failure |
+| `ConstraintViolation` | FK/unique constraint failed |
+
+`FailureTiming` distinguishes `PreExisting` (bad input) vs `MidExecution` (race condition).
+
+### Expansion Safety Rules
+
+- **Expansion output is UNTRUSTED** - validate expanded macros like hostile input
+- **Max expansion steps: 100** - prevents runaway recursive macros
+- **No macro recursion** - primitives only in expansion output
 
 ### Execution Results
 
@@ -3098,8 +3168,8 @@ When you see these in a task, read the corresponding annex first:
 | "GROUP", "ownership graph" | `ai-thoughts/019-group-taxonomy-intra-company-ownership.md` |
 | "sheet", "phased execution", "DAG" | `ai-thoughts/035-repl-session-implementation-plan.md` |
 | "solar navigation", "ViewState", "orbit", "nav_history" | `ai-thoughts/038-solar-navigation-unified-design.md` |
-| "intent pipeline", "ambiguity", "normalize_candidates", "ref_id" | `intent-pipeline-fixes-todo.md` |
-| "macro", "operator vocabulary", "structure.setup", "constraint cascade" | `rust/src/mcp/TODO_UNIFIED_ARCHITECTURE.md` |
+| "intent pipeline", "ambiguity", "normalize_candidates", "ref_id" | CLAUDE.md §Intent Pipeline Fixes (042) |
+| "macro", "operator vocabulary", "structure.setup", "constraint cascade" | CLAUDE.md §Operator Vocabulary & Macros (058) |
 | "onboarding pipeline", "RequirementPlanner", "OnboardingPlan", "ob-agentic" | CLAUDE.md §Structured Onboarding Pipeline |
 | "LSP", "language server", "completion", "diagnostics", "dsl-lsp" | CLAUDE.md §DSL Language Server |
 
