@@ -38,7 +38,7 @@ pub trait PrimitiveRegistry {
     fn has_verb(&self, verb_fqn: &str) -> bool;
 
     /// Check if a macro exists in the macro registry
-    fn has_macro(&self, macro_fqn: &str) -> bool {
+    fn has_macro(&self, _macro_fqn: &str) -> bool {
         false // Default: no cross-macro validation
     }
 }
@@ -706,7 +706,7 @@ fn check_invoke_macro_step(
 
     // MACRO065: invoke-macro must have a valid macro ID
     match macro_id {
-        Some(id) if id.is_empty() => {
+        Some("") => {
             diags.push(Diagnostic::error(
                 "MACRO065",
                 format!("{}.invoke-macro", step_path),

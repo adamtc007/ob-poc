@@ -3144,20 +3144,37 @@ Operator: "Set up a PE structure for Allianz"
 
 ### Macro Schema Example
 
+> **IMPORTANT:** All macro YAML uses **kebab-case** for field names (`target-label`, `mode-tags`, `expands-to`).
+
 ```yaml
 structure.setup:
   kind: macro
+  id: structure.setup                    # Explicit ID (optional, defaults to YAML key)
+  tier: composite                        # primitive | composite | template
+  aliases: [setup-structure, new-fund]   # Alternative names
+  taxonomy:
+    domain: structure
+    category: fund-setup
+  docs-bundle: docs.bundle.ucits-baseline
+  required-roles:
+    - role: depositary
+      cardinality: one
+      entity-kinds: [bank, custodian]
+  optional-roles:
+    - role: prime-broker
+      cardinality: zero-or-more
   ui:
     label: "Set up Structure"
     description: "Create a structure in the current client scope"
-    target_label: "Structure"
+    target-label: "Structure"
   target:
-    operates_on: client_ref
-    produces: structure_ref
+    operates-on: client-ref
+    produces: structure-ref
   args:
     required:
-      structure_type:
+      structure-type:
         type: enum
+        ui-label: "Type"
         values:
           - key: pe
             label: "Private Equity"
@@ -3165,12 +3182,81 @@ structure.setup:
           - key: sicav
             label: "SICAV"
             internal: sicav
-  expands_to:
+        default-key: pe
+      depositary:
+        type: party-ref
+        ui-label: "Depositary"
+        required-if: "structure-type = sicav"  # Conditional requirement
+        placeholder-if-missing: true           # Auto-create placeholder entity
+  expands-to:
     - verb: cbu.create
       args:
-        kind: "${arg.structure_type.internal}"  # Uses internal token
+        kind: "${arg.structure-type.internal}"  # Uses internal token
         name: "${arg.name}"
 ```
+
+### Advanced Macro Features (064)
+
+**Conditional Expansion (`when:`):**
+```yaml
+expands-to:
+  - when: "jurisdiction = LU"
+    then:
+      - verb: cbu.create
+        args: { kind: "sicav", jurisdiction: "LU" }
+    else:
+      - verb: cbu.create
+        args: { kind: "ucits" }
+```
+
+**Iteration (`foreach:`):**
+```yaml
+expands-to:
+  - foreach: role
+    in: "${required-roles}"
+    do:
+      - verb: party.assign
+        args:
+          structure-id: "${@structure}"
+          role: "${role.role}"
+          party-ref: "${role.party}"
+```
+
+**Condition Operators:**
+- `var = value` - equality
+- `var != value` - inequality
+- `var in [a, b, c]` - membership
+- `not: <condition>` - negation
+- `any-of: [<cond1>, <cond2>]` - OR
+- `all-of: [<cond1>, <cond2>]` - AND
+
+**Conditional Requirements (`required-if:`):**
+```yaml
+depositary:
+  type: party-ref
+  required-if: "structure-type = sicav"  # Required only for SICAV
+  
+prime-broker:
+  type: party-ref
+  required-if:
+    any-of:
+      - "structure-type = hedge"
+      - "has-prime-broker = true"
+```
+
+**Placeholder Entities (`placeholder-if-missing: true`):**
+When arg is missing but `placeholder-if-missing: true`, expander generates:
+```lisp
+(entity.ensure-or-placeholder :kind "depositary" :ref "depositary-placeholder")
+```
+
+**Key Files:**
+| File | Purpose |
+|------|---------|
+| `rust/src/dsl_v2/macros/schema.rs` | Schema types (`MacroSchema`, `WhenStep`, `ForEachStep`) |
+| `rust/src/dsl_v2/macros/conditions.rs` | Condition evaluation for `when:` |
+| `rust/src/dsl_v2/macros/expander.rs` | Macro expansion with When/ForEach/placeholder |
+| `config/verb_schemas/macros/*.yaml` | Macro definitions (kebab-case) |
 
 ### Macro Lint (`cargo x verbs lint-macros`)
 
@@ -3215,12 +3301,10 @@ role:
   values:
     - key: gp
       internal: general-partner
-      internal_validate:
-        allowed_structure_types: [pe, hedge]  # GP fails on SICAV
+      valid-for: [pe, hedge]  # GP fails on SICAV
     - key: manco
       internal: manco
-      internal_validate:
-        allowed_structure_types: [sicav]      # ManCo fails on PE
+      valid-for: [sicav]      # ManCo fails on PE
 ```
 
 ### Key Files

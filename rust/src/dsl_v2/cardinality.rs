@@ -73,6 +73,7 @@ pub struct RoleCardinalityDef {
 
 /// Full cardinality configuration from YAML
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct CardinalityConfig {
     pub roles: HashMap<String, RoleCardinalityDef>,
     #[serde(default)]
@@ -379,7 +380,7 @@ impl CardinalityDiagnostic {
     pub fn is_duplicate(&self) -> bool {
         self.expected
             .max_count()
-            .map_or(false, |max| self.actual > max)
+            .is_some_and(|max| self.actual > max)
     }
 }
 
@@ -454,7 +455,7 @@ roles:
   auditor:
     cardinality: one
 
-structure_aliases:
+structure-aliases:
   ucits: [sicav, icav-ucits]
   aif: [raif, qiaif]
   pe: [scsp, lp]

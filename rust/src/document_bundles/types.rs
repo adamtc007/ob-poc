@@ -47,12 +47,12 @@ impl DocsBundleDef {
     /// Check if this bundle is currently effective
     pub fn is_effective(&self) -> bool {
         let today = Utc::now().date_naive();
-        self.effective_from <= today && self.effective_to.map_or(true, |end| end > today)
+        self.effective_from <= today && self.effective_to.is_none_or(|end| end > today)
     }
 
     /// Check if this bundle was effective on a given date
     pub fn is_effective_on(&self, date: NaiveDate) -> bool {
-        self.effective_from <= date && self.effective_to.map_or(true, |end| end > date)
+        self.effective_from <= date && self.effective_to.is_none_or(|end| end > date)
     }
 }
 

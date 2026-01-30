@@ -328,20 +328,20 @@ structure.setup:
     label: "Set up Structure"
     description: "Create a new fund or mandate structure"
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: structure
+    mode-tags: [onboarding, kyc]
+    operator-domain: structure
   target:
-    operates_on: client_ref
-    produces: structure_ref
+    operates-on: client-ref
+    produces: structure-ref
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Structure name"
+        ui-label: "Structure name"
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: cbu.create
       args:
         name: "${arg.name}"
@@ -374,17 +374,17 @@ structure.setup:
     label: "Set up Structure"
     description: "Create structure"
   routing:
-    mode_tags: [onboarding]
-    operator_domain: structure
+    mode-tags: [onboarding]
+    operator-domain: structure
   target:
-    operates_on: client_ref
-    produces: structure_ref
+    operates-on: client-ref
+    produces: structure-ref
   args:
     style: keyworded
     required: {}
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: cbu.create
       args: {}
   unlocks: []
@@ -395,17 +395,17 @@ case.open:
     label: "Open Case"
     description: "Open KYC case"
   routing:
-    mode_tags: [kyc]
-    operator_domain: case
+    mode-tags: [kyc]
+    operator-domain: case
   target:
-    operates_on: structure_ref
-    produces: case_ref
+    operates-on: structure-ref
+    produces: case-ref
   args:
     style: keyworded
     required: {}
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: kyc-case.create
       args: {}
   unlocks: []
@@ -451,17 +451,17 @@ structure.setup:
     label: "Set up Structure"
     description: "Create"
   routing:
-    mode_tags: [onboarding]
-    operator_domain: structure
+    mode-tags: [onboarding]
+    operator-domain: structure
   target:
-    operates_on: client_ref
-    produces: structure_ref
+    operates-on: client-ref
+    produces: structure-ref
   args:
     style: keyworded
     required: {}
     optional: {}
   prereqs: []
-  expands_to: []
+  expands-to: []
   unlocks: []
 
 structure.list:
@@ -470,17 +470,17 @@ structure.list:
     label: "List Structures"
     description: "List"
   routing:
-    mode_tags: [onboarding]
-    operator_domain: structure
+    mode-tags: [onboarding]
+    operator-domain: structure
   target:
-    operates_on: client_ref
+    operates-on: client-ref
     produces: null
   args:
     style: keyworded
     required: {}
     optional: {}
   prereqs: []
-  expands_to: []
+  expands-to: []
   unlocks: []
 "#,
         );

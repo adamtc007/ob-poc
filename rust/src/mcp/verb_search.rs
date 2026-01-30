@@ -1645,11 +1645,11 @@ mod tests {
         let searcher =
             HybridVerbSearcher::minimal().with_macro_registry(std::sync::Arc::new(registry));
 
-        // Fuzzy match - query contains "structure"
+        // Fuzzy match - query contains "structure" (1 matching word = 0.75)
         let results = searcher.search_macros("structure", 5);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].verb, "structure.setup");
-        assert_eq!(results[0].score, 0.95); // Fuzzy match score
+        assert_eq!(results[0].score, 0.75); // Word overlap: 0.7 + 0.05 for 1 word
     }
 
     #[test]

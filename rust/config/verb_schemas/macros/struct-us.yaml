@@ -18,87 +18,87 @@ struct.us.40act.open-end:
   ui:
     label: "US 40 Act Open-End Fund"
     description: "Set up a US Investment Company Act registered open-end mutual fund"
-    target_label: "Open-End Fund"
+    target-label: "Open-End Fund"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [40act, open-end, mutual-fund]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [40act, open-end, mutual-fund]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       investment_adviser:
-        type: party_ref
-        ui_label: "Investment Adviser"
+        type: party-ref
+        ui-label: "Investment Adviser"
         description: "SEC-registered investment adviser"
         picker: party_picker
         internal:
           kinds: [company]
       custodian:
-        type: party_ref
-        ui_label: "Custodian"
+        type: party-ref
+        ui-label: "Custodian"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       sub_adviser:
-        type: party_ref
-        ui_label: "Sub-Adviser"
+        type: party-ref
+        ui-label: "Sub-Adviser"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       transfer_agent:
-        type: party_ref
-        ui_label: "Transfer Agent"
+        type: party-ref
+        ui-label: "Transfer Agent"
         picker: party_picker
         internal:
           kinds: [company]
       distributor:
-        type: party_ref
-        ui_label: "Principal Underwriter/Distributor"
+        type: party-ref
+        ui-label: "Principal Underwriter/Distributor"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Independent Auditor"
+        type: party-ref
+        ui-label: "Independent Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       legal_counsel:
-        type: party_ref
-        ui_label: "Legal Counsel"
+        type: party-ref
+        ui-label: "Legal Counsel"
         picker: party_picker
         internal:
           kinds: [company]
       cik_number:
         type: str
-        ui_label: "SEC CIK Number"
+        ui-label: "SEC CIK Number"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: open-end-fund
         jurisdiction: US
-        structure_type: 40act
+        structure-type: 40act
         regulatory_status: registered
       as: "@cbu"
 
@@ -224,7 +224,7 @@ struct.us.40act.open-end:
         profile_type: 40act
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -244,69 +244,69 @@ struct.us.40act.closed-end:
   ui:
     label: "US 40 Act Closed-End Fund"
     description: "Set up a US Investment Company Act registered closed-end fund"
-    target_label: "Closed-End Fund"
+    target-label: "Closed-End Fund"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [40act, closed-end]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [40act, closed-end]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       investment_adviser:
-        type: party_ref
-        ui_label: "Investment Adviser"
+        type: party-ref
+        ui-label: "Investment Adviser"
         picker: party_picker
         internal:
           kinds: [company]
       custodian:
-        type: party_ref
-        ui_label: "Custodian"
+        type: party-ref
+        ui-label: "Custodian"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       sub_adviser:
-        type: party_ref
-        ui_label: "Sub-Adviser"
+        type: party-ref
+        ui-label: "Sub-Adviser"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       transfer_agent:
-        type: party_ref
-        ui_label: "Transfer Agent"
+        type: party-ref
+        ui-label: "Transfer Agent"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Independent Auditor"
+        type: party-ref
+        ui-label: "Independent Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       legal_counsel:
-        type: party_ref
-        ui_label: "Legal Counsel"
+        type: party-ref
+        ui-label: "Legal Counsel"
         picker: party_picker
         internal:
           kinds: [company]
       listing_exchange:
         type: enum
-        ui_label: "Listing Exchange"
+        ui-label: "Listing Exchange"
         values:
           - key: nyse
             label: "NYSE"
@@ -317,18 +317,18 @@ struct.us.40act.closed-end:
           - key: amex
             label: "NYSE American"
             internal: AMEX
-        default_key: nyse
+        default-key: nyse
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: closed-end-fund
         jurisdiction: US
-        structure_type: 40act
+        structure-type: 40act
         regulatory_status: registered
         listing_exchange: "${arg.listing_exchange.internal}"
       as: "@cbu"
@@ -439,7 +439,7 @@ struct.us.40act.closed-end:
         profile_type: 40act
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -459,82 +459,82 @@ struct.us.etf.40act:
   ui:
     label: "US 40 Act ETF"
     description: "Set up a US Exchange-Traded Fund registered under the Investment Company Act"
-    target_label: "ETF"
+    target-label: "ETF"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [etf, 40act]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [etf, 40act]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       investment_adviser:
-        type: party_ref
-        ui_label: "Investment Adviser"
+        type: party-ref
+        ui-label: "Investment Adviser"
         picker: party_picker
         internal:
           kinds: [company]
       custodian:
-        type: party_ref
-        ui_label: "Custodian"
+        type: party-ref
+        ui-label: "Custodian"
         picker: party_picker
         internal:
           kinds: [company]
       authorized_participant:
-        type: party_ref
-        ui_label: "Authorized Participant"
+        type: party-ref
+        ui-label: "Authorized Participant"
         description: "AP for creation/redemption"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       sub_adviser:
-        type: party_ref
-        ui_label: "Sub-Adviser"
+        type: party-ref
+        ui-label: "Sub-Adviser"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       transfer_agent:
-        type: party_ref
-        ui_label: "Transfer Agent"
+        type: party-ref
+        ui-label: "Transfer Agent"
         picker: party_picker
         internal:
           kinds: [company]
       distributor:
-        type: party_ref
-        ui_label: "Distributor"
+        type: party-ref
+        ui-label: "Distributor"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Independent Auditor"
+        type: party-ref
+        ui-label: "Independent Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       market_maker:
-        type: party_ref
-        ui_label: "Market Maker"
+        type: party-ref
+        ui-label: "Market Maker"
         picker: party_picker
         internal:
           kinds: [company]
       etf_type:
         type: enum
-        ui_label: "ETF Type"
+        ui-label: "ETF Type"
         values:
           - key: index
             label: "Index ETF"
@@ -548,10 +548,10 @@ struct.us.etf.40act:
           - key: semi_transparent
             label: "Semi-Transparent"
             internal: semi-transparent
-        default_key: index
+        default-key: index
       listing_exchange:
         type: enum
-        ui_label: "Listing Exchange"
+        ui-label: "Listing Exchange"
         values:
           - key: nyse_arca
             label: "NYSE Arca"
@@ -562,18 +562,18 @@ struct.us.etf.40act:
           - key: cboe
             label: "Cboe BZX"
             internal: CBOE-BZX
-        default_key: nyse_arca
+        default-key: nyse_arca
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: etf
         jurisdiction: US
-        structure_type: 40act
+        structure-type: 40act
         regulatory_status: registered
         etf_type: "${arg.etf_type.internal}"
         listing_exchange: "${arg.listing_exchange.internal}"
@@ -731,7 +731,7 @@ struct.us.etf.40act:
         profile_type: etf
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -751,32 +751,32 @@ struct.us.private-fund.delaware-lp:
   ui:
     label: "US Private Fund Delaware LP"
     description: "Set up a US private fund using Delaware Limited Partnership structure"
-    target_label: "Delaware LP"
+    target-label: "Delaware LP"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [delaware-lp, private-fund, pe, hedge]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [delaware-lp, private-fund, pe, hedge]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       general_partner:
-        type: party_ref
-        ui_label: "General Partner"
+        type: party-ref
+        ui-label: "General Partner"
         picker: party_picker
         internal:
           kinds: [company]
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         description: "SEC-registered or exempt adviser"
         picker: party_picker
         internal:
@@ -784,7 +784,7 @@ struct.us.private-fund.delaware-lp:
     optional:
       fund_type:
         type: enum
-        ui_label: "Fund Type"
+        ui-label: "Fund Type"
         values:
           - key: pe
             label: "Private Equity"
@@ -801,47 +801,47 @@ struct.us.private-fund.delaware-lp:
           - key: credit
             label: "Private Credit"
             internal: private-credit
-        default_key: pe
+        default-key: pe
       custodian:
-        type: party_ref
-        ui_label: "Custodian"
+        type: party-ref
+        ui-label: "Custodian"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       prime_broker:
-        type: party_ref
-        ui_label: "Prime Broker"
+        type: party-ref
+        ui-label: "Prime Broker"
         description: "For hedge fund strategies"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Independent Auditor"
+        type: party-ref
+        ui-label: "Independent Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       legal_counsel:
-        type: party_ref
-        ui_label: "Legal Counsel"
+        type: party-ref
+        ui-label: "Legal Counsel"
         picker: party_picker
         internal:
           kinds: [company]
       tax_advisor:
-        type: party_ref
-        ui_label: "Tax Advisor"
+        type: party-ref
+        ui-label: "Tax Advisor"
         picker: party_picker
         internal:
           kinds: [company]
       exemption:
         type: enum
-        ui_label: "Regulatory Exemption"
+        ui-label: "Regulatory Exemption"
         values:
           - key: 3c1
             label: "3(c)(1) - 100 Investor Limit"
@@ -849,24 +849,24 @@ struct.us.private-fund.delaware-lp:
           - key: 3c7
             label: "3(c)(7) - Qualified Purchasers"
             internal: 3c7
-        default_key: 3c7
+        default-key: 3c7
       vintage_year:
         type: str
-        ui_label: "Vintage Year"
+        ui-label: "Vintage Year"
       target_size:
         type: str
-        ui_label: "Target Size"
+        ui-label: "Target Size"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: delaware-lp
         jurisdiction: US
-        structure_type: private-fund
+        structure-type: private-fund
         fund_type: "${arg.fund_type.internal}"
         exemption: "${arg.exemption.internal}"
       as: "@cbu"
@@ -1009,7 +1009,7 @@ struct.us.private-fund.delaware-lp:
         profile_type: "${arg.fund_type.internal}"
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type

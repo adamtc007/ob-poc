@@ -17,75 +17,75 @@ struct.lux.ucits.sicav:
   ui:
     label: "Luxembourg UCITS SICAV"
     description: "Set up a Luxembourg UCITS fund using SICAV structure"
-    target_label: "UCITS SICAV"
+    target-label: "UCITS SICAV"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [sicav]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [sicav]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       management_company:
-        type: party_ref
-        ui_label: "Management Company"
+        type: party-ref
+        ui-label: "Management Company"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       domiciliation_agent:
-        type: party_ref
-        ui_label: "Domiciliation Agent"
+        type: party-ref
+        ui-label: "Domiciliation Agent"
         picker: party_picker
         internal:
           kinds: [company]
       umbrella_name:
         type: str
-        ui_label: "Umbrella Name"
+        ui-label: "Umbrella Name"
         description: "Name of the umbrella fund if this is a sub-fund"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: sicav
         jurisdiction: LU
-        structure_type: ucits
+        structure-type: ucits
       as: "@cbu"
 
     # Apply document bundle
@@ -178,7 +178,7 @@ struct.lux.ucits.sicav:
         profile_type: ucits
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -198,40 +198,40 @@ struct.lux.aif.raif:
   ui:
     label: "Luxembourg AIF RAIF"
     description: "Set up a Luxembourg Reserved Alternative Investment Fund"
-    target_label: "RAIF"
+    target-label: "RAIF"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [raif]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [raif]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       aifm:
-        type: party_ref
-        ui_label: "AIFM"
+        type: party-ref
+        ui-label: "AIFM"
         description: "Alternative Investment Fund Manager"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       legal_form:
         type: enum
-        ui_label: "Legal Form"
+        ui-label: "Legal Form"
         values:
           - key: sicav
             label: "SICAV"
@@ -245,42 +245,42 @@ struct.lux.aif.raif:
           - key: fcp
             label: "FCP"
             internal: fcp
-        default_key: sicav
+        default-key: sicav
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       prime_broker:
-        type: party_ref
-        ui_label: "Prime Broker"
+        type: party-ref
+        ui-label: "Prime Broker"
         picker: party_picker
         internal:
           kinds: [company]
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: raif
         jurisdiction: LU
-        structure_type: aif
+        structure-type: aif
         legal_form: "${arg.legal_form.internal}"
       as: "@cbu"
 
@@ -390,7 +390,7 @@ struct.lux.aif.raif:
         profile_type: aif
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -410,81 +410,81 @@ struct.lux.pe.scsp:
   ui:
     label: "Luxembourg PE SCSp"
     description: "Set up a Luxembourg Private Equity fund using SCSp structure"
-    target_label: "PE SCSp"
+    target-label: "PE SCSp"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [scsp, pe]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [scsp, pe]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       general_partner:
-        type: party_ref
-        ui_label: "General Partner"
+        type: party-ref
+        ui-label: "General Partner"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       aifm:
-        type: party_ref
-        ui_label: "AIFM"
+        type: party-ref
+        ui-label: "AIFM"
         description: "Required if AuM exceeds AIFMD thresholds"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         description: "Required if fund is above AIFMD thresholds"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       legal_counsel:
-        type: party_ref
-        ui_label: "Legal Counsel"
+        type: party-ref
+        ui-label: "Legal Counsel"
         picker: party_picker
         internal:
           kinds: [company]
       vintage_year:
         type: str
-        ui_label: "Vintage Year"
+        ui-label: "Vintage Year"
         description: "Year of fund launch"
       target_size:
         type: str
-        ui_label: "Target Size"
+        ui-label: "Target Size"
         description: "Target fund size (e.g., EUR 500m)"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: scsp
         jurisdiction: LU
-        structure_type: pe
+        structure-type: pe
       as: "@cbu"
 
     # Apply document bundle
@@ -595,7 +595,7 @@ struct.lux.pe.scsp:
         profile_type: pe
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type

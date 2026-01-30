@@ -14,22 +14,22 @@ structure.setup:
   ui:
     label: "Set up Structure"
     description: "Create a new fund or mandate structure"
-    target_label: "Structure"
+    target-label: "Structure"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: structure
+    mode-tags: [onboarding, kyc]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
+    operates-on: client-ref
+    produces: structure-ref
 
   args:
     style: keyworded
     required:
-      structure_type:
+      structure-type:
         type: enum
-        ui_label: "Type"
+        ui-label: "Type"
         values:
           - key: pe
             label: "Private Equity"
@@ -52,20 +52,20 @@ structure.setup:
           - key: fof
             label: "Fund of Funds"
             internal: fund-of-funds
-        default_key: pe
+        default-key: pe
       name:
         type: str
-        ui_label: "Structure name"
+        ui-label: "Structure name"
     optional:
       jurisdiction:
         type: str
-        ui_label: "Jurisdiction"
-        valid_values: [LU, IE, DE, UK, US, CH, SG, HK]
-        autofill_from: session.client.jurisdiction
+        ui-label: "Jurisdiction"
+        valid-values: [LU, IE, DE, UK, US, CH, SG, HK]
+        autofill-from: session.client.jurisdiction
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: cbu.create
       args:
         client_id: "${scope.client_id}"
@@ -83,36 +83,36 @@ structure.assign-role:
   ui:
     label: "Assign Role"
     description: "Assign a party to a role on the structure"
-    target_label: "Role Assignment"
+    target-label: "Role Assignment"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: structure
+    mode-tags: [onboarding, kyc]
+    operator-domain: structure
 
   target:
-    operates_on: structure_ref
-    produces: role_ref
+    operates-on: structure-ref
+    produces: role-ref
 
   args:
     style: keyworded
     required:
       structure:
-        type: structure_ref
-        ui_label: "Structure"
-        autofill_from: session.current_structure
+        type: structure-ref
+        ui-label: "Structure"
+        autofill-from: session.current_structure
         picker: structure_picker
       role:
         type: enum
-        ui_label: "Role"
+        ui-label: "Role"
         values:
           - key: gp
             label: "General Partner"
             internal: general-partner
-            valid_for: [pe, hedge]
+            valid-for: [pe, hedge]
           - key: lp
             label: "Limited Partner"
             internal: limited-partner
-            valid_for: [pe, hedge]
+            valid-for: [pe, hedge]
           - key: im
             label: "Investment Manager"
             internal: investment-manager
@@ -129,20 +129,20 @@ structure.assign-role:
             label: "Director"
             internal: director
       party:
-        type: party_ref
-        ui_label: "Party"
+        type: party-ref
+        ui-label: "Party"
         picker: party_picker
     optional:
       effective_date:
         type: date
-        ui_label: "Effective Date"
+        ui-label: "Effective Date"
         default: today
 
   prereqs:
     - type: state_exists
       key: structure.exists
 
-  expands_to:
+  expands-to:
     - verb: cbu-role.assign
       args:
         cbu_id: "${arg.structure}"
@@ -160,23 +160,23 @@ structure.list:
   ui:
     label: "List Structures"
     description: "Show structures for the current client"
-    target_label: "Structures"
+    target-label: "Structures"
 
   routing:
-    mode_tags: [onboarding, kyc, trading]
-    operator_domain: structure
+    mode-tags: [onboarding, kyc, trading]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
+    operates-on: client-ref
     produces: null
 
   args:
     style: keyworded
     required: {}
     optional:
-      structure_type:
+      structure-type:
         type: enum
-        ui_label: "Filter by Type"
+        ui-label: "Filter by Type"
         values:
           - key: pe
             label: "Private Equity"
@@ -190,14 +190,14 @@ structure.list:
           - key: all
             label: "All Types"
             internal: null
-        default_key: all
+        default-key: all
       jurisdiction:
         type: str
-        ui_label: "Filter by Jurisdiction"
+        ui-label: "Filter by Jurisdiction"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: cbu.list
       args:
         client_id: "${scope.client_id}"
@@ -212,34 +212,34 @@ structure.select:
   ui:
     label: "Select Structure"
     description: "Set the current working structure"
-    target_label: "Structure"
+    target-label: "Structure"
 
   routing:
-    mode_tags: [onboarding, kyc, trading]
-    operator_domain: structure
+    mode-tags: [onboarding, kyc, trading]
+    operator-domain: structure
 
   target:
-    operates_on: structure_ref
+    operates-on: structure-ref
     produces: null
 
   args:
     style: keyworded
     required:
       structure:
-        type: structure_ref
-        ui_label: "Structure"
+        type: structure-ref
+        ui-label: "Structure"
         picker: structure_picker
     optional: {}
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: session.set-structure
       args:
         structure_id: "${arg.structure}"
 
   # Sets state flag for prereq checking
-  sets_state:
+  sets-state:
     - key: structure.selected
       value: true
     - key: structure.exists
@@ -256,30 +256,30 @@ structure.roles:
   ui:
     label: "Show Roles"
     description: "List all role assignments for a structure"
-    target_label: "Roles"
+    target-label: "Roles"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: structure
+    mode-tags: [onboarding, kyc]
+    operator-domain: structure
 
   target:
-    operates_on: structure_ref
+    operates-on: structure-ref
     produces: null
 
   args:
     style: keyworded
     required:
       structure:
-        type: structure_ref
-        ui_label: "Structure"
-        autofill_from: session.current_structure
+        type: structure-ref
+        ui-label: "Structure"
+        autofill-from: session.current_structure
     optional: {}
 
   prereqs:
     - type: state_exists
       key: structure.exists
 
-  expands_to:
+  expands-to:
     - verb: cbu-role.list
       args:
         cbu_id: "${arg.structure}"

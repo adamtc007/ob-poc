@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 /// Top-level macro definition (matches YAML structure)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct OperatorMacroDef {
     /// Fully qualified name (e.g., "structure.setup")
     #[serde(skip)]
@@ -32,10 +33,11 @@ pub struct OperatorMacroDef {
     pub prereqs: Vec<MacroPrereq>,
 
     /// DSL expansion template
+    #[serde(rename = "expands-to")]
     pub expands_to: Vec<MacroExpansion>,
 
     /// State flags set after execution
-    #[serde(default)]
+    #[serde(default, rename = "sets-state")]
     pub sets_state: Vec<MacroStateSet>,
 
     /// Macros unlocked after this one completes
@@ -45,6 +47,7 @@ pub struct OperatorMacroDef {
 
 /// UI presentation metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroUi {
     /// Display label for UI buttons/menus
     pub label: String,
@@ -59,6 +62,7 @@ pub struct MacroUi {
 
 /// Routing information
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroRouting {
     /// Mode tags this macro is available in
     pub mode_tags: Vec<String>,
@@ -69,11 +73,12 @@ pub struct MacroRouting {
 
 /// Target entity information
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroTarget {
-    /// Entity type this macro operates on (e.g., "client_ref", "structure_ref")
+    /// Entity type this macro operates on (e.g., "client-ref", "structure-ref")
     pub operates_on: String,
 
-    /// Entity type this macro produces (e.g., "structure_ref", null for read-only)
+    /// Entity type this macro produces (e.g., "structure-ref", null for read-only)
     pub produces: Option<String>,
 }
 
@@ -94,8 +99,9 @@ pub struct MacroArgs {
 
 /// Single argument definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroArgDef {
-    /// Argument type (str, enum, date, structure_ref, party_ref, etc.)
+    /// Argument type (str, enum, date, structure-ref, party-ref, etc.)
     #[serde(rename = "type")]
     pub arg_type: String,
 
@@ -129,6 +135,7 @@ pub struct MacroArgDef {
 
 /// Enum value definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroEnumValue {
     /// Key used in DSL/API
     pub key: String,
@@ -147,7 +154,7 @@ pub struct MacroEnumValue {
 
 /// Prerequisite condition
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum MacroPrereq {
     /// A state flag must exist
     StateExists { key: String },
@@ -161,6 +168,7 @@ pub enum MacroPrereq {
 
 /// DSL expansion step
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroExpansion {
     /// DSL verb to call
     pub verb: String,
@@ -171,6 +179,7 @@ pub struct MacroExpansion {
 
 /// State flag to set after execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroStateSet {
     /// State key
     pub key: String,

@@ -8,9 +8,26 @@ use std::collections::HashMap;
 
 /// Complete macro schema (one verb definition)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroSchema {
+    /// Explicit macro ID (optional, defaults to YAML key)
+    #[serde(default)]
+    pub id: Option<String>,
+
     /// Must be "macro" for operator macros
     pub kind: MacroKind,
+
+    /// Macro tier classification
+    #[serde(default)]
+    pub tier: Option<MacroTier>,
+
+    /// Alternative names for this macro
+    #[serde(default)]
+    pub aliases: Vec<String>,
+
+    /// UI categorization for taxonomy tree
+    #[serde(default)]
+    pub taxonomy: Option<TaxonomyRef>,
 
     /// UI presentation
     pub ui: MacroUi,
@@ -23,6 +40,18 @@ pub struct MacroSchema {
 
     /// Arguments specification
     pub args: MacroArgs,
+
+    /// Required roles for the structure
+    #[serde(default)]
+    pub required_roles: Vec<RoleSpec>,
+
+    /// Optional roles for the structure
+    #[serde(default)]
+    pub optional_roles: Vec<RoleSpec>,
+
+    /// Document bundle reference
+    #[serde(default)]
+    pub docs_bundle: Option<String>,
 
     /// Prerequisites (DAG readiness)
     #[serde(default)]
@@ -40,6 +69,53 @@ pub struct MacroSchema {
     pub unlocks: Vec<String>,
 }
 
+/// Macro tier classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum MacroTier {
+    /// Single primitive verb wrapper
+    Primitive,
+    /// Composed of multiple steps
+    Composite,
+    /// Template with placeholders
+    Template,
+}
+
+/// Taxonomy reference for UI categorization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct TaxonomyRef {
+    /// Domain (e.g., "structure", "case")
+    pub domain: String,
+    /// Category within domain (e.g., "lux-ucits", "ie-aif")
+    #[serde(default)]
+    pub category: Option<String>,
+}
+
+/// Role specification for structure requirements
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RoleSpec {
+    /// Role name (e.g., "depositary", "prime-broker")
+    pub role: String,
+    /// Cardinality constraint
+    #[serde(default)]
+    pub cardinality: Option<RoleCardinality>,
+    /// Allowed entity kinds for this role
+    #[serde(default)]
+    pub entity_kinds: Vec<String>,
+}
+
+/// Role cardinality for inline role specs
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RoleCardinality {
+    One,
+    ZeroOrOne,
+    OneOrMore,
+    ZeroOrMore,
+}
+
 /// Macro kind discriminator
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -50,6 +126,7 @@ pub enum MacroKind {
 
 /// UI presentation configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroUi {
     /// Label shown in palette
     pub label: String,
@@ -63,6 +140,7 @@ pub struct MacroUi {
 
 /// Routing configuration for verb filtering
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroRouting {
     /// Mode tags for palette filtering (e.g., ["kyc", "onboarding"])
     pub mode_tags: Vec<String>,
@@ -74,11 +152,12 @@ pub struct MacroRouting {
 
 /// Target configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroTarget {
-    /// What this macro operates on (e.g., "client_ref", "structure_ref")
+    /// What this macro operates on (e.g., "client-ref", "structure-ref")
     pub operates_on: String,
 
-    /// What this macro produces (e.g., "structure_ref", null)
+    /// What this macro produces (e.g., "structure-ref", null)
     #[serde(default)]
     pub produces: Option<String>,
 
@@ -89,6 +168,7 @@ pub struct MacroTarget {
 
 /// Arguments specification
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroArgs {
     /// Argument style (always "keyworded" for now)
     pub style: ArgStyle,
@@ -111,6 +191,7 @@ pub enum ArgStyle {
 
 /// Single argument definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroArg {
     /// Argument type
     #[serde(rename = "type")]
@@ -123,7 +204,7 @@ pub struct MacroArg {
     #[serde(default)]
     pub autofill_from: Option<String>,
 
-    /// Picker to use for selection (e.g., "structure_picker")
+    /// Picker to use for selection (e.g., "structure-picker")
     #[serde(default)]
     pub picker: Option<String>,
 
@@ -150,11 +231,41 @@ pub struct MacroArg {
     /// Internal configuration (hidden from UI)
     #[serde(default)]
     pub internal: Option<MacroArgInternal>,
+
+    /// Conditional requirement expression
+    #[serde(default)]
+    pub required_if: Option<RequiredIfExpr>,
+
+    /// Create placeholder entity if value not provided
+    #[serde(default)]
+    pub placeholder_if_missing: bool,
+}
+
+/// Conditional requirement expression
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RequiredIfExpr {
+    /// Simple condition: "structure-type = ucits"
+    Simple(String),
+    /// Complex condition with combinators
+    Complex(RequiredIfComplex),
+}
+
+/// Complex conditional requirement with combinators
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct RequiredIfComplex {
+    /// Any of these conditions must match
+    #[serde(default)]
+    pub any_of: Vec<String>,
+    /// All of these conditions must match
+    #[serde(default)]
+    pub all_of: Vec<String>,
 }
 
 /// Argument type
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "kebab-case")]
 pub enum MacroArgType {
     Str,
     Date,
@@ -162,24 +273,25 @@ pub enum MacroArgType {
     List,
 
     // Operator reference types (UI-safe)
-    #[serde(rename = "client_ref")]
+    #[serde(rename = "client-ref")]
     ClientRef,
-    #[serde(rename = "structure_ref")]
+    #[serde(rename = "structure-ref")]
     StructureRef,
-    #[serde(rename = "party_ref")]
+    #[serde(rename = "party-ref")]
     PartyRef,
-    #[serde(rename = "case_ref")]
+    #[serde(rename = "case-ref")]
     CaseRef,
-    #[serde(rename = "mandate_ref")]
+    #[serde(rename = "mandate-ref")]
     MandateRef,
-    #[serde(rename = "document_ref")]
+    #[serde(rename = "document-ref")]
     DocumentRef,
-    #[serde(rename = "role_ref")]
+    #[serde(rename = "role-ref")]
     RoleRef,
 }
 
 /// Enum value definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroEnumValue {
     /// Key shown in UI and used in API (e.g., "pe", "gp")
     pub key: String,
@@ -197,6 +309,7 @@ pub struct MacroEnumValue {
 
 /// Internal argument configuration (hidden from UI)
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroArgInternal {
     /// Entity kinds for filtering (e.g., ["company", "person"])
     #[serde(default)]
@@ -213,6 +326,7 @@ pub struct MacroArgInternal {
 
 /// Argument validation rules
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct MacroArgValidation {
     /// Allowed structure types
     #[serde(default)]
@@ -221,7 +335,7 @@ pub struct MacroArgValidation {
 
 /// Prerequisite condition
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum MacroPrereq {
     /// Requires specific state flag to be set
     StateExists { key: String },
@@ -238,10 +352,16 @@ pub enum MacroPrereq {
 
 /// Expansion step (primitive DSL to emit)
 ///
-/// Can be either a direct verb call or a nested macro invocation.
+/// Can be either a direct verb call, nested macro invocation, conditional, or loop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum MacroExpansionStep {
+    /// Conditional execution (when: condition)
+    When(WhenStep),
+
+    /// Loop over a list (foreach: var, in: list)
+    ForEach(ForEachStep),
+
     /// Direct verb call (most common)
     VerbCall(VerbCallStep),
 
@@ -249,8 +369,75 @@ pub enum MacroExpansionStep {
     InvokeMacro(InvokeMacroStep),
 }
 
+/// Conditional expansion step
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct WhenStep {
+    /// Condition to evaluate
+    pub when: WhenCondition,
+
+    /// Steps to execute if condition is true
+    pub then: Vec<MacroExpansionStep>,
+
+    /// Steps to execute if condition is false (optional)
+    #[serde(rename = "else", default)]
+    pub else_branch: Vec<MacroExpansionStep>,
+}
+
+/// Condition for when: clauses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum WhenCondition {
+    /// Simple string condition: "structure-type = ucits"
+    Simple(String),
+    /// Negated condition
+    Not(NotCondition),
+    /// Any of these conditions
+    AnyOf(AnyOfCondition),
+    /// All of these conditions
+    AllOf(AllOfCondition),
+}
+
+/// Negated condition wrapper
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct NotCondition {
+    pub not: Box<WhenCondition>,
+}
+
+/// Any-of condition combinator
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct AnyOfCondition {
+    pub any_of: Vec<WhenCondition>,
+}
+
+/// All-of condition combinator
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct AllOfCondition {
+    pub all_of: Vec<WhenCondition>,
+}
+
+/// Loop expansion step
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct ForEachStep {
+    /// Variable name to bind each item to
+    pub foreach: String,
+
+    /// Source list expression (e.g., "${required-roles}")
+    #[serde(rename = "in")]
+    pub in_expr: String,
+
+    /// Steps to execute for each item
+    #[serde(rename = "do")]
+    pub do_steps: Vec<MacroExpansionStep>,
+}
+
 /// A direct verb call expansion step
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct VerbCallStep {
     /// Verb to call (e.g., "cbu.create", "kyc-case.create")
     pub verb: String,
@@ -280,11 +467,12 @@ pub struct InvokeMacroStep {
 }
 
 impl MacroExpansionStep {
-    /// Get the verb or macro ID for this step
-    pub fn target_id(&self) -> &str {
+    /// Get the verb or macro ID for this step (None for When/ForEach)
+    pub fn target_id(&self) -> Option<&str> {
         match self {
-            MacroExpansionStep::VerbCall(v) => &v.verb,
-            MacroExpansionStep::InvokeMacro(m) => &m.macro_id,
+            MacroExpansionStep::VerbCall(v) => Some(&v.verb),
+            MacroExpansionStep::InvokeMacro(m) => Some(&m.macro_id),
+            MacroExpansionStep::When(_) | MacroExpansionStep::ForEach(_) => None,
         }
     }
 
@@ -292,10 +480,21 @@ impl MacroExpansionStep {
     pub fn is_invoke_macro(&self) -> bool {
         matches!(self, MacroExpansionStep::InvokeMacro(_))
     }
+
+    /// Check if this is a conditional step
+    pub fn is_when(&self) -> bool {
+        matches!(self, MacroExpansionStep::When(_))
+    }
+
+    /// Check if this is a loop step
+    pub fn is_foreach(&self) -> bool {
+        matches!(self, MacroExpansionStep::ForEach(_))
+    }
 }
 
 /// State flag to set after execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct SetState {
     /// State key (e.g., "structure.exists")
     pub key: String,
@@ -377,19 +576,19 @@ kind: macro
 ui:
   label: "Set up Structure"
   description: "Create a new fund or mandate structure"
-  target_label: "Structure"
+  target-label: "Structure"
 routing:
-  mode_tags: [onboarding, kyc]
-  operator_domain: structure
+  mode-tags: [onboarding, kyc]
+  operator-domain: structure
 target:
-  operates_on: client_ref
-  produces: structure_ref
+  operates-on: client-ref
+  produces: structure-ref
 args:
   style: keyworded
   required:
-    structure_type:
+    structure-type:
       type: enum
-      ui_label: "Type"
+      ui-label: "Type"
       values:
         - key: pe
           label: "Private Equity"
@@ -397,16 +596,16 @@ args:
         - key: sicav
           label: "SICAV"
           internal: sicav
-      default_key: pe
+      default-key: pe
     name:
       type: str
-      ui_label: "Structure name"
+      ui-label: "Structure name"
   optional: {}
 prereqs: []
-expands_to:
+expands-to:
   - verb: cbu.create
     args:
-      client_id: "${scope.client_id}"
+      client-id: "${scope.client_id}"
       kind: "${arg.structure_type.internal}"
       name: "${arg.name}"
 unlocks:
@@ -418,12 +617,12 @@ unlocks:
 
         assert_eq!(schema.kind, MacroKind::Macro);
         assert_eq!(schema.ui.label, "Set up Structure");
-        assert!(schema.args.required.contains_key("structure_type"));
+        assert!(schema.args.required.contains_key("structure-type"));
         assert!(schema.args.required.contains_key("name"));
         assert_eq!(schema.expands_to.len(), 1);
         match &schema.expands_to[0] {
             MacroExpansionStep::VerbCall(v) => assert_eq!(v.verb, "cbu.create"),
-            MacroExpansionStep::InvokeMacro(_) => panic!("Expected VerbCall"),
+            _ => panic!("Expected VerbCall"),
         }
         assert_eq!(schema.unlocks.len(), 2);
     }
@@ -435,22 +634,22 @@ kind: macro
 ui:
   label: "Cross-Border Hedge Fund"
   description: "Set up a cross-border hedge fund structure"
-  target_label: "Structure"
+  target-label: "Structure"
 routing:
-  mode_tags: [onboarding]
-  operator_domain: structure
+  mode-tags: [onboarding]
+  operator-domain: structure
 target:
-  operates_on: client_ref
-  produces: structure_ref
+  operates-on: client-ref
+  produces: structure-ref
 args:
   style: keyworded
   required:
     name:
       type: str
-      ui_label: "Structure name"
-    base_jurisdiction:
+      ui-label: "Structure name"
+    base-jurisdiction:
       type: enum
-      ui_label: "Base jurisdiction"
+      ui-label: "Base jurisdiction"
       values:
         - key: ie
           label: "Ireland"
@@ -458,10 +657,10 @@ args:
         - key: lu
           label: "Luxembourg"
           internal: LU
-      default_key: ie
+      default-key: ie
   optional: {}
 prereqs: []
-expands_to:
+expands-to:
   - invoke-macro: struct.ie.hedge.icav
     args:
       name: "${arg.name}"
@@ -470,7 +669,7 @@ expands_to:
       - "@trading-profile"
   - verb: cbu-role.assign
     args:
-      cbu_id: "@cbu"
+      cbu-id: "@cbu"
       role: cross-border-coordinator
 unlocks: []
 "#;
@@ -486,7 +685,7 @@ unlocks: []
                 assert_eq!(m.import_symbols.len(), 2);
                 assert!(m.import_symbols.contains(&"@cbu".to_string()));
             }
-            MacroExpansionStep::VerbCall(_) => panic!("Expected InvokeMacro"),
+            _ => panic!("Expected InvokeMacro"),
         }
 
         // Second step should be verb call
@@ -494,7 +693,7 @@ unlocks: []
             MacroExpansionStep::VerbCall(v) => {
                 assert_eq!(v.verb, "cbu-role.assign");
             }
-            MacroExpansionStep::InvokeMacro(_) => panic!("Expected VerbCall"),
+            _ => panic!("Expected VerbCall"),
         }
     }
 
@@ -524,6 +723,8 @@ unlocks: []
             default_key: Some("pe".to_string()),
             item_type: None,
             internal: None,
+            required_if: None,
+            placeholder_if_missing: false,
         };
 
         assert!(arg.is_enum());

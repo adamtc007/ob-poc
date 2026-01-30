@@ -47,33 +47,33 @@
 ;; The `materialize` verb projects the document to operational tables.
 
 ;; intent: Create a draft trading profile for the fund
-(trading-profile.create-draft
+(trading.profile.create-draft
   :cbu-id @fund
   :notes "OTC Derivatives trading setup"
   :as @profile)
 
 ;; intent: Set base currency
-(trading-profile.set-base-currency
+(trading.profile.set-base-currency
   :profile-id @profile
   :currency "EUR")
 
 ;; intent: Add OTC instrument classes to the universe
-(trading-profile.add-instrument-class
+(trading.profile.add-instrument-class
   :profile-id @profile
   :class-code "FX_FORWARD"
   :isda-asset-classes ["FX"])
 
-(trading-profile.add-instrument-class
+(trading.profile.add-instrument-class
   :profile-id @profile
   :class-code "IRS"
   :isda-asset-classes ["RATES"])
 
-(trading-profile.add-instrument-class
+(trading.profile.add-instrument-class
   :profile-id @profile
   :class-code "CDS"
   :isda-asset-classes ["CREDIT"])
 
-(trading-profile.add-instrument-class
+(trading.profile.add-instrument-class
   :profile-id @profile
   :class-code "EQUITY_SWAP"
   :isda-asset-classes ["EQUITY"])
@@ -85,7 +85,7 @@
 ;; The `add-isda-config` verb adds the counterparty relationship.
 
 ;; intent: Add ISDA configuration for Goldman Sachs
-(trading-profile.add-isda-config
+(trading.profile.add-isda-config
   :profile-id @profile
   :counterparty-entity-id @counterparty
   :counterparty-name "Goldman Sachs International"
@@ -94,25 +94,25 @@
   :agreement-date "2024-01-15")
 
 ;; intent: Add product coverage to the ISDA (what can be traded under this ISDA)
-(trading-profile.add-isda-coverage
+(trading.profile.add-isda-coverage
   :profile-id @profile
   :isda-ref "Goldman Sachs International"
   :asset-class "FX"
   :base-products ["FX_FORWARD" "FX_OPTION"])
 
-(trading-profile.add-isda-coverage
+(trading.profile.add-isda-coverage
   :profile-id @profile
   :isda-ref "Goldman Sachs International"
   :asset-class "RATES"
   :base-products ["IRS" "XCCY_SWAP"])
 
-(trading-profile.add-isda-coverage
+(trading.profile.add-isda-coverage
   :profile-id @profile
   :isda-ref "Goldman Sachs International"
   :asset-class "CREDIT"
   :base-products ["CDS"])
 
-(trading-profile.add-isda-coverage
+(trading.profile.add-isda-coverage
   :profile-id @profile
   :isda-ref "Goldman Sachs International"
   :asset-class "EQUITY"
@@ -124,7 +124,7 @@
 ;; CSA defines collateral terms for variation margin (VM) and/or initial margin (IM).
 
 ;; intent: Add VM CSA to the Goldman ISDA
-(trading-profile.add-csa-config
+(trading.profile.add-csa-config
   :profile-id @profile
   :isda-ref "Goldman Sachs International"
   :csa-type "VM"
@@ -133,14 +133,14 @@
   :minimum-transfer-amount 500000)
 
 ;; intent: Add eligible collateral types
-(trading-profile.add-csa-collateral
+(trading.profile.add-csa-collateral
   :profile-id @profile
   :counterparty-ref "Goldman Sachs International"
   :collateral-type "CASH"
   :currencies ["USD" "EUR" "GBP"]
   :haircut-pct 0)
 
-(trading-profile.add-csa-collateral
+(trading.profile.add-csa-collateral
   :profile-id @profile
   :counterparty-ref "Goldman Sachs International"
   :collateral-type "GOVT_BOND"
@@ -155,7 +155,7 @@
 ;; OTC_COLLATERAL type SSIs are specifically for margin transfers.
 
 ;; intent: Add USD collateral SSI
-(trading-profile.add-standing-instruction
+(trading.profile.add-standing-instruction
   :profile-id @profile
   :ssi-type "OTC_COLLATERAL"
   :ssi-name "USD-COLLATERAL"
@@ -164,7 +164,7 @@
   :cash-currency "USD")
 
 ;; intent: Add EUR collateral SSI
-(trading-profile.add-standing-instruction
+(trading.profile.add-standing-instruction
   :profile-id @profile
   :ssi-type "OTC_COLLATERAL"
   :ssi-name "EUR-COLLATERAL"
@@ -177,7 +177,7 @@
 ;; ----------------------------------------------------------------------------
 
 ;; intent: Associate USD SSI with Goldman CSA for margin transfers
-(trading-profile.link-csa-ssi
+(trading.profile.link-csa-ssi
   :profile-id @profile
   :counterparty-ref "Goldman Sachs International"
   :ssi-name "USD-COLLATERAL")

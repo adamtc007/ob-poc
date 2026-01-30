@@ -20,64 +20,64 @@ struct.uk.authorised.oeic:
   ui:
     label: "UK Authorised OEIC"
     description: "Set up a UK FCA-authorised Open-Ended Investment Company"
-    target_label: "OEIC"
+    target-label: "OEIC"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [oeic, uk-authorised]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [oeic, uk-authorised]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       authorised_corporate_director:
-        type: party_ref
-        ui_label: "Authorised Corporate Director"
+        type: party-ref
+        ui-label: "Authorised Corporate Director"
         description: "ACD responsible for fund management"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       registrar:
-        type: party_ref
-        ui_label: "Registrar"
+        type: party-ref
+        ui-label: "Registrar"
         picker: party_picker
         internal:
           kinds: [company]
       fund_type:
         type: enum
-        ui_label: "Fund Type"
+        ui-label: "Fund Type"
         values:
           - key: ucits
             label: "UCITS Scheme"
@@ -88,18 +88,18 @@ struct.uk.authorised.oeic:
           - key: qis
             label: "Qualified Investor Scheme"
             internal: qis
-        default_key: ucits
+        default-key: ucits
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: oeic
         jurisdiction: UK
-        structure_type: uk-authorised
+        structure-type: uk-authorised
         fund_type: "${arg.fund_type.internal}"
       as: "@cbu"
 
@@ -193,7 +193,7 @@ struct.uk.authorised.oeic:
         profile_type: uk-authorised
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -213,58 +213,58 @@ struct.uk.authorised.aut:
   ui:
     label: "UK Authorised Unit Trust"
     description: "Set up a UK FCA-authorised Unit Trust"
-    target_label: "Unit Trust"
+    target-label: "Unit Trust"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [aut, uk-authorised]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [aut, uk-authorised]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       manager:
-        type: party_ref
-        ui_label: "Manager"
+        type: party-ref
+        ui-label: "Manager"
         description: "Authorised Fund Manager"
         picker: party_picker
         internal:
           kinds: [company]
       trustee:
-        type: party_ref
-        ui_label: "Trustee"
+        type: party-ref
+        ui-label: "Trustee"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       fund_type:
         type: enum
-        ui_label: "Fund Type"
+        ui-label: "Fund Type"
         values:
           - key: ucits
             label: "UCITS Scheme"
@@ -272,18 +272,18 @@ struct.uk.authorised.aut:
           - key: nurs
             label: "Non-UCITS Retail Scheme"
             internal: nurs
-        default_key: nurs
+        default-key: nurs
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: aut
         jurisdiction: UK
-        structure_type: uk-authorised
+        structure-type: uk-authorised
         fund_type: "${arg.fund_type.internal}"
       as: "@cbu"
 
@@ -377,7 +377,7 @@ struct.uk.authorised.aut:
         profile_type: uk-authorised
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -397,39 +397,39 @@ struct.uk.authorised.acs:
   ui:
     label: "UK Authorised Contractual Scheme"
     description: "Set up a UK FCA-authorised Contractual Scheme (Co-ownership or Partnership)"
-    target_label: "ACS"
+    target-label: "ACS"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [acs, uk-authorised]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [acs, uk-authorised]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       operator:
-        type: party_ref
-        ui_label: "Authorised Contractual Scheme Operator"
+        type: party-ref
+        ui-label: "Authorised Contractual Scheme Operator"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       acs_type:
         type: enum
-        ui_label: "ACS Type"
+        ui-label: "ACS Type"
         values:
           - key: coownership
             label: "Co-ownership Scheme"
@@ -437,36 +437,36 @@ struct.uk.authorised.acs:
           - key: partnership
             label: "Limited Partnership"
             internal: partnership
-        default_key: coownership
+        default-key: coownership
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: acs
         jurisdiction: UK
-        structure_type: uk-authorised
+        structure-type: uk-authorised
         acs_type: "${arg.acs_type.internal}"
       as: "@cbu"
 
@@ -560,7 +560,7 @@ struct.uk.authorised.acs:
         profile_type: uk-authorised
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -580,57 +580,57 @@ struct.uk.authorised.ltaf:
   ui:
     label: "UK Long-Term Asset Fund"
     description: "Set up a UK FCA-authorised Long-Term Asset Fund for illiquid assets"
-    target_label: "LTAF"
+    target-label: "LTAF"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [ltaf, uk-authorised]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [ltaf, uk-authorised]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       authorised_corporate_director:
-        type: party_ref
-        ui_label: "Authorised Corporate Director"
+        type: party-ref
+        ui-label: "Authorised Corporate Director"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       valuation_agent:
-        type: party_ref
-        ui_label: "Valuation Agent"
+        type: party-ref
+        ui-label: "Valuation Agent"
         description: "Independent valuer for illiquid assets"
         picker: party_picker
         internal:
@@ -638,7 +638,7 @@ struct.uk.authorised.ltaf:
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Use the base OEIC macro for the authorised fund structure
     - invoke-macro: struct.uk.authorised.oeic
       args:
@@ -690,7 +690,7 @@ struct.uk.authorised.ltaf:
         profile_type: ltaf
         illiquid_assets_permitted: true
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -710,69 +710,69 @@ struct.uk.manager.llp:
   ui:
     label: "UK Manager LLP"
     description: "Set up a UK Limited Liability Partnership for fund management"
-    target_label: "Manager LLP"
+    target-label: "Manager LLP"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [llp, manager]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [llp, manager]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "LLP Name"
+        ui-label: "LLP Name"
       designated_member_1:
-        type: party_ref
-        ui_label: "First Designated Member"
+        type: party-ref
+        ui-label: "First Designated Member"
         picker: party_picker
         internal:
           kinds: [company, person]
       designated_member_2:
-        type: party_ref
-        ui_label: "Second Designated Member"
+        type: party-ref
+        ui-label: "Second Designated Member"
         picker: party_picker
         internal:
           kinds: [company, person]
     optional:
       compliance_officer:
-        type: party_ref
-        ui_label: "Compliance Officer"
+        type: party-ref
+        ui-label: "Compliance Officer"
         picker: party_picker
         internal:
           kinds: [person]
       money_laundering_officer:
-        type: party_ref
-        ui_label: "MLRO"
+        type: party-ref
+        ui-label: "MLRO"
         description: "Money Laundering Reporting Officer"
         picker: party_picker
         internal:
           kinds: [person]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       fca_reference:
         type: str
-        ui_label: "FCA Reference Number"
+        ui-label: "FCA Reference Number"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: llp
         jurisdiction: UK
-        structure_type: manager
+        structure-type: manager
       as: "@cbu"
 
     # Apply document bundle
@@ -857,7 +857,7 @@ struct.uk.manager.llp:
         entity_id: "@auditor"
         skip_if_empty: true
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -876,79 +876,79 @@ struct.uk.private-equity.lp:
   ui:
     label: "UK Private Equity LP"
     description: "Set up a UK Limited Partnership for private equity"
-    target_label: "PE LP"
+    target-label: "PE LP"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [lp, pe]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [lp, pe]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       general_partner:
-        type: party_ref
-        ui_label: "General Partner"
+        type: party-ref
+        ui-label: "General Partner"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       aifm:
-        type: party_ref
-        ui_label: "AIFM"
+        type: party-ref
+        ui-label: "AIFM"
         description: "Required if above AIFMD thresholds"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         description: "Required if above AIFMD thresholds"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       legal_counsel:
-        type: party_ref
-        ui_label: "Legal Counsel"
+        type: party-ref
+        ui-label: "Legal Counsel"
         picker: party_picker
         internal:
           kinds: [company]
       vintage_year:
         type: str
-        ui_label: "Vintage Year"
+        ui-label: "Vintage Year"
       target_size:
         type: str
-        ui_label: "Target Size"
+        ui-label: "Target Size"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: lp
         jurisdiction: UK
-        structure_type: pe
+        structure-type: pe
       as: "@cbu"
 
     # Apply document bundle
@@ -1059,7 +1059,7 @@ struct.uk.private-equity.lp:
         profile_type: pe
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type

@@ -14,22 +14,22 @@ party.add:
   ui:
     label: "Add Party"
     description: "Add a new party (person or organization)"
-    target_label: "Party"
+    target-label: "Party"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: party
+    mode-tags: [onboarding, kyc]
+    operator-domain: party
 
   target:
-    operates_on: client_ref
-    produces: party_ref
+    operates-on: client-ref
+    produces: party-ref
 
   args:
     style: keyworded
     required:
       party_type:
         type: enum
-        ui_label: "Type"
+        ui-label: "Type"
         values:
           - key: person
             label: "Person"
@@ -43,32 +43,32 @@ party.add:
           - key: foundation
             label: "Foundation"
             internal: foundation
-        default_key: person
+        default-key: person
       name:
         type: str
-        ui_label: "Name"
+        ui-label: "Name"
         description: "Full name (person) or legal name (organization)"
     optional:
       jurisdiction:
         type: str
-        ui_label: "Jurisdiction"
-        valid_values: [LU, IE, DE, UK, US, CH, SG, HK, FR, NL, BE]
+        ui-label: "Jurisdiction"
+        valid-values: [LU, IE, DE, UK, US, CH, SG, HK, FR, NL, BE]
       nationality:
         type: str
-        ui_label: "Nationality"
+        ui-label: "Nationality"
         description: "For persons only"
       date_of_birth:
         type: date
-        ui_label: "Date of Birth"
+        ui-label: "Date of Birth"
         description: "For persons only"
       registration_number:
         type: str
-        ui_label: "Registration Number"
+        ui-label: "Registration Number"
         description: "For organizations only"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: entity.create-${arg.party_type.internal}
       args:
         name: "${arg.name}"
@@ -87,39 +87,39 @@ party.add-person:
   ui:
     label: "Add Person"
     description: "Add a natural person"
-    target_label: "Person"
+    target-label: "Person"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: party
+    mode-tags: [onboarding, kyc]
+    operator-domain: party
 
   target:
-    operates_on: client_ref
-    produces: party_ref
+    operates-on: client-ref
+    produces: party-ref
 
   args:
     style: keyworded
     required:
       given_names:
         type: str
-        ui_label: "Given Names"
+        ui-label: "Given Names"
       family_name:
         type: str
-        ui_label: "Family Name"
+        ui-label: "Family Name"
     optional:
       nationality:
         type: str
-        ui_label: "Nationality"
+        ui-label: "Nationality"
       date_of_birth:
         type: date
-        ui_label: "Date of Birth"
+        ui-label: "Date of Birth"
       tax_residence:
         type: str
-        ui_label: "Tax Residence"
+        ui-label: "Tax Residence"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: entity.create-person
       args:
         given_names: "${arg.given_names}"
@@ -138,40 +138,40 @@ party.add-company:
   ui:
     label: "Add Company"
     description: "Add a legal entity/company"
-    target_label: "Company"
+    target-label: "Company"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: party
+    mode-tags: [onboarding, kyc]
+    operator-domain: party
 
   target:
-    operates_on: client_ref
-    produces: party_ref
+    operates-on: client-ref
+    produces: party-ref
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Legal Name"
+        ui-label: "Legal Name"
       jurisdiction:
         type: str
-        ui_label: "Jurisdiction"
-        valid_values: [LU, IE, DE, UK, US, CH, SG, HK, FR, NL, BE]
+        ui-label: "Jurisdiction"
+        valid-values: [LU, IE, DE, UK, US, CH, SG, HK, FR, NL, BE]
     optional:
       registration_number:
         type: str
-        ui_label: "Registration Number"
+        ui-label: "Registration Number"
       lei:
         type: str
-        ui_label: "LEI"
+        ui-label: "LEI"
         description: "Legal Entity Identifier"
       incorporation_date:
         type: date
-        ui_label: "Incorporation Date"
+        ui-label: "Incorporation Date"
       legal_form:
         type: enum
-        ui_label: "Legal Form"
+        ui-label: "Legal Form"
         values:
           - key: corp
             label: "Corporation"
@@ -197,7 +197,7 @@ party.add-company:
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: entity.create-company
       args:
         name: "${arg.name}"
@@ -217,14 +217,14 @@ party.search:
   ui:
     label: "Search Parties"
     description: "Search for existing parties"
-    target_label: "Parties"
+    target-label: "Parties"
 
   routing:
-    mode_tags: [onboarding, kyc, trading]
-    operator_domain: party
+    mode-tags: [onboarding, kyc, trading]
+    operator-domain: party
 
   target:
-    operates_on: client_ref
+    operates-on: client-ref
     produces: null
 
   args:
@@ -232,12 +232,12 @@ party.search:
     required:
       query:
         type: str
-        ui_label: "Search"
+        ui-label: "Search"
         description: "Name or identifier to search for"
     optional:
       party_type:
         type: enum
-        ui_label: "Type Filter"
+        ui-label: "Type Filter"
         values:
           - key: person
             label: "People"
@@ -248,14 +248,14 @@ party.search:
           - key: all
             label: "All"
             internal: null
-        default_key: all
+        default-key: all
       jurisdiction:
         type: str
-        ui_label: "Jurisdiction Filter"
+        ui-label: "Jurisdiction Filter"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: entity.search
       args:
         query: "${arg.query}"
@@ -270,28 +270,28 @@ party.details:
   ui:
     label: "Party Details"
     description: "View details of a party"
-    target_label: "Party"
+    target-label: "Party"
 
   routing:
-    mode_tags: [onboarding, kyc, trading]
-    operator_domain: party
+    mode-tags: [onboarding, kyc, trading]
+    operator-domain: party
 
   target:
-    operates_on: party_ref
+    operates-on: party-ref
     produces: null
 
   args:
     style: keyworded
     required:
       party:
-        type: party_ref
-        ui_label: "Party"
+        type: party-ref
+        ui-label: "Party"
         picker: party_picker
     optional: {}
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: entity.get
       args:
         entity_id: "${arg.party}"
@@ -304,37 +304,37 @@ party.update:
   ui:
     label: "Update Party"
     description: "Update party information"
-    target_label: "Party"
+    target-label: "Party"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: party
+    mode-tags: [onboarding, kyc]
+    operator-domain: party
 
   target:
-    operates_on: party_ref
+    operates-on: party-ref
     produces: null
 
   args:
     style: keyworded
     required:
       party:
-        type: party_ref
-        ui_label: "Party"
+        type: party-ref
+        ui-label: "Party"
         picker: party_picker
     optional:
       name:
         type: str
-        ui_label: "Name"
+        ui-label: "Name"
       address:
         type: str
-        ui_label: "Address"
+        ui-label: "Address"
       tax_residence:
         type: str
-        ui_label: "Tax Residence"
+        ui-label: "Tax Residence"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: entity.update
       args:
         entity_id: "${arg.party}"
@@ -350,14 +350,14 @@ party.list:
   ui:
     label: "List Parties"
     description: "List all parties for the current client"
-    target_label: "Parties"
+    target-label: "Parties"
 
   routing:
-    mode_tags: [onboarding, kyc, trading]
-    operator_domain: party
+    mode-tags: [onboarding, kyc, trading]
+    operator-domain: party
 
   target:
-    operates_on: client_ref
+    operates-on: client-ref
     produces: null
 
   args:
@@ -366,7 +366,7 @@ party.list:
     optional:
       party_type:
         type: enum
-        ui_label: "Type Filter"
+        ui-label: "Type Filter"
         values:
           - key: person
             label: "People"
@@ -377,10 +377,10 @@ party.list:
           - key: all
             label: "All"
             internal: null
-        default_key: all
+        default-key: all
       role:
         type: enum
-        ui_label: "Role Filter"
+        ui-label: "Role Filter"
         values:
           - key: gp
             label: "General Partners"
@@ -397,11 +397,11 @@ party.list:
           - key: all
             label: "All Roles"
             internal: null
-        default_key: all
+        default-key: all
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: entity.list
       args:
         client_id: "${scope.client_id}"
@@ -416,26 +416,26 @@ party.assign-identifier:
   ui:
     label: "Add Identifier"
     description: "Add an identifier to a party (LEI, tax ID, passport)"
-    target_label: "Identifier"
+    target-label: "Identifier"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: party
+    mode-tags: [onboarding, kyc]
+    operator-domain: party
 
   target:
-    operates_on: party_ref
+    operates-on: party-ref
     produces: null
 
   args:
     style: keyworded
     required:
       party:
-        type: party_ref
-        ui_label: "Party"
+        type: party-ref
+        ui-label: "Party"
         picker: party_picker
       identifier_type:
         type: enum
-        ui_label: "Type"
+        ui-label: "Type"
         values:
           - key: lei
             label: "LEI"
@@ -454,18 +454,18 @@ party.assign-identifier:
             internal: company-registration
       value:
         type: str
-        ui_label: "Value"
+        ui-label: "Value"
     optional:
       issuing_country:
         type: str
-        ui_label: "Issuing Country"
+        ui-label: "Issuing Country"
       expiry_date:
         type: date
-        ui_label: "Expiry Date"
+        ui-label: "Expiry Date"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: identifier.add
       args:
         entity_id: "${arg.party}"
@@ -482,26 +482,26 @@ party.set-address:
   ui:
     label: "Set Address"
     description: "Set or update party address"
-    target_label: "Address"
+    target-label: "Address"
 
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: party
+    mode-tags: [onboarding, kyc]
+    operator-domain: party
 
   target:
-    operates_on: party_ref
+    operates-on: party-ref
     produces: null
 
   args:
     style: keyworded
     required:
       party:
-        type: party_ref
-        ui_label: "Party"
+        type: party-ref
+        ui-label: "Party"
         picker: party_picker
       address_type:
         type: enum
-        ui_label: "Type"
+        ui-label: "Type"
         values:
           - key: registered
             label: "Registered Address"
@@ -515,27 +515,27 @@ party.set-address:
           - key: mailing
             label: "Mailing Address"
             internal: mailing
-        default_key: registered
+        default-key: registered
       country:
         type: str
-        ui_label: "Country"
+        ui-label: "Country"
     optional:
       street:
         type: str
-        ui_label: "Street"
+        ui-label: "Street"
       city:
         type: str
-        ui_label: "City"
+        ui-label: "City"
       postal_code:
         type: str
-        ui_label: "Postal Code"
+        ui-label: "Postal Code"
       region:
         type: str
-        ui_label: "Region/State"
+        ui-label: "Region/State"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: address.set
       args:
         entity_id: "${arg.party}"

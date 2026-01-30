@@ -290,8 +290,9 @@ mod tests {
     #[test]
     fn test_crud_verb_exists() {
         let reg = registry();
-        let verb = reg.get("cbu", "create");
-        assert!(verb.is_some(), "cbu.create should exist");
+        // cbu.list is a CRUD verb (cbu.create is plugin)
+        let verb = reg.get("cbu", "list");
+        assert!(verb.is_some(), "cbu.list should exist");
         assert_eq!(verb.unwrap().behavior, VerbBehavior::Crud);
     }
 

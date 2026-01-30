@@ -277,22 +277,22 @@ structure.setup:
   ui:
     label: "Set up Structure"
     description: "Create a new fund"
-    target_label: "Structure"
+    target-label: "Structure"
   routing:
-    mode_tags: [onboarding, kyc]
-    operator_domain: structure
+    mode-tags: [onboarding, kyc]
+    operator-domain: structure
   target:
-    operates_on: client_ref
-    produces: structure_ref
+    operates-on: client-ref
+    produces: structure-ref
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Name"
+        ui-label: "Name"
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: cbu.create
       args:
         name: "${arg.name}"

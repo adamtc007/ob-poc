@@ -16,46 +16,46 @@ struct.hedge.cross-border:
   ui:
     label: "Cross-Border Hedge Fund"
     description: "Set up a cross-border hedge fund using master-feeder structure"
-    target_label: "Cross-Border Hedge"
+    target-label: "Cross-Border Hedge"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [hedge, cross-border, master-feeder]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [hedge, cross-border, master-feeder]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       aifm:
-        type: party_ref
-        ui_label: "AIFM"
+        type: party-ref
+        ui-label: "AIFM"
         description: "Alternative Investment Fund Manager"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
       prime_broker:
-        type: party_ref
-        ui_label: "Prime Broker"
+        type: party-ref
+        ui-label: "Prime Broker"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       master_jurisdiction:
         type: enum
-        ui_label: "Master Fund Jurisdiction"
+        ui-label: "Master Fund Jurisdiction"
         values:
           - key: cayman
             label: "Cayman Islands"
@@ -66,47 +66,47 @@ struct.hedge.cross-border:
           - key: ireland
             label: "Ireland"
             internal: IE
-        default_key: cayman
+        default-key: cayman
       feeder_jurisdictions:
         type: list
-        ui_label: "Feeder Jurisdictions"
-        item_type: str
+        ui-label: "Feeder Jurisdictions"
+        item-type: str
         default: [US, IE]
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       secondary_prime_broker:
-        type: party_ref
-        ui_label: "Secondary Prime Broker"
+        type: party-ref
+        ui-label: "Secondary Prime Broker"
         picker: party_picker
         internal:
           kinds: [company]
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the Master Fund (typically offshore)
     - verb: cbu.create
       args:
         name: "${arg.name} Master"
         kind: master-fund
         jurisdiction: "${arg.master_jurisdiction.internal}"
-        structure_type: hedge
+        structure-type: hedge
         is_master: true
       as: "@master"
 
@@ -238,7 +238,7 @@ struct.hedge.cross-border:
         name: "${arg.name} US Feeder"
         kind: delaware-lp
         jurisdiction: US
-        structure_type: feeder
+        structure-type: feeder
         master_fund_id: "@master"
         exemption: 3c7
       as: "@us-feeder"
@@ -255,7 +255,7 @@ struct.hedge.cross-border:
         name: "${arg.name} Ireland Feeder"
         kind: icav
         jurisdiction: IE
-        structure_type: feeder
+        structure-type: feeder
         master_fund_id: "@master"
         aif_type: qiaif
       as: "@ie-feeder"
@@ -287,7 +287,7 @@ struct.hedge.cross-border:
         relationship_type: feeder
         capital_flow: upstream
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -309,33 +309,33 @@ struct.pe.cross-border:
   ui:
     label: "Cross-Border PE Fund"
     description: "Set up a cross-border private equity fund using parallel structure"
-    target_label: "Cross-Border PE"
+    target-label: "Cross-Border PE"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [pe, cross-border, parallel]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [pe, cross-border, parallel]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       general_partner:
-        type: party_ref
-        ui_label: "General Partner"
+        type: party-ref
+        ui-label: "General Partner"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       main_fund_jurisdiction:
         type: enum
-        ui_label: "Main Fund Jurisdiction"
+        ui-label: "Main Fund Jurisdiction"
         values:
           - key: luxembourg
             label: "Luxembourg"
@@ -346,54 +346,54 @@ struct.pe.cross-border:
           - key: cayman
             label: "Cayman Islands"
             internal: KY
-        default_key: luxembourg
+        default-key: luxembourg
       parallel_jurisdictions:
         type: list
-        ui_label: "Parallel Fund Jurisdictions"
-        item_type: str
+        ui-label: "Parallel Fund Jurisdictions"
+        item-type: str
         default: [US]
       aifm:
-        type: party_ref
-        ui_label: "AIFM"
+        type: party-ref
+        ui-label: "AIFM"
         description: "Required for EU funds"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         description: "Required for EU funds above threshold"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       legal_counsel:
-        type: party_ref
-        ui_label: "Legal Counsel"
+        type: party-ref
+        ui-label: "Legal Counsel"
         picker: party_picker
         internal:
           kinds: [company]
       vintage_year:
         type: str
-        ui_label: "Vintage Year"
+        ui-label: "Vintage Year"
       target_size:
         type: str
-        ui_label: "Target Size"
+        ui-label: "Target Size"
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the Main Fund using Luxembourg SCSp
     - invoke-macro: struct.lux.pe.scsp
       args:
@@ -423,7 +423,7 @@ struct.pe.cross-border:
         name: "${arg.name} US Parallel"
         kind: delaware-lp
         jurisdiction: US
-        structure_type: pe
+        structure-type: pe
         parallel_main_id: "@cbu"
         exemption: 3c7
       as: "@us-parallel"
@@ -486,7 +486,7 @@ struct.pe.cross-border:
         name: "${arg.name} Aggregator"
         kind: aggregator
         jurisdiction: "${arg.main_fund_jurisdiction.internal}"
-        structure_type: aggregator
+        structure-type: aggregator
         parent_fund_ids: ["@cbu", "@us-parallel"]
       as: "@aggregator"
 
@@ -504,7 +504,7 @@ struct.pe.cross-border:
         relationship_type: co-invest-vehicle
         capital_flow: downstream
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type

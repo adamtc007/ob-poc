@@ -9,7 +9,7 @@ use std::path::Path;
 use anyhow::{anyhow, Context, Result};
 use tracing::{debug, info, warn};
 
-use super::types::{BundleDocumentDef, DocsBundleDef, ResolvedBundleDocument};
+use super::types::{DocsBundleDef, ResolvedBundleDocument};
 
 /// Registry of document bundles loaded from YAML
 #[derive(Debug, Clone)]
@@ -48,7 +48,7 @@ impl DocsBundleRegistry {
 
             if path
                 .extension()
-                .map_or(false, |ext| ext == "yaml" || ext == "yml")
+                .is_some_and(|ext| ext == "yaml" || ext == "yml")
             {
                 debug!("Loading document bundles from {:?}", path);
                 registry.load_file(&path)?;

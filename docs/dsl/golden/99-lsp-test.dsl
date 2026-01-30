@@ -35,7 +35,7 @@
 ;; intent: Pass configuration as map value
 ;; macro: primitive
 ;; constraints: @demo-fund must exist
-(trading-profile.create
+(trading.profile.create
   :cbu-id @demo-fund
   :name "Main Profile"
   :config {:default-currency "EUR" :settlement-cycle 2}
@@ -49,7 +49,7 @@
 ;; macro: primitive
 ;; constraints: @demo-fund must exist
 ;; NOTE: Nested calls ARE supported - entity created inline
-(cbu-role.assign
+(cbu.role.assign
   :cbu-id @demo-fund
   :entity-id (entity.create :name "Demo Director" :type "NATURAL" :as @director)
   :role "DIRECTOR"
@@ -57,7 +57,7 @@
 
 ;; Alternative: separate calls (always works)
 (entity.create :name "Demo Director" :type "NATURAL" :as @director)
-(cbu-role.assign
+(cbu.role.assign
   :cbu-id @demo-fund
   :entity-id @director
   :role "DIRECTOR"

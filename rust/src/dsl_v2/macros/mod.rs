@@ -36,17 +36,21 @@
 //! Normal DSL Pipeline (parse → enrich → compile → execute)
 //! ```
 
+mod conditions;
 mod expander;
 mod registry;
 mod schema;
 mod scope;
 mod variable;
 
+pub use conditions::{evaluate_condition, ConditionContext, ConditionResult};
 pub use expander::{expand_macro, MacroExpansionError, MacroExpansionOutput};
 pub use registry::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 pub use schema::{
-    InvokeMacroStep, MacroArg, MacroArgType, MacroEnumValue, MacroExpansionStep, MacroPrereq,
-    MacroRouting, MacroSchema, MacroTarget, MacroUi, SetState, VerbCallStep,
+    AllOfCondition, AnyOfCondition, ForEachStep, InvokeMacroStep, MacroArg, MacroArgType,
+    MacroEnumValue, MacroExpansionStep, MacroPrereq, MacroRouting, MacroSchema, MacroTarget,
+    MacroTier, MacroUi, NotCondition, RequiredIfComplex, RequiredIfExpr, RoleCardinality, RoleSpec,
+    SetState, TaxonomyRef, VerbCallStep, WhenCondition, WhenStep,
 };
 pub use scope::{BoundValue, MacroExpansionScope, MacroScopeError, SymbolScope};
 pub use variable::{substitute_variables, VariableContext, VariableError};

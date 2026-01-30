@@ -112,7 +112,7 @@ roles:
     description: "Chief Compliance Officer"
 
 # Structure type aliases for context matching
-structure_aliases:
+structure-aliases:
   ucits: [sicav, icav-ucits, oeic-ucits, fcp-ucits]
   aif: [raif, qiaif, icav-aif, scsp-aif]
   uk-authorised: [oeic, aut, acs, ltaf]

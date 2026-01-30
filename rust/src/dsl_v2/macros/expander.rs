@@ -132,10 +132,24 @@ pub fn expand_macro(
     check_structure_type_constraints(schema, args, session)?;
 
     // 5. Build variable context
-    let ctx = build_variable_context(schema, args, session)?;
+    let mut ctx = build_variable_context(schema, args, session)?;
+
+    // 5a. Generate placeholder statements for missing args with placeholder-if-missing
+    let mut statements = Vec::new();
+    for (name, arg_spec) in schema.all_args() {
+        if arg_spec.placeholder_if_missing && !args.contains_key(name) {
+            // Generate a placeholder entity statement
+            let placeholder_stmt = generate_placeholder_statement(name, arg_spec);
+            statements.push(placeholder_stmt.clone());
+
+            // Also bind the placeholder reference in context for later use
+            let placeholder_ref = format!("@placeholder-{}", name);
+            ctx.args
+                .insert(name.clone(), ArgValue::literal(&placeholder_ref));
+        }
+    }
 
     // 6. Expand templates
-    let mut statements = Vec::new();
     for step in &schema.expands_to {
         let dsl = expand_step(step, &ctx)?;
         statements.push(dsl);
@@ -208,7 +222,104 @@ fn validate_args(
         }
     }
 
+    // Check required-if conditions on optional args
+    for (name, arg_spec) in schema.optional_args() {
+        if let Some(required_if) = &arg_spec.required_if {
+            if is_required_if_satisfied(required_if, args) && !args.contains_key(name) {
+                return Err(MacroExpansionError::MissingRequired(format!(
+                    "{} (required because condition '{}' is satisfied)",
+                    name,
+                    format_required_if(required_if)
+                )));
+            }
+        }
+    }
+
     Ok(())
+}
+
+/// Check if a required-if condition is satisfied
+fn is_required_if_satisfied(
+    expr: &super::schema::RequiredIfExpr,
+    args: &HashMap<String, String>,
+) -> bool {
+    use super::schema::RequiredIfExpr;
+
+    match expr {
+        RequiredIfExpr::Simple(condition) => evaluate_simple_required_if(condition, args),
+        RequiredIfExpr::Complex(complex) => {
+            // any-of: at least one condition must match
+            if !complex.any_of.is_empty()
+                && !complex
+                    .any_of
+                    .iter()
+                    .any(|c| evaluate_simple_required_if(c, args))
+                {
+                    return false;
+                }
+            // all-of: all conditions must match
+            if !complex.all_of.is_empty()
+                && !complex
+                    .all_of
+                    .iter()
+                    .all(|c| evaluate_simple_required_if(c, args))
+                {
+                    return false;
+                }
+            // If we get here, all conditions are satisfied
+            !complex.any_of.is_empty() || !complex.all_of.is_empty()
+        }
+    }
+}
+
+/// Evaluate a simple condition like "structure-type = ucits"
+fn evaluate_simple_required_if(condition: &str, args: &HashMap<String, String>) -> bool {
+    let condition = condition.trim();
+
+    // Handle equality: "var = value"
+    if let Some((lhs, rhs)) = condition.split_once('=') {
+        let lhs = lhs.trim();
+        let rhs = rhs.trim();
+        return args.get(lhs).is_some_and(|v| v == rhs);
+    }
+
+    // Handle inequality: "var != value"
+    if let Some((lhs, rhs)) = condition.split_once("!=") {
+        let lhs = lhs.trim();
+        let rhs = rhs.trim();
+        return args.get(lhs).is_none_or(|v| v != rhs);
+    }
+
+    // Handle membership: "var in [a, b, c]"
+    if let Some((lhs, rhs)) = condition.split_once(" in ") {
+        let lhs = lhs.trim();
+        let list_str = rhs.trim().trim_start_matches('[').trim_end_matches(']');
+        let items: Vec<&str> = list_str.split(',').map(|s| s.trim()).collect();
+        return args.get(lhs).is_some_and(|v| items.contains(&v.as_str()));
+    }
+
+    // Default: check if variable exists and is truthy
+    args.get(condition)
+        .is_some_and(|v| !v.is_empty() && v != "false")
+}
+
+/// Format a required-if expression for error messages
+fn format_required_if(expr: &super::schema::RequiredIfExpr) -> String {
+    use super::schema::RequiredIfExpr;
+
+    match expr {
+        RequiredIfExpr::Simple(s) => s.clone(),
+        RequiredIfExpr::Complex(c) => {
+            let mut parts = Vec::new();
+            if !c.any_of.is_empty() {
+                parts.push(format!("any-of: [{}]", c.any_of.join(", ")));
+            }
+            if !c.all_of.is_empty() {
+                parts.push(format!("all-of: [{}]", c.all_of.join(", ")));
+            }
+            parts.join(" AND ")
+        }
+    }
 }
 
 /// Check prereqs are satisfied
@@ -393,7 +504,118 @@ fn expand_step(
             // The actual recursive expansion happens in the DSL executor
             expand_invoke_macro_step(macro_step, ctx)
         }
+        MacroExpansionStep::When(when_step) => expand_when_step(when_step, ctx),
+        MacroExpansionStep::ForEach(foreach_step) => expand_foreach_step(foreach_step, ctx),
     }
+}
+
+/// Expand multiple steps into a single joined output
+fn expand_steps(
+    steps: &[super::schema::MacroExpansionStep],
+    ctx: &VariableContext,
+) -> Result<String, MacroExpansionError> {
+    let mut statements = Vec::new();
+    for step in steps {
+        let dsl = expand_step(step, ctx)?;
+        if !dsl.is_empty() {
+            statements.push(dsl);
+        }
+    }
+    Ok(statements.join("\n"))
+}
+
+/// Expand a when: conditional step
+fn expand_when_step(
+    step: &super::schema::WhenStep,
+    ctx: &VariableContext,
+) -> Result<String, MacroExpansionError> {
+    use super::conditions::{evaluate_condition, ConditionContext, ConditionResult};
+
+    // Build condition context from variable context
+    let args_map = ctx.args_map();
+    let scope_map = ctx.scope_map();
+    let cond_ctx = ConditionContext::new(&args_map, &scope_map);
+
+    // Evaluate the condition
+    match evaluate_condition(&step.when, &cond_ctx) {
+        ConditionResult::True => {
+            // Expand the 'then' branch
+            expand_steps(&step.then, ctx)
+        }
+        ConditionResult::False => {
+            // Expand the 'else' branch if present
+            if step.else_branch.is_empty() {
+                Ok(String::new())
+            } else {
+                expand_steps(&step.else_branch, ctx)
+            }
+        }
+        ConditionResult::Unknown(var) => {
+            // Condition references unknown variable - treat as false with warning comment
+            let warning = format!(
+                ";; WARNING: condition references unknown variable '{}', skipping",
+                var
+            );
+            if step.else_branch.is_empty() {
+                Ok(warning)
+            } else {
+                let else_dsl = expand_steps(&step.else_branch, ctx)?;
+                Ok(format!("{}\n{}", warning, else_dsl))
+            }
+        }
+    }
+}
+
+/// Expand a foreach: loop step
+fn expand_foreach_step(
+    step: &super::schema::ForEachStep,
+    ctx: &VariableContext,
+) -> Result<String, MacroExpansionError> {
+    use super::variable::substitute_variables;
+
+    // Resolve the source list expression
+    let list_str = substitute_variables(&step.in_expr, ctx)?;
+
+    // Parse the list - could be JSON array or comma-separated
+    let items: Vec<String> = if list_str.starts_with('[') {
+        // Try JSON array parse
+        serde_json::from_str(&list_str).unwrap_or_else(|_| {
+            // Fallback to comma-separated within brackets
+            list_str
+                .trim_start_matches('[')
+                .trim_end_matches(']')
+                .split(',')
+                .map(|s| s.trim().trim_matches('"').to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+    } else {
+        // Comma-separated values
+        list_str
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    };
+
+    if items.is_empty() {
+        return Ok(String::new());
+    }
+
+    // Expand steps for each item
+    let mut statements = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        // Create a new context with the loop variable bound
+        let mut loop_ctx = ctx.clone();
+        loop_ctx.bind_loop_var(&step.foreach, item, index);
+
+        let dsl = expand_steps(&step.do_steps, &loop_ctx)?;
+        if !dsl.is_empty() {
+            statements.push(dsl);
+        }
+    }
+
+    Ok(statements.join("\n"))
 }
 
 /// Expand a verb call step into DSL
@@ -458,6 +680,37 @@ fn expand_invoke_macro_step(
     ))
 }
 
+/// Generate a placeholder entity statement for a missing arg with placeholder-if-missing
+fn generate_placeholder_statement(arg_name: &str, arg_spec: &super::schema::MacroArg) -> String {
+    // Determine the entity kind from the arg type or internal config
+    let entity_kind = if let Some(internal) = &arg_spec.internal {
+        // Use the first kind from internal config if available
+        internal
+            .kinds
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "entity".to_string())
+    } else {
+        // Infer from arg type
+        match &arg_spec.arg_type {
+            super::schema::MacroArgType::PartyRef => "party".to_string(),
+            super::schema::MacroArgType::StructureRef => "structure".to_string(),
+            super::schema::MacroArgType::ClientRef => "client".to_string(),
+            super::schema::MacroArgType::CaseRef => "case".to_string(),
+            super::schema::MacroArgType::MandateRef => "mandate".to_string(),
+            _ => "entity".to_string(),
+        }
+    };
+
+    // Generate the placeholder statement with a unique binding
+    let binding = format!("@placeholder-{}", arg_name);
+
+    format!(
+        "(entity.ensure-or-placeholder :kind \"{}\" :ref \"{}\" :as {})",
+        entity_kind, arg_name, binding
+    )
+}
+
 /// Hash a string for audit
 fn hash_string(s: &str) -> String {
     let mut hasher = Sha256::new();
@@ -489,19 +742,19 @@ structure.setup:
   ui:
     label: "Set up Structure"
     description: "Create a new fund"
-    target_label: "Structure"
+    target-label: "Structure"
   routing:
-    mode_tags: [onboarding]
-    operator_domain: structure
+    mode-tags: [onboarding]
+    operator-domain: structure
   target:
-    operates_on: client_ref
-    produces: structure_ref
+    operates-on: client-ref
+    produces: structure-ref
   args:
     style: keyworded
     required:
-      structure_type:
+      structure-type:
         type: enum
-        ui_label: "Type"
+        ui-label: "Type"
         values:
           - key: pe
             label: "Private Equity"
@@ -509,19 +762,19 @@ structure.setup:
           - key: sicav
             label: "SICAV"
             internal: sicav
-        default_key: pe
+        default-key: pe
       name:
         type: str
-        ui_label: "Name"
+        ui-label: "Name"
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: cbu.create
       args:
-        kind: "${arg.structure_type.internal}"
+        kind: "${arg.structure-type.internal}"
         name: "${arg.name}"
-        client_id: "${scope.client_id}"
-  sets_state:
+        client-id: "${scope.client_id}"
+  sets-state:
     - key: structure.exists
       value: true
   unlocks:
@@ -542,7 +795,7 @@ structure.setup:
         let session = mock_session();
 
         let mut args = HashMap::new();
-        args.insert("structure_type".to_string(), "pe".to_string());
+        args.insert("structure-type".to_string(), "pe".to_string());
         args.insert("name".to_string(), "Acme Fund".to_string());
 
         let result = expand_macro("structure.setup", &args, &session, &registry).unwrap();
@@ -557,7 +810,7 @@ structure.setup:
             result.statements[0].contains(":name Acme Fund")
                 || result.statements[0].contains(":name \"Acme Fund\"")
         );
-        assert!(result.statements[0].contains(":client_id 11111111-1111-1111-1111-111111111111"));
+        assert!(result.statements[0].contains(":client-id 11111111-1111-1111-1111-111111111111"));
 
         // Check state and unlocks
         assert_eq!(result.sets_state.len(), 1);
@@ -572,7 +825,7 @@ structure.setup:
 
         let mut args = HashMap::new();
         // Missing required "name" argument
-        args.insert("structure_type".to_string(), "pe".to_string());
+        args.insert("structure-type".to_string(), "pe".to_string());
 
         let result = expand_macro("structure.setup", &args, &session, &registry);
         assert!(matches!(
@@ -587,7 +840,7 @@ structure.setup:
         let session = mock_session();
 
         let mut args = HashMap::new();
-        args.insert("structure_type".to_string(), "invalid".to_string());
+        args.insert("structure-type".to_string(), "invalid".to_string());
         args.insert("name".to_string(), "Acme".to_string());
 
         let result = expand_macro("structure.setup", &args, &session, &registry);
@@ -617,50 +870,50 @@ structure.assign-role:
   ui:
     label: "Assign Role"
     description: "Assign a party to a role"
-    target_label: "Role"
+    target-label: "Role"
   routing:
-    mode_tags: [onboarding]
-    operator_domain: structure
+    mode-tags: [onboarding]
+    operator-domain: structure
   target:
-    operates_on: structure_ref
-    produces: role_ref
+    operates-on: structure-ref
+    produces: role-ref
   args:
     style: keyworded
     required:
       structure:
-        type: structure_ref
-        ui_label: "Structure"
+        type: structure-ref
+        ui-label: "Structure"
       role:
         type: enum
-        ui_label: "Role"
+        ui-label: "Role"
         values:
           - key: gp
             label: "General Partner"
             internal: general-partner
-            valid_for: [pe, hedge]
+            valid-for: [pe, hedge]
           - key: lp
             label: "Limited Partner"
             internal: limited-partner
-            valid_for: [pe, hedge]
+            valid-for: [pe, hedge]
           - key: manco
             label: "Management Company"
             internal: management-company
-            valid_for: [sicav]
+            valid-for: [sicav]
           - key: im
             label: "Investment Manager"
             internal: investment-manager
-        default_key: im
+        default-key: im
       party:
-        type: party_ref
-        ui_label: "Party"
+        type: party-ref
+        ui-label: "Party"
     optional: {}
   prereqs: []
-  expands_to:
+  expands-to:
     - verb: cbu-role.assign
       args:
-        cbu_id: "${arg.structure}"
+        cbu-id: "${arg.structure}"
         role: "${arg.role.internal}"
-        entity_id: "${arg.party}"
+        entity-id: "${arg.party}"
   unlocks: []
 "#;
 

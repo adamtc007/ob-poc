@@ -54,12 +54,12 @@ domains:
               - docs.bundle.manager-baseline
               - docs.bundle.us-40act-baseline
           - name: has-prime-broker
-            type: bool
+            type: boolean
             required: false
             default: false
             description: Whether the structure has a prime broker (for conditional docs)
           - name: has-market-maker
-            type: bool
+            type: boolean
             required: false
             default: false
             description: Whether the ETF has designated market makers
@@ -131,7 +131,7 @@ domains:
           - list docs bundles
         metadata:
           tier: intent
-          source_of_truth: reference
+          source_of_truth: catalog
           scope: global
           noun: document_bundle
           tags: [query, read, reference]

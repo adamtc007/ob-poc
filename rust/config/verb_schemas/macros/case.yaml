@@ -13,28 +13,28 @@ case.open:
   ui:
     label: "Open Case"
     description: "Open a new KYC case for a structure"
-    target_label: "Case"
+    target-label: "Case"
 
   routing:
-    mode_tags: [kyc, onboarding]
-    operator_domain: case
+    mode-tags: [kyc, onboarding]
+    operator-domain: case
 
   target:
-    operates_on: structure_ref
-    produces: case_ref
+    operates-on: structure-ref
+    produces: case-ref
 
   args:
     style: keyworded
     required:
       structure:
-        type: structure_ref
-        ui_label: "Structure"
-        autofill_from: session.current_structure
+        type: structure-ref
+        ui-label: "Structure"
+        autofill-from: session.current_structure
         picker: structure_picker
     optional:
       case_type:
         type: enum
-        ui_label: "Case Type"
+        ui-label: "Case Type"
         values:
           - key: initial
             label: "Initial Onboarding"
@@ -45,10 +45,10 @@ case.open:
           - key: event
             label: "Event-Driven Review"
             internal: event-driven
-        default_key: initial
+        default-key: initial
       priority:
         type: enum
-        ui_label: "Priority"
+        ui-label: "Priority"
         values:
           - key: normal
             label: "Normal"
@@ -59,20 +59,20 @@ case.open:
           - key: urgent
             label: "Urgent"
             internal: urgent
-        default_key: normal
+        default-key: normal
 
   prereqs:
     - type: state_exists
       key: structure.exists
 
-  expands_to:
+  expands-to:
     - verb: kyc-case.create
       args:
         cbu_id: "${arg.structure}"
         case_type: "${arg.case_type.internal}"
         priority: "${arg.priority.internal}"
 
-  sets_state:
+  sets-state:
     - key: case.exists
       value: true
 
@@ -87,31 +87,31 @@ case.add-party:
   ui:
     label: "Add Party to Case"
     description: "Add a party to the KYC case for review"
-    target_label: "Party"
+    target-label: "Party"
 
   routing:
-    mode_tags: [kyc]
-    operator_domain: case
+    mode-tags: [kyc]
+    operator-domain: case
 
   target:
-    operates_on: case_ref
+    operates-on: case-ref
     produces: null
 
   args:
     style: keyworded
     required:
       case:
-        type: case_ref
-        ui_label: "Case"
-        autofill_from: session.current_case
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
       party:
-        type: party_ref
-        ui_label: "Party"
+        type: party-ref
+        ui-label: "Party"
         picker: party_picker
     optional:
       role:
         type: enum
-        ui_label: "Role in Case"
+        ui-label: "Role in Case"
         values:
           - key: subject
             label: "Subject"
@@ -125,13 +125,13 @@ case.add-party:
           - key: signatory
             label: "Signatory"
             internal: signatory
-        default_key: subject
+        default-key: subject
 
   prereqs:
     - type: state_exists
       key: case.exists
 
-  expands_to:
+  expands-to:
     - verb: kyc-case.add-party
       args:
         case_id: "${arg.case}"
@@ -146,30 +146,30 @@ case.solicit-document:
   ui:
     label: "Request Document"
     description: "Request a document from a party"
-    target_label: "Document Request"
+    target-label: "Document Request"
 
   routing:
-    mode_tags: [kyc]
-    operator_domain: case
+    mode-tags: [kyc]
+    operator-domain: case
 
   target:
-    operates_on: case_ref
+    operates-on: case-ref
     produces: null
 
   args:
     style: keyworded
     required:
       case:
-        type: case_ref
-        ui_label: "Case"
-        autofill_from: session.current_case
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
       party:
-        type: party_ref
-        ui_label: "From Party"
+        type: party-ref
+        ui-label: "From Party"
         picker: party_picker
       document_type:
         type: enum
-        ui_label: "Document Type"
+        ui-label: "Document Type"
         values:
           - key: passport
             label: "Passport"
@@ -195,16 +195,16 @@ case.solicit-document:
     optional:
       due_date:
         type: date
-        ui_label: "Due Date"
+        ui-label: "Due Date"
       notes:
         type: str
-        ui_label: "Notes"
+        ui-label: "Notes"
 
   prereqs:
     - type: state_exists
       key: case.exists
 
-  expands_to:
+  expands-to:
     - verb: document.solicit
       args:
         case_id: "${arg.case}"
@@ -221,39 +221,39 @@ case.submit:
   ui:
     label: "Submit Case"
     description: "Submit case for review"
-    target_label: "Case"
+    target-label: "Case"
 
   routing:
-    mode_tags: [kyc]
-    operator_domain: case
+    mode-tags: [kyc]
+    operator-domain: case
 
   target:
-    operates_on: case_ref
+    operates-on: case-ref
     produces: null
 
   args:
     style: keyworded
     required:
       case:
-        type: case_ref
-        ui_label: "Case"
-        autofill_from: session.current_case
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
     optional:
       notes:
         type: str
-        ui_label: "Submission Notes"
+        ui-label: "Submission Notes"
 
   prereqs:
     - type: state_exists
       key: case.exists
 
-  expands_to:
+  expands-to:
     - verb: kyc-case.submit
       args:
         case_id: "${arg.case}"
         notes: "${arg.notes}"
 
-  sets_state:
+  sets-state:
     - key: case.submitted
       value: true
 
@@ -268,43 +268,43 @@ case.approve:
   ui:
     label: "Approve Case"
     description: "Approve the KYC case"
-    target_label: "Case"
+    target-label: "Case"
 
   routing:
-    mode_tags: [kyc]
-    operator_domain: case
+    mode-tags: [kyc]
+    operator-domain: case
 
   target:
-    operates_on: case_ref
+    operates-on: case-ref
     produces: null
 
   args:
     style: keyworded
     required:
       case:
-        type: case_ref
-        ui_label: "Case"
-        autofill_from: session.current_case
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
     optional:
       notes:
         type: str
-        ui_label: "Approval Notes"
+        ui-label: "Approval Notes"
       next_review_date:
         type: date
-        ui_label: "Next Review Date"
+        ui-label: "Next Review Date"
 
   prereqs:
     - type: state_exists
       key: case.submitted
 
-  expands_to:
+  expands-to:
     - verb: kyc-case.approve
       args:
         case_id: "${arg.case}"
         notes: "${arg.notes}"
         next_review_date: "${arg.next_review_date}"
 
-  sets_state:
+  sets-state:
     - key: case.approved
       value: true
 
@@ -318,26 +318,26 @@ case.reject:
   ui:
     label: "Reject Case"
     description: "Reject the KYC case"
-    target_label: "Case"
+    target-label: "Case"
 
   routing:
-    mode_tags: [kyc]
-    operator_domain: case
+    mode-tags: [kyc]
+    operator-domain: case
 
   target:
-    operates_on: case_ref
+    operates-on: case-ref
     produces: null
 
   args:
     style: keyworded
     required:
       case:
-        type: case_ref
-        ui_label: "Case"
-        autofill_from: session.current_case
+        type: case-ref
+        ui-label: "Case"
+        autofill-from: session.current_case
       reason:
         type: enum
-        ui_label: "Rejection Reason"
+        ui-label: "Rejection Reason"
         values:
           - key: incomplete
             label: "Incomplete Documentation"
@@ -357,20 +357,20 @@ case.reject:
     optional:
       notes:
         type: str
-        ui_label: "Rejection Notes"
+        ui-label: "Rejection Notes"
 
   prereqs:
     - type: state_exists
       key: case.submitted
 
-  expands_to:
+  expands-to:
     - verb: kyc-case.reject
       args:
         case_id: "${arg.case}"
         reason: "${arg.reason.internal}"
         notes: "${arg.notes}"
 
-  sets_state:
+  sets-state:
     - key: case.rejected
       value: true
 
@@ -382,14 +382,14 @@ case.list:
   ui:
     label: "List Cases"
     description: "Show KYC cases"
-    target_label: "Cases"
+    target-label: "Cases"
 
   routing:
-    mode_tags: [kyc, onboarding]
-    operator_domain: case
+    mode-tags: [kyc, onboarding]
+    operator-domain: case
 
   target:
-    operates_on: client_ref
+    operates-on: client-ref
     produces: null
 
   args:
@@ -397,12 +397,12 @@ case.list:
     required: {}
     optional:
       structure:
-        type: structure_ref
-        ui_label: "For Structure"
+        type: structure-ref
+        ui-label: "For Structure"
         picker: structure_picker
       status:
         type: enum
-        ui_label: "Status"
+        ui-label: "Status"
         values:
           - key: open
             label: "Open"
@@ -419,11 +419,11 @@ case.list:
           - key: all
             label: "All"
             internal: null
-        default_key: all
+        default-key: all
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: kyc-case.list
       args:
         client_id: "${scope.client_id}"
@@ -438,33 +438,33 @@ case.select:
   ui:
     label: "Select Case"
     description: "Set the current working case"
-    target_label: "Case"
+    target-label: "Case"
 
   routing:
-    mode_tags: [kyc]
-    operator_domain: case
+    mode-tags: [kyc]
+    operator-domain: case
 
   target:
-    operates_on: case_ref
+    operates-on: case-ref
     produces: null
 
   args:
     style: keyworded
     required:
       case:
-        type: case_ref
-        ui_label: "Case"
+        type: case-ref
+        ui-label: "Case"
         picker: case_picker
     optional: {}
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: session.set-case
       args:
         case_id: "${arg.case}"
 
-  sets_state:
+  sets-state:
     - key: case.selected
       value: true
     - key: case.exists

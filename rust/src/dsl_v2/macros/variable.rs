@@ -158,6 +158,37 @@ impl VariableContext {
 
         Ok(ctx)
     }
+
+    /// Get args as a simple string map (for condition evaluation)
+    pub fn args_map(&self) -> HashMap<String, String> {
+        self.args
+            .iter()
+            .map(|(k, v)| {
+                // Use internal value for enums, raw value otherwise
+                let value = v.internal.as_ref().unwrap_or(&v.value).clone();
+                (k.clone(), value)
+            })
+            .collect()
+    }
+
+    /// Get scope as a simple string map (for condition evaluation)
+    pub fn scope_map(&self) -> HashMap<String, String> {
+        self.scope.clone()
+    }
+
+    /// Bind a loop variable for foreach iteration
+    pub fn bind_loop_var(&mut self, var_name: &str, value: &str, index: usize) {
+        // Bind the main variable
+        self.args
+            .insert(var_name.to_string(), ArgValue::literal(value));
+
+        // Also bind as scope for nested access patterns
+        self.scope.insert(var_name.to_string(), value.to_string());
+
+        // Bind index for iteration tracking
+        self.scope
+            .insert(format!("{}.index", var_name), index.to_string());
+    }
 }
 
 /// Substitute all variables in a template string

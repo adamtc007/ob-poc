@@ -42,6 +42,67 @@ rich syntax highlighting, outline navigation, run buttons, and agent-friendly an
 - [ ] Run buttons appear beside top-level forms
 - [ ] Golden examples parse in both tree-sitter and NOM
 
+### Incremental Edit Stability
+- [ ] Rename `@fund` → `@fund2`: highlight updates immediately (no reload)
+- [ ] Rename `@fund` → `@fund2`: outline updates immediately
+- [ ] Rename `@fund` → `@fund2`: run button remains on form
+- [ ] Partial edit `(cbu.ensure :name "Apex|` still highlights correctly outside string
+
+---
+
+## Key Implementation Risks + Mitigations
+
+These are the "80% debugging time" traps. Address them explicitly or they will bite.
+
+### Risk 1: Completion Context Scanner (Nested S-expressions + Partial Edits)
+
+**Where it bites**: Phase 4.2 "ignore strings/comments" is necessary but not sufficient.
+
+**Failure modes**:
+- Complete at `@` inside nested calls → engine misidentifies whether you're completing 
+  a symbol ref, keyword value, or verb head
+- Think you're inside string/comment when you aren't (escaped quotes, incomplete strings)
+- Cannot determine current `verb_call` because of nested `()` and `[]`/`{}`
+
+**Mitigation**: See expanded Phase 4.2 requirements below.
+
+### Risk 2: Incremental Parsing (Tree-sitter vs Zed)
+
+**Where it bites**: Tree-sitter is incremental, but grammar must support stable parsing 
+during edits. If you edit `:as @binding`, you want immediate highlight/outline updates 
+without reload.
+
+**Failure modes**:
+- `:as` parses as `keyword_arg` instead of `as_binding` → stale highlighting
+- Half-typed structures cause tree to collapse → outline disappears while typing
+- Grammar ambiguity causes tree-sitter to keep old parse shape
+
+**Mitigation**: See expanded Phase 6.1 requirements below.
+
+### Risk 3: Node Name Mismatch (Tree-sitter vs NOM AST)
+
+**Where it bites**: Different names for same concept makes debugging brutal.
+
+**Mitigation**: Enforce node name contract:
+| Concept | Tree-sitter Node | NOM AST Type |
+|---------|------------------|--------------|
+| Verb call | `verb_call` | `VerbCall` |
+| Verb name | `verb_name` | `domain + verb` |
+| Keyword arg | `keyword_arg` | `Argument` |
+| Binding | `as_binding` | `VerbCall.binding` |
+| Symbol ref | `symbol_ref` | `AstNode::SymbolRef` |
+| Map entry | `map_entry` | `MapEntry` |
+
+### Risk 4: No Logging = Blind Debugging
+
+**Mitigation**: Add debug mode to LSP that logs:
+- Completion context classification (`InsideString`, `InsideComment`, `AtSymbolRef`, 
+  `AfterKeywordAwaitingValue`, `AtVerbHead`)
+- Current call head extraction result
+- Cursor offset/position conversions
+
+Add dev task: "DSL: Dump Tree-sitter node at cursor"
+
 ---
 
 # PART A: Parser/LSP Correctness
@@ -232,14 +293,133 @@ Use `span_to_range()` for all diagnostic ranges. No more `Range::default()`.
 
 **Fix**: Convert position → offset, scan `&doc.text[..offset]` (full prefix).
 
-### 4.2 Ignore Strings and Comments
+### 4.2 Ignore Strings and Comments (Full Scanner Implementation)
 
-Replace naive `rfind('@')` with a scanner that tracks:
-- `in_string: bool` (handle escapes)
-- `in_comment: bool` (set on `;;`, reset on `\n`)
-- `paren_depth`, `bracket_depth`, `brace_depth`
+**File**: `rust/crates/dsl-lsp/src/analysis/context.rs`
 
-Prevent `"email@domain.com"` and `;; @fund` from triggering completion.
+Replace naive `rfind('@')` with a proper prefix scanner.
+
+#### 4.2.1 Scanner State
+
+Track these while scanning `text[..offset]`:
+
+```rust
+struct PrefixScanner {
+    in_string: bool,
+    escape_next: bool,
+    in_comment: bool,
+    paren_depth: i32,
+    bracket_depth: i32,
+    brace_depth: i32,
+    // Stack of absolute byte offsets for open parens
+    paren_stack: Vec<usize>,
+    // Most recent keyword token (start, end) outside string/comment
+    last_keyword: Option<(usize, usize)>,
+    // Most recent @ outside string/comment
+    last_at: Option<usize>,
+}
+```
+
+**Rules**:
+- `in_comment` starts on `;;` when not in string, ends at `\n`
+- `in_string` toggles on `"` unless `escape_next`
+- `escape_next` set after `\` in string, cleared after next char
+- Push to `paren_stack` on `(`, pop on `)` (when not in string/comment)
+
+#### 4.2.2 Determine "Current Call Head"
+
+Use the paren stack to find the current verb call:
+
+```rust
+fn current_call_context(&self, text: &str) -> Option<CallContext> {
+    // Find deepest open paren not inside brackets/braces
+    let call_start = self.paren_stack.last()?;
+    
+    // Parse slice from open paren to cursor with tolerant parser
+    let slice = &text[*call_start..];
+    
+    // Extract:
+    // - head: Option<String> (domain.verb if present)
+    // - used_keywords: Vec<String> (for duplicate avoidance)
+    // - awaiting_value: bool (last keyword has no value yet)
+}
+```
+
+#### 4.2.3 Completion Trigger Rules
+
+| Context | Trigger | Result |
+|---------|---------|--------|
+| `@` outside string/comment, followed by ident chars | `@` completion | Symbol suggestions |
+| After `:keyword` with no value yet | Value completion | Type-appropriate values |
+| After `(` at call head position | Verb completion | Verb suggestions |
+| Inside `"..."` | NO completion | — |
+| Inside `;; ...` | NO completion | — |
+| `"email@domain.com"` | NO completion | — |
+
+#### 4.2.4 Hard Test Fixtures
+
+**Must pass**:
+
+```rust
+#[test]
+fn test_nested_completion() {
+    // Cursor at | after @
+    let doc = "(outer.call :x (inner.call :ref @|))";
+    let ctx = detect_completion_context(&doc, pos(0, 35));
+    
+    // Should identify inner.call as current verb
+    assert!(matches!(ctx, CompletionContext::SymbolRef { 
+        verb_name: Some(v), .. 
+    } if v == "inner.call"));
+}
+
+#[test]
+fn test_keyword_awaiting_value() {
+    let doc = "(cbu.ensure :name |)";
+    let ctx = detect_completion_context(&doc, pos(0, 18));
+    
+    assert!(matches!(ctx, CompletionContext::KeywordValue { 
+        keyword, .. 
+    } if keyword == "name"));
+}
+
+#[test]
+fn test_no_completion_in_string() {
+    let doc = r#"(test.echo :message "email@domain.com|")"#;
+    let ctx = detect_completion_context(&doc, pos(0, 37));
+    
+    // Should NOT trigger @ completion
+    assert!(matches!(ctx, CompletionContext::None) || 
+            matches!(ctx, CompletionContext::KeywordValue { in_string: true, .. }));
+}
+
+#[test]
+fn test_no_completion_in_comment() {
+    let doc = ";; comment mentioning @fund|";
+    let ctx = detect_completion_context(&doc, pos(0, 27));
+    
+    assert!(matches!(ctx, CompletionContext::None));
+}
+
+#[test]
+fn test_incomplete_string_tolerance() {
+    // Incomplete string - completion should still work OUTSIDE the string
+    let doc = r#"(cbu.ensure :name "Apex| :as @fund)"#;
+    // Cursor after "Apex is inside string - no completion
+    // But the parser shouldn't crash
+}
+
+#[test]  
+fn test_multiple_nested_parens() {
+    let doc = "(a.b :x (c.d :y (e.f :z @|)))";
+    let ctx = detect_completion_context(&doc, pos(0, 24));
+    
+    // Current verb should be e.f (deepest)
+    assert!(matches!(ctx, CompletionContext::SymbolRef {
+        verb_name: Some(v), ..
+    } if v == "e.f"));
+}
+```
 
 ---
 
@@ -268,17 +448,41 @@ Build per-document symbol index:
 - `decls: HashMap<String, Location>` — from `:as @sym`
 - `refs: HashMap<String, Vec<Location>>` — from `@sym` usages
 
+### 5.4 Debug Logging Mode
+
+**File**: `rust/crates/dsl-lsp/src/lib.rs`
+
+Add debug mode (enabled via init option or env var) that logs:
+- Completion context classification: `InsideString`, `InsideComment`, `AtSymbolRef`, 
+  `AfterKeywordAwaitingValue`, `AtVerbHead`
+- Current call head extraction result
+- Cursor offset/position conversions
+- Parse timing
+
+```rust
+// In completion handler
+if self.debug_mode {
+    tracing::debug!(
+        "completion context: {:?}, verb={:?}, offset={}, encoding={:?}",
+        context_kind, current_verb, offset, self.position_encoding
+    );
+}
+```
+
+Without this, debugging completion issues is brutal.
+
 ---
 
 # PART B: Zed Editor Experience
 
 ## Phase 6: Tree-sitter Grammar Enhancement
 
-### 6.1 Ensure `:as` is Dedicated Node
+### 6.1 Ensure `:as` is Dedicated Node (Non-negotiable Invariant)
 
 **File**: `rust/crates/dsl-lsp/tree-sitter-dsl/grammar.js`
 
 **Critical**: `:as @x` must parse as `as_binding` node, not `keyword + symbol_ref`.
+This is the #1 cause of stale highlights during edits.
 
 ```javascript
 // Use negative lookahead to exclude :as from normal keywords
@@ -298,6 +502,121 @@ verb_call: ($) => seq(
 ```
 
 After changes: `npx tree-sitter generate`
+
+### 6.2 Edit-Tolerant Grammar Rules
+
+Make the grammar resilient to half-typed structures. This keeps the syntax tree
+stable while typing, which keeps highlights/outline/runnables stable.
+
+```javascript
+// Allow keyword_arg with missing value (shows as ERROR but tree stays stable)
+keyword_arg: ($) => seq($.keyword_except_as, optional($._value)),
+
+// Allow as_binding with missing symbol_ref temporarily  
+as_binding: ($) => seq(":as", optional($.symbol_ref)),
+
+// Verb call tolerates missing closing paren (tree-sitter handles via ERROR)
+verb_call: ($) => seq(
+    "(",
+    optional($.verb_name),
+    repeat($._expression),
+    optional($.as_binding),
+    optional(")")  // Makes partial edits more stable
+),
+```
+
+### 6.3 Tree-sitter Corpus Tests for Incremental Edits
+
+**File**: `tree-sitter-dsl/test/corpus/incremental.txt`
+
+Assert `:as` becomes `as_binding` even during typing sequences:
+
+```
+================================================================================
+Binding with complete symbol
+================================================================================
+
+(cbu.ensure :name "Test" :as @fund)
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (verb_call
+    (verb_name)
+    (keyword_arg (keyword) (string))
+    (as_binding (symbol_ref))))
+
+================================================================================
+Binding without symbol yet (mid-typing @)
+================================================================================
+
+(cbu.ensure :name "Test" :as @)
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (verb_call
+    (verb_name)
+    (keyword_arg (keyword) (string))
+    (as_binding (symbol_ref))))
+
+================================================================================
+Keyword :as without symbol (just typed :as)
+================================================================================
+
+(cbu.ensure :name "Test" :as)
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (verb_call
+    (verb_name)
+    (keyword_arg (keyword) (string))
+    (as_binding)))
+
+================================================================================
+Partial :a typing (should NOT be as_binding yet)
+================================================================================
+
+(cbu.ensure :name "Test" :a)
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (verb_call
+    (verb_name)
+    (keyword_arg (keyword) (string))
+    (keyword_arg (keyword))))
+```
+
+### 6.4 Query Robustness
+
+In `highlights.scm` and `outline.scm`, prefer capturing by node name rather than
+matching literal token sequences. Incremental parsing may produce ERROR nodes.
+
+```scheme
+;; Good: capture node
+(as_binding) @keyword.special
+
+;; Also highlight if symbol missing (mid-edit)
+(as_binding ":as" @keyword.special)
+(as_binding (symbol_ref) @variable.special)
+
+;; Outline: show item even without binding symbol
+(verb_call (verb_name) @name) @item
+(verb_call 
+  (verb_name) @name
+  (as_binding (symbol_ref)? @context.extra)) @item
+```
+
+### 6.5 Incremental Refresh Acceptance Tests
+
+Add to acceptance criteria:
+- [ ] Rename `@fund` → `@fund2`: highlight updates immediately (no reload)
+- [ ] Rename `@fund` → `@fund2`: outline updates immediately
+- [ ] Rename `@fund` → `@fund2`: run button remains on form
+- [ ] Type `:as @` then identifier: binding highlights progressively
+- [ ] Partial edit `(cbu.ensure :name "Apex|` doesn't break highlighting outside string
 
 ---
 
@@ -319,6 +638,7 @@ zed-extension/
 │       ├── outline.scm
 │       ├── textobjects.scm
 │       ├── overrides.scm
+│       ├── redactions.scm      # Optional: PII redaction for demos
 │       └── runnables.scm
 └── snippets/
     └── dsl.json
@@ -326,21 +646,34 @@ zed-extension/
 
 ### 7.2 extension.toml
 
+**Note**: Zed uses top-level keys, not `[package]`. Use commit SHA for `rev` (not branch name).
+For local dev, use `repository = "file:///path/to/repo"`.
+
 ```toml
-[package]
 id = "ob-poc-dsl"
 name = "OB-POC DSL"
+description = "Language support for the OB-POC KYC/AML onboarding DSL"
 version = "0.1.0"
 schema_version = 1
+authors = ["BNY Mellon Enterprise Onboarding Team"]
+repository = "https://github.com/your-org/ob-poc"
 
 [grammars.dsl]
 repository = "https://github.com/your-org/ob-poc"
-rev = "main"
+# For dev: repository = "file:///path/to/ob-poc"
+rev = "abc123def456"  # Must be commit SHA, not branch name
 path = "rust/crates/dsl-lsp/tree-sitter-dsl"
 
-[language_servers.dsl-lsp]
-name = "DSL Language Server"
-languages = ["DSL"]
+# NOTE: For LSP auto-launch, choose ONE path:
+#
+# PATH A (fast): Extension provides grammar/queries only.
+#   Configure LSP in Zed settings.json:
+#   "lsp": { "dsl-lsp": { "binary": { "path": "/path/to/dsl-lsp" } } }
+#
+# PATH B (full): Extension implements language_server_command in Rust.
+#   Requires extension Rust code - see Zed extension docs.
+#
+# For initial implementation, use Path A.
 ```
 
 ### 7.3 config.toml
@@ -381,18 +714,35 @@ tab_size = 2
 
 ### 8.2 brackets.scm
 
+**Note**: Zed expects paired `@open`/`@close` in a single pattern for rainbow brackets.
+
 ```scheme
-("(" @open) (")" @close)
-("[" @open) ("]" @close)
-("{" @open) ("}" @close)
+;; Parentheses (S-expressions)
+("(" @open ")" @close)
+
+;; Square brackets (arrays/lists)
+("[" @open "]" @close)
+
+;; Curly braces (maps)
+("{" @open "}" @close)
+
+;; Exclude quotes from rainbow coloring
+(string ("\"" @open "\"" @close) (#set! rainbow.exclude))
 ```
 
 ### 8.3 indents.scm
 
+**Note**: Zed expects `(node CLOSE @end) @indent` pattern.
+
 ```scheme
-(verb_call "(" @indent ")" @end)
-(array "[" @indent "]" @end)
-(map "{" @indent "}" @end)
+;; Verb calls indent, dedent on close paren
+(verb_call ")" @end) @indent
+
+;; Arrays
+(array "]" @end) @indent
+
+;; Maps
+(map "}" @end) @indent
 ```
 
 ### 8.4 outline.scm (Critical for Agent Integration)
@@ -412,20 +762,80 @@ tab_size = 2
 
 ### 8.5 textobjects.scm
 
-```scheme
-(verb_call) @function.outer
-(array) @list.outer
-(map) @block.outer
-(comment) @comment.outer
-```
-
-### 8.6 runnables.scm
+**Note**: Zed expects `@function.around`/`@function.inside`, `@class.around`/`@class.inside`, 
+`@comment.around` (not `@function.outer`/`@function.inner`).
 
 ```scheme
+;; Verb calls as "functions"
 (verb_call
-  (verb_name) @run
-  (#set! tag "dsl-form"))
+  "("
+  (_)* @function.inside
+  ")") @function.around
+
+;; Maps as "class" (for structural selection)
+(map
+  "{"
+  (_)* @class.inside
+  "}") @class.around
+
+;; Arrays also as "class"
+(array
+  "["
+  (_)* @class.inside
+  "]") @class.around
+
+;; Comments
+(comment)+ @comment.around
 ```
+
+### 8.6 overrides.scm
+
+**Note**: Use `@comment.inclusive` for line comments so scope reaches newline.
+
+```scheme
+;; Inside strings: disable certain completions
+(string) @string
+
+;; Inside comments: inclusive so scope reaches newline
+(comment) @comment.inclusive
+```
+
+### 8.7 redactions.scm (Optional - Banking Demo Friendly)
+
+Zed supports redacting PII during collaboration/screen share.
+
+```scheme
+;; Redact values for sensitive keywords
+(keyword_arg
+  (keyword) @_kw
+  (string) @redact
+  (#match? @_kw ":(passport-number|tax-id|ssn|dob|date-of-birth|bank-account)"))
+```
+
+### 8.8 runnables.scm
+
+**Note**: Zed exposes non-underscore-prefixed captures as `ZED_CUSTOM_<name>` env vars.
+Use `(#set! tag ...)` to bind tasks by tag.
+
+```scheme
+;; Basic form: run button on verb name
+(
+  (verb_call
+    (verb_name) @run @verb)
+  (#set! tag dsl-form)
+)
+
+;; Form with binding: also capture the symbol
+(
+  (verb_call
+    (verb_name) @run @verb
+    (as_binding
+      (symbol_ref) @binding))
+  (#set! tag dsl-form-with-binding)
+)
+```
+
+**Result**: Tasks can access `$ZED_CUSTOM_verb` and `$ZED_CUSTOM_binding`.
 
 ---
 
@@ -433,10 +843,22 @@ tab_size = 2
 
 **File**: `zed-extension/snippets/dsl.json`
 
+**Note**: Zed only uses the first prefix in a list. Use single strings or separate entries.
+
 ```json
 {
   "CBU Create": {
-    "prefix": ["cbu", "cbu.ensure"],
+    "prefix": "cbu",
+    "body": [
+      ";; intent: ${1:Create custody banking unit}",
+      "(cbu.ensure",
+      "  :name \"${2:Fund Name}\"",
+      "  :jurisdiction \"${3|LU,IE,US,GB|}\"",
+      "  :as @${4:cbu})"
+    ]
+  },
+  "CBU Ensure": {
+    "prefix": "cbu.ensure",
     "body": [
       ";; intent: ${1:Create custody banking unit}",
       "(cbu.ensure",
@@ -446,7 +868,7 @@ tab_size = 2
     ]
   },
   "Entity Person": {
-    "prefix": ["person"],
+    "prefix": "person",
     "body": [
       ";; intent: ${1:Create natural person}",
       "(entity.create-proper-person",
@@ -456,7 +878,7 @@ tab_size = 2
     ]
   },
   "Intent Block": {
-    "prefix": [";;", "intent"],
+    "prefix": "intent",
     "body": [
       ";; intent: ${1:What this accomplishes}",
       ";; macro: ${2:operator.verb-name}"
@@ -471,29 +893,47 @@ tab_size = 2
 
 **File**: `.zed/tasks.json`
 
+**Note**: Zed provides `$ZED_ROW` and `$ZED_COLUMN` for cursor position.
+Tasks bound by tag use captures from runnables.scm.
+
 ```json
-{
-  "tasks": [
-    {
-      "label": "DSL: Validate Form",
-      "command": "cargo",
-      "args": ["run", "-p", "dsl-cli", "--", "validate", "--file", "$ZED_FILE"],
-      "tags": ["dsl-form"]
-    },
-    {
-      "label": "DSL: Expand Macro",
-      "command": "cargo",
-      "args": ["run", "-p", "dsl-cli", "--", "expand", "--file", "$ZED_FILE"],
-      "tags": ["dsl-form"]
-    },
-    {
-      "label": "DSL: Format File",
-      "command": "cargo",
-      "args": ["run", "-p", "dsl-cli", "--", "fmt", "$ZED_FILE"]
-    }
-  ]
-}
+[
+  {
+    "label": "DSL: Validate Form",
+    "command": "cargo",
+    "args": ["run", "-p", "dsl-cli", "--", "validate", "--file", "$ZED_FILE", "--row", "$ZED_ROW", "--column", "$ZED_COLUMN"],
+    "tags": ["dsl-form", "dsl-form-with-binding"],
+    "reveal": "always"
+  },
+  {
+    "label": "DSL: Expand Macro",
+    "command": "cargo",
+    "args": ["run", "-p", "dsl-cli", "--", "expand", "--file", "$ZED_FILE", "--form", "$ZED_CUSTOM_verb"],
+    "tags": ["dsl-form", "dsl-form-with-binding"],
+    "reveal": "always"
+  },
+  {
+    "label": "DSL: Format File",
+    "command": "cargo",
+    "args": ["run", "-p", "dsl-cli", "--", "fmt", "$ZED_FILE"],
+    "reveal": "never"
+  },
+  {
+    "label": "DSL: Dump Tree-sitter Node at Cursor",
+    "command": "npx",
+    "args": ["tree-sitter", "parse", "$ZED_FILE"],
+    "reveal": "always"
+  },
+  {
+    "label": "DSL: Validate All Golden Examples",
+    "command": "cargo",
+    "args": ["run", "-p", "dsl-cli", "--", "validate", "--dir", "docs/dsl/golden/"],
+    "reveal": "always"
+  }
+]
 ```
+
+**CLI interface required**: `dsl-cli validate --file FILE --row N --column N`
 
 ---
 
@@ -597,12 +1037,14 @@ Phase 2.2 (adapter update)
     ↓
 Phase 3.* (error reporting)
     ↓
-Phase 4.* (completion context)
+Phase 4.* (completion context + scanner)
     ↓
-Phase 5.* (LSP features)
+Phase 5.* (LSP features + debug logging)
 
 PART B: Zed Experience
 Phase 6.1 (grammar :as fix) ←── Required before queries work
+    ↓
+Phase 6.2-6.5 (edit tolerance + corpus tests + query robustness)
     ↓
 Phase 7.* (extension structure)
     ↓
@@ -627,20 +1069,23 @@ Phase 12-13 (docs + tests)
 | `dsl-core/src/parser.rs` | nom_locate, absolute spans, ParseError |
 | `dsl-core/src/ast.rs` | Spans on all nodes, comment fix |
 | `dsl-lsp/src/encoding.rs` | New: position encoding |
-| `dsl-lsp/src/lib.rs` | Negotiate encoding |
+| `dsl-lsp/src/lib.rs` | Negotiate encoding, debug mode flag |
+| `dsl-lsp/src/analysis/context.rs` | Full prefix scanner with nesting |
 | `dsl-lsp/src/analysis/*.rs` | Use encoding, node spans |
 | `dsl-lsp/src/handlers/*.rs` | hover, documentSymbol, def, refs, rename |
+| `dsl-lsp/tests/completion_context.rs` | Scanner test fixtures |
 
 ### Part B (Zed Experience)
 
 | File | Changes |
 |------|---------|
-| `tree-sitter-dsl/grammar.js` | `:as` as dedicated node |
-| `zed-extension/extension.toml` | Extension manifest |
+| `tree-sitter-dsl/grammar.js` | `:as` as dedicated node, edit-tolerant rules |
+| `tree-sitter-dsl/test/corpus/incremental.txt` | Incremental edit tests |
+| `zed-extension/extension.toml` | Extension manifest (top-level keys, SHA rev) |
 | `zed-extension/languages/dsl/config.toml` | Language config |
-| `zed-extension/languages/dsl/*.scm` | 7 query files |
-| `zed-extension/snippets/dsl.json` | Code snippets |
-| `.zed/tasks.json` | Repository tasks |
+| `zed-extension/languages/dsl/*.scm` | 8 query files (with correct Zed syntax) |
+| `zed-extension/snippets/dsl.json` | Code snippets (single prefix strings) |
+| `.zed/tasks.json` | Repository tasks (JSON array, row/col params) |
 | `docs/dsl/golden/*.dsl` | 8 golden examples |
 | `docs/DSL_STYLE_GUIDE.md` | Style guide |
 | `docs/AGENT_RULES.md` | Agent rules |

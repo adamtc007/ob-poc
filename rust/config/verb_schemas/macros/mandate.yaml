@@ -14,35 +14,35 @@ mandate.create:
   ui:
     label: "Create Mandate"
     description: "Create an investment mandate for a structure"
-    target_label: "Mandate"
+    target-label: "Mandate"
 
   routing:
-    mode_tags: [trading, onboarding]
-    operator_domain: mandate
+    mode-tags: [trading, onboarding]
+    operator-domain: mandate
 
   target:
-    operates_on: structure_ref
-    produces: mandate_ref
+    operates-on: structure-ref
+    produces: mandate-ref
 
   args:
     style: keyworded
     required:
       structure:
-        type: structure_ref
-        ui_label: "Structure"
-        autofill_from: session.current_structure
+        type: structure-ref
+        ui-label: "Structure"
+        autofill-from: session.current_structure
         picker: structure_picker
       name:
         type: str
-        ui_label: "Mandate Name"
+        ui-label: "Mandate Name"
     optional:
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
       strategy:
         type: enum
-        ui_label: "Strategy"
+        ui-label: "Strategy"
         values:
           - key: equity
             label: "Equity"
@@ -59,13 +59,13 @@ mandate.create:
           - key: quant
             label: "Quantitative"
             internal: quantitative
-        default_key: multi_asset
+        default-key: multi_asset
 
   prereqs:
     - type: state_exists
       key: structure.exists
 
-  expands_to:
+  expands-to:
     - verb: trading-profile.create
       args:
         cbu_id: "${arg.structure}"
@@ -73,7 +73,7 @@ mandate.create:
         investment_manager_id: "${arg.investment_manager}"
         strategy: "${arg.strategy.internal}"
 
-  sets_state:
+  sets-state:
     - key: mandate.exists
       value: true
 
@@ -88,27 +88,27 @@ mandate.add-product:
   ui:
     label: "Add Product"
     description: "Add a product to the mandate"
-    target_label: "Product"
+    target-label: "Product"
 
   routing:
-    mode_tags: [trading]
-    operator_domain: mandate
+    mode-tags: [trading]
+    operator-domain: mandate
 
   target:
-    operates_on: mandate_ref
+    operates-on: mandate-ref
     produces: null
 
   args:
     style: keyworded
     required:
       mandate:
-        type: mandate_ref
-        ui_label: "Mandate"
-        autofill_from: session.current_mandate
+        type: mandate-ref
+        ui-label: "Mandate"
+        autofill-from: session.current_mandate
         picker: mandate_picker
       product:
         type: enum
-        ui_label: "Product"
+        ui-label: "Product"
         values:
           - key: custody
             label: "Custody"
@@ -137,7 +137,7 @@ mandate.add-product:
     - type: state_exists
       key: mandate.exists
 
-  expands_to:
+  expands-to:
     - verb: trading-profile.add-product
       args:
         trading_profile_id: "${arg.mandate}"
@@ -151,28 +151,28 @@ mandate.set-instruments:
   ui:
     label: "Set Instruments"
     description: "Configure permitted instruments for the mandate"
-    target_label: "Instruments"
+    target-label: "Instruments"
 
   routing:
-    mode_tags: [trading]
-    operator_domain: mandate
+    mode-tags: [trading]
+    operator-domain: mandate
 
   target:
-    operates_on: mandate_ref
+    operates-on: mandate-ref
     produces: null
 
   args:
     style: keyworded
     required:
       mandate:
-        type: mandate_ref
-        ui_label: "Mandate"
-        autofill_from: session.current_mandate
+        type: mandate-ref
+        ui-label: "Mandate"
+        autofill-from: session.current_mandate
         picker: mandate_picker
       instruments:
         type: list
-        item_type: enum
-        ui_label: "Instruments"
+        item-type: enum
+        ui-label: "Instruments"
         values:
           - key: equities
             label: "Equities"
@@ -207,7 +207,7 @@ mandate.set-instruments:
     - type: state_exists
       key: mandate.exists
 
-  expands_to:
+  expands-to:
     - verb: trading-profile.set-instruments
       args:
         trading_profile_id: "${arg.mandate}"
@@ -221,28 +221,28 @@ mandate.set-markets:
   ui:
     label: "Set Markets"
     description: "Configure permitted markets for the mandate"
-    target_label: "Markets"
+    target-label: "Markets"
 
   routing:
-    mode_tags: [trading]
-    operator_domain: mandate
+    mode-tags: [trading]
+    operator-domain: mandate
 
   target:
-    operates_on: mandate_ref
+    operates-on: mandate-ref
     produces: null
 
   args:
     style: keyworded
     required:
       mandate:
-        type: mandate_ref
-        ui_label: "Mandate"
-        autofill_from: session.current_mandate
+        type: mandate-ref
+        ui-label: "Mandate"
+        autofill-from: session.current_mandate
         picker: mandate_picker
       markets:
         type: list
-        item_type: enum
-        ui_label: "Markets"
+        item-type: enum
+        ui-label: "Markets"
         values:
           - key: us
             label: "United States"
@@ -274,7 +274,7 @@ mandate.set-markets:
     - type: state_exists
       key: mandate.exists
 
-  expands_to:
+  expands-to:
     - verb: trading-profile.set-markets
       args:
         trading_profile_id: "${arg.mandate}"
@@ -288,14 +288,14 @@ mandate.list:
   ui:
     label: "List Mandates"
     description: "Show mandates for a structure"
-    target_label: "Mandates"
+    target-label: "Mandates"
 
   routing:
-    mode_tags: [trading, onboarding]
-    operator_domain: mandate
+    mode-tags: [trading, onboarding]
+    operator-domain: mandate
 
   target:
-    operates_on: structure_ref
+    operates-on: structure-ref
     produces: null
 
   args:
@@ -303,14 +303,14 @@ mandate.list:
     required: {}
     optional:
       structure:
-        type: structure_ref
-        ui_label: "For Structure"
-        autofill_from: session.current_structure
+        type: structure-ref
+        ui-label: "For Structure"
+        autofill-from: session.current_structure
         picker: structure_picker
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: trading-profile.list
       args:
         cbu_id: "${arg.structure}"
@@ -323,33 +323,33 @@ mandate.select:
   ui:
     label: "Select Mandate"
     description: "Set the current working mandate"
-    target_label: "Mandate"
+    target-label: "Mandate"
 
   routing:
-    mode_tags: [trading]
-    operator_domain: mandate
+    mode-tags: [trading]
+    operator-domain: mandate
 
   target:
-    operates_on: mandate_ref
+    operates-on: mandate-ref
     produces: null
 
   args:
     style: keyworded
     required:
       mandate:
-        type: mandate_ref
-        ui_label: "Mandate"
+        type: mandate-ref
+        ui-label: "Mandate"
         picker: mandate_picker
     optional: {}
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: session.set-mandate
       args:
         mandate_id: "${arg.mandate}"
 
-  sets_state:
+  sets-state:
     - key: mandate.selected
       value: true
     - key: mandate.exists
@@ -366,29 +366,29 @@ mandate.details:
   ui:
     label: "Mandate Details"
     description: "Show details of a mandate"
-    target_label: "Mandate"
+    target-label: "Mandate"
 
   routing:
-    mode_tags: [trading]
-    operator_domain: mandate
+    mode-tags: [trading]
+    operator-domain: mandate
 
   target:
-    operates_on: mandate_ref
+    operates-on: mandate-ref
     produces: null
 
   args:
     style: keyworded
     required:
       mandate:
-        type: mandate_ref
-        ui_label: "Mandate"
-        autofill_from: session.current_mandate
+        type: mandate-ref
+        ui-label: "Mandate"
+        autofill-from: session.current_mandate
         picker: mandate_picker
     optional: {}
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     - verb: trading-profile.get
       args:
         trading_profile_id: "${arg.mandate}"

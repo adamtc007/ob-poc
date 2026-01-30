@@ -17,77 +17,77 @@ struct.ie.ucits.icav:
   ui:
     label: "Ireland UCITS ICAV"
     description: "Set up an Irish UCITS fund using ICAV structure"
-    target_label: "UCITS ICAV"
+    target-label: "UCITS ICAV"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [icav, ucits]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [icav, ucits]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       management_company:
-        type: party_ref
-        ui_label: "Management Company"
+        type: party-ref
+        ui-label: "Management Company"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       secretary:
-        type: party_ref
-        ui_label: "Company Secretary"
+        type: party-ref
+        ui-label: "Company Secretary"
         picker: party_picker
         internal:
           kinds: [company]
       legal_counsel:
-        type: party_ref
-        ui_label: "Legal Counsel"
+        type: party-ref
+        ui-label: "Legal Counsel"
         picker: party_picker
         internal:
           kinds: [company]
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: icav
         jurisdiction: IE
-        structure_type: ucits
+        structure-type: ucits
       as: "@cbu"
 
     # Apply document bundle
@@ -196,7 +196,7 @@ struct.ie.ucits.icav:
         profile_type: ucits
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -216,40 +216,40 @@ struct.ie.aif.icav:
   ui:
     label: "Ireland AIF ICAV"
     description: "Set up an Irish Alternative Investment Fund using ICAV structure"
-    target_label: "AIF ICAV"
+    target-label: "AIF ICAV"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [icav, aif]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [icav, aif]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       aifm:
-        type: party_ref
-        ui_label: "AIFM"
+        type: party-ref
+        ui-label: "AIFM"
         description: "Alternative Investment Fund Manager"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       aif_type:
         type: enum
-        ui_label: "AIF Type"
+        ui-label: "AIF Type"
         values:
           - key: qiaif
             label: "QIAIF"
@@ -257,48 +257,48 @@ struct.ie.aif.icav:
           - key: riaif
             label: "RIAIF"
             internal: riaif
-        default_key: qiaif
+        default-key: qiaif
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       prime_broker:
-        type: party_ref
-        ui_label: "Prime Broker"
+        type: party-ref
+        ui-label: "Prime Broker"
         picker: party_picker
         internal:
           kinds: [company]
       secretary:
-        type: party_ref
-        ui_label: "Company Secretary"
+        type: party-ref
+        ui-label: "Company Secretary"
         picker: party_picker
         internal:
           kinds: [company]
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Create the CBU
     - verb: cbu.create
       args:
         name: "${arg.name}"
         kind: icav
         jurisdiction: IE
-        structure_type: aif
+        structure-type: aif
         aif_type: "${arg.aif_type.internal}"
       as: "@cbu"
 
@@ -408,7 +408,7 @@ struct.ie.aif.icav:
         profile_type: aif
       as: "@trading-profile"
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
@@ -428,77 +428,77 @@ struct.ie.hedge.icav:
   ui:
     label: "Ireland Hedge Fund ICAV"
     description: "Set up an Irish Hedge Fund using ICAV/QIAIF structure with prime brokerage"
-    target_label: "Hedge ICAV"
+    target-label: "Hedge ICAV"
 
   routing:
-    mode_tags: [onboarding, structure]
-    operator_domain: structure
+    mode-tags: [onboarding, structure]
+    operator-domain: structure
 
   target:
-    operates_on: client_ref
-    produces: structure_ref
-    allowed_structure_types: [icav, hedge, qiaif]
+    operates-on: client-ref
+    produces: structure-ref
+    allowed-structure-types: [icav, hedge, qiaif]
 
   args:
     style: keyworded
     required:
       name:
         type: str
-        ui_label: "Fund Name"
+        ui-label: "Fund Name"
       aifm:
-        type: party_ref
-        ui_label: "AIFM"
+        type: party-ref
+        ui-label: "AIFM"
         picker: party_picker
         internal:
           kinds: [company]
       depositary:
-        type: party_ref
-        ui_label: "Depositary"
+        type: party-ref
+        ui-label: "Depositary"
         picker: party_picker
         internal:
           kinds: [company]
       prime_broker:
-        type: party_ref
-        ui_label: "Prime Broker"
+        type: party-ref
+        ui-label: "Prime Broker"
         description: "Primary prime broker"
         picker: party_picker
         internal:
           kinds: [company]
     optional:
       investment_manager:
-        type: party_ref
-        ui_label: "Investment Manager"
+        type: party-ref
+        ui-label: "Investment Manager"
         picker: party_picker
         internal:
           kinds: [company]
       administrator:
-        type: party_ref
-        ui_label: "Administrator"
+        type: party-ref
+        ui-label: "Administrator"
         picker: party_picker
         internal:
           kinds: [company]
       auditor:
-        type: party_ref
-        ui_label: "Auditor"
+        type: party-ref
+        ui-label: "Auditor"
         picker: party_picker
         internal:
           kinds: [company]
       secondary_prime_broker:
-        type: party_ref
-        ui_label: "Secondary Prime Broker"
+        type: party-ref
+        ui-label: "Secondary Prime Broker"
         picker: party_picker
         internal:
           kinds: [company]
       executing_broker:
-        type: party_ref
-        ui_label: "Executing Broker"
+        type: party-ref
+        ui-label: "Executing Broker"
         picker: party_picker
         internal:
           kinds: [company]
 
   prereqs: []
 
-  expands_to:
+  expands-to:
     # Invoke the base AIF ICAV macro to set up the core structure
     - invoke-macro: struct.ie.aif.icav
       args:
@@ -559,7 +559,7 @@ struct.ie.hedge.icav:
         leverage_permitted: true
         short_selling_permitted: true
 
-  sets_state:
+  sets-state:
     - key: structure.exists
       value: true
     - key: structure.type
