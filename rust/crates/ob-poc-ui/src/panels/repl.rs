@@ -9,6 +9,7 @@
 //! 4. DSL view (collapsible)
 //! 5. Input area with actions
 
+use crate::panels::macro_wizard::{macro_wizard_modal, MacroWizardAction};
 use crate::state::{AppState, ChatMessage, MessageRole};
 use egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use ob_poc_types::{
@@ -25,9 +26,20 @@ pub enum VerbDisambiguationAction {
     Cancel,
 }
 
+/// Combined action enum for all REPL panel actions
+#[derive(Debug, Clone)]
+pub enum ReplAction {
+    /// Verb disambiguation action
+    VerbDisambiguation(VerbDisambiguationAction),
+    /// Macro wizard action
+    MacroWizard(MacroWizardAction),
+}
+
 /// Main REPL panel - combines chat, resolution, and DSL
-pub fn repl_panel(ui: &mut Ui, state: &mut AppState) -> Option<VerbDisambiguationAction> {
-    let mut action = None;
+///
+/// Returns `ReplAction` for actions that need to be handled by the app.
+pub fn repl_panel(ui: &mut Ui, state: &mut AppState) -> Option<ReplAction> {
+    let mut action: Option<ReplAction> = None;
 
     ui.vertical(|ui| {
         // Calculate available height for content vs input area
@@ -48,7 +60,25 @@ pub fn repl_panel(ui: &mut Ui, state: &mut AppState) -> Option<VerbDisambiguatio
                 if state.verb_disambiguation_ui.active {
                     ui.add_space(8.0);
                     if let Some(a) = render_verb_disambiguation_card(ui, state) {
-                        action = Some(a);
+                        action = Some(ReplAction::VerbDisambiguation(a));
+                    }
+                }
+
+                // Macro wizard card (when macro has missing required args)
+                // Shows step-by-step wizard to collect missing arguments
+                if state.macro_expansion_ui.active {
+                    ui.add_space(8.0);
+                    let ctx = ui.ctx().clone();
+                    let mut search_buffer = state.macro_expansion_ui.current_input.clone();
+                    if let Some(a) =
+                        macro_wizard_modal(&ctx, &state.macro_expansion_ui, &mut search_buffer)
+                    {
+                        // Update the search buffer back to state
+                        state.macro_expansion_ui.current_input = search_buffer;
+                        action = Some(ReplAction::MacroWizard(a));
+                    } else {
+                        // Even if no action, sync the buffer back (user may have typed)
+                        state.macro_expansion_ui.current_input = search_buffer;
                     }
                 }
 
@@ -150,9 +180,7 @@ fn render_verb_disambiguation_card(
 ) -> Option<VerbDisambiguationAction> {
     let mut action = None;
 
-    let Some(ref request) = state.verb_disambiguation_ui.request else {
-        return None;
-    };
+    let request = state.verb_disambiguation_ui.request.as_ref()?;
 
     let is_loading = state.verb_disambiguation_ui.loading;
 

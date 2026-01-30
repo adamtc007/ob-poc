@@ -1,6 +1,7 @@
 //! Entity custom operations
 //!
 //! Ghost entity lifecycle operations for progressive refinement.
+//! Placeholder entity operations for deferred resolution.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -15,6 +16,9 @@ use sqlx::PgPool;
 
 #[cfg(feature = "database")]
 use super::helpers;
+
+#[cfg(feature = "database")]
+use crate::placeholder::{PlaceholderResolver, ResolvePlaceholderRequest};
 
 // =============================================================================
 // GHOST ENTITY LIFECYCLE OPERATIONS
@@ -276,5 +280,269 @@ impl CustomOperation for EntityIdentifyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+    }
+}
+
+// =============================================================================
+// PLACEHOLDER ENTITY OPERATIONS
+// =============================================================================
+
+/// Ensure an entity exists or create a placeholder for later resolution.
+///
+/// This is the core operation used by structure macros when a service provider
+/// entity reference is not yet known. It:
+/// - Returns the existing entity if `ref` is provided and valid
+/// - Creates a placeholder entity if `ref` is empty or not found
+///
+/// Placeholders are stub entity records with:
+/// - `placeholder_status = 'pending'`
+/// - `placeholder_kind` set to the role (depositary, auditor, etc.)
+/// - `placeholder_created_for` pointing to the CBU
+#[register_custom_op]
+pub struct EntityEnsureOrPlaceholderOp;
+
+#[async_trait]
+impl CustomOperation for EntityEnsureOrPlaceholderOp {
+    fn domain(&self) -> &'static str {
+        "entity"
+    }
+    fn verb(&self) -> &'static str {
+        "ensure-or-placeholder"
+    }
+    fn rationale(&self) -> &'static str {
+        "Creates placeholder entities for deferred resolution in macro expansion; requires state management"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+
+        // Extract arguments - ref is optional
+        let entity_ref = helpers::extract_uuid_opt(verb_call, ctx, "ref");
+        let kind = helpers::extract_string(verb_call, "kind")?;
+        let cbu_id = helpers::extract_uuid(verb_call, ctx, "cbu-id")?;
+        let name_hint = helpers::extract_string_opt(verb_call, "name-hint");
+
+        // Use PlaceholderResolver
+        let resolver = PlaceholderResolver::new(pool.clone());
+        let (entity_id, is_placeholder) = resolver
+            .ensure_or_placeholder(entity_ref, &kind, cbu_id, name_hint)
+            .await?;
+
+        ctx.bind("entity", entity_id);
+
+        Ok(ExecutionResult::Record(json!({
+            "entity_id": entity_id,
+            "is_placeholder": is_placeholder
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+        Ok(ExecutionResult::Record(json!({
+            "entity_id": uuid::Uuid::new_v4(),
+            "is_placeholder": true
+        })))
+    }
+}
+
+/// Resolve a placeholder entity to a real entity.
+///
+/// This transfers any role assignments from the placeholder to the real entity
+/// and marks the placeholder as resolved.
+#[register_custom_op]
+pub struct EntityResolvePlaceholderOp;
+
+#[async_trait]
+impl CustomOperation for EntityResolvePlaceholderOp {
+    fn domain(&self) -> &'static str {
+        "entity"
+    }
+    fn verb(&self) -> &'static str {
+        "resolve-placeholder"
+    }
+    fn rationale(&self) -> &'static str {
+        "Resolves placeholder to real entity with role transfer; requires transaction and state management"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+
+        let placeholder_id = helpers::extract_uuid(verb_call, ctx, "placeholder-id")?;
+        let resolved_entity_id = helpers::extract_uuid(verb_call, ctx, "resolved-entity-id")?;
+        let resolved_by = helpers::extract_string_opt(verb_call, "resolved-by")
+            .unwrap_or_else(|| "system".to_string());
+
+        let resolver = PlaceholderResolver::new(pool.clone());
+        let result = resolver
+            .resolve(ResolvePlaceholderRequest {
+                placeholder_entity_id: placeholder_id,
+                resolved_entity_id,
+                resolved_by,
+            })
+            .await?;
+
+        Ok(ExecutionResult::Record(json!({
+            "placeholder_entity_id": result.placeholder_entity_id,
+            "resolved_to_entity_id": result.resolved_to_entity_id,
+            "status": result.status.to_string(),
+            "roles_transferred": result.roles_transferred
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+        Ok(ExecutionResult::Record(json!({
+            "placeholder_entity_id": uuid::Uuid::new_v4(),
+            "resolved_to_entity_id": uuid::Uuid::new_v4(),
+            "status": "resolved",
+            "roles_transferred": 0
+        })))
+    }
+}
+
+/// List pending placeholder entities.
+#[register_custom_op]
+pub struct EntityListPlaceholdersOp;
+
+#[async_trait]
+impl CustomOperation for EntityListPlaceholdersOp {
+    fn domain(&self) -> &'static str {
+        "entity"
+    }
+    fn verb(&self) -> &'static str {
+        "list-placeholders"
+    }
+    fn rationale(&self) -> &'static str {
+        "Lists placeholders with details from custom view; requires join logic"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let cbu_id = helpers::extract_uuid_opt(verb_call, ctx, "cbu-id");
+
+        let resolver = PlaceholderResolver::new(pool.clone());
+
+        let placeholders = if let Some(cbu_id) = cbu_id {
+            resolver.list_pending_for_cbu(cbu_id).await?
+        } else {
+            resolver.list_all_pending().await?
+        };
+
+        let records: Vec<serde_json::Value> = placeholders
+            .into_iter()
+            .map(|p| {
+                serde_json::json!({
+                    "entity_id": p.placeholder.entity_id,
+                    "status": p.placeholder.status.to_string(),
+                    "kind": p.placeholder.kind,
+                    "cbu_id": p.placeholder.created_for_cbu_id,
+                    "entity_name": p.entity_name,
+                    "cbu_name": p.cbu_name,
+                    "kind_label": p.kind_label,
+                    "created_at": p.placeholder.created_at.to_rfc3339()
+                })
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(records))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::RecordSet(vec![]))
+    }
+}
+
+/// Get placeholder summary statistics for a CBU.
+#[register_custom_op]
+pub struct EntityPlaceholderSummaryOp;
+
+#[async_trait]
+impl CustomOperation for EntityPlaceholderSummaryOp {
+    fn domain(&self) -> &'static str {
+        "entity"
+    }
+    fn verb(&self) -> &'static str {
+        "placeholder-summary"
+    }
+    fn rationale(&self) -> &'static str {
+        "Aggregates placeholder stats with grouping; requires custom query"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+
+        let cbu_id = helpers::extract_uuid(verb_call, ctx, "cbu-id")?;
+
+        let resolver = PlaceholderResolver::new(pool.clone());
+        let summary = resolver.get_summary(cbu_id).await?;
+
+        let by_kind: Vec<serde_json::Value> = summary
+            .by_kind
+            .into_iter()
+            .map(|k| {
+                json!({
+                    "kind": k.kind,
+                    "count": k.count
+                })
+            })
+            .collect();
+
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": summary.cbu_id,
+            "pending_count": summary.pending_count,
+            "by_kind": by_kind
+        })))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+        Ok(ExecutionResult::Record(json!({
+            "cbu_id": uuid::Uuid::new_v4(),
+            "pending_count": 0,
+            "by_kind": []
+        })))
     }
 }

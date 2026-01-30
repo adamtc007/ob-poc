@@ -184,6 +184,9 @@ pub struct AppState {
     /// Verb disambiguation UI state (for ambiguous verb matches)
     pub verb_disambiguation_ui: VerbDisambiguationState,
 
+    /// Macro expansion wizard UI state (for partial macro invocations)
+    pub macro_expansion_ui: MacroExpansionState,
+
     /// Container browse panel state (slide-in panel for browsing container contents)
     pub container_browse: ContainerBrowseState,
 
@@ -291,6 +294,7 @@ impl Default for AppState {
             window_stack: WindowStack::default(),
             cbu_search_ui: CbuSearchUi::default(),
             verb_disambiguation_ui: VerbDisambiguationState::default(),
+            macro_expansion_ui: MacroExpansionState::default(),
             container_browse: ContainerBrowseState::default(),
             token_registry: TokenRegistry::load_defaults().unwrap_or_else(|e| {
                 web_sys::console::warn_1(
@@ -730,6 +734,198 @@ impl VerbDisambiguationState {
         self.original_input = original_input;
         self.shown_at = Some(current_time);
         self.loading = false;
+    }
+}
+
+// =============================================================================
+// MACRO EXPANSION UI STATE
+// =============================================================================
+
+/// Information about a missing macro argument
+#[derive(Clone, Debug)]
+pub struct MissingArgInfo {
+    /// Argument name
+    pub name: String,
+    /// Display label from macro schema
+    pub ui_label: String,
+    /// Argument type (str, enum, party_ref, etc.)
+    pub arg_type: String,
+    /// Whether this argument is required
+    pub required: bool,
+    /// Description/help text
+    pub description: Option<String>,
+    /// Valid values for enum types
+    pub valid_values: Vec<MacroEnumOption>,
+    /// Picker type for ref args (party_picker, structure_picker, etc.)
+    pub picker: Option<String>,
+    /// Default value if any
+    pub default_value: Option<String>,
+}
+
+/// Enum option for macro arguments
+#[derive(Clone, Debug)]
+pub struct MacroEnumOption {
+    /// Key shown in UI
+    pub key: String,
+    /// Human-readable label
+    pub label: String,
+    /// Internal token (mapped during expansion)
+    pub internal: String,
+}
+
+/// Macro expansion wizard UI state
+///
+/// When a macro has missing required arguments, the wizard guides the user
+/// through providing values step-by-step. This is similar to entity disambiguation
+/// but for macro arguments.
+#[derive(Default, Clone)]
+pub struct MacroExpansionState {
+    /// Whether the macro wizard is currently active
+    pub active: bool,
+
+    /// Fully qualified macro name (e.g., "struct.lux.ucits.sicav")
+    pub macro_fqn: Option<String>,
+
+    /// Macro display label (e.g., "Luxembourg UCITS SICAV")
+    pub macro_label: Option<String>,
+
+    /// Macro description
+    pub macro_description: Option<String>,
+
+    /// Arguments already provided by user
+    pub provided_args: std::collections::HashMap<String, String>,
+
+    /// Missing arguments that need to be filled
+    pub missing_args: Vec<MissingArgInfo>,
+
+    /// Current step index (which missing arg we're on)
+    pub current_step: usize,
+
+    /// Current input value being edited
+    pub current_input: String,
+
+    /// Search results for party_ref/structure_ref pickers
+    pub picker_results: Option<Vec<ob_poc_types::EntityMatch>>,
+
+    /// Loading flag while fetching picker results
+    pub loading: bool,
+
+    /// Error message if any
+    pub error_message: Option<String>,
+
+    /// When wizard was shown (for optional timeout)
+    pub shown_at: Option<f64>,
+
+    /// Whether to use placeholder for optional args
+    pub use_placeholder: bool,
+}
+
+impl MacroExpansionState {
+    /// Clear the wizard state
+    pub fn clear(&mut self) {
+        self.active = false;
+        self.macro_fqn = None;
+        self.macro_label = None;
+        self.macro_description = None;
+        self.provided_args.clear();
+        self.missing_args.clear();
+        self.current_step = 0;
+        self.current_input.clear();
+        self.picker_results = None;
+        self.loading = false;
+        self.error_message = None;
+        self.shown_at = None;
+        self.use_placeholder = false;
+    }
+
+    /// Initialize wizard for a macro with missing args
+    pub fn start(
+        &mut self,
+        macro_fqn: String,
+        macro_label: String,
+        macro_description: String,
+        provided_args: std::collections::HashMap<String, String>,
+        missing_args: Vec<MissingArgInfo>,
+        current_time: f64,
+    ) {
+        self.active = true;
+        self.macro_fqn = Some(macro_fqn);
+        self.macro_label = Some(macro_label);
+        self.macro_description = Some(macro_description);
+        self.provided_args = provided_args;
+        self.missing_args = missing_args;
+        self.current_step = 0;
+        self.current_input.clear();
+        self.picker_results = None;
+        self.loading = false;
+        self.error_message = None;
+        self.shown_at = Some(current_time);
+        self.use_placeholder = false;
+    }
+
+    /// Get current argument being filled
+    pub fn current_arg(&self) -> Option<&MissingArgInfo> {
+        self.missing_args.get(self.current_step)
+    }
+
+    /// Check if we're on the last step
+    pub fn is_last_step(&self) -> bool {
+        self.current_step + 1 >= self.missing_args.len()
+    }
+
+    /// Get total step count
+    pub fn total_steps(&self) -> usize {
+        self.missing_args.len()
+    }
+
+    /// Move to next step, returning true if wizard is complete
+    pub fn next_step(&mut self) -> bool {
+        if self.current_step + 1 >= self.missing_args.len() {
+            true // Wizard complete
+        } else {
+            self.current_step += 1;
+            self.current_input.clear();
+            self.picker_results = None;
+            self.error_message = None;
+            false
+        }
+    }
+
+    /// Move to previous step
+    pub fn prev_step(&mut self) {
+        if self.current_step > 0 {
+            self.current_step -= 1;
+            // Restore previous input if we saved it
+            if let Some(arg) = self.current_arg() {
+                if let Some(value) = self.provided_args.get(&arg.name) {
+                    self.current_input = value.clone();
+                } else {
+                    self.current_input.clear();
+                }
+            }
+            self.picker_results = None;
+            self.error_message = None;
+        }
+    }
+
+    /// Save current input as provided arg
+    pub fn save_current_input(&mut self) {
+        if let Some(arg) = self.current_arg() {
+            let name = arg.name.clone();
+            let value = self.current_input.clone();
+            if !value.is_empty() {
+                self.provided_args.insert(name, value);
+            }
+        }
+    }
+
+    /// Get all provided args as DSL keyword args
+    pub fn to_dsl_args(&self) -> String {
+        self.provided_args
+            .iter()
+            .map(|(k, v)| format!(":{} {}", k.replace('_', "-"), v))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 

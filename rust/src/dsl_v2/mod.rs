@@ -76,6 +76,7 @@ pub use dsl_core::compiler::{compile_to_ops, CompileError as OpCompileError, Com
 pub mod applicability_rules;
 #[cfg(feature = "database")]
 pub mod batch_executor;
+pub mod cardinality;
 pub mod csg_linter;
 pub mod display_nouns;
 
@@ -122,6 +123,10 @@ pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, Docume
 #[cfg(feature = "database")]
 pub use batch_executor::{
     BatchExecutionResult, BatchExecutor, BatchResultAccumulator, OnErrorMode,
+};
+pub use cardinality::{
+    Cardinality, CardinalityConfig, CardinalityDiagnostic, CardinalityError, CardinalityRegistry,
+    CardinalityValidator, RoleCardinalityDef,
 };
 pub use csg_linter::{CsgLinter, InferredContext, LintResult};
 pub use display_nouns::{

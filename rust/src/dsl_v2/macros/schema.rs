@@ -237,13 +237,61 @@ pub enum MacroPrereq {
 }
 
 /// Expansion step (primitive DSL to emit)
+///
+/// Can be either a direct verb call or a nested macro invocation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MacroExpansionStep {
+#[serde(untagged)]
+pub enum MacroExpansionStep {
+    /// Direct verb call (most common)
+    VerbCall(VerbCallStep),
+
+    /// Nested macro invocation (for composites like M17, M18)
+    InvokeMacro(InvokeMacroStep),
+}
+
+/// A direct verb call expansion step
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbCallStep {
     /// Verb to call (e.g., "cbu.create", "kyc-case.create")
     pub verb: String,
 
     /// Arguments with variable substitution
     pub args: HashMap<String, String>,
+
+    /// Optional symbol binding for the result (e.g., "@cbu")
+    #[serde(rename = "as", default)]
+    pub bind_as: Option<String>,
+}
+
+/// A nested macro invocation step
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InvokeMacroStep {
+    /// The macro to invoke (e.g., "struct.ie.ucits.icav")
+    #[serde(rename = "invoke-macro")]
+    pub macro_id: String,
+
+    /// Arguments to pass to the nested macro
+    #[serde(default)]
+    pub args: HashMap<String, String>,
+
+    /// Symbols to import from the nested macro's scope
+    #[serde(rename = "import-symbols", default)]
+    pub import_symbols: Vec<String>,
+}
+
+impl MacroExpansionStep {
+    /// Get the verb or macro ID for this step
+    pub fn target_id(&self) -> &str {
+        match self {
+            MacroExpansionStep::VerbCall(v) => &v.verb,
+            MacroExpansionStep::InvokeMacro(m) => &m.macro_id,
+        }
+    }
+
+    /// Check if this is a nested macro invocation
+    pub fn is_invoke_macro(&self) -> bool {
+        matches!(self, MacroExpansionStep::InvokeMacro(_))
+    }
 }
 
 /// State flag to set after execution
@@ -373,8 +421,81 @@ unlocks:
         assert!(schema.args.required.contains_key("structure_type"));
         assert!(schema.args.required.contains_key("name"));
         assert_eq!(schema.expands_to.len(), 1);
-        assert_eq!(schema.expands_to[0].verb, "cbu.create");
+        match &schema.expands_to[0] {
+            MacroExpansionStep::VerbCall(v) => assert_eq!(v.verb, "cbu.create"),
+            MacroExpansionStep::InvokeMacro(_) => panic!("Expected VerbCall"),
+        }
         assert_eq!(schema.unlocks.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_invoke_macro_step() {
+        let yaml = r#"
+kind: macro
+ui:
+  label: "Cross-Border Hedge Fund"
+  description: "Set up a cross-border hedge fund structure"
+  target_label: "Structure"
+routing:
+  mode_tags: [onboarding]
+  operator_domain: structure
+target:
+  operates_on: client_ref
+  produces: structure_ref
+args:
+  style: keyworded
+  required:
+    name:
+      type: str
+      ui_label: "Structure name"
+    base_jurisdiction:
+      type: enum
+      ui_label: "Base jurisdiction"
+      values:
+        - key: ie
+          label: "Ireland"
+          internal: IE
+        - key: lu
+          label: "Luxembourg"
+          internal: LU
+      default_key: ie
+  optional: {}
+prereqs: []
+expands_to:
+  - invoke-macro: struct.ie.hedge.icav
+    args:
+      name: "${arg.name}"
+    import-symbols:
+      - "@cbu"
+      - "@trading-profile"
+  - verb: cbu-role.assign
+    args:
+      cbu_id: "@cbu"
+      role: cross-border-coordinator
+unlocks: []
+"#;
+
+        let schema: MacroSchema = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(schema.expands_to.len(), 2);
+
+        // First step should be invoke-macro
+        match &schema.expands_to[0] {
+            MacroExpansionStep::InvokeMacro(m) => {
+                assert_eq!(m.macro_id, "struct.ie.hedge.icav");
+                assert_eq!(m.import_symbols.len(), 2);
+                assert!(m.import_symbols.contains(&"@cbu".to_string()));
+            }
+            MacroExpansionStep::VerbCall(_) => panic!("Expected InvokeMacro"),
+        }
+
+        // Second step should be verb call
+        match &schema.expands_to[1] {
+            MacroExpansionStep::VerbCall(v) => {
+                assert_eq!(v.verb, "cbu-role.assign");
+            }
+            MacroExpansionStep::InvokeMacro(_) => panic!("Expected VerbCall"),
+        }
     }
 
     #[test]

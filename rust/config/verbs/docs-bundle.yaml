@@ -1,0 +1,146 @@
+domains:
+  docs-bundle:
+    description: Document bundle management - apply versioned document requirement sets to CBUs
+    invocation_hints:
+      - docs bundle
+      - document bundle
+      - apply bundle
+      - required documents
+      - document set
+    verbs:
+      # ========================================================================
+      # Apply Bundle (creates document requirements)
+      # ========================================================================
+      apply:
+        description: Apply a document bundle to a CBU, creating document requirements
+        behavior: plugin
+        invocation_phrases:
+          - apply document bundle
+          - apply docs bundle
+          - set up required documents
+          - add document requirements
+          - apply ucits documents
+          - apply aif documents
+          - configure fund documents
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_bundle
+          tags: [setup, write, macro-support]
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to apply the bundle to
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: bundle
+            type: string
+            required: true
+            description: Bundle identifier (e.g., docs.bundle.ucits-baseline)
+            valid_values:
+              - docs.bundle.ucits-baseline
+              - docs.bundle.aif-baseline
+              - docs.bundle.hedge-baseline
+              - docs.bundle.private-equity-baseline
+              - docs.bundle.etf-baseline
+              - docs.bundle.uk-authorised-baseline
+              - docs.bundle.ltaf-baseline
+              - docs.bundle.manager-baseline
+              - docs.bundle.us-40act-baseline
+          - name: has-prime-broker
+            type: bool
+            required: false
+            default: false
+            description: Whether the structure has a prime broker (for conditional docs)
+          - name: has-market-maker
+            type: bool
+            required: false
+            default: false
+            description: Whether the ETF has designated market makers
+          - name: wrapper
+            type: string
+            required: false
+            description: Fund wrapper type (for conditional docs)
+            valid_values:
+              - sicav
+              - fcp
+              - lp
+              - oeic
+              - aut
+              - acs
+              - icav
+        returns:
+          type: record
+          fields:
+            applied_bundle_id: uuid
+            requirements_created: integer
+            requirement_ids: list
+
+      # ========================================================================
+      # List Applied Bundles
+      # ========================================================================
+      list-applied:
+        description: List document bundles applied to a CBU
+        behavior: plugin
+        invocation_phrases:
+          - list applied bundles
+          - show document bundles
+          - what bundles are applied
+          - get cbu bundles
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: cbu
+          noun: document_bundle
+          tags: [query, read]
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to query
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+          fields:
+            bundle_id: string
+            bundle_version: string
+            applied_at: timestamp
+            macro_id: string
+
+      # ========================================================================
+      # List Available Bundles
+      # ========================================================================
+      list-available:
+        description: List all available document bundles
+        behavior: plugin
+        invocation_phrases:
+          - list available bundles
+          - show document bundles
+          - what bundles exist
+          - list docs bundles
+        metadata:
+          tier: intent
+          source_of_truth: reference
+          scope: global
+          noun: document_bundle
+          tags: [query, read, reference]
+        args: []
+        returns:
+          type: record_set
+          fields:
+            bundle_id: string
+            display_name: string
+            version: string
+            extends: string
+            document_count: integer

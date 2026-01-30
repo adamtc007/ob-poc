@@ -1,0 +1,394 @@
+# Document Bundles - Baseline Definitions
+#
+# These bundles define required documents for fund structure types.
+# Bundles support inheritance via 'extends' for specialization.
+#
+# Naming convention: docs.bundle.<structure-type>-baseline
+
+bundles:
+  # ============================================================================
+  # UCITS Baseline (EU harmonized fund)
+  # ============================================================================
+  - id: docs.bundle.ucits-baseline
+    display-name: UCITS Baseline Documents
+    description: Required documents for UCITS-compliant funds (EU harmonized)
+    version: "2024-03"
+    effective-from: 2024-03-01
+    documents:
+      - id: prospectus
+        name: Fund Prospectus
+        description: Full prospectus containing investment objectives, risks, and costs
+        required: true
+        sort-order: 0
+
+      - id: kiid
+        name: Key Investor Information Document (KIID)
+        description: Standardized 2-page summary for retail investors
+        required: true
+        sort-order: 1
+
+      - id: annual-report
+        name: Annual Report & Accounts
+        description: Audited annual financial statements
+        required: true
+        sort-order: 2
+
+      - id: semi-annual-report
+        name: Semi-Annual Report
+        description: Unaudited half-yearly financial report
+        required: true
+        sort-order: 3
+
+      - id: articles-of-incorporation
+        name: Articles of Incorporation
+        description: Constitutional document (SICAV) or trust deed
+        required: true
+        sort-order: 4
+
+      - id: management-regulations
+        name: Management Regulations
+        description: Rules governing fund operations (for FCP structures)
+        required: false
+        required-if: wrapper == fcp
+        sort-order: 5
+
+  # ============================================================================
+  # AIF Baseline (Alternative Investment Funds)
+  # ============================================================================
+  - id: docs.bundle.aif-baseline
+    display-name: AIF Baseline Documents
+    description: Required documents for Alternative Investment Funds
+    version: "2024-03"
+    effective-from: 2024-03-01
+    documents:
+      - id: private-placement-memo
+        name: Private Placement Memorandum (PPM)
+        description: Offering document for professional/institutional investors
+        required: true
+        sort-order: 0
+
+      - id: limited-partnership-agreement
+        name: Limited Partnership Agreement (LPA)
+        description: Governing document for LP structures
+        required: false
+        required-if: wrapper == lp
+        sort-order: 1
+
+      - id: subscription-agreement
+        name: Subscription Agreement
+        description: Investor subscription form and terms
+        required: true
+        sort-order: 2
+
+      - id: aifm-agreement
+        name: AIFM Agreement
+        description: Agreement with Alternative Investment Fund Manager
+        required: true
+        sort-order: 3
+
+      - id: depositary-agreement
+        name: Depositary Agreement
+        description: Agreement with the fund's depositary
+        required: true
+        sort-order: 4
+
+      - id: administration-agreement
+        name: Administration Agreement
+        description: Agreement with fund administrator
+        required: true
+        sort-order: 5
+
+  # ============================================================================
+  # Hedge Fund Baseline (extends AIF)
+  # ============================================================================
+  - id: docs.bundle.hedge-baseline
+    display-name: Hedge Fund Baseline Documents
+    description: Documents for hedge fund structures (extends AIF baseline)
+    version: "2024-03"
+    effective-from: 2024-03-01
+    extends: docs.bundle.aif-baseline
+    documents:
+      - id: prime-brokerage-agreement
+        name: Prime Brokerage Agreement (PBA)
+        description: Agreement with prime broker for margin, securities lending
+        required: false
+        required-if: has-prime-broker
+        sort-order: 10
+
+      - id: isda-master
+        name: ISDA Master Agreement
+        description: Standardized derivatives trading agreement
+        required: true
+        sort-order: 11
+
+      - id: csa
+        name: Credit Support Annex (CSA)
+        description: Collateral agreement for OTC derivatives
+        required: true
+        sort-order: 12
+
+      # Override PPM with hedge-specific template
+      - id: private-placement-memo
+        name: Private Placement Memorandum (Hedge)
+        description: Hedge fund offering document with strategy disclosure
+        required: true
+        template-ref: hedge-ppm-template
+        sort-order: 0
+
+  # ============================================================================
+  # Private Equity Baseline
+  # ============================================================================
+  - id: docs.bundle.private-equity-baseline
+    display-name: Private Equity Baseline Documents
+    description: Documents for private equity fund structures
+    version: "2024-03"
+    effective-from: 2024-03-01
+    documents:
+      - id: lpa
+        name: Limited Partnership Agreement (LPA)
+        description: Primary governing document for PE fund
+        required: true
+        sort-order: 0
+
+      - id: side-letter
+        name: Side Letter Template
+        description: Template for investor-specific terms
+        required: false
+        sort-order: 1
+
+      - id: subscription-booklet
+        name: Subscription Booklet
+        description: Investor subscription materials and forms
+        required: true
+        sort-order: 2
+
+      - id: capital-call-notice
+        name: Capital Call Notice Template
+        description: Template for calling committed capital
+        required: true
+        sort-order: 3
+
+      - id: distribution-notice
+        name: Distribution Notice Template
+        description: Template for distributing proceeds to LPs
+        required: true
+        sort-order: 4
+
+      - id: gp-agreement
+        name: GP Operating Agreement
+        description: Operating agreement for the General Partner entity
+        required: true
+        sort-order: 5
+
+      - id: management-agreement
+        name: Investment Management Agreement
+        description: Agreement between fund and investment manager
+        required: true
+        sort-order: 6
+
+  # ============================================================================
+  # ETF Baseline (extends UCITS)
+  # ============================================================================
+  - id: docs.bundle.etf-baseline
+    display-name: ETF Baseline Documents
+    description: Documents for Exchange-Traded Funds (extends UCITS)
+    version: "2024-03"
+    effective-from: 2024-03-01
+    extends: docs.bundle.ucits-baseline
+    documents:
+      - id: ap-agreement
+        name: Authorized Participant Agreement
+        description: Agreement with APs for creation/redemption
+        required: true
+        sort-order: 10
+
+      - id: pcf-file-spec
+        name: Portfolio Composition File Specification
+        description: Daily PCF file format for APs
+        required: true
+        sort-order: 11
+
+      - id: market-maker-agreement
+        name: Market Maker Agreement
+        description: Agreement with designated market makers
+        required: false
+        required-if: has-market-maker
+        sort-order: 12
+
+  # ============================================================================
+  # UK Authorised Baseline
+  # ============================================================================
+  - id: docs.bundle.uk-authorised-baseline
+    display-name: UK Authorised Fund Documents
+    description: Documents for FCA-authorised funds (OEIC, AUT, ACS)
+    version: "2024-03"
+    effective-from: 2024-03-01
+    documents:
+      - id: prospectus
+        name: Fund Prospectus
+        description: FCA-compliant prospectus
+        required: true
+        sort-order: 0
+
+      - id: kiid
+        name: Key Investor Information Document
+        description: UK KIID format
+        required: true
+        sort-order: 1
+
+      - id: instrument-of-incorporation
+        name: Instrument of Incorporation
+        description: Constitutional document for OEIC
+        required: false
+        required-if: wrapper == oeic
+        sort-order: 2
+
+      - id: trust-deed
+        name: Trust Deed
+        description: Constitutional document for Unit Trust
+        required: false
+        required-if: wrapper == aut
+        sort-order: 3
+
+      - id: acd-agreement
+        name: ACD Agreement
+        description: Agreement with Authorised Corporate Director
+        required: false
+        required-if: wrapper == oeic
+        sort-order: 4
+
+      - id: manager-agreement
+        name: Manager Agreement
+        description: Agreement with the fund manager
+        required: true
+        sort-order: 5
+
+      - id: depositary-agreement
+        name: Depositary Agreement
+        description: Agreement with UK depositary
+        required: true
+        sort-order: 6
+
+  # ============================================================================
+  # LTAF Baseline (extends UK Authorised)
+  # ============================================================================
+  - id: docs.bundle.ltaf-baseline
+    display-name: LTAF Baseline Documents
+    description: Documents for Long-Term Asset Funds (extends UK Authorised)
+    version: "2024-03"
+    effective-from: 2024-03-01
+    extends: docs.bundle.uk-authorised-baseline
+    documents:
+      - id: ltaf-disclosure
+        name: LTAF Specific Disclosure
+        description: Additional disclosure for illiquid assets and redemption terms
+        required: true
+        sort-order: 10
+
+      - id: liquidity-management-policy
+        name: Liquidity Management Policy
+        description: Detailed policy for managing illiquid investments
+        required: true
+        sort-order: 11
+
+  # ============================================================================
+  # Manager Baseline (Investment Manager / ManCo)
+  # ============================================================================
+  - id: docs.bundle.manager-baseline
+    display-name: Investment Manager Documents
+    description: Documents for investment manager entities
+    version: "2024-03"
+    effective-from: 2024-03-01
+    documents:
+      - id: ima
+        name: Investment Management Agreement
+        description: Standard IMA template
+        required: true
+        sort-order: 0
+
+      - id: compliance-manual
+        name: Compliance Manual
+        description: Firm's compliance policies and procedures
+        required: true
+        sort-order: 1
+
+      - id: aml-kyc-policy
+        name: AML/KYC Policy
+        description: Anti-money laundering and know-your-customer procedures
+        required: true
+        sort-order: 2
+
+      - id: conflicts-policy
+        name: Conflicts of Interest Policy
+        description: Policy for managing conflicts
+        required: true
+        sort-order: 3
+
+      - id: business-continuity-plan
+        name: Business Continuity Plan
+        description: Disaster recovery and continuity procedures
+        required: true
+        sort-order: 4
+
+  # ============================================================================
+  # US 40 Act Baseline (SEC Registered Funds)
+  # ============================================================================
+  - id: docs.bundle.us-40act-baseline
+    display-name: US 40 Act Fund Documents
+    description: Documents for SEC-registered investment companies
+    version: "2024-03"
+    effective-from: 2024-03-01
+    documents:
+      - id: registration-statement
+        name: Registration Statement (N-1A / N-2)
+        description: SEC registration including prospectus and SAI
+        required: true
+        sort-order: 0
+
+      - id: sai
+        name: Statement of Additional Information (SAI)
+        description: Detailed fund information supplement
+        required: true
+        sort-order: 1
+
+      - id: prospectus
+        name: Summary Prospectus
+        description: SEC-compliant summary prospectus
+        required: true
+        sort-order: 2
+
+      - id: advisory-agreement
+        name: Investment Advisory Agreement
+        description: Agreement with investment adviser (15(a) compliant)
+        required: true
+        sort-order: 3
+
+      - id: custody-agreement
+        name: Custody Agreement
+        description: Agreement with qualified custodian
+        required: true
+        sort-order: 4
+
+      - id: distribution-agreement
+        name: Distribution Agreement
+        description: Agreement with principal underwriter
+        required: true
+        sort-order: 5
+
+      - id: transfer-agency-agreement
+        name: Transfer Agency Agreement
+        description: Agreement with transfer agent
+        required: true
+        sort-order: 6
+
+      - id: code-of-ethics
+        name: Code of Ethics
+        description: Required personal trading policy (17j-1)
+        required: true
+        sort-order: 7
+
+      - id: compliance-policies
+        name: Compliance Policies & Procedures
+        description: Rule 38a-1 compliance program
+        required: true
+        sort-order: 8

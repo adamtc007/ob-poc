@@ -384,6 +384,23 @@ fn expand_step(
     step: &super::schema::MacroExpansionStep,
     ctx: &VariableContext,
 ) -> Result<String, MacroExpansionError> {
+    use super::schema::MacroExpansionStep;
+
+    match step {
+        MacroExpansionStep::VerbCall(verb_step) => expand_verb_call_step(verb_step, ctx),
+        MacroExpansionStep::InvokeMacro(macro_step) => {
+            // For now, generate a placeholder that will be recursively expanded
+            // The actual recursive expansion happens in the DSL executor
+            expand_invoke_macro_step(macro_step, ctx)
+        }
+    }
+}
+
+/// Expand a verb call step into DSL
+fn expand_verb_call_step(
+    step: &super::schema::VerbCallStep,
+    ctx: &VariableContext,
+) -> Result<String, MacroExpansionError> {
     // Build the DSL statement
     let mut parts = vec![format!("({}", step.verb)];
 
@@ -402,9 +419,43 @@ fn expand_step(
         }
     }
 
+    // Add binding if specified
+    if let Some(bind_as) = &step.bind_as {
+        parts.push(format!(" :as {}", bind_as));
+    }
+
     parts.push(")".to_string());
 
     Ok(parts.join(""))
+}
+
+/// Expand an invoke-macro step
+///
+/// This generates a comment marker that the executor will handle for recursive expansion.
+/// The format is: ;; @invoke-macro <macro-id> <args-json>
+/// This allows the DSL pipeline to detect and recursively expand nested macros.
+fn expand_invoke_macro_step(
+    step: &super::schema::InvokeMacroStep,
+    ctx: &VariableContext,
+) -> Result<String, MacroExpansionError> {
+    // Substitute variables in the args
+    let mut resolved_args = HashMap::new();
+    for (arg_name, arg_template) in &step.args {
+        let value = substitute_variables(arg_template, ctx)?;
+        if value != "null" && !value.is_empty() {
+            resolved_args.insert(arg_name.clone(), value);
+        }
+    }
+
+    // Generate a directive comment that the executor will expand recursively
+    // Format: ;; @invoke-macro <macro-id> import:[symbols] args:{json}
+    let args_json = serde_json::to_string(&resolved_args).unwrap_or_else(|_| "{}".to_string());
+    let import_list = step.import_symbols.join(",");
+
+    Ok(format!(
+        ";; @invoke-macro {} import:[{}] args:{}",
+        step.macro_id, import_list, args_json
+    ))
 }
 
 /// Hash a string for audit

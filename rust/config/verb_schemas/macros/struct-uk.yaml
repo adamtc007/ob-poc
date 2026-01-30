@@ -1,0 +1,1070 @@
+# UK Structure Macros (M7-M12)
+#
+# Jurisdiction-specific fund structure macros for United Kingdom.
+# These expand business-friendly terms to DSL primitives with
+# appropriate document bundles and role cardinality.
+#
+# M7: struct.uk.authorised.oeic - UK Authorised OEIC
+# M8: struct.uk.authorised.aut - UK Authorised Unit Trust
+# M9: struct.uk.authorised.acs - UK Authorised Contractual Scheme
+# M10: struct.uk.authorised.ltaf - UK Long-Term Asset Fund (composite)
+# M11: struct.uk.manager.llp - UK Manager LLP
+# M12: struct.uk.private-equity.lp - UK Private Equity LP
+
+# =============================================================================
+# M7: UK Authorised OEIC
+# =============================================================================
+struct.uk.authorised.oeic:
+  kind: macro
+
+  ui:
+    label: "UK Authorised OEIC"
+    description: "Set up a UK FCA-authorised Open-Ended Investment Company"
+    target_label: "OEIC"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [oeic, uk-authorised]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      authorised_corporate_director:
+        type: party_ref
+        ui_label: "Authorised Corporate Director"
+        description: "ACD responsible for fund management"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      registrar:
+        type: party_ref
+        ui_label: "Registrar"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      fund_type:
+        type: enum
+        ui_label: "Fund Type"
+        values:
+          - key: ucits
+            label: "UCITS Scheme"
+            internal: ucits
+          - key: nurs
+            label: "Non-UCITS Retail Scheme"
+            internal: nurs
+          - key: qis
+            label: "Qualified Investor Scheme"
+            internal: qis
+        default_key: ucits
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: oeic
+        jurisdiction: UK
+        structure_type: uk-authorised
+        fund_type: "${arg.fund_type.internal}"
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.uk-authorised-baseline
+
+    # Assign ACD (required for OEIC)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.authorised_corporate_director}"
+        kind: company
+        placeholder_name: "ACD TBD"
+      as: "@acd"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: authorised-corporate-director
+        entity_id: "@acd"
+
+    # Assign depositary (required)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.depositary}"
+        kind: company
+        placeholder_name: "Depositary TBD"
+      as: "@depositary"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: depositary
+        entity_id: "@depositary"
+
+    # Assign investment manager (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.investment_manager}"
+        kind: company
+        placeholder_name: "Investment Manager TBD"
+        skip_if_empty: true
+      as: "@im"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: investment-manager
+        entity_id: "@im"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Create trading profile
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@cbu"
+        name: "${arg.name} Trading"
+        profile_type: uk-authorised
+      as: "@trading-profile"
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: oeic
+
+  unlocks:
+    - structure.assign-role
+    - mandate.create
+    - case.open
+
+# =============================================================================
+# M8: UK Authorised Unit Trust
+# =============================================================================
+struct.uk.authorised.aut:
+  kind: macro
+
+  ui:
+    label: "UK Authorised Unit Trust"
+    description: "Set up a UK FCA-authorised Unit Trust"
+    target_label: "Unit Trust"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [aut, uk-authorised]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      manager:
+        type: party_ref
+        ui_label: "Manager"
+        description: "Authorised Fund Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      trustee:
+        type: party_ref
+        ui_label: "Trustee"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      fund_type:
+        type: enum
+        ui_label: "Fund Type"
+        values:
+          - key: ucits
+            label: "UCITS Scheme"
+            internal: ucits
+          - key: nurs
+            label: "Non-UCITS Retail Scheme"
+            internal: nurs
+        default_key: nurs
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: aut
+        jurisdiction: UK
+        structure_type: uk-authorised
+        fund_type: "${arg.fund_type.internal}"
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.uk-authorised-baseline
+
+    # Assign manager (required for AUT)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.manager}"
+        kind: company
+        placeholder_name: "Manager TBD"
+      as: "@manager"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: authorised-fund-manager
+        entity_id: "@manager"
+
+    # Assign trustee (required for AUT)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.trustee}"
+        kind: company
+        placeholder_name: "Trustee TBD"
+      as: "@trustee"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: trustee
+        entity_id: "@trustee"
+
+    # Assign investment manager (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.investment_manager}"
+        kind: company
+        placeholder_name: "Investment Manager TBD"
+        skip_if_empty: true
+      as: "@im"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: investment-manager
+        entity_id: "@im"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Create trading profile
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@cbu"
+        name: "${arg.name} Trading"
+        profile_type: uk-authorised
+      as: "@trading-profile"
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: aut
+
+  unlocks:
+    - structure.assign-role
+    - mandate.create
+    - case.open
+
+# =============================================================================
+# M9: UK Authorised Contractual Scheme
+# =============================================================================
+struct.uk.authorised.acs:
+  kind: macro
+
+  ui:
+    label: "UK Authorised Contractual Scheme"
+    description: "Set up a UK FCA-authorised Contractual Scheme (Co-ownership or Partnership)"
+    target_label: "ACS"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [acs, uk-authorised]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      operator:
+        type: party_ref
+        ui_label: "Authorised Contractual Scheme Operator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      acs_type:
+        type: enum
+        ui_label: "ACS Type"
+        values:
+          - key: coownership
+            label: "Co-ownership Scheme"
+            internal: co-ownership
+          - key: partnership
+            label: "Limited Partnership"
+            internal: partnership
+        default_key: coownership
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: acs
+        jurisdiction: UK
+        structure_type: uk-authorised
+        acs_type: "${arg.acs_type.internal}"
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.uk-authorised-baseline
+
+    # Assign operator (required for ACS)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.operator}"
+        kind: company
+        placeholder_name: "ACS Operator TBD"
+      as: "@operator"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: acs-operator
+        entity_id: "@operator"
+
+    # Assign depositary (required)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.depositary}"
+        kind: company
+        placeholder_name: "Depositary TBD"
+      as: "@depositary"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: depositary
+        entity_id: "@depositary"
+
+    # Assign investment manager (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.investment_manager}"
+        kind: company
+        placeholder_name: "Investment Manager TBD"
+        skip_if_empty: true
+      as: "@im"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: investment-manager
+        entity_id: "@im"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Create trading profile
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@cbu"
+        name: "${arg.name} Trading"
+        profile_type: uk-authorised
+      as: "@trading-profile"
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: acs
+
+  unlocks:
+    - structure.assign-role
+    - mandate.create
+    - case.open
+
+# =============================================================================
+# M10: UK Long-Term Asset Fund (LTAF) - Composite
+# =============================================================================
+struct.uk.authorised.ltaf:
+  kind: macro
+
+  ui:
+    label: "UK Long-Term Asset Fund"
+    description: "Set up a UK FCA-authorised Long-Term Asset Fund for illiquid assets"
+    target_label: "LTAF"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [ltaf, uk-authorised]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      authorised_corporate_director:
+        type: party_ref
+        ui_label: "Authorised Corporate Director"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      valuation_agent:
+        type: party_ref
+        ui_label: "Valuation Agent"
+        description: "Independent valuer for illiquid assets"
+        picker: party_picker
+        internal:
+          kinds: [company]
+
+  prereqs: []
+
+  expands_to:
+    # Use the base OEIC macro for the authorised fund structure
+    - invoke-macro: struct.uk.authorised.oeic
+      args:
+        name: "${arg.name}"
+        authorised_corporate_director: "${arg.authorised_corporate_director}"
+        depositary: "${arg.depositary}"
+        investment_manager: "${arg.investment_manager}"
+        administrator: "${arg.administrator}"
+        auditor: "${arg.auditor}"
+        fund_type: qis
+      import-symbols:
+        - "@cbu"
+        - "@trading-profile"
+
+    # Apply LTAF-specific document bundle (extends UK authorised)
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.ltaf-baseline
+
+    # Update CBU with LTAF-specific attributes
+    - verb: cbu.update
+      args:
+        cbu_id: "@cbu"
+        kind: ltaf
+        liquidity_type: illiquid
+        redemption_notice_days: 90
+
+    # Assign valuation agent (important for LTAFs)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.valuation_agent}"
+        kind: company
+        placeholder_name: "Valuation Agent TBD"
+        skip_if_empty: true
+      as: "@valuer"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: valuation-agent
+        entity_id: "@valuer"
+        skip_if_empty: true
+
+    # Update trading profile for LTAF specifics
+    - verb: trading-profile.update
+      args:
+        trading_profile_id: "@trading-profile"
+        profile_type: ltaf
+        illiquid_assets_permitted: true
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: ltaf
+
+  unlocks:
+    - structure.assign-role
+    - mandate.create
+    - case.open
+
+# =============================================================================
+# M11: UK Manager LLP
+# =============================================================================
+struct.uk.manager.llp:
+  kind: macro
+
+  ui:
+    label: "UK Manager LLP"
+    description: "Set up a UK Limited Liability Partnership for fund management"
+    target_label: "Manager LLP"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [llp, manager]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "LLP Name"
+      designated_member_1:
+        type: party_ref
+        ui_label: "First Designated Member"
+        picker: party_picker
+        internal:
+          kinds: [company, person]
+      designated_member_2:
+        type: party_ref
+        ui_label: "Second Designated Member"
+        picker: party_picker
+        internal:
+          kinds: [company, person]
+    optional:
+      compliance_officer:
+        type: party_ref
+        ui_label: "Compliance Officer"
+        picker: party_picker
+        internal:
+          kinds: [person]
+      money_laundering_officer:
+        type: party_ref
+        ui_label: "MLRO"
+        description: "Money Laundering Reporting Officer"
+        picker: party_picker
+        internal:
+          kinds: [person]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      fca_reference:
+        type: str
+        ui_label: "FCA Reference Number"
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: llp
+        jurisdiction: UK
+        structure_type: manager
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.manager-baseline
+
+    # Assign first designated member (required)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.designated_member_1}"
+        kind: company
+        placeholder_name: "Designated Member 1 TBD"
+      as: "@dm1"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: designated-member
+        entity_id: "@dm1"
+
+    # Assign second designated member (required)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.designated_member_2}"
+        kind: company
+        placeholder_name: "Designated Member 2 TBD"
+      as: "@dm2"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: designated-member
+        entity_id: "@dm2"
+
+    # Assign compliance officer (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.compliance_officer}"
+        kind: person
+        placeholder_name: "Compliance Officer TBD"
+        skip_if_empty: true
+      as: "@co"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: compliance-officer
+        entity_id: "@co"
+        skip_if_empty: true
+
+    # Assign MLRO (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.money_laundering_officer}"
+        kind: person
+        placeholder_name: "MLRO TBD"
+        skip_if_empty: true
+      as: "@mlro"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: mlro
+        entity_id: "@mlro"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: manager-llp
+
+  unlocks:
+    - structure.assign-role
+    - case.open
+
+# =============================================================================
+# M12: UK Private Equity LP
+# =============================================================================
+struct.uk.private-equity.lp:
+  kind: macro
+
+  ui:
+    label: "UK Private Equity LP"
+    description: "Set up a UK Limited Partnership for private equity"
+    target_label: "PE LP"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [lp, pe]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      general_partner:
+        type: party_ref
+        ui_label: "General Partner"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      aifm:
+        type: party_ref
+        ui_label: "AIFM"
+        description: "Required if above AIFMD thresholds"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        description: "Required if above AIFMD thresholds"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      legal_counsel:
+        type: party_ref
+        ui_label: "Legal Counsel"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      vintage_year:
+        type: str
+        ui_label: "Vintage Year"
+      target_size:
+        type: str
+        ui_label: "Target Size"
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: lp
+        jurisdiction: UK
+        structure_type: pe
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.private-equity-baseline
+
+    # Assign general partner (required)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.general_partner}"
+        kind: company
+        placeholder_name: "GP TBD"
+      as: "@gp"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: general-partner
+        entity_id: "@gp"
+
+    # Assign AIFM (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.aifm}"
+        kind: company
+        placeholder_name: "AIFM TBD"
+        skip_if_empty: true
+      as: "@aifm"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: aifm
+        entity_id: "@aifm"
+        skip_if_empty: true
+
+    # Assign depositary (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.depositary}"
+        kind: company
+        placeholder_name: "Depositary TBD"
+        skip_if_empty: true
+      as: "@depositary"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: depositary
+        entity_id: "@depositary"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Assign legal counsel (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.legal_counsel}"
+        kind: company
+        placeholder_name: "Legal Counsel TBD"
+        skip_if_empty: true
+      as: "@legal"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: legal-counsel
+        entity_id: "@legal"
+        skip_if_empty: true
+
+    # Create trading profile (PE style)
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@cbu"
+        name: "${arg.name} Trading"
+        profile_type: pe
+      as: "@trading-profile"
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: pe-lp
+
+  unlocks:
+    - structure.assign-role
+    - case.open

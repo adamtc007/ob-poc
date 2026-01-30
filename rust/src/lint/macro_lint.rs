@@ -36,6 +36,11 @@ use super::diagnostic::Diagnostic;
 pub trait PrimitiveRegistry {
     /// Check if a verb exists in the primitive registry
     fn has_verb(&self, verb_fqn: &str) -> bool;
+
+    /// Check if a macro exists in the macro registry
+    fn has_macro(&self, macro_fqn: &str) -> bool {
+        false // Default: no cross-macro validation
+    }
 }
 
 /// Empty registry for when no cross-registry validation is needed
@@ -629,38 +634,48 @@ fn check_expansion(
         let step_path = format!("{}[{}]", path, i);
 
         if let Some(step_map) = step.as_mapping() {
-            // MACRO061: Each step must have verb and args
-            if !step_map.contains_key("verb") {
-                diags.push(Diagnostic::error(
-                    "MACRO061",
-                    format!("{}.verb", step_path),
-                    "Expansion step must have 'verb' field",
-                ));
-            } else if let Some(verb_value) = step_map.get(Value::String("verb".into())) {
-                // MACRO062: No raw s-expr strings
-                if let Some(verb_str) = verb_value.as_str() {
-                    if verb_str.starts_with('(') && verb_str.ends_with(')') {
-                        diags.push(
-                            Diagnostic::error(
-                                "MACRO062",
-                                format!("{}.verb", step_path),
-                                "Raw s-expression strings are not allowed",
-                            )
-                            .with_hint("Use structured format: verb: cbu.create"),
-                        );
+            // Check if this is an invoke-macro step or a verb call step
+            let has_invoke_macro = step_map.contains_key("invoke-macro");
+            let has_verb = step_map.contains_key("verb");
+
+            if has_invoke_macro {
+                // Validate invoke-macro step
+                check_invoke_macro_step(diags, step_map, arg_names, enum_args, &step_path);
+            } else if has_verb {
+                // Validate verb call step
+                if let Some(verb_value) = step_map.get(Value::String("verb".into())) {
+                    // MACRO062: No raw s-expr strings
+                    if let Some(verb_str) = verb_value.as_str() {
+                        if verb_str.starts_with('(') && verb_str.ends_with(')') {
+                            diags.push(
+                                Diagnostic::error(
+                                    "MACRO062",
+                                    format!("{}.verb", step_path),
+                                    "Raw s-expression strings are not allowed",
+                                )
+                                .with_hint("Use structured format: verb: cbu.create"),
+                            );
+                        }
                     }
                 }
-            }
 
-            // Validate args if present
-            if let Some(args) = step_map.get(Value::String("args".into())) {
-                validate_expansion_args(
-                    diags,
-                    args,
-                    arg_names,
-                    enum_args,
-                    &format!("{}.args", step_path),
-                );
+                // Validate args if present
+                if let Some(args) = step_map.get(Value::String("args".into())) {
+                    validate_expansion_args(
+                        diags,
+                        args,
+                        arg_names,
+                        enum_args,
+                        &format!("{}.args", step_path),
+                    );
+                }
+            } else {
+                // MACRO061: Step must have either 'verb' or 'invoke-macro'
+                diags.push(Diagnostic::error(
+                    "MACRO061",
+                    &step_path,
+                    "Expansion step must have 'verb' or 'invoke-macro' field",
+                ));
             }
         } else {
             diags.push(Diagnostic::error(
@@ -669,6 +684,104 @@ fn check_expansion(
                 "Expansion step must be a mapping",
             ));
         }
+    }
+}
+
+// =============================================================================
+// INVOKE-MACRO RULES (MACRO065-067)
+// =============================================================================
+
+/// Validate an invoke-macro expansion step
+fn check_invoke_macro_step(
+    diags: &mut Vec<Diagnostic>,
+    step_map: &serde_yaml::Mapping,
+    arg_names: &HashSet<String>,
+    enum_args: &HashSet<String>,
+    step_path: &str,
+) {
+    // Get the macro ID
+    let macro_id = step_map
+        .get(Value::String("invoke-macro".into()))
+        .and_then(|v| v.as_str());
+
+    // MACRO065: invoke-macro must have a valid macro ID
+    match macro_id {
+        Some(id) if id.is_empty() => {
+            diags.push(Diagnostic::error(
+                "MACRO065",
+                format!("{}.invoke-macro", step_path),
+                "invoke-macro value cannot be empty",
+            ));
+        }
+        Some(id) if !id.contains('.') => {
+            diags.push(
+                Diagnostic::error(
+                    "MACRO065",
+                    format!("{}.invoke-macro", step_path),
+                    format!(
+                        "invoke-macro '{}' must be a fully qualified name (domain.verb)",
+                        id
+                    ),
+                )
+                .with_hint("Example: invoke-macro: struct.ie.hedge.icav"),
+            );
+        }
+        Some(_) => {
+            // Valid format - cross-registry validation in Pass 2
+        }
+        None => {
+            diags.push(Diagnostic::error(
+                "MACRO065",
+                format!("{}.invoke-macro", step_path),
+                "invoke-macro must be a string",
+            ));
+        }
+    }
+
+    // MACRO066: Validate import-symbols format
+    if let Some(import_symbols) = step_map.get(Value::String("import-symbols".into())) {
+        let import_path = format!("{}.import-symbols", step_path);
+
+        if let Some(symbols) = import_symbols.as_sequence() {
+            for (i, sym) in symbols.iter().enumerate() {
+                if let Some(sym_str) = sym.as_str() {
+                    // Symbols should start with @
+                    if !sym_str.starts_with('@') {
+                        diags.push(
+                            Diagnostic::warn(
+                                "MACRO066",
+                                format!("{}[{}]", import_path, i),
+                                format!("Symbol '{}' should start with @", sym_str),
+                            )
+                            .with_hint(format!("Use: @{}", sym_str)),
+                        );
+                    }
+                } else {
+                    diags.push(Diagnostic::error(
+                        "MACRO066",
+                        format!("{}[{}]", import_path, i),
+                        "import-symbols items must be strings",
+                    ));
+                }
+            }
+        } else {
+            diags.push(Diagnostic::error(
+                "MACRO066",
+                &import_path,
+                "import-symbols must be a list",
+            ));
+        }
+    }
+
+    // Validate args if present (same as verb call args)
+    if let Some(args) = step_map.get(Value::String("args".into())) {
+        validate_expansion_args(
+            diags,
+            args,
+            arg_names,
+            enum_args,
+            &format!("{}.args", step_path),
+        );
     }
 }
 
@@ -926,9 +1039,11 @@ fn lint_cross_registry(
     registry: &dyn PrimitiveRegistry,
 ) {
     // MACRO071: expands_to verbs must exist
+    // MACRO067: invoke-macro targets must exist
     if let Some(expands_to) = get_seq(spec, "expands_to") {
         for (i, step) in expands_to.iter().enumerate() {
             if let Some(step_map) = step.as_mapping() {
+                // Check verb call steps
                 if let Some(verb_value) = step_map.get(Value::String("verb".into())) {
                     if let Some(target_verb) = verb_value.as_str() {
                         if !registry.has_verb(target_verb) {
@@ -936,6 +1051,32 @@ fn lint_cross_registry(
                                 "MACRO071",
                                 format!("{}.expands_to[{}].verb", verb, i),
                                 format!("Primitive verb '{}' not found in registry", target_verb),
+                            ));
+                        }
+                    }
+                }
+
+                // Check invoke-macro steps (MACRO067)
+                if let Some(macro_value) = step_map.get(Value::String("invoke-macro".into())) {
+                    if let Some(target_macro) = macro_value.as_str() {
+                        // Check for self-invocation (direct cycle)
+                        if target_macro == verb {
+                            diags.push(Diagnostic::error(
+                                "MACRO067",
+                                format!("{}.expands_to[{}].invoke-macro", verb, i),
+                                format!(
+                                    "Macro '{}' cannot invoke itself (circular invocation)",
+                                    verb
+                                ),
+                            ));
+                        } else if !registry.has_macro(target_macro) {
+                            diags.push(Diagnostic::error(
+                                "MACRO067",
+                                format!("{}.expands_to[{}].invoke-macro", verb, i),
+                                format!(
+                                    "Nested macro '{}' not found in macro registry",
+                                    target_macro
+                                ),
                             ));
                         }
                     }

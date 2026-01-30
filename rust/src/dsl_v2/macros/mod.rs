@@ -39,12 +39,14 @@
 mod expander;
 mod registry;
 mod schema;
+mod scope;
 mod variable;
 
 pub use expander::{expand_macro, MacroExpansionError, MacroExpansionOutput};
 pub use registry::{load_macro_registry, load_macro_registry_from_dir, MacroRegistry};
 pub use schema::{
-    MacroArg, MacroArgType, MacroEnumValue, MacroExpansionStep, MacroPrereq, MacroRouting,
-    MacroSchema, MacroTarget, MacroUi, SetState,
+    InvokeMacroStep, MacroArg, MacroArgType, MacroEnumValue, MacroExpansionStep, MacroPrereq,
+    MacroRouting, MacroSchema, MacroTarget, MacroUi, SetState, VerbCallStep,
 };
+pub use scope::{BoundValue, MacroExpansionScope, MacroScopeError, SymbolScope};
 pub use variable::{substitute_variables, VariableContext, VariableError};

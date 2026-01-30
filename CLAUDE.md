@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-29
+> **Last reviewed:** 2026-01-30
 > **Crates:** 17 Rust crates (includes ob-poc-macros)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
-> **Migrations:** 56 schema migrations
+> **Migrations:** 58 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
 > **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
@@ -29,6 +29,7 @@
 > **LSP Alignment (060):** ✅ Complete - UTF-16 encoding, multiline context, tree-sitter binding rule, rename handler
 > **LSP Test Harness (063):** ✅ Complete - 150+ parser tests, golden file validation, syntax edge cases
 > **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
+> **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

@@ -1,0 +1,517 @@
+# Cross-Border Structure Macros (M17-M18)
+#
+# Composite macros for cross-border fund structures.
+# These use invoke-macro to delegate to jurisdiction-specific macros
+# while adding cross-border coordination elements.
+#
+# M17: struct.hedge.cross-border - Cross-Border Hedge Fund (Master-Feeder)
+# M18: struct.pe.cross-border - Cross-Border PE Fund (Parallel Structure)
+
+# =============================================================================
+# M17: Cross-Border Hedge Fund (Master-Feeder Structure)
+# =============================================================================
+struct.hedge.cross-border:
+  kind: macro
+
+  ui:
+    label: "Cross-Border Hedge Fund"
+    description: "Set up a cross-border hedge fund using master-feeder structure"
+    target_label: "Cross-Border Hedge"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [hedge, cross-border, master-feeder]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      aifm:
+        type: party_ref
+        ui_label: "AIFM"
+        description: "Alternative Investment Fund Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      prime_broker:
+        type: party_ref
+        ui_label: "Prime Broker"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      master_jurisdiction:
+        type: enum
+        ui_label: "Master Fund Jurisdiction"
+        values:
+          - key: cayman
+            label: "Cayman Islands"
+            internal: KY
+          - key: bvi
+            label: "British Virgin Islands"
+            internal: VG
+          - key: ireland
+            label: "Ireland"
+            internal: IE
+        default_key: cayman
+      feeder_jurisdictions:
+        type: list
+        ui_label: "Feeder Jurisdictions"
+        item_type: str
+        default: [US, IE]
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      secondary_prime_broker:
+        type: party_ref
+        ui_label: "Secondary Prime Broker"
+        picker: party_picker
+        internal:
+          kinds: [company]
+
+  prereqs: []
+
+  expands_to:
+    # Create the Master Fund (typically offshore)
+    - verb: cbu.create
+      args:
+        name: "${arg.name} Master"
+        kind: master-fund
+        jurisdiction: "${arg.master_jurisdiction.internal}"
+        structure_type: hedge
+        is_master: true
+      as: "@master"
+
+    # Apply hedge fund document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@master"
+        bundle_id: docs.bundle.hedge-baseline
+
+    # Assign AIFM to master
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.aifm}"
+        kind: company
+        placeholder_name: "AIFM TBD"
+      as: "@aifm"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@master"
+        role: aifm
+        entity_id: "@aifm"
+
+    # Assign depositary to master
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.depositary}"
+        kind: company
+        placeholder_name: "Depositary TBD"
+      as: "@depositary"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@master"
+        role: depositary
+        entity_id: "@depositary"
+
+    # Assign prime broker to master
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.prime_broker}"
+        kind: company
+        placeholder_name: "Prime Broker TBD"
+      as: "@pb"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@master"
+        role: prime-broker
+        entity_id: "@pb"
+
+    # Assign investment manager (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.investment_manager}"
+        kind: company
+        placeholder_name: "Investment Manager TBD"
+        skip_if_empty: true
+      as: "@im"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@master"
+        role: investment-manager
+        entity_id: "@im"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@master"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@master"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Assign secondary prime broker (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.secondary_prime_broker}"
+        kind: company
+        placeholder_name: "Secondary PB TBD"
+        skip_if_empty: true
+      as: "@secondary-pb"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@master"
+        role: prime-broker
+        entity_id: "@secondary-pb"
+        skip_if_empty: true
+
+    # Create trading profile for master
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@master"
+        name: "${arg.name} Master Trading"
+        profile_type: hedge
+        leverage_permitted: true
+        short_selling_permitted: true
+      as: "@trading-profile"
+
+    # Create US Feeder (Delaware LP for US investors)
+    - verb: cbu.create
+      args:
+        name: "${arg.name} US Feeder"
+        kind: delaware-lp
+        jurisdiction: US
+        structure_type: feeder
+        master_fund_id: "@master"
+        exemption: 3c7
+      as: "@us-feeder"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@us-feeder"
+        role: general-partner
+        entity_id: "@aifm"
+
+    # Create Ireland Feeder (QIAIF for EU investors)
+    - verb: cbu.create
+      args:
+        name: "${arg.name} Ireland Feeder"
+        kind: icav
+        jurisdiction: IE
+        structure_type: feeder
+        master_fund_id: "@master"
+        aif_type: qiaif
+      as: "@ie-feeder"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@ie-feeder"
+        role: aifm
+        entity_id: "@aifm"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@ie-feeder"
+        role: depositary
+        entity_id: "@depositary"
+
+    # Link feeders to master in cross-border structure
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@master"
+        child_cbu_id: "@us-feeder"
+        relationship_type: feeder
+        capital_flow: upstream
+
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@master"
+        child_cbu_id: "@ie-feeder"
+        relationship_type: feeder
+        capital_flow: upstream
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: cross-border-hedge
+    - key: structure.is_master_feeder
+      value: true
+
+  unlocks:
+    - structure.assign-role
+    - mandate.create
+    - case.open
+
+# =============================================================================
+# M18: Cross-Border PE Fund (Parallel Structure)
+# =============================================================================
+struct.pe.cross-border:
+  kind: macro
+
+  ui:
+    label: "Cross-Border PE Fund"
+    description: "Set up a cross-border private equity fund using parallel structure"
+    target_label: "Cross-Border PE"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [pe, cross-border, parallel]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      general_partner:
+        type: party_ref
+        ui_label: "General Partner"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      main_fund_jurisdiction:
+        type: enum
+        ui_label: "Main Fund Jurisdiction"
+        values:
+          - key: luxembourg
+            label: "Luxembourg"
+            internal: LU
+          - key: delaware
+            label: "Delaware (US)"
+            internal: US
+          - key: cayman
+            label: "Cayman Islands"
+            internal: KY
+        default_key: luxembourg
+      parallel_jurisdictions:
+        type: list
+        ui_label: "Parallel Fund Jurisdictions"
+        item_type: str
+        default: [US]
+      aifm:
+        type: party_ref
+        ui_label: "AIFM"
+        description: "Required for EU funds"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        description: "Required for EU funds above threshold"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      legal_counsel:
+        type: party_ref
+        ui_label: "Legal Counsel"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      vintage_year:
+        type: str
+        ui_label: "Vintage Year"
+      target_size:
+        type: str
+        ui_label: "Target Size"
+
+  prereqs: []
+
+  expands_to:
+    # Create the Main Fund using Luxembourg SCSp
+    - invoke-macro: struct.lux.pe.scsp
+      args:
+        name: "${arg.name} Main"
+        general_partner: "${arg.general_partner}"
+        aifm: "${arg.aifm}"
+        depositary: "${arg.depositary}"
+        administrator: "${arg.administrator}"
+        auditor: "${arg.auditor}"
+        legal_counsel: "${arg.legal_counsel}"
+        vintage_year: "${arg.vintage_year}"
+        target_size: "${arg.target_size}"
+      import-symbols:
+        - "@cbu"
+        - "@trading-profile"
+
+    # Rename the imported @cbu to @main for clarity
+    - verb: cbu.update
+      args:
+        cbu_id: "@cbu"
+        is_main_fund: true
+        structure_role: main
+
+    # Create US Parallel (Delaware LP for US tax-exempt investors)
+    - verb: cbu.create
+      args:
+        name: "${arg.name} US Parallel"
+        kind: delaware-lp
+        jurisdiction: US
+        structure_type: pe
+        parallel_main_id: "@cbu"
+        exemption: 3c7
+      as: "@us-parallel"
+
+    # Apply PE document bundle to US parallel
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@us-parallel"
+        bundle_id: docs.bundle.private-equity-baseline
+
+    # Assign GP to US parallel
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.general_partner}"
+        kind: company
+        placeholder_name: "GP TBD"
+      as: "@gp-us"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@us-parallel"
+        role: general-partner
+        entity_id: "@gp-us"
+
+    # Assign auditor to US parallel (if provided)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor-us"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@us-parallel"
+        role: auditor
+        entity_id: "@auditor-us"
+        skip_if_empty: true
+
+    # Create trading profile for US parallel
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@us-parallel"
+        name: "${arg.name} US Parallel Trading"
+        profile_type: pe
+      as: "@trading-profile-us"
+
+    # Link parallel to main in cross-border structure
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@cbu"
+        child_cbu_id: "@us-parallel"
+        relationship_type: parallel
+        capital_flow: co-invest
+
+    # Create aggregation vehicle for co-investments
+    - verb: cbu.create
+      args:
+        name: "${arg.name} Aggregator"
+        kind: aggregator
+        jurisdiction: "${arg.main_fund_jurisdiction.internal}"
+        structure_type: aggregator
+        parent_fund_ids: ["@cbu", "@us-parallel"]
+      as: "@aggregator"
+
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@cbu"
+        child_cbu_id: "@aggregator"
+        relationship_type: co-invest-vehicle
+        capital_flow: downstream
+
+    - verb: cbu.link-structure
+      args:
+        parent_cbu_id: "@us-parallel"
+        child_cbu_id: "@aggregator"
+        relationship_type: co-invest-vehicle
+        capital_flow: downstream
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: cross-border-pe
+    - key: structure.is_parallel
+      value: true
+
+  unlocks:
+    - structure.assign-role
+    - case.open

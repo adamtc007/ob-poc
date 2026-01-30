@@ -1,0 +1,606 @@
+# Luxembourg Structure Macros (M1-M3)
+#
+# Jurisdiction-specific fund structure macros for Luxembourg.
+# These expand business-friendly terms to DSL primitives with
+# appropriate document bundles and role cardinality.
+#
+# M1: struct.lux.ucits.sicav - Luxembourg UCITS SICAV
+# M2: struct.lux.aif.raif - Luxembourg AIF RAIF
+# M3: struct.lux.pe.scsp - Luxembourg PE SCSp
+
+# =============================================================================
+# M1: Luxembourg UCITS SICAV
+# =============================================================================
+struct.lux.ucits.sicav:
+  kind: macro
+
+  ui:
+    label: "Luxembourg UCITS SICAV"
+    description: "Set up a Luxembourg UCITS fund using SICAV structure"
+    target_label: "UCITS SICAV"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [sicav]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      management_company:
+        type: party_ref
+        ui_label: "Management Company"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      domiciliation_agent:
+        type: party_ref
+        ui_label: "Domiciliation Agent"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      umbrella_name:
+        type: str
+        ui_label: "Umbrella Name"
+        description: "Name of the umbrella fund if this is a sub-fund"
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: sicav
+        jurisdiction: LU
+        structure_type: ucits
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.ucits-baseline
+
+    # Assign management company (required for UCITS)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.management_company}"
+        kind: company
+        placeholder_name: "ManCo TBD"
+      as: "@manco"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: management-company
+        entity_id: "@manco"
+
+    # Assign depositary (required for UCITS)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.depositary}"
+        kind: company
+        placeholder_name: "Depositary TBD"
+      as: "@depositary"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: depositary
+        entity_id: "@depositary"
+
+    # Assign investment manager (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.investment_manager}"
+        kind: company
+        placeholder_name: "Investment Manager TBD"
+        skip_if_empty: true
+      as: "@im"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: investment-manager
+        entity_id: "@im"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Create trading profile
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@cbu"
+        name: "${arg.name} Trading"
+        profile_type: ucits
+      as: "@trading-profile"
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: ucits-sicav
+
+  unlocks:
+    - structure.assign-role
+    - mandate.create
+    - case.open
+
+# =============================================================================
+# M2: Luxembourg AIF RAIF
+# =============================================================================
+struct.lux.aif.raif:
+  kind: macro
+
+  ui:
+    label: "Luxembourg AIF RAIF"
+    description: "Set up a Luxembourg Reserved Alternative Investment Fund"
+    target_label: "RAIF"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [raif]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      aifm:
+        type: party_ref
+        ui_label: "AIFM"
+        description: "Alternative Investment Fund Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      legal_form:
+        type: enum
+        ui_label: "Legal Form"
+        values:
+          - key: sicav
+            label: "SICAV"
+            internal: sicav
+          - key: sca
+            label: "SCA"
+            internal: sca
+          - key: scsp
+            label: "SCSp"
+            internal: scsp
+          - key: fcp
+            label: "FCP"
+            internal: fcp
+        default_key: sicav
+      investment_manager:
+        type: party_ref
+        ui_label: "Investment Manager"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      prime_broker:
+        type: party_ref
+        ui_label: "Prime Broker"
+        picker: party_picker
+        internal:
+          kinds: [company]
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: raif
+        jurisdiction: LU
+        structure_type: aif
+        legal_form: "${arg.legal_form.internal}"
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.aif-baseline
+
+    # Assign AIFM (required for RAIF)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.aifm}"
+        kind: company
+        placeholder_name: "AIFM TBD"
+      as: "@aifm"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: aifm
+        entity_id: "@aifm"
+
+    # Assign depositary (required for AIF)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.depositary}"
+        kind: company
+        placeholder_name: "Depositary TBD"
+      as: "@depositary"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: depositary
+        entity_id: "@depositary"
+
+    # Assign investment manager (optional, may be delegated by AIFM)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.investment_manager}"
+        kind: company
+        placeholder_name: "Investment Manager TBD"
+        skip_if_empty: true
+      as: "@im"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: investment-manager
+        entity_id: "@im"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Assign prime broker (optional, common for hedge-style RAIFs)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.prime_broker}"
+        kind: company
+        placeholder_name: "Prime Broker TBD"
+        skip_if_empty: true
+      as: "@pb"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: prime-broker
+        entity_id: "@pb"
+        skip_if_empty: true
+
+    # Create trading profile
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@cbu"
+        name: "${arg.name} Trading"
+        profile_type: aif
+      as: "@trading-profile"
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: aif-raif
+
+  unlocks:
+    - structure.assign-role
+    - mandate.create
+    - case.open
+
+# =============================================================================
+# M3: Luxembourg PE SCSp
+# =============================================================================
+struct.lux.pe.scsp:
+  kind: macro
+
+  ui:
+    label: "Luxembourg PE SCSp"
+    description: "Set up a Luxembourg Private Equity fund using SCSp structure"
+    target_label: "PE SCSp"
+
+  routing:
+    mode_tags: [onboarding, structure]
+    operator_domain: structure
+
+  target:
+    operates_on: client_ref
+    produces: structure_ref
+    allowed_structure_types: [scsp, pe]
+
+  args:
+    style: keyworded
+    required:
+      name:
+        type: str
+        ui_label: "Fund Name"
+      general_partner:
+        type: party_ref
+        ui_label: "General Partner"
+        picker: party_picker
+        internal:
+          kinds: [company]
+    optional:
+      aifm:
+        type: party_ref
+        ui_label: "AIFM"
+        description: "Required if AuM exceeds AIFMD thresholds"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      depositary:
+        type: party_ref
+        ui_label: "Depositary"
+        description: "Required if fund is above AIFMD thresholds"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      administrator:
+        type: party_ref
+        ui_label: "Administrator"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      auditor:
+        type: party_ref
+        ui_label: "Auditor"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      legal_counsel:
+        type: party_ref
+        ui_label: "Legal Counsel"
+        picker: party_picker
+        internal:
+          kinds: [company]
+      vintage_year:
+        type: str
+        ui_label: "Vintage Year"
+        description: "Year of fund launch"
+      target_size:
+        type: str
+        ui_label: "Target Size"
+        description: "Target fund size (e.g., EUR 500m)"
+
+  prereqs: []
+
+  expands_to:
+    # Create the CBU
+    - verb: cbu.create
+      args:
+        name: "${arg.name}"
+        kind: scsp
+        jurisdiction: LU
+        structure_type: pe
+      as: "@cbu"
+
+    # Apply document bundle
+    - verb: docs-bundle.apply
+      args:
+        cbu_id: "@cbu"
+        bundle_id: docs.bundle.private-equity-baseline
+
+    # Assign general partner (required for partnership)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.general_partner}"
+        kind: company
+        placeholder_name: "GP TBD"
+      as: "@gp"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: general-partner
+        entity_id: "@gp"
+
+    # Assign AIFM (optional for sub-threshold funds)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.aifm}"
+        kind: company
+        placeholder_name: "AIFM TBD"
+        skip_if_empty: true
+      as: "@aifm"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: aifm
+        entity_id: "@aifm"
+        skip_if_empty: true
+
+    # Assign depositary (optional for sub-threshold funds)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.depositary}"
+        kind: company
+        placeholder_name: "Depositary TBD"
+        skip_if_empty: true
+      as: "@depositary"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: depositary
+        entity_id: "@depositary"
+        skip_if_empty: true
+
+    # Assign administrator (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.administrator}"
+        kind: company
+        placeholder_name: "Administrator TBD"
+        skip_if_empty: true
+      as: "@admin"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: administrator
+        entity_id: "@admin"
+        skip_if_empty: true
+
+    # Assign auditor (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.auditor}"
+        kind: company
+        placeholder_name: "Auditor TBD"
+        skip_if_empty: true
+      as: "@auditor"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: auditor
+        entity_id: "@auditor"
+        skip_if_empty: true
+
+    # Assign legal counsel (optional)
+    - verb: entity.ensure-or-placeholder
+      args:
+        ref: "${arg.legal_counsel}"
+        kind: company
+        placeholder_name: "Legal Counsel TBD"
+        skip_if_empty: true
+      as: "@legal"
+
+    - verb: cbu-role.assign
+      args:
+        cbu_id: "@cbu"
+        role: legal-counsel
+        entity_id: "@legal"
+        skip_if_empty: true
+
+    # Create trading profile (PE style)
+    - verb: trading-profile.create
+      args:
+        cbu_id: "@cbu"
+        name: "${arg.name} Trading"
+        profile_type: pe
+      as: "@trading-profile"
+
+  sets_state:
+    - key: structure.exists
+      value: true
+    - key: structure.type
+      value: pe-scsp
+
+  unlocks:
+    - structure.assign-role
+    - case.open

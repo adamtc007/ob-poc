@@ -1,0 +1,120 @@
+# Role Cardinality Configuration
+# Defines the allowed multiplicity of roles within fund structures
+#
+# Cardinality values:
+#   - one: Exactly one required
+#   - zero-or-one: Optional, at most one
+#   - one-or-more: At least one required
+#   - zero-or-more: Any number (no constraint)
+#
+# Context: Optional list of structure types where this cardinality applies
+# If no context, applies to all structure types
+
+roles:
+  # Core Fund Roles
+  fund-vehicle:
+    cardinality: one
+    description: "The legal fund entity itself"
+
+  # Regulatory Required Roles
+  depositary:
+    cardinality: one
+    context: [ucits, aif, raif]
+    description: "Required for regulated funds"
+
+  trustee:
+    cardinality: one
+    context: [uk-authorised, uk-aut, uk-acs]
+    description: "Required for UK authorised funds"
+
+  custodian:
+    cardinality: one-or-more
+    description: "Asset safekeeping - may have sub-custodians"
+
+  # Management Roles
+  management-company:
+    cardinality: one
+    context: [ucits, aif, raif, icav]
+    description: "ManCo for regulated EU funds"
+
+  aifm:
+    cardinality: one
+    context: [aif, raif, qiaif]
+    description: "Alternative Investment Fund Manager"
+
+  general-partner:
+    cardinality: one
+    context: [pe, scsp, lp, delaware-lp]
+    description: "GP for partnership structures"
+
+  investment-manager:
+    cardinality: one-or-more
+    description: "Delegated portfolio management"
+
+  investment-advisor:
+    cardinality: zero-or-more
+    description: "Advisory services"
+
+  # Administrative Roles
+  administrator:
+    cardinality: one
+    description: "Fund administration"
+
+  transfer-agent:
+    cardinality: one
+    description: "Investor servicing"
+
+  registrar:
+    cardinality: zero-or-one
+    description: "Share registry (often combined with TA)"
+
+  # Oversight Roles
+  auditor:
+    cardinality: one
+    description: "External auditor"
+
+  legal-counsel:
+    cardinality: one-or-more
+    description: "Legal advisors"
+
+  tax-advisor:
+    cardinality: zero-or-more
+    description: "Tax advisory"
+
+  # Trading Roles
+  prime-broker:
+    cardinality: zero-or-more
+    context: [hedge, aif, qiaif]
+    description: "Prime brokerage services"
+
+  executing-broker:
+    cardinality: zero-or-more
+    description: "Trade execution"
+
+  # Distribution Roles
+  distributor:
+    cardinality: zero-or-more
+    description: "Fund distribution"
+
+  paying-agent:
+    cardinality: zero-or-more
+    description: "Local paying agents for cross-border"
+
+  # US-Specific Roles
+  board-of-directors:
+    cardinality: one
+    context: [40act-open, 40act-closed, etf-40act]
+    description: "US fund board"
+
+  cco:
+    cardinality: one
+    context: [40act-open, 40act-closed, etf-40act]
+    description: "Chief Compliance Officer"
+
+# Structure type aliases for context matching
+structure_aliases:
+  ucits: [sicav, icav-ucits, oeic-ucits, fcp-ucits]
+  aif: [raif, qiaif, icav-aif, scsp-aif]
+  uk-authorised: [oeic, aut, acs, ltaf]
+  pe: [scsp, lp, delaware-lp]
+  hedge: [icav-hedge, qiaif-hedge]

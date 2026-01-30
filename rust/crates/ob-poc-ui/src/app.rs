@@ -11,9 +11,9 @@ use crate::panels::{
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
     results_panel, service_taxonomy_panel, taxonomy_panel, toolbar, trading_matrix_panel,
     CbuSearchAction, CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction,
-    DslEditorAction, EntityMatchDisplay, InvestorRegisterAction, ResolutionPanelAction,
-    ResolutionPanelData, ServiceTaxonomyPanelAction, TaxonomyPanelAction, ToolbarAction,
-    ToolbarData, TradingMatrixPanelAction, VerbDisambiguationAction,
+    DslEditorAction, EntityMatchDisplay, InvestorRegisterAction, MacroWizardAction, ReplAction,
+    ResolutionPanelAction, ResolutionPanelData, ServiceTaxonomyPanelAction, TaxonomyPanelAction,
+    ToolbarAction, ToolbarData, TradingMatrixPanelAction, VerbDisambiguationAction,
 };
 use crate::state::{
     AppState, AsyncState, BrowserTab, CbuSearchUi, LayoutMode, PanelState, TextBuffers,
@@ -181,6 +181,7 @@ impl App {
             investor_register_ui: crate::state::InvestorRegisterUi::default(),
             pending_navigation_verb: None,
             verb_disambiguation_ui: crate::state::VerbDisambiguationState::default(),
+            macro_expansion_ui: crate::state::MacroExpansionState::default(),
         };
 
         // Try to restore session from localStorage
@@ -3162,6 +3163,130 @@ impl App {
         }
     }
 
+    /// Handle macro wizard panel actions
+    fn handle_macro_wizard_action(&mut self, action: MacroWizardAction) {
+        match action {
+            MacroWizardAction::Cancel => {
+                // Clear the wizard state
+                self.state.macro_expansion_ui.active = false;
+                self.state.macro_expansion_ui.macro_fqn = None;
+                self.state.macro_expansion_ui.missing_args.clear();
+                self.state.macro_expansion_ui.provided_args.clear();
+                self.state.macro_expansion_ui.current_step = 0;
+                self.state.macro_expansion_ui.current_input.clear();
+                self.state.macro_expansion_ui.error_message = None;
+                web_sys::console::log_1(&"MacroWizard: Cancelled".into());
+            }
+            MacroWizardAction::Back => {
+                // Go back to previous step
+                if self.state.macro_expansion_ui.current_step > 0 {
+                    self.state.macro_expansion_ui.current_step -= 1;
+                    self.state.macro_expansion_ui.current_input.clear();
+                    self.state.macro_expansion_ui.error_message = None;
+                }
+            }
+            MacroWizardAction::Next { arg_name, value } => {
+                // Store the value and advance to next step
+                self.state
+                    .macro_expansion_ui
+                    .provided_args
+                    .insert(arg_name.clone(), value.clone());
+                self.state.macro_expansion_ui.current_step += 1;
+                self.state.macro_expansion_ui.current_input.clear();
+                self.state.macro_expansion_ui.error_message = None;
+                web_sys::console::log_1(
+                    &format!("MacroWizard: Set {} = {}", arg_name, value).into(),
+                );
+            }
+            MacroWizardAction::Complete => {
+                // All args collected, expand the macro
+                let macro_fqn = self
+                    .state
+                    .macro_expansion_ui
+                    .macro_fqn
+                    .clone()
+                    .unwrap_or_default();
+                let args = self.state.macro_expansion_ui.provided_args.clone();
+                web_sys::console::log_1(
+                    &format!("MacroWizard: Complete {} with {:?}", macro_fqn, args).into(),
+                );
+
+                // Build DSL from macro + args and execute
+                // Format: (macro.fqn :arg1 "value1" :arg2 "value2" ...)
+                let mut dsl = format!("({}", macro_fqn);
+                for (key, value) in &args {
+                    // Quote string values
+                    dsl.push_str(&format!(" :{} \"{}\"", key, value));
+                }
+                dsl.push(')');
+
+                // Set as DSL and execute
+                self.state.buffers.dsl_editor = dsl;
+                self.state.execute_dsl();
+
+                // Clear wizard state
+                self.state.macro_expansion_ui.active = false;
+                self.state.macro_expansion_ui.macro_fqn = None;
+                self.state.macro_expansion_ui.missing_args.clear();
+                self.state.macro_expansion_ui.provided_args.clear();
+                self.state.macro_expansion_ui.current_step = 0;
+            }
+            MacroWizardAction::UsePlaceholder { arg_name } => {
+                // Use placeholder for this entity arg
+                let placeholder_value = format!("$placeholder:{}", arg_name);
+                self.state
+                    .macro_expansion_ui
+                    .provided_args
+                    .insert(arg_name.clone(), placeholder_value);
+                self.state.macro_expansion_ui.current_step += 1;
+                self.state.macro_expansion_ui.current_input.clear();
+                self.state.macro_expansion_ui.error_message = None;
+                web_sys::console::log_1(
+                    &format!("MacroWizard: Using placeholder for {}", arg_name).into(),
+                );
+            }
+            MacroWizardAction::Search { query, entity_type } => {
+                // Trigger entity search for picker
+                web_sys::console::log_1(
+                    &format!("MacroWizard: Search '{}' (type: {})", query, entity_type).into(),
+                );
+                // TODO: Wire up to EntityGateway search
+                // For now, just log - the actual search would populate picker_results
+            }
+            MacroWizardAction::SelectEntity {
+                arg_name,
+                entity_id,
+                display_name,
+            } => {
+                // Entity selected from picker
+                self.state
+                    .macro_expansion_ui
+                    .provided_args
+                    .insert(arg_name.clone(), entity_id.clone());
+                self.state.macro_expansion_ui.current_step += 1;
+                self.state.macro_expansion_ui.current_input.clear();
+                self.state.macro_expansion_ui.picker_results = None;
+                self.state.macro_expansion_ui.error_message = None;
+                web_sys::console::log_1(
+                    &format!(
+                        "MacroWizard: Selected {} = {} ({})",
+                        arg_name, display_name, entity_id
+                    )
+                    .into(),
+                );
+            }
+            MacroWizardAction::Skip { arg_name } => {
+                // Skip optional argument
+                self.state.macro_expansion_ui.current_step += 1;
+                self.state.macro_expansion_ui.current_input.clear();
+                self.state.macro_expansion_ui.error_message = None;
+                web_sys::console::log_1(
+                    &format!("MacroWizard: Skipped optional arg {}", arg_name).into(),
+                );
+            }
+        }
+    }
+
     /// Render simplified layout:
     /// - Top 90%: Single viewport (graph widget)
     /// - Bottom 10%: Split - Chat (left 50%) + Session/REPL (right 50%)
@@ -3650,7 +3775,7 @@ impl App {
             ui.set_height(bottom_height);
 
             // Unified REPL panel (left, 60% width) - chat + resolution + DSL
-            let verb_disambig_action = ui
+            let repl_action = ui
                 .vertical(|ui| {
                     ui.set_width(available.x * 0.6 - 4.0);
                     egui::Frame::default()
@@ -3661,15 +3786,21 @@ impl App {
                 })
                 .inner;
 
-            // Handle verb disambiguation actions (after render, Rule 2)
-            if let Some(action) = verb_disambig_action {
+            // Handle REPL actions (after render, Rule 2)
+            if let Some(action) = repl_action {
                 match action {
-                    VerbDisambiguationAction::Select { verb_fqn } => {
-                        self.state.select_verb_disambiguation(&verb_fqn);
-                    }
-                    VerbDisambiguationAction::Cancel => {
-                        self.state
-                            .abandon_verb_disambiguation(ob_poc_types::AbandonReason::Cancelled);
+                    ReplAction::VerbDisambiguation(verb_action) => match verb_action {
+                        VerbDisambiguationAction::Select { verb_fqn } => {
+                            self.state.select_verb_disambiguation(&verb_fqn);
+                        }
+                        VerbDisambiguationAction::Cancel => {
+                            self.state.abandon_verb_disambiguation(
+                                ob_poc_types::AbandonReason::Cancelled,
+                            );
+                        }
+                    },
+                    ReplAction::MacroWizard(wizard_action) => {
+                        self.handle_macro_wizard_action(wizard_action);
                     }
                 }
             }

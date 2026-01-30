@@ -774,3 +774,188 @@ domains:
             default: 0
         returns:
           type: record_set
+
+      # =========================================================================
+      # PLACEHOLDER ENTITY VERBS - Deferred resolution for macro expansion
+      # =========================================================================
+
+      ensure-or-placeholder:
+        description: Return existing entity or create placeholder for later resolution
+        behavior: plugin
+        invocation_phrases:
+          - "ensure entity or create placeholder"
+          - "get or placeholder"
+          - "entity placeholder"
+          - "deferred entity"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, placeholder, macro]
+        plugin:
+          handler: entity_ensure_or_placeholder
+        args:
+          - name: ref
+            type: uuid
+            required: false
+            description: Optional entity reference to check
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: kind
+            type: string
+            required: true
+            description: Kind of placeholder (depositary, auditor, custodian, etc.)
+            valid_values:
+              - depositary
+              - auditor
+              - custodian
+              - administrator
+              - transfer-agent
+              - prime-broker
+              - legal-counsel
+              - tax-advisor
+              - compliance-officer
+              - director
+              - secretary
+              - authorized-signatory
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU this placeholder is being created for
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: name-hint
+            type: string
+            required: false
+            description: Optional name hint for the placeholder
+        returns:
+          type: record
+          fields:
+            - name: entity_id
+              type: uuid
+              description: The entity ID (existing or placeholder)
+            - name: is_placeholder
+              type: boolean
+              description: True if a placeholder was created
+          capture: true
+
+      resolve-placeholder:
+        description: Resolve a placeholder entity to a real entity
+        behavior: plugin
+        invocation_phrases:
+          - "resolve placeholder"
+          - "link placeholder to entity"
+          - "replace placeholder"
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: global
+          noun: entity
+          tags: [lifecycle, placeholder, resolution]
+        plugin:
+          handler: entity_resolve_placeholder
+        args:
+          - name: placeholder-id
+            type: uuid
+            required: true
+            description: The placeholder entity ID
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: resolved-entity-id
+            type: uuid
+            required: true
+            description: The real entity to resolve to
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: resolved-by
+            type: string
+            required: false
+            description: Who is performing the resolution
+            default: system
+        returns:
+          type: record
+          fields:
+            - name: placeholder_entity_id
+              type: uuid
+            - name: resolved_to_entity_id
+              type: uuid
+            - name: status
+              type: string
+            - name: roles_transferred
+              type: integer
+
+      list-placeholders:
+        description: List pending placeholder entities for a CBU
+        behavior: plugin
+        invocation_phrases:
+          - "list placeholders"
+          - "show pending placeholders"
+          - "view unresolved entities"
+        metadata:
+          tier: diagnostics
+          source_of_truth: entity
+          noun: entity
+          tags: [query, placeholder, listing]
+        plugin:
+          handler: entity_list_placeholders
+        args:
+          - name: cbu-id
+            type: uuid
+            required: false
+            description: Filter by CBU (if not provided, lists all pending)
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record_set
+
+      placeholder-summary:
+        description: Get placeholder summary statistics for a CBU
+        behavior: plugin
+        metadata:
+          tier: diagnostics
+          source_of_truth: entity
+          noun: entity
+          tags: [query, placeholder, stats]
+        plugin:
+          handler: entity_placeholder_summary
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: CBU to get summary for
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+        returns:
+          type: record
+          fields:
+            - name: cbu_id
+              type: uuid
+            - name: pending_count
+              type: integer
+            - name: by_kind
+              type: array

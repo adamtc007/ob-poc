@@ -121,6 +121,14 @@ pub mod service_resources;
 #[cfg(feature = "database")]
 pub mod repl;
 
+// Document Bundles - Versioned document requirement sets for structure macros
+#[cfg(feature = "database")]
+pub mod document_bundles;
+
+// Placeholder Entities - Deferred entity resolution for macro expansion
+#[cfg(feature = "database")]
+pub mod placeholder;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;
