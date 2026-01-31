@@ -161,7 +161,6 @@ mod tests {
             subtype: None,
             entity_pk: Uuid::nil(),
             resolved: false,
-            source_sheet_id: None,
         });
         let reg = runtime_registry();
 

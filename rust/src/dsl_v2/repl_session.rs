@@ -193,7 +193,6 @@ impl ReplSession {
                 subtype,
                 entity_pk: *pk,
                 resolved: true, // Already executed, so it's resolved
-                source_sheet_id: None,
             });
         }
 

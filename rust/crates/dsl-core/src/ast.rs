@@ -211,8 +211,6 @@ pub struct ResolutionExplain {
     pub resolution_tier: ResolutionTier,
     /// Discriminators that were applied (e.g., ["nationality:DE", "dob:1980"])
     pub discriminators_applied: Vec<String>,
-    /// Tantivy index generation (for cache debugging)
-    pub index_generation: Option<u64>,
     /// When resolution happened
     pub resolved_at: chrono::DateTime<chrono::Utc>,
 }

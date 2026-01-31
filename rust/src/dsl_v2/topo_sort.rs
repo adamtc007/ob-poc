@@ -942,7 +942,6 @@ mod tests {
             subtype: None,
             entity_pk: uuid::Uuid::new_v4(),
             resolved: false,
-            source_sheet_id: None,
         });
 
         // New statement references existing @fund
@@ -1129,7 +1128,6 @@ mod tests {
             subtype: None,
             entity_pk: uuid::Uuid::new_v4(),
             resolved: false,
-            source_sheet_id: None,
         });
 
         let source = r#"

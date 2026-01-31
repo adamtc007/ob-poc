@@ -21,3 +21,8 @@ thiserror = "1.0"
 
 # NO OTHER DEPENDENCIES ALLOWED
 # This crate must be the foundation that everything else builds on
+
+[features]
+# Empty feature to satisfy rust-analyzer workspace-wide feature activation
+# This crate has no database code, but rust-analyzer enables "database" globally
+database = []

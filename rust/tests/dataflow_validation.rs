@@ -266,7 +266,6 @@ fn test_available_types_for_verb_satisfaction() {
         subtype: None,
         entity_pk: Uuid::nil(),
         resolved: false,
-        source_sheet_id: None,
     });
 
     ctx.insert(BindingInfo {
@@ -275,7 +274,6 @@ fn test_available_types_for_verb_satisfaction() {
         subtype: Some("proper_person".to_string()),
         entity_pk: Uuid::nil(),
         resolved: false,
-        source_sheet_id: None,
     });
 
     let types = ctx.available_types();
@@ -299,7 +297,6 @@ fn test_llm_context_generation() {
         subtype: None,
         entity_pk: Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap(),
         resolved: false,
-        source_sheet_id: None,
     });
 
     let llm_ctx = ctx.to_llm_context();
@@ -322,7 +319,6 @@ fn test_entity_subtype_matches_base() {
         subtype: Some("proper_person".to_string()),
         entity_pk: Uuid::nil(),
         resolved: false,
-        source_sheet_id: None,
     };
 
     // Should match base type
@@ -359,7 +355,6 @@ fn test_cbu_type_matches() {
         subtype: None,
         entity_pk: Uuid::nil(),
         resolved: false,
-        source_sheet_id: None,
     };
 
     assert!(cbu.matches_type("cbu"), "CBU should match cbu");

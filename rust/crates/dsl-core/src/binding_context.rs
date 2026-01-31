@@ -28,8 +28,6 @@ pub struct BindingInfo {
     pub entity_pk: Uuid,
     /// True if this is a lookup (resolved existing) vs create (new)
     pub resolved: bool,
-    /// Source sheet ID (for audit trail)
-    pub source_sheet_id: Option<Uuid>,
 }
 
 impl BindingInfo {
@@ -74,7 +72,6 @@ impl BindingInfo {
             subtype: produces.subtype.clone(),
             entity_pk: Uuid::nil(), // Not yet executed
             resolved: produces.resolved,
-            source_sheet_id: None,
         }
     }
 
@@ -192,7 +189,6 @@ mod tests {
             subtype: None,
             entity_pk: Uuid::new_v4(),
             resolved: false,
-            source_sheet_id: None,
         };
 
         assert!(cbu.matches_type("cbu"));
@@ -208,7 +204,6 @@ mod tests {
             subtype: Some("proper_person".to_string()),
             entity_pk: Uuid::new_v4(),
             resolved: false,
-            source_sheet_id: None,
         };
 
         // Base type matches
@@ -231,7 +226,6 @@ mod tests {
             subtype: None,
             entity_pk: Uuid::nil(),
             resolved: false,
-            source_sheet_id: None,
         });
 
         ctx.insert(BindingInfo {
@@ -240,7 +234,6 @@ mod tests {
             subtype: Some("proper_person".to_string()),
             entity_pk: Uuid::nil(),
             resolved: false,
-            source_sheet_id: None,
         });
 
         let types = ctx.available_types();
@@ -259,7 +252,6 @@ mod tests {
             subtype: None,
             entity_pk: Uuid::new_v4(),
             resolved: false,
-            source_sheet_id: None,
         });
 
         let mut ctx2 = BindingContext::new();
@@ -269,7 +261,6 @@ mod tests {
             subtype: Some("proper_person".to_string()),
             entity_pk: Uuid::new_v4(),
             resolved: false,
-            source_sheet_id: None,
         });
 
         ctx1.merge(&ctx2);

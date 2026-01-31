@@ -7,13 +7,16 @@
       "initialization_options": {
         "cargo": {
           "features": ["database"],
+          "noDefaultFeatures": false,
           "buildScripts": {
             "enable": true,
           },
+          "unsetTest": ["dsl_types"],
         },
         "check": {
           "command": "clippy",
           "features": ["database"],
+          "allTargets": false,
         },
         "procMacro": {
           "enable": true,

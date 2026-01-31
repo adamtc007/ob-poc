@@ -73,7 +73,6 @@ pub async fn get_completions(
                     subtype: None,
                     entity_pk: uuid::Uuid::nil(), // dummy
                     resolved: false,
-                    source_sheet_id: None,
                 });
             }
 
