@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-30
-> **Crates:** 17 Rust crates (includes ob-poc-macros)
+> **Last reviewed:** 2026-01-31
+> **Crates:** 22 Rust crates (includes ob-poc-macros + 5 esper_* crates)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 58 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
@@ -30,6 +30,7 @@
 > **LSP Test Harness (063):** ✅ Complete - 150+ parser tests, golden file validation, syntax edge cases
 > **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
+> **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -3073,6 +3074,134 @@ No direct `sqlx::query` calls outside of service modules.
 
 ---
 
+## ESPER Navigation Crates (065)
+
+> ✅ **IMPLEMENTED (2026-01-31)**: Rip-and-replace refactor of navigation system into 5 independent crates with 158 tests.
+
+The ESPER (Entity Spatial Exploration and Rendering) navigation system is split into 5 crates with strict dependency ordering:
+
+```
+esper_snapshot (no deps)     ─┐
+                              ├─► esper_core ─┬─► esper_input ─┬─► esper_egui
+                              │               └─► esper_policy ─┘
+                              └─────────────────────────────────────────────┘
+```
+
+### Crate Overview
+
+| Crate | Tests | Purpose |
+|-------|-------|---------|
+| `esper_snapshot` | 29 | SoA data layout, bincode serialization, spatial grid |
+| `esper_core` | 39 | Verb enum, EffectSet bitflags, DroneState state machine |
+| `esper_input` | 23 | Unified input (keyboard/mouse/touch/gamepad → Verb) |
+| `esper_policy` | 41 | Permission bitflags, VerbPolicy, EntityPolicy, PolicyGuard |
+| `esper_egui` | 26 | egui rendering with camera animation, LOD, overlays |
+
+### Key Design Patterns
+
+**Structure-of-Arrays (SoA) Layout:**
+```rust
+// ChamberSnapshot stores entity data in parallel arrays for cache efficiency
+pub struct ChamberSnapshot {
+    pub entity_ids: Vec<u64>,    // Stable entity IDs
+    pub kind_ids: Vec<u16>,      // Entity type indices
+    pub x: Vec<f32>,             // X coordinates
+    pub y: Vec<f32>,             // Y coordinates
+    pub first_child: Vec<u32>,   // Tree navigation (NONE_IDX if leaf)
+    pub next_sibling: Vec<u32>,  // Sibling navigation
+    // ...
+}
+```
+
+**Sentinel Constants:**
+```rust
+pub const NONE_IDX: u32 = u32::MAX;  // No child/sibling
+pub const NONE_ID: u64 = 0;          // No entity
+```
+
+**Verb-Based Navigation:**
+All input (keyboard, mouse, touch, agent commands) translates to `Verb` enum before execution:
+```rust
+pub enum Verb {
+    PanBy { dx: f32, dy: f32 },
+    Zoom(f32),
+    Ascend, Descend, Next, Prev,
+    DiveInto(DoorId), PullBack, Surface,
+    Select(NodeIdx), Focus(EntityId),
+    // ...
+}
+```
+
+**EffectSet Output Protocol:**
+Verb execution returns a bitflag of effects for the renderer to handle:
+```rust
+bitflags! {
+    pub struct EffectSet: u32 {
+        const CAMERA_CHANGED = 0x0001;
+        const TAXONOMY_CHANGED = 0x0002;
+        const CHAMBER_CHANGED = 0x0004;
+        const CONTEXT_PUSHED = 0x0008;
+        // ...
+    }
+}
+```
+
+**DroneState (Navigation State Machine):**
+```rust
+pub struct DroneState {
+    pub mode: NavigationMode,        // Spatial vs Structural
+    pub current_chamber: ChamberId,  // Active chamber
+    pub context_stack: ContextStack, // For nested navigation
+    pub camera: CameraState,         // Position, zoom, animation
+    pub taxonomy: TaxonomyState,     // Selection, expansion, scroll
+    pub tick: u64,                   // Frame counter
+}
+```
+
+**Policy-Based Access Control:**
+```rust
+pub struct PolicyGuard {
+    policy: UserPolicy,
+}
+
+impl PolicyGuard {
+    pub fn pre_execute(&self, verb: &Verb) -> PolicyResult<()>;
+    pub fn post_execute(&self, effects: EffectSet) -> EffectSet;
+    pub fn filter_world(&self, world: &WorldSnapshot) -> FilteredWorld;
+}
+```
+
+**egui Compliance (Update vs Render):**
+```rust
+// Update phase: mutate state
+fn update(&mut self, dt: f32, drone: &mut DroneState, world: &WorldSnapshot) {
+    self.camera.tick(dt);           // Animation
+    let verbs = self.input.process(&input_state);  // Input → Verbs
+}
+
+// Render phase: read-only
+fn render(&self, ui: &mut Ui, drone: &DroneState, world: &WorldSnapshot) {
+    // Pure drawing, no mutation
+}
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/esper_snapshot/src/chamber.rs` | ChamberSnapshot SoA structure |
+| `rust/crates/esper_snapshot/src/validate.rs` | Snapshot validation rules |
+| `rust/crates/esper_core/src/verb.rs` | Verb enum and DSL serialization |
+| `rust/crates/esper_core/src/state.rs` | DroneState and verb execution |
+| `rust/crates/esper_core/src/effect.rs` | EffectSet bitflags |
+| `rust/crates/esper_input/src/processor.rs` | InputProcessor (input → Verb) |
+| `rust/crates/esper_input/src/config.rs` | Rebindable key/mouse bindings |
+| `rust/crates/esper_policy/src/guard.rs` | PolicyGuard enforcement |
+| `rust/crates/esper_egui/src/renderer.rs` | Main EsperRenderer |
+| `rust/crates/esper_egui/src/camera.rs` | Camera animation with lerp |
+
+---
+
 ## Key Directories
 
 ```
@@ -3080,6 +3209,11 @@ ob-poc/
 ├── rust/
 │   ├── config/verbs/           # 103 YAML verb definitions
 │   ├── crates/
+│   │   ├── esper_snapshot/     # SoA data layout, serialization
+│   │   ├── esper_core/         # Verb enum, DroneState, EffectSet
+│   │   ├── esper_input/        # Unified input handling
+│   │   ├── esper_policy/       # Access control, PolicyGuard
+│   │   ├── esper_egui/         # egui rendering layer
 │   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
 │   │   ├── dsl-lsp/            # LSP server + Zed extension + tree-sitter grammar
 │   │   ├── ob-agentic/         # Onboarding pipeline (Intent→Plan→DSL)

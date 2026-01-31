@@ -1,0 +1,28 @@
+[package]
+name = "esper_policy"
+version = "0.1.0"
+edition = "2021"
+description = "Permission and access control policy for ESPER navigation"
+
+[dependencies]
+esper_snapshot = { path = "../esper_snapshot" }
+esper_core = { path = "../esper_core" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+
+# Error handling
+thiserror = "1.0"
+
+# Hashing for policy fingerprints
+sha2 = "0.10"
+hex = "0.4"
+
+# Bitflags for permissions
+bitflags = { version = "2.4", features = ["serde"] }
+
+# JSON for metadata
+serde_json = "1.0"
+
+[dev-dependencies]
+proptest = "1.0"
