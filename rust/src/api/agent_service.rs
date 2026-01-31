@@ -883,6 +883,70 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return self.execute_runbook(session).await;
         }
 
+        // 2. Check for pending verb disambiguation - numeric input selects an option
+        if let Some(ref pending) = session.pending_verb_disambiguation {
+            // Check if input is a number (1, 2, 3, etc.)
+            if let Ok(selection) = input.trim().parse::<usize>() {
+                if selection >= 1 && selection <= pending.options.len() {
+                    let option = &pending.options[selection - 1];
+                    let selected_verb = option.verb_fqn.clone();
+                    let original_input = pending.original_input.clone();
+                    let all_candidates: Vec<crate::session::unified::VerbCandidate> = pending
+                        .options
+                        .iter()
+                        .map(|o| crate::session::unified::VerbCandidate {
+                            verb: o.verb_fqn.clone(),
+                            score: o.score,
+                        })
+                        .collect();
+
+                    // Clear the pending state
+                    session.pending_verb_disambiguation = None;
+
+                    tracing::info!(
+                        selected_verb = %selected_verb,
+                        original_input = %original_input,
+                        selection = selection,
+                        "User selected verb from disambiguation"
+                    );
+
+                    // Record learning signal and continue with selected verb
+                    return self
+                        .handle_verb_selection(
+                            session,
+                            &original_input,
+                            &selected_verb,
+                            &all_candidates,
+                        )
+                        .await;
+                } else {
+                    // Invalid selection number
+                    let msg = format!(
+                        "Please select a number between 1 and {}.",
+                        pending.options.len()
+                    );
+                    session.add_agent_message(msg.clone(), None, None);
+                    return Ok(AgentChatResponse {
+                        message: msg,
+                        intents: vec![],
+                        validation_results: vec![],
+                        session_state: SessionState::PendingValidation,
+                        can_execute: false,
+                        dsl_source: None,
+                        ast: None,
+                        disambiguation: None,
+                        commands: None,
+                        unresolved_refs: None,
+                        current_ref_index: None,
+                        dsl_hash: None,
+                        verb_disambiguation: None,
+                    });
+                }
+            }
+            // Not a number - clear pending and process as new input
+            session.pending_verb_disambiguation = None;
+        }
+
         // ONE PIPELINE - generate/validate DSL
         // Wrap session for macro expansion (macros need session state for prereqs/context)
         let session_arc = Arc::new(RwLock::new(session.clone()));
@@ -992,6 +1056,82 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return true;
         }
         false
+    }
+
+    /// Handle verb selection from disambiguation (either numeric input or API call)
+    ///
+    /// Records learning signal and re-runs pipeline with selected verb
+    async fn handle_verb_selection(
+        &self,
+        session: &mut UnifiedSession,
+        original_input: &str,
+        selected_verb: &str,
+        all_candidates: &[crate::session::unified::VerbCandidate],
+    ) -> Result<AgentChatResponse, String> {
+        use crate::dsl_v2::parse_program;
+
+        // Record learning signal (gold-standard training data)
+        // Convert candidates to verb strings for the recording function
+        let candidate_verbs: Vec<String> = all_candidates.iter().map(|c| c.verb.clone()).collect();
+        if let Err(e) = crate::api::agent_routes::record_verb_selection_signal(
+            &self.pool,
+            original_input,
+            selected_verb,
+            &candidate_verbs,
+        )
+        .await
+        {
+            tracing::warn!("Failed to record verb selection signal: {}", e);
+            // Continue anyway - don't block the user
+        }
+
+        // Re-run intent pipeline with selected verb as domain hint
+        // The verb is now known, so we generate DSL for it
+        let domain = selected_verb.split('.').next();
+        let session_arc = std::sync::Arc::new(std::sync::RwLock::new(session.clone()));
+        let result = self
+            .get_intent_pipeline()
+            .with_session(session_arc)
+            .process_with_scope(original_input, domain, session.context.client_scope.clone())
+            .await;
+
+        match result {
+            Ok(r) => {
+                // Got valid DSL - stage it
+                if r.valid && !r.dsl.is_empty() {
+                    let ast = parse_program(&r.dsl)
+                        .map(|p| p.statements)
+                        .unwrap_or_default();
+
+                    // Check if navigation verb (auto-execute)
+                    let is_navigation =
+                        selected_verb.starts_with("session.") || selected_verb.starts_with("view.");
+
+                    if is_navigation {
+                        session.set_pending_dsl(r.dsl.clone(), ast, None, false);
+                        return self.execute_runbook(session).await;
+                    }
+
+                    // Stage for confirmation
+                    session.set_pending_dsl(r.dsl.clone(), ast, None, false);
+                    let msg = format!(
+                        "Selected **{}**.\n\nStaged: {}\n\nSay 'run' to execute.",
+                        selected_verb, r.dsl
+                    );
+                    session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
+                    return Ok(self.staged_response(r.dsl, msg));
+                }
+
+                // Pipeline gave an error
+                if let Some(err) = r.validation_error {
+                    return Ok(self.fail(&err, session));
+                }
+
+                // Fallback
+                Ok(self.fail("Failed to generate DSL for selected verb", session))
+            }
+            Err(e) => Ok(self.fail(&format!("Pipeline error: {}", e), session)),
+        }
     }
 
     /// Execute all pending DSL in the session runbook
@@ -1393,6 +1533,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         use ob_poc_types::{VerbDisambiguationRequest, VerbOption};
 
         // Build verb options from candidates (top 5 max)
+        // Include domain/category context from taxonomy for better UX
+        let taxonomy = crate::dsl_v2::verb_taxonomy::verb_taxonomy();
         let options: Vec<VerbOption> = candidates
             .iter()
             .take(5)
@@ -1401,12 +1543,18 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     .description
                     .clone()
                     .unwrap_or_else(|| format!("Execute {}", c.verb));
+
+                // Get domain context from taxonomy
+                let location = taxonomy.location_for_verb(&c.verb);
+
                 VerbOption {
                     verb_fqn: c.verb.clone(),
                     description,
                     example: format!("({})", c.verb),
                     score: c.score,
                     matched_phrase: Some(c.matched_phrase.clone()),
+                    domain_label: location.as_ref().map(|l| l.domain_label.clone()),
+                    category_label: location.as_ref().map(|l| l.category_label.clone()),
                 }
             })
             .collect();
@@ -1432,12 +1580,43 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             .collect();
 
         let message = format!(
-            "I found multiple matching actions for \"{}\":\n\n{}\n\nPlease select one.",
+            "I found multiple matching actions for \"{}\":\n\n{}\n\nType a number to select, or enter a new command.",
             original_input,
             options_text.join("\n")
         );
 
         session.add_agent_message(message.clone(), None, None);
+
+        // Store pending disambiguation state for numeric selection handling
+        use crate::session::unified::{
+            PendingVerbDisambiguation, VerbCandidate, VerbDisambiguationOption,
+        };
+        let pending_options: Vec<VerbDisambiguationOption> = candidates
+            .iter()
+            .take(5)
+            .map(|c| VerbDisambiguationOption {
+                verb_fqn: c.verb.clone(),
+                description: c
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| format!("Execute {}", c.verb)),
+                score: c.score,
+                matched_phrase: c.matched_phrase.clone(),
+                all_candidates: candidates
+                    .iter()
+                    .map(|cand| VerbCandidate {
+                        verb: cand.verb.clone(),
+                        score: cand.score,
+                    })
+                    .collect(),
+            })
+            .collect();
+
+        session.pending_verb_disambiguation = Some(PendingVerbDisambiguation {
+            original_input: original_input.to_string(),
+            options: pending_options,
+            created_at: chrono::Utc::now(),
+        });
 
         // Return response with verb_disambiguation field populated
         // The UI should check for this field and render clickable buttons

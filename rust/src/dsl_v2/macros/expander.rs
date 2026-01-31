@@ -254,18 +254,18 @@ fn is_required_if_satisfied(
                     .any_of
                     .iter()
                     .any(|c| evaluate_simple_required_if(c, args))
-                {
-                    return false;
-                }
+            {
+                return false;
+            }
             // all-of: all conditions must match
             if !complex.all_of.is_empty()
                 && !complex
                     .all_of
                     .iter()
                     .all(|c| evaluate_simple_required_if(c, args))
-                {
-                    return false;
-                }
+            {
+                return false;
+            }
             // If we get here, all conditions are satisfied
             !complex.any_of.is_empty() || !complex.all_of.is_empty()
         }

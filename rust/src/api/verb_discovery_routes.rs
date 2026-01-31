@@ -13,6 +13,7 @@
 //! These endpoints are used by the agent to get contextually relevant
 //! verb suggestions during DSL generation.
 
+use crate::dsl_v2::verb_taxonomy::{verb_taxonomy, DomainSummary, VerbLocation};
 use crate::macros::{MacroFilter, MacroTaxonomy, OperatorMacroRegistry};
 use crate::session::{
     AgentVerbContext, CategoryInfo, DiscoveryQuery, VerbDiscoveryService, VerbSuggestion,
@@ -289,6 +290,10 @@ pub fn create_verb_discovery_router(pool: PgPool) -> Router {
         .route("/api/verbs/example", get(get_verb_example))
         // Macro taxonomy (P2) - for verb picker UI
         .route("/api/verbs/taxonomy", get(get_macro_taxonomy))
+        // Domain taxonomy - hierarchical verb organization
+        .route("/api/verbs/domains", get(get_domain_list))
+        .route("/api/verbs/domains/:domain_id", get(get_domain_detail))
+        .route("/api/verbs/:fqn/location", get(get_verb_location))
         // Macro schema (P3) - for form generation
         .route("/api/verbs/:fqn/schema", get(get_macro_schema))
         .with_state(state)
@@ -638,6 +643,112 @@ async fn get_macro_schema(
     };
 
     Ok(Json(response))
+}
+
+// ============================================================================
+// Domain Taxonomy Handlers
+// ============================================================================
+
+/// GET /api/verbs/domains - List all domains with summaries
+///
+/// Returns a list of domains sorted by priority, suitable for the verb picker
+/// domain selector UI.
+async fn get_domain_list(
+    State(_state): State<VerbDiscoveryState>,
+) -> Result<Json<DomainListResponse>, StatusCode> {
+    let taxonomy = verb_taxonomy();
+    let domains = taxonomy.domain_list();
+
+    Ok(Json(DomainListResponse {
+        domains,
+        total: taxonomy.domains.len(),
+    }))
+}
+
+/// Response for domain list
+#[derive(Debug, Serialize)]
+pub struct DomainListResponse {
+    pub domains: Vec<DomainSummary>,
+    pub total: usize,
+}
+
+/// GET /api/verbs/domains/:domain_id - Get domain detail with categories
+///
+/// Returns the full domain structure including categories and verbs,
+/// for drill-down in the verb picker.
+async fn get_domain_detail(
+    State(_state): State<VerbDiscoveryState>,
+    Path(domain_id): Path<String>,
+) -> Result<Json<DomainDetailResponse>, StatusCode> {
+    let taxonomy = verb_taxonomy();
+
+    let domain = taxonomy.get_domain(&domain_id).ok_or_else(|| {
+        tracing::warn!("Domain not found: {}", domain_id);
+        StatusCode::NOT_FOUND
+    })?;
+
+    Ok(Json(DomainDetailResponse {
+        id: domain.id.clone(),
+        label: domain.label.clone(),
+        description: domain.description.clone(),
+        icon: domain.icon.clone(),
+        categories: domain
+            .categories
+            .iter()
+            .map(|c| CategoryDetail {
+                id: c.id.clone(),
+                label: c.label.clone(),
+                description: c.description.clone(),
+                verbs: c.verbs.clone(),
+                verb_count: c.verbs.len(),
+            })
+            .collect(),
+    }))
+}
+
+/// Response for domain detail
+#[derive(Debug, Serialize)]
+pub struct DomainDetailResponse {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub icon: Option<String>,
+    pub categories: Vec<CategoryDetail>,
+}
+
+/// Category with verbs
+#[derive(Debug, Serialize)]
+pub struct CategoryDetail {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub verbs: Vec<String>,
+    pub verb_count: usize,
+}
+
+/// GET /api/verbs/:fqn/location - Get location of a verb in taxonomy
+///
+/// Returns the domain and category containing this verb, for breadcrumb
+/// display in the verb picker.
+async fn get_verb_location(
+    State(_state): State<VerbDiscoveryState>,
+    Path(fqn): Path<String>,
+) -> Result<Json<VerbLocationResponse>, StatusCode> {
+    let taxonomy = verb_taxonomy();
+
+    let location = taxonomy.location_for_verb(&fqn).ok_or_else(|| {
+        tracing::debug!("Verb not in taxonomy: {}", fqn);
+        StatusCode::NOT_FOUND
+    })?;
+
+    Ok(Json(VerbLocationResponse { fqn, location }))
+}
+
+/// Response for verb location
+#[derive(Debug, Serialize)]
+pub struct VerbLocationResponse {
+    pub fqn: String,
+    pub location: VerbLocation,
 }
 
 #[cfg(test)]

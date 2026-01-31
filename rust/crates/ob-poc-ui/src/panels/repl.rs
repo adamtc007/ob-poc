@@ -151,7 +151,12 @@ fn render_message(ui: &mut Ui, msg: &ChatMessage) {
                 } else {
                     ("Agent", Color32::from_rgb(100, 220, 150))
                 };
-                ui.label(RichText::new(role_text).strong().color(role_color));
+                ui.label(
+                    RichText::new(role_text)
+                        .strong()
+                        .color(role_color)
+                        .size(18.0),
+                );
 
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
@@ -162,7 +167,7 @@ fn render_message(ui: &mut Ui, msg: &ChatMessage) {
                 });
             });
 
-            ui.label(&msg.content);
+            ui.label(RichText::new(&msg.content).size(24.0).color(Color32::WHITE));
         });
 }
 

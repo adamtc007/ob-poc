@@ -18,6 +18,7 @@
 mod chamber;
 mod door;
 mod error;
+pub mod graph;
 pub mod grid;
 mod types;
 mod validate;
@@ -25,6 +26,7 @@ mod validate;
 pub use chamber::{CameraPreset, ChamberKind, ChamberSnapshot};
 pub use door::{DoorKind, DoorSnapshot};
 pub use error::SnapshotError;
+pub use graph::{Edge, EdgeKind, Graph, GraphBuilder, Node};
 pub use grid::GridSnapshot;
 pub use types::{Rect, SnapshotEnvelope, Vec2, WorldSnapshot};
 pub use validate::Validate;

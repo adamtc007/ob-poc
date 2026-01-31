@@ -125,11 +125,16 @@ fn render_message(ui: &mut Ui, msg: &ChatMessage) {
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 let role_text = if is_user { "You" } else { "Agent" };
-                ui.label(RichText::new(role_text).strong().color(if is_user {
-                    Color32::LIGHT_BLUE
-                } else {
-                    Color32::LIGHT_GREEN
-                }));
+                ui.label(
+                    RichText::new(role_text)
+                        .strong()
+                        .size(16.0)
+                        .color(if is_user {
+                            Color32::LIGHT_BLUE
+                        } else {
+                            Color32::LIGHT_GREEN
+                        }),
+                );
 
                 // Timestamp
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -141,6 +146,6 @@ fn render_message(ui: &mut Ui, msg: &ChatMessage) {
                 });
             });
 
-            ui.label(&msg.content);
+            ui.label(RichText::new(&msg.content).size(16.0));
         });
 }

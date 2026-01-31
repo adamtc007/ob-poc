@@ -6853,7 +6853,7 @@ async fn select_verb_disambiguation(
 ///
 /// Also generates and stores phrase variants (confidence=0.85) to make learning
 /// more robust to phrasings like "show me the cbus" vs "list all cbus".
-async fn record_verb_selection_signal(
+pub async fn record_verb_selection_signal(
     pool: &PgPool,
     original_input: &str,
     selected_verb: &str,

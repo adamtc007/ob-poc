@@ -1663,6 +1663,12 @@ pub struct VerbOption {
     /// The phrase that matched this verb (from verb search)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matched_phrase: Option<String>,
+    /// Domain label for grouping in UI (e.g., "Session & Navigation")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain_label: Option<String>,
+    /// Category within domain (e.g., "Load CBUs")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category_label: Option<String>,
 }
 
 /// User's verb selection response

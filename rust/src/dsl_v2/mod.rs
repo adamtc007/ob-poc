@@ -117,6 +117,7 @@ pub mod topo_sort;
 pub mod v2_registry;
 pub mod validation;
 pub mod verb_registry;
+pub mod verb_taxonomy;
 
 // Re-export local module types
 pub use applicability_rules::{ApplicabilityRules, AttributeApplicability, DocumentApplicability};
@@ -193,6 +194,9 @@ pub use v2_registry::{
 pub use verb_registry::{
     find_unified_verb, registry, verb_exists, ArgDef, UnifiedVerbDef, UnifiedVerbRegistry,
     VerbBehavior,
+};
+pub use verb_taxonomy::{
+    verb_taxonomy, DomainSummary, TaxonomyCategory, TaxonomyDomain, VerbLocation, VerbTaxonomy,
 };
 
 // Re-export expansion module types

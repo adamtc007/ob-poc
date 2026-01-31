@@ -48,6 +48,12 @@ pub struct UnifiedSession {
     /// When Some, UI should show resolution modal
     pub resolution: Option<ResolutionState>,
 
+    // === Verb Disambiguation (pending selection) ===
+    /// When Some, user needs to pick from verb options
+    /// Numeric input (e.g., "2") should be interpreted as selection
+    #[serde(default)]
+    pub pending_verb_disambiguation: Option<PendingVerbDisambiguation>,
+
     // === Conversation ===
     pub messages: Vec<ChatMessage>,
 
@@ -583,6 +589,42 @@ impl Default for ViewState {
             selected_nodes: HashSet::new(),
         }
     }
+}
+
+/// Pending verb disambiguation state
+///
+/// When verb search returns multiple matches with similar confidence,
+/// user needs to pick one. This state tracks the pending options.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingVerbDisambiguation {
+    /// Original user input that triggered disambiguation
+    pub original_input: String,
+    /// Verb options to choose from (ordered by score descending)
+    pub options: Vec<VerbDisambiguationOption>,
+    /// When this disambiguation was created
+    pub created_at: DateTime<Utc>,
+}
+
+/// A verb option in disambiguation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbDisambiguationOption {
+    /// Fully qualified verb name
+    pub verb_fqn: String,
+    /// Human-readable description
+    pub description: String,
+    /// Match score
+    pub score: f32,
+    /// Matched phrase from search
+    pub matched_phrase: String,
+    /// All candidates for learning signal
+    pub all_candidates: Vec<VerbCandidate>,
+}
+
+/// Verb candidate for learning signal recording
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbCandidate {
+    pub verb: String,
+    pub score: f32,
 }
 
 /// Inline resolution state (not a sub-session)
@@ -1484,6 +1526,7 @@ impl UnifiedSession {
             state_stack: StateStack::new(100),
             view_state: ViewState::default(),
             resolution: None,
+            pending_verb_disambiguation: None,
             messages: Vec::new(),
             bindings: HashMap::new(),
             // Constraint cascade (starts empty, narrowed as user works)

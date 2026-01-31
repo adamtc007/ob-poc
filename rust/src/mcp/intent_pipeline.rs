@@ -372,6 +372,19 @@ impl IntentPipeline {
             return self.process_direct_dsl(trimmed, existing_scope).await;
         }
 
+        // Infer domain from input phrase if no hint provided
+        // This narrows verb search to relevant domain, improving accuracy
+        let inferred_domain = domain_hint
+            .map(|s| s.to_string())
+            .or_else(|| infer_domain_from_phrase(trimmed));
+
+        tracing::debug!(
+            input = trimmed,
+            domain_hint = ?domain_hint,
+            inferred_domain = ?inferred_domain,
+            "Domain inference for verb search"
+        );
+
         // =========================================================================
         // STAGE 0: Scope Resolution (HARD GATE - runs BEFORE Candle)
         // =========================================================================
@@ -453,7 +466,8 @@ impl IntentPipeline {
         let scope_ctx = existing_scope.unwrap_or_default();
 
         // Natural language path (with scope context for entity resolution)
-        self.process_as_natural_language(instruction, domain_hint, scope_ctx)
+        // Pass inferred domain to filter verb search results
+        self.process_as_natural_language(instruction, inferred_domain.as_deref(), scope_ctx)
             .await
     }
 
@@ -463,14 +477,14 @@ impl IntentPipeline {
     async fn process_as_natural_language(
         &self,
         instruction: &str,
-        domain_hint: Option<&str>,
+        domain_filter: Option<&str>,
         scope_ctx: ScopeContext,
     ) -> Result<PipelineResult> {
         // Step 1: Find verb candidates via semantic search
-        // TODO: Pass scope_ctx to verb_searcher.search() for scoped entity resolution
+        // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
         let candidates = self
             .verb_searcher
-            .search(instruction, None, domain_hint, 5)
+            .search(instruction, None, domain_filter, 5)
             .await?;
 
         if candidates.is_empty() {
@@ -1224,6 +1238,144 @@ pub fn compute_dsl_hash(dsl: &str) -> String {
     format!("{:x}", result)[..16].to_string()
 }
 
+/// Infer domain from input phrase to narrow verb search
+///
+/// Maps common phrase patterns to DSL domains:
+/// - "session", "load", "set session", "unload" → session
+/// - "view", "show", "drill", "surface", "zoom" → view
+/// - "create cbu", "cbu" → cbu
+/// - "entity", "person", "company" → entity
+/// - "kyc", "case", "screening" → kyc
+/// - "trading", "profile", "mandate" → trading-profile
+/// - "custody", "settlement", "ssi" → custody
+/// - "contract", "subscription" → contract
+/// - "gleif", "lei" → gleif
+/// - "ubo", "ownership", "control" → ubo
+/// - "document", "upload", "verify" → document
+///
+/// Returns None if no domain can be inferred (allows full search).
+fn infer_domain_from_phrase(phrase: &str) -> Option<String> {
+    let lower = phrase.to_lowercase();
+    let words: Vec<&str> = lower.split_whitespace().collect();
+
+    // Session/navigation domain - high priority for navigation commands
+    if words.iter().any(|w| {
+        matches!(
+            *w,
+            "session" | "load" | "unload" | "undo" | "redo" | "clear" | "history"
+        )
+    }) || lower.contains("set session")
+        || lower.contains("load the")
+        || lower.contains("load galaxy")
+        || lower.contains("load book")
+        || lower.contains("load cbu")
+    {
+        return Some("session".to_string());
+    }
+
+    // UBO/ownership domain - check BEFORE view since "show ownership" should be UBO not view
+    if words
+        .iter()
+        .any(|w| matches!(*w, "ubo" | "ownership" | "control" | "beneficial"))
+    {
+        return Some("ubo".to_string());
+    }
+
+    // View/visualization domain
+    if words.iter().any(|w| {
+        matches!(
+            *w,
+            "view" | "show" | "drill" | "surface" | "zoom" | "enhance" | "xray" | "trace"
+        )
+    }) || lower.contains("drill down")
+        || lower.contains("zoom in")
+        || lower.contains("zoom out")
+    {
+        return Some("view".to_string());
+    }
+
+    // CBU domain - explicit cbu mention OR fund/structure with action
+    if words.iter().any(|w| matches!(*w, "cbu" | "cbus"))
+        || (words
+            .iter()
+            .any(|w| matches!(*w, "structure" | "fund" | "funds" | "mandate"))
+            && words.iter().any(|w| {
+                matches!(
+                    *w,
+                    "create" | "delete" | "update" | "assign" | "list" | "get" | "show" | "all"
+                )
+            }))
+    {
+        return Some("cbu".to_string());
+    }
+
+    // Entity domain
+    if words
+        .iter()
+        .any(|w| matches!(*w, "entity" | "person" | "company" | "party"))
+        && words.iter().any(|w| {
+            matches!(
+                *w,
+                "create" | "delete" | "update" | "search" | "find" | "list"
+            )
+        })
+    {
+        return Some("entity".to_string());
+    }
+
+    // KYC domain
+    if words.iter().any(|w| {
+        matches!(
+            *w,
+            "kyc" | "case" | "screening" | "sanction" | "aml" | "compliance"
+        )
+    }) {
+        return Some("kyc".to_string());
+    }
+
+    // Trading profile domain
+    if words.iter().any(|w| {
+        matches!(
+            *w,
+            "trading" | "profile" | "instrument" | "market" | "counterparty"
+        )
+    }) {
+        return Some("trading-profile".to_string());
+    }
+
+    // Custody domain
+    if words
+        .iter()
+        .any(|w| matches!(*w, "custody" | "settlement" | "ssi" | "safekeeping"))
+    {
+        return Some("custody".to_string());
+    }
+
+    // Contract domain
+    if words
+        .iter()
+        .any(|w| matches!(*w, "contract" | "subscription" | "rate"))
+    {
+        return Some("contract".to_string());
+    }
+
+    // GLEIF domain
+    if words.iter().any(|w| matches!(*w, "gleif" | "lei")) {
+        return Some("gleif".to_string());
+    }
+
+    // Document domain
+    if words
+        .iter()
+        .any(|w| matches!(*w, "document" | "upload" | "verify" | "solicit"))
+    {
+        return Some("document".to_string());
+    }
+
+    // No domain could be inferred - allow full search
+    None
+}
+
 /// Extract JSON from LLM response, handling markdown code blocks
 fn extract_json_from_response(response: &str) -> &str {
     let trimmed = response.trim();
@@ -1726,5 +1878,134 @@ mod tests {
             }
             _ => false,
         }
+    }
+
+    #[test]
+    fn test_infer_domain_from_phrase() {
+        // Session domain
+        assert_eq!(
+            infer_domain_from_phrase("set session to allianz"),
+            Some("session".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("load the allianz book"),
+            Some("session".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("load galaxy"),
+            Some("session".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("unload cbu"),
+            Some("session".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("undo"),
+            Some("session".to_string())
+        );
+
+        // View domain
+        assert_eq!(
+            infer_domain_from_phrase("show me the entities"),
+            Some("view".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("drill down into this"),
+            Some("view".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("zoom in"),
+            Some("view".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("view the structure"),
+            Some("view".to_string())
+        );
+
+        // CBU domain (requires verb + noun)
+        assert_eq!(
+            infer_domain_from_phrase("create a new cbu"),
+            Some("cbu".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("list all funds"),
+            Some("cbu".to_string())
+        );
+
+        // Entity domain (requires verb + noun)
+        assert_eq!(
+            infer_domain_from_phrase("create entity for john"),
+            Some("entity".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("search for company apple"),
+            Some("entity".to_string())
+        );
+
+        // KYC domain
+        assert_eq!(
+            infer_domain_from_phrase("open a kyc case"),
+            Some("kyc".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("run screening"),
+            Some("kyc".to_string())
+        );
+
+        // UBO domain
+        assert_eq!(
+            infer_domain_from_phrase("who is the ubo"),
+            Some("ubo".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("show ownership structure"),
+            Some("ubo".to_string())
+        );
+
+        // Trading profile domain
+        assert_eq!(
+            infer_domain_from_phrase("set trading profile"),
+            Some("trading-profile".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("add instrument"),
+            Some("trading-profile".to_string())
+        );
+
+        // Custody domain
+        assert_eq!(
+            infer_domain_from_phrase("create custody account"),
+            Some("custody".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("add ssi"),
+            Some("custody".to_string())
+        );
+
+        // Contract domain
+        assert_eq!(
+            infer_domain_from_phrase("create contract"),
+            Some("contract".to_string())
+        );
+
+        // GLEIF domain
+        assert_eq!(
+            infer_domain_from_phrase("lookup gleif"),
+            Some("gleif".to_string())
+        );
+        assert_eq!(
+            infer_domain_from_phrase("find lei"),
+            Some("gleif".to_string())
+        );
+
+        // Document domain
+        assert_eq!(
+            infer_domain_from_phrase("upload document"),
+            Some("document".to_string())
+        );
+
+        // No domain inferred - allows full search
+        assert_eq!(infer_domain_from_phrase("help me"), None);
+        assert_eq!(infer_domain_from_phrase("what can you do"), None);
     }
 }

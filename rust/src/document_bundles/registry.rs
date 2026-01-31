@@ -200,6 +200,7 @@ use serde::Deserialize;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::document_bundles::types::BundleDocumentDef;
     use chrono::NaiveDate;
 
     fn make_test_registry() -> DocsBundleRegistry {

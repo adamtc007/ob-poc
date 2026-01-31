@@ -1,0 +1,509 @@
+# Verb Taxonomy for Domain-Level Hierarchy
+#
+# This file defines the hierarchical organization of DSL verbs for:
+# 1. Domain inference during verb search (user says "load" → session domain)
+# 2. Guided verb picker UI (domain → category → verb drill-down)
+# 3. Disambiguation UX (show domain context for ambiguous matches)
+#
+# Structure:
+#   domains:
+#     - id: domain-name
+#       label: User-visible label
+#       description: What this domain covers
+#       keywords: Phrases that trigger this domain
+#       categories:
+#         - id: category-name
+#           label: User-visible label
+#           verbs: List of verb FQNs in this category
+#
+# The UI verb picker uses this hierarchy:
+#   Level 1: Domain (e.g., "Session & Navigation")
+#   Level 2: Category (e.g., "Load/Unload", "History")
+#   Level 3: Verb (e.g., "session.load-galaxy", "session.undo")
+
+version: 1
+generated: false  # Manual curation, not auto-generated
+
+domains:
+  # ===========================================================================
+  # SESSION & NAVIGATION - Highest priority for user commands
+  # ===========================================================================
+  - id: session
+    label: Session & Navigation
+    description: Load CBUs, navigate history, manage session scope
+    icon: compass
+    priority: 1
+    keywords:
+      - session
+      - load
+      - unload
+      - set session
+      - load the
+      - load galaxy
+      - load book
+      - load cbu
+      - undo
+      - redo
+      - clear
+      - history
+    categories:
+      - id: load
+        label: Load CBUs
+        description: Load CBUs into the session
+        verbs:
+          - session.load-cbu
+          - session.load-galaxy
+          - session.load-jurisdiction
+          - session.load-cluster
+      - id: unload
+        label: Unload CBUs
+        description: Remove CBUs from session
+        verbs:
+          - session.unload-cbu
+          - session.unload-all
+          - session.clear
+      - id: history
+        label: History
+        description: Navigate session history
+        verbs:
+          - session.undo
+          - session.redo
+          - session.go-to-start
+          - session.go-to-last
+      - id: info
+        label: Session Info
+        description: Query session state
+        verbs:
+          - session.info
+          - session.list
+          - session.scope
+          - session.status
+
+  # ===========================================================================
+  # VIEW / ESPER NAVIGATION
+  # ===========================================================================
+  - id: view
+    label: View & Visualization
+    description: Navigate graph, zoom, filter, drill-down
+    icon: eye
+    priority: 2
+    keywords:
+      - view
+      - show
+      - drill
+      - surface
+      - zoom
+      - enhance
+      - xray
+      - trace
+      - drill down
+      - zoom in
+      - zoom out
+    categories:
+      - id: zoom
+        label: Zoom Levels
+        description: Change zoom level
+        verbs:
+          - view.universe
+          - view.book
+          - view.cbu
+          - view.entity
+      - id: navigate
+        label: Navigate
+        description: Move through graph
+        verbs:
+          - view.drill
+          - view.surface
+          - view.focus
+          - view.center
+      - id: trace
+        label: Trace & Analyze
+        description: Follow relationships
+        verbs:
+          - view.trace
+          - view.xray
+          - view.follow-control
+          - view.follow-money
+      - id: filter
+        label: Filter
+        description: Filter visible items
+        verbs:
+          - view.refine
+          - view.filter
+          - view.show-only
+          - view.hide
+
+  # ===========================================================================
+  # UBO / OWNERSHIP
+  # ===========================================================================
+  - id: ubo
+    label: Ownership & Control
+    description: UBO discovery, ownership chains, control analysis
+    icon: tree
+    priority: 3
+    keywords:
+      - ubo
+      - ownership
+      - control
+      - beneficial
+      - owner
+      - who owns
+      - control chain
+    categories:
+      - id: discover
+        label: Discover Owners
+        description: Find beneficial owners
+        verbs:
+          - ubo.discover
+          - ubo.search
+          - ubo.trace-chain
+      - id: analyze
+        label: Analyze Structure
+        description: Analyze ownership structure
+        verbs:
+          - ubo.build-chain
+          - ubo.compute-percentages
+          - ubo.detect-circular
+      - id: report
+        label: Reports
+        description: Generate ownership reports
+        verbs:
+          - ubo.report
+          - ubo.export
+
+  # ===========================================================================
+  # CBU MANAGEMENT
+  # ===========================================================================
+  - id: cbu
+    label: Client Business Units
+    description: Create, update, delete CBUs (fund structures)
+    icon: building
+    priority: 4
+    keywords:
+      - cbu
+      - cbus
+      - structure
+      - fund
+      - funds
+      - mandate
+    categories:
+      - id: lifecycle
+        label: Lifecycle
+        description: Create, update, archive CBUs
+        verbs:
+          - cbu.create
+          - cbu.update
+          - cbu.archive
+          - cbu.delete
+      - id: roles
+        label: Roles & Membership
+        description: Assign entity roles to CBUs
+        verbs:
+          - cbu.assign-role
+          - cbu.remove-role
+          - cbu.list-roles
+      - id: query
+        label: Query
+        description: Search and list CBUs
+        verbs:
+          - cbu.get
+          - cbu.list
+          - cbu.search
+
+  # ===========================================================================
+  # ENTITY MANAGEMENT
+  # ===========================================================================
+  - id: entity
+    label: Entities (People & Companies)
+    description: Create and manage natural persons and legal entities
+    icon: users
+    priority: 5
+    keywords:
+      - entity
+      - entities
+      - person
+      - company
+      - party
+      - parties
+      - people
+    categories:
+      - id: create
+        label: Create
+        description: Create new entities
+        verbs:
+          - entity.create
+          - entity.create-person
+          - entity.create-company
+      - id: update
+        label: Update
+        description: Modify entities
+        verbs:
+          - entity.update
+          - entity.merge
+          - entity.archive
+      - id: query
+        label: Search & List
+        description: Find entities
+        verbs:
+          - entity.get
+          - entity.search
+          - entity.list
+      - id: relationships
+        label: Relationships
+        description: Manage entity relationships
+        verbs:
+          - entity.link
+          - entity.unlink
+          - entity.list-relationships
+
+  # ===========================================================================
+  # KYC / COMPLIANCE
+  # ===========================================================================
+  - id: kyc
+    label: KYC & Compliance
+    description: Case management, screening, document review
+    icon: shield
+    priority: 6
+    keywords:
+      - kyc
+      - case
+      - cases
+      - screening
+      - sanction
+      - aml
+      - compliance
+    categories:
+      - id: cases
+        label: Case Management
+        description: Create and manage KYC cases
+        verbs:
+          - kyc.open-case
+          - kyc.update-case
+          - kyc.close-case
+          - kyc.assign-case
+      - id: screening
+        label: Screening
+        description: Run sanction/PEP screening
+        verbs:
+          - kyc.run-screening
+          - kyc.review-hit
+          - kyc.dismiss-hit
+          - kyc.escalate-hit
+      - id: workflow
+        label: Workflow
+        description: Move cases through workflow
+        verbs:
+          - kyc.submit
+          - kyc.approve
+          - kyc.reject
+          - kyc.request-info
+
+  # ===========================================================================
+  # TRADING PROFILE
+  # ===========================================================================
+  - id: trading-profile
+    label: Trading & Mandates
+    description: Trading profiles, instruments, counterparties
+    icon: chart
+    priority: 7
+    keywords:
+      - trading
+      - profile
+      - instrument
+      - instruments
+      - market
+      - counterparty
+      - mandate
+    categories:
+      - id: profile
+        label: Profile Management
+        description: Create and manage trading profiles
+        verbs:
+          - trading-profile.create
+          - trading-profile.update
+          - trading-profile.delete
+      - id: instruments
+        label: Instruments
+        description: Add/remove trading instruments
+        verbs:
+          - trading-profile.add-instrument
+          - trading-profile.remove-instrument
+          - trading-profile.list-instruments
+      - id: counterparties
+        label: Counterparties
+        description: Manage trading counterparties
+        verbs:
+          - trading-profile.add-counterparty
+          - trading-profile.remove-counterparty
+
+  # ===========================================================================
+  # CUSTODY & SETTLEMENT
+  # ===========================================================================
+  - id: custody
+    label: Custody & Settlement
+    description: Custody accounts, SSIs, settlement
+    icon: vault
+    priority: 8
+    keywords:
+      - custody
+      - settlement
+      - ssi
+      - safekeeping
+      - account
+    categories:
+      - id: accounts
+        label: Custody Accounts
+        description: Manage custody accounts
+        verbs:
+          - custody.create-account
+          - custody.update-account
+          - custody.close-account
+      - id: ssi
+        label: SSIs
+        description: Standing Settlement Instructions
+        verbs:
+          - custody.add-ssi
+          - custody.update-ssi
+          - custody.remove-ssi
+      - id: settlement
+        label: Settlement
+        description: Settlement operations
+        verbs:
+          - custody.settle
+          - custody.match
+          - custody.reconcile
+
+  # ===========================================================================
+  # DOCUMENTS
+  # ===========================================================================
+  - id: document
+    label: Documents
+    description: Document solicitation, upload, verification
+    icon: file
+    priority: 9
+    keywords:
+      - document
+      - documents
+      - upload
+      - verify
+      - solicit
+      - passport
+      - id
+    categories:
+      - id: solicit
+        label: Request Documents
+        description: Request documents from parties
+        verbs:
+          - document.solicit
+          - document.solicit-set
+          - document.remind
+      - id: review
+        label: Review & Verify
+        description: Review and verify documents
+        verbs:
+          - document.verify
+          - document.reject
+          - document.expire
+      - id: manage
+        label: Manage
+        description: Document management
+        verbs:
+          - document.upload
+          - document.download
+          - document.list
+
+  # ===========================================================================
+  # CONTRACTS
+  # ===========================================================================
+  - id: contract
+    label: Contracts
+    description: Legal contracts, rate cards, subscriptions
+    icon: document
+    priority: 10
+    keywords:
+      - contract
+      - contracts
+      - subscription
+      - rate
+      - agreement
+    categories:
+      - id: lifecycle
+        label: Contract Lifecycle
+        description: Create and manage contracts
+        verbs:
+          - contract.create
+          - contract.update
+          - contract.terminate
+      - id: products
+        label: Products & Rates
+        description: Add products and rate cards
+        verbs:
+          - contract.add-product
+          - contract.set-rate
+          - contract.remove-product
+      - id: subscriptions
+        label: Subscriptions
+        description: CBU subscriptions
+        verbs:
+          - contract.subscribe
+          - contract.unsubscribe
+
+  # ===========================================================================
+  # GLEIF / EXTERNAL RESEARCH
+  # ===========================================================================
+  - id: gleif
+    label: GLEIF & External Sources
+    description: LEI lookup, corporate hierarchy import
+    icon: globe
+    priority: 11
+    keywords:
+      - gleif
+      - lei
+      - lookup
+      - import
+      - external
+      - research
+    categories:
+      - id: lookup
+        label: Lookup
+        description: Search external registries
+        verbs:
+          - gleif.lookup
+          - gleif.search
+          - gleif.get-by-lei
+      - id: import
+        label: Import
+        description: Import data from external sources
+        verbs:
+          - gleif.import
+          - gleif.import-tree
+          - gleif.sync
+
+  # ===========================================================================
+  # SYSTEM / META
+  # ===========================================================================
+  - id: system
+    label: System & Help
+    description: Help, status, diagnostics
+    icon: gear
+    priority: 99
+    keywords:
+      - help
+      - status
+      - version
+      - commands
+      - what can
+    categories:
+      - id: help
+        label: Help
+        description: Get help and documentation
+        verbs:
+          - agent.help
+          - agent.commands
+          - agent.verbs
+      - id: status
+        label: Status
+        description: System status
+        verbs:
+          - agent.status
+          - agent.version

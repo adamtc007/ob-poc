@@ -3486,13 +3486,16 @@ impl App {
                                     };
                                     ui.horizontal(|ui| {
                                         ui.label(
-                                            RichText::new(role).small().strong().color(role_color),
+                                            RichText::new(role)
+                                                .size(18.0)
+                                                .strong()
+                                                .color(role_color),
                                         );
                                         ui.label(
                                             RichText::new(
                                                 msg.timestamp.format("%H:%M").to_string(),
                                             )
-                                            .small()
+                                            .size(14.0)
                                             .color(Color32::DARK_GRAY),
                                         );
                                     });
@@ -3502,7 +3505,7 @@ impl App {
                                     } else {
                                         msg.content.clone()
                                     };
-                                    ui.label(RichText::new(content).small());
+                                    ui.label(RichText::new(content).size(18.0));
                                 });
                             ui.add_space(2.0);
                         }

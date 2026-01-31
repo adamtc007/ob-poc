@@ -191,6 +191,7 @@ fn negate_result(result: ConditionResult) -> ConditionResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dsl_v2::macros::schema::{AllOfCondition, AnyOfCondition, NotCondition};
 
     fn make_ctx(
         args: &[(&str, &str)],
