@@ -1,0 +1,274 @@
+# Intent Tier Taxonomy
+#
+# This defines the hierarchical clarification structure for ambiguous user input.
+# When semantic search returns multiple verbs spanning different intents, we ask
+# the user to narrow down WHAT they're trying to do before showing specific verbs.
+#
+# Flow:
+#   User: "load something" (ambiguous)
+#   → Tier 1: "What are you trying to do?" [Navigate, Create, Modify, Analyze]
+#   → User picks "Navigate"
+#   → Tier 2: "What scope?" [Single structure, Client book, Jurisdiction]
+#   → User picks "Client book"
+#   → Verb options: [session.load-galaxy, session.load-cluster]
+
+# =============================================================================
+# TIER 1: Primary Action Intent
+# =============================================================================
+# These are the high-level "what are you trying to do?" categories
+
+tier_1:
+  id: action_intent
+  prompt: "What are you trying to do?"
+
+  options:
+    - id: navigate
+      label: "Set session scope / Navigate"
+      description: "Load structures into your working session to browse or modify"
+      keywords: [load, show, view, browse, open, display, see, look at, switch to, go to]
+      hint: "You want to work with existing data"
+
+    - id: create
+      label: "Create something new"
+      description: "Add a new structure, entity, case, or relationship"
+      keywords: [create, add, new, setup, establish, spin up, register, onboard]
+      hint: "You want to add something that doesn't exist yet"
+
+    - id: modify
+      label: "Update existing data"
+      description: "Change properties, assign roles, or update relationships"
+      keywords: [update, change, edit, modify, assign, set, configure, adjust]
+      hint: "You want to change something that already exists"
+
+    - id: analyze
+      label: "Analyze / Investigate"
+      description: "Trace ownership, discover UBOs, follow money flows"
+      keywords: [analyze, trace, investigate, follow, drill, discover, who owns, find, search]
+      hint: "You want to understand relationships or find information"
+
+    - id: workflow
+      label: "Workflow / Approval"
+      description: "Start a case, approve, reject, or advance a workflow"
+      keywords: [approve, reject, submit, start case, open case, complete, advance]
+      hint: "You want to manage a business process"
+
+# =============================================================================
+# TIER 2: Domain/Scope (context-dependent on Tier 1 selection)
+# =============================================================================
+
+tier_2:
+  navigate:
+    id: navigate_scope
+    prompt: "What do you want to load?"
+    options:
+      - id: single_structure
+        label: "Single structure (CBU)"
+        description: "Load one specific fund or trading unit"
+        verbs: [session.load-cbu, view.cbu]
+
+      - id: client_book
+        label: "Client book (all structures for a client)"
+        description: "Load all CBUs under a client like Allianz or BlackRock"
+        verbs: [session.load-galaxy, session.load-cluster, view.book]
+
+      - id: jurisdiction
+        label: "By jurisdiction (country/region)"
+        description: "Load all CBUs in Luxembourg, Ireland, etc."
+        verbs: [session.load-jurisdiction]
+
+      - id: everything
+        label: "Everything (universe)"
+        description: "Load or view all available structures"
+        verbs: [view.universe, session.clear]
+
+  create:
+    id: create_type
+    prompt: "What do you want to create?"
+    options:
+      - id: structure
+        label: "Fund / CBU / Structure"
+        description: "Create a new Client Business Unit (fund, mandate, etc.)"
+        verbs: [cbu.create, structure.setup, fund.create-umbrella, fund.create-subfund]
+
+      - id: entity
+        label: "Entity (person or company)"
+        description: "Create a natural person or legal entity"
+        verbs: [entity.create, entity.create-natural-person, entity.create-limited-company, party.add]
+
+      - id: relationship
+        label: "Relationship / Role assignment"
+        description: "Assign a role, add ownership, create a link"
+        verbs: [cbu-role.assign, ownership.add-ubo, party.assign-role]
+
+      - id: case
+        label: "KYC Case / Workflow"
+        description: "Open a new KYC case or workflow"
+        verbs: [kyc-case.create, kyc-case.open, case.open]
+
+      - id: trading
+        label: "Trading profile / Mandate"
+        description: "Create trading capabilities or investment mandate"
+        verbs: [trading-profile.create, mandate.create]
+
+  modify:
+    id: modify_target
+    prompt: "What do you want to modify?"
+    options:
+      - id: structure_properties
+        label: "Structure properties"
+        description: "Update CBU attributes, status, or configuration"
+        verbs: [cbu.update, structure.update, cbu.set-status]
+
+      - id: entity_properties
+        label: "Entity properties"
+        description: "Update person/company details, identifiers, addresses"
+        verbs: [entity.update, party.set-address, party.assign-identifier]
+
+      - id: roles
+        label: "Roles / Relationships"
+        description: "Assign, change, or remove role assignments"
+        verbs: [cbu-role.assign, cbu-role.remove, party.assign-role]
+
+      - id: trading_config
+        label: "Trading configuration"
+        description: "Update trading profile, instruments, or markets"
+        verbs: [trading-profile.update, trading-profile.add-instrument]
+
+  analyze:
+    id: analyze_type
+    prompt: "What do you want to analyze?"
+    options:
+      - id: ownership
+        label: "Ownership / UBO"
+        description: "Discover ultimate beneficial owners, trace control"
+        verbs: [ubo.discover, ubo.list-owners, control.identify-ubos, control.build-graph]
+
+      - id: entity_details
+        label: "Entity details"
+        description: "Get information about a specific entity"
+        verbs: [entity.get, entity.read, entity.verify]
+
+      - id: research
+        label: "External research (GLEIF, etc.)"
+        description: "Look up company information from external sources"
+        verbs: [gleif.search, gleif.import-tree, gleif.lookup]
+
+      - id: drill_down
+        label: "Drill down / Navigate deeper"
+        description: "Zoom into details, follow relationships"
+        verbs: [view.drill, view.trace, view.xray]
+
+  workflow:
+    id: workflow_action
+    prompt: "What workflow action?"
+    options:
+      - id: start
+        label: "Start / Open a case"
+        description: "Initiate a new KYC case or workflow"
+        verbs: [kyc-case.create, kyc-case.open, case.open]
+
+      - id: approve
+        label: "Approve / Complete"
+        description: "Approve a case, document, or workflow step"
+        verbs: [kyc-case.approve, document.verify, trading-profile.approve]
+
+      - id: reject
+        label: "Reject / Send back"
+        description: "Reject or return something for rework"
+        verbs: [kyc-case.reject, document.reject]
+
+      - id: request
+        label: "Request documents / Information"
+        description: "Solicit documents or data from parties"
+        verbs: [document.solicit, document.solicit-set, requirement.create]
+
+# =============================================================================
+# VERB → TIER MAPPING (for reverse lookup)
+# =============================================================================
+# Used to determine which tiers a verb belongs to
+
+verb_tier_mapping:
+  # Navigate verbs
+  session.load-cbu: [navigate, single_structure]
+  session.load-galaxy: [navigate, client_book]
+  session.load-cluster: [navigate, client_book]
+  session.load-jurisdiction: [navigate, jurisdiction]
+  view.cbu: [navigate, single_structure]
+  view.book: [navigate, client_book]
+  view.universe: [navigate, everything]
+  session.clear: [navigate, everything]
+
+  # Create verbs
+  cbu.create: [create, structure]
+  structure.setup: [create, structure]
+  fund.create-umbrella: [create, structure]
+  fund.create-subfund: [create, structure]
+  entity.create: [create, entity]
+  entity.create-natural-person: [create, entity]
+  entity.create-limited-company: [create, entity]
+  entity.create-management-company: [create, entity]
+  party.add: [create, entity]
+  party.add-company: [create, entity]
+  cbu-role.assign: [create, relationship]
+  ownership.add-ubo: [create, relationship]
+  party.assign-role: [create, relationship]
+  kyc-case.create: [create, case]
+  kyc-case.open: [create, case]
+  case.open: [create, case]
+  trading-profile.create: [create, trading]
+  mandate.create: [create, trading]
+
+  # Modify verbs
+  cbu.update: [modify, structure_properties]
+  structure.update: [modify, structure_properties]
+  cbu.set-status: [modify, structure_properties]
+  entity.update: [modify, entity_properties]
+  party.set-address: [modify, entity_properties]
+  party.assign-identifier: [modify, entity_properties]
+  cbu-role.remove: [modify, roles]
+  trading-profile.update: [modify, trading_config]
+  trading-profile.add-instrument: [modify, trading_config]
+  trading-profile.clone-to: [modify, trading_config]
+
+  # Analyze verbs
+  ubo.discover: [analyze, ownership]
+  ubo.list-owners: [analyze, ownership]
+  control.identify-ubos: [analyze, ownership]
+  control.build-graph: [analyze, ownership]
+  entity.get: [analyze, entity_details]
+  entity.read: [analyze, entity_details]
+  entity.verify: [analyze, entity_details]
+  gleif.search: [analyze, research]
+  gleif.import-tree: [analyze, research]
+  gleif.lookup: [analyze, research]
+  view.drill: [analyze, drill_down]
+  view.zoom-in: [analyze, drill_down]
+  view.trace: [analyze, drill_down]
+  view.xray: [analyze, drill_down]
+  view.surface: [navigate, single_structure]  # Surface up is navigation
+  view.back-to: [navigate, single_structure]
+
+  # Workflow verbs
+  kyc-case.approve: [workflow, approve]
+  document.verify: [workflow, approve]
+  trading-profile.approve: [workflow, approve]
+  kyc.recommend: [workflow, approve]
+  kyc-case.reject: [workflow, reject]
+  document.reject: [workflow, reject]
+  document.solicit: [workflow, request]
+  document.solicit-set: [workflow, request]
+  requirement.create: [workflow, request]
+
+# =============================================================================
+# DISAMBIGUATION THRESHOLDS
+# =============================================================================
+
+thresholds:
+  # If candidates span more than this many tier_1 intents, show tier 1 first
+  multi_intent_threshold: 1
+
+  # If a single tier_1 has more than this many tier_2 options represented, show tier 2
+  multi_scope_threshold: 1
+
+  # Skip tiers if top candidate score is above this (very confident match)
+  skip_tiers_confidence: 0.92

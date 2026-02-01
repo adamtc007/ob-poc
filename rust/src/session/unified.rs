@@ -54,6 +54,11 @@ pub struct UnifiedSession {
     #[serde(default)]
     pub pending_verb_disambiguation: Option<PendingVerbDisambiguation>,
 
+    /// When Some, user needs to pick an intent tier first
+    /// This happens before verb disambiguation when candidates span multiple intents
+    #[serde(default)]
+    pub pending_intent_tier: Option<PendingIntentTier>,
+
     // === Conversation ===
     pub messages: Vec<ChatMessage>,
 
@@ -625,6 +630,34 @@ pub struct VerbDisambiguationOption {
 pub struct VerbCandidate {
     pub verb: String,
     pub score: f32,
+}
+
+/// Pending intent tier clarification state
+///
+/// When verb search returns candidates spanning multiple intents (navigate vs create),
+/// user picks the intent first, then optionally scope, before seeing specific verbs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingIntentTier {
+    /// Request ID for tracking
+    pub request_id: String,
+    /// Current tier number (1 = action intent, 2 = scope)
+    pub tier_number: u32,
+    /// Original user input
+    pub original_input: String,
+    /// All verb candidates from search (for filtering after tier selection)
+    pub candidates: Vec<VerbCandidate>,
+    /// Tier selections made so far (for multi-tier flows)
+    pub selected_path: Vec<IntentTierPathEntry>,
+    /// When this tier request was created
+    pub created_at: DateTime<Utc>,
+}
+
+/// An entry in the intent tier selection path
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentTierPathEntry {
+    pub tier: u32,
+    pub option_id: String,
+    pub option_label: String,
 }
 
 /// Inline resolution state (not a sub-session)
@@ -1527,6 +1560,7 @@ impl UnifiedSession {
             view_state: ViewState::default(),
             resolution: None,
             pending_verb_disambiguation: None,
+            pending_intent_tier: None,
             messages: Vec::new(),
             bindings: HashMap::new(),
             // Constraint cascade (starts empty, narrowed as user works)

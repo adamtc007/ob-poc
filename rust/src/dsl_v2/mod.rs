@@ -98,6 +98,7 @@ pub mod graph_executor;
 #[cfg(feature = "database")]
 pub mod idempotency;
 pub mod intent;
+pub mod intent_tiers;
 #[cfg(feature = "database")]
 pub mod lsp_validator;
 pub mod macros;

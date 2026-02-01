@@ -1671,6 +1671,103 @@ pub struct VerbOption {
     pub category_label: Option<String>,
 }
 
+// ============================================================================
+// INTENT TIER DISAMBIGUATION
+// ============================================================================
+// When verb search returns candidates spanning multiple intents (e.g., navigate
+// vs create), we first ask the user to clarify their intent before showing
+// specific verbs. This reduces cognitive load and improves learning signals.
+
+/// Request for intent tier clarification (shown before verb disambiguation)
+///
+/// Example flow:
+/// User: "load something"
+/// → Tier 1: "What are you trying to do?" [Navigate, Create, Modify]
+/// → User picks "Navigate"
+/// → Tier 2: "What scope?" [Single structure, Client book, Jurisdiction]
+/// → User picks "Client book"
+/// → Verb options: [session.load-galaxy, session.load-cluster]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentTierRequest {
+    /// Unique ID for this tier request (used for selection tracking)
+    pub request_id: String,
+    /// Which tier level (1 = action intent, 2 = scope/domain)
+    pub tier_number: u32,
+    /// Original user input that triggered disambiguation
+    pub original_input: String,
+    /// Options to choose from at this tier
+    pub options: Vec<IntentTierOption>,
+    /// Human-readable prompt (e.g., "What are you trying to do?")
+    pub prompt: String,
+    /// Previously selected tiers (for context display)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub selected_path: Vec<IntentTierSelection>,
+}
+
+/// A single option in an intent tier
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentTierOption {
+    /// Option identifier (e.g., "navigate", "create", "single_structure")
+    pub id: String,
+    /// Human-readable label (e.g., "Set session scope / Navigate")
+    pub label: String,
+    /// Longer description explaining this option
+    pub description: String,
+    /// Optional hint text (e.g., "You want to work with existing data")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
+    /// Number of verbs this option would narrow down to
+    #[serde(default)]
+    pub verb_count: usize,
+}
+
+/// A recorded tier selection (for tracking the path through tiers)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentTierSelection {
+    /// Tier number that was selected
+    pub tier: u32,
+    /// Selected option ID
+    pub option_id: String,
+    /// Selected option label (for display)
+    pub option_label: String,
+}
+
+/// User's selection at an intent tier
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentTierSelectionRequest {
+    /// The tier request ID being responded to
+    pub request_id: String,
+    /// Selected option ID
+    pub selected_option: String,
+    /// Original user input (for learning)
+    pub original_input: String,
+}
+
+/// Response after intent tier selection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IntentTierSelectionResponse {
+    /// Whether to show another tier or proceed to verb disambiguation
+    #[serde(flatten)]
+    pub next_step: IntentTierNextStep,
+}
+
+/// What happens after an intent tier selection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum IntentTierNextStep {
+    /// Show another tier (narrowing down further)
+    ShowTier { tier_request: IntentTierRequest },
+    /// Show verb disambiguation (final step before DSL)
+    ShowVerbs {
+        verb_disambiguation: VerbDisambiguationRequest,
+    },
+    /// Clear match found - proceed directly to DSL generation
+    Proceed {
+        selected_verb: String,
+        message: String,
+    },
+}
+
 /// User's verb selection response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerbSelectionRequest {

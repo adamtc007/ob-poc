@@ -274,6 +274,11 @@ pub struct AgentChatResponse {
     /// User selection triggers POST /api/session/:id/select-verb
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verb_disambiguation: Option<ob_poc_types::VerbDisambiguationRequest>,
+    /// Intent tier clarification request (when candidates span multiple intents)
+    /// Shown BEFORE verb disambiguation to reduce cognitive load
+    /// User selection triggers POST /api/session/:id/select-intent-tier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub intent_tier: Option<ob_poc_types::IntentTierRequest>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -940,12 +945,16 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         current_ref_index: None,
                         dsl_hash: None,
                         verb_disambiguation: None,
+                        intent_tier: None,
                     });
                 }
             }
             // Not a number - clear pending and process as new input
             session.pending_verb_disambiguation = None;
         }
+
+        // Clear pending intent tier if user typed something new
+        session.pending_intent_tier = None;
 
         // ONE PIPELINE - generate/validate DSL
         // Wrap session for macro expansion (macros need session state for prereqs/context)
@@ -1019,11 +1028,31 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     return Ok(self.staged_response(r.dsl, msg));
                 }
 
-                // Ambiguous? Return structured disambiguation request
-                // User will click a button, triggering /select-verb endpoint
+                // Ambiguous? Check if we should show intent tiers or direct verb disambiguation
+                // Intent tiers reduce cognitive load when candidates span multiple intents
                 if matches!(r.outcome, PipelineOutcome::NeedsClarification)
                     && r.verb_candidates.len() >= 2
                 {
+                    // Analyze which intent tiers are represented
+                    let intent_taxonomy = crate::dsl_v2::intent_tiers::intent_tier_taxonomy();
+                    let verbs: Vec<&str> =
+                        r.verb_candidates.iter().map(|c| c.verb.as_str()).collect();
+                    let analysis = intent_taxonomy.analyze_candidates(&verbs);
+
+                    // Get top score for threshold check
+                    let top_score = r.verb_candidates.first().map(|c| c.score).unwrap_or(0.0);
+
+                    // Should we show intent tiers first?
+                    if intent_taxonomy.should_use_tiers(&analysis, top_score) {
+                        return Ok(self.build_intent_tier_response(
+                            &request.message,
+                            &r.verb_candidates,
+                            &analysis,
+                            session,
+                        ));
+                    }
+
+                    // Otherwise show direct verb disambiguation
                     return Ok(self.build_verb_disambiguation_response(
                         &request.message,
                         &r.verb_candidates,
@@ -1256,6 +1285,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                                     current_ref_index: None,
                                     dsl_hash: None,
                                     verb_disambiguation: None,
+                                    intent_tier: None,
                                 });
                             }
                         }
@@ -1326,6 +1356,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     current_ref_index: None,
                     dsl_hash: None,
                     verb_disambiguation: None,
+                    intent_tier: None,
                 })
             }
             Err(e) => {
@@ -1476,6 +1507,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             current_ref_index: None,
             dsl_hash: None,
             verb_disambiguation: None,
+            intent_tier: None,
         }
     }
 
@@ -1494,6 +1526,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             current_ref_index: None,
             dsl_hash: None,
             verb_disambiguation: None,
+            intent_tier: None,
         }
     }
 
@@ -1514,6 +1547,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             current_ref_index: None,
             dsl_hash: None,
             verb_disambiguation: None,
+            intent_tier: None,
         }
     }
 
@@ -1634,6 +1668,83 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             current_ref_index: None,
             dsl_hash: None,
             verb_disambiguation: Some(disambiguation_request),
+            intent_tier: None,
+        }
+    }
+
+    /// Build an intent tier clarification response
+    ///
+    /// When verb candidates span multiple intents (navigate vs create vs modify),
+    /// we first ask the user to clarify their intent before showing specific verbs.
+    /// This reduces cognitive load and creates richer learning signals.
+    fn build_intent_tier_response(
+        &self,
+        original_input: &str,
+        candidates: &[crate::mcp::verb_search::VerbSearchResult],
+        analysis: &crate::dsl_v2::intent_tiers::TierAnalysis,
+        session: &mut UnifiedSession,
+    ) -> AgentChatResponse {
+        let intent_taxonomy = crate::dsl_v2::intent_tiers::intent_tier_taxonomy();
+
+        // Build tier 1 request
+        let tier_request = intent_taxonomy.build_tier1_request(original_input, analysis);
+
+        // Build message for display
+        let options_text: Vec<String> = tier_request
+            .options
+            .iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                format!(
+                    "{}. **{}**: {} ({} options)",
+                    i + 1,
+                    opt.label,
+                    opt.description,
+                    opt.verb_count
+                )
+            })
+            .collect();
+
+        let message = format!(
+            "I'm not sure what you mean by \"{}\". What are you trying to do?\n\n{}\n\nType a number to select.",
+            original_input,
+            options_text.join("\n")
+        );
+
+        session.add_agent_message(message.clone(), None, None);
+
+        // Store pending intent tier state for selection handling
+        use crate::session::unified::{PendingIntentTier, VerbCandidate};
+        session.pending_intent_tier = Some(PendingIntentTier {
+            request_id: tier_request.request_id.clone(),
+            tier_number: 1,
+            original_input: original_input.to_string(),
+            candidates: candidates
+                .iter()
+                .map(|c| VerbCandidate {
+                    verb: c.verb.clone(),
+                    score: c.score,
+                })
+                .collect(),
+            selected_path: vec![],
+            created_at: chrono::Utc::now(),
+        });
+
+        AgentChatResponse {
+            message,
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::PendingValidation,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: Some(tier_request),
         }
     }
 
@@ -1844,6 +1955,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     current_ref_index: None,
                     dsl_hash: None,
                     verb_disambiguation: None,
+                    intent_tier: None,
                 });
             } else {
                 return Some(AgentChatResponse {
@@ -1860,6 +1972,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     current_ref_index: None,
                     dsl_hash: None,
                     verb_disambiguation: None,
+                    intent_tier: None,
                 });
             }
         }
@@ -1880,6 +1993,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 current_ref_index: None,
                 dsl_hash: None,
                 verb_disambiguation: None,
+                intent_tier: None,
             });
         }
 
@@ -1899,6 +2013,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 current_ref_index: None,
                 dsl_hash: None,
                 verb_disambiguation: None,
+                intent_tier: None,
             });
         }
 
@@ -2341,6 +2456,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             current_ref_index,
             dsl_hash,
             verb_disambiguation: None,
+            intent_tier: None,
         })
     }
 
