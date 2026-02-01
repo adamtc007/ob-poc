@@ -1210,6 +1210,201 @@ When user selects a verb:
 
 ---
 
+## Intent Tier Disambiguation (065)
+
+> ✅ **IMPLEMENTED (2026-02-01)**: Higher-level intent clarification before verb disambiguation.
+
+**Problem Solved:** Verb disambiguation showed low-level technical verb options (e.g., `session.load-galaxy`, `session.load-cbu`, `cbu.create`) which overwhelmed users. They need to first answer a simpler question: "What are you trying to do?"
+
+**Key Insight:** Intent tier disambiguation happens **BEFORE** verb disambiguation. It's a funnel:
+
+```
+User Input → Intent Tier (action type) → Verb Disambiguation (specific verb) → Entity Resolution → Execute
+```
+
+### Two-Tier Clarification Model
+
+| Tier | Question | Example Options |
+|------|----------|-----------------|
+| **Tier 1** | "What are you trying to do?" | Navigate, Create, Modify, Analyze, Workflow |
+| **Tier 2** | "What kind of [action]?" | (for Navigate): Single Structure, Client Book, Jurisdiction |
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  INTENT TIER DISAMBIGUATION                                                  │
+│                                                                              │
+│  User: "load the book"                                                       │
+│      │                                                                       │
+│      ▼                                                                       │
+│  HybridVerbSearcher.search() → Multiple verbs across different tiers        │
+│      │   session.load-galaxy (navigate), cbu.create (create), ...           │
+│      │                                                                       │
+│      ▼                                                                       │
+│  IntentTierTaxonomy.analyze_candidates()                                    │
+│      │   Detects verbs span multiple action categories                      │
+│      │   navigate: 3 verbs, create: 2 verbs, modify: 1 verb                 │
+│      │                                                                       │
+│      ▼                                                                       │
+│  should_use_tiers() = true (multiple tiers with candidates)                 │
+│      │                                                                       │
+│      ▼                                                                       │
+│  ChatResponse.intent_tier = Some(IntentTierRequest {                        │
+│      tier_number: 1,                                                        │
+│      prompt: "What are you trying to do?",                                  │
+│      options: [Navigate, Create, Modify, ...]                               │
+│  })                                                                          │
+│      │                                                                       │
+│      ▼                                                                       │
+│  UI shows intent tier card with high-level action buttons                   │
+│      │                                                                       │
+│      ├─► User selects "Navigate & View"                                     │
+│      │       → Filter to navigate verbs only                                │
+│      │       → If 1 verb remains: proceed to execute                        │
+│      │       → If multiple remain: show Tier 2 or verb disambiguation       │
+│      │                                                                       │
+│      └─► User cancels → Clear state, no action                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Taxonomy Configuration
+
+Defined in `config/verb_schemas/intent_tiers.yaml`:
+
+```yaml
+tiers:
+  tier1:
+    navigate:
+      id: navigate
+      label: "Navigate & View"
+      description: "Load, view, or explore structures and data"
+      hint: "session.load-*, view.*, session.info"
+    create:
+      id: create
+      label: "Create New"
+      description: "Create new structures, entities, or relationships"
+      hint: "*.create, *.add, *.register"
+    modify:
+      id: modify
+      label: "Modify Existing"
+      description: "Update, edit, or change existing data"
+      hint: "*.update, *.set, *.assign"
+    analyze:
+      id: analyze
+      label: "Analyze & Report"
+      description: "Run analysis, generate reports, or query data"
+      hint: "*.analyze, *.report, *.query"
+    workflow:
+      id: workflow
+      label: "Workflow & Process"
+      description: "Manage cases, approvals, or multi-step processes"
+      hint: "kyc.*, workflow.*, case.*"
+
+  tier2:
+    navigate:
+      single_structure:
+        label: "Single Structure"
+        description: "Focus on one CBU/fund"
+      client_book:
+        label: "Client Book"
+        description: "All structures for a client"
+      jurisdiction:
+        label: "By Jurisdiction"
+        description: "Structures in a region"
+
+verb_tier_mapping:
+  session.load-galaxy: navigate
+  session.load-cbu: navigate
+  session.load-jurisdiction: navigate
+  cbu.create: create
+  entity.create: create
+  # ... etc
+```
+
+### Types (`ob-poc-types`)
+
+```rust
+/// Request for intent tier selection (before verb disambiguation)
+pub struct IntentTierRequest {
+    pub request_id: String,
+    pub tier_number: u32,           // 1 or 2
+    pub original_input: String,
+    pub options: Vec<IntentTierOption>,
+    pub prompt: String,             // "What are you trying to do?"
+    pub selected_path: Vec<IntentTierSelection>,  // Previous selections
+}
+
+pub struct IntentTierOption {
+    pub id: String,         // "navigate", "create", etc.
+    pub label: String,      // "Navigate & View"
+    pub description: String,
+    pub hint: Option<String>,
+    pub verb_count: usize,  // How many verbs in this category
+}
+
+pub struct IntentTierSelection {
+    pub tier: u32,
+    pub selected_id: String,
+}
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `config/verb_schemas/intent_tiers.yaml` | Tier definitions and verb→tier mapping |
+| `rust/src/dsl_v2/intent_tiers.rs` | `IntentTierTaxonomy` loader and analysis |
+| `rust/src/api/agent_service.rs` | Integration in `process_chat()`, builds tier requests |
+| `rust/crates/ob-poc-types/src/lib.rs` | `IntentTierRequest`, `IntentTierOption` types |
+| `rust/crates/ob-poc-ui/src/state.rs` | `IntentTierState` UI state |
+| `rust/crates/ob-poc-ui/src/panels/repl.rs` | `render_intent_tier_card()` |
+| `rust/crates/ob-poc-ui/src/app.rs` | `select_intent_tier()`, `cancel_intent_tier()` |
+
+### Decision Flow in agent_service.rs
+
+```rust
+// In process_chat():
+// 1. Run verb search
+let search_result = verb_searcher.search(&input).await?;
+
+// 2. Check if we need intent tier disambiguation FIRST
+if let VerbSearchOutcome::Ambiguous { candidates, .. } = &search_result {
+    let tier_analysis = taxonomy.analyze_candidates(candidates);
+    
+    if taxonomy.should_use_tiers(&tier_analysis) {
+        // Multiple action categories detected - ask high-level question first
+        let tier_request = taxonomy.build_tier1_request(&input, &tier_analysis);
+        return Ok(AgentChatResponse {
+            intent_tier: Some(tier_request),
+            verb_disambiguation: None,  // Don't show verb options yet
+            ..
+        });
+    }
+}
+
+// 3. If single tier or user already selected tier, proceed to verb disambiguation
+```
+
+### Why This Matters
+
+| Without Intent Tiers | With Intent Tiers |
+|---------------------|-------------------|
+| "load the book" → 8 verb buttons | "load the book" → "What are you trying to do?" |
+| User sees: `session.load-galaxy`, `session.load-cbu`, `cbu.create`, ... | User sees: Navigate, Create, Modify |
+| Cognitive overload, technical jargon | Simple, action-oriented choices |
+| User may pick wrong verb | Guided to correct category first |
+
+### Learning from Selections
+
+User tier selections generate **gold-standard training data**:
+
+1. Input phrase + selected tier → train intent classifier
+2. If tier leads to single verb → implicit phrase→verb mapping
+3. Aggregate tier selection patterns → improve taxonomy weights
+
+---
+
 ## Operator Macro Vocabulary (058)
 
 > ✅ **IMPLEMENTED (2026-01-28)**: Business-friendly vocabulary layer over technical DSL.
@@ -3459,6 +3654,7 @@ When you see these in a task, read the corresponding annex first:
 | "sheet", "phased execution", "DAG" | `ai-thoughts/035-repl-session-implementation-plan.md` |
 | "solar navigation", "ViewState", "orbit", "nav_history" | `ai-thoughts/038-solar-navigation-unified-design.md` |
 | "intent pipeline", "ambiguity", "normalize_candidates", "ref_id" | CLAUDE.md §Intent Pipeline Fixes (042) |
+| "intent tier", "tier disambiguation", "what are you trying to do" | CLAUDE.md §Intent Tier Disambiguation (065) |
 | "macro", "operator vocabulary", "structure.setup", "constraint cascade" | CLAUDE.md §Operator Vocabulary & Macros (058) |
 | "onboarding pipeline", "RequirementPlanner", "OnboardingPlan", "ob-agentic" | CLAUDE.md §Structured Onboarding Pipeline |
 | "LSP", "language server", "completion", "diagnostics", "dsl-lsp" | CLAUDE.md §DSL Language Server |
