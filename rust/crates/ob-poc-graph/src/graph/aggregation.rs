@@ -4,14 +4,14 @@
 //! - Jurisdiction galaxies (LU(47), DE(23), US(89))
 //! - ManCo/segment regions within jurisdictions
 //!
-//! Cap guarantee: never render more than MAX_VISIBLE_NODES nodes.
+//! Cap guarantee: never render more than max_visible_nodes() nodes.
 
 use std::collections::HashMap;
 
 use egui::{Color32, Pos2, Vec2};
 
 use super::types::{EntityType, LayoutGraph, LayoutNode, NodeStyle, PrimaryRole};
-use super::viewport_fit::{ViewLevel, MAX_VISIBLE_NODES};
+use super::viewport_fit::{max_visible_nodes, ViewLevel};
 
 // =============================================================================
 // AGGREGATED NODE TYPES
@@ -406,11 +406,12 @@ pub fn create_aggregated_graph(
 
         ViewLevel::Cluster | ViewLevel::Solar => {
             // No aggregation - use source graph
-            // But cap at MAX_VISIBLE_NODES if needed
-            if source_graph.nodes.len() <= MAX_VISIBLE_NODES {
+            // But cap at max_visible_nodes() if needed
+            let max_nodes = max_visible_nodes();
+            if source_graph.nodes.len() <= max_nodes {
                 source_graph.clone()
             } else {
-                // Take first MAX_VISIBLE_NODES by importance
+                // Take first max_visible_nodes by importance
                 let mut nodes: Vec<_> = source_graph.nodes.iter().collect();
                 nodes.sort_by(|a, b| {
                     b.1.importance
@@ -419,7 +420,7 @@ pub fn create_aggregated_graph(
                 });
 
                 let mut graph = LayoutGraph::default();
-                for (id, node) in nodes.into_iter().take(MAX_VISIBLE_NODES) {
+                for (id, node) in nodes.into_iter().take(max_nodes) {
                     graph.nodes.insert(id.clone(), node.clone());
                 }
 

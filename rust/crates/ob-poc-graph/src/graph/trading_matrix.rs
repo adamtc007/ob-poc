@@ -258,7 +258,7 @@ impl TradingMatrixState {
         self.expanded.insert(key.clone());
         self.expand_progress
             .entry(key)
-            .or_insert_with(|| SpringF32::with_config(0.0, SpringConfig::FAST))
+            .or_insert_with(|| SpringF32::with_config(0.0, SpringConfig::from_preset("fast")))
             .set_target(1.0);
     }
 

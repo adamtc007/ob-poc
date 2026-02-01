@@ -3202,6 +3202,162 @@ fn render(&self, ui: &mut Ui, drone: &DroneState, world: &WorldSnapshot) {
 
 ---
 
+## Graph Configuration (Policy-Driven)
+
+> ✅ **IMPLEMENTED (2026-02-01)**: Centralized YAML config for graph visualization with hot-reload support.
+
+The graph visualization system uses a centralized YAML configuration file for all tunables: LOD thresholds, layout dimensions, animation springs, viewport parameters, rendering options, and debug overlays. This enables tuning without code changes.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    GRAPH CONFIG PIPELINE                                     │
+│                                                                              │
+│  config/graph_settings.yaml                                                  │
+│         │                                                                    │
+│         ▼                                                                    │
+│  GraphConfig::load_default()                                                │
+│         │   - Searches: config/, ../config/, rust/config/                   │
+│         │   - Validates all fields                                          │
+│         │   - Computes policy_hash() for cache invalidation                 │
+│         │                                                                    │
+│         ▼                                                                    │
+│  global_config() → &'static GraphConfig                                     │
+│         │   - OnceLock singleton                                            │
+│         │   - Falls back to defaults if file missing                        │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Module accessors (lod.rs, layout.rs, animation.rs, etc.)                   │
+│         │   - lod::density_base() → global_config().lod.density.base       │
+│         │   - layout::node_width() → global_config().layout.node.width     │
+│         │   - animation::SpringConfig::from_preset("camera")               │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Rendering uses config values instead of hardcoded constants                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Config Sections
+
+| Section | Purpose | Example Keys |
+|---------|---------|--------------|
+| `policy` | Version/variant tracking, cache invalidation | `version`, `name`, `variant` |
+| `lod` | Level of Detail thresholds and hysteresis | `tiers.icon.zoom_max`, `thresholds.compact`, `density.weight` |
+| `budgets` | Performance limits | `label_budget_count`, `shape_budget_ms_per_frame` |
+| `flyover` | Navigation phase settings | `dwell_ticks`, `phases.moving.selection_lod` |
+| `structural` | Taxonomy navigation density | `density_cutover.icon_only`, `max_labels_per_cluster` |
+| `camera` | Pan/zoom/snap settings | `pan_speed`, `zoom_speed`, `snap_epsilon` |
+| `focus` | Selection and neighbor priority | `selection_priority`, `neighbor_ring_size` |
+| `label_cache` | Text shaping cache | `max_entries`, `width_quantization` |
+| `spatial_index` | Spatial query optimization | `default_cell_size`, `chamber_overrides` |
+| `layout` | Node dimensions and spacing | `node.width`, `spacing.horizontal`, `tiers.cbu` |
+| `viewport` | Auto-fit and visibility limits | `fit_margin`, `max_visible_nodes` |
+| `animation` | Spring presets for motion | `springs.camera.stiffness`, `scale_pulse_peak` |
+| `rendering` | Edge and blur settings | `edges.bezier_segments`, `blur_opacity` |
+| `colors` | Risk, KYC, entity palette | `risk.high`, `kyc.complete`, `sun.glow` |
+| `debug` | Development overlay | `overlay.enabled`, `show_lod_counts` |
+| `clamps` | Safety limits | `max_nodes_visible`, `max_snapshot_bytes` |
+
+### Usage in Code
+
+**Getting config values:**
+```rust
+use ob_poc_graph::config::global_config;
+
+// Direct access
+let threshold = global_config().lod.thresholds.compact;
+let margin = global_config().viewport.fit_margin;
+
+// Module-level accessors (preferred)
+use ob_poc_graph::graph::layout::{node_width, h_spacing, tier_cbu};
+let width = node_width();  // from config
+let spacing = h_spacing(); // from config
+```
+
+**Spring presets:**
+```rust
+use ob_poc_graph::graph::animation::SpringConfig;
+
+// Config-driven (preferred)
+let camera_spring = SpringConfig::from_preset("camera");
+let gentle_spring = SpringConfig::from_preset("gentle");
+
+// Available presets: fast, medium, slow, bouncy, instant,
+// snappy, organic, gentle, camera, agent_ui, autopilot, pulse
+```
+
+**Policy hash for cache invalidation:**
+```rust
+let config = global_config();
+let hash = config.policy_hash();  // u64 hash of key config values
+
+// Use hash as part of cache key for WorldSnapshots
+let cache_key = format!("snapshot_{}_{}", session_id, hash);
+```
+
+### Validation Command
+
+```bash
+# Check config loads and validates
+cd rust && cargo x graph-config
+
+# Verbose output (shows all sections)
+cargo x graph-config -v
+```
+
+**Output:**
+```
+✓ Loaded graph config
+  Policy: default v1 (baseline)
+  Hash: 0x1a2b3c4d5e6f7890
+  LOD tiers: icon(<0.80) label(<1.50) extended(<3.00) full(<999.00)
+  Budgets: labels=250 full=20 shape=3.0ms/frame
+  Animation springs: 12 presets
+  ✓ Validation passed
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/config/graph_settings.yaml` | Master config file (~360 lines) |
+| `rust/crates/ob-poc-graph/src/config.rs` | GraphConfig types, validation, `global_config()` |
+| `rust/crates/ob-poc-graph/src/graph/lod.rs` | LOD accessors: `density_base()`, `compression_thresholds()` |
+| `rust/crates/ob-poc-graph/src/graph/layout.rs` | Layout accessors: `node_width()`, `tier_cbu()` |
+| `rust/crates/ob-poc-graph/src/graph/animation.rs` | `SpringConfig::from_preset()` |
+| `rust/crates/ob-poc-graph/src/graph/viewport_fit.rs` | Viewport accessors: `fit_margin()`, `max_visible_nodes()` |
+| `rust/crates/ob-poc-graph/src/graph/render.rs` | Render accessors: `corner_radius()`, `blur_opacity()` |
+| `rust/xtask/src/main.rs` | `graph-config` validation command |
+
+### Modifying Config
+
+1. Edit `rust/config/graph_settings.yaml`
+2. Run `cargo x graph-config` to validate
+3. Restart server (config loads once at startup via OnceLock)
+
+For hot-reload during development, the config file can be re-read by restarting the WASM app or server process.
+
+### Migration Pattern
+
+Legacy hardcoded constants are deprecated but retained for backwards compatibility:
+
+```rust
+// OLD (deprecated)
+const NODE_WIDTH: f32 = 160.0;
+let w = NODE_WIDTH;
+
+// NEW (config-driven)
+pub fn node_width() -> f32 {
+    global_config().layout.node.width
+}
+let w = node_width();
+```
+
+Deprecation warnings guide migration to config-driven accessors.
+
+---
+
 ## Key Directories
 
 ```

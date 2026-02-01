@@ -32,8 +32,8 @@ pub struct Camera2D {
 impl Default for Camera2D {
     fn default() -> Self {
         Self {
-            position: SpringVec2::with_config(0.0, 0.0, SpringConfig::MEDIUM),
-            zoom: SpringF32::with_config(1.0, SpringConfig::MEDIUM),
+            position: SpringVec2::with_config(0.0, 0.0, SpringConfig::from_preset("medium")),
+            zoom: SpringF32::with_config(1.0, SpringConfig::from_preset("medium")),
             min_zoom: 0.1,
             max_zoom: 5.0,
         }
@@ -116,7 +116,8 @@ impl Camera2D {
     /// Fly to center on a world position with default spring
     /// This is the primary method for animated camera movement
     pub fn fly_to(&mut self, world_pos: Pos2) {
-        self.position.set_config(SpringConfig::MEDIUM);
+        self.position
+            .set_config(SpringConfig::from_preset("medium"));
         self.position.set_target(world_pos.x, world_pos.y);
     }
 
@@ -128,17 +129,17 @@ impl Camera2D {
 
     /// Fly to center on a world position with slow/cinematic spring
     pub fn fly_to_slow(&mut self, world_pos: Pos2) {
-        self.fly_to_with_config(world_pos, SpringConfig::SLOW);
+        self.fly_to_with_config(world_pos, SpringConfig::from_preset("slow"));
     }
 
     /// Fly to center on a world position with fast/snappy spring
     pub fn fly_to_fast(&mut self, world_pos: Pos2) {
-        self.fly_to_with_config(world_pos, SpringConfig::FAST);
+        self.fly_to_with_config(world_pos, SpringConfig::from_preset("fast"));
     }
 
     /// Animate to a specific zoom level
     pub fn zoom_to(&mut self, zoom_level: f32) {
-        self.zoom.set_config(SpringConfig::MEDIUM);
+        self.zoom.set_config(SpringConfig::from_preset("medium"));
         self.zoom
             .set_target(zoom_level.clamp(self.min_zoom, self.max_zoom));
     }
@@ -188,7 +189,7 @@ impl Camera2D {
         }
 
         self.fly_to_slow(bounds.center());
-        self.zoom.set_config(SpringConfig::SLOW);
+        self.zoom.set_config(SpringConfig::from_preset("slow"));
         self.zoom_to_fit(bounds, screen_rect, padding);
     }
 
@@ -292,12 +293,12 @@ impl Camera2D {
 
     /// Use fast spring (snappy UI response)
     pub fn use_fast_spring(&mut self) {
-        self.set_spring_config(SpringConfig::FAST);
+        self.set_spring_config(SpringConfig::from_preset("fast"));
     }
 
     /// Use slow spring (cinematic transitions)
     pub fn use_slow_spring(&mut self) {
-        self.set_spring_config(SpringConfig::SLOW);
+        self.set_spring_config(SpringConfig::from_preset("slow"));
     }
 
     // =========================================================================

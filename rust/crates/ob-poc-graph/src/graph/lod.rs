@@ -1,11 +1,13 @@
 //! Level of Detail (LOD) system for graph rendering
 //!
 //! Adjusts rendering detail based on screen-space size of nodes.
+//! Thresholds are loaded from `config/graph_settings.yaml` via `global_config()`.
 
 use egui::{Color32, FontId, Pos2, Stroke, Vec2};
 
 use super::colors::{control_portal_border, control_portal_fill, ControlConfidence};
 use super::types::{EntityType, LayoutNode, PrimaryRole};
+use crate::config::global_config;
 
 // =============================================================================
 // RENDER CONTEXT
@@ -54,9 +56,6 @@ impl RenderContext {
 // DETAIL LEVEL
 // =============================================================================
 
-/// Reference viewport area for LOD scaling (800x600 = 480,000 px²)
-const REFERENCE_VIEWPORT_AREA: f32 = 480_000.0;
-
 /// Level of detail for node rendering
 /// Thresholds: Micro < 8px < Icon < 30px < Compact < 80px < Standard < 120px < Expanded
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,10 +89,11 @@ pub struct LodConfig {
 
 impl Default for LodConfig {
     fn default() -> Self {
+        let cfg = global_config();
         Self {
-            density_base: 20.0,
-            density_weight: 0.3,
-            viewport_area: REFERENCE_VIEWPORT_AREA,
+            density_base: cfg.lod.density.base,
+            density_weight: cfg.lod.density.weight,
+            viewport_area: cfg.lod.density.reference_viewport_area,
         }
     }
 }
@@ -101,16 +101,17 @@ impl Default for LodConfig {
 impl LodConfig {
     /// Create LOD config for a specific viewport size
     pub fn for_viewport(width: f32, height: f32) -> Self {
+        let cfg = global_config();
         let area = width * height;
-        let area_ratio = area / REFERENCE_VIEWPORT_AREA;
+        let area_ratio = area / cfg.lod.density.reference_viewport_area;
 
         // Larger viewport = higher density threshold (can show more nodes before aggregating)
         // Smaller viewport = lower threshold (aggregate sooner)
-        let scaled_base = 20.0 * area_ratio.sqrt();
+        let scaled_base = cfg.lod.density.base * area_ratio.sqrt();
 
         Self {
             density_base: scaled_base.clamp(10.0, 60.0),
-            density_weight: 0.3,
+            density_weight: cfg.lod.density.weight,
             viewport_area: area,
         }
     }
@@ -130,6 +131,7 @@ impl LodConfig {
 
 impl DetailLevel {
     /// Determine LOD from screen-space radius
+    /// Thresholds loaded from config/graph_settings.yaml
     pub fn from_screen_size(screen_width: f32, is_focused: bool) -> Self {
         if is_focused {
             return DetailLevel::Focused;
@@ -138,11 +140,12 @@ impl DetailLevel {
         // screen_width = node.size.x * camera.zoom()
         // Typical node is ~140px wide, so at zoom 1.0 screen_width=140
         // At zoom 0.5, screen_width=70. At zoom 2.0, screen_width=280
+        let thresholds = &global_config().lod.thresholds;
         match screen_width {
-            w if w < 20.0 => DetailLevel::Micro,
-            w if w < 40.0 => DetailLevel::Icon,
-            w if w < 70.0 => DetailLevel::Compact,
-            w if w < 120.0 => DetailLevel::Standard,
+            w if w < thresholds.micro => DetailLevel::Micro,
+            w if w < thresholds.icon => DetailLevel::Icon,
+            w if w < thresholds.compact => DetailLevel::Compact,
+            w if w < thresholds.standard => DetailLevel::Standard,
             _ => DetailLevel::Expanded,
         }
     }
@@ -151,20 +154,17 @@ impl DetailLevel {
     ///
     /// Compression is inverse of zoom (0.0 = zoomed in, 1.0 = zoomed out).
     /// Density factor adjusts for crowded views.
-    ///
-    /// Visual progression:
-    /// - compression > 0.8: Icon (dot + count badge)
-    /// - compression 0.5-0.8: Compact (shape + 2-char code)
-    /// - compression 0.2-0.5: Standard (full name)
-    /// - compression < 0.2: Expanded (full + inline detail)
+    /// Thresholds loaded from config/graph_settings.yaml
     pub fn for_compression(compression: f32, node_count: usize) -> Self {
-        let density_factor = (node_count as f32 / 20.0).min(1.0);
-        let effective = compression + (density_factor * 0.3);
+        let cfg = global_config();
+        let density_factor = (node_count as f32 / cfg.lod.density.base).min(1.0);
+        let effective = compression + (density_factor * cfg.lod.density.weight);
 
+        let comp = &cfg.lod.compression;
         match effective {
-            c if c > 0.8 => DetailLevel::Icon,
-            c if c > 0.5 => DetailLevel::Compact,
-            c if c > 0.2 => DetailLevel::Standard,
+            c if c > comp.icon => DetailLevel::Icon,
+            c if c > comp.compact => DetailLevel::Compact,
+            c if c > comp.standard => DetailLevel::Standard,
             _ => DetailLevel::Expanded,
         }
     }
@@ -178,13 +178,15 @@ impl DetailLevel {
         node_count: usize,
         config: &LodConfig,
     ) -> Self {
+        let cfg = global_config();
         let density_factor = config.density_factor(node_count);
         let effective = compression + (density_factor * config.density_weight);
 
+        let comp = &cfg.lod.compression;
         match effective {
-            c if c > 0.8 => DetailLevel::Icon,
-            c if c > 0.5 => DetailLevel::Compact,
-            c if c > 0.2 => DetailLevel::Standard,
+            c if c > comp.icon => DetailLevel::Icon,
+            c if c > comp.compact => DetailLevel::Compact,
+            c if c > comp.standard => DetailLevel::Standard,
             _ => DetailLevel::Expanded,
         }
     }

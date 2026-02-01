@@ -70,13 +70,5 @@ clap = { version = "4.4", features = ["derive"] }
 name = "populate_embeddings"
 path = "src/bin/populate_embeddings.rs"
 
-[[bin]]
-name = "feedback_analysis"
-path = "src/bin/feedback_analysis.rs"
-
-[[bin]]
-name = "feedback_cleanup"
-path = "src/bin/feedback_cleanup.rs"
-
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

@@ -263,7 +263,7 @@ impl TaxonomyState {
         self.expanded.insert(type_code.to_string());
         self.expand_progress
             .entry(type_code.to_string())
-            .or_insert_with(|| SpringF32::with_config(0.0, SpringConfig::FAST))
+            .or_insert_with(|| SpringF32::with_config(0.0, SpringConfig::from_preset("fast")))
             .set_target(1.0);
     }
 

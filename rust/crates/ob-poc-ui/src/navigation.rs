@@ -216,7 +216,7 @@ impl NavigationService {
             scope: NavigationScope::Universe,
             view_level: ViewLevel::Universe,
             active_transition: None,
-            transition_spring: SpringF32::with_config(1.0, SpringConfig::SLOW),
+            transition_spring: SpringF32::with_config(1.0, SpringConfig::from_preset("slow")),
             depth_colors: DepthColors::default(),
             current_depth: 0.0, // Start at Universe depth
             universe_graph: None,

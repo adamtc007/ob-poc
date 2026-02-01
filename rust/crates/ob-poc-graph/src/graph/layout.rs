@@ -2,43 +2,68 @@
 //!
 //! Entities are assigned to "slots" based on their primary role.
 //! Templates define slot positions for different CBU categories.
+//! Layout constants are loaded from `config/graph_settings.yaml`.
 
 #![allow(dead_code)]
 
 use super::types::*;
+use crate::config::global_config;
 use egui::{Pos2, Vec2};
 use std::collections::HashMap;
 
 // =============================================================================
-// LAYOUT CONSTANTS
+// LAYOUT CONSTANTS (config-driven)
 // =============================================================================
 
-/// Default node size
-pub const NODE_WIDTH: f32 = 160.0;
-pub const NODE_HEIGHT: f32 = 70.0;
+/// Get node width from config
+pub fn node_width() -> f32 {
+    global_config().layout.node.width
+}
 
-/// Minimum and maximum node size scale factors based on importance
-const MIN_SIZE_SCALE: f32 = 0.7;
-const MAX_SIZE_SCALE: f32 = 1.3;
+/// Get node height from config
+pub fn node_height() -> f32 {
+    global_config().layout.node.height
+}
 
-/// Spacing between nodes
-pub const H_SPACING: f32 = 40.0;
-pub const V_SPACING: f32 = 120.0;
+/// Get horizontal spacing from config
+pub fn h_spacing() -> f32 {
+    global_config().layout.spacing.horizontal
+}
+
+/// Get vertical spacing from config
+pub fn v_spacing() -> f32 {
+    global_config().layout.spacing.vertical
+}
 
 /// Compute node size based on importance (0.0 - 1.0)
 /// Returns scaled (width, height) tuple
-/// CBU (importance=1.0) gets MAX_SIZE_SCALE, leaves (importance~0.3) get MIN_SIZE_SCALE
+/// CBU (importance=1.0) gets max_scale, leaves (importance~0.3) get min_scale
 fn size_for_importance(importance: f32) -> Vec2 {
-    let scale = MIN_SIZE_SCALE + (MAX_SIZE_SCALE - MIN_SIZE_SCALE) * importance.clamp(0.0, 1.0);
-    Vec2::new(NODE_WIDTH * scale, NODE_HEIGHT * scale)
+    let cfg = &global_config().layout.node;
+    let scale = cfg.min_scale + (cfg.max_scale - cfg.min_scale) * importance.clamp(0.0, 1.0);
+    Vec2::new(cfg.width * scale, cfg.height * scale)
 }
 
-/// Vertical positions for role tiers (Y coordinates)
-const TIER_CBU: f32 = 0.0;
-const TIER_STRUCTURE: f32 = 150.0; // ManCo, Principal, Fund entity
-const TIER_OFFICERS: f32 = 300.0; // Directors, Officers
-const TIER_UBO: f32 = 450.0; // UBOs, Shareholders
-const TIER_INVESTORS: f32 = 600.0; // Investors (collapsed)
+/// Get tier Y positions from config
+pub fn tier_cbu() -> f32 {
+    global_config().layout.tiers.cbu
+}
+
+pub fn tier_structure() -> f32 {
+    global_config().layout.tiers.structure
+}
+
+pub fn tier_officers() -> f32 {
+    global_config().layout.tiers.officers
+}
+
+pub fn tier_ubo() -> f32 {
+    global_config().layout.tiers.ubo
+}
+
+pub fn tier_investors() -> f32 {
+    global_config().layout.tiers.investors
+}
 
 // =============================================================================
 // SLOT DEFINITIONS
@@ -72,49 +97,49 @@ fn fund_mandate_template() -> LayoutTemplate {
         slots: vec![
             Slot {
                 name: "cbu",
-                position: Pos2::new(0.0, TIER_CBU),
+                position: Pos2::new(0.0, tier_cbu()),
                 accepts_roles: &["CBU"],
                 max_count: 1,
             },
             Slot {
                 name: "manco",
-                position: Pos2::new(-200.0, TIER_STRUCTURE),
+                position: Pos2::new(-200.0, tier_structure()),
                 accepts_roles: &["MANAGEMENT_COMPANY", "MANCO"],
                 max_count: 1,
             },
             Slot {
                 name: "principal",
-                position: Pos2::new(0.0, TIER_STRUCTURE),
+                position: Pos2::new(0.0, tier_structure()),
                 accepts_roles: &["PRINCIPAL"],
                 max_count: 1,
             },
             Slot {
                 name: "fund_admin",
-                position: Pos2::new(200.0, TIER_STRUCTURE),
+                position: Pos2::new(200.0, tier_structure()),
                 accepts_roles: &["FUND_ADMINISTRATOR"],
                 max_count: 1,
             },
             Slot {
                 name: "directors",
-                position: Pos2::new(-150.0, TIER_OFFICERS),
+                position: Pos2::new(-150.0, tier_officers()),
                 accepts_roles: &["DIRECTOR"],
                 max_count: 0, // unlimited, horizontal
             },
             Slot {
                 name: "officers",
-                position: Pos2::new(150.0, TIER_OFFICERS),
+                position: Pos2::new(150.0, tier_officers()),
                 accepts_roles: &["OFFICER", "AUTHORIZED_SIGNATORY", "CONTACT_PERSON"],
                 max_count: 0,
             },
             Slot {
                 name: "ubos",
-                position: Pos2::new(0.0, TIER_UBO),
+                position: Pos2::new(0.0, tier_ubo()),
                 accepts_roles: &["ULTIMATE_BENEFICIAL_OWNER", "UBO", "SHAREHOLDER"],
                 max_count: 0,
             },
             Slot {
                 name: "investors",
-                position: Pos2::new(0.0, TIER_INVESTORS),
+                position: Pos2::new(0.0, tier_investors()),
                 accepts_roles: &["INVESTOR"],
                 max_count: 0,
             },
@@ -128,37 +153,37 @@ fn corporate_group_template() -> LayoutTemplate {
         slots: vec![
             Slot {
                 name: "cbu",
-                position: Pos2::new(0.0, TIER_CBU),
+                position: Pos2::new(0.0, tier_cbu()),
                 accepts_roles: &["CBU"],
                 max_count: 1,
             },
             Slot {
                 name: "principal",
-                position: Pos2::new(0.0, TIER_STRUCTURE),
+                position: Pos2::new(0.0, tier_structure()),
                 accepts_roles: &["PRINCIPAL"],
                 max_count: 1,
             },
             Slot {
                 name: "subsidiaries",
-                position: Pos2::new(-200.0, TIER_STRUCTURE),
+                position: Pos2::new(-200.0, tier_structure()),
                 accepts_roles: &["SUBSIDIARY"],
                 max_count: 0,
             },
             Slot {
                 name: "directors",
-                position: Pos2::new(-100.0, TIER_OFFICERS),
+                position: Pos2::new(-100.0, tier_officers()),
                 accepts_roles: &["DIRECTOR"],
                 max_count: 0,
             },
             Slot {
                 name: "officers",
-                position: Pos2::new(100.0, TIER_OFFICERS),
+                position: Pos2::new(100.0, tier_officers()),
                 accepts_roles: &["OFFICER", "AUTHORIZED_SIGNATORY", "CONTACT_PERSON"],
                 max_count: 0,
             },
             Slot {
                 name: "ubos",
-                position: Pos2::new(0.0, TIER_UBO),
+                position: Pos2::new(0.0, tier_ubo()),
                 accepts_roles: &["ULTIMATE_BENEFICIAL_OWNER", "UBO", "SHAREHOLDER"],
                 max_count: 0,
             },
@@ -172,37 +197,37 @@ fn family_trust_template() -> LayoutTemplate {
         slots: vec![
             Slot {
                 name: "cbu",
-                position: Pos2::new(0.0, TIER_CBU),
+                position: Pos2::new(0.0, tier_cbu()),
                 accepts_roles: &["CBU"],
                 max_count: 1,
             },
             Slot {
                 name: "trustee",
-                position: Pos2::new(-150.0, TIER_STRUCTURE),
+                position: Pos2::new(-150.0, tier_structure()),
                 accepts_roles: &["TRUSTEE"],
                 max_count: 1,
             },
             Slot {
                 name: "protector",
-                position: Pos2::new(150.0, TIER_STRUCTURE),
+                position: Pos2::new(150.0, tier_structure()),
                 accepts_roles: &["PROTECTOR"],
                 max_count: 1,
             },
             Slot {
                 name: "settlor",
-                position: Pos2::new(-150.0, TIER_OFFICERS),
+                position: Pos2::new(-150.0, tier_officers()),
                 accepts_roles: &["SETTLOR"],
                 max_count: 1,
             },
             Slot {
                 name: "beneficiaries",
-                position: Pos2::new(0.0, TIER_UBO),
+                position: Pos2::new(0.0, tier_ubo()),
                 accepts_roles: &["BENEFICIARY"],
                 max_count: 0,
             },
             Slot {
                 name: "ubos",
-                position: Pos2::new(0.0, TIER_UBO + 120.0),
+                position: Pos2::new(0.0, tier_ubo() + 120.0),
                 accepts_roles: &["ULTIMATE_BENEFICIAL_OWNER", "UBO"],
                 max_count: 0,
             },
@@ -693,11 +718,11 @@ impl LayoutEngine {
         }
 
         // Calculate horizontal spread
-        let total_width = count as f32 * NODE_WIDTH + (count - 1) as f32 * H_SPACING;
-        let start_x = slot.position.x - total_width / 2.0 + NODE_WIDTH / 2.0;
+        let total_width = count as f32 * node_width() + (count - 1) as f32 * h_spacing();
+        let start_x = slot.position.x - total_width / 2.0 + node_width() / 2.0;
 
         for (i, node) in nodes.iter().enumerate() {
-            let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+            let x = start_x + i as f32 * (node_width() + h_spacing());
             let position = Pos2::new(x, slot.position.y);
 
             let hints = NodeVisualHints::from_node_data(node);
@@ -762,14 +787,14 @@ impl LayoutEngine {
     }
 
     fn position_unassigned(&self, graph: &mut LayoutGraph, nodes: &[&GraphNodeData]) {
-        let y = TIER_INVESTORS + V_SPACING; // Below investors
+        let y = tier_investors() + v_spacing(); // Below investors
 
         let count = nodes.len();
-        let total_width = count as f32 * NODE_WIDTH + (count - 1) as f32 * H_SPACING;
-        let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+        let total_width = count as f32 * node_width() + (count - 1) as f32 * h_spacing();
+        let start_x = -total_width / 2.0 + node_width() / 2.0;
 
         for (i, node) in nodes.iter().enumerate() {
-            let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+            let x = start_x + i as f32 * (node_width() + h_spacing());
             let position = Pos2::new(x, y);
 
             let hints = NodeVisualHints::from_node_data(node);
@@ -873,11 +898,11 @@ impl LayoutEngine {
         let product_count = products.len();
         if product_count > 0 {
             let total_width =
-                product_count as f32 * NODE_WIDTH + (product_count - 1) as f32 * H_SPACING;
-            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+                product_count as f32 * node_width() + (product_count - 1) as f32 * h_spacing();
+            let start_x = -total_width / 2.0 + node_width() / 2.0;
 
             for (i, product) in products.iter().enumerate() {
-                let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                let x = start_x + i as f32 * (node_width() + h_spacing());
                 let position = Pos2::new(x, TIER_PRODUCT);
 
                 let hints = NodeVisualHints::default_for_service_layer();
@@ -936,12 +961,12 @@ impl LayoutEngine {
                 // Position services under this product
                 if let Some(prod_services) = product_services.get(&product.id) {
                     let svc_count = prod_services.len();
-                    let svc_total_width =
-                        svc_count as f32 * NODE_WIDTH + (svc_count - 1) as f32 * (H_SPACING / 2.0);
-                    let svc_start_x = x - svc_total_width / 2.0 + NODE_WIDTH / 2.0;
+                    let svc_total_width = svc_count as f32 * node_width()
+                        + (svc_count - 1) as f32 * (h_spacing() / 2.0);
+                    let svc_start_x = x - svc_total_width / 2.0 + node_width() / 2.0;
 
                     for (j, service) in prod_services.iter().enumerate() {
-                        let svc_x = svc_start_x + j as f32 * (NODE_WIDTH + H_SPACING / 2.0);
+                        let svc_x = svc_start_x + j as f32 * (node_width() + h_spacing() / 2.0);
                         let svc_position = Pos2::new(svc_x, TIER_SERVICE);
 
                         let svc_hints = NodeVisualHints::default_for_service_layer();
@@ -1000,12 +1025,13 @@ impl LayoutEngine {
                         // Position resources under this service
                         if let Some(svc_resources) = service_resources.get(&service.id) {
                             let res_count = svc_resources.len();
-                            let res_total_width = res_count as f32 * NODE_WIDTH
-                                + (res_count - 1) as f32 * (H_SPACING / 3.0);
-                            let res_start_x = svc_x - res_total_width / 2.0 + NODE_WIDTH / 2.0;
+                            let res_total_width = res_count as f32 * node_width()
+                                + (res_count - 1) as f32 * (h_spacing() / 3.0);
+                            let res_start_x = svc_x - res_total_width / 2.0 + node_width() / 2.0;
 
                             for (k, resource) in svc_resources.iter().enumerate() {
-                                let res_x = res_start_x + k as f32 * (NODE_WIDTH + H_SPACING / 3.0);
+                                let res_x =
+                                    res_start_x + k as f32 * (node_width() + h_spacing() / 3.0);
                                 let res_position = Pos2::new(res_x, TIER_RESOURCE);
 
                                 let res_hints = NodeVisualHints::default_for_service_layer();
@@ -1080,11 +1106,11 @@ impl LayoutEngine {
 
         if !orphan_services.is_empty() {
             let count = orphan_services.len();
-            let total_width = count as f32 * NODE_WIDTH + (count - 1) as f32 * H_SPACING;
-            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+            let total_width = count as f32 * node_width() + (count - 1) as f32 * h_spacing();
+            let start_x = -total_width / 2.0 + node_width() / 2.0;
 
             for (i, service) in orphan_services.iter().enumerate() {
-                let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                let x = start_x + i as f32 * (node_width() + h_spacing());
                 let position = Pos2::new(x, TIER_SERVICE);
 
                 let hints = NodeVisualHints::default_for_service_layer();
@@ -1155,11 +1181,11 @@ impl LayoutEngine {
 
         if !orphan_resources.is_empty() {
             let count = orphan_resources.len();
-            let total_width = count as f32 * NODE_WIDTH + (count - 1) as f32 * H_SPACING;
-            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+            let total_width = count as f32 * node_width() + (count - 1) as f32 * h_spacing();
+            let start_x = -total_width / 2.0 + node_width() / 2.0;
 
             for (i, resource) in orphan_resources.iter().enumerate() {
-                let x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                let x = start_x + i as f32 * (node_width() + h_spacing());
                 let position = Pos2::new(x, TIER_RESOURCE);
 
                 let hints = NodeVisualHints::default_for_service_layer();
@@ -1304,7 +1330,7 @@ impl LayoutEngine {
         // Group nodes by Y position (tier)
         let mut tiers: HashMap<i32, Vec<String>> = HashMap::new();
         for (id, node) in &graph.nodes {
-            let tier_key = (node.position.y / V_SPACING).round() as i32;
+            let tier_key = (node.position.y / v_spacing()).round() as i32;
             tiers.entry(tier_key).or_default().push(id.clone());
         }
 
@@ -1331,18 +1357,18 @@ impl LayoutEngine {
 
         // Apply new X positions based on order within tier
         for (tier_key, node_ids) in &tiers {
-            let tier_y = *tier_key as f32 * V_SPACING;
+            let tier_y = *tier_key as f32 * v_spacing();
             let count = node_ids.len();
             if count == 0 {
                 continue;
             }
 
-            let total_width = count as f32 * NODE_WIDTH + (count - 1) as f32 * H_SPACING;
-            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+            let total_width = count as f32 * node_width() + (count - 1) as f32 * h_spacing();
+            let start_x = -total_width / 2.0 + node_width() / 2.0;
 
             for (i, id) in node_ids.iter().enumerate() {
                 if let Some(node) = graph.nodes.get_mut(id) {
-                    let new_x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                    let new_x = start_x + i as f32 * (node_width() + h_spacing());
                     node.position.x = new_x;
                     node.position.y = tier_y;
                     node.base_position = node.position;
@@ -1475,12 +1501,12 @@ impl LayoutEngine {
         // Position persons at top, spread horizontally
         if !persons.is_empty() {
             let total_width =
-                persons.len() as f32 * NODE_WIDTH + (persons.len() - 1) as f32 * H_SPACING;
-            let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+                persons.len() as f32 * node_width() + (persons.len() - 1) as f32 * h_spacing();
+            let start_x = -total_width / 2.0 + node_width() / 2.0;
 
             for (i, person_id) in persons.iter().enumerate() {
                 if let Some(node) = graph.nodes.get_mut(person_id) {
-                    node.position.x = start_x + i as f32 * (NODE_WIDTH + H_SPACING);
+                    node.position.x = start_x + i as f32 * (node_width() + h_spacing());
                     node.position.y = UBO_TIER_PERSON;
                     node.base_position = node.position;
                 }
@@ -1499,7 +1525,7 @@ impl LayoutEngine {
         let shell_tier_count = if shell_positions.is_empty() {
             0
         } else {
-            ((UBO_TIER_CBU - UBO_TIER_SHELL_BASE) / V_SPACING).floor() as usize
+            ((UBO_TIER_CBU - UBO_TIER_SHELL_BASE) / v_spacing()).floor() as usize
         };
 
         if shell_tier_count > 0 && !shell_positions.is_empty() {
@@ -1511,17 +1537,17 @@ impl LayoutEngine {
                 let pos_in_tier = i % shells_per_tier.max(1);
 
                 if let Some(node) = graph.nodes.get_mut(shell_id) {
-                    let tier_y = UBO_TIER_SHELL_BASE + tier as f32 * V_SPACING;
+                    let tier_y = UBO_TIER_SHELL_BASE + tier as f32 * v_spacing();
                     let entities_in_this_tier = shell_positions
                         .iter()
                         .skip(tier * shells_per_tier)
                         .take(shells_per_tier)
                         .count();
-                    let total_width = entities_in_this_tier as f32 * NODE_WIDTH
-                        + (entities_in_this_tier - 1) as f32 * H_SPACING;
-                    let start_x = -total_width / 2.0 + NODE_WIDTH / 2.0;
+                    let total_width = entities_in_this_tier as f32 * node_width()
+                        + (entities_in_this_tier - 1) as f32 * h_spacing();
+                    let start_x = -total_width / 2.0 + node_width() / 2.0;
 
-                    node.position.x = start_x + pos_in_tier as f32 * (NODE_WIDTH + H_SPACING);
+                    node.position.x = start_x + pos_in_tier as f32 * (node_width() + h_spacing());
                     node.position.y = tier_y;
                     node.base_position = node.position;
                 }

@@ -374,16 +374,16 @@ impl GalaxyView {
             agent_state: AgentState::default(),
             node_anomalies: HashMap::new(),
             anomaly_pulse: 0.0,
-            speech_opacity: SpringF32::with_config(0.0, SpringConfig::AGENT_UI),
+            speech_opacity: SpringF32::with_config(0.0, SpringConfig::from_preset("agent_ui")),
             speech_start_time: 0.0,
             speech_cooldown_until: 0.0,
             speech_elapsed: 0.0,
             prefetch_hints: Vec::new(),
             // Phase 6: Autopilot Navigation
             autopilot_mission: None,
-            route_path_progress: SpringF32::with_config(0.0, SpringConfig::GENTLE),
-            autopilot_camera_x: SpringF32::with_config(0.0, SpringConfig::AUTOPILOT),
-            autopilot_camera_y: SpringF32::with_config(0.0, SpringConfig::AUTOPILOT),
+            route_path_progress: SpringF32::with_config(0.0, SpringConfig::from_preset("gentle")),
+            autopilot_camera_x: SpringF32::with_config(0.0, SpringConfig::from_preset("autopilot")),
+            autopilot_camera_y: SpringF32::with_config(0.0, SpringConfig::from_preset("autopilot")),
             user_input_this_frame: false,
             // Phase 8: Depth Atmosphere Particles
             particles: Self::create_particles(0), // Start at universe depth

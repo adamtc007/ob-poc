@@ -448,6 +448,28 @@ enum Command {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
+
+    /// Check and validate graph configuration
+    ///
+    /// Loads graph_settings.yaml and validates all configuration values.
+    /// Reports errors for invalid thresholds, missing values, or constraint violations.
+    GraphConfig {
+        /// Path to config file (default: config/graph_settings.yaml)
+        #[arg(long, short = 'c')]
+        config: Option<std::path::PathBuf>,
+
+        /// Show all configuration values
+        #[arg(long, short = 'v')]
+        verbose: bool,
+
+        /// Output as JSON (for programmatic use)
+        #[arg(long)]
+        json: bool,
+
+        /// Validate only, don't print config
+        #[arg(long)]
+        validate_only: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -736,6 +758,12 @@ fn main() -> Result<()> {
             format,
             verbose,
         } => playbook_check(files, &format, verbose),
+        Command::GraphConfig {
+            config,
+            verbose,
+            json,
+            validate_only,
+        } => graph_config_check(config, verbose, json, validate_only),
         Command::LexiconHarness {
             prompts,
             standard,
@@ -2018,6 +2046,310 @@ fn playbook_check(files: Vec<std::path::PathBuf>, format: &str, verbose: bool) -
     if total_errors > 0 {
         anyhow::bail!("Playbook check failed with {} errors", total_errors);
     }
+
+    Ok(())
+}
+
+// ============================================================================
+// Graph Config Check
+// ============================================================================
+
+fn graph_config_check(
+    config_path: Option<std::path::PathBuf>,
+    verbose: bool,
+    json: bool,
+    validate_only: bool,
+) -> Result<()> {
+    use ob_poc_graph::config::GraphConfig;
+
+    println!("==========================================");
+    println!("  Graph Configuration Check (Policy)");
+    println!("==========================================");
+    println!();
+
+    // Load config from specified path or default
+    let config = if let Some(ref path) = config_path {
+        println!("Loading: {}", path.display());
+        GraphConfig::load_from_path(path)
+            .with_context(|| format!("Failed to load config from {}", path.display()))?
+    } else {
+        println!("Loading: config/graph_settings.yaml (default)");
+        GraphConfig::load_default().context("Failed to load default config")?
+    };
+
+    // Show policy metadata
+    println!("Policy:");
+    println!("  name:    {}", config.policy.name);
+    println!("  variant: {}", config.policy.variant);
+    println!("  version: {}", config.policy.version);
+    println!("  hash:    {:016x}", config.policy_hash());
+    println!();
+
+    // Validate
+    println!("Validating configuration...");
+    match config.validate() {
+        Ok(()) => {
+            println!("  All validation checks passed");
+        }
+        Err(errors) => {
+            println!("  ERRORS:");
+            for error in &errors {
+                println!("    - {}", error);
+            }
+            println!();
+            anyhow::bail!(
+                "Configuration validation failed with {} errors",
+                errors.len()
+            );
+        }
+    }
+
+    if validate_only {
+        println!();
+        println!("==========================================");
+        println!("  Validation complete (--validate-only)");
+        println!("==========================================");
+        return Ok(());
+    }
+
+    println!();
+
+    // Output config
+    if json {
+        let json_output =
+            serde_json::to_string_pretty(&config).context("Failed to serialize config to JSON")?;
+        println!("{}", json_output);
+    } else if verbose {
+        println!("Configuration values:");
+        println!();
+
+        // LOD Tiers (new zoom-based system)
+        println!("LOD Tiers (zoom-based):");
+        println!(
+            "  icon:     zoom_max={:.2}, hysteresis={:.2}",
+            config.lod.tiers.icon.zoom_max, config.lod.tiers.icon.hysteresis
+        );
+        println!(
+            "  label:    zoom_max={:.2}, hysteresis={:.2}",
+            config.lod.tiers.label.zoom_max, config.lod.tiers.label.hysteresis
+        );
+        println!(
+            "  extended: zoom_max={:.2}, hysteresis={:.2}",
+            config.lod.tiers.extended.zoom_max, config.lod.tiers.extended.hysteresis
+        );
+        println!(
+            "  full:     zoom_max={:.2}, hysteresis={:.2}",
+            config.lod.tiers.full.zoom_max, config.lod.tiers.full.hysteresis
+        );
+        println!();
+
+        println!("LOD Thresholds (legacy screen-size):");
+        println!("  micro:    < {:.1}px", config.lod.thresholds.micro);
+        println!("  icon:     < {:.1}px", config.lod.thresholds.icon);
+        println!("  compact:  < {:.1}px", config.lod.thresholds.compact);
+        println!("  standard: < {:.1}px", config.lod.thresholds.standard);
+        println!();
+
+        println!("Budgets:");
+        println!(
+            "  icons_unlimited:           {}",
+            config.budgets.icons_unlimited
+        );
+        println!(
+            "  label_budget_count:        {}",
+            config.budgets.label_budget_count
+        );
+        println!(
+            "  full_budget_count:         {}",
+            config.budgets.full_budget_count
+        );
+        println!(
+            "  shape_budget_ms_per_frame: {:.1}ms",
+            config.budgets.shape_budget_ms_per_frame
+        );
+        println!(
+            "  visible_query_budget_ms:   {:.1}ms",
+            config.budgets.visible_query_budget_ms
+        );
+        println!();
+
+        println!("Flyover Navigation:");
+        println!("  dwell_ticks:       {}", config.flyover.dwell_ticks);
+        println!(
+            "  settle_duration_s: {:.2}s",
+            config.flyover.settle_duration_s
+        );
+        println!("  easing:            {}", config.flyover.easing);
+        println!("  Phases:");
+        println!(
+            "    moving:   selection={}, siblings={}, shaping={}",
+            config.flyover.phases.moving.selection_lod,
+            config.flyover.phases.moving.siblings_lod,
+            config.flyover.phases.moving.shaping_allowed
+        );
+        println!(
+            "    settling: selection={}, siblings={}, shaping={}",
+            config.flyover.phases.settling.selection_lod,
+            config.flyover.phases.settling.siblings_lod,
+            config.flyover.phases.settling.shaping_allowed
+        );
+        println!(
+            "    focused:  selection={}, siblings={}, shaping={}",
+            config.flyover.phases.focused.selection_lod,
+            config.flyover.phases.focused.siblings_lod,
+            config.flyover.phases.focused.shaping_allowed
+        );
+        println!();
+
+        println!("Structural Mode:");
+        println!(
+            "  density_cutover.icon_only: {} nodes",
+            config.structural.density_cutover.icon_only
+        );
+        println!(
+            "  density_cutover.labels:    {} nodes",
+            config.structural.density_cutover.labels
+        );
+        println!(
+            "  max_labels_per_cluster:    {}",
+            config.structural.max_labels_per_cluster
+        );
+        println!();
+
+        println!("Camera:");
+        println!("  pan_speed:     {:.1}", config.camera.pan_speed);
+        println!("  zoom_speed:    {:.1}", config.camera.zoom_speed);
+        println!("  snap_epsilon:  {:.4}", config.camera.snap_epsilon);
+        println!("  focus_padding: {:.1}px", config.camera.focus_padding);
+        println!();
+
+        println!("Focus:");
+        println!(
+            "  selection_priority:    {:?}",
+            config.focus.selection_priority
+        );
+        println!(
+            "  neighbor_ring_size:    {}",
+            config.focus.neighbor_ring_size
+        );
+        println!(
+            "  prefetch_radius_cells: {}",
+            config.focus.prefetch_radius_cells
+        );
+        println!();
+
+        println!("Label Cache:");
+        println!("  max_entries:        {}", config.label_cache.max_entries);
+        println!(
+            "  width_quantization: {}px",
+            config.label_cache.width_quantization
+        );
+        println!("  eviction:           {}", config.label_cache.eviction);
+        println!();
+
+        println!("Spatial Index:");
+        println!(
+            "  default_cell_size: {:.1}px",
+            config.spatial_index.default_cell_size
+        );
+        if !config.spatial_index.chamber_overrides.is_empty() {
+            println!("  chamber_overrides:");
+            for (name, cfg) in &config.spatial_index.chamber_overrides {
+                println!("    {}: cell_size={:.1}px", name, cfg.cell_size);
+            }
+        }
+        println!();
+
+        println!("Layout Node:");
+        println!("  width:     {:.1}px", config.layout.node.width);
+        println!("  height:    {:.1}px", config.layout.node.height);
+        println!("  min_scale: {:.2}", config.layout.node.min_scale);
+        println!("  max_scale: {:.2}", config.layout.node.max_scale);
+        println!();
+
+        println!("Layout Spacing:");
+        println!("  horizontal: {:.1}px", config.layout.spacing.horizontal);
+        println!("  vertical:   {:.1}px", config.layout.spacing.vertical);
+        println!();
+
+        println!("Layout Tiers:");
+        println!("  cbu:       {:.1}", config.layout.tiers.cbu);
+        println!("  structure: {:.1}", config.layout.tiers.structure);
+        println!("  officers:  {:.1}", config.layout.tiers.officers);
+        println!("  ubo:       {:.1}", config.layout.tiers.ubo);
+        println!("  investors: {:.1}", config.layout.tiers.investors);
+        println!();
+
+        println!("Viewport:");
+        println!("  fit_margin:           {:.2}", config.viewport.fit_margin);
+        println!(
+            "  min_auto_zoom:        {:.2}",
+            config.viewport.min_auto_zoom
+        );
+        println!(
+            "  max_auto_zoom:        {:.2}",
+            config.viewport.max_auto_zoom
+        );
+        println!(
+            "  max_visible_nodes:    {}",
+            config.viewport.max_visible_nodes
+        );
+        println!(
+            "  max_visible_clusters: {}",
+            config.viewport.max_visible_clusters
+        );
+        println!();
+
+        println!(
+            "Animation Springs ({} defined):",
+            config.animation.springs.len()
+        );
+        let mut springs: Vec<_> = config.animation.springs.iter().collect();
+        springs.sort_by_key(|(name, _)| *name);
+        for (name, spring) in springs {
+            println!(
+                "  {}: stiffness={:.1}, damping={:.1}",
+                name, spring.stiffness, spring.damping
+            );
+        }
+        println!();
+
+        println!("Debug:");
+        println!("  overlay.enabled:      {}", config.debug.overlay.enabled);
+        println!(
+            "  overlay.show_hashes:  {}",
+            config.debug.overlay.show_hashes
+        );
+        println!(
+            "  overlay.show_phase:   {}",
+            config.debug.overlay.show_phase
+        );
+        println!(
+            "  overlay.show_timings: {}",
+            config.debug.overlay.show_timings
+        );
+        println!();
+
+        println!("Safety Clamps:");
+        println!("  max_nodes_visible:   {}", config.clamps.max_nodes_visible);
+        println!(
+            "  max_chambers_loaded: {}",
+            config.clamps.max_chambers_loaded
+        );
+        println!(
+            "  max_snapshot_bytes:  {} bytes ({:.1}MB)",
+            config.clamps.max_snapshot_bytes,
+            config.clamps.max_snapshot_bytes as f64 / 1_000_000.0
+        );
+    } else {
+        println!("Configuration loaded successfully.");
+        println!("Use --verbose to see all values, or --json for machine-readable output.");
+    }
+
+    println!();
+    println!("==========================================");
+    println!("  Graph config check complete");
+    println!("==========================================");
 
     Ok(())
 }

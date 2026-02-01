@@ -209,10 +209,10 @@ impl Default for ViewportRenderState {
 impl ViewportRenderState {
     pub fn new() -> Self {
         Self {
-            focus_ring_pos: SpringVec2::with_config(0.0, 0.0, SpringConfig::MEDIUM),
-            focus_ring_scale: SpringF32::with_config(1.0, SpringConfig::FAST),
-            breadcrumb_height: SpringF32::with_config(0.0, SpringConfig::FAST),
-            hud_opacity: SpringF32::with_config(1.0, SpringConfig::MEDIUM),
+            focus_ring_pos: SpringVec2::with_config(0.0, 0.0, SpringConfig::from_preset("medium")),
+            focus_ring_scale: SpringF32::with_config(1.0, SpringConfig::from_preset("fast")),
+            breadcrumb_height: SpringF32::with_config(0.0, SpringConfig::from_preset("fast")),
+            hud_opacity: SpringF32::with_config(1.0, SpringConfig::from_preset("medium")),
             focus_ring_target_id: None,
             confidence_threshold: 0.0, // Show all by default
         }

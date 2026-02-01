@@ -7,6 +7,16 @@
 //! - Animation state is UI-only (not server data)
 //! - No callbacks - values are polled each frame via `get()`
 //! - Call `tick(dt)` at start of update(), then render with `get()` values
+//!
+//! # Config-Driven Spring Presets
+//!
+//! Spring presets are loaded from `config/graph_settings.yaml` via `global_config()`.
+//! Use `SpringConfig::from_preset("camera")` to get config-driven values.
+//!
+//! Available presets: fast, medium, slow, bouncy, instant, snappy, organic,
+//! gentle, camera, agent_ui, autopilot, pulse
+
+use crate::config::{global_config, SpringConfigYaml};
 
 /// Spring configuration parameters
 #[derive(Debug, Clone, Copy)]
@@ -20,93 +30,40 @@ pub struct SpringConfig {
 
 impl Default for SpringConfig {
     fn default() -> Self {
-        Self::MEDIUM
+        Self::from_preset("medium")
+    }
+}
+
+impl From<SpringConfigYaml> for SpringConfig {
+    fn from(yaml: SpringConfigYaml) -> Self {
+        Self {
+            stiffness: yaml.stiffness,
+            damping: yaml.damping,
+        }
     }
 }
 
 impl SpringConfig {
-    /// Fast, snappy animation (UI button responses, quick zooms)
-    pub const FAST: Self = Self {
-        stiffness: 300.0,
-        damping: 1.0,
-    };
-
-    /// Medium animation (camera moves, node transitions)
-    pub const MEDIUM: Self = Self {
-        stiffness: 150.0,
-        damping: 1.0,
-    };
-
-    /// Slow, cinematic animation (view transitions, drill-down)
-    pub const SLOW: Self = Self {
-        stiffness: 80.0,
-        damping: 1.0,
-    };
-
-    /// Bouncy animation (attention-grabbing, playful)
-    pub const BOUNCY: Self = Self {
-        stiffness: 200.0,
-        damping: 0.6,
-    };
-
-    /// Very fast for immediate feedback
-    pub const INSTANT: Self = Self {
-        stiffness: 500.0,
-        damping: 1.0,
-    };
-
-    // =========================================================================
-    // GALAXY NAVIGATION SPRING CONFIGS (Phase 8 Polish)
-    // =========================================================================
-
-    /// Snappy response for UI elements and node interactions
-    /// High stiffness, higher damping to prevent overshoot
-    pub const SNAPPY: Self = Self {
-        stiffness: 300.0,
-        damping: 1.25, // Slightly overdamped for crisp feel
-    };
-
-    /// Organic, natural-feeling motion for node expansions
-    /// Lower damping allows subtle overshoot for lifelike feel
-    pub const ORGANIC: Self = Self {
-        stiffness: 180.0,
-        damping: 0.85,
-    };
-
-    /// Gentle transitions for level changes and deep navigation
-    /// Slower, more contemplative motion
-    pub const GENTLE: Self = Self {
-        stiffness: 120.0,
-        damping: 1.0,
-    };
-
-    /// Camera-specific spring for smooth fly-to animations
-    /// Balanced for smooth tracking without lag
-    pub const CAMERA: Self = Self {
-        stiffness: 150.0,
-        damping: 1.1, // Slightly overdamped to avoid camera jitter
-    };
-
-    /// Agent speech and UI overlay animations
-    /// Quick fade-in, holds, gentle fade-out
-    pub const AGENT_UI: Self = Self {
-        stiffness: 200.0,
-        damping: 1.0,
-    };
-
-    /// Autopilot camera following
-    /// Slightly looser to allow for anticipatory camera lead
-    pub const AUTOPILOT: Self = Self {
-        stiffness: 120.0,
-        damping: 0.95,
-    };
-
-    /// Anomaly pulse animation (continuous, subtle)
-    /// Low stiffness for slow, organic pulse
-    pub const PULSE: Self = Self {
-        stiffness: 60.0,
-        damping: 0.8,
-    };
+    /// Load spring config from YAML preset by name.
+    ///
+    /// Falls back to reasonable defaults if preset not found.
+    ///
+    /// # Available presets
+    /// - `fast`: UI button responses, quick zooms
+    /// - `medium`: Camera moves, node transitions
+    /// - `slow`: View transitions, drill-down
+    /// - `bouncy`: Attention-grabbing, playful
+    /// - `instant`: Immediate feedback
+    /// - `snappy`: UI elements, crisp feel
+    /// - `organic`: Natural motion with subtle overshoot
+    /// - `gentle`: Level changes, contemplative motion
+    /// - `camera`: Smooth fly-to animations
+    /// - `agent_ui`: Agent speech overlays
+    /// - `autopilot`: Camera following
+    /// - `pulse`: Anomaly pulse animation
+    pub fn from_preset(name: &str) -> Self {
+        global_config().animation.spring(name).into()
+    }
 }
 
 // =============================================================================
@@ -133,9 +90,9 @@ pub struct SpringF32 {
 }
 
 impl SpringF32 {
-    /// Create with initial value and default (MEDIUM) spring config
+    /// Create with initial value and default (medium) spring config
     pub fn new(initial: f32) -> Self {
-        Self::with_config(initial, SpringConfig::MEDIUM)
+        Self::with_config(initial, SpringConfig::from_preset("medium"))
     }
 
     /// Create with initial value and custom spring config
@@ -302,6 +259,13 @@ impl SpringVec2 {
 /// NOT smooth interpolation - discrete steps with brief hold and scale pulse.
 /// Feels like Blade Runner's Esper machine: deliberate, mechanical, precision.
 ///
+/// # Config-Driven Parameters
+///
+/// Parameters are loaded from `config/graph_settings.yaml`:
+/// - `animation.default_hold_ms`: Hold duration between steps
+/// - `animation.scale_pulse_peak`: Scale bump on step change
+/// - `animation.scale_settle_factor`: How fast the pulse settles
+///
 /// # EGUI-RULES Compliance
 /// - Call `update(dt)` at start of frame (in update loop, not render)
 /// - Read state via `current_level()`, `scale()` for rendering
@@ -331,26 +295,59 @@ pub struct EsperTransition {
     hold_timer: f32,
     /// How long to hold each step before advancing (seconds)
     hold_duration: f32,
-    /// Scale pulse for "click" effect (1.0 = settled, 1.03 = peak)
+    /// Scale pulse for "click" effect (1.0 = settled, peak from config)
     scale_pulse: f32,
+    /// Scale pulse peak value (from config)
+    scale_pulse_peak: f32,
+    /// Scale settle factor (from config)
+    scale_settle_factor: f32,
     /// Whether transition is complete
     complete: bool,
 }
 
 impl EsperTransition {
-    /// Default hold duration between steps (100ms)
+    /// Default hold duration between steps (100ms) - deprecated, use config
+    #[deprecated(
+        since = "0.1.0",
+        note = "use global_config().animation.default_hold_ms"
+    )]
     pub const DEFAULT_HOLD_MS: u64 = 100;
 
-    /// Scale pulse peak (3% bump)
+    /// Scale pulse peak (3% bump) - deprecated, use config
+    #[deprecated(
+        since = "0.1.0",
+        note = "use global_config().animation.scale_pulse_peak"
+    )]
     pub const SCALE_PULSE_PEAK: f32 = 1.03;
 
-    /// Scale settle factor (0.3 = fast settle, ~3-4 frames at 60fps)
+    /// Scale settle factor - deprecated, use config
+    #[deprecated(
+        since = "0.1.0",
+        note = "use global_config().animation.scale_settle_factor"
+    )]
     pub const SCALE_SETTLE_FACTOR: f32 = 0.3;
+
+    /// Get default hold duration from config (in milliseconds)
+    pub fn default_hold_ms() -> u64 {
+        global_config().animation.default_hold_ms
+    }
+
+    /// Get scale pulse peak from config
+    pub fn scale_pulse_peak_config() -> f32 {
+        global_config().animation.scale_pulse_peak
+    }
+
+    /// Get scale settle factor from config
+    pub fn scale_settle_factor_config() -> f32 {
+        global_config().animation.scale_settle_factor
+    }
 
     /// Create transition from one enhance level to another
     ///
     /// Steps through each intermediate level - never skips.
     /// E.g., L0 → L3 steps through: L0 → L1 → L2 → L3
+    ///
+    /// Uses config-driven default hold duration from `graph_settings.yaml`.
     pub fn new(from_level: u8, to_level: u8) -> Self {
         let steps: Vec<u8> = if from_level <= to_level {
             (from_level..=to_level).collect()
@@ -358,12 +355,16 @@ impl EsperTransition {
             (to_level..=from_level).rev().collect()
         };
 
+        let anim_cfg = &global_config().animation;
+
         Self {
             steps,
             current_step: 0,
             hold_timer: 0.0,
-            hold_duration: Self::DEFAULT_HOLD_MS as f32 / 1000.0,
+            hold_duration: anim_cfg.default_hold_ms as f32 / 1000.0,
             scale_pulse: 1.0,
+            scale_pulse_peak: anim_cfg.scale_pulse_peak,
+            scale_settle_factor: anim_cfg.scale_settle_factor,
             complete: false,
         }
     }
@@ -389,7 +390,7 @@ impl EsperTransition {
         if self.hold_timer >= self.hold_duration && self.current_step < self.steps.len() - 1 {
             self.current_step += 1;
             self.hold_timer = 0.0;
-            self.scale_pulse = Self::SCALE_PULSE_PEAK; // The "click" - quick scale bump
+            self.scale_pulse = self.scale_pulse_peak; // The "click" - quick scale bump
         }
 
         // Check if we've completed all steps
@@ -401,7 +402,7 @@ impl EsperTransition {
         }
 
         // Settle the pulse (lerp toward 1.0)
-        self.scale_pulse = self.scale_pulse + (1.0 - self.scale_pulse) * Self::SCALE_SETTLE_FACTOR;
+        self.scale_pulse = self.scale_pulse + (1.0 - self.scale_pulse) * self.scale_settle_factor;
 
         EsperTransitionState::Stepping {
             level: self.steps[self.current_step],
@@ -539,7 +540,7 @@ mod tests {
 
     #[test]
     fn test_bouncy_spring() {
-        let mut spring = SpringF32::with_config(0.0, SpringConfig::BOUNCY);
+        let mut spring = SpringF32::with_config(0.0, SpringConfig::from_preset("bouncy"));
         spring.set_target(1.0);
 
         let mut max_value = 0.0f32;

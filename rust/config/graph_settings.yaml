@@ -1,0 +1,359 @@
+# Graph Visualization Settings (Policy Configuration)
+#
+# This file controls LOD thresholds, layout spacing, animation, and rendering
+# for the ESPER graph visualization. Changes here don't require code changes.
+#
+# Policy versioning: Changes to this file produce a new policy_hash, which
+# invalidates cached snapshots and triggers recompilation.
+#
+# Reload: cargo x graph-config check
+# Apply:  Hot-reload in dev, policy artifact rollout in prod
+
+# =============================================================================
+# POLICY METADATA
+# =============================================================================
+# Used for versioning, caching, and reproducibility.
+
+policy:
+  version: 1 # Increment on breaking schema changes
+  name: "default" # Policy name for A/B testing
+  variant: "baseline" # Variant identifier
+
+# =============================================================================
+# LEVEL OF DETAIL (LOD)
+# =============================================================================
+# Controls when nodes transition between detail levels based on screen-space size.
+# Screen size = node.size * camera.zoom
+
+lod:
+  # Screen-space width thresholds (pixels) for each detail level
+  # Micro: colored dot only
+  # Icon: shape + status color (no text)
+  # Label: shape + truncated name (1 line)
+  # Extended: shape + name + badges (3 lines)
+  # Full: all details inline (6+ lines)
+  tiers:
+    icon:
+      zoom_max: 0.8 # Below this zoom = icon tier
+      hysteresis: 0.08 # Prevents flicker at threshold
+    label:
+      zoom_max: 1.5
+      hysteresis: 0.10
+    extended:
+      zoom_max: 3.0
+      hysteresis: 0.12
+    full:
+      zoom_max: 999.0 # Effectively no upper limit
+      hysteresis: 0.15
+
+  # Legacy screen-size thresholds (kept for compatibility)
+  thresholds:
+    micro: 20.0 # < this = Micro (dot)
+    icon: 40.0 # < this = Icon (shape only)
+    compact: 70.0 # < this = Compact (truncated name)
+    standard: 120.0 # < this = Standard, >= this = Expanded
+
+  # Manual LOD cycling order for ENHANCE verb
+  manual_cycle_order: [icon, label, extended, full]
+
+  # Viewport-aware density scaling
+  density:
+    reference_viewport_area: 480000.0 # 800x600 baseline
+    base: 20.0 # Node count threshold
+    weight: 0.3 # Aggregation factor (0.0-1.0)
+
+  # Compression thresholds (inverse of zoom)
+  compression:
+    icon: 0.8
+    compact: 0.5
+    standard: 0.2
+
+# =============================================================================
+# BUDGETS
+# =============================================================================
+# Caps to prevent frame budget overruns. Primary defense against text shaping cost.
+
+budgets:
+  # Count caps per frame
+  icons_unlimited: true # Icons are cheap, no cap
+  label_budget_count: 250 # Max labels to shape/draw
+  full_budget_count: 20 # Max full-detail nodes
+
+  # Time caps (more robust than count-only)
+  shape_budget_ms_per_frame: 3.0 # Max text shaping time
+  visible_query_budget_ms: 2.0 # Max spatial query time
+
+# =============================================================================
+# FLYOVER NAVIGATION
+# =============================================================================
+# Phase-driven LOD during rapid navigation. Icons while moving, detail on dwell.
+
+flyover:
+  # Dwell timing
+  dwell_ticks: 30 # Frames before MOVING -> SETTLING (~0.5s at 60fps)
+  settle_duration_s: 0.2 # Animation time SETTLING -> FOCUSED
+
+  # Easing function for focus_t animation
+  easing: "smoothstep" # Options: linear, smoothstep, cubic, ease_out_quad
+
+  # Phase-specific LOD overrides
+  phases:
+    moving:
+      selection_lod: icon # Selected node LOD during movement
+      siblings_lod: icon # Sibling nodes LOD
+      shaping_allowed: false # No text shaping during rapid nav
+    settling:
+      selection_lod: label # Transitioning to detail
+      siblings_lod: icon
+      shaping_allowed: true # Gradual shaping allowed
+    focused:
+      selection_lod: full # Full detail when settled
+      siblings_lod: label
+      shaping_allowed: true
+
+  # Mode-specific defaults
+  mode_defaults:
+    spatial:
+      dwell_ticks: 30
+      settle_duration_s: 0.2
+    structural:
+      dwell_ticks: 20 # Faster in structural (more deliberate nav)
+      settle_duration_s: 0.15
+
+# =============================================================================
+# STRUCTURAL MODE
+# =============================================================================
+# Density-driven LOD for taxonomy/hierarchy navigation.
+
+structural:
+  # Density cutover thresholds (nodes per level)
+  density_cutover:
+    icon_only: 50 # > this = icons only
+    labels: 10 # > this = labels, <= this = full
+
+  # Max labels per cluster to prevent explosion
+  max_labels_per_cluster: 30
+
+# =============================================================================
+# CAMERA
+# =============================================================================
+# Camera motion parameters for smooth navigation.
+
+camera:
+  pan_speed: 1.0 # Multiplier for pan velocity
+  zoom_speed: 1.0 # Multiplier for zoom velocity
+  snap_epsilon: 0.001 # When "arrived" at target
+  focus_padding: 50.0 # Extra pixels around target when focusing
+
+# =============================================================================
+# FOCUS & SELECTION
+# =============================================================================
+# Rules for which nodes get detail priority.
+
+focus:
+  selection_priority: [selected, hovered, recent]
+  neighbor_ring_size: 3 # Siblings/nearby also show label
+  prefetch_radius_cells: 2 # Grid cells to prefetch around focus
+
+# =============================================================================
+# LABEL CACHE
+# =============================================================================
+# Shaped text (Galley) caching configuration.
+
+label_cache:
+  max_entries: 500 # LRU cache size
+  width_quantization: 10 # Round widths to 10px buckets (stabilizes cache)
+  eviction: "lru" # Options: lru, clock
+
+# =============================================================================
+# SPATIAL INDEX
+# =============================================================================
+# Grid-based spatial query configuration.
+
+spatial_index:
+  default_cell_size: 100.0 # Default grid cell size
+
+  # Chamber-specific overrides
+  chamber_overrides:
+    instrument_matrix:
+      cell_size: 50.0 # Smaller cells for dense matrix
+    cbu_graph:
+      cell_size: 150.0 # Larger cells for sparse graph
+
+# =============================================================================
+# LAYOUT
+# =============================================================================
+# Node sizes, spacing, and tier positions.
+
+layout:
+  node:
+    width: 160.0
+    height: 70.0
+    min_scale: 0.7
+    max_scale: 1.3
+
+  spacing:
+    horizontal: 40.0
+    vertical: 120.0
+
+  tiers:
+    cbu: 0.0
+    structure: 150.0
+    officers: 300.0
+    ubo: 450.0
+    investors: 600.0
+
+  ubo_tiers:
+    person: 0.0
+    shell_base: 150.0
+    cbu: 450.0
+
+  trading:
+    gap_above: 100.0
+    gap_below: 100.0
+    tier_spacing: 80.0
+
+  container:
+    padding: 40.0
+    header_height: 36.0
+    corner_radius: 8.0
+
+# =============================================================================
+# VIEWPORT
+# =============================================================================
+# Auto-fit and visibility limits.
+
+viewport:
+  fit_margin: 0.9
+  min_auto_zoom: 0.1
+  max_auto_zoom: 2.0
+  max_visible_nodes: 200
+  max_visible_clusters: 50
+
+# =============================================================================
+# ANIMATION
+# =============================================================================
+# Spring physics for smooth transitions.
+
+animation:
+  springs:
+    fast:
+      stiffness: 400.0
+      damping: 30.0
+    medium:
+      stiffness: 200.0
+      damping: 20.0
+    slow:
+      stiffness: 100.0
+      damping: 15.0
+    bouncy:
+      stiffness: 300.0
+      damping: 10.0
+    instant:
+      stiffness: 1000.0
+      damping: 50.0
+    snappy:
+      stiffness: 350.0
+      damping: 25.0
+    organic:
+      stiffness: 150.0
+      damping: 18.0
+    gentle:
+      stiffness: 80.0
+      damping: 12.0
+    camera:
+      stiffness: 120.0
+      damping: 16.0
+    agent_ui:
+      stiffness: 180.0
+      damping: 22.0
+    autopilot:
+      stiffness: 80.0
+      damping: 14.0
+    pulse:
+      stiffness: 500.0
+      damping: 35.0
+
+  default_hold_ms: 100
+  scale_pulse_peak: 1.03
+  scale_settle_factor: 0.3
+
+# =============================================================================
+# RENDERING
+# =============================================================================
+# Visual styling constants.
+
+rendering:
+  edges:
+    bezier_segments: 20
+    arrow_size: 8.0
+    label_zoom_threshold: 0.6
+
+  blur_opacity: 0.25
+
+  board_control:
+    node_width: 180.0
+    node_height: 80.0
+    h_spacing: 60.0
+    v_spacing: 140.0
+    corner_radius: 8.0
+
+# =============================================================================
+# COLORS
+# =============================================================================
+# Color palettes for different states and entity types.
+
+colors:
+  risk:
+    standard: [76, 175, 80]
+    low: [139, 195, 74]
+    medium: [255, 193, 7]
+    high: [255, 87, 34]
+    prohibited: [33, 33, 33]
+    unrated: [158, 158, 158]
+
+  kyc:
+    complete: [76, 175, 80]
+    partial: [255, 193, 7]
+    draft: [158, 158, 158]
+    pending: [66, 165, 245]
+    overdue: [244, 67, 54]
+
+  entity:
+    shell: [66, 165, 245]
+    person: [102, 187, 106]
+    product: [255, 167, 38]
+    service: [171, 71, 188]
+
+  sun:
+    core: [255, 215, 0]
+    glow: [255, 200, 50]
+
+# =============================================================================
+# DEBUG OVERLAY (Dev Only)
+# =============================================================================
+# Configuration for the debug overlay panel.
+
+debug:
+  overlay:
+    enabled: false # Enable debug overlay
+    show_hashes: true # Display source_hash, policy_hash, schema_version
+    show_phase: true # Display NavigationPhase, focus_t
+    show_lod_counts: true # Visible counts per LOD tier
+    show_cache_stats: true # Label cache hit rate + entries
+    show_timings: true # Per-frame timings (query, shape, paint)
+
+  # Metrics logging (server-side)
+  metrics:
+    stage_timings_enabled: true # Log compile stage times
+    snapshot_size_enabled: true # Log snapshot byte sizes
+
+# =============================================================================
+# SAFETY CLAMPS
+# =============================================================================
+# Hard limits to prevent pathological cases.
+
+clamps:
+  max_nodes_visible: 5000 # Hard fallback if budgets fail
+  max_chambers_loaded: 50 # Prevent memory blowup
+  max_snapshot_bytes: 50000000 # 50MB max snapshot size

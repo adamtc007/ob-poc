@@ -2,6 +2,15 @@
 //!
 //! All rendering uses world coordinates transformed by the camera.
 //! Uses LOD system for performance and bezier curves for edges.
+//!
+//! # Config-Driven Parameters
+//!
+//! Parameters are loaded from `config/graph_settings.yaml`:
+//! - `layout.container.corner_radius`: Corner radius for container backgrounds
+//! - `layout.container.padding`: Padding around container contents
+//! - `layout.container.header_height`: Height of container header
+//! - `rendering.blur_opacity`: Opacity for non-focused elements
+//! - `rendering.edges.*`: Edge rendering parameters
 
 use super::camera::Camera2D;
 use super::colors::{edge_color, edge_width_for_weight, verification_edge_style};
@@ -12,16 +21,33 @@ use super::edges::{
 use super::lod::{render_node_at_lod, DetailLevel};
 use super::types::*;
 use super::viewport::EsperRenderState;
+use crate::config::global_config;
 use egui::{Color32, FontId, Pos2, Rect, Stroke, Vec2};
 use std::collections::HashMap;
 
 // =============================================================================
-// RENDER CONSTANTS
+// CONFIG ACCESSORS
 // =============================================================================
 
-const CORNER_RADIUS: f32 = 8.0;
-const CONTAINER_PADDING: f32 = 40.0;
-const CONTAINER_HEADER_HEIGHT: f32 = 36.0; // Taller header for larger CBU title font
+/// Get corner radius from config
+pub fn corner_radius() -> f32 {
+    global_config().layout.container.corner_radius
+}
+
+/// Get container padding from config
+pub fn container_padding() -> f32 {
+    global_config().layout.container.padding
+}
+
+/// Get container header height from config
+pub fn container_header_height() -> f32 {
+    global_config().layout.container.header_height
+}
+
+/// Get blur opacity from config
+pub fn blur_opacity() -> f32 {
+    global_config().rendering.blur_opacity
+}
 
 // =============================================================================
 // GRAPH RENDERER
@@ -39,7 +65,7 @@ pub struct GraphRenderer {
 impl Default for GraphRenderer {
     fn default() -> Self {
         Self {
-            blur_opacity: 0.25,
+            blur_opacity: blur_opacity(),
             use_bezier_edges: true,
             use_lod: true,
         }
@@ -408,8 +434,8 @@ impl GraphRenderer {
             return None;
         }
 
-        let padding = CONTAINER_PADDING * camera.zoom();
-        let header_height = CONTAINER_HEADER_HEIGHT * camera.zoom();
+        let padding = container_padding() * camera.zoom();
+        let header_height = container_header_height() * camera.zoom();
 
         let mut min_x = f32::MAX;
         let mut min_y = f32::MAX;
@@ -448,22 +474,18 @@ impl GraphRenderer {
         camera: &Camera2D,
         _screen_rect: Rect,
     ) {
-        let corner_radius = CORNER_RADIUS * camera.zoom();
+        let cr = corner_radius() * camera.zoom();
 
         // Container background - subtle dark fill
         let fill_color = Color32::from_rgba_unmultiplied(30, 35, 45, 180);
         let border_color = Color32::from_rgb(70, 80, 100);
         let border_width = 2.0 * camera.zoom();
 
-        painter.rect_filled(bounds, corner_radius, fill_color);
-        painter.rect_stroke(
-            bounds,
-            corner_radius,
-            Stroke::new(border_width, border_color),
-        );
+        painter.rect_filled(bounds, cr, fill_color);
+        painter.rect_stroke(bounds, cr, Stroke::new(border_width, border_color));
 
         // Container label in top-left
-        let header_height = CONTAINER_HEADER_HEIGHT * camera.zoom();
+        let header_height = container_header_height() * camera.zoom();
         let label_pos = Pos2::new(
             bounds.left() + 12.0 * camera.zoom(),
             bounds.top() + header_height / 2.0,
@@ -517,8 +539,8 @@ impl GraphRenderer {
         // Optional: render a subtle header divider line
         let divider_y = bounds.top() + header_height;
         if divider_y < bounds.bottom() {
-            let divider_start = Pos2::new(bounds.left() + corner_radius, divider_y);
-            let divider_end = Pos2::new(bounds.right() - corner_radius, divider_y);
+            let divider_start = Pos2::new(bounds.left() + cr, divider_y);
+            let divider_end = Pos2::new(bounds.right() - cr, divider_y);
             painter.line_segment(
                 [divider_start, divider_end],
                 Stroke::new(
@@ -636,7 +658,7 @@ impl GraphRenderer {
         esper_state: Option<&EsperRenderState>,
     ) {
         let node_rect = Rect::from_center_size(screen_pos, screen_size);
-        let corner_radius = CORNER_RADIUS * zoom;
+        let cr = corner_radius() * zoom;
 
         // Determine highlight color based on active Esper mode
         let highlight_color = if let Some(esper) = esper_state {
@@ -666,22 +688,18 @@ impl GraphRenderer {
             highlight_color.b(),
             (80.0 * opacity) as u8,
         );
-        painter.rect_filled(glow_rect, corner_radius + glow_expand / 2.0, glow_color);
+        painter.rect_filled(glow_rect, cr + glow_expand / 2.0, glow_color);
 
         // Draw node background
         let fill = apply_opacity(node.style.fill_color, opacity);
         let text_color = apply_opacity(node.style.text_color, opacity);
 
-        painter.rect_filled(node_rect, corner_radius, fill);
+        painter.rect_filled(node_rect, cr, fill);
 
         // Draw highlighted border
         let border_width = 3.0 * zoom;
         let border_color = apply_opacity(highlight_color, opacity);
-        painter.rect_stroke(
-            node_rect,
-            corner_radius,
-            Stroke::new(border_width, border_color),
-        );
+        painter.rect_stroke(node_rect, cr, Stroke::new(border_width, border_color));
 
         // Draw label
         let font_size = 12.0 * zoom;
@@ -710,11 +728,11 @@ impl GraphRenderer {
         let border = apply_opacity(node.style.border_color, opacity);
         let text_color = apply_opacity(node.style.text_color, opacity);
 
-        let corner_radius = CORNER_RADIUS * (screen_size.x / node.size.x);
+        let cr = corner_radius() * (screen_size.x / node.size.x);
         let border_width = node.style.border_width * (screen_size.x / node.size.x);
 
-        painter.rect_filled(node_rect, corner_radius, fill);
-        painter.rect_stroke(node_rect, corner_radius, Stroke::new(border_width, border));
+        painter.rect_filled(node_rect, cr, fill);
+        painter.rect_stroke(node_rect, cr, Stroke::new(border_width, border));
 
         // Draw label
         let font_size = 12.0 * (screen_size.x / node.size.x);
@@ -902,14 +920,10 @@ impl GraphRenderer {
         // Draw collapsed group box
         let fill = Color32::from_rgb(55, 48, 23);
         let border = Color32::from_rgb(161, 98, 7);
-        let corner_radius = CORNER_RADIUS * camera.zoom();
+        let cr = corner_radius() * camera.zoom();
 
-        painter.rect_filled(rect, corner_radius, fill);
-        painter.rect_stroke(
-            rect,
-            corner_radius,
-            Stroke::new(2.0 * camera.zoom(), border),
-        );
+        painter.rect_filled(rect, cr, fill);
+        painter.rect_stroke(rect, cr, Stroke::new(2.0 * camera.zoom(), border));
 
         // Draw investor count
         let text = format!("{} Investors", group.investor_count);

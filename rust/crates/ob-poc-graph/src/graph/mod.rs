@@ -97,7 +97,7 @@ pub use viewport::{
     render_focus_ring, render_node_with_confidence, render_viewport_hud, EsperRenderState, GapType,
     IlluminateAspect, RedFlagCategory, ViewportAction, ViewportRenderState,
 };
-pub use viewport_fit::{ViewLevel, ViewportFit, MAX_VISIBLE_NODES};
+pub use viewport_fit::{max_visible_nodes, ViewLevel, ViewportFit};
 
 // SDF primitives and operations for hit testing and confidence visualization
 pub use sdf::{cluster_blob, hit_test_circle, hit_test_rect, ConfidenceHalo, HitResult};

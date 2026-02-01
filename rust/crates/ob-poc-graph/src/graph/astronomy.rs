@@ -84,7 +84,7 @@ impl Default for ViewTransition {
                 timestamp: 0.0,
             }],
             is_transitioning: false,
-            transition_progress: SpringF32::with_config(0.0, SpringConfig::SLOW),
+            transition_progress: SpringF32::with_config(0.0, SpringConfig::from_preset("slow")),
             pending_cbu_id: None,
         }
     }
@@ -163,7 +163,7 @@ impl ViewTransition {
 
         // Fly camera to CBU position and zoom in
         camera.fly_to_slow(cbu_position);
-        camera.zoom_to_with_config(3.0, SpringConfig::SLOW);
+        camera.zoom_to_with_config(3.0, SpringConfig::from_preset("slow"));
 
         // Fade out other CBUs
         let target_id = cbu_id.to_string();
@@ -171,7 +171,9 @@ impl ViewTransition {
             let opacity = self
                 .cbu_opacity
                 .entry(cbu_id_str.clone())
-                .or_insert_with(|| SpringF32::with_config(1.0, SpringConfig::MEDIUM));
+                .or_insert_with(|| {
+                    SpringF32::with_config(1.0, SpringConfig::from_preset("medium"))
+                });
 
             if cbu_id_str == &target_id {
                 // Keep target fully visible
@@ -224,14 +226,16 @@ impl ViewTransition {
 
         // Pull camera back to universe center and zoom out
         camera.fly_to_slow(Pos2::ZERO);
-        camera.zoom_to_with_config(0.5, SpringConfig::SLOW);
+        camera.zoom_to_with_config(0.5, SpringConfig::from_preset("slow"));
 
         // Fade in all CBUs
         for cbu_id_str in all_cbu_ids {
             let opacity = self
                 .cbu_opacity
                 .entry(cbu_id_str.clone())
-                .or_insert_with(|| SpringF32::with_config(0.0, SpringConfig::MEDIUM));
+                .or_insert_with(|| {
+                    SpringF32::with_config(0.0, SpringConfig::from_preset("medium"))
+                });
             opacity.set_target(1.0);
         }
 

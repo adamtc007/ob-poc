@@ -4,29 +4,49 @@
 //! User can override; reset returns to auto.
 //!
 //! Also provides ViewLevel for progressive disclosure based on zoom + content density.
+//!
+//! # Config-Driven Parameters
+//!
+//! Parameters are loaded from `config/graph_settings.yaml`:
+//! - `viewport.fit_margin`: Margin around content (default 0.9 = 10% margin each side)
+//! - `viewport.min_auto_zoom`: Minimum zoom level for auto-fit
+//! - `viewport.max_auto_zoom`: Maximum zoom level for auto-fit
+//! - `viewport.max_visible_nodes`: Node count before aggregation
+//! - `viewport.max_visible_clusters`: Cluster count before collapse
 
 use egui::{Pos2, Rect, Vec2};
 
 use super::types::LayoutGraph;
+use crate::config::global_config;
 
 // =============================================================================
-// CONSTANTS
+// CONFIG ACCESSORS
 // =============================================================================
 
-/// Margin around content (10% on each side)
-const FIT_MARGIN: f32 = 0.9;
+/// Get fit margin from config (0.9 = 10% margin on each side)
+pub fn fit_margin() -> f32 {
+    global_config().viewport.fit_margin
+}
 
-/// Minimum zoom level for auto-fit
-const MIN_AUTO_ZOOM: f32 = 0.1;
+/// Get minimum auto-fit zoom from config
+pub fn min_auto_zoom() -> f32 {
+    global_config().viewport.min_auto_zoom
+}
 
-/// Maximum zoom level for auto-fit
-const MAX_AUTO_ZOOM: f32 = 2.0;
+/// Get maximum auto-fit zoom from config
+pub fn max_auto_zoom() -> f32 {
+    global_config().viewport.max_auto_zoom
+}
 
-/// Maximum nodes to render before aggregation kicks in
-pub const MAX_VISIBLE_NODES: usize = 200;
+/// Get max visible nodes from config
+pub fn max_visible_nodes() -> usize {
+    global_config().viewport.max_visible_nodes
+}
 
-/// Maximum clusters to show before collapsing to galaxies
-pub const MAX_VISIBLE_CLUSTERS: usize = 50;
+/// Get max visible clusters from config
+pub fn max_visible_clusters() -> usize {
+    global_config().viewport.max_visible_clusters
+}
 
 // =============================================================================
 // VIEW LEVEL
@@ -82,12 +102,13 @@ impl ViewLevel {
     }
 
     /// Get max nodes that should be visible at this level
-    pub fn max_visible_nodes(&self) -> usize {
+    pub fn max_visible_nodes_for_level(&self) -> usize {
+        let max = max_visible_nodes();
         match self {
             ViewLevel::Galaxy => 20,
             ViewLevel::Region => 50,
-            ViewLevel::Cluster => MAX_VISIBLE_NODES,
-            ViewLevel::Solar => MAX_VISIBLE_NODES,
+            ViewLevel::Cluster => max,
+            ViewLevel::Solar => max,
         }
     }
 }
@@ -149,10 +170,14 @@ impl ViewportFit {
             return Self::default();
         }
 
-        // Calculate zoom to fit with margin
-        let zoom_x = (viewport_size.x * FIT_MARGIN) / bounds.width();
-        let zoom_y = (viewport_size.y * FIT_MARGIN) / bounds.height();
-        let optimal_zoom = zoom_x.min(zoom_y).clamp(MIN_AUTO_ZOOM, MAX_AUTO_ZOOM);
+        // Calculate zoom to fit with margin (values from config)
+        let margin = fit_margin();
+        let min_zoom = min_auto_zoom();
+        let max_zoom = max_auto_zoom();
+
+        let zoom_x = (viewport_size.x * margin) / bounds.width();
+        let zoom_y = (viewport_size.y * margin) / bounds.height();
+        let optimal_zoom = zoom_x.min(zoom_y).clamp(min_zoom, max_zoom);
 
         Self {
             auto_enabled: true,
@@ -197,9 +222,13 @@ impl ViewportFit {
             return;
         }
 
-        let zoom_x = (viewport_size.x * FIT_MARGIN) / self.content_bounds.width();
-        let zoom_y = (viewport_size.y * FIT_MARGIN) / self.content_bounds.height();
-        self.optimal_zoom = zoom_x.min(zoom_y).clamp(MIN_AUTO_ZOOM, MAX_AUTO_ZOOM);
+        let margin = fit_margin();
+        let min_zoom = min_auto_zoom();
+        let max_zoom = max_auto_zoom();
+
+        let zoom_x = (viewport_size.x * margin) / self.content_bounds.width();
+        let zoom_y = (viewport_size.y * margin) / self.content_bounds.height();
+        self.optimal_zoom = zoom_x.min(zoom_y).clamp(min_zoom, max_zoom);
     }
 
     /// Update when content changes
