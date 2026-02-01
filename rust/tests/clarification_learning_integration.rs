@@ -227,6 +227,7 @@ struct CreateSessionResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ChatResponse {
     message: Option<String>,
     verb_disambiguation: Option<VerbDisambiguationRequest>,
@@ -235,6 +236,7 @@ struct ChatResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct VerbDisambiguationRequest {
     request_id: String,
     original_input: String,
@@ -243,6 +245,7 @@ struct VerbDisambiguationRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct VerbOption {
     verb_fqn: String,
     description: String,
@@ -251,6 +254,7 @@ struct VerbOption {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct DslResponse {
     source: Option<String>,
     can_execute: bool,
@@ -270,6 +274,7 @@ struct VerbSelectionRequest {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct VerbSelectionResponse {
     /// Whether the learning signal was recorded
     recorded: bool,
@@ -292,6 +297,7 @@ struct TestHarness {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 struct ScenarioResult {
     scenario: String,
     category: String,

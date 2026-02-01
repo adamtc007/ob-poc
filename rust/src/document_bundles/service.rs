@@ -254,6 +254,7 @@ impl DocsBundleService {
 
 #[cfg(all(test, feature = "database"))]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     // Integration tests would go here
