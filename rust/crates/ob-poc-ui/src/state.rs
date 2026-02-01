@@ -184,6 +184,9 @@ pub struct AppState {
     /// Verb disambiguation UI state (for ambiguous verb matches)
     pub verb_disambiguation_ui: VerbDisambiguationState,
 
+    /// Intent tier UI state (for clarifying action intent before verb disambiguation)
+    pub intent_tier_ui: IntentTierState,
+
     /// Macro expansion wizard UI state (for partial macro invocations)
     pub macro_expansion_ui: MacroExpansionState,
 
@@ -294,6 +297,7 @@ impl Default for AppState {
             window_stack: WindowStack::default(),
             cbu_search_ui: CbuSearchUi::default(),
             verb_disambiguation_ui: VerbDisambiguationState::default(),
+            intent_tier_ui: IntentTierState::default(),
             macro_expansion_ui: MacroExpansionState::default(),
             container_browse: ContainerBrowseState::default(),
             token_registry: TokenRegistry::load_defaults().unwrap_or_else(|e| {
@@ -738,6 +742,64 @@ impl VerbDisambiguationState {
 }
 
 // =============================================================================
+// INTENT TIER UI STATE
+// =============================================================================
+
+/// Intent tier clarification UI state
+///
+/// When verb search returns candidates spanning multiple intents (navigate vs create),
+/// we show an intent tier clarification card BEFORE verb disambiguation.
+/// This reduces cognitive load by asking "What are you trying to do?" first.
+#[derive(Default, Clone)]
+pub struct IntentTierState {
+    /// Whether intent tier selection is currently active
+    pub active: bool,
+    /// The tier request from the server
+    pub request: Option<ob_poc_types::IntentTierRequest>,
+    /// Original user input that triggered disambiguation
+    pub original_input: String,
+    /// When tier selection was shown (for timeout handling)
+    pub shown_at: Option<f64>,
+    /// Loading flag while selecting
+    pub loading: bool,
+}
+
+impl IntentTierState {
+    /// Check if tier selection has timed out (30 seconds)
+    pub fn is_timed_out(&self, current_time: f64) -> bool {
+        const TIMEOUT_SECS: f64 = 30.0;
+        if let Some(shown_at) = self.shown_at {
+            (current_time - shown_at) > TIMEOUT_SECS
+        } else {
+            false
+        }
+    }
+
+    /// Clear the intent tier state
+    pub fn clear(&mut self) {
+        self.active = false;
+        self.request = None;
+        self.original_input.clear();
+        self.shown_at = None;
+        self.loading = false;
+    }
+
+    /// Set intent tier from server response
+    pub fn set_from_response(
+        &mut self,
+        request: ob_poc_types::IntentTierRequest,
+        original_input: String,
+        current_time: f64,
+    ) {
+        self.active = true;
+        self.request = Some(request);
+        self.original_input = original_input;
+        self.shown_at = Some(current_time);
+        self.loading = false;
+    }
+}
+
+// =============================================================================
 // MACRO EXPANSION UI STATE
 // =============================================================================
 
@@ -1040,6 +1102,9 @@ pub struct PendingResults {
     // Verb disambiguation (earlier in pipeline than entity disambiguation)
     pub verb_disambiguation: Option<ob_poc_types::VerbDisambiguationRequest>,
 
+    // Intent tier clarification (before verb disambiguation)
+    pub intent_tier: Option<ob_poc_types::IntentTierRequest>,
+
     // Unresolved refs (direct from ChatResponse)
     pub unresolved_refs: Option<Vec<UnresolvedRefResponse>>,
     pub current_ref_index: Option<usize>,
@@ -1126,6 +1191,10 @@ pub struct AsyncState {
     // Verb disambiguation (from agent chat when verb is ambiguous)
     /// Verb disambiguation request from chat response
     pub pending_verb_disambiguation: Option<ob_poc_types::VerbDisambiguationRequest>,
+
+    // Intent tier clarification (when verbs span multiple intents)
+    /// Intent tier request from chat response
+    pub pending_intent_tier: Option<ob_poc_types::IntentTierRequest>,
     /// Result from verb selection API call
     pub pending_verb_selection_result: Option<Result<ob_poc_types::ChatResponse, String>>,
     /// Loading flag for verb selection
@@ -1336,6 +1405,9 @@ impl AsyncState {
 
             // Verb disambiguation
             verb_disambiguation: self.pending_verb_disambiguation.take(),
+
+            // Intent tier clarification
+            intent_tier: self.pending_intent_tier.take(),
 
             // Unresolved refs
             unresolved_refs: self.pending_unresolved_refs.take(),

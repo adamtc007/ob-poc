@@ -726,6 +726,12 @@ pub struct ChatResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verb_disambiguation: Option<VerbDisambiguationRequest>,
 
+    /// Intent tier request if user input matches multiple action categories
+    /// When present, UI should show tier selection before verb disambiguation
+    /// This is a higher-level question: "Are you navigating, creating, modifying, etc.?"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent_tier: Option<IntentTierRequest>,
+
     /// Unresolved entity references needing resolution (post-DSL parsing)
     /// When present, UI should trigger resolution modal before execution
     #[serde(default, skip_serializing_if = "Option::is_none")]

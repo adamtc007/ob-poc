@@ -26,11 +26,22 @@ pub enum VerbDisambiguationAction {
     Cancel,
 }
 
+/// Action returned from intent tier card
+#[derive(Debug, Clone)]
+pub enum IntentTierAction {
+    /// User selected an intent tier option
+    Select { option_id: String },
+    /// User cancelled intent tier selection
+    Cancel,
+}
+
 /// Combined action enum for all REPL panel actions
 #[derive(Debug, Clone)]
 pub enum ReplAction {
     /// Verb disambiguation action
     VerbDisambiguation(VerbDisambiguationAction),
+    /// Intent tier selection action
+    IntentTier(IntentTierAction),
     /// Macro wizard action
     MacroWizard(MacroWizardAction),
 }
@@ -54,6 +65,15 @@ pub fn repl_panel(ui: &mut Ui, state: &mut AppState) -> Option<ReplAction> {
             .show(ui, |ui| {
                 // Chat history
                 render_chat_history(ui, state);
+
+                // Intent tier card (when candidates span multiple intents)
+                // This is shown BEFORE verb disambiguation to reduce cognitive load
+                if state.intent_tier_ui.active {
+                    ui.add_space(8.0);
+                    if let Some(a) = render_intent_tier_card(ui, state) {
+                        action = Some(ReplAction::IntentTier(a));
+                    }
+                }
 
                 // Verb disambiguation card (when multiple verbs match user input)
                 // This is higher priority than entity resolution - happens earlier in pipeline
@@ -338,6 +358,191 @@ fn render_verb_option_button(ui: &mut Ui, option: &VerbOption) -> Option<VerbDis
     if response.interact(egui::Sense::click()).clicked() {
         action = Some(VerbDisambiguationAction::Select {
             verb_fqn: option.verb_fqn.clone(),
+        });
+    }
+
+    // Hover effect
+    if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+
+    action
+}
+
+// =============================================================================
+// INTENT TIER CARD
+// =============================================================================
+
+/// Render intent tier clarification card
+///
+/// Shown when verb candidates span multiple intents (navigate vs create).
+/// User picks the intent first to reduce cognitive load.
+fn render_intent_tier_card(ui: &mut Ui, state: &AppState) -> Option<IntentTierAction> {
+    let mut action = None;
+
+    let request = state.intent_tier_ui.request.as_ref()?;
+
+    let is_loading = state.intent_tier_ui.loading;
+
+    // Card frame with blue border (clarification needed)
+    egui::Frame::default()
+        .fill(Color32::from_rgb(40, 45, 55))
+        .stroke(egui::Stroke::new(2.0, Color32::from_rgb(80, 130, 180)))
+        .inner_margin(12.0)
+        .rounding(8.0)
+        .show(ui, |ui| {
+            // Header
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new("?")
+                        .size(18.0)
+                        .color(Color32::from_rgb(80, 130, 180)),
+                );
+                ui.label(
+                    RichText::new(&request.prompt)
+                        .strong()
+                        .color(Color32::WHITE),
+                );
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Show original input
+                    ui.label(
+                        RichText::new(format!("\"{}\"", request.original_input))
+                            .small()
+                            .color(Color32::LIGHT_GRAY)
+                            .italics(),
+                    );
+                });
+            });
+
+            // Show selection path (if any tiers already selected)
+            if !request.selected_path.is_empty() {
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new("Path:").small().color(Color32::GRAY));
+                    for selection in &request.selected_path {
+                        ui.label(
+                            RichText::new(&selection.option_label)
+                                .small()
+                                .color(Color32::from_rgb(100, 180, 255)),
+                        );
+                        ui.label(RichText::new("→").small().color(Color32::GRAY));
+                    }
+                });
+            }
+
+            ui.add_space(12.0);
+
+            // Intent tier option buttons
+            if is_loading {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(RichText::new("Processing selection...").color(Color32::LIGHT_GRAY));
+                });
+            } else {
+                for option in &request.options {
+                    if let Some(a) = render_intent_tier_option_button(ui, option) {
+                        action = Some(a);
+                    }
+                    ui.add_space(4.0);
+                }
+            }
+
+            ui.add_space(8.0);
+
+            // Cancel button and timeout
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui
+                        .add_enabled(!is_loading, egui::Button::new("Cancel"))
+                        .on_hover_text("None of these - start fresh")
+                        .clicked()
+                    {
+                        action = Some(IntentTierAction::Cancel);
+                    }
+
+                    // Timeout indicator
+                    if let Some(shown_at) = state.intent_tier_ui.shown_at {
+                        let current_time = web_sys::window()
+                            .and_then(|w| w.performance())
+                            .map(|p| p.now() / 1000.0)
+                            .unwrap_or(0.0);
+                        let elapsed = (current_time - shown_at) as i32;
+                        let remaining = 30 - elapsed;
+                        if remaining > 0 && remaining <= 10 {
+                            ui.label(
+                                RichText::new(format!("{}s", remaining))
+                                    .small()
+                                    .color(Color32::from_rgb(220, 80, 80)),
+                            );
+                        }
+                    }
+                });
+            });
+        });
+
+    action
+}
+
+/// Render a single intent tier option as a clickable button
+fn render_intent_tier_option_button(
+    ui: &mut Ui,
+    option: &ob_poc_types::IntentTierOption,
+) -> Option<IntentTierAction> {
+    let mut action = None;
+
+    // Button frame
+    let response = egui::Frame::default()
+        .fill(Color32::from_rgb(50, 55, 65))
+        .inner_margin(10.0)
+        .rounding(6.0)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                // Main content
+                ui.vertical(|ui| {
+                    // Option label (e.g., "Set session scope / Navigate")
+                    ui.label(
+                        RichText::new(&option.label)
+                            .strong()
+                            .color(Color32::from_rgb(100, 180, 255)),
+                    );
+
+                    // Description
+                    ui.label(
+                        RichText::new(&option.description)
+                            .small()
+                            .color(Color32::LIGHT_GRAY),
+                    );
+
+                    // Hint (if present)
+                    if let Some(hint) = &option.hint {
+                        ui.label(
+                            RichText::new(hint)
+                                .small()
+                                .italics()
+                                .color(Color32::DARK_GRAY),
+                        );
+                    }
+                });
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Verb count badge
+                    if option.verb_count > 0 {
+                        ui.label(
+                            RichText::new(format!("{} options", option.verb_count))
+                                .small()
+                                .color(Color32::from_rgb(150, 150, 180)),
+                        );
+                    }
+                });
+            });
+        })
+        .response;
+
+    // Make the whole frame clickable
+    if response.interact(egui::Sense::click()).clicked() {
+        action = Some(IntentTierAction::Select {
+            option_id: option.id.clone(),
         });
     }
 

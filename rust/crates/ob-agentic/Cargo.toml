@@ -38,11 +38,6 @@ entity-gateway = { path = "../entity-gateway", optional = true }
 # gRPC (for entity resolution, optional)
 tonic = { version = "0.12", optional = true }
 
-[[bin]]
-name = "lexicon_harness"
-path = "src/bin/lexicon_harness.rs"
-required-features = ["cli"]
-
 [features]
 default = []
 cli = ["dep:clap"]

@@ -2348,6 +2348,7 @@ async fn chat_session(
                 commands: None,
                 disambiguation_request: None,
                 verb_disambiguation: None,
+                intent_tier: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2362,6 +2363,7 @@ async fn chat_session(
                 commands: None,
                 disambiguation_request: None,
                 verb_disambiguation: None,
+                intent_tier: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2376,6 +2378,7 @@ async fn chat_session(
                 commands: None,
                 disambiguation_request: None,
                 verb_disambiguation: None,
+                intent_tier: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2399,6 +2402,7 @@ async fn chat_session(
                 commands: None,
                 disambiguation_request: None,
                 verb_disambiguation: None,
+                intent_tier: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2429,6 +2433,7 @@ async fn chat_session(
                 commands: None,
                 disambiguation_request: None,
                 verb_disambiguation: None,
+                intent_tier: None,
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
@@ -2545,6 +2550,7 @@ async fn chat_session(
             .as_ref()
             .map(to_api_disambiguation_request),
         verb_disambiguation: response.verb_disambiguation,
+        intent_tier: response.intent_tier,
         unresolved_refs: response
             .unresolved_refs
             .as_ref()

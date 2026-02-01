@@ -11,9 +11,10 @@ use crate::panels::{
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
     results_panel, service_taxonomy_panel, taxonomy_panel, toolbar, trading_matrix_panel,
     CbuSearchAction, CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction,
-    DslEditorAction, EntityMatchDisplay, InvestorRegisterAction, MacroWizardAction, ReplAction,
-    ResolutionPanelAction, ResolutionPanelData, ServiceTaxonomyPanelAction, TaxonomyPanelAction,
-    ToolbarAction, ToolbarData, TradingMatrixPanelAction, VerbDisambiguationAction,
+    DslEditorAction, EntityMatchDisplay, IntentTierAction, InvestorRegisterAction,
+    MacroWizardAction, ReplAction, ResolutionPanelAction, ResolutionPanelData,
+    ServiceTaxonomyPanelAction, TaxonomyPanelAction, ToolbarAction, ToolbarData,
+    TradingMatrixPanelAction, VerbDisambiguationAction,
 };
 use crate::state::{
     AppState, AsyncState, BrowserTab, CbuSearchUi, LayoutMode, PanelState, TextBuffers,
@@ -181,6 +182,7 @@ impl App {
             investor_register_ui: crate::state::InvestorRegisterUi::default(),
             pending_navigation_verb: None,
             verb_disambiguation_ui: crate::state::VerbDisambiguationState::default(),
+            intent_tier_ui: crate::state::IntentTierState::default(),
             macro_expansion_ui: crate::state::MacroExpansionState::default(),
         };
 
@@ -3802,6 +3804,14 @@ impl App {
                             );
                         }
                     },
+                    ReplAction::IntentTier(tier_action) => match tier_action {
+                        IntentTierAction::Select { option_id } => {
+                            self.state.select_intent_tier(&option_id);
+                        }
+                        IntentTierAction::Cancel => {
+                            self.state.cancel_intent_tier();
+                        }
+                    },
                     ReplAction::MacroWizard(wizard_action) => {
                         self.handle_macro_wizard_action(wizard_action);
                     }
@@ -5713,6 +5723,129 @@ impl AppState {
                 &"check_verb_disambiguation_timeout: 30s timeout reached".into(),
             );
             self.abandon_verb_disambiguation(ob_poc_types::AbandonReason::Timeout);
+        }
+    }
+
+    // =========================================================================
+    // Intent Tier Selection Methods
+    // =========================================================================
+
+    /// Select an intent tier option
+    ///
+    /// Called when user clicks an intent tier button. Sends the selection to the
+    /// server which will either show tier 2, show verb disambiguation, or proceed.
+    pub fn select_intent_tier(&mut self, option_id: &str) {
+        let Some(session_id) = self.session_id else {
+            web_sys::console::warn_1(&"select_intent_tier: no session_id".into());
+            return;
+        };
+
+        let Some(ref request) = self.intent_tier_ui.request else {
+            web_sys::console::warn_1(&"select_intent_tier: no tier request".into());
+            return;
+        };
+
+        // Build selection request
+        let selection_request = ob_poc_types::IntentTierSelectionRequest {
+            request_id: request.request_id.clone(),
+            selected_option: option_id.to_string(),
+            original_input: self.intent_tier_ui.original_input.clone(),
+        };
+
+        // Mark as loading
+        self.intent_tier_ui.loading = true;
+
+        let async_state = Arc::clone(&self.async_state);
+        let ctx = self.ctx.clone();
+
+        spawn_local(async move {
+            web_sys::console::log_1(
+                &format!(
+                    "select_intent_tier: selecting {}",
+                    selection_request.selected_option
+                )
+                .into(),
+            );
+
+            // For now, just send as a chat message with the option context
+            // TODO: Add dedicated /select-intent-tier endpoint
+            let chat_msg = format!(
+                "[intent:{}] {}",
+                selection_request.selected_option, selection_request.original_input
+            );
+            let result = api::send_chat(session_id, &chat_msg).await;
+
+            if let Ok(mut state) = async_state.lock() {
+                match result {
+                    Ok(chat_response) => {
+                        web_sys::console::log_1(
+                            &format!(
+                                "select_intent_tier: success, message: {}",
+                                chat_response.message
+                            )
+                            .into(),
+                        );
+
+                        // Add agent response to chat
+                        state.pending_chat = Some(Ok(crate::state::ChatMessage {
+                            role: crate::state::MessageRole::Agent,
+                            content: chat_response.message.clone(),
+                            timestamp: chrono::Utc::now(),
+                        }));
+
+                        // Check for another intent tier (tier 2)
+                        if let Some(intent_tier) = chat_response.intent_tier {
+                            state.pending_intent_tier = Some(intent_tier);
+                        }
+
+                        // Check for verb disambiguation
+                        if let Some(verb_disambig) = chat_response.verb_disambiguation {
+                            state.pending_verb_disambiguation = Some(verb_disambig);
+                        }
+
+                        // Trigger session refetch
+                        state.needs_session_refetch = true;
+                    }
+                    Err(e) => {
+                        web_sys::console::error_1(
+                            &format!("select_intent_tier: error: {}", e).into(),
+                        );
+                        state.last_error = Some(e);
+                    }
+                }
+            }
+
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+
+        // Clear intent tier state (we're done with it)
+        self.intent_tier_ui.clear();
+    }
+
+    /// Cancel intent tier selection
+    ///
+    /// Called when user clicks cancel or times out.
+    pub fn cancel_intent_tier(&mut self) {
+        web_sys::console::log_1(&"cancel_intent_tier: user cancelled".into());
+        self.intent_tier_ui.clear();
+    }
+
+    /// Check if intent tier has timed out
+    pub fn check_intent_tier_timeout(&mut self) {
+        if !self.intent_tier_ui.active {
+            return;
+        }
+
+        let current_time = web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now() / 1000.0)
+            .unwrap_or(0.0);
+
+        if self.intent_tier_ui.is_timed_out(current_time) {
+            web_sys::console::log_1(&"check_intent_tier_timeout: 30s timeout reached".into());
+            self.cancel_intent_tier();
         }
     }
 

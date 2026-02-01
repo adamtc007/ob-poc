@@ -34,7 +34,7 @@ pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
 pub use investor_register::{investor_register_panel, InvestorRegisterAction};
 pub use macro_wizard::MacroWizardAction;
-pub use repl::{repl_panel, ReplAction, VerbDisambiguationAction};
+pub use repl::{repl_panel, IntentTierAction, ReplAction, VerbDisambiguationAction};
 pub use resolution::{
     resolution_modal, EntityMatchDisplay, ResolutionPanelAction, ResolutionPanelData,
 };
