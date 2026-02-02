@@ -15,7 +15,7 @@
 > **Nav UX Messages:** ✅ Complete - NavReason codes, NavSuggestion, standardized error copy
 > **Promotion Pipeline (043):** ✅ Complete - Quality-gated pattern promotion with collision detection
 > **Teaching Mechanism (044):** ✅ Complete - Direct phrase→verb mapping for trusted sources
-> **Verb Search Test Harness:** ✅ Complete - Full pipeline sweep, safety-first policy, `cargo x test-verbs`
+> **Verb Search Test Harness:** ✅ Complete - Full pipeline sweep, safety-first policy, learning accelerator workflow
 > **Client Group Resolver (048):** ✅ Complete - Two-stage alias→group→anchor resolution for session scope
 > **Workflow Task Queue (049):** ✅ Complete - Async task return path, document entity, requirement guards
 > **Transactional Execution (050):** ✅ Complete - Atomic execution, advisory locks, expansion audit
@@ -2621,9 +2621,9 @@ User prompt: "Show me Irish funds"
 
 ---
 
-## Verb Search Test Harness
+## Verb Search Test Harness & Learning Accelerator
 
-Comprehensive test harness for verifying semantic matching after teaching new phrases or tuning thresholds.
+Comprehensive test harness for verifying semantic matching after teaching new phrases or tuning thresholds. Includes a **learning accelerator workflow** that uses LLM-generated phrases to rapidly improve verb discovery accuracy.
 
 ### Quick Start
 
@@ -2650,6 +2650,87 @@ cargo x test-verbs --explore "load the allianz book"
 | `hard_negative` | Dangerous confusions (delete vs archive) |
 | `safety_first` | Verbs where ambiguity is acceptable |
 | `edge` | Edge cases (garbage input, ambiguous queries) |
+
+### Learning Accelerator Workflow
+
+The test harness enables a closed-loop learning accelerator:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  LEARNING ACCELERATOR WORKFLOW                                               │
+│                                                                              │
+│  1. Run test harness → Identify failing phrases                             │
+│         │                                                                    │
+│         ▼                                                                    │
+│  2. Harness outputs SQL for phrases that need teaching                      │
+│         │                                                                    │
+│         ▼                                                                    │
+│  3. Execute SQL via agent.teach_phrases_batch()                             │
+│         │                                                                    │
+│         ▼                                                                    │
+│  4. Run populate_embeddings (delta loading - fast)                          │
+│         │                                                                    │
+│         ▼                                                                    │
+│  5. Re-run test harness → Validate improvement                              │
+│         │                                                                    │
+│         └──► Repeat until target accuracy achieved                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Commands:**
+
+```bash
+# Step 1: Run extended CBU scenarios to find gaps
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test verb_search_integration test_cbu_extended -- --ignored --nocapture
+
+# Step 2: Harness outputs SQL like:
+# SELECT * FROM agent.teach_phrases_batch('[{"phrase": "create a fund", "verb": "cbu.create"}, ...]'::jsonb, 'accelerated_learning');
+
+# Step 3: Execute the SQL (or use scripts/teach_cbu_phrases.sql)
+psql -d data_designer -f scripts/teach_cbu_phrases.sql
+
+# Step 4: Populate embeddings (delta loading - only new patterns)
+DATABASE_URL="postgresql:///data_designer" \
+  cargo run --release --package ob-semantic-matcher --bin populate_embeddings
+
+# Step 5: Re-run to validate
+DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features database --test verb_search_integration test_cbu_extended -- --ignored --nocapture
+```
+
+**Example Results (CBU domain):**
+
+| Round | Pass Rate | Top-1 Correct | Top-3 Contains | Ambiguity Rate |
+|-------|-----------|---------------|----------------|----------------|
+| Baseline | 15.2% | 13.2% | 32.5% | 66.9% |
+| Round 1 | 61.6% | 58.9% | 88.7% | 40.4% |
+| Round 2 | **78.1%** | **75.5%** | **95.4%** | **23.8%** |
+
+Remaining failures are typically **legitimate disambiguation cases** where the system correctly asks for clarification.
+
+### Extended Test Scenarios
+
+The `cbu_phrase_scenarios.rs` module provides ~150 test scenarios across CBU verbs:
+
+```rust
+// rust/tests/cbu_phrase_scenarios.rs
+pub fn all_cbu_scenarios() -> Vec<TestScenario> {
+    let mut all = Vec::new();
+    all.extend(cbu_create_scenarios());      // 34 scenarios
+    all.extend(cbu_list_scenarios());        // 21 scenarios
+    all.extend(cbu_assign_role_scenarios()); // 34 scenarios
+    all.extend(cbu_parties_scenarios());     // 13 scenarios
+    // ... etc
+    all
+}
+```
+
+**Adding scenarios for other domains:**
+1. Create `<domain>_phrase_scenarios.rs` in `rust/tests/`
+2. Define `TestScenario::matched()` for expected phrase→verb mappings
+3. Use `TestScenario::safety_first()` for destructive operations
+4. Add module to `verb_search_integration.rs`
 
 ### Threshold Sweep (Full Pipeline)
 
@@ -2687,8 +2768,11 @@ This prevents optimizing for overconfident behavior on safety-critical verbs.
 
 | File | Purpose |
 |------|---------|
-| `rust/tests/verb_search_integration.rs` | Test harness implementation |
+| `rust/tests/verb_search_integration.rs` | Main test harness with `VerbSearchTestHarness` |
+| `rust/tests/cbu_phrase_scenarios.rs` | Extended CBU test scenarios (~150 phrases) |
 | `rust/xtask/src/main.rs` | `cargo x test-verbs` command |
+| `scripts/teach_cbu_phrases.sql` | Batch teaching script for CBU verbs |
+| `migrations/044_agent_teaching.sql` | `agent.teach_phrases_batch()` function |
 
 ---
 

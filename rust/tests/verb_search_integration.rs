@@ -23,6 +23,12 @@ use ob_poc::mcp::verb_search::{
     normalize_candidates, VerbSearchOutcome, VerbSearchResult, VerbSearchSource, AMBIGUITY_MARGIN,
 };
 
+// Extended CBU phrase scenarios for accelerated learning
+// Named with _mod suffix to avoid being auto-discovered as a separate test binary
+#[cfg(feature = "database")]
+#[path = "helpers/cbu_phrase_scenarios.rs"]
+mod cbu_phrase_scenarios;
+
 // Database-dependent imports (only used in #[cfg(feature = "database")] tests)
 #[cfg(feature = "database")]
 use anyhow::Result;
@@ -1322,6 +1328,142 @@ async fn test_all_scenarios() {
 
     let report = run_scenarios(&harness, &all_scenarios).await;
     report.print_summary();
+}
+
+/// Extended CBU phrase tests - comprehensive coverage for accelerated learning
+///
+/// This test runs ~150+ CBU-specific scenarios to identify phrases that need teaching.
+/// Run this BEFORE teaching to identify gaps, and AFTER to validate improvements.
+///
+/// Usage:
+///   cargo test --features database --test verb_search_integration test_cbu_extended -- --ignored --nocapture
+#[cfg(feature = "database")]
+#[tokio::test]
+#[ignore]
+async fn test_cbu_extended() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    let scenarios = cbu_phrase_scenarios::all_cbu_scenarios();
+
+    println!("Running {} extended CBU scenarios...\n", scenarios.len());
+
+    let report = run_scenarios(&harness, &scenarios).await;
+    report.print_summary();
+
+    // Output phrases that need teaching (failed scenarios)
+    let failed_traces: Vec<_> = report.traces.iter().filter(|t| !t.correct).collect();
+    if !failed_traces.is_empty() {
+        println!("\n============================================================");
+        println!(
+            "  PHRASES THAT NEED TEACHING ({} total)",
+            failed_traces.len()
+        );
+        println!("============================================================\n");
+
+        // Group by expected verb (from scenarios)
+        let mut by_verb: std::collections::HashMap<String, Vec<&str>> =
+            std::collections::HashMap::new();
+        for trace in &failed_traces {
+            // Find the matching scenario to get expected verb
+            if let Some(scenario) = scenarios.iter().find(|s| s.query == trace.query) {
+                if let Some(verb) = scenario.expected_verb {
+                    by_verb
+                        .entry(verb.to_string())
+                        .or_default()
+                        .push(&trace.query);
+                }
+            }
+        }
+
+        // Print as teachable SQL
+        println!("-- Copy-paste into psql to teach these phrases:\n");
+        for (verb, phrases) in &by_verb {
+            println!("-- {} ({} phrases)", verb, phrases.len());
+            let json_array: Vec<String> = phrases
+                .iter()
+                .map(|p| format!(r#"{{"phrase": "{}", "verb": "{}"}}"#, p, verb))
+                .collect();
+            println!(
+                "SELECT * FROM agent.teach_phrases_batch('[{}]'::jsonb, 'accelerated_learning');\n",
+                json_array.join(", ")
+            );
+        }
+    }
+}
+
+/// Run CBU scenarios and output mismatch report for learning analysis
+///
+/// This generates a detailed JSON report of what's working and what needs teaching.
+///
+/// Usage:
+///   VERB_SEARCH_DUMP_MISMATCH=cbu_mismatches.json \
+///     cargo test --features database --test verb_search_integration test_cbu_dump_mismatches -- --ignored --nocapture
+#[cfg(feature = "database")]
+#[tokio::test]
+#[ignore]
+async fn test_cbu_dump_mismatches() {
+    let output_path = match std::env::var("VERB_SEARCH_DUMP_MISMATCH") {
+        Ok(path) => std::path::PathBuf::from(path),
+        Err(_) => {
+            println!("VERB_SEARCH_DUMP_MISMATCH not set, using default: cbu_mismatches.json");
+            std::path::PathBuf::from("cbu_mismatches.json")
+        }
+    };
+
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    let scenarios = cbu_phrase_scenarios::all_cbu_scenarios();
+
+    println!("Running {} extended CBU scenarios...", scenarios.len());
+
+    let report = collect_mismatches(&harness, &scenarios).await;
+
+    // Print summary
+    println!("\n============================================================");
+    println!("                CBU PHRASE MISMATCH REPORT");
+    println!("============================================================\n");
+    println!("Total tests:        {}", report.total_tests);
+    println!("Passed:             {}", report.passed);
+    println!("Failed:             {}", report.failed);
+    println!("Pass rate:          {:.1}%", report.pass_rate);
+    println!("Confidently wrong:  {}", report.confidently_wrong);
+
+    // Group mismatches by category
+    let mut by_category: std::collections::HashMap<&str, Vec<&MismatchEntry>> =
+        std::collections::HashMap::new();
+    for m in &report.mismatches {
+        by_category.entry(&m.category).or_default().push(m);
+    }
+
+    if !by_category.is_empty() {
+        println!("\n--- Mismatches by Category ---");
+        for (cat, entries) in &by_category {
+            println!("\n{} ({} failures):", cat, entries.len());
+            for m in entries.iter().take(5) {
+                println!("  ✗ \"{}\"", m.query);
+                println!("    Expected: {:?}", m.expected_verb);
+                if let Some(actual) = &m.actual_verb {
+                    println!("    Got:      {}", actual);
+                } else {
+                    println!("    Got:      {}", m.actual_outcome);
+                }
+            }
+            if entries.len() > 5 {
+                println!("  ... and {} more", entries.len() - 5);
+            }
+        }
+    }
+
+    // Write JSON output
+    let json = serde_json::to_string_pretty(&report).expect("Failed to serialize report");
+    std::fs::write(&output_path, &json).expect("Failed to write output file");
+    println!("\n============================================================");
+    println!("  Report written to: {}", output_path.display());
+    println!("============================================================");
 }
 
 #[cfg(feature = "database")]
