@@ -32,6 +32,7 @@
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
 > **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
 > **Utterance Segmentation (066):** ✅ Complete - 4-pass segmentation, typo detection, VERB_GROUP_PREFIXES for "work on" patterns
+> **Learned Phrase Prefix Matching (070):** ✅ Complete - Prefix-based learned phrase matching, macro priority fix
 > **Entity Scope DSL (067):** ✅ Complete - Pattern B runtime scope resolution, scope.commit/resolve/narrow/union verbs, entity-ids rewrite
 > **Proposal/Confirm Protocol (067):** ✅ Complete - exec.proposal/confirm/edit/cancel verbs, atomic execution, session-scoped security
 > **Narration Templates (068):** ✅ Complete - YAML-embedded templates, variable substitution, startup lint (NARR001-NARR006)
@@ -598,6 +599,66 @@ Disambiguation UI (both verbs have same score)
 | `rust/src/api/agent_service.rs` | Wires segmentation into chat flow |
 | `rust/src/mcp/intent_pipeline.rs` | `process_with_segmentation()` - uses verb phrase for search |
 | `rust/tests/utterance_integration.rs` | Integration tests |
+
+### Learned Phrase Prefix Matching (070)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: Prefix-based learned phrase matching ensures taught phrases work even with additional arguments.
+
+**Problem Solved:** Learned phrases like "spin up a fund" (mapped to `cbu.create`) weren't matching when users added arguments: "spin up a fund named Acme in LU". The utterance segmentation extracted "spin up a" as the verb phrase, which didn't match the full learned phrase.
+
+**Solution:** Two-part fix:
+
+1. **Prefix Matching in IntentPipeline:** Try progressively shorter prefixes of the full instruction against learned phrases before falling back to semantic search.
+
+2. **Learned Phrase Priority in VerbSearch:** Check learned phrases even when macros return partial matches (score < 1.0), since exact learned matches (score 1.0) should take priority.
+
+**Prefix Matching Algorithm:**
+
+```
+User Input: "spin up a fund named Acme in LU"
+    │
+    ▼
+Prefixes tried (longest first):
+    1. "spin up a fund named Acme in LU" → no match
+    2. "spin up a fund named Acme in" → no match
+    3. "spin up a fund named Acme" → no match
+    4. "spin up a fund named" → no match
+    5. "spin up a fund" → MATCH! LearnedExact, score 1.0 → cbu.create
+    │
+    ▼
+Continue with cbu.create, extract args via LLM
+    │
+    ▼
+DSL: (cbu.create :name "Acme" :jurisdiction "LU")
+```
+
+**Search Priority (Updated):**
+
+```
+0. Operator macros (exact match only, score 1.0) → return early
+1. User-specific learned (exact) - score 1.0
+2. Global learned (exact) - score 1.0  ← Now checked even if macros found partial matches
+3. User-specific learned (semantic)
+4. [REMOVED]
+5. Blocklist filter
+6. Global semantic (cold start)
+```
+
+**Key Changes:**
+
+| File | Change |
+|------|--------|
+| `rust/src/mcp/intent_pipeline.rs` | Prefix loop in `process_as_natural_language()` |
+| `rust/src/mcp/verb_search.rs` | Check learned phrases when `results.first().score < 1.0` |
+| `rust/crates/dsl-core/src/config/types.rs` | Added `Session` variant to `VerbScope` enum |
+
+**Test Cases:**
+
+| Input | Result |
+|-------|--------|
+| "spin up a fund" | `cbu.create` (missing args: name, jurisdiction) |
+| "spin up a fund named Acme in LU" | `cbu.create` with DSL generated |
+| "spin up a new fund for client ABC" | `cbu.create` (matches "spin up a new fund") |
 
 ### Embeddings: Candle Local (BGE Retrieval Model)
 

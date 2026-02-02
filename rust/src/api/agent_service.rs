@@ -454,19 +454,30 @@ pub struct AgentService {
     config: AgentServiceConfig,
     /// Embedder for semantic verb search - REQUIRED, no fallback path
     embedder: Arc<CandleEmbedder>,
+    /// Learned data for exact phrase matching (invocation_phrases, entity_aliases)
+    /// Loaded at startup via warmup - enables step 2 (global learned exact match)
+    learned_data: Option<crate::agent::learning::warmup::SharedLearnedData>,
 }
 
 #[allow(dead_code)]
 impl AgentService {
-    /// Create agent service with pool and embedder
+    /// Create agent service with pool, embedder, and learned data
     ///
     /// The embedder is REQUIRED for semantic verb search. All prompts go through
     /// the Candle intent pipeline - there is no fallback path.
-    pub fn new(pool: PgPool, embedder: Arc<CandleEmbedder>) -> Self {
+    ///
+    /// The learned_data enables step 2 (global learned exact match) for phrases
+    /// like "spin up a fund" → cbu.create. Without it, only semantic search is used.
+    pub fn new(
+        pool: PgPool,
+        embedder: Arc<CandleEmbedder>,
+        learned_data: Option<crate::agent::learning::warmup::SharedLearnedData>,
+    ) -> Self {
         Self {
             pool,
             config: AgentServiceConfig::default(),
             embedder,
+            learned_data,
         }
     }
 
@@ -487,7 +498,9 @@ impl AgentService {
             OperatorMacroRegistry::new()
         });
 
-        let searcher = HybridVerbSearcher::new(verb_service, None)
+        // Pass learned_data to enable step 2 (global learned exact match)
+        // Without this, phrases like "spin up a fund" won't match cbu.create
+        let searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone())
             .with_embedder(dyn_embedder)
             .with_macro_registry(Arc::new(macro_reg));
 

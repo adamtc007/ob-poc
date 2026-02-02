@@ -500,19 +500,34 @@ impl HybridVerbSearcher {
         }
 
         // 2. Global learned phrases (exact match)
-        if results.is_empty() {
+        // Check learned phrases even if macros returned partial matches (score < 1.0),
+        // because learned exact matches should take priority over non-exact macro matches.
+        // Only skip this step if we already have a perfect score (1.0) match.
+        let should_check_learned =
+            results.is_empty() || results.first().map(|r| r.score < 1.0).unwrap_or(true);
+
+        if should_check_learned {
             if let Some(learned) = &self.learned_data {
                 let guard = learned.read().await;
                 if let Some(verb) = guard.resolve_phrase(&normalized) {
                     if self.matches_domain(verb, domain_filter) {
                         let description = self.get_verb_description(verb).await;
-                        results.push(VerbSearchResult {
-                            verb: verb.to_string(),
-                            score: 1.0,
-                            source: VerbSearchSource::LearnedExact,
-                            matched_phrase: query.to_string(),
-                            description,
-                        });
+                        tracing::debug!(
+                            verb = verb,
+                            phrase = normalized,
+                            "VerbSearch: found exact learned phrase match"
+                        );
+                        // Insert at front since learned exact (1.0) beats partial macro matches
+                        results.insert(
+                            0,
+                            VerbSearchResult {
+                                verb: verb.to_string(),
+                                score: 1.0,
+                                source: VerbSearchSource::LearnedExact,
+                                matched_phrase: query.to_string(),
+                                description,
+                            },
+                        );
                         seen_verbs.insert(verb.to_string());
                     }
                 }

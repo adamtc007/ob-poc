@@ -945,6 +945,7 @@ impl AgentState {
     /// so semantic search is available immediately when server starts accepting requests.
     pub async fn with_semantic(pool: PgPool, sessions: SessionStore) -> Self {
         use crate::agent::learning::embedder::CandleEmbedder;
+        use crate::agent::learning::warmup::LearningWarmup;
 
         let dsl_v2_executor = Arc::new(DslExecutor::new(pool.clone()));
         let generation_log = Arc::new(GenerationLogRepository::new(pool.clone()));
@@ -973,8 +974,33 @@ impl AgentState {
             }
         };
 
-        // Build agent service with embedder - REQUIRED, no fallback
-        let agent_service = crate::api::agent_service::AgentService::new(pool.clone(), embedder);
+        // Load learned data (invocation_phrases, entity_aliases) for exact match lookup
+        // This enables step 2 (global learned exact match) in verb search
+        tracing::info!("Loading learned data for verb search...");
+        let warmup_start = std::time::Instant::now();
+        let warmup = LearningWarmup::new(pool.clone());
+        let learned_data = match warmup.warmup().await {
+            Ok((data, stats)) => {
+                tracing::info!(
+                    "Learned data loaded in {}ms: {} invocation phrases, {} entity aliases",
+                    warmup_start.elapsed().as_millis(),
+                    stats.invocation_phrases_loaded,
+                    stats.entity_aliases_loaded
+                );
+                Some(data)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to load learned data: {}. Verb search will use semantic-only mode.",
+                    e
+                );
+                None
+            }
+        };
+
+        // Build agent service with embedder and learned data
+        let agent_service =
+            crate::api::agent_service::AgentService::new(pool.clone(), embedder, learned_data);
         let expansion_audit =
             Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
 

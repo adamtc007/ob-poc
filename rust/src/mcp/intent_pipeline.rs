@@ -535,21 +535,97 @@ impl IntentPipeline {
         verb_phrase_override: Option<&str>,
     ) -> Result<PipelineResult> {
         // Step 1: Find verb candidates via semantic search
-        // Use segmented verb phrase if available, otherwise full instruction
-        let search_phrase = verb_phrase_override.unwrap_or(instruction);
+        //
+        // SEARCH STRATEGY (when verb_phrase_override is provided from segmentation):
+        // 1. First try FULL instruction for exact learned phrase match
+        //    e.g., "spin up a fund" → cbu.create (learned)
+        // 2. If no exact match found, use segmented verb phrase for semantic search
+        //    e.g., "spin up a" for embedding-based matching
+        //
+        // This ensures learned phrases like "spin up a fund" work even when
+        // segmentation extracts "spin up a" as the verb phrase and "fund" as scope.
 
-        tracing::debug!(
-            full_instruction = instruction,
-            search_phrase = search_phrase,
-            verb_phrase_override = ?verb_phrase_override,
-            "Verb search using phrase"
-        );
+        let mut candidates = Vec::new();
 
-        // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
-        let candidates = self
-            .verb_searcher
-            .search(search_phrase, None, domain_filter, 5)
-            .await?;
+        // SEARCH STRATEGY for learned phrase matching:
+        // 1. Try progressively shorter prefixes of instruction for exact learned match
+        //    e.g., "spin up a fund named Acme in LU" tries:
+        //      - "spin up a fund named Acme in LU" (no match)
+        //      - "spin up a fund named Acme in" (no match)
+        //      - "spin up a fund named Acme" (no match)
+        //      - "spin up a fund named" (no match)
+        //      - "spin up a fund" → MATCH! cbu.create
+        // 2. If no prefix match found, fall back to semantic search on verb phrase
+        //
+        // This handles cases like:
+        //   - "spin up a fund" (exact match)
+        //   - "spin up a fund called Acme" (prefix match on "spin up a fund")
+        //   - "create a new trading profile" (semantic match if no learned phrase)
+
+        if verb_phrase_override.is_some() {
+            // Try progressively shorter prefixes of the full instruction
+            let words: Vec<&str> = instruction.split_whitespace().collect();
+
+            tracing::debug!(
+                word_count = words.len(),
+                full_instruction = instruction,
+                "Verb search: starting prefix matching loop"
+            );
+
+            for end in (1..=words.len()).rev() {
+                let prefix = words[..end].join(" ");
+
+                tracing::trace!(
+                    prefix = %prefix,
+                    end = end,
+                    "Verb search: trying prefix"
+                );
+
+                let prefix_candidates = self
+                    .verb_searcher
+                    .search(&prefix, None, domain_filter, 5)
+                    .await?;
+
+                // If we got an exact match (score 1.0, LearnedExact source), use it
+                if let Some(first) = prefix_candidates.first() {
+                    tracing::trace!(
+                        prefix = %prefix,
+                        verb = %first.verb,
+                        score = first.score,
+                        source = ?first.source,
+                        "Verb search: prefix candidate result"
+                    );
+                    if first.score >= 1.0 {
+                        tracing::debug!(
+                            verb = %first.verb,
+                            source = ?first.source,
+                            matched_prefix = %prefix,
+                            full_instruction = instruction,
+                            "Verb search: found exact learned phrase match via prefix"
+                        );
+                        candidates = prefix_candidates;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If no exact match found, use segmented verb phrase (or full instruction if no override)
+        if candidates.is_empty() {
+            let search_phrase = verb_phrase_override.unwrap_or(instruction);
+
+            tracing::debug!(
+                full_instruction = instruction,
+                search_phrase = search_phrase,
+                verb_phrase_override = ?verb_phrase_override,
+                "Verb search: using search phrase for semantic matching"
+            );
+
+            candidates = self
+                .verb_searcher
+                .search(search_phrase, None, domain_filter, 5)
+                .await?;
+        }
 
         if candidates.is_empty() {
             // Check if semantic search is available

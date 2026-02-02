@@ -402,6 +402,8 @@ pub enum VerbScope {
     Global,
     /// Operates within CBU context
     Cbu,
+    /// Operates within session context (exec proposals, temporary state)
+    Session,
 }
 
 /// Verb lifecycle status
