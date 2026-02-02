@@ -118,6 +118,7 @@ use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
 use crate::macros::OperatorMacroRegistry;
 use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
+use crate::mcp::utterance::segment_utterance;
 use crate::mcp::verb_search::HybridVerbSearcher;
 use crate::ontology::SemanticStageRegistry;
 use crate::session::SessionScope;
@@ -956,13 +957,44 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // Clear pending intent tier if user typed something new
         session.pending_intent_tier = None;
 
+        // STAGE 0: UTTERANCE SEGMENTATION
+        // Segment input into verb_phrase, group_phrase, scope_phrase, residual_terms
+        // This runs BEFORE the pipeline to protect entity context from verb matching
+        let segmentation = segment_utterance(&request.message, &self.pool).await;
+
+        tracing::debug!(
+            original = %segmentation.original,
+            verb_phrase = %segmentation.verb_phrase.text,
+            verb_confidence = segmentation.verb_phrase.confidence,
+            group_phrase = ?segmentation.group_phrase.as_ref().map(|g| &g.text),
+            group_confidence = ?segmentation.group_phrase.as_ref().map(|g| g.confidence),
+            scope_phrase = ?segmentation.scope_phrase.as_ref().map(|s| &s.text),
+            is_likely_typo = segmentation.is_likely_typo(),
+            is_likely_garbage = segmentation.is_likely_garbage(),
+            "Utterance segmentation complete"
+        );
+
         // ONE PIPELINE - generate/validate DSL
         // Wrap session for macro expansion (macros need session state for prereqs/context)
         let session_arc = Arc::new(RwLock::new(session.clone()));
+
+        // Use segmented verb phrase for verb search (improves matching accuracy)
+        // Only use if verb phrase has reasonable confidence
+        let verb_phrase_for_search = if segmentation.verb_phrase.confidence >= 0.5 {
+            Some(segmentation.verb_phrase.text.as_str())
+        } else {
+            None
+        };
+
         let result = self
             .get_intent_pipeline()
             .with_session(session_arc)
-            .process_with_scope(&request.message, None, session.context.client_scope.clone())
+            .process_with_segmentation(
+                &request.message,
+                None,
+                session.context.client_scope.clone(),
+                verb_phrase_for_search,
+            )
             .await;
 
         match result {
@@ -1070,7 +1102,47 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             }
         }
 
-        // Fallback
+        // STAGE 1: TYPO CHECK using segmentation
+        // If group resolved but verb weak, this is likely a typo (not garbage)
+        if segmentation.is_likely_typo() {
+            let group_name = segmentation
+                .group_phrase
+                .as_ref()
+                .map(|g| g.text.as_str())
+                .unwrap_or("unknown");
+            let verb_text = &segmentation.verb_phrase.text;
+
+            tracing::info!(
+                verb_phrase = %verb_text,
+                group_phrase = %group_name,
+                verb_confidence = segmentation.verb_phrase.confidence,
+                "Detected likely typo - group resolved but verb weak"
+            );
+
+            // Provide helpful feedback with the resolved group
+            let msg = format!(
+                "I understood you want to work with '{}', but I couldn't parse the command '{}'.\n\n\
+                 Did you mean one of these?\n\
+                 - \"work on {}\" (set client scope)\n\
+                 - \"load {}\" (load client book)\n\
+                 - \"show {} cbus\" (list CBUs)\n\n\
+                 Try /commands for help.",
+                group_name, verb_text, group_name, group_name, group_name
+            );
+            session.add_agent_message(msg.clone(), None, None);
+            return Ok(self.fail(&msg, session));
+        }
+
+        // STAGE 2: GARBAGE CHECK
+        if segmentation.is_likely_garbage() {
+            tracing::debug!(
+                original = %segmentation.original,
+                "Input appears to be garbage (no meaningful segments)"
+            );
+            return Ok(self.fail("I don't understand. Try /commands for help.", session));
+        }
+
+        // Fallback - something else went wrong
         Ok(self.fail("I don't understand. Try /commands for help.", session))
     }
 

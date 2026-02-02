@@ -364,6 +364,24 @@ impl IntentPipeline {
         domain_hint: Option<&str>,
         existing_scope: Option<ScopeContext>,
     ) -> Result<PipelineResult> {
+        self.process_with_segmentation(instruction, domain_hint, existing_scope, None)
+            .await
+    }
+
+    /// Process with segmented verb phrase for improved verb matching
+    ///
+    /// When `verb_phrase` is provided, it's used for verb search instead of the full instruction.
+    /// This improves matching when the instruction contains entity names that would confuse search.
+    ///
+    /// Example: "work on allianz" with verb_phrase="work on" will search for "work on" verbs
+    /// instead of searching for "work on allianz" which might match entity-related verbs.
+    pub async fn process_with_segmentation(
+        &self,
+        instruction: &str,
+        domain_hint: Option<&str>,
+        existing_scope: Option<ScopeContext>,
+        verb_phrase: Option<&str>,
+    ) -> Result<PipelineResult> {
         let trimmed = instruction.trim();
 
         // Fast path: Direct DSL input (starts with "(")
@@ -388,6 +406,16 @@ impl IntentPipeline {
         // =========================================================================
         // STAGE 0: Scope Resolution (HARD GATE - runs BEFORE Candle)
         // =========================================================================
+        //
+        // IMPORTANT: When verb_phrase is provided (from segmentation), we have BOTH
+        // a verb and a scope. In this case, we capture the scope but do NOT return
+        // early - we continue to verb search with the segmented verb phrase.
+        //
+        // The hard gate only applies when there's NO verb phrase (bare "allianz").
+        // =========================================================================
+
+        let mut resolved_scope: Option<ScopeContext> = existing_scope.clone();
+
         #[cfg(feature = "database")]
         if let Some(pool) = &self.pool {
             let scope_outcome = self.scope_resolver.resolve(trimmed, pool).await?;
@@ -398,37 +426,53 @@ impl IntentPipeline {
                     group_name,
                     entity_count,
                 } => {
-                    // Scope phrase consumed the input - return early, do NOT call Candle
-                    tracing::info!(
-                        group_id = %group_id,
-                        group_name = %group_name,
-                        entity_count = %entity_count,
-                        "Stage 0: Scope resolved (hard gate - skipping Candle)"
-                    );
-
                     let scope_ctx =
                         ScopeContext::new().with_client_group(*group_id, group_name.clone());
 
-                    return Ok(PipelineResult {
-                        intent: StructuredIntent::empty(),
-                        verb_candidates: vec![],
-                        dsl: String::new(),
-                        dsl_hash: None,
-                        valid: true, // Scope resolution is a valid outcome
-                        validation_error: None,
-                        unresolved_refs: vec![],
-                        missing_required: vec![],
-                        outcome: PipelineOutcome::ScopeResolved {
-                            group_id: group_id.to_string(),
-                            group_name: group_name.clone(),
-                            entity_count: *entity_count,
-                        },
-                        scope_resolution: Some(scope_outcome),
-                        scope_context: Some(scope_ctx),
-                    });
+                    // If we have a verb phrase from segmentation, capture scope but CONTINUE
+                    // to verb search. The verb phrase like "work on" needs to be matched.
+                    if verb_phrase.is_some() {
+                        tracing::info!(
+                            group_id = %group_id,
+                            group_name = %group_name,
+                            entity_count = %entity_count,
+                            verb_phrase = ?verb_phrase,
+                            "Stage 0: Scope resolved, but verb phrase present - continuing to verb search"
+                        );
+                        resolved_scope = Some(scope_ctx);
+                        // Continue to verb search below (don't return early)
+                    } else {
+                        // No verb phrase - this is a pure scope-setting command like "allianz"
+                        // Return early with scope resolved
+                        tracing::info!(
+                            group_id = %group_id,
+                            group_name = %group_name,
+                            entity_count = %entity_count,
+                            "Stage 0: Scope resolved (hard gate - skipping Candle)"
+                        );
+
+                        return Ok(PipelineResult {
+                            intent: StructuredIntent::empty(),
+                            verb_candidates: vec![],
+                            dsl: String::new(),
+                            dsl_hash: None,
+                            valid: true, // Scope resolution is a valid outcome
+                            validation_error: None,
+                            unresolved_refs: vec![],
+                            missing_required: vec![],
+                            outcome: PipelineOutcome::ScopeResolved {
+                                group_id: group_id.to_string(),
+                                group_name: group_name.clone(),
+                                entity_count: *entity_count,
+                            },
+                            scope_resolution: Some(scope_outcome),
+                            scope_context: Some(scope_ctx),
+                        });
+                    }
                 }
                 ScopeResolutionOutcome::Candidates(candidates) => {
                     // Multiple matches - return for user to pick (compact picker, not modal)
+                    // Even with verb phrase, we need disambiguation first
                     tracing::info!(
                         candidate_count = candidates.len(),
                         "Stage 0: Scope candidates (hard gate - skipping Candle)"
@@ -462,29 +506,49 @@ impl IntentPipeline {
             }
         }
 
-        // Use existing scope or empty
-        let scope_ctx = existing_scope.unwrap_or_default();
+        // Use resolved scope, existing scope, or empty
+        let scope_ctx = resolved_scope.or(existing_scope).unwrap_or_default();
 
         // Natural language path (with scope context for entity resolution)
         // Pass inferred domain to filter verb search results
-        self.process_as_natural_language(instruction, inferred_domain.as_deref(), scope_ctx)
-            .await
+        self.process_as_natural_language(
+            instruction,
+            inferred_domain.as_deref(),
+            scope_ctx,
+            verb_phrase,
+        )
+        .await
     }
 
     /// Process input as natural language (semantic search → LLM extraction → DSL)
     ///
     /// This is the main NL processing path, also called when direct DSL parsing fails.
+    ///
+    /// When `verb_phrase_override` is provided (from utterance segmentation), it's used
+    /// for verb search instead of the full instruction. This improves matching accuracy
+    /// when the instruction contains entity names.
     async fn process_as_natural_language(
         &self,
         instruction: &str,
         domain_filter: Option<&str>,
         scope_ctx: ScopeContext,
+        verb_phrase_override: Option<&str>,
     ) -> Result<PipelineResult> {
         // Step 1: Find verb candidates via semantic search
+        // Use segmented verb phrase if available, otherwise full instruction
+        let search_phrase = verb_phrase_override.unwrap_or(instruction);
+
+        tracing::debug!(
+            full_instruction = instruction,
+            search_phrase = search_phrase,
+            verb_phrase_override = ?verb_phrase_override,
+            "Verb search using phrase"
+        );
+
         // Domain filter narrows results to relevant verbs (e.g., "session" domain for "set session...")
         let candidates = self
             .verb_searcher
-            .search(instruction, None, domain_filter, 5)
+            .search(search_phrase, None, domain_filter, 5)
             .await?;
 
         if candidates.is_empty() {
@@ -1026,7 +1090,10 @@ Respond with ONLY valid JSON:
                 );
                 // Recursively call process() but skip the DSL detection
                 // by treating the malformed DSL as natural language
-                return self.process_as_natural_language(dsl, None, scope_ctx).await;
+                // No verb phrase override since this is raw DSL that failed to parse
+                return self
+                    .process_as_natural_language(dsl, None, scope_ctx, None)
+                    .await;
             }
         };
 

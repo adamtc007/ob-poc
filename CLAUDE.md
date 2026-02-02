@@ -31,6 +31,7 @@
 > **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
 > **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
+> **Utterance Segmentation (066):** ✅ Complete - 4-pass segmentation, typo detection, VERB_GROUP_PREFIXES for "work on" patterns
 > **Entity Scope DSL (067):** ✅ Complete - Pattern B runtime scope resolution, scope.commit/resolve/narrow/union verbs, entity-ids rewrite
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
@@ -425,6 +426,113 @@ POST /api/dsl/resolve-by-ref-id
 - `rust/crates/dsl-core/src/ast.rs` - `find_unresolved_ref_locations()` uses stored `ref_id`
 - `rust/src/api/agent_routes.rs` - `resolve_by_ref_id` endpoint
 - `intent-pipeline-fixes-todo.md` - Full spec with 12-point PR review rubric
+
+### Utterance Segmentation & Typo Detection (066)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: 4-pass segmentation extracts verb/group/scope before semantic search. Enables typo detection when group resolves but verb doesn't.
+
+**Problem Solved:** Input like "set seeion to aviva uk" failed silently. The typo "seeion" distorted embeddings, causing verb search to fail. But "aviva uk" IS a valid client - that signal was lost.
+
+**Solution:** Segment utterance BEFORE semantic search. When group resolves but verb is weak, detect likely typo and suggest corrections.
+
+**4-Pass Algorithm:**
+
+```
+Pass 0: Normalize & Tokenize (lowercase, collapse whitespace, track spans)
+Pass 1: Group Phrase Extraction (client names via DB lookup)
+Pass 2: Verb Phrase Extraction (from early tokens, respects VERB_GROUP_PREFIXES)
+Pass 3: Scope Phrase Extraction (remaining entity descriptors)
+Pass 4: Residual Terms (filters, parameters)
+```
+
+**Key Data Structures:**
+
+```rust
+pub struct UtteranceSegmentation {
+    pub original: String,
+    pub normalized: String,
+    pub tokens: Vec<Token>,
+    pub verb_phrase: Segment,           // Always present (may be low confidence)
+    pub group_phrase: Option<Segment>,  // Resolved client group
+    pub scope_phrase: Option<Segment>,  // Entity descriptors
+    pub residual_terms: Vec<Segment>,
+    pub method_trace: Vec<SegStep>,     // Debug/learning trail
+}
+
+pub struct Segment {
+    pub text: String,
+    pub span: Span,
+    pub confidence: f32,    // 0.0 - 1.0
+    pub method: SegmentMethod,
+}
+```
+
+**Typo vs Garbage Detection:**
+
+```rust
+// Typo: Group resolved (≥0.6) but verb weak (<0.5)
+// → Suggest corrections: "Did you mean 'work on aviva uk'?"
+fn is_likely_typo(&self) -> bool {
+    self.group_phrase.as_ref().is_some_and(|g| g.confidence >= 0.6)
+        && self.verb_phrase.confidence < 0.5
+}
+
+// Garbage: Nothing resolved
+// → Return "I don't understand" immediately (no LLM call)
+fn is_likely_garbage(&self) -> bool {
+    !has_verb && !has_group && !has_scope
+}
+```
+
+**VERB_GROUP_PREFIXES:**
+
+Dual-purpose prefixes like "work on" introduce groups AND are verbs themselves:
+
+```rust
+const VERB_GROUP_PREFIXES: &[(&str, &str)] = &[
+    ("work on ", "work on"),
+    ("working on ", "working on"),
+    ("switch to ", "switch to"),
+    ("set client to ", "set client to"),
+    ("set client ", "set client"),
+];
+```
+
+When detected, the prefix is used as implied verb phrase (0.95 confidence).
+
+**Pipeline Integration:**
+
+```
+User Input: "work on allianz"
+    │
+    ▼
+segment_utterance()
+    │   verb_phrase: "work on" (0.95)
+    │   group_phrase: "allianz" → Allianz Global Investors (1.0)
+    │
+    ▼
+IntentPipeline.process_with_segmentation()
+    │   - Scope resolved (Allianz) but verb_phrase present
+    │   - DO NOT return early (unlike bare "allianz")
+    │   - Continue to verb search with "work on"
+    │
+    ▼
+HybridVerbSearcher.search("work on")
+    │   → session.load-cluster (0.894)
+    │   → session.set-client (0.894)
+    │
+    ▼
+Disambiguation UI (both verbs have same score)
+```
+
+**Key Files:**
+
+| File | Purpose |
+|------|---------|
+| `rust/src/mcp/utterance.rs` | 4-pass segmentation algorithm |
+| `rust/src/api/agent_service.rs` | Wires segmentation into chat flow |
+| `rust/src/mcp/intent_pipeline.rs` | `process_with_segmentation()` - uses verb phrase for search |
+| `rust/tests/utterance_integration.rs` | Integration tests |
 
 ### Embeddings: Candle Local (BGE Retrieval Model)
 
@@ -3855,6 +3963,7 @@ When you see these in a task, read the corresponding annex first:
 | "sheet", "phased execution", "DAG" | `ai-thoughts/035-repl-session-implementation-plan.md` |
 | "solar navigation", "ViewState", "orbit", "nav_history" | `ai-thoughts/038-solar-navigation-unified-design.md` |
 | "intent pipeline", "ambiguity", "normalize_candidates", "ref_id" | CLAUDE.md §Intent Pipeline Fixes (042) |
+| "utterance segmentation", "typo detection", "verb phrase", "group phrase" | CLAUDE.md §Utterance Segmentation (066) |
 | "intent tier", "tier disambiguation", "what are you trying to do" | CLAUDE.md §Intent Tier Disambiguation (065) |
 | "macro", "operator vocabulary", "structure.setup", "constraint cascade" | CLAUDE.md §Operator Vocabulary & Macros (058) |
 | "onboarding pipeline", "RequirementPlanner", "OnboardingPlan", "ob-agentic" | CLAUDE.md §Structured Onboarding Pipeline |

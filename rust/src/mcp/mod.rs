@@ -53,6 +53,7 @@ pub mod server;
 pub mod session;
 pub mod tools;
 pub mod types;
+pub mod utterance;
 pub mod verb_search;
 
 pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
