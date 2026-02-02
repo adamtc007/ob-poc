@@ -993,13 +993,13 @@ fn taught_phrase_scenarios() -> Vec<TestScenario> {
             0.90,
         )
         .with_category("taught"),
-        // Variations - "spin up a new fund called Alpha" has extra words that dilute
-        // semantic similarity to any exact taught pattern. Either NoMatch or Ambiguous
-        // is acceptable - both trigger clarification flow. Ambiguous is actually better
-        // because it gives the user options to pick from.
-        TestScenario::ambiguous(
-            "spin up a new fund (variation needs clarification)",
+        // "spin up a new fund called Alpha" - semantic model correctly identifies
+        // this as cbu.create intent. The extra words don't dilute the core meaning.
+        TestScenario::matched_with_score(
+            "spin up a new fund (variation)",
             "spin up a new fund called Alpha",
+            "cbu.create",
+            0.80,
         )
         .with_category("taught"),
         TestScenario::matched_with_score(
