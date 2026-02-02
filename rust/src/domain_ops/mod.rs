@@ -57,6 +57,7 @@ mod research_workflow_ops;
 mod resource_ops;
 mod runbook_ops;
 
+mod scope_ops;
 mod screening_ops;
 mod semantic_ops;
 mod service_pipeline_ops;

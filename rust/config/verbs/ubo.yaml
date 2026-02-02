@@ -567,7 +567,7 @@ domains:
         returns:
           type: affected
       list-owners:
-        description: List owners of an entity as of a specific date
+        description: List owners of one or more entities as of a specific date. Supports Pattern B entity scope.
         invocation_phrases:
           - "list owners"
           - "show who owns"
@@ -577,6 +577,7 @@ domains:
           - "show shareholders"
           - "list beneficial owners"
           - "find all owners"
+          - "bulk list owners"
         behavior: plugin
         metadata:
           tier: diagnostics
@@ -585,9 +586,13 @@ domains:
           noun: ubo
           tags: [ownership, query, temporal]
         args:
+          - name: entity-ids
+            type: uuid_list
+            required: false
+            description: Filter to specific entity UUIDs (injected by :scope rewrite from Pattern B)
           - name: entity-id
             type: uuid
-            required: true
+            required: false
             description: Entity to find owners for
             lookup:
               table: entities
@@ -599,10 +604,12 @@ domains:
             type: date
             required: false
             description: Point-in-time date for temporal query (defaults to today)
+        validation:
+          one_of_required: [entity-id, entity-ids]
         returns:
           type: record_set
       list-owned:
-        description: List entities owned by an entity (what does this entity own)
+        description: List entities owned by one or more entities. Supports Pattern B entity scope.
         invocation_phrases:
           - "list owned entities"
           - "what do they own"
@@ -610,31 +617,30 @@ domains:
           - "view owned companies"
           - "list subsidiaries"
           - "show what's owned"
-        behavior: crud
+          - "bulk list owned"
+        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: entity
           scope: global
           noun: ubo
           tags: [ownership, query]
-        crud:
-          operation: list_by_fk
-          table: entity_relationships_current
-          schema: ob-poc
-          fk_col: from_entity_id
-          filter:
-            relationship_type: OWNERSHIP
         args:
+          - name: entity-ids
+            type: uuid_list
+            required: false
+            description: Filter to specific entity UUIDs (injected by :scope rewrite from Pattern B)
           - name: entity-id
             type: uuid
-            required: true
-            maps_to: from_entity_id
+            required: false
             lookup:
               table: entities
               entity_type: entity
               schema: ob-poc
               search_key: name
               primary_key: entity_id
+        validation:
+          one_of_required: [entity-id, entity-ids]
         returns:
           type: record_set
       list-ubos:
@@ -752,7 +758,7 @@ domains:
           type: record_set
 
       trace-chains:
-        description: Trace all ownership and control chains to natural persons for a CBU or client
+        description: Trace all ownership and control chains to natural persons for a CBU, client, or entity scope
         invocation_phrases:
           - "trace ownership chains"
           - "trace UBO chains"
@@ -769,6 +775,11 @@ domains:
           noun: ubo
         behavior: plugin
         args:
+          # Pattern B: entity-ids from scope rewrite
+          - name: entity-ids
+            type: uuid_list
+            required: false
+            description: Filter to specific entity UUIDs (injected by :scope rewrite from Pattern B)
           # Primary: client nickname for group-level tracing
           - name: client
             type: string
@@ -811,7 +822,7 @@ domains:
             required: false
             description: Point-in-time date for temporal query (defaults to today)
         validation:
-          one_of_required: [client, cbu-id]
+          one_of_required: [client, cbu-id, entity-ids]
         returns:
           type: record
 

@@ -1,0 +1,184 @@
+domains:
+  scope:
+    description: Entity scope resolution and binding for Pattern B runtime
+    invocation_hints:
+      - scope
+      - resolve entities
+      - find entities
+      - search entities
+    verbs:
+      commit:
+        description: Search entities within client group and bind result to @symbol
+        behavior: plugin
+        invocation_phrases:
+          - scope commit
+          - resolve entities
+          - find entities matching
+          - search for entities
+          - commit scope
+          - create entity scope
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: entity_scope
+          tags: [scope, resolution, search]
+        produces:
+          type: entity_scope
+          resolved: true
+        args:
+          - name: desc
+            type: string
+            required: true
+            description: Natural language description to search for entities
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+            description: Maximum entities to return (max 100, enforced by lint)
+          - name: semantic
+            type: boolean
+            required: false
+            default: false
+            description: Use semantic (Candle) search vs fuzzy text search
+          - name: persona
+            type: string
+            required: false
+            description: Override session persona (kyc, trading, ops, onboarding)
+            valid_values: [kyc, trading, ops, onboarding]
+          - name: mode
+            type: string
+            required: false
+            default: strict
+            description: Resolution mode - strict fails if ambiguous, interactive prompts
+            valid_values: [strict, interactive]
+        returns:
+          type: uuid
+          name: snapshot_id
+          capture: true
+          description: Snapshot ID, bound via :as @symbol with type entity_scope
+
+      resolve:
+        description: Preview entity scope resolution without committing (dry-run)
+        behavior: plugin
+        invocation_phrases:
+          - preview scope
+          - scope preview
+          - resolve scope preview
+          - dry run scope
+          - check scope matches
+        metadata:
+          tier: diagnostics
+          source_of_truth: operational
+          scope: session
+          noun: entity_scope
+          tags: [scope, resolution, preview]
+        args:
+          - name: desc
+            type: string
+            required: true
+            description: Natural language description to search for entities
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+            description: Maximum entities to return (max 100)
+          - name: semantic
+            type: boolean
+            required: false
+            default: false
+            description: Use semantic search vs fuzzy text search
+          - name: persona
+            type: string
+            required: false
+            description: Override session persona
+            valid_values: [kyc, trading, ops, onboarding]
+        returns:
+          type: record_set
+          description: Preview of matching entities without creating snapshot
+
+      narrow:
+        description: Create new scope by filtering existing scope with additional criteria
+        behavior: plugin
+        invocation_phrases:
+          - narrow scope
+          - filter scope
+          - refine scope
+          - scope narrow
+          - subset scope
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: entity_scope
+          tags: [scope, resolution, filter]
+        produces:
+          type: entity_scope
+          resolved: true
+        args:
+          - name: source-scope
+            type: uuid
+            required: true
+            description: Source scope snapshot to narrow from (e.g., @s1)
+          - name: filter-desc
+            type: string
+            required: false
+            description: Additional natural language filter to apply
+          - name: entity-type
+            type: string
+            required: false
+            description: Filter to specific entity type
+            valid_values: [natural_person, legal_entity, trust, fund]
+          - name: jurisdiction
+            type: string
+            required: false
+            description: Filter to specific jurisdiction code
+          - name: limit
+            type: integer
+            required: false
+            default: 50
+            description: Maximum entities in narrowed scope
+        returns:
+          type: uuid
+          name: snapshot_id
+          capture: true
+          description: New narrowed scope snapshot ID
+
+      union:
+        description: Create new scope by combining multiple existing scopes
+        behavior: plugin
+        invocation_phrases:
+          - union scopes
+          - combine scopes
+          - merge scopes
+          - scope union
+          - join scopes
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: entity_scope
+          tags: [scope, resolution, combine]
+        produces:
+          type: entity_scope
+          resolved: true
+        args:
+          - name: scopes
+            type: uuid_list
+            required: true
+            description: List of scope snapshots to union (e.g., [@s1, @s2])
+          - name: dedupe
+            type: boolean
+            required: false
+            default: true
+            description: Remove duplicate entities across scopes
+          - name: limit
+            type: integer
+            required: false
+            default: 100
+            description: Maximum entities in combined scope
+        returns:
+          type: uuid
+          name: snapshot_id
+          capture: true
+          description: New combined scope snapshot ID

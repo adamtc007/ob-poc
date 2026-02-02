@@ -1,9 +1,9 @@
 domains:
   screening:
-    description: Entity screening operations (PEP, sanctions, adverse media)
+    description: Entity screening operations (PEP, sanctions, adverse media). Supports Pattern B entity scope.
     verbs:
       pep:
-        description: Run PEP (Politically Exposed Persons) screening
+        description: Run PEP (Politically Exposed Persons) screening on one or more entities
         invocation_phrases:
           - "run PEP screening"
           - "check for PEP"
@@ -14,6 +14,7 @@ domains:
           - "check political exposure"
           - "run PEP check"
           - "politically exposed person check"
+          - "bulk PEP screening"
         metadata:
           tier: intent
           source_of_truth: external
@@ -21,24 +22,30 @@ domains:
           noun: screening
         behavior: plugin
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: provider
-          type: string
-          required: false
+          - name: entity-ids
+            type: uuid_list
+            required: false
+            description: Filter to specific entity UUIDs (injected by :scope rewrite from Pattern B)
+          - name: entity-id
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: provider
+            type: string
+            required: false
+        validation:
+          one_of_required: [entity-id, entity-ids]
         returns:
-          type: uuid
-          capture: true
+          type: record_set
+          description: Screening results for each entity
 
       sanctions:
-        description: Run sanctions list screening
+        description: Run sanctions list screening on one or more entities
         invocation_phrases:
           - "run sanctions check"
           - "sanctions screening"
@@ -49,6 +56,7 @@ domains:
           - "run sanctions screening"
           - "check if sanctioned"
           - "sanctions list check"
+          - "bulk sanctions screening"
         metadata:
           tier: intent
           source_of_truth: external
@@ -56,24 +64,30 @@ domains:
           noun: screening
         behavior: plugin
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: lists
-          type: string_list
-          required: false
+          - name: entity-ids
+            type: uuid_list
+            required: false
+            description: Filter to specific entity UUIDs (injected by :scope rewrite from Pattern B)
+          - name: entity-id
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: lists
+            type: string_list
+            required: false
+        validation:
+          one_of_required: [entity-id, entity-ids]
         returns:
-          type: uuid
-          capture: true
+          type: record_set
+          description: Screening results for each entity
 
       adverse-media:
-        description: Run adverse media screening
+        description: Run adverse media screening on one or more entities
         invocation_phrases:
           - "run adverse media check"
           - "adverse media screening"
@@ -84,6 +98,7 @@ domains:
           - "run media screening"
           - "check news coverage"
           - "adverse news scan"
+          - "bulk media screening"
         metadata:
           tier: intent
           source_of_truth: external
@@ -91,19 +106,25 @@ domains:
           noun: screening
         behavior: plugin
         args:
-        - name: entity-id
-          type: uuid
-          required: true
-          lookup:
-            table: entities
-            entity_type: entity
-            schema: ob-poc
-            search_key: name
-            primary_key: entity_id
-        - name: lookback-months
-          type: integer
-          required: false
-          default: 24
+          - name: entity-ids
+            type: uuid_list
+            required: false
+            description: Filter to specific entity UUIDs (injected by :scope rewrite from Pattern B)
+          - name: entity-id
+            type: uuid
+            required: false
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: lookback-months
+            type: integer
+            required: false
+            default: 24
+        validation:
+          one_of_required: [entity-id, entity-ids]
         returns:
-          type: uuid
-          capture: true
+          type: record_set
+          description: Screening results for each entity

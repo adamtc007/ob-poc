@@ -546,3 +546,175 @@ impl CustomOperation for EntityPlaceholderSummaryOp {
         })))
     }
 }
+
+// =============================================================================
+// ENTITY LIST OPERATION (Scope-Aware)
+// =============================================================================
+
+/// Extract an optional list of UUIDs from a verb argument.
+/// Used for :entity-ids argument injected by scope rewrite.
+#[cfg(feature = "database")]
+fn extract_uuid_list_opt(verb_call: &VerbCall, arg_name: &str) -> Option<Vec<uuid::Uuid>> {
+    verb_call
+        .arguments
+        .iter()
+        .find(|a| a.key == arg_name)
+        .and_then(|a| {
+            a.value.as_list().map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| {
+                        // Try literal UUID
+                        if let Some(uuid) = item.as_uuid() {
+                            return Some(uuid);
+                        }
+                        // Try parsing string as UUID
+                        if let Some(s) = item.as_string() {
+                            return uuid::Uuid::parse_str(s).ok();
+                        }
+                        None
+                    })
+                    .collect()
+            })
+        })
+}
+
+/// List entities with optional filters. Supports :entity-ids for Pattern B scope resolution.
+///
+/// When `:scope @sX` is used, the executor rewrites it to `:entity-ids [...]` before
+/// this handler runs. This makes entity.list scope-aware without special handling.
+///
+/// # Usage
+/// ```clojure
+/// ;; List all entities (with filters)
+/// (entity.list :entity-type "FUND" :jurisdiction "LU" :limit 50)
+///
+/// ;; List entities from a scope snapshot
+/// (scope.commit :desc "irish funds" :limit 20 :as @irish)
+/// (entity.list :scope @irish)
+/// ;; Executor rewrites to: (entity.list :entity-ids [uuid1, uuid2, ...])
+/// ```
+#[register_custom_op]
+pub struct EntityListOp;
+
+#[async_trait]
+impl CustomOperation for EntityListOp {
+    fn domain(&self) -> &'static str {
+        "entity"
+    }
+
+    fn verb(&self) -> &'static str {
+        "list"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Lists entities with optional filters including entity-ids for scope resolution"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+        use sqlx::Row;
+        use uuid::Uuid;
+
+        // Extract arguments
+        let entity_ids = extract_uuid_list_opt(verb_call, "entity-ids");
+        let entity_type = helpers::extract_string_opt(verb_call, "entity-type");
+        let jurisdiction = helpers::extract_string_opt(verb_call, "jurisdiction");
+        let status = helpers::extract_string_opt(verb_call, "status");
+        let limit = helpers::extract_int_opt(verb_call, "limit").unwrap_or(100) as i64;
+        let offset = helpers::extract_int_opt(verb_call, "offset").unwrap_or(0) as i64;
+
+        // Build dynamic query based on filters
+        let rows = if let Some(ids) = entity_ids {
+            // Filter by specific entity IDs (from scope rewrite)
+            tracing::info!(
+                entity_count = ids.len(),
+                "entity.list: filtering by {} entity-ids from scope",
+                ids.len()
+            );
+
+            sqlx::query(
+                r#"
+                SELECT
+                    entity_id, entity_name, entity_type,
+                    jurisdiction, status, created_at
+                FROM "ob-poc".entities
+                WHERE entity_id = ANY($1)
+                  AND ($2::text IS NULL OR entity_type = $2)
+                  AND ($3::text IS NULL OR jurisdiction = $3)
+                  AND ($4::text IS NULL OR status = $4)
+                ORDER BY entity_name
+                LIMIT $5 OFFSET $6
+                "#,
+            )
+            .bind(&ids)
+            .bind(&entity_type)
+            .bind(&jurisdiction)
+            .bind(&status)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(pool)
+            .await?
+        } else {
+            // No entity-ids filter - list with other filters
+            sqlx::query(
+                r#"
+                SELECT
+                    entity_id, entity_name, entity_type,
+                    jurisdiction, status, created_at
+                FROM "ob-poc".entities
+                WHERE ($1::text IS NULL OR entity_type = $1)
+                  AND ($2::text IS NULL OR jurisdiction = $2)
+                  AND ($3::text IS NULL OR status = $3)
+                ORDER BY entity_name
+                LIMIT $4 OFFSET $5
+                "#,
+            )
+            .bind(&entity_type)
+            .bind(&jurisdiction)
+            .bind(&status)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(pool)
+            .await?
+        };
+
+        // Convert to JSON records
+        let records: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|row| {
+                json!({
+                    "entity_id": row.get::<Uuid, _>("entity_id"),
+                    "entity_name": row.get::<String, _>("entity_name"),
+                    "entity_type": row.get::<Option<String>, _>("entity_type"),
+                    "jurisdiction": row.get::<Option<String>, _>("jurisdiction"),
+                    "status": row.get::<Option<String>, _>("status"),
+                    "created_at": row.get::<chrono::DateTime<chrono::Utc>, _>("created_at").to_rfc3339()
+                })
+            })
+            .collect();
+
+        tracing::info!(
+            count = records.len(),
+            "entity.list: returning {} entities",
+            records.len()
+        );
+
+        Ok(ExecutionResult::RecordSet(records))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::RecordSet(vec![]))
+    }
+}

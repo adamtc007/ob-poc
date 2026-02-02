@@ -67,6 +67,200 @@ use crate::database::locks::{acquire_locks, LockError};
 use super::expansion::{ExpansionReport, LockKey, LockMode};
 
 // ============================================================================
+// Scope Rewrite - Pattern B Runtime Entity Scope Resolution
+// ============================================================================
+
+/// Rewrite `:scope @sX` arguments to `:entity-ids [UUID...]` at runtime.
+///
+/// This is the core of Pattern B scope resolution:
+/// 1. Detect `:scope` argument with `@sX` symbol reference
+/// 2. Load the snapshot from DB (includes group_id for cross-group check)
+/// 3. CROSS-GROUP PROTECTION: Validate snapshot.group_id == ctx.client_group_id
+/// 4. Check if target verb accepts `:entity-ids` argument
+/// 5. Remove `:scope`, inject `:entity-ids` with UUIDs from snapshot
+///
+/// # Non-Negotiables (from spec)
+/// - Cross-group protection is enforced (snapshot.group_id must match context)
+/// - Determinism: `selected_entity_ids` from snapshot is source of truth
+/// - Fail fast if verb doesn't accept `:entity-ids`
+#[cfg(feature = "database")]
+mod scope_rewrite {
+    use super::*;
+    use sqlx::Row;
+
+    /// Result of scope rewrite attempt
+    pub enum ScopeRewriteResult {
+        /// No `:scope` argument found - proceed with original VerbCall
+        NoScope,
+        /// `:scope` found and rewritten - use the modified VerbCall
+        Rewritten(VerbCall),
+        /// Error during rewrite (cross-group violation, verb doesn't accept entity-ids, etc.)
+        Error(anyhow::Error),
+    }
+
+    /// Check if the verb accepts an `:entity-ids` argument.
+    fn verb_accepts_entity_ids(verb_fqn: &str) -> bool {
+        if let Some(runtime_verb) = runtime_registry().get_by_name(verb_fqn) {
+            runtime_verb
+                .args
+                .iter()
+                .any(|arg| arg.name == "entity-ids" || arg.name == "entity_ids")
+        } else {
+            false
+        }
+    }
+
+    /// Attempt to rewrite a VerbCall if it has a `:scope` argument.
+    ///
+    /// Returns:
+    /// - `NoScope` if no `:scope` argument present
+    /// - `Rewritten(modified_vc)` if scope was successfully resolved and injected
+    /// - `Error(e)` if cross-group protection fails or verb doesn't support entity-ids
+    pub async fn maybe_rewrite_scope(
+        vc: &VerbCall,
+        ctx: &ExecutionContext,
+        pool: &PgPool,
+    ) -> ScopeRewriteResult {
+        // 1. Check for :scope argument
+        let scope_arg = vc.arguments.iter().find(|a| a.key == "scope");
+        let scope_arg = match scope_arg {
+            Some(a) => a,
+            None => return ScopeRewriteResult::NoScope,
+        };
+
+        // 2. Extract symbol reference from :scope value
+        let symbol_name = match &scope_arg.value {
+            AstNode::SymbolRef { name, .. } => name.clone(),
+            _ => {
+                return ScopeRewriteResult::Error(anyhow!(
+                    ":scope argument must be a symbol reference (@sX), got: {}",
+                    scope_arg.value.to_dsl_string()
+                ));
+            }
+        };
+
+        // 3. Resolve symbol to snapshot UUID
+        let snapshot_id = match ctx.resolve(&symbol_name) {
+            Some(id) => id,
+            None => {
+                return ScopeRewriteResult::Error(anyhow!(
+                    "Unresolved scope symbol: @{}. Did you forget to run scope.commit?",
+                    symbol_name
+                ));
+            }
+        };
+
+        // 4. Load snapshot from DB (includes group_id for cross-group check)
+        let snapshot = match load_snapshot(pool, snapshot_id).await {
+            Ok(s) => s,
+            Err(e) => return ScopeRewriteResult::Error(e),
+        };
+
+        // 5. CROSS-GROUP PROTECTION CHECK (Non-negotiable from spec)
+        if let Some(ctx_group_id) = ctx.client_group_id {
+            if snapshot.group_id != ctx_group_id {
+                return ScopeRewriteResult::Error(anyhow!(
+                    "Scope snapshot belongs to different client group. \
+                     Snapshot group: {}, current context: {}. \
+                     This is a security violation - scope cannot cross client boundaries.",
+                    snapshot.group_id,
+                    ctx_group_id
+                ));
+            }
+        } else {
+            // Context has no client_group_id - this shouldn't happen if scope.commit was used
+            return ScopeRewriteResult::Error(anyhow!(
+                "Cannot use scope without active client group context. \
+                 Set client group first (use 'work on <client>')."
+            ));
+        }
+
+        // 6. Check if verb accepts :entity-ids
+        let verb_fqn = format!("{}.{}", vc.domain, vc.verb);
+        if !verb_accepts_entity_ids(&verb_fqn) {
+            return ScopeRewriteResult::Error(anyhow!(
+                "Verb {} does not accept :entity-ids argument. \
+                 Cannot expand scope into entity list. \
+                 Use a verb that supports bulk entity operations, or iterate manually.",
+                verb_fqn
+            ));
+        }
+
+        // 7. Build rewritten VerbCall
+        let mut new_args: Vec<super::super::ast::Argument> = vc
+            .arguments
+            .iter()
+            .filter(|a| a.key != "scope")
+            .cloned()
+            .collect();
+
+        // Add :entity-ids with UUIDs from snapshot
+        let entity_ids_node = AstNode::List {
+            items: snapshot
+                .selected_entity_ids
+                .iter()
+                .map(|id| AstNode::Literal(Literal::Uuid(*id), super::super::ast::Span::default()))
+                .collect(),
+            span: super::super::ast::Span::default(),
+        };
+
+        new_args.push(super::super::ast::Argument {
+            key: "entity-ids".to_string(),
+            value: entity_ids_node,
+            span: super::super::ast::Span::default(),
+        });
+
+        let rewritten = VerbCall {
+            domain: vc.domain.clone(),
+            verb: vc.verb.clone(),
+            arguments: new_args,
+            binding: vc.binding.clone(),
+            span: vc.span,
+        };
+
+        tracing::info!(
+            snapshot_id = %snapshot_id,
+            entity_count = snapshot.selected_entity_ids.len(),
+            verb = %verb_fqn,
+            "scope rewrite: expanded @{} to {} entity-ids",
+            symbol_name,
+            snapshot.selected_entity_ids.len()
+        );
+
+        ScopeRewriteResult::Rewritten(rewritten)
+    }
+
+    /// Loaded snapshot data (minimal fields needed for rewrite)
+    struct LoadedSnapshot {
+        group_id: Uuid,
+        selected_entity_ids: Vec<Uuid>,
+    }
+
+    /// Load snapshot from DB
+    async fn load_snapshot(pool: &PgPool, snapshot_id: Uuid) -> Result<LoadedSnapshot> {
+        let row = sqlx::query(
+            r#"
+            SELECT group_id, selected_entity_ids
+            FROM "ob-poc".scope_snapshots
+            WHERE id = $1
+            "#,
+        )
+        .bind(snapshot_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow!("Scope snapshot not found: {}", snapshot_id))?;
+
+        let group_id: Uuid = row.get("group_id");
+        let selected_entity_ids: Vec<Uuid> = row.get("selected_entity_ids");
+
+        Ok(LoadedSnapshot {
+            group_id,
+            selected_entity_ids,
+        })
+    }
+}
+
+// ============================================================================
 // Pre-Flight Resolution Check
 // ============================================================================
 
@@ -1165,6 +1359,22 @@ impl DslExecutor {
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         tracing::debug!("execute_verb: ENTER {}.{}", vc.domain, vc.verb);
+
+        // =================================================================
+        // SCOPE REWRITE (Pattern B Runtime Entity Scope Resolution)
+        // =================================================================
+        // Check for :scope argument and rewrite to :entity-ids if present.
+        // This happens BEFORE any verb execution to ensure cross-group
+        // protection and deterministic entity resolution.
+        use scope_rewrite::ScopeRewriteResult;
+        let effective_vc: std::borrow::Cow<'_, VerbCall> =
+            match scope_rewrite::maybe_rewrite_scope(vc, ctx, &self.pool).await {
+                ScopeRewriteResult::NoScope => std::borrow::Cow::Borrowed(vc),
+                ScopeRewriteResult::Rewritten(rewritten) => std::borrow::Cow::Owned(rewritten),
+                ScopeRewriteResult::Error(e) => return Err(e),
+            };
+        let vc = effective_vc.as_ref();
+        // =================================================================
 
         // Look up verb in runtime registry (loaded from YAML)
         let runtime_verb = runtime_registry()

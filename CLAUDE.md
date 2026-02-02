@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-31
+> **Last reviewed:** 2026-02-02
 > **Crates:** 22 Rust crates (includes ob-poc-macros + 5 esper_* crates)
-> **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
+> **Verbs:** 541 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 58 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
 > **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
@@ -31,6 +31,7 @@
 > **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
 > **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
+> **Entity Scope DSL (067):** ✅ Complete - Pattern B runtime scope resolution, scope.commit/resolve/narrow/union verbs, entity-ids rewrite
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -3478,6 +3479,122 @@ fn render(&self, ui: &mut Ui, drone: &DroneState, world: &WorldSnapshot) {
 | `rust/crates/esper_policy/src/guard.rs` | PolicyGuard enforcement |
 | `rust/crates/esper_egui/src/renderer.rs` | Main EsperRenderer |
 | `rust/crates/esper_egui/src/camera.rs` | Camera animation with lerp |
+
+---
+
+## Entity Scope DSL (067)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: Pattern B runtime scope resolution for bulk entity operations.
+
+**Problem Solved:** Bulk operations on entities (screening, UBO tracing, listing) previously required explicit entity ID lists. Entity Scope DSL enables natural language entity selection that persists as immutable snapshots for deterministic replay.
+
+### Architecture (Pattern B - Runtime Only)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PATTERN B: RUNTIME SCOPE RESOLUTION                                        │
+│                                                                              │
+│  (scope.commit :desc "irish funds" :limit 20 :as @irish)                    │
+│      │                                                                       │
+│      ├─► Search entities within client_group (fuzzy or semantic)            │
+│      ├─► Order results: score DESC, uuid ASC (deterministic)                │
+│      └─► Insert immutable snapshot → bind @irish as UUID (type entity_scope)│
+│                                                                              │
+│  (ubo.trace-chains :scope @irish)                                           │
+│      │                                                                       │
+│      ├─► Executor detects :scope argument                                   │
+│      ├─► Resolves @irish → snapshot UUID                                    │
+│      ├─► Loads snapshot, validates cross-group protection                   │
+│      ├─► Checks verb accepts :entity-ids (from YAML)                        │
+│      └─► Rewrites to: (ubo.trace-chains :entity-ids [uuid1, uuid2, ...])   │
+│                                                                              │
+│  KEY INSIGHT: No parser/AST changes. @s1 is normal :as binding.             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Non-Negotiables (From Spec)
+
+1. **No Parser/AST Changes** - `@s1` is a normal `:as` binding with UUID value typed as `"entity_scope"`
+2. **Determinism from Snapshot** - `selected_entity_ids` ordered by score DESC, uuid ASC
+3. **Cross-Group Protection** - Every snapshot stores `client_group_id`, executor validates match
+4. **Immutability** - Snapshots cannot be modified after creation (DB trigger enforces)
+
+### Scope Verbs
+
+| Verb | Purpose | Returns |
+|------|---------|---------|
+| `scope.commit` | Search entities and create immutable snapshot | UUID (snapshot_id) |
+| `scope.resolve` | Preview search results without committing (dry-run) | record_set |
+| `scope.narrow` | Filter existing scope by type/jurisdiction/text | UUID (new snapshot) |
+| `scope.union` | Combine multiple scopes into one | UUID (combined snapshot) |
+
+### DSL Usage
+
+```clojure
+;; Create scope from search
+(scope.commit :desc "irish etf funds" :limit 50 :as @irish)
+
+;; Preview without committing
+(scope.resolve :desc "luxembourg manco" :semantic true)
+
+;; Narrow existing scope
+(scope.narrow :source-scope @irish :entity-type "legal_entity" :as @irish_le)
+
+;; Combine scopes
+(scope.union :scopes [@irish @german] :dedupe true :as @combined)
+
+;; Use scope in bulk operations
+(entity.list :scope @irish)
+(ubo.trace-chains :scope @irish :threshold 25)
+(screening.pep :scope @irish)
+```
+
+### Scope-Aware Verbs
+
+Verbs that accept `:entity-ids` argument (rewritten from `:scope`):
+
+| Domain | Verbs |
+|--------|-------|
+| `entity` | `entity.list` |
+| `ubo` | `ubo.trace-chains`, `ubo.list-owners`, `ubo.list-owned` |
+| `screening` | `screening.pep`, `screening.sanctions`, `screening.adverse-media` |
+
+### Executor Rewrite Flow
+
+```rust
+// In execute_verb_inner(), before dispatching:
+if let Some(scope_arg) = verb_call.get_arg("scope") {
+    // 1. Resolve @sX symbol → snapshot UUID
+    // 2. Load snapshot, check group_id matches ctx.client_group_id
+    // 3. Check if verb accepts :entity-ids (from YAML schema)
+    // 4. Rewrite: remove :scope, inject :entity-ids with UUID array
+}
+```
+
+### Database Schema
+
+```sql
+-- migrations/067_scope_snapshots.sql
+CREATE TABLE "ob-poc".scope_snapshots (
+    id UUID PRIMARY KEY,
+    group_id UUID NOT NULL,                    -- Cross-group protection
+    description TEXT,                          -- Natural language desc
+    selected_entity_ids UUID[] NOT NULL,       -- Ordered: score DESC, uuid ASC
+    resolution_method TEXT NOT NULL,           -- fuzzy_text, semantic, narrowed, union
+    created_at TIMESTAMPTZ NOT NULL,
+    -- Immutability enforced by trigger
+);
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/config/verbs/scope.yaml` | scope.commit/resolve/narrow/union definitions |
+| `rust/src/domain_ops/scope_ops.rs` | ScopeCommitOp, ScopeResolveOp, ScopeNarrowOp, ScopeUnionOp |
+| `rust/src/dsl_v2/executor.rs` | `scope_rewrite` module for :scope → :entity-ids |
+| `migrations/067_scope_snapshots.sql` | Immutable snapshot table with trigger |
+| `rust/tests/entity_scope_integration.rs` | Integration tests |
 
 ---
 

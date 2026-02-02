@@ -159,10 +159,128 @@ impl CustomOperation for UboCalculateOp {
     }
 }
 
-/// Discover potential UBOs from document extraction or registry lookup
+/// List entities owned by one or more entities
+///
+/// Rationale: Returns ownership relationships where entities are the owners.
+/// Supports Pattern B entity scope via :entity-ids argument.
+#[register_custom_op]
+pub struct UboListOwnedOp;
+
+#[async_trait]
+impl CustomOperation for UboListOwnedOp {
+    fn domain(&self) -> &'static str {
+        "ubo"
+    }
+    fn verb(&self) -> &'static str {
+        "list-owned"
+    }
+    fn rationale(&self) -> &'static str {
+        "Lists entities owned by entities with Pattern B scope support"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        use serde_json::json;
+        use sqlx::Row;
+        use uuid::Uuid;
+
+        // Check for entity-ids (Pattern B scope rewrite) first
+        let entity_ids: Vec<Uuid> = if let Some(arg) =
+            verb_call.arguments.iter().find(|a| a.key == "entity-ids")
+        {
+            // Extract UUIDs from list
+            arg.value
+                .as_list()
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| {
+                            item.as_uuid()
+                                .or_else(|| item.as_string().and_then(|s| Uuid::parse_str(s).ok()))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else if let Some(arg) = verb_call.arguments.iter().find(|a| a.key == "entity-id") {
+            // Single entity-id fallback
+            let entity_id = if let Some(name) = arg.value.as_symbol() {
+                ctx.resolve(name)
+            } else {
+                arg.value.as_uuid()
+            };
+            entity_id.map(|id| vec![id]).unwrap_or_default()
+        } else {
+            return Err(anyhow::anyhow!("Missing entity-id or entity-ids argument"));
+        };
+
+        if entity_ids.is_empty() {
+            return Ok(ExecutionResult::RecordSet(vec![]));
+        }
+
+        // Query ownership relationships where entity_ids are the owners (from_entity_id)
+        let owned = sqlx::query(
+            r#"SELECT
+                r.relationship_id,
+                r.from_entity_id as owner_entity_id,
+                r.to_entity_id as owned_entity_id,
+                e.name as owned_name,
+                et.type_code as owned_type,
+                r.percentage,
+                r.ownership_type,
+                r.effective_from,
+                r.effective_to
+            FROM "ob-poc".entity_relationships r
+            JOIN "ob-poc".entities e ON r.to_entity_id = e.entity_id
+            JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
+            WHERE r.from_entity_id = ANY($1)
+              AND r.relationship_type = 'ownership'
+              AND (r.effective_to IS NULL OR r.effective_to >= CURRENT_DATE)
+            ORDER BY r.from_entity_id, r.percentage DESC NULLS LAST"#,
+        )
+        .bind(&entity_ids)
+        .fetch_all(pool)
+        .await?;
+
+        let owned_list: Vec<serde_json::Value> = owned
+            .iter()
+            .map(|o| {
+                json!({
+                    "relationship_id": o.get::<Uuid, _>("relationship_id"),
+                    "owner_entity_id": o.get::<Uuid, _>("owner_entity_id"),
+                    "owned_entity_id": o.get::<Uuid, _>("owned_entity_id"),
+                    "owned_name": o.get::<Option<String>, _>("owned_name"),
+                    "owned_type": o.get::<Option<String>, _>("owned_type"),
+                    "percentage": o.get::<Option<sqlx::types::BigDecimal>, _>("percentage"),
+                    "ownership_type": o.get::<Option<String>, _>("ownership_type"),
+                    "effective_from": o.get::<Option<chrono::NaiveDate>, _>("effective_from"),
+                    "effective_to": o.get::<Option<chrono::NaiveDate>, _>("effective_to")
+                })
+            })
+            .collect();
+
+        Ok(ExecutionResult::RecordSet(owned_list))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::RecordSet(vec![]))
+    }
+}
+
+/// Trace UBO ownership chains for entities
 ///
 /// Rationale: Orchestrates document extraction and registry lookups to identify
 /// potential beneficial owners, creating preliminary ownership records.
+/// Supports Pattern B entity scope via :entity-ids argument.
 #[register_custom_op]
 pub struct UboTraceChainsOp;
 
@@ -175,7 +293,7 @@ impl CustomOperation for UboTraceChainsOp {
         "trace-chains"
     }
     fn rationale(&self) -> &'static str {
-        "Calls SQL recursive function to compute ownership chains"
+        "Calls SQL recursive function to compute ownership chains with Pattern B scope support"
     }
 
     #[cfg(feature = "database")]
@@ -186,8 +304,117 @@ impl CustomOperation for UboTraceChainsOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         use serde_json::json;
+        use sqlx::Row;
         use uuid::Uuid;
 
+        // Check for entity-ids (Pattern B scope rewrite) first
+        let entity_ids: Option<Vec<Uuid>> = verb_call
+            .arguments
+            .iter()
+            .find(|a| a.key == "entity-ids")
+            .and_then(|arg| {
+                arg.value.as_list().map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| {
+                            item.as_uuid()
+                                .or_else(|| item.as_string().and_then(|s| Uuid::parse_str(s).ok()))
+                        })
+                        .collect()
+                })
+            });
+
+        // If entity-ids provided, use those directly (Pattern B mode)
+        if let Some(ids) = entity_ids {
+            if ids.is_empty() {
+                return Ok(ExecutionResult::RecordSet(vec![]));
+            }
+
+            let threshold: f64 = verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "threshold")
+                .and_then(|a| a.value.as_decimal())
+                .map(|d| d.to_string().parse().unwrap_or(25.0))
+                .unwrap_or(25.0);
+
+            let as_of_date: chrono::NaiveDate = verb_call
+                .arguments
+                .iter()
+                .find(|a| a.key == "as-of-date")
+                .and_then(|a| a.value.as_string())
+                .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
+                .unwrap_or_else(|| chrono::Utc::now().date_naive());
+
+            let threshold_bd: sqlx::types::BigDecimal = threshold
+                .to_string()
+                .parse()
+                .unwrap_or_else(|_| sqlx::types::BigDecimal::from(25));
+
+            // Query for all entity_ids in scope
+            let mut all_chains: Vec<serde_json::Value> = Vec::new();
+            for entity_id in &ids {
+                // Get the CBU for this entity (if any) to call compute_ownership_chains
+                let cbu_row = sqlx::query(
+                    r#"SELECT cbu_id FROM "ob-poc".cbu_entity_roles WHERE entity_id = $1 LIMIT 1"#,
+                )
+                .bind(entity_id)
+                .fetch_optional(pool)
+                .await?;
+
+                if let Some(row) = cbu_row {
+                    let cbu_id: Uuid = row.get("cbu_id");
+                    let chains = sqlx::query(
+                        r#"SELECT chain_id, ubo_person_id, ubo_name,
+                                  path_entities, path_names, ownership_percentages,
+                                  effective_ownership, chain_depth, is_complete,
+                                  relationship_types, has_control_path
+                           FROM "ob-poc".compute_ownership_chains($1, $2, 10, $4)
+                           WHERE effective_ownership >= $3 OR has_control_path = true
+                           ORDER BY effective_ownership DESC NULLS LAST"#,
+                    )
+                    .bind(cbu_id)
+                    .bind(Some(*entity_id))
+                    .bind(threshold_bd.clone())
+                    .bind(as_of_date)
+                    .fetch_all(pool)
+                    .await?;
+
+                    for c in chains {
+                        let has_control: Option<bool> = c.get("has_control_path");
+                        let eff_ownership: Option<sqlx::types::BigDecimal> =
+                            c.get("effective_ownership");
+                        let ubo_type = if has_control == Some(true) && eff_ownership.is_none() {
+                            "CONTROL"
+                        } else if has_control == Some(true) {
+                            "OWNERSHIP_AND_CONTROL"
+                        } else {
+                            "OWNERSHIP"
+                        };
+                        all_chains.push(json!({
+                            "source_entity_id": entity_id,
+                            "cbu_id": cbu_id,
+                            "chain_id": c.get::<Option<i32>, _>("chain_id"),
+                            "ubo_person_id": c.get::<Option<Uuid>, _>("ubo_person_id"),
+                            "ubo_name": c.get::<Option<String>, _>("ubo_name"),
+                            "path_entities": c.get::<Option<Vec<Uuid>>, _>("path_entities"),
+                            "path_names": c.get::<Option<Vec<String>>, _>("path_names"),
+                            "ownership_percentages": c.get::<Option<Vec<sqlx::types::BigDecimal>>, _>("ownership_percentages"),
+                            "effective_ownership": eff_ownership,
+                            "chain_depth": c.get::<Option<i32>, _>("chain_depth"),
+                            "is_complete": c.get::<Option<bool>, _>("is_complete"),
+                            "relationship_types": c.get::<Option<Vec<String>>, _>("relationship_types"),
+                            "has_control_path": has_control,
+                            "ubo_type": ubo_type
+                        }));
+                    }
+                }
+            }
+
+            return Ok(ExecutionResult::RecordSet(all_chains));
+        }
+
+        // Fallback: traditional cbu-id based trace
         let cbu_id: Uuid = verb_call
             .arguments
             .iter()
@@ -199,7 +426,7 @@ impl CustomOperation for UboTraceChainsOp {
                     a.value.as_uuid()
                 }
             })
-            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id argument"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing cbu-id or entity-ids argument"))?;
 
         let target_entity_id: Option<Uuid> = verb_call
             .arguments
@@ -323,10 +550,10 @@ impl CustomOperation for UboTraceChainsOp {
     }
 }
 
-/// List owners of an entity as of a specific date
+/// List owners of one or more entities as of a specific date
 ///
-/// Rationale: Returns ownership relationships for an entity with temporal filtering.
-/// This is the temporal-aware version of the CRUD list-owners.
+/// Rationale: Returns ownership relationships for entities with temporal filtering.
+/// Supports Pattern B entity scope via :entity-ids argument.
 #[register_custom_op]
 pub struct UboListOwnersOp;
 
@@ -339,7 +566,7 @@ impl CustomOperation for UboListOwnersOp {
         "list-owners"
     }
     fn rationale(&self) -> &'static str {
-        "Lists ownership relationships with temporal filtering"
+        "Lists ownership relationships with temporal filtering and Pattern B scope support"
     }
 
     #[cfg(feature = "database")]
@@ -350,20 +577,41 @@ impl CustomOperation for UboListOwnersOp {
         pool: &PgPool,
     ) -> Result<ExecutionResult> {
         use serde_json::json;
+        use sqlx::Row;
         use uuid::Uuid;
 
-        let entity_id: Uuid = verb_call
-            .arguments
-            .iter()
-            .find(|a| a.key == "entity-id")
-            .and_then(|a| {
-                if let Some(name) = a.value.as_symbol() {
-                    ctx.resolve(name)
-                } else {
-                    a.value.as_uuid()
-                }
-            })
-            .ok_or_else(|| anyhow::anyhow!("Missing entity-id argument"))?;
+        // Check for entity-ids (Pattern B scope rewrite) first
+        let entity_ids: Vec<Uuid> = if let Some(arg) =
+            verb_call.arguments.iter().find(|a| a.key == "entity-ids")
+        {
+            // Extract UUIDs from list
+            arg.value
+                .as_list()
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| {
+                            item.as_uuid()
+                                .or_else(|| item.as_string().and_then(|s| Uuid::parse_str(s).ok()))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else if let Some(arg) = verb_call.arguments.iter().find(|a| a.key == "entity-id") {
+            // Single entity-id fallback
+            let entity_id = if let Some(name) = arg.value.as_symbol() {
+                ctx.resolve(name)
+            } else {
+                arg.value.as_uuid()
+            };
+            entity_id.map(|id| vec![id]).unwrap_or_default()
+        } else {
+            return Err(anyhow::anyhow!("Missing entity-id or entity-ids argument"));
+        };
+
+        if entity_ids.is_empty() {
+            return Ok(ExecutionResult::RecordSet(vec![]));
+        }
 
         // Get as-of-date (optional, defaults to today)
         let as_of_date: chrono::NaiveDate = verb_call
@@ -374,10 +622,11 @@ impl CustomOperation for UboListOwnersOp {
             .and_then(|s| chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d").ok())
             .unwrap_or_else(|| chrono::Utc::now().date_naive());
 
-        // Query ownership relationships with temporal filtering
-        let owners = sqlx::query!(
+        // Query ownership relationships with temporal filtering - use runtime query for entity_ids array
+        let owners = sqlx::query(
             r#"SELECT
                 r.relationship_id,
+                r.to_entity_id as subject_entity_id,
                 r.from_entity_id as owner_entity_id,
                 e.name as owner_name,
                 et.type_code as owner_type,
@@ -389,14 +638,14 @@ impl CustomOperation for UboListOwnersOp {
             FROM "ob-poc".entity_relationships r
             JOIN "ob-poc".entities e ON r.from_entity_id = e.entity_id
             JOIN "ob-poc".entity_types et ON e.entity_type_id = et.entity_type_id
-            WHERE r.to_entity_id = $1
+            WHERE r.to_entity_id = ANY($1)
               AND r.relationship_type = 'ownership'
               AND (r.effective_from IS NULL OR r.effective_from <= $2)
               AND (r.effective_to IS NULL OR r.effective_to >= $2)
-            ORDER BY r.percentage DESC NULLS LAST"#,
-            entity_id,
-            as_of_date
+            ORDER BY r.to_entity_id, r.percentage DESC NULLS LAST"#,
         )
+        .bind(&entity_ids)
+        .bind(as_of_date)
         .fetch_all(pool)
         .await?;
 
@@ -404,27 +653,21 @@ impl CustomOperation for UboListOwnersOp {
             .iter()
             .map(|o| {
                 json!({
-                    "relationship_id": o.relationship_id,
-                    "owner_entity_id": o.owner_entity_id,
-                    "owner_name": o.owner_name,
-                    "owner_type": o.owner_type,
-                    "percentage": o.percentage,
-                    "ownership_type": o.ownership_type,
-                    "effective_from": o.effective_from,
-                    "effective_to": o.effective_to,
-                    "source": o.source
+                    "relationship_id": o.get::<Uuid, _>("relationship_id"),
+                    "subject_entity_id": o.get::<Uuid, _>("subject_entity_id"),
+                    "owner_entity_id": o.get::<Uuid, _>("owner_entity_id"),
+                    "owner_name": o.get::<Option<String>, _>("owner_name"),
+                    "owner_type": o.get::<Option<String>, _>("owner_type"),
+                    "percentage": o.get::<Option<sqlx::types::BigDecimal>, _>("percentage"),
+                    "ownership_type": o.get::<Option<String>, _>("ownership_type"),
+                    "effective_from": o.get::<Option<chrono::NaiveDate>, _>("effective_from"),
+                    "effective_to": o.get::<Option<chrono::NaiveDate>, _>("effective_to"),
+                    "source": o.get::<Option<String>, _>("source")
                 })
             })
             .collect();
 
-        let result = json!({
-            "entity_id": entity_id,
-            "as_of_date": as_of_date.to_string(),
-            "owner_count": owner_list.len(),
-            "owners": owner_list
-        });
-
-        Ok(ExecutionResult::Record(result))
+        Ok(ExecutionResult::RecordSet(owner_list))
     }
 
     #[cfg(not(feature = "database"))]
@@ -433,9 +676,6 @@ impl CustomOperation for UboListOwnersOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Record(serde_json::json!({
-            "owner_count": 0,
-            "owners": []
-        })))
+        Ok(ExecutionResult::RecordSet(vec![]))
     }
 }

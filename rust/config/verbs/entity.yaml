@@ -552,7 +552,7 @@ domains:
         returns:
           type: affected
       list:
-        description: List entities with optional filters
+        description: List entities with optional filters. Supports :scope for Pattern B entity scope resolution.
         invocation_phrases:
           - "list entities"
           - "show all entities"
@@ -562,28 +562,30 @@ domains:
           - "list all entities"
           - "display entities"
           - "get entity list"
-        behavior: crud
+          - "show entities in scope"
+          - "list scoped entities"
+        behavior: plugin
         metadata:
           tier: diagnostics
           source_of_truth: entity
           noun: entity
-          tags: [query, listing]
-        crud:
-          operation: select
-          table: entities
-          schema: ob-poc
+          tags: [query, listing, scope-aware]
+        plugin:
+          handler: entity_list
         args:
+          - name: entity-ids
+            type: uuid_list
+            required: false
+            description: Filter to specific entity UUIDs (injected by :scope rewrite)
           - name: entity-type
             type: string
             required: false
           - name: jurisdiction
             type: string
             required: false
-            maps_to: jurisdiction
           - name: status
             type: string
             required: false
-            maps_to: status
           - name: limit
             type: integer
             required: false
