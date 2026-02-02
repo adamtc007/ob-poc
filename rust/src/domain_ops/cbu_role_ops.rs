@@ -356,6 +356,9 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
 
         let role_id = get_role_id(pool, &role).await?;
 
+        // DAG GUARDRAIL: Verify entity and CBU exist before role assignment
+        verify_entity_and_cbu_exist(pool, owner_entity_id, cbu_id, &role).await?;
+
         // Transaction for atomicity
         let mut tx = pool.begin().await?;
 
@@ -524,6 +527,9 @@ impl CustomOperation for CbuRoleAssignControlOp {
 
         let role_id = get_role_id(pool, &role).await?;
 
+        // DAG GUARDRAIL: Verify entity and CBU exist before role assignment
+        verify_entity_and_cbu_exist(pool, controller_entity_id, cbu_id, &role).await?;
+
         let mut tx = pool.begin().await?;
 
         // 1. Upsert role assignment
@@ -691,6 +697,9 @@ impl CustomOperation for CbuRoleAssignTrustOp {
             .map(|s| s.to_string());
 
         let role_id = get_role_id(pool, &role).await?;
+
+        // DAG GUARDRAIL: Verify entity and CBU exist before role assignment
+        verify_entity_and_cbu_exist(pool, participant_entity_id, cbu_id, &role).await?;
 
         // Map role to relationship type
         let relationship_type = match role.as_str() {
@@ -876,6 +885,9 @@ impl CustomOperation for CbuRoleAssignFundOp {
 
         let role_id = get_role_id(pool, &role).await?;
 
+        // DAG GUARDRAIL: Verify entity and CBU exist before role assignment
+        verify_entity_and_cbu_exist(pool, entity_id, cbu_id, &role).await?;
+
         let mut tx = pool.begin().await?;
 
         // 1. Upsert role assignment
@@ -1044,6 +1056,9 @@ impl CustomOperation for CbuRoleAssignServiceOp {
 
         let role_id = get_role_id(pool, &role).await?;
 
+        // DAG GUARDRAIL: Verify entity and CBU exist before role assignment
+        verify_entity_and_cbu_exist(pool, provider_entity_id, cbu_id, &role).await?;
+
         // Upsert role assignment (service providers typically don't create relationship edges)
         let role_result = sqlx::query_scalar!(
             r#"INSERT INTO "ob-poc".cbu_entity_roles
@@ -1188,6 +1203,9 @@ impl CustomOperation for CbuRoleAssignSignatoryOp {
             .unwrap_or(false);
 
         let role_id = get_role_id(pool, &role).await?;
+
+        // DAG GUARDRAIL: Verify entity and CBU exist before role assignment
+        verify_entity_and_cbu_exist(pool, person_entity_id, cbu_id, &role).await?;
 
         // Upsert role assignment with authority metadata
         let role_result = sqlx::query_scalar!(
