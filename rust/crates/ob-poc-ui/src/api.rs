@@ -8,8 +8,8 @@ use ob_poc_types::{
     galaxy::UniverseGraph,
     investor_register::{InvestorFilters, InvestorListResponse, InvestorRegisterView},
     CbuSummary, ChatRequest, ChatResponse, CommitResolutionResponse, ConfirmAllRequest,
-    ConfirmResolutionRequest, CreateSessionRequest, CreateSessionResponse, ExecuteRequest,
-    ExecuteResponse, GetContextResponse, ResolutionSearchRequest, ResolutionSearchResponse,
+    CreateSessionRequest, CreateSessionResponse, ExecuteRequest, ExecuteResponse,
+    GetContextResponse, ResolutionSearchRequest, ResolutionSearchResponse,
     ResolutionSessionResponse, SelectResolutionRequest, SelectResolutionResponse, SessionContext,
     SessionStateResponse, SetBindingRequest, SetBindingResponse, ValidateDslRequest,
     ValidateDslResponse,
@@ -572,11 +572,8 @@ pub async fn load_cbu_into_scope(
 // NOTE: start_resolution() removed - now using direct ChatResponse.unresolved_refs flow
 // See ai-thoughts/036-session-rip-and-replace.md
 
-/// Get current resolution state
-#[allow(dead_code)]
-pub async fn get_resolution(session_id: Uuid) -> Result<ResolutionSessionResponse, String> {
-    get(&format!("/api/session/{}/resolution", session_id)).await
-}
+// NOTE: get_resolution() removed - was unused after resolution flow refactor
+// See ai-thoughts/036-session-rip-and-replace.md
 
 /// Search for entity matches for a specific ref
 pub async fn search_resolution(
@@ -663,20 +660,8 @@ pub async fn select_resolution(
     .await
 }
 
-/// Confirm a resolution (mark as reviewed)
-#[allow(dead_code)]
-pub async fn confirm_resolution(
-    session_id: Uuid,
-    ref_id: &str,
-) -> Result<ResolutionSessionResponse, String> {
-    post(
-        &format!("/api/session/{}/resolution/confirm", session_id),
-        &ConfirmResolutionRequest {
-            ref_id: ref_id.to_string(),
-        },
-    )
-    .await
-}
+// NOTE: confirm_resolution() removed - was unused after resolution flow refactor
+// Use confirm_all_resolutions() instead for batch confirmation
 
 /// Confirm all high-confidence resolutions
 pub async fn confirm_all_resolutions(
@@ -850,19 +835,8 @@ pub fn set_local_storage(key: &str, value: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Remove value from localStorage
-#[allow(dead_code)]
-pub fn remove_local_storage(key: &str) -> Result<(), String> {
-    let window = web_sys::window().ok_or("No window")?;
-    let storage = window
-        .local_storage()
-        .map_err(|_| "No localStorage")?
-        .ok_or("No localStorage")?;
-    storage
-        .remove_item(key)
-        .map_err(|_| "Failed to remove localStorage item")?;
-    Ok(())
-}
+// NOTE: remove_local_storage() removed - was unused
+// Use set_local_storage(key, "") to clear a value if needed
 
 // =============================================================================
 // Investor Register API
