@@ -1,0 +1,1086 @@
+{
+  "timestamp": "2026-02-02T14:25:08.767237+00:00",
+  "total_tests": 151,
+  "passed": 120,
+  "failed": 31,
+  "pass_rate": 79.47019867549669,
+  "confidently_wrong": 0,
+  "semantic_threshold": 0.65,
+  "ambiguity_margin": 0.05,
+  "mismatches": [
+    {
+      "name": "add cbu",
+      "query": "add cbu",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(session.add-cbu vs cbu.create)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "session.add-cbu",
+          "score": 0.938345,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add cbu"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.create",
+          "score": 0.938345,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add CBU"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.add-product",
+          "score": 0.8706517,
+          "source": "PatternEmbedding",
+          "matched_phrase": "cbu add product"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create fund",
+      "query": "create a fund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs fund.create-umbrella)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.951018,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a fund"
+        },
+        {
+          "rank": 2,
+          "verb": "fund.create-umbrella",
+          "score": 0.9117611,
+          "source": "PatternEmbedding",
+          "matched_phrase": "how to create fund"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "establish fund",
+      "query": "establish a fund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs fund.create-umbrella)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.95326847,
+          "source": "PatternEmbedding",
+          "matched_phrase": "establish a fund"
+        },
+        {
+          "rank": 2,
+          "verb": "fund.create-umbrella",
+          "score": 0.9411462,
+          "source": "PatternEmbedding",
+          "matched_phrase": "establish fund"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "new structure",
+      "query": "new structure",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.list vs kyc.preview-scope)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.list",
+          "score": 0.77641404,
+          "source": "PatternEmbedding",
+          "matched_phrase": "what structures exist"
+        },
+        {
+          "rank": 2,
+          "verb": "kyc.preview-scope",
+          "score": 0.7524872,
+          "source": "PatternEmbedding",
+          "matched_phrase": "structure scope"
+        },
+        {
+          "rank": 3,
+          "verb": "ubo.trace-chains",
+          "score": 0.7454584,
+          "source": "PatternEmbedding",
+          "matched_phrase": "group structure"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create account",
+      "query": "create an account",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs service-resource.provision)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.89539623,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create an account"
+        },
+        {
+          "rank": 2,
+          "verb": "service-resource.provision",
+          "score": 0.8695486,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create account"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "open account",
+      "query": "open an account",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs service-resource.activate)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.91326064,
+          "source": "PatternEmbedding",
+          "matched_phrase": "open an account"
+        },
+        {
+          "rank": 2,
+          "verb": "service-resource.activate",
+          "score": 0.88341266,
+          "source": "PatternEmbedding",
+          "matched_phrase": "open account"
+        },
+        {
+          "rank": 3,
+          "verb": "service-resource.provision",
+          "score": 0.7953815,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create account"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create sicav",
+      "query": "create a sicav",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs fund.create-umbrella)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.95379335,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a sicav"
+        },
+        {
+          "rank": 2,
+          "verb": "fund.create-umbrella",
+          "score": 0.93397087,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create SICAV"
+        },
+        {
+          "rank": 3,
+          "verb": "fund-vehicle.list-by-umbrella",
+          "score": 0.7343459,
+          "source": "PatternEmbedding",
+          "matched_phrase": "compartments in SICAV"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create pe fund",
+      "query": "create a pe fund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs fund.create-standalone)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.96162456,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a pe fund"
+        },
+        {
+          "rank": 2,
+          "verb": "fund.create-standalone",
+          "score": 0.9546085,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create PE fund"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create segregated mandate",
+      "query": "create a segregated mandate",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "NoMatch",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "entity.create-cooperative",
+          "score": 0.628628,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create cooperative"
+        },
+        {
+          "rank": 2,
+          "verb": "client-group.assign-role",
+          "score": 0.59687346,
+          "source": "PatternEmbedding",
+          "matched_phrase": "make this the"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.create",
+          "score": 0.59668595,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a compartment"
+        },
+        {
+          "rank": 4,
+          "verb": "manco.group.create",
+          "score": 0.5939997,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create group"
+        },
+        {
+          "rank": 5,
+          "verb": "entity.create-partnership-limited",
+          "score": 0.593981,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create llp"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create subfund",
+      "query": "create a subfund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs fund.create-subfund)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.9525115,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a subfund"
+        },
+        {
+          "rank": 2,
+          "verb": "fund.create-subfund",
+          "score": 0.9454826,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create subfund"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create compartment",
+      "query": "create a compartment",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create",
+      "allowed_verbs": [
+        "cbu.create"
+      ],
+      "actual_outcome": "Ambiguous(cbu.create vs fund-compartment.upsert)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.9440709,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a compartment"
+        },
+        {
+          "rank": 2,
+          "verb": "fund-compartment.upsert",
+          "score": 0.9349007,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create compartment"
+        },
+        {
+          "rank": 3,
+          "verb": "fund.create-subfund",
+          "score": 0.9349007,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create compartment"
+        }
+      ],
+      "category": "cbu_create",
+      "is_hard_negative": false
+    },
+    {
+      "name": "list cbus",
+      "query": "list cbus",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.list",
+      "allowed_verbs": [
+        "cbu.list"
+      ],
+      "actual_outcome": "Ambiguous(session.list-cbus vs cbu.list)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "session.list-cbus",
+          "score": 0.9530501,
+          "source": "PatternEmbedding",
+          "matched_phrase": "list cbus"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.list",
+          "score": 0.9530501,
+          "source": "PatternEmbedding",
+          "matched_phrase": "list CBUs"
+        },
+        {
+          "rank": 3,
+          "verb": "manco.group.cbus",
+          "score": 0.91021204,
+          "source": "PatternEmbedding",
+          "matched_phrase": "list book CBUs"
+        }
+      ],
+      "category": "cbu_list",
+      "is_hard_negative": false
+    },
+    {
+      "name": "show cbus",
+      "query": "show all cbus",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.list",
+      "allowed_verbs": [
+        "cbu.list"
+      ],
+      "actual_outcome": "Ambiguous(session.load-cluster vs cbu.list)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "session.load-cluster",
+          "score": 0.92721593,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show all cbus"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.list",
+          "score": 0.92721593,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show all CBUs"
+        },
+        {
+          "rank": 3,
+          "verb": "view.universe",
+          "score": 0.90410334,
+          "source": "PatternEmbedding",
+          "matched_phrase": "see all CBUs"
+        }
+      ],
+      "category": "cbu_list",
+      "is_hard_negative": false
+    },
+    {
+      "name": "show me cbus",
+      "query": "show me all cbus",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.list",
+      "allowed_verbs": [
+        "cbu.list"
+      ],
+      "actual_outcome": "Ambiguous(cbu.list vs session.load-cluster)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.list",
+          "score": 0.93713415,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show me all cbus"
+        },
+        {
+          "rank": 2,
+          "verb": "session.load-cluster",
+          "score": 0.9093656,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show all cbus"
+        },
+        {
+          "rank": 3,
+          "verb": "view.universe",
+          "score": 0.89288837,
+          "source": "PatternEmbedding",
+          "matched_phrase": "see all CBUs"
+        }
+      ],
+      "category": "cbu_list",
+      "is_hard_negative": false
+    },
+    {
+      "name": "active cbus",
+      "query": "show active cbus",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.list",
+      "allowed_verbs": [
+        "cbu.list"
+      ],
+      "actual_outcome": "Ambiguous(cbu.list vs session.list-active-cbus)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.list",
+          "score": 0.95258385,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show active cbus"
+        },
+        {
+          "rank": 2,
+          "verb": "session.list-active-cbus",
+          "score": 0.9125874,
+          "source": "PatternEmbedding",
+          "matched_phrase": "list active cbus"
+        },
+        {
+          "rank": 3,
+          "verb": "semantic.prompt-context",
+          "score": 0.89104176,
+          "source": "PatternEmbedding",
+          "matched_phrase": "active cbu"
+        },
+        {
+          "rank": 4,
+          "verb": "session.load-cluster",
+          "score": 0.8441268,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show all CBUs for"
+        }
+      ],
+      "category": "cbu_list",
+      "is_hard_negative": false
+    },
+    {
+      "name": "edit cbu",
+      "query": "edit cbu",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.update",
+      "allowed_verbs": [
+        "cbu.update"
+      ],
+      "actual_outcome": "Ambiguous(view.cbu vs cbu.show)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "view.cbu",
+          "score": 0.8645946,
+          "source": "PatternEmbedding",
+          "matched_phrase": "cbu"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.show",
+          "score": 0.85793096,
+          "source": "PatternEmbedding",
+          "matched_phrase": "describe cbu"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.read",
+          "score": 0.85793096,
+          "source": "PatternEmbedding",
+          "matched_phrase": "describe cbu"
+        }
+      ],
+      "category": "cbu_update",
+      "is_hard_negative": false
+    },
+    {
+      "name": "assign role",
+      "query": "assign role to cbu",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.role.assign)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 0.96491605,
+          "source": "PatternEmbedding",
+          "matched_phrase": "assign role to cbu"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.role.assign",
+          "score": 0.9560828,
+          "source": "PatternEmbedding",
+          "matched_phrase": "assign CBU role"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add role",
+      "query": "add role to entity",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.role.assign)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 0.9621791,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add role to entity"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.role.assign",
+          "score": 0.9621791,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add role to entity"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "appoint director",
+      "query": "appoint director",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.role.assign vs cbu.assign-role)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.role.assign",
+          "score": 0.93919617,
+          "source": "PatternEmbedding",
+          "matched_phrase": "appoint director"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-role",
+          "score": 0.93919617,
+          "source": "PatternEmbedding",
+          "matched_phrase": "appoint director"
+        },
+        {
+          "rank": 3,
+          "verb": "control.add",
+          "score": 0.78790873,
+          "source": "PatternEmbedding",
+          "matched_phrase": "director nomination"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add beneficial owner",
+      "query": "add beneficial owner",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(ubo.register-ubo vs cbu.assign-role)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "ubo.register-ubo",
+          "score": 0.9511553,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add beneficial owner"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-role",
+          "score": 0.9511553,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add beneficial owner"
+        },
+        {
+          "rank": 3,
+          "verb": "ubo.add-ownership",
+          "score": 0.9511553,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add beneficial owner"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "assign signatory",
+      "query": "assign signatory",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.role.assign-signatory vs cbu.assign-role)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.role.assign-signatory",
+          "score": 0.9571225,
+          "source": "PatternEmbedding",
+          "matched_phrase": "assign signatory"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.assign-role",
+          "score": 0.9571225,
+          "source": "PatternEmbedding",
+          "matched_phrase": "assign signatory"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.role.assign",
+          "score": 0.8342994,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add as signatory"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add investment manager",
+      "query": "add investment manager",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs investment-manager.assign)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 0.9548676,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add investment manager"
+        },
+        {
+          "rank": 2,
+          "verb": "investment-manager.assign",
+          "score": 0.9366558,
+          "source": "PatternEmbedding",
+          "matched_phrase": "how to add investment manager"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "assign custodian",
+      "query": "assign custodian",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.role.assign-signatory)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 0.77349615,
+          "source": "PatternEmbedding",
+          "matched_phrase": "assign signatory"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.role.assign-signatory",
+          "score": 0.77349615,
+          "source": "PatternEmbedding",
+          "matched_phrase": "assign signatory"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add prime broker",
+      "query": "add prime broker",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(trading-profile.add-csa-collateral vs trading-profile.add-instrument-class)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "trading-profile.add-csa-collateral",
+          "score": 0.73600036,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add eligible securities"
+        },
+        {
+          "rank": 2,
+          "verb": "trading-profile.add-instrument-class",
+          "score": 0.6966584,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add equities"
+        },
+        {
+          "rank": 3,
+          "verb": "fund.add-investment",
+          "score": 0.6920877,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add underlying investment"
+        },
+        {
+          "rank": 4,
+          "verb": "trading-profile.add-im-mandate",
+          "score": 0.68727773,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add investment mandate"
+        }
+      ],
+      "category": "cbu_role",
+      "is_hard_negative": false
+    },
+    {
+      "name": "remove role",
+      "query": "remove role from cbu",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.remove-role",
+      "allowed_verbs": [
+        "cbu.remove-role"
+      ],
+      "actual_outcome": "Ambiguous(cbu.remove-role vs cbu.role.remove)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.remove-role",
+          "score": 0.962257,
+          "source": "PatternEmbedding",
+          "matched_phrase": "remove role from CBU"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.role.remove",
+          "score": 0.9484435,
+          "source": "PatternEmbedding",
+          "matched_phrase": "remove cbu.role"
+        }
+      ],
+      "category": "cbu_role_remove",
+      "is_hard_negative": false
+    },
+    {
+      "name": "list roles",
+      "query": "list roles on fund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.parties",
+      "allowed_verbs": [
+        "cbu.parties"
+      ],
+      "actual_outcome": "Ambiguous(cbu.parties vs investor-role.list-by-issuer)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.parties",
+          "score": 0.95145696,
+          "source": "PatternEmbedding",
+          "matched_phrase": "list fund roles"
+        },
+        {
+          "rank": 2,
+          "verb": "investor-role.list-by-issuer",
+          "score": 0.9099926,
+          "source": "PatternEmbedding",
+          "matched_phrase": "list investor roles for fund"
+        }
+      ],
+      "category": "cbu_parties",
+      "is_hard_negative": false
+    },
+    {
+      "name": "who are the ubos",
+      "query": "who are the ubos",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.parties",
+      "allowed_verbs": [
+        "cbu.parties"
+      ],
+      "actual_outcome": "Ambiguous(bods.discover-ubos vs cbu.parties)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "bods.discover-ubos",
+          "score": 0.97280306,
+          "source": "PatternEmbedding",
+          "matched_phrase": "who are the UBOs"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.parties",
+          "score": 0.97280306,
+          "source": "PatternEmbedding",
+          "matched_phrase": "who are the ubos"
+        },
+        {
+          "rank": 3,
+          "verb": "ubo.list-ubos",
+          "score": 0.97280306,
+          "source": "PatternEmbedding",
+          "matched_phrase": "who are the UBOs"
+        },
+        {
+          "rank": 4,
+          "verb": "ubo.calculate",
+          "score": 0.97280306,
+          "source": "PatternEmbedding",
+          "matched_phrase": "who are the ubos"
+        },
+        {
+          "rank": 5,
+          "verb": "trust.identify-ubos",
+          "score": 0.8621498,
+          "source": "PatternEmbedding",
+          "matched_phrase": "identify ubos"
+        }
+      ],
+      "category": "cbu_parties",
+      "is_hard_negative": false
+    },
+    {
+      "name": "who are the signatories",
+      "query": "who are the signatories",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.parties",
+      "allowed_verbs": [
+        "cbu.parties"
+      ],
+      "actual_outcome": "Ambiguous(cbu.assign-role vs cbu.role.assign-signatory)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.assign-role",
+          "score": 0.72311074,
+          "source": "PatternEmbedding",
+          "matched_phrase": "make someone a signatory"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.role.assign-signatory",
+          "score": 0.696205,
+          "source": "PatternEmbedding",
+          "matched_phrase": "assign signatory"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.remove-role",
+          "score": 0.6788146,
+          "source": "PatternEmbedding",
+          "matched_phrase": "unassign signatory"
+        }
+      ],
+      "category": "cbu_parties",
+      "is_hard_negative": false
+    },
+    {
+      "name": "completely remove",
+      "query": "completely remove fund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.delete-cascade",
+      "allowed_verbs": [
+        "cbu.delete-cascade"
+      ],
+      "actual_outcome": "Ambiguous(cbu.delete-cascade vs cbu.delete)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.delete-cascade",
+          "score": 0.9495386,
+          "source": "PatternEmbedding",
+          "matched_phrase": "completely remove fund"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.delete",
+          "score": 0.9040196,
+          "source": "PatternEmbedding",
+          "matched_phrase": "remove fund"
+        }
+      ],
+      "category": "cbu_delete",
+      "is_hard_negative": false
+    },
+    {
+      "name": "add trading",
+      "query": "add trading to fund",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.add-product",
+      "allowed_verbs": [
+        "cbu.add-product"
+      ],
+      "actual_outcome": "Ambiguous(fund.add-investment vs fund-investor.create)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "fund.add-investment",
+          "score": 0.8943876,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add fund investment"
+        },
+        {
+          "rank": 2,
+          "verb": "fund-investor.create",
+          "score": 0.8677052,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add investor to fund"
+        }
+      ],
+      "category": "cbu_product",
+      "is_hard_negative": false
+    },
+    {
+      "name": "onboard from research",
+      "query": "onboard entities from research",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.create-from-client-group",
+      "allowed_verbs": [
+        "cbu.create-from-client-group"
+      ],
+      "actual_outcome": "Ambiguous(client-group.discover-entities vs cbu.parties)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "client-group.discover-entities",
+          "score": 0.721975,
+          "source": "PatternEmbedding",
+          "matched_phrase": "discover entities for"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.parties",
+          "score": 0.718323,
+          "source": "PatternEmbedding",
+          "matched_phrase": "involved entities"
+        },
+        {
+          "rank": 3,
+          "verb": "observation.list-for-entity",
+          "score": 0.71446955,
+          "source": "PatternEmbedding",
+          "matched_phrase": "entity observations"
+        },
+        {
+          "rank": 4,
+          "verb": "temporal.entity-history",
+          "score": 0.71432894,
+          "source": "PatternEmbedding",
+          "matched_phrase": "entity history"
+        }
+      ],
+      "category": "cbu_bulk",
+      "is_hard_negative": false
+    }
+  ]
+}

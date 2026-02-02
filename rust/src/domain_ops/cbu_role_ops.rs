@@ -39,6 +39,57 @@ async fn get_role_id(pool: &PgPool, role_name: &str) -> Result<uuid::Uuid> {
 }
 
 // =============================================================================
+// HELPER: DAG Guardrail - Verify entity and CBU exist before role assignment
+// =============================================================================
+
+#[cfg(feature = "database")]
+async fn verify_entity_and_cbu_exist(
+    pool: &PgPool,
+    entity_id: uuid::Uuid,
+    cbu_id: uuid::Uuid,
+    role: &str,
+) -> Result<()> {
+    // Check entity exists
+    let entity_exists = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".entities WHERE entity_id = $1) as "exists!""#,
+        entity_id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !entity_exists {
+        return Err(anyhow::anyhow!(
+            "Entity {} not found. Cannot assign role '{}' to non-existent entity.\n\
+             \n\
+             To fix this, either:\n\
+             1. Run GLEIF research first: (gleif.import-tree :entity-id <root> :depth 3)\n\
+             2. Create the entity manually: (entity.create :name \"...\" :type legal_entity)\n\
+             3. Use entity.ensure-or-placeholder to create a placeholder",
+            entity_id,
+            role
+        ));
+    }
+
+    // Check CBU exists
+    let cbu_exists = sqlx::query_scalar!(
+        r#"SELECT EXISTS(SELECT 1 FROM "ob-poc".cbus WHERE cbu_id = $1) as "exists!""#,
+        cbu_id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !cbu_exists {
+        return Err(anyhow::anyhow!(
+            "CBU {} not found. Cannot assign role to non-existent CBU.\n\
+             Create the CBU first: (cbu.create :name \"...\" :kind fund)",
+            cbu_id
+        ));
+    }
+
+    Ok(())
+}
+
+// =============================================================================
 // cbu.role:assign - Core role assignment
 // =============================================================================
 
@@ -145,6 +196,9 @@ impl CustomOperation for CbuRoleAssignOp {
 
         // Get role_id
         let role_id = get_role_id(pool, &role).await?;
+
+        // DAG GUARDRAIL: Verify entity and CBU exist before role assignment
+        verify_entity_and_cbu_exist(pool, entity_id, cbu_id, &role).await?;
 
         // Upsert role assignment (idempotent via ON CONFLICT)
         let row = sqlx::query_scalar!(

@@ -1,0 +1,425 @@
+{
+  "timestamp": "2026-02-02T14:24:33.148516+00:00",
+  "total_tests": 53,
+  "passed": 42,
+  "failed": 11,
+  "pass_rate": 79.24528301886792,
+  "confidently_wrong": 0,
+  "semantic_threshold": 0.65,
+  "ambiguity_margin": 0.05,
+  "mismatches": [
+    {
+      "name": "spin up a new fund (variation needs clarification)",
+      "query": "spin up a new fund called Alpha",
+      "expected_outcome": "Ambiguous",
+      "expected_verb": null,
+      "allowed_verbs": [],
+      "actual_outcome": "Matched",
+      "actual_verb": "cbu.create",
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "cbu.create",
+          "score": 0.8379086,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create a fund called alpha growth"
+        },
+        {
+          "rank": 2,
+          "verb": "fund.create-standalone",
+          "score": 0.7389526,
+          "source": "PatternEmbedding",
+          "matched_phrase": "new hedge fund"
+        }
+      ],
+      "category": "taught",
+      "is_hard_negative": false
+    },
+    {
+      "name": "assign role",
+      "query": "assign custody role to BNY",
+      "expected_outcome": "Matched",
+      "expected_verb": "cbu.assign-role",
+      "allowed_verbs": [
+        "cbu.assign-role"
+      ],
+      "actual_outcome": "Ambiguous(service-resource.provision vs cbu.add-product)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "service-resource.provision",
+          "score": 0.71586794,
+          "source": "PatternEmbedding",
+          "matched_phrase": "provision custody account"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu.add-product",
+          "score": 0.71164507,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add custody"
+        },
+        {
+          "rank": 3,
+          "verb": "contract.add-product",
+          "score": 0.7018341,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add custody to contract"
+        },
+        {
+          "rank": 4,
+          "verb": "cbu-custody.list-agent-overrides",
+          "score": 0.69760376,
+          "source": "PatternEmbedding",
+          "matched_phrase": "cbu-custody list agent overrides"
+        },
+        {
+          "rank": 5,
+          "verb": "instrument-class.read",
+          "score": 0.68726015,
+          "source": "PatternEmbedding",
+          "matched_phrase": "custody requirements"
+        }
+      ],
+      "category": "cbu",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create person",
+      "query": "add a natural person",
+      "expected_outcome": "Matched",
+      "expected_verb": "entity.create-proper-person",
+      "allowed_verbs": [
+        "entity.create-proper-person"
+      ],
+      "actual_outcome": "Ambiguous(entity.create-proper-person-natural vs entity.create-proper-person)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "entity.create-proper-person-natural",
+          "score": 0.78770345,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create proper person natural"
+        },
+        {
+          "rank": 2,
+          "verb": "entity.create-proper-person",
+          "score": 0.78202045,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add person"
+        }
+      ],
+      "category": "entity",
+      "is_hard_negative": false
+    },
+    {
+      "name": "search entity",
+      "query": "find entity BlackRock",
+      "expected_outcome": "Matched",
+      "expected_verb": "entity.query",
+      "allowed_verbs": [
+        "entity.query"
+      ],
+      "actual_outcome": "Ambiguous(gleif.search vs entity.identify)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "gleif.search",
+          "score": 0.7375064,
+          "source": "PatternEmbedding",
+          "matched_phrase": "search for entity"
+        },
+        {
+          "rank": 2,
+          "verb": "entity.identify",
+          "score": 0.71350986,
+          "source": "PatternEmbedding",
+          "matched_phrase": "identify entity"
+        },
+        {
+          "rank": 3,
+          "verb": "client-group.discover-entities",
+          "score": 0.7073695,
+          "source": "PatternEmbedding",
+          "matched_phrase": "discover entities for"
+        }
+      ],
+      "category": "entity",
+      "is_hard_negative": false
+    },
+    {
+      "name": "entity details",
+      "query": "show entity details",
+      "expected_outcome": "Matched",
+      "expected_verb": "entity.read",
+      "allowed_verbs": [
+        "entity.read"
+      ],
+      "actual_outcome": "Ambiguous(entity.list vs document.for-entity)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "entity.list",
+          "score": 0.89219177,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show entity"
+        },
+        {
+          "rank": 2,
+          "verb": "document.for-entity",
+          "score": 0.85702044,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show documents for entity"
+        },
+        {
+          "rank": 3,
+          "verb": "view.entity-forest",
+          "score": 0.8524364,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show entity structure"
+        }
+      ],
+      "category": "entity",
+      "is_hard_negative": false
+    },
+    {
+      "name": "discover ubo",
+      "query": "discover ultimate beneficial owners",
+      "expected_outcome": "Matched",
+      "expected_verb": "control.identify-ubos",
+      "allowed_verbs": [
+        "control.identify-ubos"
+      ],
+      "actual_outcome": "Ambiguous(control.identify-ubos vs ubo.register-ubo)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "control.identify-ubos",
+          "score": 0.9247788,
+          "source": "PatternEmbedding",
+          "matched_phrase": "find ultimate beneficial owners"
+        },
+        {
+          "rank": 2,
+          "verb": "ubo.register-ubo",
+          "score": 0.9037226,
+          "source": "PatternEmbedding",
+          "matched_phrase": "ultimate beneficial owner"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu.assign-role",
+          "score": 0.8806282,
+          "source": "PatternEmbedding",
+          "matched_phrase": "add ultimate beneficial owner"
+        },
+        {
+          "rank": 4,
+          "verb": "ubo.add-ownership",
+          "score": 0.84975547,
+          "source": "PatternEmbedding",
+          "matched_phrase": "ultimate owner"
+        }
+      ],
+      "category": "kyc",
+      "is_hard_negative": false
+    },
+    {
+      "name": "create kyc case",
+      "query": "open a kyc case",
+      "expected_outcome": "Matched",
+      "expected_verb": "kyc-case.create",
+      "allowed_verbs": [
+        "kyc-case.create"
+      ],
+      "actual_outcome": "Ambiguous(kyc-case.create vs kyc-case.state)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "kyc-case.create",
+          "score": 0.8694441,
+          "source": "PatternEmbedding",
+          "matched_phrase": "create the kyc case"
+        },
+        {
+          "rank": 2,
+          "verb": "kyc-case.state",
+          "score": 0.8688745,
+          "source": "PatternEmbedding",
+          "matched_phrase": "state the kyc case"
+        },
+        {
+          "rank": 3,
+          "verb": "kyc-case.read",
+          "score": 0.8636732,
+          "source": "PatternEmbedding",
+          "matched_phrase": "get kyc case"
+        },
+        {
+          "rank": 4,
+          "verb": "kyc-case.reopen",
+          "score": 0.8634386,
+          "source": "PatternEmbedding",
+          "matched_phrase": "reopen kyc case"
+        }
+      ],
+      "category": "kyc",
+      "is_hard_negative": false
+    },
+    {
+      "name": "view universe",
+      "query": "show the universe",
+      "expected_outcome": "Matched",
+      "expected_verb": "view.universe",
+      "allowed_verbs": [
+        "view.universe"
+      ],
+      "actual_outcome": "Ambiguous(view.universe vs cbu-custody.list-universe)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "view.universe",
+          "score": 0.9347353,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show the universe"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu-custody.list-universe",
+          "score": 0.90984786,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show universe"
+        },
+        {
+          "rank": 3,
+          "verb": "session.load-cluster",
+          "score": 0.77983296,
+          "source": "PatternEmbedding",
+          "matched_phrase": "show allianz universe"
+        }
+      ],
+      "category": "view",
+      "is_hard_negative": false
+    },
+    {
+      "name": "surface up",
+      "query": "surface back up",
+      "expected_outcome": "Matched",
+      "expected_verb": "view.surface",
+      "allowed_verbs": [
+        "view.surface"
+      ],
+      "actual_outcome": "Ambiguous(ubo.end-ownership vs movement.transfer-out)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "ubo.end-ownership",
+          "score": 0.69229734,
+          "source": "PatternEmbedding",
+          "matched_phrase": "buyback"
+        },
+        {
+          "rank": 2,
+          "verb": "movement.transfer-out",
+          "score": 0.67379373,
+          "source": "PatternEmbedding",
+          "matched_phrase": "rollover out"
+        },
+        {
+          "rank": 3,
+          "verb": "movement.transfer-in",
+          "score": 0.659198,
+          "source": "PatternEmbedding",
+          "matched_phrase": "rollover in"
+        },
+        {
+          "rank": 4,
+          "verb": "movement.redeem",
+          "score": 0.63592213,
+          "source": "PatternEmbedding",
+          "matched_phrase": "return of capital"
+        }
+      ],
+      "category": "view",
+      "is_hard_negative": false
+    },
+    {
+      "name": "approve case (safety)",
+      "query": "approve the kyc case",
+      "expected_outcome": "MatchedOrAmbiguous",
+      "expected_verb": "kyc.approve-case",
+      "allowed_verbs": [
+        "kyc.approve-case"
+      ],
+      "actual_outcome": "Matched",
+      "actual_verb": "investor.approve-kyc",
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "investor.approve-kyc",
+          "score": 0.90815276,
+          "source": "PatternEmbedding",
+          "matched_phrase": "approve kyc"
+        }
+      ],
+      "category": "safety_first",
+      "is_hard_negative": true
+    },
+    {
+      "name": "single word nonsense",
+      "query": "xyz",
+      "expected_outcome": "NoMatch",
+      "expected_verb": null,
+      "allowed_verbs": [],
+      "actual_outcome": "Ambiguous(allegation.record vs cbu-custody.add-booking-rule)",
+      "actual_verb": null,
+      "top_candidates": [
+        {
+          "rank": 1,
+          "verb": "allegation.record",
+          "score": 0.7,
+          "source": "Phonetic",
+          "matched_phrase": "client says"
+        },
+        {
+          "rank": 2,
+          "verb": "cbu-custody.add-booking-rule",
+          "score": 0.7,
+          "source": "Phonetic",
+          "matched_phrase": "rule by trade size"
+        },
+        {
+          "rank": 3,
+          "verb": "cbu-custody.derive-required-coverage",
+          "score": 0.7,
+          "source": "Phonetic",
+          "matched_phrase": "calculate required ssis"
+        },
+        {
+          "rank": 4,
+          "verb": "session.load-cluster",
+          "score": 0.5968,
+          "source": "PatternEmbedding",
+          "matched_phrase": "allianz"
+        },
+        {
+          "rank": 5,
+          "verb": "view.xray",
+          "score": 0.55747426,
+          "source": "PatternEmbedding",
+          "matched_phrase": "x-ray this entity"
+        }
+      ],
+      "category": "edge",
+      "is_hard_negative": false
+    }
+  ]
+}
