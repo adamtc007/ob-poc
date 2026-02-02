@@ -52,7 +52,7 @@ pub struct ExpansionReport {
 impl Default for ExpansionReport {
     fn default() -> Self {
         Self {
-            expansion_id: Uuid::new_v4(),
+            expansion_id: Uuid::now_v7(),
             source_digest: String::new(),
             template_digests: Vec::new(),
             invocations: Vec::new(),

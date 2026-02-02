@@ -133,7 +133,7 @@ impl DocumentService {
 
     /// Create a document catalog entry
     pub async fn create_document(&self, fields: &NewDocumentFields) -> Result<Uuid> {
-        let document_id = Uuid::new_v4();
+        let document_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -403,7 +403,7 @@ impl DocumentService {
             return Ok(existing.type_id);
         }
 
-        let type_id = Uuid::new_v4();
+        let type_id = Uuid::now_v7();
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".document_types (type_id, type_code, display_name, category, description)

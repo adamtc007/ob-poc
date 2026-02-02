@@ -762,7 +762,7 @@ impl CustomOperation for SetupSsiFromDocumentOp {
                 .map_err(|e| anyhow::anyhow!("Invalid expiry_date for {}: {}", ssi.ssi_name, e))?;
 
             // Insert SSI
-            let ssi_id = Uuid::new_v4();
+            let ssi_id = Uuid::now_v7();
             sqlx::query!(
                 r#"
                 INSERT INTO custody.cbu_ssi (

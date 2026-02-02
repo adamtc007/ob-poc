@@ -287,7 +287,7 @@ impl IntentTierTaxonomy {
             .collect();
 
         IntentTierRequest {
-            request_id: Uuid::new_v4().to_string(),
+            request_id: Uuid::now_v7().to_string(),
             tier_number: 1,
             original_input: original_input.to_string(),
             options,
@@ -342,7 +342,7 @@ impl IntentTierTaxonomy {
             .find(|o| o.id == tier1_selection)?;
 
         Some(IntentTierRequest {
-            request_id: Uuid::new_v4().to_string(),
+            request_id: Uuid::now_v7().to_string(),
             tier_number: 2,
             original_input: original_input.to_string(),
             options,

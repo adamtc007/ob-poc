@@ -178,7 +178,7 @@ async fn zoom_in(
     // Push a loading frame with the type code as label
     // In a full implementation, this would use the TaxonomyParser to expand the type
     let frame = crate::taxonomy::TaxonomyFrame::loading(
-        Uuid::new_v4(), // Focus node ID (placeholder)
+        Uuid::now_v7(), // Focus node ID (placeholder)
         request.type_code.clone(),
     );
 

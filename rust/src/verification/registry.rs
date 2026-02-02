@@ -483,7 +483,7 @@ mod tests {
     #[tokio::test]
     async fn test_gleif_lei_validation() {
         let verifier = RegistryVerifier::new();
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
 
         // Invalid LEI format
         let result = verifier

@@ -538,8 +538,8 @@ mod tests {
         );
 
         // Manually set IDs for testing
-        cmd1.id = Uuid::new_v4();
-        cmd2.id = Uuid::new_v4();
+        cmd1.id = Uuid::now_v7();
+        cmd2.id = Uuid::now_v7();
 
         let commands = vec![cmd1.clone(), cmd2.clone()];
         let mut analyzer = DagAnalyzer::new(&commands);

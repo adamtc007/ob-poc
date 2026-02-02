@@ -625,9 +625,9 @@ mod tests {
     #[test]
     fn primary_governance_controller_validity() {
         let controller = PrimaryGovernanceController {
-            issuer_entity_id: Uuid::new_v4(),
-            primary_controller_entity_id: Uuid::new_v4(),
-            governance_controller_entity_id: Uuid::new_v4(),
+            issuer_entity_id: Uuid::now_v7(),
+            primary_controller_entity_id: Uuid::now_v7(),
+            governance_controller_entity_id: Uuid::now_v7(),
             basis: ControllerBasis::BoardAppointment,
             board_seats: 2,
             voting_pct: Some(Decimal::new(5500, 2)),

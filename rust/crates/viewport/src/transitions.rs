@@ -322,18 +322,18 @@ mod tests {
     use uuid::Uuid;
 
     fn test_cbu() -> CbuRef {
-        CbuRef(Uuid::new_v4())
+        CbuRef(Uuid::now_v7())
     }
 
     fn test_matrix() -> InstrumentMatrixRef {
-        InstrumentMatrixRef(Uuid::new_v4())
+        InstrumentMatrixRef(Uuid::now_v7())
     }
 
     #[test]
     fn test_can_focus_entity_requires_cbu() {
         let state = ViewportFocusState::None;
         let entity = ConcreteEntityRef {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             entity_type: ob_poc_types::viewport::ConcreteEntityType::Company,
         };
 
@@ -348,7 +348,7 @@ mod tests {
             enhance_level: 1,
         };
         let entity = ConcreteEntityRef {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             entity_type: ob_poc_types::viewport::ConcreteEntityType::Company,
         };
 

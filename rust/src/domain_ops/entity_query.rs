@@ -275,8 +275,8 @@ mod tests {
     fn test_entity_query_result_entity_ids() {
         let result = EntityQueryResult {
             items: vec![
-                (Uuid::new_v4(), "Test 1".to_string()),
-                (Uuid::new_v4(), "Test 2".to_string()),
+                (Uuid::now_v7(), "Test 1".to_string()),
+                (Uuid::now_v7(), "Test 2".to_string()),
             ],
             entity_type: Some("fund".to_string()),
             total_count: 2,

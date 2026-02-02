@@ -33,7 +33,7 @@ ob-poc-types = { path = "../ob-poc-types" }
 ob-poc-graph = { path = "../ob-poc-graph" }
 
 # Utils
-uuid = { version = "1", features = ["v4", "serde", "js"] }
+uuid = { version = "1.20", features = ["v4", "serde", "js", "v7"] }
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 tracing = "0.1"
 tracing-wasm = "0.2"

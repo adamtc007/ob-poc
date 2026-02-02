@@ -914,7 +914,7 @@ mod tests {
     #[test]
     fn focus_manager_descend_ascend() {
         let mut fm = FocusManager::new();
-        let cbu = CbuRef::new(Uuid::new_v4());
+        let cbu = CbuRef::new(Uuid::now_v7());
 
         // Start at None
         assert_eq!(fm.stack_depth(), 0);
@@ -930,7 +930,7 @@ mod tests {
 
         // Descend to entity
         let entity = ConcreteEntityRef {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             entity_type: ConcreteEntityType::Company,
         };
         fm.descend(ViewportFocusState::CbuEntity {
@@ -953,7 +953,7 @@ mod tests {
 
     #[test]
     fn viewport_focus_state_max_enhance() {
-        let cbu = CbuRef::new(Uuid::new_v4());
+        let cbu = CbuRef::new(Uuid::now_v7());
 
         let container = ViewportFocusState::CbuContainer {
             cbu: cbu.clone(),
@@ -964,7 +964,7 @@ mod tests {
         let entity = ViewportFocusState::CbuEntity {
             cbu: cbu.clone(),
             entity: ConcreteEntityRef {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 entity_type: ConcreteEntityType::Person,
             },
             entity_enhance: 0,
@@ -974,7 +974,7 @@ mod tests {
 
         let matrix = ViewportFocusState::InstrumentMatrix {
             cbu: cbu.clone(),
-            matrix: InstrumentMatrixRef(Uuid::new_v4()),
+            matrix: InstrumentMatrixRef(Uuid::now_v7()),
             matrix_enhance: 0,
             container_enhance: 1,
         };
@@ -984,7 +984,7 @@ mod tests {
     #[test]
     fn serialization_roundtrip() {
         let state = ViewportFocusState::CbuContainer {
-            cbu: CbuRef::new(Uuid::new_v4()),
+            cbu: CbuRef::new(Uuid::now_v7()),
             enhance_level: 1,
         };
 

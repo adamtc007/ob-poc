@@ -101,7 +101,7 @@ async fn upload_document(
 
     // TODO: Implement proper document upload when schema is aligned
     // For now, return a mock response
-    let doc_id = Uuid::new_v4();
+    let doc_id = Uuid::now_v7();
 
     Ok(Json(UploadDocumentResponse {
         doc_id,

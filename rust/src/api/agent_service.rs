@@ -1593,7 +1593,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             })
             .collect();
 
-        let request_id = Uuid::new_v4().to_string();
+        let request_id = Uuid::now_v7().to_string();
 
         let disambiguation_request = VerbDisambiguationRequest {
             request_id: request_id.clone(),

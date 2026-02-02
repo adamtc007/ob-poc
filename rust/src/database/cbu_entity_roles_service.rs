@@ -88,7 +88,7 @@ impl CbuEntityRolesService {
         }
 
         // Create new role
-        let role_id = Uuid::new_v4();
+        let role_id = Uuid::now_v7();
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".roles (role_id, name, description, created_at)
@@ -125,7 +125,7 @@ impl CbuEntityRolesService {
         entity_id: Uuid,
         role_id: Uuid,
     ) -> Result<Uuid> {
-        let cbu_entity_role_id = Uuid::new_v4();
+        let cbu_entity_role_id = Uuid::now_v7();
 
         sqlx::query(
             r#"

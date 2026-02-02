@@ -194,7 +194,7 @@ impl EntityService {
 
     /// Create a new entity (generic)
     pub async fn create_entity(&self, fields: &NewEntityFields) -> Result<Uuid> {
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
         let entity_type_id = self.resolve_entity_type_id(&fields.entity_type).await?;
 
         sqlx::query(
@@ -225,7 +225,7 @@ impl EntityService {
         &self,
         person_fields: &NewProperPersonFields,
     ) -> Result<(Uuid, Uuid)> {
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
         let proper_person_id = entity_id; // Use same UUID for simplicity
         let entity_type_id = self.resolve_entity_type_id("PROPER_PERSON").await?;
 
@@ -422,7 +422,7 @@ impl EntityService {
     /// Create a limited company
     /// Returns limited_company_id
     pub async fn create_limited_company(&self, fields: &NewLimitedCompanyFields) -> Result<Uuid> {
-        let limited_company_id = Uuid::new_v4();
+        let limited_company_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -522,7 +522,7 @@ impl EntityService {
     /// Create a partnership
     /// Returns partnership_id
     pub async fn create_partnership(&self, fields: &NewPartnershipFields) -> Result<Uuid> {
-        let partnership_id = Uuid::new_v4();
+        let partnership_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -619,7 +619,7 @@ impl EntityService {
     /// Create a trust
     /// Returns trust_id
     pub async fn create_trust(&self, fields: &NewTrustFields) -> Result<Uuid> {
-        let trust_id = Uuid::new_v4();
+        let trust_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -737,7 +737,7 @@ impl EntityService {
         role_name: &str,
     ) -> Result<Uuid> {
         let role_id = self.resolve_role_id(role_name).await?;
-        let cbu_entity_role_id = Uuid::new_v4();
+        let cbu_entity_role_id = Uuid::now_v7();
 
         sqlx::query(
             r#"

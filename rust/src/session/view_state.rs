@@ -1392,7 +1392,7 @@ mod tests {
     fn make_test_taxonomy() -> TaxonomyNode {
         // Create a small test taxonomy
         let mut root = TaxonomyNode::new(
-            Uuid::new_v4(),
+            Uuid::now_v7(),
             NodeType::Root,
             "Universe".to_string(),
             DimensionValues::default(),
@@ -1414,7 +1414,7 @@ mod tests {
             };
 
             let child =
-                TaxonomyNode::new(Uuid::new_v4(), NodeType::Cbu, format!("CBU {}", i), dims);
+                TaxonomyNode::new(Uuid::now_v7(), NodeType::Cbu, format!("CBU {}", i), dims);
             root.children.push(child);
         }
 
@@ -1520,7 +1520,7 @@ mod tests {
         let taxonomy = make_test_taxonomy();
         let mut view = ViewState::from_taxonomy(taxonomy, TaxonomyContext::Universe);
 
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
 
         // Remove an existing ID
         let first_id = view.selection[0];

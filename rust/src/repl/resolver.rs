@@ -550,9 +550,9 @@ mod tests {
 
     #[test]
     fn test_evaluate_single_match() {
-        let resolver = EntityArgResolver::new(Uuid::new_v4());
+        let resolver = EntityArgResolver::new(Uuid::now_v7());
         let matches = vec![EntityMatch {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             entity_name: "Test Entity".to_string(),
             matched_tag: Some("test".to_string()),
             confidence: 0.9,
@@ -566,17 +566,17 @@ mod tests {
 
     #[test]
     fn test_evaluate_high_confidence_matches() {
-        let resolver = EntityArgResolver::new(Uuid::new_v4());
+        let resolver = EntityArgResolver::new(Uuid::now_v7());
         let matches = vec![
             EntityMatch {
-                entity_id: Uuid::new_v4(),
+                entity_id: Uuid::now_v7(),
                 entity_name: "Entity A".to_string(),
                 matched_tag: Some("tag a".to_string()),
                 confidence: 0.9,
                 match_type: MatchType::Exact,
             },
             EntityMatch {
-                entity_id: Uuid::new_v4(),
+                entity_id: Uuid::now_v7(),
                 entity_name: "Entity B".to_string(),
                 matched_tag: Some("tag b".to_string()),
                 confidence: 0.8,
@@ -591,17 +591,17 @@ mod tests {
 
     #[test]
     fn test_evaluate_low_confidence_matches_ambiguous() {
-        let resolver = EntityArgResolver::new(Uuid::new_v4());
+        let resolver = EntityArgResolver::new(Uuid::now_v7());
         let matches = vec![
             EntityMatch {
-                entity_id: Uuid::new_v4(),
+                entity_id: Uuid::now_v7(),
                 entity_name: "Entity A".to_string(),
                 matched_tag: Some("manco".to_string()),
                 confidence: 0.5,
                 match_type: MatchType::Fuzzy,
             },
             EntityMatch {
-                entity_id: Uuid::new_v4(),
+                entity_id: Uuid::now_v7(),
                 entity_name: "Entity B".to_string(),
                 matched_tag: Some("manco".to_string()),
                 confidence: 0.4,
@@ -616,7 +616,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_no_matches() {
-        let resolver = EntityArgResolver::new(Uuid::new_v4());
+        let resolver = EntityArgResolver::new(Uuid::now_v7());
         let result = resolver.evaluate_matches(vec![]);
         assert_eq!(result.status, ResolutionOutcome::Failed);
     }

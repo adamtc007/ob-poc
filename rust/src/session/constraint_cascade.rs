@@ -347,14 +347,14 @@ mod tests {
 
     fn make_client() -> ClientRef {
         ClientRef {
-            client_id: Uuid::new_v4(),
+            client_id: Uuid::now_v7(),
             display_name: "Allianz".to_string(),
         }
     }
 
     fn make_structure(structure_type: StructureType) -> StructureRef {
         StructureRef {
-            structure_id: Uuid::new_v4(),
+            structure_id: Uuid::now_v7(),
             display_name: "Test Fund".to_string(),
             structure_type,
         }
@@ -362,7 +362,7 @@ mod tests {
 
     fn make_case() -> CaseRef {
         CaseRef {
-            case_id: Uuid::new_v4(),
+            case_id: Uuid::now_v7(),
             display_name: "KYC-2024-001".to_string(),
         }
     }

@@ -25,7 +25,7 @@ async fn setup_pool() -> PgPool {
 
 /// Test helper to create a test CBU with unique name
 async fn create_test_cbu(pool: &PgPool, name: &str, jurisdiction: &str, client_type: &str) -> Uuid {
-    let unique_name = format!("{} - {}", name, Uuid::new_v4());
+    let unique_name = format!("{} - {}", name, Uuid::now_v7());
     sqlx::query_scalar!(
         r#"
         INSERT INTO "ob-poc".cbus (name, jurisdiction, client_type)
@@ -330,7 +330,7 @@ async fn test_doc_request_creation() {
     .await
     .expect("Failed to get entity type");
 
-    let entity_name = format!("Test Person - {}", Uuid::new_v4());
+    let entity_name = format!("Test Person - {}", Uuid::now_v7());
     let entity_id = sqlx::query_scalar!(
         r#"INSERT INTO "ob-poc".entities (name, entity_type_id)
            VALUES ($1, $2)
@@ -415,7 +415,7 @@ async fn test_doc_request_status_transitions() {
     .await
     .expect("Failed to get entity type");
 
-    let entity_name = format!("Status Test Person - {}", Uuid::new_v4());
+    let entity_name = format!("Status Test Person - {}", Uuid::now_v7());
     let entity_id = sqlx::query_scalar!(
         r#"INSERT INTO "ob-poc".entities (name, entity_type_id)
            VALUES ($1, $2)
@@ -522,7 +522,7 @@ async fn test_rfi_completion_check() {
     .await
     .expect("Failed to get entity type");
 
-    let entity_name = format!("Completion Test Person - {}", Uuid::new_v4());
+    let entity_name = format!("Completion Test Person - {}", Uuid::now_v7());
     let entity_id = sqlx::query_scalar!(
         r#"INSERT INTO "ob-poc".entities (name, entity_type_id)
            VALUES ($1, $2)

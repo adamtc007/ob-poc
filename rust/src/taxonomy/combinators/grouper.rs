@@ -240,19 +240,19 @@ mod tests {
                 let mut dims = DimensionValues::default();
                 dims.set("jurisdiction", "LU");
                 dims.set("entity_type", "FUND");
-                SourceItem::new(Uuid::new_v4(), "Fund A", dims)
+                SourceItem::new(Uuid::now_v7(), "Fund A", dims)
             },
             {
                 let mut dims = DimensionValues::default();
                 dims.set("jurisdiction", "LU");
                 dims.set("entity_type", "FUND");
-                SourceItem::new(Uuid::new_v4(), "Fund B", dims)
+                SourceItem::new(Uuid::now_v7(), "Fund B", dims)
             },
             {
                 let mut dims = DimensionValues::default();
                 dims.set("jurisdiction", "IE");
                 dims.set("entity_type", "CORPORATE");
-                SourceItem::new(Uuid::new_v4(), "Corp C", dims)
+                SourceItem::new(Uuid::now_v7(), "Corp C", dims)
             },
         ]
     }

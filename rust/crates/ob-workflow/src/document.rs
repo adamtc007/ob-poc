@@ -442,7 +442,7 @@ mod tests {
     #[test]
     fn test_document_requirement_can_retry() {
         let mut req = DocumentRequirement {
-            requirement_id: Uuid::new_v4(),
+            requirement_id: Uuid::now_v7(),
             workflow_instance_id: None,
             subject_entity_id: None,
             subject_cbu_id: None,

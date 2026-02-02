@@ -666,7 +666,7 @@ impl GenericCrudExecutor {
             .as_deref()
             .unwrap_or_else(|| self.infer_pk_column(&crud.table));
 
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
         columns.push(format!("\"{}\"", pk_col));
         placeholders.push("$1".to_string());
         bind_values.push(SqlValue::Uuid(new_id));
@@ -1099,7 +1099,7 @@ impl GenericCrudExecutor {
         let mut bind_values: Vec<SqlValue> = Vec::new();
 
         // Generate UUID for PK
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
         columns.push(format!("\"{}\"", pk_col));
         placeholders.push("$1".to_string());
         bind_values.push(SqlValue::Uuid(new_id));
@@ -1281,7 +1281,7 @@ impl GenericCrudExecutor {
             .ok_or_else(|| anyhow!("Link requires to_col"))?;
 
         let pk_col = self.infer_pk_column(junction);
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
 
         let mut columns = vec![
             format!("\"{}\"", pk_col),
@@ -1461,7 +1461,7 @@ impl GenericCrudExecutor {
 
         // Build insert
         let pk_col = self.infer_pk_column(junction);
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
 
         let mut columns = vec![
             format!("\"{}\"", pk_col),
@@ -1868,7 +1868,7 @@ impl GenericCrudExecutor {
         };
 
         // Generate entity_id
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
 
         // Get entity name - for proper_persons, constructed from first/last name
         let entity_name = if type_code == "PROPER_PERSON" {
@@ -1934,7 +1934,7 @@ impl GenericCrudExecutor {
             )
         } else {
             // Separate PK pattern: table has its own PK plus entity_id FK
-            let ext_pk_id = Uuid::new_v4();
+            let ext_pk_id = Uuid::now_v7();
             (
                 vec![format!("\"{}\"", ext_pk_col), "\"entity_id\"".to_string()],
                 vec!["$1".to_string(), "$2".to_string()],
@@ -2101,7 +2101,7 @@ impl GenericCrudExecutor {
             (
                 vec![format!("\"{}\"", ext_pk_col), "\"entity_id\"".to_string()],
                 vec!["$1".to_string(), "$2".to_string()],
-                vec![SqlValue::Uuid(Uuid::new_v4()), SqlValue::Uuid(entity_id)],
+                vec![SqlValue::Uuid(Uuid::now_v7()), SqlValue::Uuid(entity_id)],
                 3,
             )
         };
@@ -2215,7 +2215,7 @@ impl GenericCrudExecutor {
             .as_deref()
             .unwrap_or_else(|| self.infer_pk_column(&crud.table));
 
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
         columns.push(format!("\"{}\"", pk_col));
         placeholders.push("$1".to_string());
         bind_values.push(SqlValue::Uuid(new_id));
@@ -2536,7 +2536,7 @@ impl GenericCrudExecutor {
         let mut updates = Vec::new();
         let mut bind_values: Vec<SqlValue> = Vec::new();
 
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
         columns.push(format!("\"{}\"", pk_col));
         placeholders.push("$1".to_string());
         bind_values.push(SqlValue::Uuid(new_id));
@@ -2692,7 +2692,7 @@ impl GenericCrudExecutor {
             .ok_or_else(|| anyhow!("Link requires to_col"))?;
 
         let pk_col = self.infer_pk_column(junction);
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
 
         let mut columns = vec![
             format!("\"{}\"", pk_col),
@@ -2857,7 +2857,7 @@ impl GenericCrudExecutor {
         let role_id = self.resolve_lookup(role_arg, role_code).await?;
 
         let pk_col = self.infer_pk_column(junction);
-        let new_id = Uuid::new_v4();
+        let new_id = Uuid::now_v7();
 
         let mut columns = vec![
             format!("\"{}\"", pk_col),
@@ -3086,7 +3086,7 @@ impl GenericCrudExecutor {
             }
         };
 
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
 
         let entity_name = if type_code == "PROPER_PERSON" {
             let first = args
@@ -3147,7 +3147,7 @@ impl GenericCrudExecutor {
                 2,
             )
         } else {
-            let ext_pk_id = Uuid::new_v4();
+            let ext_pk_id = Uuid::now_v7();
             (
                 vec![format!("\"{}\"", ext_pk_col), "\"entity_id\"".to_string()],
                 vec!["$1".to_string(), "$2".to_string()],
@@ -3294,7 +3294,7 @@ impl GenericCrudExecutor {
             (
                 vec![format!("\"{}\"", ext_pk_col), "\"entity_id\"".to_string()],
                 vec!["$1".to_string(), "$2".to_string()],
-                vec![SqlValue::Uuid(Uuid::new_v4()), SqlValue::Uuid(entity_id)],
+                vec![SqlValue::Uuid(Uuid::now_v7()), SqlValue::Uuid(entity_id)],
                 3,
             )
         };

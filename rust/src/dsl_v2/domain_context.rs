@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn test_for_cbu() {
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let ctx = DomainContext::for_cbu(cbu_id, Some("Test Fund".to_string()));
 
         assert_eq!(ctx.active_domain, ActiveDomain::Cbu);
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_push_pop_domain() {
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let mut ctx = DomainContext::for_cbu(cbu_id, None);
 
         // Push KYC case
@@ -465,7 +465,7 @@ mod tests {
 
     #[test]
     fn test_with_domain_auto_pop() {
-        let mut ctx = DomainContext::for_cbu(Uuid::new_v4(), None);
+        let mut ctx = DomainContext::for_cbu(Uuid::now_v7(), None);
 
         let result = ctx.with_domain(ActiveDomain::KycCase, "scoped", |inner| {
             assert_eq!(inner.active_domain, ActiveDomain::KycCase);
@@ -480,11 +480,11 @@ mod tests {
 
     #[test]
     fn test_child_for_iteration() {
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let mut parent = DomainContext::for_cbu(cbu_id, Some("Parent Fund".to_string()));
-        parent.set_active_case(Uuid::new_v4());
+        parent.set_active_case(Uuid::now_v7());
 
-        let source_entity = Uuid::new_v4();
+        let source_entity = Uuid::now_v7();
         let child = parent.child_for_iteration(
             0,
             "fund:Child Fund",
@@ -517,7 +517,7 @@ mod tests {
 
         assert!(!ctx.in_batch_iteration());
 
-        ctx.enter_iteration(5, "test:item", Uuid::new_v4(), "entity", None);
+        ctx.enter_iteration(5, "test:item", Uuid::now_v7(), "entity", None);
 
         assert!(ctx.in_batch_iteration());
         let (idx, key) = ctx.iteration_info().unwrap();
@@ -530,8 +530,8 @@ mod tests {
 
     #[test]
     fn test_set_active_case_pushes_domain() {
-        let mut ctx = DomainContext::for_cbu(Uuid::new_v4(), None);
-        let case_id = Uuid::new_v4();
+        let mut ctx = DomainContext::for_cbu(Uuid::now_v7(), None);
+        let case_id = Uuid::now_v7();
 
         ctx.set_active_case(case_id);
 
@@ -557,7 +557,7 @@ mod tests {
         let mut ctx = DomainContext::new();
         assert_eq!(ctx.active_domain, ActiveDomain::None);
 
-        ctx.set_active_cbu(Uuid::new_v4(), Some("Test".to_string()));
+        ctx.set_active_cbu(Uuid::now_v7(), Some("Test".to_string()));
         assert_eq!(ctx.active_domain, ActiveDomain::Cbu);
     }
 
@@ -566,7 +566,7 @@ mod tests {
         let mut ctx = DomainContext::new();
         ctx.push_domain(ActiveDomain::KycCase, "test");
 
-        ctx.set_active_cbu(Uuid::new_v4(), Some("Test".to_string()));
+        ctx.set_active_cbu(Uuid::now_v7(), Some("Test".to_string()));
         // Should NOT change domain since it's not None
         assert_eq!(ctx.active_domain, ActiveDomain::KycCase);
     }

@@ -222,7 +222,7 @@ pub async fn create_draft(
 
     let doc_json = serde_json::to_value(&doc)?;
     let hash = compute_document_hash(&doc);
-    let profile_id = Uuid::new_v4();
+    let profile_id = Uuid::now_v7();
 
     sqlx::query!(
         r#"
@@ -285,7 +285,7 @@ pub async fn clone_to_draft(
 
     let doc_json = serde_json::to_value(&doc)?;
     let hash = compute_document_hash(&doc);
-    let profile_id = Uuid::new_v4();
+    let profile_id = Uuid::now_v7();
 
     sqlx::query!(
         r#"

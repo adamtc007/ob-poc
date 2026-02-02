@@ -20,7 +20,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: session
+          scope: cbu
           noun: entity_scope
           tags: [scope, resolution, search]
         produces:
@@ -70,7 +70,7 @@ domains:
         metadata:
           tier: diagnostics
           source_of_truth: operational
-          scope: session
+          scope: cbu
           noun: entity_scope
           tags: [scope, resolution, preview]
         args:
@@ -109,7 +109,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: session
+          scope: cbu
           noun: entity_scope
           tags: [scope, resolution, filter]
         produces:
@@ -156,7 +156,7 @@ domains:
         metadata:
           tier: intent
           source_of_truth: operational
-          scope: session
+          scope: cbu
           noun: entity_scope
           tags: [scope, resolution, combine]
         produces:

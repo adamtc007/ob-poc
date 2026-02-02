@@ -37,7 +37,7 @@ mod tests {
 
     /// Generate a unique session ID for each test
     fn test_session_id() -> String {
-        format!("test-{}", Uuid::new_v4())
+        format!("test-{}", Uuid::now_v7())
     }
 
     // =========================================================================

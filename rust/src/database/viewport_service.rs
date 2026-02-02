@@ -650,11 +650,11 @@ mod tests {
     #[test]
     fn test_entity_member_confidence_zones() {
         let member = CbuEntityMember {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             entity_name: "Test".to_string(),
             entity_type: "Company".to_string(),
             entity_type_code: Some("limited_company".to_string()),
-            role_id: Uuid::new_v4(),
+            role_id: Uuid::now_v7(),
             role_name: "Director".to_string(),
             jurisdiction: Some("US".to_string()),
             confidence: 0.98,
@@ -688,7 +688,7 @@ mod tests {
     #[test]
     fn test_cbu_container_creation() {
         let container = CbuViewportContainer {
-            cbu_id: Uuid::new_v4(),
+            cbu_id: Uuid::now_v7(),
             name: "Luxembourg Growth Fund".to_string(),
             jurisdiction: Some("LU".to_string()),
             client_type: Some("FUND".to_string()),
@@ -745,8 +745,8 @@ mod tests {
     #[test]
     fn test_matrix_summary() {
         let summary = InstrumentMatrixSummary {
-            profile_id: Uuid::new_v4(),
-            cbu_id: Uuid::new_v4(),
+            profile_id: Uuid::now_v7(),
+            cbu_id: Uuid::now_v7(),
             version: 3,
             status: "ACTIVE".to_string(),
             instrument_type_count: 5,
@@ -762,7 +762,7 @@ mod tests {
     #[test]
     fn test_entity_detail_company() {
         let detail = EntityViewportDetail {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             name: "Acme Corp".to_string(),
             entity_type: "LIMITED_COMPANY".to_string(),
             type_code: Some("limited_company".to_string()),
@@ -784,7 +784,7 @@ mod tests {
     #[test]
     fn test_entity_detail_person() {
         let detail = EntityViewportDetail {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             name: "John Smith".to_string(),
             entity_type: "PROPER_PERSON".to_string(),
             type_code: Some("proper_person".to_string()),

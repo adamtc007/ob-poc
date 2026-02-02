@@ -36,7 +36,7 @@ mod materialize_tests {
                 .unwrap_or_else(|_| "postgresql:///data_designer".into());
 
             let pool = PgPool::connect(&url).await?;
-            let prefix = format!("tmm_{}", &Uuid::new_v4().to_string()[..8]);
+            let prefix = format!("tmm_{}", &Uuid::now_v7().to_string()[..8]);
             Ok(Self {
                 pool,
                 prefix,
@@ -82,7 +82,7 @@ mod materialize_tests {
             document: serde_json::Value,
         ) -> Result<Uuid> {
             let cbu_id = self.ensure_cbu().await?;
-            let profile_id = Uuid::new_v4();
+            let profile_id = Uuid::now_v7();
 
             // Compute a simple hash for the document
             let doc_str = serde_json::to_string(&document)?;

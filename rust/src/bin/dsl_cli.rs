@@ -2120,7 +2120,7 @@ async fn cmd_repl(
         (
             ob_poc::database::CbuDslState {
                 cbu_id: Uuid::nil(),
-                session_id: Uuid::new_v4(),
+                session_id: Uuid::now_v7(),
                 executed_dsl: String::new(),
                 bindings: std::collections::HashMap::new(),
                 snapshot_count: 0,

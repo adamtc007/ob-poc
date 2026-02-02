@@ -2576,7 +2576,7 @@ mod tests {
 
     #[test]
     fn uuid_as_string() {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let summary = CbuSummary::new(id, "Test Fund".into(), Some("LU".into()), None, None);
 
         let json = serde_json::to_string(&summary).unwrap();
@@ -2703,7 +2703,7 @@ mod tests {
 
     #[test]
     fn resolved_key_from_uuid() {
-        let uuid = Uuid::new_v4();
+        let uuid = Uuid::now_v7();
         let key: ResolvedKey = uuid.into();
         assert!(key.is_uuid());
         assert_eq!(key.as_uuid(), Some(uuid));

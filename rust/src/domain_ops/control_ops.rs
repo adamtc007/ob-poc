@@ -1826,7 +1826,7 @@ impl CustomOperation for SetBoardControllerOp {
         .await; // Ignore if table doesn't exist
 
         // Insert new override
-        let override_id = Uuid::new_v4();
+        let override_id = Uuid::now_v7();
         let _ = sqlx::query(
             r#"
             INSERT INTO "ob-poc".board_controller_overrides

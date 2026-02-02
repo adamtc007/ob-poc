@@ -78,7 +78,7 @@ impl TaxonomyFrame {
     /// Create a new root frame
     pub fn root(tree: TaxonomyNode) -> Self {
         Self {
-            frame_id: Uuid::new_v4(),
+            frame_id: Uuid::now_v7(),
             focus_node_id: None,
             label: tree.label.clone(),
             short_label: tree.short_label.clone(),
@@ -100,7 +100,7 @@ impl TaxonomyFrame {
         parser: Option<Arc<dyn TaxonomyParser + Send + Sync>>,
     ) -> Self {
         Self {
-            frame_id: Uuid::new_v4(),
+            frame_id: Uuid::now_v7(),
             focus_node_id: Some(focus_node_id),
             label: label.into(),
             short_label: None,
@@ -117,7 +117,7 @@ impl TaxonomyFrame {
     /// Create a loading placeholder frame
     pub fn loading(focus_node_id: Uuid, label: impl Into<String>) -> Self {
         Self {
-            frame_id: Uuid::new_v4(),
+            frame_id: Uuid::now_v7(),
             focus_node_id: Some(focus_node_id),
             label: label.into(),
             short_label: None,
@@ -449,7 +449,7 @@ mod tests {
         let mut root = TaxonomyNode::root("Universe");
         for i in 0..3 {
             let child = TaxonomyNode::new(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 crate::taxonomy::types::NodeType::Cbu,
                 format!("CBU {}", i),
                 DimensionValues::default(),
@@ -478,7 +478,7 @@ mod tests {
 
         // Zoom in
         let child_tree = TaxonomyNode::root("Child Level");
-        let frame = TaxonomyFrame::from_zoom(Uuid::new_v4(), "Level 2", child_tree, None);
+        let frame = TaxonomyFrame::from_zoom(Uuid::now_v7(), "Level 2", child_tree, None);
         stack.push(frame).unwrap();
 
         assert_eq!(stack.depth(), 2);
@@ -499,7 +499,7 @@ mod tests {
 
         stack
             .push(TaxonomyFrame::from_zoom(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 "CBU Alpha",
                 TaxonomyNode::root("Alpha"),
                 None,
@@ -508,7 +508,7 @@ mod tests {
 
         stack
             .push(TaxonomyFrame::from_zoom(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 "Trading Matrix",
                 TaxonomyNode::root("Trading"),
                 None,
@@ -528,7 +528,7 @@ mod tests {
         for i in 1..=3 {
             stack
                 .push(TaxonomyFrame::from_zoom(
-                    Uuid::new_v4(),
+                    Uuid::now_v7(),
                     format!("Level {}", i),
                     TaxonomyNode::root(format!("L{}", i)),
                     None,
@@ -549,7 +549,7 @@ mod tests {
         let tree = make_test_tree();
         let mut stack = TaxonomyStack::with_root(tree);
 
-        let node_id = Uuid::new_v4();
+        let node_id = Uuid::now_v7();
         stack.select(node_id);
         assert!(stack.selection().contains(&node_id));
 
@@ -571,7 +571,7 @@ mod tests {
         // Can push 2 more (already have 1)
         stack
             .push(TaxonomyFrame::from_zoom(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 "L1",
                 TaxonomyNode::root("L1"),
                 None,
@@ -579,7 +579,7 @@ mod tests {
             .unwrap();
         stack
             .push(TaxonomyFrame::from_zoom(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 "L2",
                 TaxonomyNode::root("L2"),
                 None,
@@ -588,7 +588,7 @@ mod tests {
 
         // Should fail
         let result = stack.push(TaxonomyFrame::from_zoom(
-            Uuid::new_v4(),
+            Uuid::now_v7(),
             "L3",
             TaxonomyNode::root("L3"),
             None,

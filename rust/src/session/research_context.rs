@@ -161,7 +161,7 @@ mod tests {
 
     fn create_test_result() -> ResearchResult {
         ResearchResult {
-            result_id: Uuid::new_v4(),
+            result_id: Uuid::now_v7(),
             macro_name: "client-discovery".to_string(),
             params: serde_json::json!({"client_name": "Test Corp"}),
             data: serde_json::json!({"apex": {"name": "Test Corp"}}),

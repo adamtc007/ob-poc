@@ -2074,7 +2074,7 @@ mod tests {
             refinement_count: 2,
             has_pending: false,
             metaphor: "Galaxy".to_string(),
-            selection_ids: vec![Uuid::new_v4()],
+            selection_ids: vec![Uuid::now_v7()],
         };
 
         let json = serde_json::to_string(&result).unwrap();

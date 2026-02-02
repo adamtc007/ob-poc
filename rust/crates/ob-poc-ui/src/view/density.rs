@@ -384,8 +384,8 @@ mod tests {
     #[test]
     fn test_visible_entities_count() {
         let mut visible = VisibleEntities::new();
-        visible.cbus = vec![Uuid::new_v4(), Uuid::new_v4()];
-        visible.persons = vec![Uuid::new_v4()];
+        visible.cbus = vec![Uuid::now_v7(), Uuid::now_v7()];
+        visible.persons = vec![Uuid::now_v7()];
         visible.total_count = 3;
 
         assert_eq!(visible.cbu_count(), 2);
@@ -400,7 +400,7 @@ mod tests {
 
         // Many CBUs -> overview
         let mut visible = VisibleEntities::new();
-        visible.cbus = (0..25).map(|_| Uuid::new_v4()).collect();
+        visible.cbus = (0..25).map(|_| Uuid::now_v7()).collect();
         visible.total_count = 25;
 
         let matched = evaluate_density_rules(&visible, &rules);
@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(matched.unwrap().mode, ViewMode::AstroOverview);
 
         // Single CBU -> pyramid
-        visible.cbus = vec![Uuid::new_v4()];
+        visible.cbus = vec![Uuid::now_v7()];
         visible.total_count = 1;
 
         let matched = evaluate_density_rules(&visible, &rules);

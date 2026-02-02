@@ -1333,7 +1333,7 @@ impl ToolHandlers {
 
             match feedback_svc
                 .capture_match(
-                    session_id.unwrap_or_else(uuid::Uuid::new_v4),
+                    session_id.unwrap_or_else(uuid::Uuid::now_v7),
                     instruction,
                     ob_semantic_matcher::feedback::InputSource::Command,
                     match_result.as_ref(),

@@ -186,11 +186,11 @@ mod entity_member_tests {
     #[test]
     fn test_entity_member_zone_classification() {
         let high_confidence = CbuEntityMember {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             entity_name: "High Confidence Entity".to_string(),
             entity_type: "LIMITED_COMPANY".to_string(),
             entity_type_code: Some("limited_company".to_string()),
-            role_id: Uuid::new_v4(),
+            role_id: Uuid::now_v7(),
             role_name: "DIRECTOR".to_string(),
             jurisdiction: Some("LU".to_string()),
             confidence: 0.98,
@@ -206,11 +206,11 @@ mod entity_member_tests {
     #[test]
     fn test_entity_member_low_confidence() {
         let low_confidence = CbuEntityMember {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             entity_name: "Speculative Entity".to_string(),
             entity_type: "PROPER_PERSON".to_string(),
             entity_type_code: Some("proper_person".to_string()),
-            role_id: Uuid::new_v4(),
+            role_id: Uuid::now_v7(),
             role_name: "UBO".to_string(),
             jurisdiction: None,
             confidence: 0.25,
@@ -236,7 +236,7 @@ mod entity_detail_tests {
     #[test]
     fn test_company_detail() {
         let detail = EntityViewportDetail {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             name: "Acme Corp".to_string(),
             entity_type: "LIMITED_COMPANY".to_string(),
             type_code: Some("limited_company".to_string()),
@@ -258,7 +258,7 @@ mod entity_detail_tests {
     #[test]
     fn test_person_detail() {
         let detail = EntityViewportDetail {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             name: "John Smith".to_string(),
             entity_type: "PROPER_PERSON".to_string(),
             type_code: Some("proper_person".to_string()),
@@ -291,10 +291,10 @@ mod entity_relationship_tests {
     #[test]
     fn test_ownership_relationship() {
         let rel = EntityRelationship {
-            relationship_id: Uuid::new_v4(),
-            from_entity_id: Uuid::new_v4(),
+            relationship_id: Uuid::now_v7(),
+            from_entity_id: Uuid::now_v7(),
             from_name: "Parent Corp".to_string(),
-            to_entity_id: Uuid::new_v4(),
+            to_entity_id: Uuid::now_v7(),
             to_name: "Subsidiary Ltd".to_string(),
             relationship_type: "ownership".to_string(),
             percentage: Some(Decimal::new(7500, 2)), // 75.00%
@@ -308,10 +308,10 @@ mod entity_relationship_tests {
     #[test]
     fn test_control_relationship_no_percentage() {
         let rel = EntityRelationship {
-            relationship_id: Uuid::new_v4(),
-            from_entity_id: Uuid::new_v4(),
+            relationship_id: Uuid::now_v7(),
+            from_entity_id: Uuid::now_v7(),
             from_name: "Director".to_string(),
-            to_entity_id: Uuid::new_v4(),
+            to_entity_id: Uuid::now_v7(),
             to_name: "Company".to_string(),
             relationship_type: "control".to_string(),
             percentage: None,
@@ -334,7 +334,7 @@ mod cbu_container_tests {
     #[test]
     fn test_cbu_container_minimal() {
         let container = CbuViewportContainer {
-            cbu_id: Uuid::new_v4(),
+            cbu_id: Uuid::now_v7(),
             name: "Test Fund".to_string(),
             jurisdiction: None,
             client_type: None,
@@ -349,7 +349,7 @@ mod cbu_container_tests {
     #[test]
     fn test_cbu_container_full() {
         let container = CbuViewportContainer {
-            cbu_id: Uuid::new_v4(),
+            cbu_id: Uuid::now_v7(),
             name: "Luxembourg Growth Fund".to_string(),
             jurisdiction: Some("LU".to_string()),
             client_type: Some("FUND".to_string()),
@@ -375,8 +375,8 @@ mod matrix_summary_tests {
     #[test]
     fn test_matrix_summary_active() {
         let summary = InstrumentMatrixSummary {
-            profile_id: Uuid::new_v4(),
-            cbu_id: Uuid::new_v4(),
+            profile_id: Uuid::now_v7(),
+            cbu_id: Uuid::now_v7(),
             version: 3,
             status: "ACTIVE".to_string(),
             instrument_type_count: 5,
@@ -394,8 +394,8 @@ mod matrix_summary_tests {
     #[test]
     fn test_matrix_summary_draft() {
         let summary = InstrumentMatrixSummary {
-            profile_id: Uuid::new_v4(),
-            cbu_id: Uuid::new_v4(),
+            profile_id: Uuid::now_v7(),
+            cbu_id: Uuid::now_v7(),
             version: 1,
             status: "DRAFT".to_string(),
             instrument_type_count: 0,

@@ -422,7 +422,7 @@ body: |
         let mut params = HashMap::new();
         params.insert("name".to_string(), "Alice".to_string());
 
-        let context = ExpansionContext::with_cbu(Uuid::new_v4());
+        let context = ExpansionContext::with_cbu(Uuid::now_v7());
 
         let result = TemplateExpander::expand(&template, &params, &context);
 
@@ -451,7 +451,7 @@ body: |
         let mut params = HashMap::new();
         params.insert("name".to_string(), "Bob".to_string());
 
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let context = ExpansionContext::with_cbu(cbu_id);
 
         let result = TemplateExpander::expand(&template, &params, &context);

@@ -31,7 +31,7 @@ impl ServiceResourcePipelineService {
 
     /// Create a new service intent
     pub async fn create_service_intent(&self, input: &NewServiceIntent) -> Result<Uuid> {
-        let intent_id = Uuid::new_v4();
+        let intent_id = Uuid::now_v7();
         let options = input.options.clone().unwrap_or(json!({}));
 
         sqlx::query(
@@ -119,7 +119,7 @@ impl ServiceResourcePipelineService {
 
     /// Record a discovery reason
     pub async fn record_discovery(&self, input: &NewSrdefDiscovery) -> Result<Uuid> {
-        let discovery_id = Uuid::new_v4();
+        let discovery_id = Uuid::now_v7();
         let triggered_by = json!(input.triggered_by_intents);
         let parameters = input.parameters.clone().unwrap_or(json!({}));
 
@@ -348,7 +348,7 @@ impl ServiceResourcePipelineService {
         &self,
         input: &NewProvisioningRequest,
     ) -> Result<Uuid> {
-        let request_id = Uuid::new_v4();
+        let request_id = Uuid::now_v7();
         let payload = serde_json::to_value(&input.request_payload)?;
 
         sqlx::query(
@@ -453,7 +453,7 @@ impl ServiceResourcePipelineService {
         payload: &JsonValue,
         content_hash: Option<&str>,
     ) -> Result<Uuid> {
-        let event_id = Uuid::new_v4();
+        let event_id = Uuid::now_v7();
 
         sqlx::query(
             r#"

@@ -194,7 +194,7 @@ impl StagedRunbook {
     pub fn new(session_id: String, client_group_id: Option<Uuid>, persona: Option<String>) -> Self {
         let now = chrono::Utc::now();
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             session_id,
             client_group_id,
             persona,
@@ -304,7 +304,7 @@ impl StagedCommand {
     /// Create a new command with parse failed status
     pub fn parse_failed(source_order: i32, dsl_raw: String, error: String) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             source_order,
             dag_order: None,
             dsl_raw,
@@ -329,7 +329,7 @@ impl StagedCommand {
         source_prompt: Option<String>,
     ) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             source_order,
             dag_order: None,
             dsl_raw,

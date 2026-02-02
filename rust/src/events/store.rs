@@ -188,7 +188,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store = EventStore::new(dir.path().join("events.jsonl"));
 
-        let event = DslEvent::succeeded(Some(Uuid::new_v4()), "test.verb".to_string(), 100);
+        let event = DslEvent::succeeded(Some(Uuid::now_v7()), "test.verb".to_string(), 100);
 
         store.append(&event).await.unwrap();
         store.flush().await.unwrap();
@@ -242,7 +242,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store = EventStore::new(dir.path().join("events.jsonl"));
 
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         store
             .append(&DslEvent::session_started(session_id, SessionSource::Repl))

@@ -701,7 +701,7 @@ pub struct ServerRunSheet {
 impl ServerRunSheet {
     /// Add a new draft entry
     pub fn add_draft(&mut self, dsl_source: String, ast: Vec<Statement>) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.entries.push(ServerRunSheetEntry {
             id,
             dsl_source,
@@ -1037,7 +1037,7 @@ impl AgentSession {
     ) -> Self {
         let now = Utc::now();
         Self {
-            id: entity_id.unwrap_or_else(Uuid::new_v4),
+            id: entity_id.unwrap_or_else(Uuid::now_v7),
             user_id: user_id.unwrap_or(Uuid::nil()),
             entity_type: entity_type.to_string(),
             entity_id,
@@ -1077,7 +1077,7 @@ impl AgentSession {
         let inherited_symbols = parent.context.bindings.clone();
 
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             user_id: parent.user_id,
             entity_type: parent.entity_type.clone(),
             entity_id: parent.entity_id,
@@ -1338,7 +1338,7 @@ impl AgentSession {
 
     /// Add a user message to the session
     pub fn add_user_message(&mut self, content: String) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.messages.push(ChatMessage {
             id,
             role: MessageRole::User,
@@ -1358,7 +1358,7 @@ impl AgentSession {
         intents: Option<Vec<VerbIntent>>,
         dsl: Option<String>,
     ) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.messages.push(ChatMessage {
             id,
             role: MessageRole::Agent,
@@ -3295,7 +3295,7 @@ mod tests {
         assert_eq!(session.state, SessionState::Executing);
 
         // Mark entry as executed via run_sheet (new approach)
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         session
             .run_sheet
             .mark_executed(entry_id, vec![cbu_id], HashMap::new());
@@ -3320,8 +3320,8 @@ mod tests {
     #[test]
     fn test_context_resolve_ref() {
         let mut ctx = SessionContext::default();
-        let cbu_id = Uuid::new_v4();
-        let entity_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
+        let entity_id = Uuid::now_v7();
 
         ctx.last_cbu_id = Some(cbu_id);
         ctx.last_entity_id = Some(entity_id);
@@ -3340,7 +3340,7 @@ mod tests {
     #[test]
     fn test_context_named_refs() {
         let mut ctx = SessionContext::default();
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
 
         ctx.set_named_ref("my_entity", id);
         assert_eq!(ctx.resolve_ref("@my_entity"), Some(format!("\"{}\"", id)));

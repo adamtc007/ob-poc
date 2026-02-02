@@ -216,7 +216,7 @@ impl<'a> ProvisioningOrchestrator<'a> {
             .unwrap_or_else(|| "UNKNOWN".to_string());
 
         // Create the instance first (in PENDING state)
-        let instance_id = Uuid::new_v4();
+        let instance_id = Uuid::now_v7();
         let instance_url = format!("urn:ob-poc:instance:{}", instance_id);
 
         sqlx::query(
@@ -577,7 +577,7 @@ impl ResourceProvisioner for StubProvisioner {
         srdef_id: &str,
         _attrs: &HashMap<String, JsonValue>,
     ) -> Result<ProvisionResult> {
-        let fake_key = format!("FAKE-{}", Uuid::new_v4().to_string()[..8].to_uppercase());
+        let fake_key = format!("FAKE-{}", Uuid::now_v7().to_string()[..8].to_uppercase());
         let parts: Vec<&str> = srdef_id.split("::").collect();
         let (app, kind) = if parts.len() >= 3 {
             (parts[1], parts[2])

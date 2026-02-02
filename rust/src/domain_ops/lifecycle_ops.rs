@@ -215,7 +215,7 @@ impl CustomOperation for LifecycleProvisionOp {
             .map(|s| s.to_string());
 
         // Idempotent upsert
-        let instance_id = uuid::Uuid::new_v4();
+        let instance_id = uuid::Uuid::now_v7();
 
         let row: (Uuid,) = sqlx::query_as(
             r#"WITH ins AS (
@@ -270,7 +270,7 @@ impl CustomOperation for LifecycleProvisionOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 

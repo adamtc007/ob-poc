@@ -202,7 +202,7 @@ impl Checkpoint {
         target_entity_id: Option<Uuid>,
     ) -> Self {
         Self {
-            checkpoint_id: Uuid::new_v4(),
+            checkpoint_id: Uuid::now_v7(),
             checkpoint_type: CheckpointType::AmbiguousMatch,
             context: CheckpointContext {
                 search_query,
@@ -223,7 +223,7 @@ impl Checkpoint {
         target_entity_id: Uuid,
     ) -> Self {
         Self {
-            checkpoint_id: Uuid::new_v4(),
+            checkpoint_id: Uuid::now_v7(),
             checkpoint_type: CheckpointType::ScreeningHit,
             context: CheckpointContext {
                 search_query: entity_name,
@@ -309,7 +309,7 @@ impl AgentState {
     /// Create a new agent state for a task
     pub fn new(task: AgentTask) -> Self {
         Self {
-            agent_session_id: Uuid::new_v4(),
+            agent_session_id: Uuid::now_v7(),
             task: Some(task),
             status: AgentStatus::Running,
             target_entity_id: None,
@@ -490,7 +490,7 @@ mod tests {
 
     #[test]
     fn test_agent_state_lifecycle() {
-        let mut state = AgentState::resolve_gaps(Uuid::new_v4());
+        let mut state = AgentState::resolve_gaps(Uuid::now_v7());
 
         // Running
         assert_eq!(state.status, AgentStatus::Running);
@@ -540,10 +540,10 @@ mod tests {
     fn test_record_decision_action() {
         let mut state = AgentState::new(AgentTask::EnrichEntity);
 
-        state.record_decision(Uuid::new_v4(), "AUTO_SELECTED", "gleif");
+        state.record_decision(Uuid::now_v7(), "AUTO_SELECTED", "gleif");
         assert_eq!(state.decisions.len(), 1);
 
-        state.record_action(Uuid::new_v4(), "gleif:enrich", true);
+        state.record_action(Uuid::now_v7(), "gleif:enrich", true);
         assert_eq!(state.actions.len(), 1);
     }
 }

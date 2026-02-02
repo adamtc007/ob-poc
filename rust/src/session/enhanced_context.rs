@@ -374,7 +374,7 @@ mod tests {
             binding_type: "cbu".to_string(),
             subtype: None,
             display_name: Some("Apex Fund".to_string()),
-            uuid: Some(Uuid::new_v4()),
+            uuid: Some(Uuid::now_v7()),
         };
 
         let serializable = SerializableBinding::from(&binding);
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn test_prompt_section_with_bindings() {
         let mut bindings = HashMap::new();
-        bindings.insert("fund".to_string(), Uuid::new_v4());
+        bindings.insert("fund".to_string(), Uuid::now_v7());
 
         let base = AgentContextBuilder::new()
             .with_bindings_map(&bindings)

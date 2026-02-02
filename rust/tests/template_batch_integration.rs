@@ -31,7 +31,7 @@ mod template_batch_tests {
                 .unwrap_or_else(|_| "postgresql:///data_designer".into());
 
             let pool = PgPool::connect(&url).await?;
-            let prefix = format!("batch_test_{}", &Uuid::new_v4().to_string()[..8]);
+            let prefix = format!("batch_test_{}", &Uuid::now_v7().to_string()[..8]);
             Ok(Self { pool, prefix })
         }
 
@@ -117,7 +117,7 @@ mod template_batch_tests {
 
             // Create test entities
             for i in 1..=5 {
-                let entity_id = Uuid::new_v4();
+                let entity_id = Uuid::now_v7();
                 let name = self.name(&format!("TestEntity_{}", i));
 
                 sqlx::query(
@@ -148,7 +148,7 @@ mod template_batch_tests {
                 None => return Ok(None),
             };
 
-            let entity_id = Uuid::new_v4();
+            let entity_id = Uuid::now_v7();
             let name = self.name("ManCo");
 
             sqlx::query(
@@ -467,7 +467,7 @@ mod template_batch_tests {
         let db = TestDb::new().await?;
 
         // Create a test CBU
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let cbu_name = db.name("ProductTestCBU");
 
         sqlx::query(
@@ -519,7 +519,7 @@ mod template_batch_tests {
         // Create multiple test CBUs
         let mut cbu_ids = Vec::new();
         for i in 1..=3 {
-            let cbu_id = Uuid::new_v4();
+            let cbu_id = Uuid::now_v7();
             let cbu_name = db.name(&format!("MultiCBU_{}", i));
 
             sqlx::query(
@@ -565,7 +565,7 @@ mod template_batch_tests {
     async fn test_context_parent_child_hierarchy() -> Result<()> {
         // Test that child contexts inherit parent bindings
         let mut parent = ExecutionContext::new();
-        let parent_uuid = Uuid::new_v4();
+        let parent_uuid = Uuid::now_v7();
         parent.symbols.insert("manco".to_string(), parent_uuid);
         parent
             .symbol_types
@@ -589,13 +589,13 @@ mod template_batch_tests {
     #[tokio::test]
     async fn test_context_local_overrides_parent() -> Result<()> {
         let mut parent = ExecutionContext::new();
-        let parent_uuid = Uuid::new_v4();
+        let parent_uuid = Uuid::now_v7();
         parent.symbols.insert("entity".to_string(), parent_uuid);
 
         let mut child = parent.child_for_iteration(0);
 
         // Add local binding with same name
-        let local_uuid = Uuid::new_v4();
+        let local_uuid = Uuid::now_v7();
         child.symbols.insert("entity".to_string(), local_uuid);
 
         // Local should override parent
@@ -615,7 +615,7 @@ mod template_batch_tests {
         let db = TestDb::new().await?;
 
         // Create source CBU with trading profile
-        let source_cbu_id = Uuid::new_v4();
+        let source_cbu_id = Uuid::now_v7();
         let source_cbu_name = db.name("SourceCBU");
 
         sqlx::query(
@@ -628,7 +628,7 @@ mod template_batch_tests {
         .await?;
 
         // Create a DRAFT trading profile for source CBU
-        let source_profile_id = Uuid::new_v4();
+        let source_profile_id = Uuid::now_v7();
         let profile_doc = serde_json::json!({
             "universe": {
                 "base_currency": "EUR",
@@ -668,7 +668,7 @@ mod template_batch_tests {
         // Create multiple target CBUs
         let mut target_cbu_ids = Vec::new();
         for i in 1..=5 {
-            let cbu_id = Uuid::new_v4();
+            let cbu_id = Uuid::now_v7();
             let cbu_name = db.name(&format!("TargetCBU_{}", i));
 
             sqlx::query(
@@ -768,7 +768,7 @@ mod template_batch_tests {
         let db = TestDb::new().await?;
 
         // Create source CBU with trading profile
-        let source_cbu_id = Uuid::new_v4();
+        let source_cbu_id = Uuid::now_v7();
         let source_cbu_name = db.name("CloneSourceCBU");
 
         sqlx::query(
@@ -781,7 +781,7 @@ mod template_batch_tests {
         .await?;
 
         // Create a DRAFT trading profile
-        let source_profile_id = Uuid::new_v4();
+        let source_profile_id = Uuid::now_v7();
         let profile_doc = serde_json::json!({
             "universe": {
                 "base_currency": "USD",
@@ -819,7 +819,7 @@ mod template_batch_tests {
         .await?;
 
         // Create target CBU
-        let target_cbu_id = Uuid::new_v4();
+        let target_cbu_id = Uuid::now_v7();
         let target_cbu_name = db.name("CloneTargetCBU");
 
         sqlx::query(

@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_uuid_result() {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let result = ExecutionResult::uuid(id);
 
         assert_eq!(result.as_uuid(), Some(id));
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_from_uuid() {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let result: ExecutionResult = id.into();
         assert_eq!(result.as_uuid(), Some(id));
     }

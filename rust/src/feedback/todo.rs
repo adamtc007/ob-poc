@@ -348,7 +348,7 @@ mod tests {
         let generator = TodoGenerator::new(PathBuf::from("/tmp/todos"));
 
         let mut failure = FailureRecord {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             fingerprint: "test".to_string(),
             fingerprint_version: 1,
             error_type: ErrorType::Timeout,

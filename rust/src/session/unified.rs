@@ -501,7 +501,7 @@ impl StateStack {
         }
 
         self.snapshots.push(StateSnapshot {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             timestamp: Utc::now(),
             entity_scope: scope,
             run_sheet_cursor: cursor,
@@ -1549,7 +1549,7 @@ impl UnifiedSession {
     pub fn new() -> Self {
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             user_id: Uuid::nil(),
             created_at: now,
             updated_at: now,
@@ -1883,7 +1883,7 @@ impl UnifiedSession {
 
     /// Add DSL entry to run sheet
     pub fn add_dsl(&mut self, dsl_source: String, display_dsl: String) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.run_sheet.entries.push(RunSheetEntry {
             id,
             dsl_source,
@@ -1910,7 +1910,7 @@ impl UnifiedSession {
         dag_depth: u32,
         dependencies: Vec<Uuid>,
     ) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.run_sheet.entries.push(RunSheetEntry {
             id,
             dsl_source,
@@ -2043,7 +2043,7 @@ impl UnifiedSession {
 
     /// Add user message
     pub fn add_user_message(&mut self, content: String) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.messages.push(ChatMessage {
             id,
             role: MessageRole::User,
@@ -2064,7 +2064,7 @@ impl UnifiedSession {
         intents: Option<Vec<crate::api::intent::VerbIntent>>,
         dsl: Option<String>,
     ) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.messages.push(ChatMessage {
             id,
             role: MessageRole::Agent,
@@ -2079,7 +2079,7 @@ impl UnifiedSession {
 
     /// Add system message
     pub fn add_system_message(&mut self, content: String) -> Uuid {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         self.messages.push(ChatMessage {
             id,
             role: MessageRole::System,
@@ -2801,7 +2801,7 @@ mod tests {
     #[test]
     fn test_add_cbu() {
         let mut session = UnifiedSession::new();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         session.add_cbu(cbu_id);
         assert!(session.entity_scope.cbu_ids.contains(&cbu_id));
     }
@@ -2913,7 +2913,7 @@ mod tests {
         assert!(session.structure_type.is_none());
 
         // Set client (level 1)
-        let client_id = Uuid::new_v4();
+        let client_id = Uuid::now_v7();
         session.set_client(client_id, "Allianz".to_string());
         assert!(session.client.is_some());
         assert_eq!(session.client.as_ref().unwrap().display_name, "Allianz");
@@ -2923,7 +2923,7 @@ mod tests {
         assert_eq!(session.structure_type, Some(StructureType::Sicav));
 
         // Set current structure (level 3)
-        let structure_id = Uuid::new_v4();
+        let structure_id = Uuid::now_v7();
         session.set_current_structure(
             structure_id,
             "Allianz SICAV 1".to_string(),
@@ -3048,9 +3048,9 @@ mod tests {
     fn test_cascade_skip() {
         let mut sheet = RunSheet::default();
 
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        let id3 = Uuid::new_v4();
+        let id1 = Uuid::now_v7();
+        let id2 = Uuid::now_v7();
+        let id3 = Uuid::now_v7();
 
         sheet.entries.push(RunSheetEntry {
             id: id1,

@@ -1586,7 +1586,7 @@ mod tests {
     #[test]
     fn test_node_type_to_code() {
         let builder = ConfigDrivenGraphBuilder {
-            cbu_id: Uuid::new_v4(),
+            cbu_id: Uuid::now_v7(),
             _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
             edge_type_configs: HashMap::new(),
@@ -1606,7 +1606,7 @@ mod tests {
     #[test]
     fn test_edge_type_to_code() {
         let builder = ConfigDrivenGraphBuilder {
-            cbu_id: Uuid::new_v4(),
+            cbu_id: Uuid::now_v7(),
             _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
             edge_type_configs: HashMap::new(),
@@ -1639,7 +1639,7 @@ mod tests {
         visible_edges.insert("OWNERSHIP".to_string());
 
         let builder = ConfigDrivenGraphBuilder {
-            cbu_id: Uuid::new_v4(),
+            cbu_id: Uuid::now_v7(),
             _view_mode: "KYC_UBO".to_string(),
             node_type_configs: HashMap::new(),
             edge_type_configs: HashMap::new(),

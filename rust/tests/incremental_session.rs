@@ -125,7 +125,7 @@ impl TestSession {
             "{} {} {}",
             base,
             self.test_name,
-            &Uuid::new_v4().to_string()[..8]
+            &Uuid::now_v7().to_string()[..8]
         )
     }
 }
@@ -870,7 +870,7 @@ async fn test_51_session_after_long_pause() {
 #[tokio::test]
 async fn test_52_invalid_session_id() {
     let client = Client::new();
-    let fake_session_id = Uuid::new_v4();
+    let fake_session_id = Uuid::now_v7();
 
     let resp = client
         .post(format!(

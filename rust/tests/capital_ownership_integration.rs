@@ -29,7 +29,7 @@ mod capital_tests {
                 .unwrap_or_else(|_| "postgresql:///data_designer".into());
 
             let pool = PgPool::connect(&url).await?;
-            let prefix = format!("captest_{}", &Uuid::new_v4().to_string()[..8]);
+            let prefix = format!("captest_{}", &Uuid::now_v7().to_string()[..8]);
             Ok(Self { pool, prefix })
         }
 

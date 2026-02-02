@@ -265,8 +265,8 @@ mod tests {
     #[test]
     fn test_pending_task_completion() {
         let task = PendingTask {
-            task_id: Uuid::new_v4(),
-            instance_id: Uuid::new_v4(),
+            task_id: Uuid::now_v7(),
+            instance_id: Uuid::now_v7(),
             blocker_type: "MissingDocument".to_string(),
             blocker_key: None,
             verb: "document.solicit".to_string(),
@@ -288,8 +288,8 @@ mod tests {
     #[test]
     fn test_pending_task_terminal_with_failures() {
         let task = PendingTask {
-            task_id: Uuid::new_v4(),
-            instance_id: Uuid::new_v4(),
+            task_id: Uuid::now_v7(),
+            instance_id: Uuid::now_v7(),
             blocker_type: "MissingDocument".to_string(),
             blocker_key: None,
             verb: "document.solicit".to_string(),

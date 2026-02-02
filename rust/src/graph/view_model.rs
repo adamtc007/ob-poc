@@ -124,7 +124,7 @@ impl GraphViewModel {
     /// Create a new empty GraphViewModel
     pub fn new(root_id: String) -> Self {
         Self {
-            query_id: Uuid::new_v4().to_string(),
+            query_id: Uuid::now_v7().to_string(),
             timestamp: chrono::Utc::now(),
             root_id,
             nodes: Vec::new(),

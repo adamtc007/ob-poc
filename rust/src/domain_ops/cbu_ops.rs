@@ -431,7 +431,7 @@ impl CustomOperation for CbuAddProductOp {
         let mut delivery_skipped: i64 = 0;
 
         for svc in &services {
-            let delivery_id = Uuid::new_v4();
+            let delivery_id = Uuid::now_v7();
             let result = sqlx::query(
                 r#"INSERT INTO "ob-poc".service_delivery_map
                    (delivery_id, cbu_id, product_id, service_id, delivery_status)
@@ -476,7 +476,7 @@ impl CustomOperation for CbuAddProductOp {
         .await?;
 
         for sr in &service_resources {
-            let instance_id = Uuid::new_v4();
+            let instance_id = Uuid::now_v7();
             // Generate a unique instance URL using CBU name, resource code, and partial UUID
             let instance_url = format!(
                 "urn:ob-poc:{}:{}:{}",
@@ -1000,7 +1000,7 @@ impl CustomOperation for CbuDecideOp {
         }
 
         // 3. Create evaluation snapshot with decision
-        let snapshot_id = Uuid::new_v4();
+        let snapshot_id = Uuid::now_v7();
         sqlx::query!(
             r#"INSERT INTO "ob-poc".case_evaluation_snapshots
                (snapshot_id, case_id, soft_count, escalate_count, hard_stop_count, total_score,

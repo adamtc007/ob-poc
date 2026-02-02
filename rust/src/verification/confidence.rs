@@ -385,9 +385,9 @@ mod tests {
 
     fn make_evidence(source: EvidenceSource, confidence: f64, authoritative: bool) -> Evidence {
         Evidence {
-            evidence_id: Uuid::new_v4(),
-            entity_id: Uuid::new_v4(),
-            attribute_id: Uuid::new_v4(),
+            evidence_id: Uuid::now_v7(),
+            entity_id: Uuid::now_v7(),
+            attribute_id: Uuid::now_v7(),
             observed_value: serde_json::json!("test"),
             source,
             confidence,
@@ -498,9 +498,9 @@ mod tests {
 
         // Create evidence with explicit dates to ensure recency difference
         let old_evidence = Evidence {
-            evidence_id: Uuid::new_v4(),
-            entity_id: Uuid::new_v4(),
-            attribute_id: Uuid::new_v4(),
+            evidence_id: Uuid::now_v7(),
+            entity_id: Uuid::now_v7(),
+            attribute_id: Uuid::now_v7(),
             observed_value: serde_json::json!("test"),
             source: EvidenceSource::Document,
             confidence: 0.80,
@@ -513,9 +513,9 @@ mod tests {
         };
 
         let fresh_evidence = Evidence {
-            evidence_id: Uuid::new_v4(),
-            entity_id: Uuid::new_v4(),
-            attribute_id: Uuid::new_v4(),
+            evidence_id: Uuid::now_v7(),
+            entity_id: Uuid::now_v7(),
+            attribute_id: Uuid::now_v7(),
             observed_value: serde_json::json!("test"),
             source: EvidenceSource::Document,
             confidence: 0.80,

@@ -114,7 +114,7 @@ async fn get_board_controller(
 
     // Convert to response
     let controller = BoardControllerEdge {
-        id: Uuid::new_v4(),
+        id: Uuid::now_v7(),
         cbu_id,
         controller_entity_id: result.controller_entity_id,
         controller_name: result.controller_name,

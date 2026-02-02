@@ -499,7 +499,7 @@ impl PgGraphRepository {
             .roles
             .into_iter()
             .map(|r| RoleAssignment {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 cbu_id: r.cbu_id,
                 entity_id: r.entity_id,
                 role: r.role_name,
@@ -1180,7 +1180,7 @@ impl GraphRepository for PgGraphRepository {
         let assignments: Vec<RoleAssignment> = rows
             .into_iter()
             .map(|r| RoleAssignment {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 cbu_id: r.cbu_id,
                 entity_id: r.entity_id,
                 role: r.role_name,

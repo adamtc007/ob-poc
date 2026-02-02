@@ -380,7 +380,7 @@ mod tests {
         bindings.insert(
             "fund".to_string(),
             BindingInfo {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 display_name: "Apex Capital".to_string(),
                 entity_type: "cbu".to_string(),
             },
@@ -407,7 +407,7 @@ mod tests {
     #[test]
     fn test_binding_summary() {
         let mut bindings = HashMap::new();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         bindings.insert(
             "fund".to_string(),
             BindingInfo {
@@ -419,7 +419,7 @@ mod tests {
         bindings.insert(
             "john".to_string(),
             BindingInfo {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 display_name: "John Smith".to_string(),
                 entity_type: "proper_person".to_string(),
             },

@@ -71,7 +71,7 @@ impl DocumentAttributeCrudService {
         domain: Option<&str>,
         description: Option<&str>,
     ) -> Result<CrudResult, String> {
-        let type_id = Uuid::new_v4();
+        let type_id = Uuid::now_v7();
 
         let result = sqlx::query!(
             r#"
@@ -254,7 +254,7 @@ impl DocumentAttributeCrudService {
         is_required: Option<bool>,
         field_name: Option<&str>,
     ) -> Result<CrudResult, String> {
-        let mapping_id = Uuid::new_v4();
+        let mapping_id = Uuid::now_v7();
         let required = is_required.unwrap_or(false);
 
         let result = sqlx::query!(
@@ -411,7 +411,7 @@ mod tests {
     fn test_crud_result() {
         let result = CrudResult {
             success: true,
-            id: Some(Uuid::new_v4()),
+            id: Some(Uuid::now_v7()),
             message: "Test".to_string(),
             affected_rows: Some(1),
         };

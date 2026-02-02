@@ -5,7 +5,7 @@ edition = "2021"
 description = "Workflow templates for DSL generation - parameter substitution and expansion"
 
 [dependencies]
-uuid = { version = "1.11", features = ["v4", "serde"] }
+uuid = { version = "1.20", features = ["v4", "serde", "v7"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 thiserror = "2.0"

@@ -105,7 +105,7 @@ mod tests {
         use crate::dsl_v2::ast::Program;
 
         let mut session = ReplSession::new();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
 
         // Simulate binding a CBU via append_executed
         let program = Program { statements: vec![] };
@@ -128,7 +128,7 @@ mod tests {
         use crate::api::session::BoundEntity;
 
         let mut session_ctx = SessionContext::default();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
 
         session_ctx.active_cbu = Some(BoundEntity {
             id: cbu_id,

@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 playbook-core = { path = "../playbook-core" }
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1.20", features = ["v4", "v7"] }
 serde_yaml = "0.9"

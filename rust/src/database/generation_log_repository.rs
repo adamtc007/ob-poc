@@ -158,7 +158,7 @@ impl GenerationLogRepository {
         model_used: Option<&str>,
         intent_feedback_id: Option<i64>,
     ) -> Result<Uuid, sqlx::Error> {
-        let log_id = Uuid::new_v4();
+        let log_id = Uuid::now_v7();
 
         sqlx::query(
             r#"

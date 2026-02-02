@@ -179,7 +179,7 @@ mod tests {
         // Emit some events
         let emitter = emitter.unwrap();
         emitter.emit(DslEvent::succeeded(
-            Some(Uuid::new_v4()),
+            Some(Uuid::now_v7()),
             "test.verb".to_string(),
             100,
         ));

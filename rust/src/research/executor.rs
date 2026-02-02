@@ -172,7 +172,7 @@ impl<C: ResearchLlmClient> ResearchExecutor<C> {
             });
 
         Ok(ResearchResult {
-            result_id: Uuid::new_v4(),
+            result_id: Uuid::now_v7(),
             macro_name: macro_name.to_string(),
             params: serde_json::to_value(&validated_params)?,
             data,

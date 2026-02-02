@@ -940,7 +940,7 @@ mod tests {
             name: "fund".to_string(),
             produced_type: "cbu".to_string(),
             subtype: None,
-            entity_pk: uuid::Uuid::new_v4(),
+            entity_pk: uuid::Uuid::now_v7(),
             resolved: false,
         });
 
@@ -1126,7 +1126,7 @@ mod tests {
             name: "fund".to_string(),
             produced_type: "cbu".to_string(),
             subtype: None,
-            entity_pk: uuid::Uuid::new_v4(),
+            entity_pk: uuid::Uuid::now_v7(),
             resolved: false,
         });
 

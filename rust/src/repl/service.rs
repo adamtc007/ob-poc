@@ -706,7 +706,7 @@ impl<'a> RunbookService<'a> {
             .await
             .map_err(RunError::Database)?;
 
-        let execution_id = Uuid::new_v4();
+        let execution_id = Uuid::now_v7();
 
         // 7. Emit execution started
         self.emit(RunbookEvent::ExecutionStarted {

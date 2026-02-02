@@ -1034,7 +1034,7 @@ async fn upsert_entity(pool: &PgPool, record: &GleifRecord, entity_type_id: Uuid
     }
 
     // Create new entity
-    let entity_id = Uuid::new_v4();
+    let entity_id = Uuid::now_v7();
     let mut tx = pool.begin().await?;
 
     sqlx::query(
@@ -1117,7 +1117,7 @@ async fn create_ownership_relationship(
     } else {
         // GLEIF direct-parent-relationship means 100% consolidation (or at least majority control)
         // Use 100.00 as the percentage for direct consolidation relationships
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".entity_relationships (
@@ -1308,7 +1308,7 @@ async fn get_or_create_entity_type(pool: &PgPool, type_code: &str, name: &str) -
     }
 
     // Create new
-    let id = Uuid::new_v4();
+    let id = Uuid::now_v7();
     sqlx::query(
         r#"INSERT INTO "ob-poc".entity_types (entity_type_id, type_code, name, table_name) VALUES ($1, $2, $3, $4)"#
     )
@@ -1372,7 +1372,7 @@ async fn create_cbu_for_fund(
         (id, false)
     } else {
         // Create new CBU
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".cbus (cbu_id, name, jurisdiction, client_type)
@@ -1421,7 +1421,7 @@ async fn get_or_create_role(pool: &PgPool, role_name: &str) -> Result<Uuid> {
         return Ok(id);
     }
 
-    let id = Uuid::new_v4();
+    let id = Uuid::now_v7();
     sqlx::query(r#"INSERT INTO "ob-poc".roles (role_id, name) VALUES ($1, $2)"#)
         .bind(id)
         .bind(role_name)
@@ -1461,7 +1461,7 @@ async fn assign_role_if_not_exists(
         VALUES ($1, $2, $3, $4)
         "#,
     )
-    .bind(Uuid::new_v4())
+    .bind(Uuid::now_v7())
     .bind(cbu_id)
     .bind(entity_id)
     .bind(role_id)

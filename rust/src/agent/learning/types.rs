@@ -438,7 +438,7 @@ mod tests {
         let start = std::time::Instant::now();
         for _ in 0..1000 {
             let _ = AgentEvent::message_received(
-                Some(Uuid::new_v4()),
+                Some(Uuid::now_v7()),
                 "test message".to_string(),
                 None,
             );
@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn test_event_serialization() {
         let event = AgentEvent::verb_selected(
-            Some(Uuid::new_v4()),
+            Some(Uuid::now_v7()),
             "create counterparty".to_string(),
             "entity.ensure-limited-company".to_string(),
             0.95,

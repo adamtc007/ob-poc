@@ -633,7 +633,7 @@ mod tests {
 
     fn make_test_graph(nodes: Vec<GraphNode>, edges: Vec<LegacyGraphEdge>) -> CbuGraph {
         CbuGraph {
-            cbu_id: uuid::Uuid::new_v4(),
+            cbu_id: uuid::Uuid::now_v7(),
             label: "Test CBU".to_string(),
             cbu_category: None,
             jurisdiction: None,

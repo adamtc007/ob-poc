@@ -774,7 +774,7 @@ async fn test_economic_exposure_max_depth_parameter() {
 // =============================================================================
 
 async fn create_test_share_class(pool: &PgPool, entity_id: Uuid, name: &str) -> Uuid {
-    let share_class_id = Uuid::new_v4();
+    let share_class_id = Uuid::now_v7();
     let unique_name = format!("{} {}", name, share_class_id);
 
     sqlx::query!(
@@ -812,7 +812,7 @@ async fn cleanup_test_share_class(pool: &PgPool, share_class_id: Uuid) {
 }
 
 async fn create_test_entity(pool: &PgPool, name: &str) -> Uuid {
-    let entity_id = Uuid::new_v4();
+    let entity_id = Uuid::now_v7();
     // Make name unique per test run to avoid conflicts
     let unique_name = format!("{} {}", name, entity_id);
 

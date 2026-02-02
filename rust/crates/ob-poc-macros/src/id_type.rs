@@ -37,7 +37,7 @@ pub fn derive_id_type_impl(input: TokenStream) -> TokenStream {
     let new_impl = if generate_new {
         quote! {
             impl #name {
-                pub fn new() -> Self { Self(::uuid::Uuid::new_v4()) }
+                pub fn new() -> Self { Self(::uuid::Uuid::now_v7()) }
             }
 
             impl Default for #name {

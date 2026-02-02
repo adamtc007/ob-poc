@@ -62,7 +62,7 @@ impl ServiceResourceService {
     }
 
     pub async fn create_service_resource(&self, fields: &NewServiceResourceFields) -> Result<Uuid> {
-        let resource_id = Uuid::new_v4();
+        let resource_id = Uuid::now_v7();
         sqlx::query(r#"INSERT INTO "ob-poc".service_resource_types (resource_id, name, description, owner, dictionary_group, resource_code, resource_type, vendor, version, api_endpoint, api_version, authentication_method, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())"#)
             .bind(resource_id).bind(&fields.name).bind(&fields.description).bind(&fields.owner)
             .bind(&fields.dictionary_group).bind(&fields.resource_code).bind(&fields.resource_type)

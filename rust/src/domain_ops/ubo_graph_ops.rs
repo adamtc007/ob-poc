@@ -461,7 +461,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         _verb_call: &VerbCall,
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        let new_id = uuid::Uuid::new_v4();
+        let new_id = uuid::Uuid::now_v7();
         ctx.bind("relationship", new_id);
         Ok(ExecutionResult::Record(serde_json::json!({
             "new_relationship_id": new_id
@@ -675,7 +675,7 @@ impl CustomOperation for UboTransferControlOp {
         _verb_call: &VerbCall,
         ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        let new_id = uuid::Uuid::new_v4();
+        let new_id = uuid::Uuid::now_v7();
         ctx.bind("relationship", new_id);
         Ok(ExecutionResult::Record(serde_json::json!({
             "new_relationship_id": new_id

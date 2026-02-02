@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn test_version_roundtrip() {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let cargo = CargoRef::version(id);
         let uri = cargo.to_uri();
         let parsed = CargoRef::parse(&uri).unwrap();
@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_document_roundtrip() {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let cargo = CargoRef::document(id);
         let uri = cargo.to_uri();
         let parsed = CargoRef::parse(&uri).unwrap();
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn test_uuid_extraction() {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let cargo = CargoRef::version(id);
         assert_eq!(cargo.uuid(), Some(id));
 

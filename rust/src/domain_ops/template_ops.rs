@@ -614,7 +614,7 @@ mod tests {
             total_items: 10,
             success_count: 8,
             failure_count: 2,
-            primary_entity_ids: vec![Uuid::new_v4(), Uuid::new_v4()],
+            primary_entity_ids: vec![Uuid::now_v7(), Uuid::now_v7()],
             primary_entity_type: "cbu".to_string(),
             aborted: false,
             errors: HashMap::new(),

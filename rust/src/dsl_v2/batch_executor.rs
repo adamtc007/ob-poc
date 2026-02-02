@@ -428,8 +428,8 @@ mod tests {
         let mut acc = BatchResultAccumulator::with_primary("cbu", "cbu");
 
         let mut symbols = HashMap::new();
-        symbols.insert("cbu".to_string(), Uuid::new_v4());
-        symbols.insert("case".to_string(), Uuid::new_v4());
+        symbols.insert("cbu".to_string(), Uuid::now_v7());
+        symbols.insert("case".to_string(), Uuid::now_v7());
 
         acc.record_success(0, symbols.clone(), HashMap::new());
 
@@ -456,7 +456,7 @@ mod tests {
         let mut acc = BatchResultAccumulator::with_primary("cbu", "cbu");
 
         let mut symbols = HashMap::new();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         symbols.insert("cbu".to_string(), cbu_id);
 
         acc.record_success(0, symbols, HashMap::new());

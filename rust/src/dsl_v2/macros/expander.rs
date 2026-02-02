@@ -160,7 +160,7 @@ pub fn expand_macro(
     let output_str = statements.join("\n");
 
     let audit = MacroExpansionAudit {
-        expansion_id: Uuid::new_v4(),
+        expansion_id: Uuid::now_v7(),
         macro_fqn: macro_fqn.to_string(),
         args_digest: hash_string(&args_json),
         output_digest: hash_string(&output_str),

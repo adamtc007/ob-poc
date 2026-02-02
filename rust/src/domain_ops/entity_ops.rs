@@ -98,7 +98,7 @@ impl CustomOperation for EntityGhostOp {
         .await?
         .ok_or_else(|| anyhow::anyhow!("Entity type PROPER_PERSON_NATURAL not found"))?;
 
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
 
         // Insert into base entities table
         sqlx::query!(
@@ -147,7 +147,7 @@ impl CustomOperation for EntityGhostOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 
@@ -279,7 +279,7 @@ impl CustomOperation for EntityIdentifyOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 
@@ -350,7 +350,7 @@ impl CustomOperation for EntityEnsureOrPlaceholderOp {
     ) -> Result<ExecutionResult> {
         use serde_json::json;
         Ok(ExecutionResult::Record(json!({
-            "entity_id": uuid::Uuid::new_v4(),
+            "entity_id": uuid::Uuid::now_v7(),
             "is_placeholder": true
         })))
     }
@@ -414,8 +414,8 @@ impl CustomOperation for EntityResolvePlaceholderOp {
     ) -> Result<ExecutionResult> {
         use serde_json::json;
         Ok(ExecutionResult::Record(json!({
-            "placeholder_entity_id": uuid::Uuid::new_v4(),
-            "resolved_to_entity_id": uuid::Uuid::new_v4(),
+            "placeholder_entity_id": uuid::Uuid::now_v7(),
+            "resolved_to_entity_id": uuid::Uuid::now_v7(),
             "status": "resolved",
             "roles_transferred": 0
         })))
@@ -540,7 +540,7 @@ impl CustomOperation for EntityPlaceholderSummaryOp {
     ) -> Result<ExecutionResult> {
         use serde_json::json;
         Ok(ExecutionResult::Record(json!({
-            "cbu_id": uuid::Uuid::new_v4(),
+            "cbu_id": uuid::Uuid::now_v7(),
             "pending_count": 0,
             "by_kind": []
         })))

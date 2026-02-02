@@ -763,7 +763,7 @@ mod tests {
 
     #[test]
     fn test_ubo_rules() {
-        let rules = MembershipRules::cbu_ubo(Uuid::new_v4());
+        let rules = MembershipRules::cbu_ubo(Uuid::now_v7());
         assert_eq!(rules.direction, TraversalDirection::Up);
         assert!(matches!(rules.terminus, TerminusCondition::NaturalPerson));
         assert!(rules.edge_types.contains(&EdgeType::Ownership));
@@ -773,7 +773,7 @@ mod tests {
 
     #[test]
     fn test_trading_rules() {
-        let rules = MembershipRules::cbu_trading(Uuid::new_v4());
+        let rules = MembershipRules::cbu_trading(Uuid::now_v7());
         assert_eq!(rules.direction, TraversalDirection::Down);
         assert!(rules.edge_types.contains(&EdgeType::CbuRole));
         assert!(rules.edge_types.contains(&EdgeType::CbuHasTradingProfile));

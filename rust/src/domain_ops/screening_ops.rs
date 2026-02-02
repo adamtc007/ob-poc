@@ -96,7 +96,7 @@ impl CustomOperation for ScreeningPepOp {
         }
 
         // Create screening record
-        let screening_id = Uuid::new_v4();
+        let screening_id = Uuid::now_v7();
 
         sqlx::query!(
             r#"INSERT INTO kyc.screenings
@@ -119,7 +119,7 @@ impl CustomOperation for ScreeningPepOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 
@@ -202,7 +202,7 @@ impl CustomOperation for ScreeningSanctionsOp {
         }
 
         // Create screening record
-        let screening_id = Uuid::new_v4();
+        let screening_id = Uuid::now_v7();
 
         sqlx::query!(
             r#"INSERT INTO kyc.screenings
@@ -225,7 +225,7 @@ impl CustomOperation for ScreeningSanctionsOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 

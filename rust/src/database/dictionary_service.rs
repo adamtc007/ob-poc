@@ -50,7 +50,7 @@ impl DictionaryDatabaseService {
         &self,
         new_attribute: NewDictionaryAttribute,
     ) -> Result<DictionaryAttribute> {
-        let attribute_id = Uuid::new_v4();
+        let attribute_id = Uuid::now_v7();
 
         let result = sqlx::query_as::<_, DictionaryAttribute>(
             r#"

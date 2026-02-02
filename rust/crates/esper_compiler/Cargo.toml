@@ -20,7 +20,7 @@ sha2 = "0.10"
 hex = "0.4"
 
 # UUID for entity IDs
-uuid = { version = "1.4", features = ["v4", "serde"] }
+uuid = { version = "1.20", features = ["v4", "serde", "v7"] }
 
 [dev-dependencies]
 proptest = "1.0"

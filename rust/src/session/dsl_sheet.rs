@@ -84,7 +84,7 @@ impl DslSheet {
     /// Create a new empty sheet
     pub fn new(session_id: Uuid) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             session_id,
             statements: Vec::new(),
             phases: Vec::new(),
@@ -96,7 +96,7 @@ impl DslSheet {
     /// Create sheet with statements
     pub fn with_statements(session_id: Uuid, statements: Vec<SessionDslStatement>) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             session_id,
             statements,
             phases: Vec::new(),
@@ -659,7 +659,7 @@ mod tests {
 
     #[test]
     fn test_new_sheet() {
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
         let sheet = DslSheet::new(session_id);
         assert_eq!(sheet.session_id, session_id);
         assert!(sheet.statements.is_empty());

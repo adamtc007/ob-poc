@@ -290,7 +290,7 @@ impl UnifiedSessionContext {
     /// Create a new session with default values
     pub fn new() -> Self {
         Self {
-            session_id: Uuid::new_v4(),
+            session_id: Uuid::now_v7(),
             user_id: None,
             created_at: Utc::now(),
             execution: ExecutionContext::new(),
@@ -696,7 +696,7 @@ mod tests {
 
     #[test]
     fn test_session_with_user() {
-        let user_id = Uuid::new_v4();
+        let user_id = Uuid::now_v7();
         let session = UnifiedSessionContext::with_user(user_id);
         assert_eq!(session.user_id, Some(user_id));
     }

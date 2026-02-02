@@ -121,7 +121,7 @@ impl ResourceInstanceService {
     // -------------------------------------------------------------------------
 
     pub async fn create_instance(&self, input: &NewResourceInstance) -> Result<Uuid> {
-        let instance_id = Uuid::new_v4();
+        let instance_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -263,7 +263,7 @@ impl ResourceInstanceService {
     // -------------------------------------------------------------------------
 
     pub async fn set_attribute(&self, input: &SetInstanceAttribute) -> Result<Uuid> {
-        let value_id = Uuid::new_v4();
+        let value_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -356,7 +356,7 @@ impl ResourceInstanceService {
         instance_id: Option<Uuid>,
         service_config: Option<JsonValue>,
     ) -> Result<Uuid> {
-        let delivery_id = Uuid::new_v4();
+        let delivery_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -575,7 +575,7 @@ mod tests {
     #[test]
     fn test_new_resource_instance_builder() {
         let input = NewResourceInstance {
-            cbu_id: Uuid::new_v4(),
+            cbu_id: Uuid::now_v7(),
             product_id: None,
             service_id: None,
             resource_type_id: None,
@@ -592,8 +592,8 @@ mod tests {
     #[test]
     fn test_set_instance_attribute_builder() {
         let input = SetInstanceAttribute {
-            instance_id: Uuid::new_v4(),
-            attribute_id: Uuid::new_v4(),
+            instance_id: Uuid::now_v7(),
+            attribute_id: Uuid::now_v7(),
             value_text: Some("DTC-789456".to_string()),
             value_number: None,
             value_boolean: None,

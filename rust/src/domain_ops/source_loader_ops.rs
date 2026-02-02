@@ -772,7 +772,7 @@ impl CustomOperation for ChImportCompanyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
+            "entity_id": uuid::Uuid::now_v7(),
         })))
     }
 }
@@ -1126,7 +1126,7 @@ impl CustomOperation for SecImportCompanyOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
+            "entity_id": uuid::Uuid::now_v7(),
         })))
     }
 }
@@ -1210,7 +1210,7 @@ async fn create_entity_from_normalized(
     .await?;
 
     // Create base entity
-    let entity_id = Uuid::new_v4();
+    let entity_id = Uuid::now_v7();
     sqlx::query(
         r#"INSERT INTO "ob-poc".entities (entity_id, entity_type_id, name)
            VALUES ($1, $2, $3)"#,

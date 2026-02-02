@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn test_step_result_produced_pk() {
-        let pk = Uuid::new_v4();
+        let pk = Uuid::now_v7();
 
         let created = StepResult::Created {
             pk,
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_step_result_entity_type() {
-        let pk = Uuid::new_v4();
+        let pk = Uuid::now_v7();
 
         let created = StepResult::Created {
             pk,
@@ -278,7 +278,7 @@ mod tests {
     fn test_step_result_type_name() {
         assert_eq!(
             StepResult::Created {
-                pk: Uuid::new_v4(),
+                pk: Uuid::now_v7(),
                 entity_type: "x".to_string()
             }
             .type_name(),
@@ -297,7 +297,7 @@ mod tests {
     #[test]
     fn test_execution_results_record() {
         let mut results = ExecutionResults::new();
-        let pk = Uuid::new_v4();
+        let pk = Uuid::now_v7();
 
         results.record_step(
             0,
@@ -325,7 +325,7 @@ mod tests {
     #[test]
     fn test_execution_results_merge() {
         let mut results1 = ExecutionResults::new();
-        let pk1 = Uuid::new_v4();
+        let pk1 = Uuid::now_v7();
         results1.record_step(
             0,
             StepResult::Created {
@@ -336,7 +336,7 @@ mod tests {
         );
 
         let mut results2 = ExecutionResults::new();
-        let pk2 = Uuid::new_v4();
+        let pk2 = Uuid::now_v7();
         results2.record_step(
             1,
             StepResult::Created {
@@ -359,7 +359,7 @@ mod tests {
         results.record_step(
             0,
             StepResult::Created {
-                pk: Uuid::new_v4(),
+                pk: Uuid::now_v7(),
                 entity_type: "cbu".to_string(),
             },
             Some("fund"),
@@ -367,7 +367,7 @@ mod tests {
         results.record_step(
             1,
             StepResult::Updated {
-                pk: Uuid::new_v4(),
+                pk: Uuid::now_v7(),
                 entity_type: "cbu".to_string(),
             },
             None,

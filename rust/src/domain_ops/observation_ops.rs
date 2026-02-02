@@ -131,7 +131,7 @@ impl CustomOperation for ObservationFromDocumentOp {
         .unwrap_or(false);
 
         // Insert observation
-        let observation_id = Uuid::new_v4();
+        let observation_id = Uuid::now_v7();
 
         sqlx::query(
             r#"INSERT INTO "ob-poc".attribute_observations
@@ -161,7 +161,7 @@ impl CustomOperation for ObservationFromDocumentOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 
@@ -399,7 +399,7 @@ impl CustomOperation for ObservationReconcileOp {
             // Compare values (simplified - just text comparison for now)
             if first.1 != other.1 && auto_create {
                 // Create discrepancy record
-                let discrepancy_id = Uuid::new_v4();
+                let discrepancy_id = Uuid::now_v7();
                 sqlx::query!(
                     r#"INSERT INTO "ob-poc".observation_discrepancies
                        (discrepancy_id, entity_id, attribute_id, observation_1_id, observation_2_id,
@@ -687,7 +687,7 @@ impl CustomOperation for DocumentExtractObservationsOp {
         for (attribute_id, attr_name, extraction_method, confidence, is_authoritative) in
             &extractable
         {
-            let observation_id = Uuid::new_v4();
+            let observation_id = Uuid::now_v7();
 
             // Create observation with placeholder value (real impl would extract from document)
             sqlx::query!(

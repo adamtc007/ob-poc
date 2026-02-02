@@ -107,7 +107,7 @@ fn default_confidence() -> f32 {
 }
 
 fn default_session_id() -> Uuid {
-    Uuid::new_v4()
+    Uuid::now_v7()
 }
 
 /// Context for better matching
@@ -188,7 +188,7 @@ pub async fn match_voice_command(
     State(state): State<Arc<VoiceMatcherState>>,
     Json(request): Json<VoiceMatchRequest>,
 ) -> impl IntoResponse {
-    let interaction_id = Uuid::new_v4();
+    let interaction_id = Uuid::now_v7();
 
     // Reject low-confidence transcripts
     if request.confidence < 0.5 {
@@ -363,7 +363,7 @@ pub async fn batch_match_voice_commands(
                     .transcripts
                     .iter()
                     .map(|_| VoiceMatchResponse {
-                        interaction_id: Uuid::new_v4(),
+                        interaction_id: Uuid::now_v7(),
                         matched: false,
                         verb_name: None,
                         pattern_phrase: None,
@@ -388,7 +388,7 @@ pub async fn batch_match_voice_commands(
                     .transcripts
                     .iter()
                     .map(|_| VoiceMatchResponse {
-                        interaction_id: Uuid::new_v4(),
+                        interaction_id: Uuid::now_v7(),
                         matched: false,
                         verb_name: None,
                         pattern_phrase: None,
@@ -418,7 +418,7 @@ pub async fn batch_match_voice_commands(
                 };
 
                 VoiceMatchResponse {
-                    interaction_id: Uuid::new_v4(), // Batch doesn't capture feedback
+                    interaction_id: Uuid::now_v7(), // Batch doesn't capture feedback
                     matched: true,
                     verb_name: Some(result.verb_name),
                     pattern_phrase: Some(result.pattern_phrase),
@@ -432,7 +432,7 @@ pub async fn batch_match_voice_commands(
                 }
             }
             Err(e) => VoiceMatchResponse {
-                interaction_id: Uuid::new_v4(),
+                interaction_id: Uuid::now_v7(),
                 matched: false,
                 verb_name: None,
                 pattern_phrase: None,

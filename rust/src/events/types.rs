@@ -259,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_succeeded_event() {
-        let event = DslEvent::succeeded(Some(Uuid::new_v4()), "entity.create".to_string(), 100);
+        let event = DslEvent::succeeded(Some(Uuid::now_v7()), "entity.create".to_string(), 100);
 
         assert!(event.session_id.is_some());
         match event.payload {
@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_event_serialization() {
-        let event = DslEvent::succeeded(Some(Uuid::new_v4()), "cbu.create".to_string(), 42);
+        let event = DslEvent::succeeded(Some(Uuid::now_v7()), "cbu.create".to_string(), 42);
         let json = serde_json::to_string(&event).unwrap();
 
         assert!(json.contains("\"type\":\"CommandSucceeded\""));

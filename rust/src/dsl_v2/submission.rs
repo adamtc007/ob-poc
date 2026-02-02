@@ -602,7 +602,7 @@ mod tests {
 
     #[test]
     fn test_symbol_binding_singleton() {
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         let b = SymbolBinding::singleton(id);
         assert!(b.is_singleton());
         assert!(!b.is_unresolved());
@@ -612,7 +612,7 @@ mod tests {
 
     #[test]
     fn test_symbol_binding_multiple() {
-        let ids = vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+        let ids = vec![Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7()];
         let b = SymbolBinding::multiple(ids.clone());
         assert!(b.is_multiple());
         assert!(!b.is_singleton());
@@ -622,8 +622,8 @@ mod tests {
     #[test]
     fn test_symbol_binding_add_remove() {
         let mut b = SymbolBinding::unresolved();
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
+        let id1 = Uuid::now_v7();
+        let id2 = Uuid::now_v7();
 
         b.add(id1, Some("first".to_string()));
         assert!(b.is_singleton());
@@ -682,7 +682,7 @@ mod tests {
             binding: None,
             span: Span::default(),
         });
-        let submission = DslSubmission::new(vec![stmt]).bind_one("target", Uuid::new_v4());
+        let submission = DslSubmission::new(vec![stmt]).bind_one("target", Uuid::now_v7());
 
         let state = submission.state(&SubmissionLimits::default());
         assert!(matches!(state, SubmissionState::Ready));
@@ -705,7 +705,7 @@ mod tests {
             span: Span::default(),
         });
 
-        let ids = vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+        let ids = vec![Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7()];
         let submission = DslSubmission::new(vec![stmt]).bind_many("target", ids.clone());
 
         assert!(submission.is_batch());
@@ -734,7 +734,7 @@ mod tests {
             span: Span::default(),
         });
 
-        let ids: Vec<Uuid> = (0..15000).map(|_| Uuid::new_v4()).collect();
+        let ids: Vec<Uuid> = (0..15000).map(|_| Uuid::now_v7()).collect();
         let submission = DslSubmission::new(vec![stmt]).bind_many("target", ids);
 
         let state = submission.state(&SubmissionLimits::default());
@@ -769,8 +769,8 @@ mod tests {
         });
 
         let submission = DslSubmission::new(vec![stmt])
-            .bind_many("sym1", vec![Uuid::new_v4(), Uuid::new_v4()])
-            .bind_many("sym2", vec![Uuid::new_v4(), Uuid::new_v4()]);
+            .bind_many("sym1", vec![Uuid::now_v7(), Uuid::now_v7()])
+            .bind_many("sym2", vec![Uuid::now_v7(), Uuid::now_v7()]);
 
         let result = submission.iteration_symbol();
         assert!(matches!(

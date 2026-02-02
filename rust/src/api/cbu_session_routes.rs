@@ -686,7 +686,7 @@ async fn generate_sheet(
         // Replace @cbu placeholder with actual UUID
         let populated = template.replace("@cbu", &format!("\"{}\"", entity_id));
         entries.push(RunSheetEntry {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             dsl_source: populated.clone(),
             display_dsl: populated,
             status: EntryStatus::Ready,

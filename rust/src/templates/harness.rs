@@ -154,11 +154,11 @@ pub fn get_sample_params() -> HashMap<String, HashMap<String, String>> {
     let mut samples = HashMap::new();
 
     // Generate sample UUIDs for consistency
-    let sample_cbu = Uuid::new_v4().to_string();
-    let sample_case = Uuid::new_v4().to_string();
-    let sample_entity = Uuid::new_v4().to_string();
-    let sample_workstream = Uuid::new_v4().to_string();
-    let sample_screening = Uuid::new_v4().to_string();
+    let sample_cbu = Uuid::now_v7().to_string();
+    let sample_case = Uuid::now_v7().to_string();
+    let sample_entity = Uuid::now_v7().to_string();
+    let sample_workstream = Uuid::now_v7().to_string();
+    let sample_screening = Uuid::now_v7().to_string();
 
     // onboard-director
     samples.insert(
@@ -193,7 +193,7 @@ pub fn get_sample_params() -> HashMap<String, HashMap<String, String>> {
         "add-ownership".to_string(),
         HashMap::from([
             ("owner_id".to_string(), sample_entity.clone()),
-            ("owned_id".to_string(), Uuid::new_v4().to_string()),
+            ("owned_id".to_string(), Uuid::now_v7().to_string()),
             ("percentage".to_string(), "25.5".to_string()),
             ("ownership_type".to_string(), "DIRECT".to_string()),
             ("effective_date".to_string(), "2024-01-15".to_string()),
@@ -216,7 +216,7 @@ pub fn get_sample_params() -> HashMap<String, HashMap<String, String>> {
             ("cbu_id".to_string(), sample_cbu.clone()),
             ("case_id".to_string(), sample_case.clone()),
             ("subject_entity_id".to_string(), sample_entity.clone()),
-            ("ubo_person_id".to_string(), Uuid::new_v4().to_string()),
+            ("ubo_person_id".to_string(), Uuid::now_v7().to_string()),
             ("ownership_percentage".to_string(), "35.5".to_string()),
             (
                 "qualifying_reason".to_string(),
@@ -371,8 +371,8 @@ pub async fn run_harness(
 
         // Create expansion context with sample UUIDs
         let context = ExpansionContext {
-            current_cbu: Some(Uuid::new_v4()),
-            current_case: Some(Uuid::new_v4()),
+            current_cbu: Some(Uuid::now_v7()),
+            current_case: Some(Uuid::now_v7()),
             bindings: HashMap::new(),
             binding_types: HashMap::new(),
         };
@@ -652,8 +652,8 @@ fn test_single_template(
     let explicit_params = sample_params.get(&template_id).cloned().unwrap_or_default();
 
     let context = ExpansionContext {
-        current_cbu: Some(Uuid::new_v4()),
-        current_case: Some(Uuid::new_v4()),
+        current_cbu: Some(Uuid::now_v7()),
+        current_case: Some(Uuid::now_v7()),
         bindings: HashMap::new(),
         binding_types: HashMap::new(),
     };

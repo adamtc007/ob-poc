@@ -27,7 +27,7 @@ mod db_tests {
                 .unwrap_or_else(|_| "postgresql:///data_designer".into());
 
             let pool = PgPool::connect(&url).await?;
-            let prefix = format!("test_{}", &Uuid::new_v4().to_string()[..8]);
+            let prefix = format!("test_{}", &Uuid::now_v7().to_string()[..8]);
             Ok(Self { pool, prefix })
         }
 
@@ -617,7 +617,7 @@ mod db_tests {
         let db = TestDb::new().await?;
 
         // Try to add product to non-existent CBU
-        let fake_cbu_id = Uuid::new_v4();
+        let fake_cbu_id = Uuid::now_v7();
         let dsl = format!(
             r#"(cbu.add-product :cbu-id "{}" :product "CUSTODY")"#,
             fake_cbu_id
@@ -947,7 +947,7 @@ mod db_tests {
         let (cbu_id, case_id) = setup_cbu_for_decision(&db).await?;
 
         // Create evaluation snapshot
-        let snapshot_id = Uuid::new_v4();
+        let snapshot_id = Uuid::now_v7();
         sqlx::query(
             r#"INSERT INTO "ob-poc".case_evaluation_snapshots
                (snapshot_id, case_id, soft_count, escalate_count, hard_stop_count,
@@ -1184,7 +1184,7 @@ mod db_tests {
         // Create a complete audit trail: evaluation → decision → status change
 
         // 1. Evaluation snapshot
-        let snapshot_id = Uuid::new_v4();
+        let snapshot_id = Uuid::now_v7();
         sqlx::query(
             r#"INSERT INTO "ob-poc".case_evaluation_snapshots
                (snapshot_id, case_id, soft_count, escalate_count, hard_stop_count,

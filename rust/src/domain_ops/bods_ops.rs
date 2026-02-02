@@ -106,7 +106,7 @@ impl CustomOperation for BodsDiscoverUbosOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
+            "entity_id": uuid::Uuid::now_v7(),
             "is_complete": false,
             "ubos": [],
             "gaps": ["No database connection"],

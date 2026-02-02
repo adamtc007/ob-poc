@@ -280,7 +280,7 @@ mod tests {
     use uuid::Uuid;
 
     fn test_cbu() -> CbuRef {
-        CbuRef(Uuid::new_v4())
+        CbuRef(Uuid::now_v7())
     }
 
     #[test]
@@ -361,7 +361,7 @@ mod tests {
             &mut manager,
             FocusTransition::Descend(Box::new(FocusTransition::FocusMatrix {
                 cbu: cbu.clone(),
-                matrix: InstrumentMatrixRef(Uuid::new_v4()),
+                matrix: InstrumentMatrixRef(Uuid::now_v7()),
                 matrix_enhance: 0,
                 container_enhance: 1,
             })),

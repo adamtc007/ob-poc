@@ -191,7 +191,7 @@ async fn create_document(
     State(state): State<WorkflowState>,
     Json(req): Json<CreateDocumentRequest>,
 ) -> Result<Json<CreateDocumentResponse>, WorkflowApiError> {
-    let document_id = Uuid::new_v4();
+    let document_id = Uuid::now_v7();
     let created_at = Utc::now();
 
     sqlx::query(
@@ -291,7 +291,7 @@ async fn create_version(
         ));
     }
 
-    let version_id = Uuid::new_v4();
+    let version_id = Uuid::now_v7();
     let created_at = Utc::now();
 
     // Get next version number

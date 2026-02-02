@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_cbu_path() {
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let path = ScopePath::cbu(cbu_id, "Apex Fund");
         assert!(path.is_cbu());
         assert_eq!(path.cbu_id(), Some(cbu_id));
@@ -338,8 +338,8 @@ mod tests {
 
     #[test]
     fn test_entity_path() {
-        let cbu_id = Uuid::new_v4();
-        let entity_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
+        let entity_id = Uuid::now_v7();
         let path = ScopePath::entity(
             cbu_id,
             "Apex Fund",
@@ -355,11 +355,11 @@ mod tests {
 
     #[test]
     fn test_path_navigation() {
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let mut path = ScopePath::cbu(cbu_id, "Apex Fund");
 
         // Zoom in
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
         path.push(ScopeSegment::Entity {
             entity_id,
             name: "John Smith".to_string(),

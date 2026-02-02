@@ -208,7 +208,7 @@ impl DslRepository {
             (id, new_version)
         } else {
             // Create new instance - no lock needed
-            let new_id = Uuid::new_v4();
+            let new_id = Uuid::now_v7();
             sqlx::query(
                 r#"
                 INSERT INTO "ob-poc".dsl_instances

@@ -45,7 +45,7 @@ impl ServiceService {
     }
 
     pub async fn create_service(&self, fields: &NewServiceFields) -> Result<Uuid> {
-        let service_id = Uuid::new_v4();
+        let service_id = Uuid::now_v7();
         sqlx::query(r#"INSERT INTO "ob-poc".services (service_id, name, description, service_code, service_category, sla_definition, is_active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())"#)
             .bind(service_id).bind(&fields.name).bind(&fields.description).bind(&fields.service_code)
             .bind(&fields.service_category).bind(&fields.sla_definition).bind(fields.is_active.unwrap_or(true))

@@ -94,7 +94,7 @@ mod tests {
         let (emitter, mut receiver) = AgentEventEmitter::new();
 
         let event =
-            AgentEvent::message_received(Some(Uuid::new_v4()), "test message".to_string(), None);
+            AgentEvent::message_received(Some(Uuid::now_v7()), "test message".to_string(), None);
 
         emitter.emit(event);
 
@@ -110,7 +110,7 @@ mod tests {
         // Emit more than buffer size
         for i in 0..10 {
             let event =
-                AgentEvent::message_received(Some(Uuid::new_v4()), format!("message {}", i), None);
+                AgentEvent::message_received(Some(Uuid::now_v7()), format!("message {}", i), None);
             emitter.emit(event);
         }
 
@@ -126,7 +126,7 @@ mod tests {
         let start = std::time::Instant::now();
         for _ in 0..1000 {
             let event =
-                AgentEvent::message_received(Some(Uuid::new_v4()), "test".to_string(), None);
+                AgentEvent::message_received(Some(Uuid::now_v7()), "test".to_string(), None);
             emitter.emit(event);
         }
         let elapsed = start.elapsed();

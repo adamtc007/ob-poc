@@ -5,6 +5,14 @@
 //! This provides type-safe, cross-platform build automation that replaces
 //! shell scripts with Rust code.
 
+#![allow(clippy::print_literal)]
+#![allow(clippy::manual_contains)]
+#![allow(clippy::len_zero)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::double_ended_iterator_last)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};

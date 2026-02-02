@@ -137,7 +137,7 @@ impl CustomOperation for DocumentCatalogOp {
         }
 
         // Create new document
-        let doc_id = Uuid::new_v4();
+        let doc_id = Uuid::now_v7();
 
         sqlx::query!(
             r#"INSERT INTO "ob-poc".document_catalog
@@ -164,7 +164,7 @@ impl CustomOperation for DocumentCatalogOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 
@@ -341,7 +341,7 @@ impl CustomOperation for DocumentSolicitOp {
         let requirement_id: Uuid = requirement_row.get("requirement_id");
 
         // 2. Create pending task (need workflow_instance_id for FK)
-        let task_id = Uuid::new_v4();
+        let task_id = Uuid::now_v7();
 
         // If no workflow_instance_id provided, we need to handle this
         // For now, require workflow_instance_id for task creation
@@ -475,7 +475,7 @@ impl CustomOperation for DocumentSolicitSetOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("verified");
 
-        let task_id = Uuid::new_v4();
+        let task_id = Uuid::now_v7();
         let mut requirement_ids: Vec<Uuid> = Vec::with_capacity(doc_types.len());
 
         // 1. Create requirements for each doc type
@@ -681,7 +681,7 @@ impl CustomOperation for DocumentUploadVersionOp {
 
         let version_no: i32 = version_row.try_get("version_no").unwrap_or(1);
 
-        let version_id = Uuid::new_v4();
+        let version_id = Uuid::now_v7();
 
         sqlx::query(
             r#"

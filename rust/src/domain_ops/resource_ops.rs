@@ -79,7 +79,7 @@ impl CustomOperation for ResourceCreateOp {
                     "urn:ob-poc:{}:{}:{}",
                     cbu_id,
                     resource_type_code.to_lowercase().replace('_', "-"),
-                    Uuid::new_v4()
+                    Uuid::now_v7()
                 )
             });
 
@@ -170,7 +170,7 @@ impl CustomOperation for ResourceCreateOp {
             .unwrap_or_default();
 
         // Idempotent: INSERT or return existing using instance_url as conflict key
-        let instance_id = Uuid::new_v4();
+        let instance_id = Uuid::now_v7();
 
         let row: (Uuid,) = sqlx::query_as(
             r#"WITH ins AS (
@@ -226,7 +226,7 @@ impl CustomOperation for ResourceCreateOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 
@@ -302,7 +302,7 @@ impl CustomOperation for ResourceSetAttrOp {
             .and_then(|a| a.value.as_string())
             .unwrap_or("proposed");
 
-        let value_id = Uuid::new_v4();
+        let value_id = Uuid::now_v7();
 
         sqlx::query(
             r#"INSERT INTO "ob-poc".resource_instance_attributes
@@ -330,7 +330,7 @@ impl CustomOperation for ResourceSetAttrOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(uuid::Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(uuid::Uuid::now_v7()))
     }
 }
 

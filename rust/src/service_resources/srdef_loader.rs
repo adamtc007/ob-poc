@@ -378,7 +378,7 @@ impl SrdefLoader {
                 debug!("Updated SRDEF: {}", srdef_id);
             } else {
                 // Insert new
-                let resource_id = Uuid::new_v4();
+                let resource_id = Uuid::now_v7();
                 sqlx::query(
                     r#"
                     INSERT INTO "ob-poc".service_resource_types

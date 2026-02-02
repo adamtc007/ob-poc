@@ -199,7 +199,7 @@ mod tests {
         let uuid = FirstName::uuid();
 
         let source = ValueSource::DocumentExtraction {
-            document_id: Uuid::new_v4(),
+            document_id: Uuid::now_v7(),
             page: Some(1),
             confidence: 0.95,
         };

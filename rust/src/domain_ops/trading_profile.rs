@@ -132,7 +132,7 @@ impl CustomOperation for TradingProfileImportOp {
         let document_json = serde_json::to_value(&document)?;
 
         // Insert profile
-        let profile_id = Uuid::new_v4();
+        let profile_id = Uuid::now_v7();
 
         sqlx::query(
             r#"INSERT INTO "ob-poc".cbu_trading_profiles
@@ -164,7 +164,7 @@ impl CustomOperation for TradingProfileImportOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(Uuid::now_v7()))
     }
 }
 
@@ -706,7 +706,7 @@ async fn materialize_ssi(
     refs: &ReferenceMaps,
     opts: &MaterializationOptions,
 ) -> Result<Uuid> {
-    let ssi_id = Uuid::new_v4();
+    let ssi_id = Uuid::now_v7();
 
     // Determine SSI type from category
     let ssi_type = match category {
@@ -1016,7 +1016,7 @@ async fn materialize_isda_agreements(
             .unwrap_or(agreement_date);
 
         // Insert ISDA agreement
-        let isda_id = Uuid::new_v4();
+        let isda_id = Uuid::now_v7();
         tracing::debug!(
             counterparty = %counterparty_entity_id,
             agreement_date = %agreement_date,
@@ -1093,7 +1093,7 @@ async fn materialize_isda_agreements(
                 None
             };
 
-            let csa_id = Uuid::new_v4();
+            let csa_id = Uuid::now_v7();
             tracing::debug!(
                 csa_type = %csa.csa_type,
                 collateral_ssi_id = ?collateral_ssi_id,
@@ -1361,7 +1361,7 @@ impl CustomOperation for TradingProfileCreateDraftOp {
         _verb_call: &VerbCall,
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
-        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+        Ok(ExecutionResult::Uuid(Uuid::now_v7()))
     }
 }
 
@@ -3037,7 +3037,7 @@ impl CustomOperation for TradingProfileAddImMandateOp {
             .unwrap_or(true);
 
         // Generate a unique mandate ID
-        let mandate_id = Uuid::new_v4().to_string();
+        let mandate_id = Uuid::now_v7().to_string();
 
         // Resolve manager entity if needed - for now use manager_ref as both ID and name
         // In a fuller implementation, we'd look up the entity by LEI/BIC/UUID/NAME

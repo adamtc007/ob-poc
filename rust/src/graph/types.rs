@@ -956,7 +956,7 @@ impl OwnershipEdge {
         ownership_type: OwnershipType,
     ) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             from_entity_id,
             to_entity_id,
             percentage,
@@ -1005,7 +1005,7 @@ pub struct ControlEdge {
 impl ControlEdge {
     pub fn new(controller_id: Uuid, controlled_id: Uuid, control_type: ControlType) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             controller_id,
             controlled_id,
             control_type,
@@ -1046,7 +1046,7 @@ pub struct FundEdge {
 impl FundEdge {
     pub fn new(parent_id: Uuid, child_id: Uuid, relationship_type: FundRelationshipType) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             parent_id,
             child_id,
             relationship_type,
@@ -1110,7 +1110,7 @@ pub struct RoleAssignment {
 impl RoleAssignment {
     pub fn new(cbu_id: Uuid, entity_id: Uuid, role: String) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             cbu_id,
             entity_id,
             role,
@@ -2615,9 +2615,9 @@ mod tests {
     #[test]
     fn test_navigation_history_push_and_back() {
         let mut history = NavigationHistory::new();
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        let id3 = Uuid::new_v4();
+        let id1 = Uuid::now_v7();
+        let id2 = Uuid::now_v7();
+        let id3 = Uuid::now_v7();
 
         // Push locations to back_stack
         history.push(id1);
@@ -2629,7 +2629,7 @@ mod tests {
 
         // go_back pops from back_stack (returns id3, the last pushed)
         // and pushes current to forward_stack
-        let back = history.go_back(Some(Uuid::new_v4())); // current position
+        let back = history.go_back(Some(Uuid::now_v7())); // current position
         assert_eq!(back, Some(id3));
         assert!(history.can_go_forward());
 
@@ -2642,8 +2642,8 @@ mod tests {
     #[test]
     fn test_navigation_history_clear() {
         let mut history = NavigationHistory::new();
-        history.push(Uuid::new_v4());
-        history.push(Uuid::new_v4());
+        history.push(Uuid::now_v7());
+        history.push(Uuid::now_v7());
 
         history.clear();
 

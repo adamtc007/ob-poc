@@ -461,8 +461,8 @@ mod tests {
     fn test_view_transition_zoom_in() {
         let mut transition = ViewTransition::new();
         let mut camera = Camera2D::new();
-        let cbu_id = Uuid::new_v4();
-        let all_cbus = vec![cbu_id.to_string(), Uuid::new_v4().to_string()];
+        let cbu_id = Uuid::now_v7();
+        let all_cbus = vec![cbu_id.to_string(), Uuid::now_v7().to_string()];
 
         let action = transition.zoom_into_cbu(
             cbu_id,
@@ -482,7 +482,7 @@ mod tests {
     fn test_view_transition_zoom_out() {
         let mut transition = ViewTransition::new();
         let mut camera = Camera2D::new();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         let all_cbus = vec![cbu_id.to_string()];
 
         // First zoom in
@@ -510,8 +510,8 @@ mod tests {
     fn test_cbu_opacity() {
         let mut transition = ViewTransition::new();
         let mut camera = Camera2D::new();
-        let target_id = Uuid::new_v4();
-        let other_id = Uuid::new_v4();
+        let target_id = Uuid::now_v7();
+        let other_id = Uuid::now_v7();
         let all_cbus = vec![target_id.to_string(), other_id.to_string()];
 
         transition.zoom_into_cbu(

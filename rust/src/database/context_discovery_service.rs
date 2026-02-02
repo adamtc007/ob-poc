@@ -365,7 +365,7 @@ mod tests {
     #[test]
     fn test_cbu_context_conversion() {
         let row = CbuContextRow {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             name: "Test Fund".to_string(),
             jurisdiction: Some("LU".to_string()),
             client_type: Some("FUND".to_string()),
@@ -384,7 +384,7 @@ mod tests {
     #[test]
     fn test_linked_context_conversion() {
         let row = LinkedContextRow {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             context_type: "kyc_case".to_string(),
             label: "NEW_CLIENT Case".to_string(),
             status: Some("INTAKE".to_string()),

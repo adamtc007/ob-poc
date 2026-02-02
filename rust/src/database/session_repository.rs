@@ -387,7 +387,7 @@ impl SessionRepository {
         domains: &[String],
         execution_ms: Option<i32>,
     ) -> Result<DslSnapshot, sqlx::Error> {
-        let snapshot_id = Uuid::new_v4();
+        let snapshot_id = Uuid::now_v7();
         let checksum = compute_checksum(dsl_source);
         let now = Utc::now();
 
@@ -500,7 +500,7 @@ impl SessionRepository {
         error_message: Option<&str>,
         metadata: Option<serde_json::Value>,
     ) -> Result<Uuid, sqlx::Error> {
-        let event_id = Uuid::new_v4();
+        let event_id = Uuid::now_v7();
         let metadata = metadata.unwrap_or(serde_json::json!({}));
 
         sqlx::query!(
@@ -663,7 +663,7 @@ impl SessionRepository {
         }
 
         // Create new session for this CBU
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
         let now = Utc::now();
         let expires_at = now + chrono::Duration::hours(24);
 

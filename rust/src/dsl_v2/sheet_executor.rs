@@ -663,7 +663,7 @@ impl<'a> SheetExecutor<'a> {
         template_dsl: Option<&str>,
         submitted_by: Option<&str>,
     ) -> Result<Uuid> {
-        let execution_id = Uuid::new_v4();
+        let execution_id = Uuid::now_v7();
 
         // Collect source statements
         let source_statements: Vec<String> =
@@ -749,7 +749,7 @@ impl<'a> SheetExecutor<'a> {
         template_dsl: Option<&str>,
         submitted_by: Option<&str>,
     ) -> Result<Uuid> {
-        let execution_id = Uuid::new_v4();
+        let execution_id = Uuid::now_v7();
 
         // Collect source statements from RunSheet entries
         let source_statements: Vec<String> = run_sheet
@@ -961,7 +961,7 @@ mod tests {
     #[test]
     fn test_substitute_symbols_basic() {
         let mut symbols = HashMap::new();
-        let uuid = Uuid::new_v4();
+        let uuid = Uuid::now_v7();
         symbols.insert("fund".to_string(), uuid);
 
         let source = "(cbu.assign-role :cbu-id @fund :role \"DIRECTOR\")";
@@ -985,8 +985,8 @@ mod tests {
     #[test]
     fn test_substitute_symbols_multiple() {
         let mut symbols = HashMap::new();
-        let uuid1 = Uuid::new_v4();
-        let uuid2 = Uuid::new_v4();
+        let uuid1 = Uuid::now_v7();
+        let uuid2 = Uuid::now_v7();
         symbols.insert("fund".to_string(), uuid1);
         symbols.insert("director".to_string(), uuid2);
 

@@ -35,7 +35,7 @@ impl BodsService {
 
     /// Attach an identifier to an entity (LEI, BIC, ISIN, REG_NUM, etc.)
     pub async fn attach_identifier(&self, fields: &NewEntityIdentifier) -> Result<Uuid> {
-        let identifier_id = Uuid::new_v4();
+        let identifier_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -229,7 +229,7 @@ impl BodsService {
 
     /// Create a GLEIF relationship (corporate hierarchy for accounting consolidation)
     pub async fn create_gleif_relationship(&self, fields: &NewGleifRelationship) -> Result<Uuid> {
-        let gleif_rel_id = Uuid::new_v4();
+        let gleif_rel_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -427,7 +427,7 @@ impl BodsService {
 
     /// Add PEP status for a person
     pub async fn add_pep_status(&self, fields: &NewPersonPepStatus) -> Result<Uuid> {
-        let pep_status_id = Uuid::new_v4();
+        let pep_status_id = Uuid::now_v7();
 
         sqlx::query(
             r#"

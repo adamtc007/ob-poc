@@ -382,17 +382,17 @@ mod tests {
             {
                 let mut dims = DimensionValues::default();
                 dims.set("jurisdiction", "LU");
-                SourceItem::new(Uuid::new_v4(), "Fund Alpha", dims)
+                SourceItem::new(Uuid::now_v7(), "Fund Alpha", dims)
             },
             {
                 let mut dims = DimensionValues::default();
                 dims.set("jurisdiction", "LU");
-                SourceItem::new(Uuid::new_v4(), "Fund Beta", dims)
+                SourceItem::new(Uuid::now_v7(), "Fund Beta", dims)
             },
             {
                 let mut dims = DimensionValues::default();
                 dims.set("jurisdiction", "IE");
-                SourceItem::new(Uuid::new_v4(), "Fund Gamma", dims)
+                SourceItem::new(Uuid::now_v7(), "Fund Gamma", dims)
             },
         ]
     }

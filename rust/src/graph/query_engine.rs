@@ -567,7 +567,7 @@ impl GraphQueryEngine {
             });
 
         Ok(GraphComparison {
-            query_id: Uuid::new_v4().to_string(),
+            query_id: Uuid::now_v7().to_string(),
             timestamp: chrono::Utc::now(),
             left_id: left.query_id.clone(),
             right_id: right.query_id.clone(),

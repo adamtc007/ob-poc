@@ -73,7 +73,7 @@ mod tests {
 
         // Create a test snapshot via SQL (simulating scope.commit)
         let test_desc = "test fund search";
-        let test_session_id = Uuid::new_v4();
+        let test_session_id = Uuid::now_v7();
 
         let row = sqlx::query(
             r#"
@@ -167,7 +167,7 @@ mod tests {
         let group_b: Uuid = "22222222-2222-2222-2222-222222222222".parse()?; // Aviva
 
         // Create snapshot in group A
-        let snapshot_id = Uuid::new_v4();
+        let snapshot_id = Uuid::now_v7();
         sqlx::query(
             r#"
             INSERT INTO "ob-poc".scope_snapshots
@@ -178,7 +178,7 @@ mod tests {
         )
         .bind(snapshot_id)
         .bind(group_a)
-        .bind(Uuid::new_v4())
+        .bind(Uuid::now_v7())
         .execute(pool)
         .await?;
 
@@ -274,7 +274,7 @@ mod tests {
         println!("\n=== Test: Replay Determinism ===\n");
 
         // Create snapshot with specific entity order
-        let snapshot_id = Uuid::new_v4();
+        let snapshot_id = Uuid::now_v7();
         let group_id: Uuid = "11111111-1111-1111-1111-111111111111".parse()?;
 
         // Use deterministic UUIDs for testing
@@ -295,7 +295,7 @@ mod tests {
         .bind(snapshot_id)
         .bind(group_id)
         .bind(&entity_ids)
-        .bind(Uuid::new_v4())
+        .bind(Uuid::now_v7())
         .execute(pool)
         .await?;
 
@@ -399,7 +399,7 @@ mod tests {
         let group_id: Uuid = "11111111-1111-1111-1111-111111111111".parse()?;
 
         // Step 1: Create a snapshot with some entities
-        let snapshot_id = Uuid::new_v4();
+        let snapshot_id = Uuid::now_v7();
         let test_entity_ids: Vec<Uuid> = sqlx::query_scalar(
             r#"
             SELECT entity_id
@@ -431,7 +431,7 @@ mod tests {
         .bind(snapshot_id)
         .bind(group_id)
         .bind(&test_entity_ids)
-        .bind(Uuid::new_v4())
+        .bind(Uuid::now_v7())
         .execute(pool)
         .await?;
 

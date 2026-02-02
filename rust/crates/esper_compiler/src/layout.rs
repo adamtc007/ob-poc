@@ -137,12 +137,13 @@ fn calculate_subtree_width(
     total_width
 }
 
+#[allow(clippy::too_many_arguments)]
 fn position_tree(
     input: &dyn GraphInput,
     entity_id: u64,
     center_x: f32,
     y: f32,
-    depth: usize,
+    _depth: usize,
     config: &LayoutConfig,
     subtree_widths: &HashMap<u64, f32>,
     positions: &mut HashMap<u64, Position>,
@@ -175,7 +176,7 @@ fn position_tree(
             child,
             child_center_x,
             child_y,
-            depth + 1,
+            _depth + 1,
             config,
             subtree_widths,
             positions,
@@ -392,7 +393,7 @@ fn position_radial_children(
     center_x: f32,
     center_y: f32,
     radius: f32,
-    config: &LayoutConfig,
+    _config: &LayoutConfig,
     positions: &mut HashMap<u64, Position>,
 ) {
     let children = input.children(entity_id);
@@ -414,7 +415,7 @@ fn position_radial_children(
             x,
             y,
             radius * 0.7, // Shrink radius for deeper levels
-            config,
+            _config,
             positions,
         );
     }

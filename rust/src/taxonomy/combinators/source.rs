@@ -156,8 +156,8 @@ mod tests {
     #[tokio::test]
     async fn test_vec_source() {
         let items = vec![
-            SourceItem::new(Uuid::new_v4(), "Item 1", DimensionValues::default()),
-            SourceItem::new(Uuid::new_v4(), "Item 2", DimensionValues::default()),
+            SourceItem::new(Uuid::now_v7(), "Item 1", DimensionValues::default()),
+            SourceItem::new(Uuid::now_v7(), "Item 2", DimensionValues::default()),
         ];
         let source = VecSource::new(items.clone());
         let fetched = source.fetch().await.unwrap();

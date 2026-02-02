@@ -43,7 +43,7 @@ async fn test_lock_key_is_stable() {
 async fn test_advisory_lock_acquired_and_released() {
     let pool = get_test_pool().await;
 
-    let entity_id = Uuid::new_v4().to_string();
+    let entity_id = Uuid::now_v7().to_string();
     let key = lock_key("test_entity", &entity_id);
 
     // Start transaction and acquire lock
@@ -76,7 +76,7 @@ async fn test_advisory_lock_acquired_and_released() {
 async fn test_try_lock_returns_false_on_contention() {
     let pool = get_test_pool().await;
 
-    let entity_id = Uuid::new_v4().to_string();
+    let entity_id = Uuid::now_v7().to_string();
     let key = lock_key("test_entity", &entity_id);
 
     // Session A acquires lock
@@ -199,7 +199,7 @@ async fn test_concurrent_sessions_with_locking() {
     let pool = Arc::new(get_test_pool().await);
     let barrier = Arc::new(Barrier::new(2));
 
-    let entity_id = Uuid::new_v4().to_string();
+    let entity_id = Uuid::now_v7().to_string();
     let locks = vec![LockKey::write("person", &entity_id)];
 
     // Session A: Acquires lock, holds it for 200ms, then releases
@@ -263,7 +263,7 @@ async fn test_concurrent_sessions_with_locking() {
 async fn test_lock_released_on_rollback() {
     let pool = get_test_pool().await;
 
-    let entity_id = Uuid::new_v4().to_string();
+    let entity_id = Uuid::now_v7().to_string();
     let key = lock_key("entity", &entity_id);
 
     // Session A acquires lock then rolls back

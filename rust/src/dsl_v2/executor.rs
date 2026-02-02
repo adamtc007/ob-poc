@@ -681,7 +681,7 @@ impl Default for ExecutionContext {
             batch_index: None,
             audit_user: None,
             transaction_id: None,
-            execution_id: Uuid::new_v4(),
+            execution_id: Uuid::now_v7(),
             idempotency_enabled: true,
             current_selection: None,
             pending_view_state: None,
@@ -2924,7 +2924,7 @@ mod tests {
     #[test]
     fn test_execution_context_bind_resolve() {
         let mut ctx = ExecutionContext::new();
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         ctx.bind("test", id);
         assert_eq!(ctx.resolve("test"), Some(id));
         assert_eq!(ctx.resolve("nonexistent"), None);

@@ -214,7 +214,7 @@ mod tests {
 
         data.entity_aliases.insert(
             "barclays".to_string(),
-            ("Barclays PLC".to_string(), Some(Uuid::new_v4())),
+            ("Barclays PLC".to_string(), Some(Uuid::now_v7())),
         );
         data.lexicon_tokens.insert(
             "counterparty".to_string(),

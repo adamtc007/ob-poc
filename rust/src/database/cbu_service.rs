@@ -66,7 +66,7 @@ impl CbuService {
 
     /// Create a new CBU
     pub async fn create_cbu(&self, fields: &NewCbuFields) -> Result<Uuid> {
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
 
         sqlx::query(
             r#"
@@ -198,7 +198,7 @@ impl CbuService {
 
     /// Upsert CBU (create or update)
     pub async fn upsert_cbu(&self, cbu_id: Option<Uuid>, fields: &NewCbuFields) -> Result<Uuid> {
-        let id = cbu_id.unwrap_or_else(Uuid::new_v4);
+        let id = cbu_id.unwrap_or_else(Uuid::now_v7);
 
         sqlx::query(
             r#"

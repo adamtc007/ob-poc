@@ -457,7 +457,7 @@ impl<R: ReferenceResolver> ViewportExecutor<R> {
                 let matrix = self
                     .resolver
                     .current_matrix()
-                    .unwrap_or_else(|| InstrumentMatrixRef(Uuid::new_v4()));
+                    .unwrap_or_else(|| InstrumentMatrixRef(Uuid::now_v7()));
                 Ok(FocusTransition::FocusMatrix {
                     cbu,
                     matrix,
@@ -621,12 +621,12 @@ mod tests {
 
     fn simple_resolver() -> SimpleResolver {
         let mut resolver = SimpleResolver::default();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         resolver.cbus.insert("Apex Fund".to_string(), cbu_id);
         resolver.current_cbu = Some(CbuRef(cbu_id));
-        resolver.current_matrix = Some(InstrumentMatrixRef(Uuid::new_v4()));
+        resolver.current_matrix = Some(InstrumentMatrixRef(Uuid::now_v7()));
 
-        let entity_id = Uuid::new_v4();
+        let entity_id = Uuid::now_v7();
         resolver.entities.insert(
             "John Smith".to_string(),
             (entity_id, ConcreteEntityType::Person),

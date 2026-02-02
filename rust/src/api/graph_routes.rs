@@ -582,7 +582,7 @@ async fn calculate_route(
     destination: (String, NodeType),
     pause_at_forks: bool,
 ) -> Result<Route, (StatusCode, String)> {
-    let route_id = Uuid::new_v4().to_string();
+    let route_id = Uuid::now_v7().to_string();
     let mut waypoints = Vec::new();
     let mut level_transitions = 0;
 

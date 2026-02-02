@@ -406,7 +406,7 @@ impl RunbookEvent {
     /// Create an audit log entry from this event
     pub fn to_audit_entry(&self, session_id: &str, runbook_id: Option<Uuid>) -> AuditLogEntry {
         AuditLogEntry {
-            id: Uuid::new_v4(),
+            id: Uuid::now_v7(),
             timestamp: chrono::Utc::now(),
             session_id: session_id.to_string(),
             runbook_id,
@@ -424,9 +424,9 @@ mod tests {
     #[test]
     fn test_event_serialization() {
         let event = RunbookEvent::CommandStaged {
-            runbook_id: Uuid::new_v4(),
+            runbook_id: Uuid::now_v7(),
             command: StagedCommandSummary {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 source_order: 1,
                 verb: "entity.list".to_string(),
                 description: Some("List Irish funds".to_string()),
@@ -434,7 +434,7 @@ mod tests {
                 entity_count: 3,
             },
             runbook_summary: RunbookSummary {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 status: RunbookStatus::Building,
                 command_count: 1,
                 resolved_count: 1,
@@ -453,8 +453,8 @@ mod tests {
     #[test]
     fn test_audit_category() {
         let event = RunbookEvent::ResolutionAmbiguous {
-            runbook_id: Uuid::new_v4(),
-            command_id: Uuid::new_v4(),
+            runbook_id: Uuid::now_v7(),
+            command_id: Uuid::now_v7(),
             arg_name: "entity-ids".to_string(),
             original_ref: "main manco".to_string(),
             candidates: vec![],

@@ -34,7 +34,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # UUID
-uuid = { version = "1.4", features = ["v4", "serde"] }
+uuid = { version = "1.20", features = ["v4", "serde", "v7"] }
 
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }

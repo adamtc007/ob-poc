@@ -45,7 +45,7 @@ impl Default for ExecutionContext {
             batch_index: None,
             audit_user: None,
             transaction_id: None,
-            execution_id: Uuid::new_v4(),
+            execution_id: Uuid::now_v7(),
             idempotency_enabled: true,
         }
     }
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn test_bind_and_resolve() {
         let mut ctx = ExecutionContext::new();
-        let pk = Uuid::new_v4();
+        let pk = Uuid::now_v7();
 
         ctx.bind("fund", pk);
         assert_eq!(ctx.resolve("fund"), Some(pk));
@@ -193,7 +193,7 @@ mod tests {
     #[test]
     fn test_bind_typed() {
         let mut ctx = ExecutionContext::new();
-        let pk = Uuid::new_v4();
+        let pk = Uuid::now_v7();
 
         ctx.bind_typed("fund", pk, "cbu");
         assert_eq!(ctx.resolve("fund"), Some(pk));
@@ -203,11 +203,11 @@ mod tests {
     #[test]
     fn test_parent_child_resolution() {
         let mut parent = ExecutionContext::new();
-        let parent_pk = Uuid::new_v4();
+        let parent_pk = Uuid::now_v7();
         parent.bind_typed("shared", parent_pk, "cbu");
 
         let mut child = parent.child_for_iteration(0);
-        let child_pk = Uuid::new_v4();
+        let child_pk = Uuid::now_v7();
         child.bind_typed("local", child_pk, "entity");
 
         // Child can resolve both local and parent
@@ -222,11 +222,11 @@ mod tests {
     #[test]
     fn test_local_shadows_parent() {
         let mut parent = ExecutionContext::new();
-        let parent_pk = Uuid::new_v4();
+        let parent_pk = Uuid::now_v7();
         parent.bind("x", parent_pk);
 
         let mut child = parent.child_for_iteration(0);
-        let child_pk = Uuid::new_v4();
+        let child_pk = Uuid::now_v7();
         child.bind("x", child_pk);
 
         // Child's local binding shadows parent
@@ -236,11 +236,11 @@ mod tests {
     #[test]
     fn test_effective_symbols() {
         let mut parent = ExecutionContext::new();
-        parent.bind("a", Uuid::new_v4());
-        parent.bind("b", Uuid::new_v4());
+        parent.bind("a", Uuid::now_v7());
+        parent.bind("b", Uuid::now_v7());
 
         let mut child = parent.child_for_iteration(0);
-        child.bind("c", Uuid::new_v4());
+        child.bind("c", Uuid::now_v7());
 
         let effective = child.effective_symbols();
         assert!(effective.contains_key("a"));
@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn test_with_execution_id() {
-        let exec_id = Uuid::new_v4();
+        let exec_id = Uuid::now_v7();
         let ctx = ExecutionContext::with_execution_id(exec_id);
         assert_eq!(ctx.execution_id, exec_id);
     }
@@ -268,7 +268,7 @@ mod tests {
     #[test]
     fn test_has() {
         let mut ctx = ExecutionContext::new();
-        ctx.bind("exists", Uuid::new_v4());
+        ctx.bind("exists", Uuid::now_v7());
 
         assert!(ctx.has("exists"));
         assert!(!ctx.has("not_exists"));

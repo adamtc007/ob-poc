@@ -305,10 +305,10 @@ mod tests {
 
     #[test]
     fn test_windowed_scope() {
-        let center = Uuid::new_v4();
+        let center = Uuid::now_v7();
         let scope = SessionScope::windowed(
             GraphScope::SingleCbu {
-                cbu_id: Uuid::new_v4(),
+                cbu_id: Uuid::now_v7(),
                 cbu_name: "Test Fund".to_string(),
             },
             center,
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn test_summary_only_scope() {
         let expandable = vec![ExpandableNode {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             name: "Allianz SE".to_string(),
             collapsed_child_count: 47,
             child_type_hint: "47 subfunds".to_string(),
@@ -336,7 +336,7 @@ mod tests {
 
         let scope = SessionScope::summary_only(
             GraphScope::Book {
-                apex_entity_id: Uuid::new_v4(),
+                apex_entity_id: Uuid::now_v7(),
                 apex_name: "Allianz".to_string(),
             },
             ScopeSummary::default(),
@@ -372,7 +372,7 @@ mod tests {
     fn test_display_summary() {
         let scope = SessionScope {
             definition: GraphScope::SingleCbu {
-                cbu_id: Uuid::new_v4(),
+                cbu_id: Uuid::now_v7(),
                 cbu_name: "Alpha Fund".to_string(),
             },
             stats: ScopeSummary {

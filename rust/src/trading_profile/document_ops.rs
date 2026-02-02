@@ -186,7 +186,7 @@ pub async fn create_draft_profile(
     .fetch_one(pool)
     .await?;
 
-    let profile_id = Uuid::new_v4();
+    let profile_id = Uuid::now_v7();
     let doc_json = serde_json::to_value(&doc)?;
     let hash = compute_document_hash(&doc);
 
@@ -2173,7 +2173,7 @@ pub async fn clone_to_cbu(
     .fetch_one(pool)
     .await?;
 
-    let target_profile_id = Uuid::new_v4();
+    let target_profile_id = Uuid::now_v7();
     let doc_json = serde_json::to_value(&doc)?;
     let hash = compute_document_hash(&doc);
     let now = chrono::Utc::now();

@@ -337,7 +337,7 @@ mod tests {
 
     #[test]
     fn test_fetch_options_builder() {
-        let id = uuid::Uuid::new_v4();
+        let id = uuid::Uuid::now_v7();
         let opts = FetchOptions::new().with_raw().with_decision_id(id);
 
         assert!(opts.include_raw);

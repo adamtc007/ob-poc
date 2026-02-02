@@ -74,7 +74,7 @@ pub fn expand_templates(
     template_registry: &TemplateRegistry,
     template_args: &std::collections::HashMap<String, serde_json::Value>,
 ) -> Result<ExpansionOutput, ExpansionError> {
-    let expansion_id = Uuid::new_v4();
+    let expansion_id = Uuid::now_v7();
     let source_digest = hash_canonical(source_dsl);
 
     let mut template_digests = Vec::new();

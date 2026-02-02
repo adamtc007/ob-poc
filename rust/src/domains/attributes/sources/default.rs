@@ -97,7 +97,7 @@ mod tests {
     #[tokio::test]
     async fn test_can_handle() {
         let mut source = DefaultValueSource::new();
-        let test_uuid = Uuid::new_v4();
+        let test_uuid = Uuid::now_v7();
 
         assert!(!source.can_handle(&test_uuid));
 
@@ -109,7 +109,7 @@ mod tests {
     async fn test_fetch_default_value() {
         let mut source = DefaultValueSource::new();
         let context = ExecutionContext::new();
-        let test_uuid = Uuid::new_v4();
+        let test_uuid = Uuid::now_v7();
 
         source.add_default(test_uuid, JsonValue::String("default_value".to_string()));
 

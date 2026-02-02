@@ -57,7 +57,7 @@ impl WorkflowInstance {
     ) -> Self {
         let now = Utc::now();
         Self {
-            instance_id: Uuid::new_v4(),
+            instance_id: Uuid::now_v7(),
             workflow_id,
             version,
             subject_type,
@@ -379,7 +379,7 @@ mod tests {
             "kyc_onboarding".to_string(),
             1,
             "cbu".to_string(),
-            Uuid::new_v4(),
+            Uuid::now_v7(),
             "INTAKE".to_string(),
             Some("user@example.com".to_string()),
         );
@@ -396,7 +396,7 @@ mod tests {
             "kyc_onboarding".to_string(),
             1,
             "cbu".to_string(),
-            Uuid::new_v4(),
+            Uuid::now_v7(),
             "INTAKE".to_string(),
             None,
         );

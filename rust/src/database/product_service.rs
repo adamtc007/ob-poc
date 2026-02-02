@@ -49,7 +49,7 @@ impl ProductService {
     }
 
     pub async fn create_product(&self, fields: &NewProductFields) -> Result<Uuid> {
-        let product_id = Uuid::new_v4();
+        let product_id = Uuid::now_v7();
         sqlx::query(r#"INSERT INTO "ob-poc".products (product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())"#)
             .bind(product_id).bind(&fields.name).bind(&fields.description).bind(&fields.product_code)
             .bind(&fields.product_category).bind(&fields.regulatory_framework).bind(fields.min_asset_requirement)

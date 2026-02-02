@@ -491,7 +491,7 @@ mod tests {
         // Add 3 clients
         for i in 0..3 {
             let mut client = TaxonomyNode::new(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 NodeType::Client,
                 format!("Client {}", i),
                 DimensionValues::default(),
@@ -500,7 +500,7 @@ mod tests {
             // Each client has 5 CBUs
             for j in 0..5 {
                 let cbu = TaxonomyNode::new(
-                    Uuid::new_v4(),
+                    Uuid::now_v7(),
                     NodeType::Cbu,
                     format!("CBU {}-{}", i, j),
                     DimensionValues::default(),
@@ -566,7 +566,7 @@ mod tests {
         let mut current = &mut deep;
         for i in 0..7 {
             let child = TaxonomyNode::new(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 NodeType::Entity,
                 format!("Level {}", i),
                 DimensionValues::default(),

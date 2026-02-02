@@ -130,7 +130,7 @@ impl CrudService {
 
     /// Log a CRUD operation
     pub async fn log_crud_operation(&self, log: CrudOperationLog) -> Result<Uuid> {
-        let operation_id = Uuid::new_v4();
+        let operation_id = Uuid::now_v7();
 
         let (ai_provider, ai_model) = log
             .ai_context

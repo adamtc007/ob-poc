@@ -557,7 +557,7 @@ async fn create_entity(
     entity_type_id: Uuid,
     jurisdiction: Option<&str>,
 ) -> Result<Uuid> {
-    let entity_id = Uuid::new_v4();
+    let entity_id = Uuid::now_v7();
 
     // Insert into base entities table
     sqlx::query(
@@ -590,7 +590,7 @@ async fn create_entity(
                 VALUES ($1, $2, $3, $4)
                 "#,
             )
-            .bind(Uuid::new_v4())
+            .bind(Uuid::now_v7())
             .bind(entity_id)
             .bind(name)
             .bind(jurisdiction)

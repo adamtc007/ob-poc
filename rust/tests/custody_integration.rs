@@ -26,7 +26,7 @@ async fn setup_pool() -> PgPool {
 /// Test helper to create a test CBU with unique name
 async fn create_test_cbu(pool: &PgPool, name: &str) -> Uuid {
     // Add UUID suffix to ensure uniqueness across parallel test runs
-    let unique_name = format!("{} - {}", name, Uuid::new_v4());
+    let unique_name = format!("{} - {}", name, Uuid::now_v7());
     sqlx::query_scalar!(
         r#"
         INSERT INTO "ob-poc".cbus (name, jurisdiction, client_type)

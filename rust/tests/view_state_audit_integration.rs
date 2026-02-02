@@ -42,7 +42,7 @@ mod view_state_audit_tests {
                 .unwrap_or_else(|_| "postgresql:///data_designer".into());
 
             let pool = PgPool::connect(&url).await?;
-            let prefix = format!("vstest_{}", &Uuid::new_v4().to_string()[..8]);
+            let prefix = format!("vstest_{}", &Uuid::now_v7().to_string()[..8]);
             Ok(Self { pool, prefix })
         }
 
@@ -121,12 +121,12 @@ mod view_state_audit_tests {
         // Create a test view state
         let taxonomy = TaxonomyNode::empty_root();
         let mut view_state = ViewState::from_taxonomy(taxonomy, TaxonomyContext::Universe);
-        view_state.selection = vec![Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
+        view_state.selection = vec![Uuid::now_v7(), Uuid::now_v7(), Uuid::now_v7()];
 
         let repo = ViewStateAuditRepository::new(db.pool.clone());
 
         // Create a fake idempotency key for this test
-        let idempotency_key = format!("{}_test_idem_{}", db.prefix, Uuid::new_v4());
+        let idempotency_key = format!("{}_test_idem_{}", db.prefix, Uuid::now_v7());
 
         // First, we need an idempotency record to link to
         // Insert a minimal idempotency record
@@ -136,7 +136,7 @@ mod view_state_audit_tests {
                VALUES ($1, $2, 0, 'test.verb', '', 'success', '{}')"#,
         )
         .bind(&idempotency_key)
-        .bind(Uuid::new_v4())
+        .bind(Uuid::now_v7())
         .execute(&db.pool)
         .await?;
 
@@ -176,8 +176,8 @@ mod view_state_audit_tests {
         let db = TestDb::new().await?;
 
         let repo = ViewStateAuditRepository::new(db.pool.clone());
-        let idempotency_key = format!("{}_io_test_{}", db.prefix, Uuid::new_v4());
-        let execution_id = Uuid::new_v4();
+        let idempotency_key = format!("{}_io_test_{}", db.prefix, Uuid::now_v7());
+        let execution_id = Uuid::now_v7();
 
         // Create idempotency record
         sqlx::query(
@@ -193,7 +193,7 @@ mod view_state_audit_tests {
         // Create input view state with selection
         let taxonomy = TaxonomyNode::empty_root();
         let mut input_view = ViewState::from_taxonomy(taxonomy.clone(), TaxonomyContext::Universe);
-        input_view.selection = vec![Uuid::new_v4(), Uuid::new_v4()];
+        input_view.selection = vec![Uuid::now_v7(), Uuid::now_v7()];
 
         // Record input view state
         repo.record_input_view_state(&idempotency_key, &input_view)
@@ -201,7 +201,7 @@ mod view_state_audit_tests {
 
         // Create output view state (after operation)
         let mut output_view = ViewState::from_taxonomy(taxonomy, TaxonomyContext::Universe);
-        output_view.selection = vec![Uuid::new_v4()]; // Different selection after operation
+        output_view.selection = vec![Uuid::now_v7()]; // Different selection after operation
 
         // Record output view state
         repo.record_output_view_state(&idempotency_key, &output_view)
@@ -241,9 +241,9 @@ mod view_state_audit_tests {
         let repo = ViewStateAuditRepository::new(db.pool.clone());
 
         // Create some entity IDs that will be in selections
-        let entity1 = Uuid::new_v4();
-        let entity2 = Uuid::new_v4();
-        let entity3 = Uuid::new_v4();
+        let entity1 = Uuid::now_v7();
+        let entity2 = Uuid::now_v7();
+        let entity3 = Uuid::now_v7();
 
         // Record multiple view state changes with different selections
         for (i, selection) in [
@@ -254,7 +254,7 @@ mod view_state_audit_tests {
         .iter()
         .enumerate()
         {
-            let idempotency_key = format!("{}_entity_test_{}_{}", db.prefix, i, Uuid::new_v4());
+            let idempotency_key = format!("{}_entity_test_{}_{}", db.prefix, i, Uuid::now_v7());
 
             // Create idempotency record
             sqlx::query(
@@ -263,7 +263,7 @@ mod view_state_audit_tests {
                    VALUES ($1, $2, $3, 'view.test', '', 'success', '{}')"#,
             )
             .bind(&idempotency_key)
-            .bind(Uuid::new_v4())
+            .bind(Uuid::now_v7())
             .bind(i as i32)
             .execute(&db.pool)
             .await?;
@@ -359,7 +359,7 @@ mod view_state_audit_tests {
         let db = TestDb::new().await?;
         let repo = ViewStateAuditRepository::new(db.pool.clone());
 
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         // Create a valid session in dsl_sessions (FK target)
         let expires_at = Utc::now() + Duration::hours(24);
@@ -375,7 +375,7 @@ mod view_state_audit_tests {
 
         // Record multiple view state changes for a session
         for i in 0..5 {
-            let idempotency_key = format!("{}_session_hist_{}_{}", db.prefix, i, Uuid::new_v4());
+            let idempotency_key = format!("{}_session_hist_{}_{}", db.prefix, i, Uuid::now_v7());
 
             // Create idempotency record
             sqlx::query(
@@ -384,14 +384,14 @@ mod view_state_audit_tests {
                    VALUES ($1, $2, $3, 'view.universe', '', 'success', '{}')"#,
             )
             .bind(&idempotency_key)
-            .bind(Uuid::new_v4())
+            .bind(Uuid::now_v7())
             .bind(i)
             .execute(&db.pool)
             .await?;
 
             let taxonomy = TaxonomyNode::empty_root();
             let mut view_state = ViewState::from_taxonomy(taxonomy, TaxonomyContext::Universe);
-            view_state.selection = (0..i + 1).map(|_| Uuid::new_v4()).collect();
+            view_state.selection = (0..i + 1).map(|_| Uuid::now_v7()).collect();
 
             repo.record_view_state_change(ob_poc::database::RecordViewStateChange {
                 idempotency_key,
@@ -435,7 +435,7 @@ mod view_state_audit_tests {
         let db = TestDb::new().await?;
         let repo = ViewStateAuditRepository::new(db.pool.clone());
 
-        let idempotency_key = format!("{}_empty_sel_{}", db.prefix, Uuid::new_v4());
+        let idempotency_key = format!("{}_empty_sel_{}", db.prefix, Uuid::now_v7());
 
         // Create idempotency record
         sqlx::query(
@@ -444,7 +444,7 @@ mod view_state_audit_tests {
                VALUES ($1, $2, 0, 'view.clear', '', 'success', '{}')"#,
         )
         .bind(&idempotency_key)
-        .bind(Uuid::new_v4())
+        .bind(Uuid::now_v7())
         .execute(&db.pool)
         .await?;
 
@@ -478,7 +478,7 @@ mod view_state_audit_tests {
         let db = TestDb::new().await?;
         let repo = ViewStateAuditRepository::new(db.pool.clone());
 
-        let idempotency_key = format!("{}_large_sel_{}", db.prefix, Uuid::new_v4());
+        let idempotency_key = format!("{}_large_sel_{}", db.prefix, Uuid::now_v7());
 
         // Create idempotency record
         sqlx::query(
@@ -487,14 +487,14 @@ mod view_state_audit_tests {
                VALUES ($1, $2, 0, 'view.universe', '', 'success', '{}')"#,
         )
         .bind(&idempotency_key)
-        .bind(Uuid::new_v4())
+        .bind(Uuid::now_v7())
         .execute(&db.pool)
         .await?;
 
         // Create view state with 1000 items in selection
         let taxonomy = TaxonomyNode::empty_root();
         let mut view_state = ViewState::from_taxonomy(taxonomy, TaxonomyContext::Universe);
-        view_state.selection = (0..1000).map(|_| Uuid::new_v4()).collect();
+        view_state.selection = (0..1000).map(|_| Uuid::now_v7()).collect();
 
         let change_id = repo
             .record_view_state_change(ob_poc::database::RecordViewStateChange {

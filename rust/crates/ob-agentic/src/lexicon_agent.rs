@@ -280,7 +280,7 @@ mod tests {
     async fn test_lexicon_agent_pipeline() {
         let lexicon = test_lexicon();
         let mut pipeline = LexiconAgentPipeline::new(lexicon);
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         pipeline.set_active_cbu(session_id, "cbu-123".to_string(), "Test Fund".to_string());
 
@@ -298,7 +298,7 @@ mod tests {
     async fn test_unknown_intent() {
         let lexicon = test_lexicon();
         let mut pipeline = LexiconAgentPipeline::new(lexicon);
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         let response = pipeline.process(session_id, "hello world").await.unwrap();
 

@@ -747,9 +747,9 @@ mod tests {
         let detector = PatternDetector::new();
         let mut graph: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
 
-        let a = Uuid::new_v4();
-        let b = Uuid::new_v4();
-        let c = Uuid::new_v4();
+        let a = Uuid::now_v7();
+        let b = Uuid::now_v7();
+        let c = Uuid::now_v7();
 
         // Create cycle: A → B → C → A
         graph.insert(a, vec![b]);
@@ -772,9 +772,9 @@ mod tests {
         let detector = PatternDetector::new();
         let mut graph: HashMap<Uuid, Vec<Uuid>> = HashMap::new();
 
-        let a = Uuid::new_v4();
-        let b = Uuid::new_v4();
-        let c = Uuid::new_v4();
+        let a = Uuid::now_v7();
+        let b = Uuid::now_v7();
+        let c = Uuid::now_v7();
 
         // Linear chain: A → B → C (no cycle)
         graph.insert(a, vec![b]);

@@ -255,7 +255,7 @@ mod tests {
         let mut session = ReplSession::new();
 
         let mut bindings = HashMap::new();
-        bindings.insert("fund".to_string(), Uuid::new_v4());
+        bindings.insert("fund".to_string(), Uuid::now_v7());
 
         let mut types = HashMap::new();
         types.insert("fund".to_string(), "cbu".to_string());
@@ -274,12 +274,12 @@ mod tests {
 
         // First block
         let mut bindings1 = HashMap::new();
-        bindings1.insert("fund".to_string(), Uuid::new_v4());
+        bindings1.insert("fund".to_string(), Uuid::now_v7());
         session.append_executed(empty_program(), bindings1, HashMap::new());
 
         // Second block
         let mut bindings2 = HashMap::new();
-        bindings2.insert("person".to_string(), Uuid::new_v4());
+        bindings2.insert("person".to_string(), Uuid::now_v7());
         session.append_executed(empty_program(), bindings2, HashMap::new());
 
         assert_eq!(session.block_count(), 2);
@@ -293,11 +293,11 @@ mod tests {
 
         // Execute two blocks
         let mut bindings1 = HashMap::new();
-        bindings1.insert("a".to_string(), Uuid::new_v4());
+        bindings1.insert("a".to_string(), Uuid::now_v7());
         session.append_executed(empty_program(), bindings1, HashMap::new());
 
         let mut bindings2 = HashMap::new();
-        bindings2.insert("b".to_string(), Uuid::new_v4());
+        bindings2.insert("b".to_string(), Uuid::now_v7());
         session.append_executed(empty_program(), bindings2, HashMap::new());
 
         assert!(session.has_binding("a"));
@@ -326,7 +326,7 @@ mod tests {
         // Add 3 blocks
         for i in 0..3 {
             let mut bindings = HashMap::new();
-            bindings.insert(format!("b{}", i), Uuid::new_v4());
+            bindings.insert(format!("b{}", i), Uuid::now_v7());
             session.append_executed(empty_program(), bindings, HashMap::new());
         }
 
@@ -345,7 +345,7 @@ mod tests {
     fn test_binding_context() {
         let mut session = ReplSession::new();
 
-        let pk = Uuid::new_v4();
+        let pk = Uuid::now_v7();
         let mut bindings = HashMap::new();
         bindings.insert("fund".to_string(), pk);
 
@@ -367,7 +367,7 @@ mod tests {
         let mut session = ReplSession::new();
 
         let mut bindings = HashMap::new();
-        bindings.insert("john".to_string(), Uuid::new_v4());
+        bindings.insert("john".to_string(), Uuid::now_v7());
 
         let mut types = HashMap::new();
         types.insert("john".to_string(), "entity.proper_person".to_string());
@@ -385,7 +385,7 @@ mod tests {
         let mut session = ReplSession::new();
 
         let mut bindings = HashMap::new();
-        bindings.insert("fund".to_string(), Uuid::new_v4());
+        bindings.insert("fund".to_string(), Uuid::now_v7());
         session.append_executed(empty_program(), bindings, HashMap::new());
 
         assert!(!session.is_empty());
@@ -401,8 +401,8 @@ mod tests {
         let mut session = ReplSession::new();
 
         let mut bindings = HashMap::new();
-        bindings.insert("fund".to_string(), Uuid::new_v4());
-        bindings.insert("person".to_string(), Uuid::new_v4());
+        bindings.insert("fund".to_string(), Uuid::now_v7());
+        bindings.insert("person".to_string(), Uuid::now_v7());
 
         let mut types = HashMap::new();
         types.insert("fund".to_string(), "cbu".to_string());

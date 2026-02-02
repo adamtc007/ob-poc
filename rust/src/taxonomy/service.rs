@@ -99,7 +99,7 @@ impl TaxonomyService {
         // SHELL category
         if let Some(shell_types) = by_category.remove("SHELL") {
             let mut shell_node = TaxonomyNode::new(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 NodeType::Cluster,
                 "SHELL",
                 DimensionValues {
@@ -111,7 +111,7 @@ impl TaxonomyService {
 
             for t in shell_types {
                 let mut type_node = TaxonomyNode::new(
-                    Uuid::new_v4(),
+                    Uuid::now_v7(),
                     NodeType::Cluster, // Entity type is a cluster of entities
                     &t.type_code,
                     DimensionValues {
@@ -131,7 +131,7 @@ impl TaxonomyService {
         // PERSON category
         if let Some(person_types) = by_category.remove("PERSON") {
             let mut person_node = TaxonomyNode::new(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 NodeType::Cluster,
                 "PERSON",
                 DimensionValues {
@@ -143,7 +143,7 @@ impl TaxonomyService {
 
             for t in person_types {
                 let mut type_node = TaxonomyNode::new(
-                    Uuid::new_v4(),
+                    Uuid::now_v7(),
                     NodeType::Cluster, // Entity type is a cluster of entities
                     &t.type_code,
                     DimensionValues {
@@ -163,7 +163,7 @@ impl TaxonomyService {
         // Any other categories
         for (category, types) in by_category {
             let mut category_node = TaxonomyNode::new(
-                Uuid::new_v4(),
+                Uuid::now_v7(),
                 NodeType::Cluster,
                 &category,
                 DimensionValues {
@@ -174,7 +174,7 @@ impl TaxonomyService {
 
             for t in types {
                 let mut type_node = TaxonomyNode::new(
-                    Uuid::new_v4(),
+                    Uuid::now_v7(),
                     NodeType::Cluster, // Entity type is a cluster of entities
                     &t.type_code,
                     DimensionValues {
@@ -520,7 +520,7 @@ mod tests {
     #[test]
     fn test_entity_list_item_structure() {
         let item = EntityListItem {
-            entity_id: Uuid::new_v4(),
+            entity_id: Uuid::now_v7(),
             name: "Test Entity".to_string(),
             entity_type: "LIMITED_COMPANY".to_string(),
             jurisdiction: Some("LU".to_string()),

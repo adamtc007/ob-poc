@@ -110,7 +110,7 @@ fn get_optional_decimal(verb_call: &VerbCall, key: &str) -> Option<f64> {
 /// Get session ID from context, or generate a new one
 #[cfg(feature = "database")]
 fn get_session_id(ctx: &ExecutionContext) -> Uuid {
-    ctx.session_id.unwrap_or_else(Uuid::new_v4)
+    ctx.session_id.unwrap_or_else(Uuid::now_v7)
 }
 
 // ============================================================================
@@ -175,7 +175,7 @@ impl CustomOperation for AgentStartOp {
         }
 
         // Generate agent session ID
-        let agent_session_id = Uuid::new_v4();
+        let agent_session_id = Uuid::now_v7();
 
         // Record agent start in database
         sqlx::query!(

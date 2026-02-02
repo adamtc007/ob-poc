@@ -46,7 +46,7 @@ impl TaxonomyBuilder {
             let grouped = self.group_by_dimension(&root_entities, *dim);
             for (group_label, entities) in grouped {
                 let mut cluster = TaxonomyNode::new(
-                    Uuid::new_v4(),
+                    Uuid::now_v7(),
                     NodeType::Cluster,
                     group_label,
                     DimensionValues::default(),
@@ -359,7 +359,7 @@ impl TaxonomyBuilder {
                 let by_role = self.group_entities_by_role(&entities);
                 for (role, role_entities) in by_role {
                     let mut role_cluster = TaxonomyNode::new(
-                        Uuid::new_v4(),
+                        Uuid::now_v7(),
                         NodeType::Cluster,
                         role,
                         DimensionValues::default(),
@@ -516,7 +516,7 @@ mod tests {
     fn sample_entities() -> Vec<EntityData> {
         vec![
             EntityData {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 name: "Fund A".into(),
                 entity_type: "cbu".into(),
                 external_id: None,
@@ -529,7 +529,7 @@ mod tests {
                 },
             },
             EntityData {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 name: "Fund B".into(),
                 entity_type: "cbu".into(),
                 external_id: None,
@@ -542,7 +542,7 @@ mod tests {
                 },
             },
             EntityData {
-                id: Uuid::new_v4(),
+                id: Uuid::now_v7(),
                 name: "Fund C".into(),
                 entity_type: "cbu".into(),
                 external_id: None,

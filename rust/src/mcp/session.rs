@@ -133,7 +133,7 @@ pub fn session_context(action: SessionAction) -> Result<SessionState, String> {
     match action {
         SessionAction::Create => {
             let session = Session::new();
-            let id = Uuid::new_v4().to_string();
+            let id = Uuid::now_v7().to_string();
 
             SESSIONS
                 .write()

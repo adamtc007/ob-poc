@@ -360,7 +360,7 @@ impl BodsRepository {
         match_method: &str,
         confidence: Option<f64>,
     ) -> Result<Uuid> {
-        let link_id = Uuid::new_v4();
+        let link_id = Uuid::now_v7();
         let confidence_decimal = confidence.and_then(|c| Decimal::try_from(c).ok());
 
         sqlx::query(
@@ -408,7 +408,7 @@ impl BodsRepository {
 
     /// Insert or update a discovered UBO
     pub async fn upsert_entity_ubo(&self, ubo: &DiscoveredUbo, entity_id: Uuid) -> Result<Uuid> {
-        let ubo_id = Uuid::new_v4();
+        let ubo_id = Uuid::now_v7();
         let ownership_chain = serde_json::to_value(&ubo.ownership_chain).ok();
         let chain_depth = ubo.ownership_chain.len() as i32;
 

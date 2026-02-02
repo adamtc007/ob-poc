@@ -180,7 +180,7 @@ impl CustomOperation for GleifEnrichOp {
         _ctx: &mut ExecutionContext,
     ) -> Result<ExecutionResult> {
         Ok(ExecutionResult::Record(serde_json::json!({
-            "entity_id": uuid::Uuid::new_v4(),
+            "entity_id": uuid::Uuid::now_v7(),
             "lei": "MOCK_LEI",
             "names_added": 0,
             "addresses_added": 0,

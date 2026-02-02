@@ -359,7 +359,7 @@ mod tests {
     fn test_root_scope_binding() {
         let mut scope = SymbolScope::root();
 
-        let id = Uuid::new_v4();
+        let id = Uuid::now_v7();
         scope.bind("@cbu", id);
 
         assert!(scope.is_bound("@cbu"));
@@ -370,7 +370,7 @@ mod tests {
     #[test]
     fn test_child_scope_inheritance() {
         let mut root = SymbolScope::root();
-        let cbu_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
         root.bind("@cbu", cbu_id);
 
         let child = root.child("nested-macro");
@@ -386,11 +386,11 @@ mod tests {
     #[test]
     fn test_child_scope_shadowing() {
         let mut root = SymbolScope::root();
-        let root_cbu = Uuid::new_v4();
+        let root_cbu = Uuid::now_v7();
         root.bind("@cbu", root_cbu);
 
         let mut child = root.child("nested-macro");
-        let child_cbu = Uuid::new_v4();
+        let child_cbu = Uuid::now_v7();
         child.bind("@cbu", child_cbu);
 
         // Child sees its own binding
@@ -403,9 +403,9 @@ mod tests {
     #[test]
     fn test_import_symbols() {
         let mut source = SymbolScope::root();
-        source.bind("@cbu", Uuid::new_v4());
-        source.bind("@trading-profile", Uuid::new_v4());
-        source.bind("@secret", Uuid::new_v4());
+        source.bind("@cbu", Uuid::now_v7());
+        source.bind("@trading-profile", Uuid::now_v7());
+        source.bind("@secret", Uuid::now_v7());
 
         let mut target = SymbolScope::root();
 

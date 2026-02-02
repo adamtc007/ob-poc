@@ -412,7 +412,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_session() {
         let (manager, _temp) = create_test_manager().await;
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         let metadata = manager
             .create_session(session_id, Some("cbu".to_string()))
@@ -428,7 +428,7 @@ mod tests {
     #[tokio::test]
     async fn test_append_dsl() {
         let (manager, _temp) = create_test_manager().await;
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         manager.create_session(session_id, None).await.unwrap();
 
@@ -467,7 +467,7 @@ mod tests {
     #[tokio::test]
     async fn test_history_and_revert() {
         let (manager, _temp) = create_test_manager().await;
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         manager.create_session(session_id, None).await.unwrap();
 
@@ -499,12 +499,12 @@ mod tests {
     #[tokio::test]
     async fn test_bindings() {
         let (manager, _temp) = create_test_manager().await;
-        let session_id = Uuid::new_v4();
+        let session_id = Uuid::now_v7();
 
         manager.create_session(session_id, None).await.unwrap();
 
-        let cbu_id = Uuid::new_v4();
-        let entity_id = Uuid::new_v4();
+        let cbu_id = Uuid::now_v7();
+        let entity_id = Uuid::now_v7();
 
         let mut bindings = HashMap::new();
         bindings.insert("cbu".to_string(), cbu_id);

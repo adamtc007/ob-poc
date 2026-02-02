@@ -56,7 +56,7 @@ impl FeedbackService {
         let (sanitized_input, input_hash) = sanitize_input(user_input, &entity_refs);
         drop(known);
 
-        let interaction_id = Uuid::new_v4();
+        let interaction_id = Uuid::now_v7();
 
         let feedback = IntentFeedback {
             session_id,

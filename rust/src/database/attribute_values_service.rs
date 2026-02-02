@@ -61,7 +61,7 @@ impl AttributeValuesService {
         state: &str,
         source: Option<JsonValue>,
     ) -> Result<Uuid> {
-        let av_id = Uuid::new_v4();
+        let av_id = Uuid::now_v7();
         let observed_at = Utc::now();
 
         sqlx::query(
