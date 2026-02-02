@@ -202,6 +202,68 @@ User: "teach: 'spin up a fund' = cbu.create"
 
 ---
 
+## Agent API Architecture (Call Paths)
+
+### Canonical Chat Flow (Single Path)
+
+All chat goes through ONE path:
+
+```
+UI (chat panel)
+    ↓
+api::send_chat(session_id, message)  [ob-poc-ui/src/api.rs]
+    ↓
+POST /api/session/:id/chat  [agent_routes.rs]
+    ↓
+AgentService.process_chat()  [agent_service.rs]
+    ├── Stage 0: Utterance segmentation (verb/group/scope)
+    ├── Stage 1: Intent pipeline (verb search → disambiguation → DSL)
+    ├── Stage 2: Typo detection
+    └── Stage 3: Garbage rejection
+    ↓
+ChatResponse { message, dsl, verb_disambiguation, unresolved_refs }
+    ↓
+(Optional) POST /api/session/:id/select-verb  [user picks verb]
+(Optional) POST /api/session/:id/resolution/*  [entity resolution]
+    ↓
+POST /api/session/:id/execute  [when user confirms]
+```
+
+### Two Session Models (Intentionally Separate)
+
+| Model | Path | Store | Purpose |
+|-------|------|-------|---------|
+| `AgentSession` | `/api/session/*` | `SessionStore` | Full agent workflow: chat, DSL, execution |
+| `CbuSession` | `/api/cbu-session/*` | `CbuSessionStore` | Standalone scope navigation (load/undo/redo) |
+
+**Both use `UnifiedSession` type but in separate stores - they do NOT sync.**
+
+**Primary workflow:** Use DSL verbs (`session.load-galaxy`, etc.) which update `AgentSession.context.cbu_ids` after execution. This drives viewport refresh.
+
+**Standalone REST:** Use `/api/cbu-session/*` only for direct REST integration without agent/DSL layer.
+
+### Core Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/session/:id/chat` | POST | **PRIMARY** - Send message, get DSL |
+| `/api/session/:id/execute` | POST | Execute staged DSL |
+| `/api/session/:id/select-verb` | POST | User selects verb from disambiguation |
+| `/api/session/:id/resolution/*` | * | Entity resolution sub-router |
+| `/api/agent/validate` | POST | Validate DSL syntax |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/api/agent_routes.rs` | All agent API endpoints |
+| `rust/src/api/agent_service.rs` | `AgentService.process_chat()` - main logic |
+| `rust/src/mcp/intent_pipeline.rs` | Verb search → DSL generation |
+| `rust/src/mcp/utterance.rs` | Utterance segmentation (pre-search) |
+| `rust/crates/ob-poc-ui/src/api.rs` | UI API client |
+
+---
+
 ## Core Architecture: CBU-Centric Model
 
 **CBU (Client Business Unit) is the atomic unit.** Everything resolves to sets of CBUs.
