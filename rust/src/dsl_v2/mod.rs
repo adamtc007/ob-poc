@@ -102,6 +102,8 @@ pub mod intent_tiers;
 #[cfg(feature = "database")]
 pub mod lsp_validator;
 pub mod macros;
+pub mod narration;
+pub mod narration_lint;
 pub mod operator_types;
 pub mod planning_facade;
 #[cfg(feature = "database")]
@@ -167,6 +169,11 @@ pub use idempotency::{compute_idempotency_key, IdempotencyManager};
 pub use intent::{ArgIntent, DslIntent, DslIntentBatch, ResolvedArg};
 #[cfg(feature = "database")]
 pub use lsp_validator::LspValidator;
+pub use narration::{render_narration, NarrationContext, NarrationOutcome};
+pub use narration_lint::{
+    format_lint_errors, has_lint_errors, lint_all_narration_templates, lint_narration_template,
+    LintStatus, NarrationLintError, NarrationLintReport, NarrationLintWarning,
+};
 pub use operator_types::{OperatorRole, OperatorType};
 pub use planning_facade::{
     analyse_and_plan, quick_validate, ImplicitCreateMode, PlannedExecution, PlanningInput,

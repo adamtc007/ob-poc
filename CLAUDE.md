@@ -33,6 +33,9 @@
 > **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
 > **Utterance Segmentation (066):** ✅ Complete - 4-pass segmentation, typo detection, VERB_GROUP_PREFIXES for "work on" patterns
 > **Entity Scope DSL (067):** ✅ Complete - Pattern B runtime scope resolution, scope.commit/resolve/narrow/union verbs, entity-ids rewrite
+> **Proposal/Confirm Protocol (067):** ✅ Complete - exec.proposal/confirm/edit/cancel verbs, atomic execution, session-scoped security
+> **Narration Templates (068):** ✅ Complete - YAML-embedded templates, variable substitution, startup lint (NARR001-NARR006)
+> **DSL Executable Subset Validator (069):** ✅ Complete - EBNF grammar, fast pre-parse validation, two-stage pipeline integration
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -1573,6 +1576,395 @@ User tier selections generate **gold-standard training data**:
 1. Input phrase + selected tier → train intent classifier
 2. If tier leads to single verb → implicit phrase→verb mapping
 3. Aggregate tier selection patterns → improve taxonomy weights
+
+---
+
+## Proposal/Confirm Protocol (067)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: Execution proposals with preview, validation, and atomic confirmation.
+
+In regulated environments, DSL execution must be reviewable before commit. The proposal/confirm protocol provides:
+- `exec.proposal` - Parse + validate + show preview, **NO side effects**
+- `exec.confirm` - Execute a previously created proposal atomically
+- `exec.edit` - Modify pending proposal before confirmation
+- `exec.cancel` - Cancel a pending proposal
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  PROPOSAL/CONFIRM FLOW                                                       │
+│                                                                              │
+│  User: "create a fund for Acme"                                             │
+│      │                                                                       │
+│      ▼                                                                       │
+│  IntentPipeline → DSL generated                                             │
+│      │                                                                       │
+│      ▼                                                                       │
+│  exec.proposal (NO side effects)                                            │
+│      ├─► Parse DSL                                                          │
+│      ├─► Validate (pre-parse + full compile)                                │
+│      ├─► Resolve entity references                                          │
+│      ├─► Generate narration from verb templates                             │
+│      ├─► Compute affected entities                                          │
+│      └─► Store proposal in exec_proposals table                             │
+│      │                                                                       │
+│      ▼                                                                       │
+│  Return to UI: narration, preview, warnings, expires_at                     │
+│      │                                                                       │
+│      ├─► User says "confirm" / "yes" / "go ahead"                           │
+│      │       │                                                               │
+│      │       ▼                                                               │
+│      │   exec.confirm                                                        │
+│      │       ├─► Validate proposal still pending + not expired              │
+│      │       ├─► Cross-session security check                               │
+│      │       ├─► Execute atomically (single transaction)                    │
+│      │       └─► Update proposal status to 'confirmed'                      │
+│      │                                                                       │
+│      └─► User says "cancel" / "never mind"                                  │
+│              │                                                               │
+│              ▼                                                               │
+│          exec.cancel → Mark proposal as 'cancelled'                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Non-Negotiables
+
+1. **Proposals are immutable** - Content cannot change after creation; `exec.edit` creates NEW proposal
+2. **Proposals expire** - TTL configurable (default: 15 minutes), background cleanup
+3. **Confirmation is atomic** - Full success or full rollback
+4. **Session-scoped security** - Cannot confirm another session's proposal
+
+### Database Schema
+
+**Table:** `ob-poc.exec_proposals`
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | UUID PK | Proposal identifier |
+| `session_id` | UUID FK | Session that created it |
+| `source_dsl` | TEXT | Original DSL source |
+| `canonical_dsl` | TEXT | Normalized AST as DSL |
+| `ast_json` | JSONB | Full AST for replay |
+| `validation_passed` | BOOLEAN | Did validation pass? |
+| `narration` | TEXT | Human-readable summary |
+| `status` | VARCHAR | pending/confirmed/expired/cancelled |
+| `expires_at` | TIMESTAMPTZ | When proposal expires |
+
+### Verb Definitions
+
+| Verb | Description |
+|------|-------------|
+| `exec.proposal` | Create proposal (parse, validate, preview) - NO execution |
+| `exec.confirm` | Execute pending proposal atomically |
+| `exec.edit` | Create new proposal based on existing one with changes |
+| `exec.cancel` | Cancel pending proposal |
+| `exec.status` | Check proposal status |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/070_exec_proposals.sql` | Schema with immutability trigger |
+| `rust/config/verbs/exec.yaml` | Verb definitions with narration templates |
+| `rust/src/domain_ops/exec_ops.rs` | Plugin handlers (ExecProposalOp, ExecConfirmOp, etc.) |
+
+---
+
+## Narration Template System (068)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: Human-readable narration from verb execution via YAML templates.
+
+Verb execution results are raw JSON. Users need human-readable narration like:
+- "Created CBU 'Acme Fund' with ID xyz-123"
+- "Added 5 entities to scope @irish"
+- "This will modify 12 custody accounts"
+
+Templates embedded in verb YAML enable deterministic, consistent narration without LLM calls.
+
+### Schema Extension
+
+Add `narration_template` block to verb YAML:
+
+```yaml
+verbs:
+  create:
+    description: "Create a new CBU"
+    behavior: plugin
+    # ... existing fields ...
+    
+    narration_template:
+      success: "Created {arg.type} '{arg.name}' with ID {result.id}"
+      failure: "Could not create CBU: {error}"
+      preview: "This will create a new {arg.type} named '{arg.name}'"
+      training_hint: "create {arg.type} called {arg.name}"
+      conditionals:
+        - when: "affected_count > 10"
+          success: "Bulk created {affected_count} {arg.type}s"
+```
+
+### Template Variables
+
+| Variable | Source | Description |
+|----------|--------|-------------|
+| `{arg.X}` | Verb arguments | Any arg value (e.g., `{arg.name}`) |
+| `{result.X}` | Execution result | Any result field (e.g., `{result.id}`) |
+| `{error}` | Error | Error message on failure |
+| `{affected_count}` | Result | Count for bulk operations |
+| `{verb}` | Context | Verb FQN (e.g., `cbu.create`) |
+| `{domain}` | Context | Domain name (e.g., `cbu`) |
+
+### Rust Types
+
+```rust
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct NarrationTemplate {
+    pub success: Option<String>,      // Template for successful execution
+    pub failure: Option<String>,      // Template for failed execution
+    pub preview: Option<String>,      // Template for proposal/preview mode
+    pub conditionals: Vec<ConditionalNarration>,
+    pub training_hint: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ConditionalNarration {
+    pub condition: String,   // e.g., "affected_count > 10"
+    pub success: Option<String>,
+    pub failure: Option<String>,
+}
+```
+
+### Template Rendering
+
+**File:** `rust/src/dsl_v2/narration.rs`
+
+```rust
+pub enum NarrationOutcome {
+    Success,
+    Failure,
+    Preview,
+}
+
+pub fn render_narration(
+    template: &NarrationTemplate,
+    outcome: NarrationOutcome,
+    context: &NarrationContext,
+) -> String;
+```
+
+The renderer:
+1. Selects base template based on outcome
+2. Checks conditionals for override
+3. Substitutes `{placeholder}` variables from context
+4. Falls back to default narration if template missing
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/dsl-core/src/config/types.rs` | `NarrationTemplate`, `ConditionalNarration` types |
+| `rust/src/dsl_v2/narration.rs` | Template rendering logic |
+| `rust/src/dsl_v2/mod.rs` | Exports narration module |
+
+---
+
+## Narration Template Lint (068)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: Startup-time validation of narration templates.
+
+Strict **startup-time lint** ensures templates are safe, grounded, and executable. MUST run when loading verb registry and MUST fail-fast on errors.
+
+### Placeholder Whitelist
+
+Linter rejects any placeholder not in whitelist:
+
+| Namespace | Allowed Placeholders |
+|-----------|---------------------|
+| `verb` | `{verb.id}`, `{verb.domain}`, `{verb.action}` |
+| `group` | `{group.alias}`, `{group.id}` |
+| `scope` | `{scope.desc}`, `{scope.snapshot}`, `{scope.count}` |
+| `entity` | `{entity.label}`, `{entity.id}` |
+| `result` | `{result.id}`, `{result.*}` (any result field) |
+| `arg` | `{arg.<name>}` where `<name>` is declared in verb args |
+| Built-in | `{error}`, `{affected_count}`, `{duration_ms}` |
+
+### Lint Error Codes
+
+| Code | Description |
+|------|-------------|
+| `NARR001` | Unknown placeholder (not in whitelist) |
+| `NARR002` | Unknown param placeholder (`{arg.X}` with no arg X) |
+| `NARR003` | Scope placeholder without scope slot |
+| `NARR004` | Snapshot placeholder without entity_scope type |
+| `NARR005` | Effects placeholder without effects metadata |
+| `NARR006` | Malformed placeholder (nested braces, function call) |
+
+### Lint Implementation
+
+**File:** `rust/src/dsl_v2/narration_lint.rs`
+
+```rust
+#[derive(Debug, Error)]
+pub enum NarrationLintError {
+    #[error("NARR001: Unknown placeholder '{placeholder}' in {field}...")]
+    UnknownPlaceholder { verb_id: String, field: String, placeholder: String, suggestion: Option<String> },
+    
+    #[error("NARR002: Unknown param placeholder '{{arg.{param}}}' - verb has no arg '{param}'")]
+    UnknownParamPlaceholder { verb_id: String, field: String, param: String, available_params: Vec<String> },
+    // ... other errors
+}
+
+pub fn lint_narration_template(
+    verb_id: &str,
+    verb_def: &VerbDefinition,
+) -> NarrationLintReport;
+```
+
+### Lint Output Example
+
+```json
+{
+  "verb_id": "ubo.trace-chain",
+  "status": "error",
+  "errors": [
+    {
+      "code": "NARR001",
+      "field": "narration_template.training_hint",
+      "placeholder": "scope.cnt",
+      "message": "Unknown placeholder. Did you mean {scope.count}?"
+    }
+  ]
+}
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/dsl_v2/narration_lint.rs` | Lint implementation with error types |
+| `rust/src/session/verb_sync.rs` | Runs lint on startup |
+
+---
+
+## DSL Executable Subset Validator (069)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: Fast pre-parse validation with EBNF grammar.
+
+LLM-generated DSL can contain unsupported constructs. The validator provides:
+1. Formal EBNF grammar spec defining the **executable subset**
+2. Fast validation before full parsing
+3. Clear error messages for invalid syntax
+4. Documentation for LLM prompt engineering
+
+### EBNF Grammar
+
+**File:** `rust/crates/dsl-core/src/grammar.ebnf`
+
+Key constraints of the executable subset:
+- **NO nested verb calls** - `(verb1 :arg (verb2))` is invalid
+- **NO embedded SQL** - Pure S-expression syntax only
+- **Single-level only** - Flat verb call structure
+
+```ebnf
+program = { statement } ;
+statement = verb_call | comment ;
+verb_call = "(" , verb_fqn , { argument } , [ binding ] , ")" ;
+verb_fqn = domain , "." , verb_name ;
+argument = ":" , arg_name , arg_value ;
+arg_value = literal | symbol_ref | entity_ref | list | map ;
+symbol_ref = "@" , identifier ;
+entity_ref = "<" , entity_name , ">" ;
+binding = ":as" , symbol_ref ;
+```
+
+### Validator Implementation
+
+**File:** `rust/crates/dsl-core/src/validator.rs`
+
+```rust
+#[derive(Debug, Error, Clone)]
+pub enum ValidationError {
+    #[error("Unclosed parenthesis at position {0}")]
+    UnclosedParen(usize),
+    #[error("Nested verb calls not allowed (position {0})")]
+    NestedVerbCall(usize),
+    #[error("Empty verb call at position {0}")]
+    EmptyVerbCall(usize),
+    // ... other errors
+}
+
+pub struct ValidationResult {
+    pub valid: bool,
+    pub errors: Vec<ValidationError>,
+    pub warnings: Vec<String>,
+    pub stats: ValidationStats,
+}
+
+pub fn validate_executable_subset(source: &str) -> ValidationResult;
+```
+
+### Integration Points
+
+**Two-stage validation in intent pipeline:**
+
+```rust
+// rust/src/mcp/intent_pipeline.rs
+
+fn validate_dsl(&self, dsl: &str) -> (bool, Option<String>) {
+    // Stage 1: Fast pre-parse validation (catches LLM hallucinations)
+    let pre_validation = dsl_core::validate_executable_subset(dsl);
+    if !pre_validation.valid {
+        return (false, Some(format!("Syntax error: {}", error_summary)));
+    }
+
+    // Stage 2: Full parse and compile
+    match parse_program(dsl) {
+        Ok(ast) => match compile(&ast) {
+            Ok(_) => (true, None),
+            Err(e) => (false, Some(format!("Compile error: {:?}", e))),
+        },
+        Err(e) => (false, Some(format!("Parse error: {:?}", e))),
+    }
+}
+```
+
+### Validation Stats
+
+```rust
+pub struct ValidationStats {
+    pub statement_count: usize,    // Number of verb calls
+    pub entity_ref_count: usize,   // Number of <entity> references
+    pub symbol_ref_count: usize,   // Number of @symbol references
+    pub binding_count: usize,      // Number of :as bindings
+}
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/dsl-core/src/grammar.ebnf` | EBNF grammar documentation |
+| `rust/crates/dsl-core/src/validator.rs` | Validator implementation (19 tests) |
+| `rust/crates/dsl-core/src/lib.rs` | Exports `validate_executable_subset` |
+| `rust/src/mcp/intent_pipeline.rs` | Two-stage validation integration |
+
+### LLM Prompt Engineering
+
+Include grammar constraints in system prompts for DSL generation:
+
+```text
+Generate DSL following this grammar:
+
+VALID:
+- (domain.verb :arg value :as @symbol)
+- Values: "string", 123, true/false, @symbol, <Entity Name>, [list], {map}
+- Bindings: :as @name
+
+INVALID:
+- Nested verb calls: (verb1 :arg (verb2))  ← NOT ALLOWED
+- Raw SQL: SELECT * FROM ...
+- Non-s-expression syntax
+```
 
 ---
 
@@ -4030,6 +4422,10 @@ When you see these in a task, read the corresponding annex first:
 | "macro", "operator vocabulary", "structure.setup", "constraint cascade" | CLAUDE.md §Operator Vocabulary & Macros (058) |
 | "onboarding pipeline", "RequirementPlanner", "OnboardingPlan", "ob-agentic" | CLAUDE.md §Structured Onboarding Pipeline |
 | "LSP", "language server", "completion", "diagnostics", "dsl-lsp" | CLAUDE.md §DSL Language Server |
+| "proposal", "confirm", "exec.proposal", "exec.confirm", "atomic execution" | CLAUDE.md §Proposal/Confirm Protocol (067) |
+| "narration", "template", "NarrationTemplate", "human-readable output" | CLAUDE.md §Narration Template System (068) |
+| "narration lint", "NARR001", "placeholder validation", "startup lint" | CLAUDE.md §Narration Template Lint (068) |
+| "validator", "pre-parse", "EBNF", "executable subset", "nested verb" | CLAUDE.md §DSL Executable Subset Validator (069) |
 
 ---
 

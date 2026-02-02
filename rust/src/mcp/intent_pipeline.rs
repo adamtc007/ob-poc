@@ -1079,6 +1079,25 @@ Respond with ONLY valid JSON:
 
         tracing::info!("Processing direct DSL input: {}", dsl);
 
+        // Pre-parse validation - catches LLM hallucinations like nested verb calls
+        let pre_validation = dsl_core::validate_executable_subset(dsl);
+        if !pre_validation.valid {
+            let error_summary = pre_validation
+                .errors
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join("; ");
+            tracing::info!(
+                "DSL pre-validation failed, re-routing to NL pipeline: {}",
+                error_summary
+            );
+            // Re-route to NL pipeline for interpretation
+            return self
+                .process_as_natural_language(dsl, None, scope_ctx, None)
+                .await;
+        }
+
         // Parse the DSL - on failure, re-route through natural language pipeline
         // This lets the LLM interpret malformed DSL as user intent
         let ast = match parse_program(dsl) {
@@ -1187,7 +1206,24 @@ Respond with ONLY valid JSON:
     }
 
     /// Validate generated DSL
+    ///
+    /// Uses two-stage validation:
+    /// 1. Fast pre-parse validation (catches LLM hallucinations like nested verb calls)
+    /// 2. Full parse and compile
     fn validate_dsl(&self, dsl: &str) -> (bool, Option<String>) {
+        // Stage 1: Fast pre-parse validation (catches LLM-generated invalid constructs)
+        let pre_validation = dsl_core::validate_executable_subset(dsl);
+        if !pre_validation.valid {
+            let error_summary = pre_validation
+                .errors
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join("; ");
+            return (false, Some(format!("Syntax error: {}", error_summary)));
+        }
+
+        // Stage 2: Full parse and compile
         match parse_program(dsl) {
             Ok(ast) => match compile(&ast) {
                 Ok(_) => (true, None),

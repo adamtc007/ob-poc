@@ -1,0 +1,212 @@
+# Execution Proposal and Confirmation Protocol
+#
+# Provides a two-phase commit pattern for DSL execution:
+# 1. proposal - Parse, validate, resolve entities, generate preview (NO side effects)
+# 2. confirm  - Execute the validated proposal atomically
+# 3. edit     - Create new proposal based on existing one with modifications
+# 4. cancel   - Cancel a pending proposal
+#
+# This enables:
+# - Deterministic intent replay
+# - Audit trails for regulated environments
+# - User review before execution
+# - Training data from confirmed/edited/cancelled proposals
+
+domains:
+  exec:
+    description: "Execution proposal and confirmation protocol"
+
+    verbs:
+      proposal:
+        description: "Create execution proposal - parses, validates, resolves entities, generates preview. NO side effects."
+        behavior: plugin
+        handler: ExecProposalOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: proposal
+          tags: [proposal, validation, preview]
+        invocation_phrases:
+          - "propose"
+          - "preview"
+          - "dry run"
+          - "validate"
+          - "check before running"
+          - "show what would happen"
+          - "what if"
+          - "test this"
+        args:
+          - name: dsl
+            type: string
+            required: true
+            description: "DSL source to propose for execution"
+          - name: ttl-minutes
+            type: integer
+            required: false
+            default: 15
+            description: "Time-to-live for proposal in minutes (max 60)"
+        returns:
+          type: record
+          name: ProposalResult
+          fields:
+            - proposal_id
+            - valid
+            - narration
+            - warnings
+            - errors
+            - affected_entities
+            - unresolved_refs
+            - expires_at
+        narration_template:
+          success: "I'm ready to {verb.action}. This will affect {affected_count} entities. Say 'confirm' to proceed."
+          failure: "I can't do that because: {error}. Fix these issues and try again."
+          preview: "Validating: {arg.dsl}"
+          training_hint: "propose {arg.dsl}"
+
+      confirm:
+        description: "Execute a pending proposal. Atomic - all or nothing."
+        behavior: plugin
+        handler: ExecConfirmOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: confirmation
+          tags: [execution, commit]
+        invocation_phrases:
+          - "confirm"
+          - "go ahead"
+          - "execute"
+          - "do it"
+          - "run it"
+          - "yes"
+          - "proceed"
+          - "ok"
+          - "approved"
+          - "looks good"
+        args:
+          - name: proposal-id
+            type: uuid
+            required: false
+            description: "Proposal to confirm (defaults to most recent pending)"
+        returns:
+          type: record
+          name: ConfirmResult
+          fields:
+            - success
+            - execution_result
+            - narration
+        narration_template:
+          success: "Done! {result.summary}"
+          failure: "Execution failed: {error}. No changes were made."
+          training_hint: "confirm"
+
+      edit:
+        description: "Create a new proposal based on an existing one with modifications"
+        behavior: plugin
+        handler: ExecEditOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: edit
+          tags: [proposal, edit]
+        invocation_phrases:
+          - "edit proposal"
+          - "modify proposal"
+          - "change to"
+          - "but instead"
+          - "actually"
+          - "wait"
+          - "change that to"
+          - "no wait"
+        args:
+          - name: proposal-id
+            type: uuid
+            required: false
+            description: "Proposal to edit (defaults to most recent pending)"
+          - name: changes
+            type: string
+            required: true
+            description: "Natural language or DSL changes to apply"
+        returns:
+          type: record
+          name: EditResult
+          fields:
+            - new_proposal_id
+            - diff_summary
+            - narration
+        narration_template:
+          success: "Updated proposal. {result.diff_summary}. Say 'confirm' to proceed."
+          failure: "Could not apply changes: {error}"
+          training_hint: "edit {arg.changes}"
+
+      cancel:
+        description: "Cancel a pending proposal"
+        behavior: plugin
+        handler: ExecCancelOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: cancellation
+          tags: [proposal, cancel]
+        invocation_phrases:
+          - "cancel"
+          - "never mind"
+          - "forget it"
+          - "discard"
+          - "abort"
+          - "no"
+          - "stop"
+        args:
+          - name: proposal-id
+            type: uuid
+            required: false
+            description: "Proposal to cancel (defaults to most recent pending)"
+        returns:
+          type: affected
+        narration_template:
+          success: "Cancelled. What would you like to do instead?"
+          failure: "No pending proposal to cancel."
+          training_hint: "cancel"
+
+      status:
+        description: "Check status of a proposal or list recent proposals"
+        behavior: plugin
+        handler: ExecStatusOp
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: session
+          noun: status
+          tags: [proposal, status]
+        invocation_phrases:
+          - "proposal status"
+          - "check proposal"
+          - "pending proposals"
+          - "what's pending"
+        args:
+          - name: proposal-id
+            type: uuid
+            required: false
+            description: "Specific proposal to check (defaults to most recent)"
+          - name: limit
+            type: integer
+            required: false
+            default: 5
+            description: "Number of recent proposals to show"
+        returns:
+          type: record_set
+          name: ProposalStatus
+          fields:
+            - proposal_id
+            - status
+            - created_at
+            - expires_at
+            - seconds_remaining
+            - narration
+        narration_template:
+          success: "Found {affected_count} proposals."
+          training_hint: "proposal status"

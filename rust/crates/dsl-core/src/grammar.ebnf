@@ -1,0 +1,194 @@
+(* ============================================================================
+   Executable DSL Subset - EBNF Grammar
+
+   This defines what the DSL executor accepts, not what the parser accepts.
+   Used for:
+   1. Fast pre-parse validation of LLM-generated DSL
+   2. Clear error messages for invalid syntax
+   3. Documentation for LLM prompt engineering
+
+   Key constraints:
+   - NO nested verb calls (single-level only)
+   - NO embedded SQL or complex expressions
+   - Pure S-expression syntax
+   ============================================================================ *)
+
+(* ==========================================================================
+   TOP-LEVEL PROGRAM STRUCTURE
+   ========================================================================== *)
+
+program = { statement } ;
+
+statement = verb_call | comment ;
+
+verb_call = "(" , verb_fqn , { argument } , [ binding ] , ")" ;
+
+(* ==========================================================================
+   VERB IDENTIFICATION
+   ========================================================================== *)
+
+verb_fqn = domain , "." , verb_name ;
+domain = identifier ;
+verb_name = identifier | kebab_identifier ;
+
+(* ==========================================================================
+   ARGUMENTS
+   ========================================================================== *)
+
+argument = ":" , arg_name , arg_value ;
+arg_name = identifier | kebab_identifier ;
+
+arg_value = literal
+          | symbol_ref
+          | entity_ref
+          | list
+          | map ;
+
+(* ==========================================================================
+   BINDING (SYMBOL ASSIGNMENT)
+   ========================================================================== *)
+
+binding = ":as" , symbol_ref ;
+
+(* ==========================================================================
+   LITERALS
+   ========================================================================== *)
+
+literal = string_literal
+        | number_literal
+        | boolean_literal
+        | uuid_literal
+        | nil_literal ;
+
+string_literal = '"' , { string_char } , '"' ;
+string_char = ? any character except '"' or '\' ?
+            | '\' , escape_char ;
+escape_char = '"' | '\' | 'n' | 't' | 'r' ;
+
+number_literal = [ "-" ] , digits , [ "." , digits ] ;
+digits = digit , { digit } ;
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+
+boolean_literal = "true" | "false" ;
+
+uuid_literal = hex8 , "-" , hex4 , "-" , hex4 , "-" , hex4 , "-" , hex12 ;
+hex8 = hex , hex , hex , hex , hex , hex , hex , hex ;
+hex4 = hex , hex , hex , hex ;
+hex12 = hex , hex , hex , hex , hex , hex , hex , hex , hex , hex , hex , hex ;
+hex = digit | "a" | "b" | "c" | "d" | "e" | "f"
+            | "A" | "B" | "C" | "D" | "E" | "F" ;
+
+nil_literal = "nil" ;
+
+(* ==========================================================================
+   REFERENCES
+   ========================================================================== *)
+
+(* Symbol references: @name bindings resolved at execution time *)
+symbol_ref = "@" , identifier ;
+
+(* Entity references: <Name> resolved via EntityGateway *)
+entity_ref = "<" , entity_name , ">" ;
+entity_name = { entity_name_char } ;
+entity_name_char = ? any character except '>' ? ;
+
+(* ==========================================================================
+   COLLECTIONS
+   ========================================================================== *)
+
+list = "[" , [ arg_value , { "," , arg_value } ] , "]" ;
+
+map = "{" , [ map_entry , { "," , map_entry } ] , "}" ;
+map_entry = ( keyword | string_literal ) , arg_value ;
+
+keyword = ":" , identifier ;
+
+(* ==========================================================================
+   IDENTIFIERS
+   ========================================================================== *)
+
+identifier = letter , { letter | digit | "_" } ;
+kebab_identifier = letter , { letter | digit | "-" } ;
+letter = "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j"
+       | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t"
+       | "u" | "v" | "w" | "x" | "y" | "z"
+       | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J"
+       | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T"
+       | "U" | "V" | "W" | "X" | "Y" | "Z" ;
+
+(* ==========================================================================
+   COMMENTS AND WHITESPACE
+   ========================================================================== *)
+
+comment = ";" , { ? any character except newline ? } , newline ;
+newline = "\n" | "\r\n" ;
+
+(* Whitespace is implicit between tokens *)
+
+(* ==========================================================================
+   CONSTRAINTS (NOT IN EXECUTABLE SUBSET)
+
+   The following constructs are NOT allowed in executable DSL:
+
+   1. Nested verb calls:
+      INVALID: (verb1 :arg (verb2 :x 1))
+      VALID:   (verb2 :x 1 :as @result)
+               (verb1 :arg @result)
+
+   2. Raw SQL:
+      INVALID: SELECT * FROM entities WHERE ...
+
+   3. Macro expansion syntax (handled before execution):
+      INVALID: ${arg.name}, ${session.client}
+
+   4. Complex expressions:
+      INVALID: (+ 1 2), (if cond then else)
+
+   5. Multi-line strings without proper escaping
+   ========================================================================== *)
+
+(* ==========================================================================
+   EXAMPLES
+
+   Valid DSL:
+
+   ; Simple verb call
+   (cbu.create :name "Acme Fund" :jurisdiction "LU")
+
+   ; With binding
+   (cbu.create :name "Acme Fund" :as @acme)
+
+   ; With entity reference
+   (session.load-cluster :client <Allianz>)
+
+   ; With symbol reference
+   (cbu-role.assign :cbu-id @acme :entity-id <John Smith> :role "director")
+
+   ; With list
+   (scope.commit :entity-ids [<Alpha Corp>, <Beta Ltd>, <Gamma Inc>])
+
+   ; With map
+   (entity.update :id @person :attributes {:email "john@example.com" :phone "+1234567890"})
+
+   ; Multiple statements
+   (cbu.create :name "Fund A" :as @fund)
+   (entity.create :name "Manager" :as @mgr)
+   (cbu-role.assign :cbu-id @fund :entity-id @mgr :role "investment-manager")
+
+   Invalid DSL:
+
+   ; Nested verb call (not allowed)
+   (cbu.create :name (string.upper "test"))
+
+   ; Missing verb name
+   (create :name "Test")
+
+   ; Missing colon on argument
+   (cbu.create name "Test")
+
+   ; Unclosed string
+   (cbu.create :name "Test)
+
+   ; SQL injection attempt
+   (cbu.create :name "Test'; DROP TABLE cbus;--")
+   ========================================================================== *)

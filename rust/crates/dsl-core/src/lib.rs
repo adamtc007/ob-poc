@@ -20,6 +20,7 @@ pub mod dag;
 pub mod diagnostics;
 pub mod ops;
 pub mod parser;
+pub mod validator;
 pub mod viewport_parser;
 
 // Re-export commonly used types
@@ -35,6 +36,9 @@ pub use config::loader::ConfigLoader;
 pub use config::types::*;
 pub use diagnostics::{Diagnostic, DiagnosticCode, Severity, SourceSpan};
 pub use parser::parse_program;
+pub use validator::{
+    validate_executable_subset, ValidationError, ValidationResult, ValidationStats,
+};
 pub use viewport_parser::{
     extract_viewport_verbs, is_viewport_verb, parse_viewport_verb, ViewportParseError,
     ViewportParseResult,

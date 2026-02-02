@@ -36,6 +36,7 @@ mod document_ops;
 mod economic_exposure_ops;
 mod entity_ops;
 pub mod entity_query;
+mod exec_ops;
 mod gleif_ops;
 pub mod helpers;
 mod investor_ops;

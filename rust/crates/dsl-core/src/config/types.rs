@@ -87,6 +87,10 @@ pub struct VerbConfig {
     /// Controls atomic vs best-effort execution and advisory locks.
     #[serde(default)]
     pub policy: Option<PolicyConfig>,
+    /// Narration templates for human-readable output.
+    /// Provides success/failure/preview templates with variable substitution.
+    #[serde(default)]
+    pub narration_template: Option<NarrationTemplate>,
 }
 
 // =============================================================================
@@ -182,6 +186,81 @@ pub enum LockAccessConfig {
     /// Write lock - exclusive access (default)
     #[default]
     Write,
+}
+
+// =============================================================================
+// NARRATION TEMPLATE CONFIG
+// =============================================================================
+
+/// Narration template configuration for human-readable output
+///
+/// Templates use variable substitution with `{placeholder}` syntax:
+/// - `{arg.X}` - Value of argument X
+/// - `{result.X}` - Value from execution result
+/// - `{verb}`, `{domain}` - Verb/domain names
+/// - `{affected_count}` - Number of affected entities
+/// - `{error}` - Error message (for failure templates)
+/// - `{duration_ms}` - Execution time
+///
+/// Example YAML:
+/// ```yaml
+/// narration_template:
+///   success: "Created {arg.type} '{arg.name}' with ID {result.id}"
+///   failure: "Could not create {arg.type}: {error}"
+///   preview: "This will create a new {arg.type} named '{arg.name}'"
+///   training_hint: "create {arg.type} called {arg.name}"
+/// ```
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct NarrationTemplate {
+    /// Template for successful execution
+    #[serde(default)]
+    pub success: Option<String>,
+
+    /// Template for failed execution
+    #[serde(default)]
+    pub failure: Option<String>,
+
+    /// Template for preview/proposal mode
+    #[serde(default)]
+    pub preview: Option<String>,
+
+    /// Conditional overrides based on execution context
+    #[serde(default)]
+    pub conditionals: Vec<ConditionalNarration>,
+
+    /// Training hint template for learning suggestions
+    #[serde(default)]
+    pub training_hint: Option<String>,
+}
+
+/// Conditional narration override
+///
+/// Allows different templates based on execution context.
+///
+/// Example YAML:
+/// ```yaml
+/// conditionals:
+///   - when: "affected_count > 10"
+///     success: "Bulk created {affected_count} entities"
+///   - when: "has_warnings"
+///     success: "Created '{arg.name}' with warnings: {warnings}"
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ConditionalNarration {
+    /// Condition expression (simple syntax):
+    /// - `"affected_count > 10"` - comparison
+    /// - `"has_warnings"` - boolean check
+    /// - `"arg.type == 'FUND'"` - equality
+    #[serde(rename = "when")]
+    pub condition: String,
+
+    /// Template to use when condition is true (for success outcome)
+    #[serde(default)]
+    pub success: Option<String>,
+
+    /// Template to use when condition is true (for failure outcome)
+    #[serde(default)]
+    pub failure: Option<String>,
 }
 
 // =============================================================================
