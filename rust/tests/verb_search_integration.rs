@@ -1470,17 +1470,41 @@ async fn test_cbu_dump_mismatches() {
 // VERIFICATION B-F: Evidence, Ensemble Mode, Lazy Embedding Tests
 // =============================================================================
 // These tests verify the 071 finish line fixes are working correctly.
-// Run with: cargo test --features database --test verb_search_integration verify_ -- --ignored --nocapture
+//
+// IMPORTANT: The OB_VERB_ENSEMBLE_MODE env var is read ONCE via OnceLock at startup.
+// Tests that modify the env var will interfere with each other if run in parallel.
+// Run each test in a SEPARATE cargo invocation to ensure correct behavior.
+//
+// Run ensemble-mode-ON tests (B, C):
+//   OB_VERB_ENSEMBLE_MODE=1 DATABASE_URL="postgresql:///data_designer" \
+//     cargo test --features database --test verb_search_integration -- verify_b_evidence_populated_with --ignored --nocapture
+//   OB_VERB_ENSEMBLE_MODE=1 cargo test --test verb_search_integration -- verify_c --nocapture
+//
+// Run ensemble-mode-OFF tests (B-control, D, E, F):
+//   DATABASE_URL="postgresql:///data_designer" \
+//     cargo test --features database --test verb_search_integration -- verify_b_evidence_empty --ignored --nocapture
+//   DATABASE_URL="postgresql:///data_designer" \
+//     cargo test --features database --test verb_search_integration -- verify_d --ignored --nocapture
+//   DATABASE_URL="postgresql:///data_designer" \
+//     cargo test --features database --test verb_search_integration -- verify_e --ignored --nocapture
+//   cargo test --test verb_search_integration -- verify_f --nocapture
 
 /// Verification B: Evidence is populated on every candidate when ensemble mode enabled
 ///
 /// When OB_VERB_ENSEMBLE_MODE=1, each VerbSearchResult should have non-empty evidence
 /// showing which channel produced it.
+///
+/// IMPORTANT: Run this test ALONE with the env var set BEFORE cargo:
+///   OB_VERB_ENSEMBLE_MODE=1 cargo test --features database --test verb_search_integration verify_b_evidence_populated_with -- --ignored --nocapture
+///
+/// The OnceLock means the env var is read once per process. Running with other tests
+/// that unset the env var will cause this test to fail.
 #[cfg(feature = "database")]
 #[tokio::test]
 #[ignore]
 async fn verify_b_evidence_populated_with_ensemble_mode() {
-    // Set ensemble mode for this test
+    // NOTE: Setting env var here doesn't work if another test already triggered OnceLock
+    // The env var must be set BEFORE the process starts
     std::env::set_var("OB_VERB_ENSEMBLE_MODE", "1");
 
     let harness = VerbSearchTestHarness::new()
