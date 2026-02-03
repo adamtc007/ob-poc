@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-01-31
+> **Last reviewed:** 2026-02-03
 > **Crates:** 22 Rust crates (includes ob-poc-macros + 5 esper_* crates)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
-> **Migrations:** 58 schema migrations
+> **Migrations:** 73 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
 > **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
@@ -31,6 +31,8 @@
 > **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
 > **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
+> **Lexicon Service (072):** ✅ Complete - In-memory verb/domain/concept lookup with bincode snapshots
+> **Entity Linking Service (073):** ✅ Complete - In-memory entity resolution with mention extraction, token overlap matching
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -289,6 +291,8 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Session-runsheet-viewport | `ai-thoughts/035-session-runsheet-viewport-integration.md` | ✅ Done |
 | Session rip-and-replace | `ai-thoughts/036-session-rip-and-replace.md` | ✅ Done |
 | Solar navigation | `ai-thoughts/038-solar-navigation-unified-design.md` | ✅ Done |
+| Lexicon service | `ai-thoughts/072-lexicon-service-implementation-plan.md` | ✅ Done |
+| Entity linking | `ai-thoughts/073-entity-linking-implementation-plan.md` | ✅ Done |
 
 ---
 
@@ -3637,6 +3641,203 @@ Deprecation warnings guide migration to config-driven accessors.
 
 ---
 
+## Lexicon Service (072)
+
+> ✅ **IMPLEMENTED (2026-02-02)**: In-memory verb/domain/concept lookup with bincode snapshots.
+
+The Lexicon Service provides fast, in-memory lookup for DSL vocabulary without database queries at runtime.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    LEXICON PIPELINE                                          │
+│                                                                              │
+│  config/verbs/*.yaml + config/lexicon/*.yaml                                │
+│         │                                                                    │
+│         ▼                                                                    │
+│  cargo x lexicon compile                                                    │
+│         │   - Loads verb definitions from YAML                              │
+│         │   - Loads domain/entity_type/verb_concept config                  │
+│         │   - Builds indexed snapshot                                       │
+│         │   - Serializes to bincode                                         │
+│         │                                                                    │
+│         ▼                                                                    │
+│  assets/lexicon.snapshot.bin                                                │
+│         │                                                                    │
+│         ▼                                                                    │
+│  LexiconService::load() at server startup                                   │
+│         │   - Deserializes snapshot                                         │
+│         │   - Provides O(1) lookups for verbs, domains, concepts            │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Types
+
+| Type | Purpose |
+|------|---------|
+| `LexiconSnapshot` | In-memory index with verb/domain/concept maps |
+| `VerbEntry` | Verb metadata (domain, action, description, args) |
+| `DomainEntry` | Domain with associated verbs |
+| `VerbConceptEntry` | Semantic concept for intent matching |
+
+### Commands
+
+```bash
+cd rust/
+
+# Compile lexicon snapshot from YAML
+cargo x lexicon compile [-v|--verbose]
+
+# Lint lexicon config for issues  
+cargo x lexicon lint [--errors-only]
+
+# Show snapshot statistics
+cargo x lexicon stats [--snapshot <path>]
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/lexicon/mod.rs` | Module exports |
+| `rust/src/lexicon/types.rs` | `LexiconSnapshot`, `VerbEntry`, `DomainEntry` |
+| `rust/src/lexicon/compiler.rs` | YAML → snapshot compiler |
+| `rust/src/lexicon/service.rs` | `LexiconService` trait and implementation |
+| `rust/src/lexicon/snapshot.rs` | Bincode serialization |
+| `rust/xtask/src/lexicon.rs` | CLI commands |
+| `rust/config/lexicon/domains.yaml` | Domain definitions |
+| `rust/config/lexicon/entity_types.yaml` | Entity type vocabulary |
+| `rust/config/lexicon/verb_concepts.yaml` | Verb concept mappings |
+| `rust/assets/lexicon.snapshot.bin` | Compiled snapshot artifact |
+
+---
+
+## Entity Linking Service (073)
+
+> ✅ **IMPLEMENTED (2026-02-03)**: In-memory entity resolution with mention extraction and token overlap matching.
+
+The Entity Linking Service resolves natural language entity references to database UUIDs without runtime DB queries for the lookup phase.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    ENTITY LINKING PIPELINE                                   │
+│                                                                              │
+│  User utterance: "Set up ISDA with Goldman Sachs"                           │
+│         │                                                                    │
+│         ▼                                                                    │
+│  MentionExtractor.extract()                                                 │
+│         │   - N-gram scanning (1 to max_ngram_size tokens)                  │
+│         │   - Alias index lookup                                            │
+│         │   - Token overlap fallback for fuzzy matching                     │
+│         │   - Non-overlapping span selection                                │
+│         │                                                                    │
+│         ▼                                                                    │
+│  MentionSpan { text: "Goldman Sachs", candidate_ids: [uuid1, ...] }         │
+│         │                                                                    │
+│         ▼                                                                    │
+│  EntityLinkingService.resolve_mentions()                                    │
+│         │   - Score candidates by kind constraint + concept overlap         │
+│         │   - Generate Evidence for disambiguation audit                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  EntityResolution { entity_id, score, evidence: [...] }                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Snapshot Compilation
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  DATABASE TABLES                          SNAPSHOT INDEXES                   │
+│                                                                              │
+│  ob-poc.entities ──────────────────────► entities: Vec<EntityRow>           │
+│  ob-poc.entity_names ──────────────────► name_index: HashMap<norm, id>      │
+│  agent.entity_aliases ─────────────────► alias_index: HashMap<alias, ids>   │
+│  ob-poc.entity_concept_link ───────────► concept_links: HashMap<id, concepts>│
+│  ob-poc.entity_feature ────────────────► (future: feature vectors)          │
+│                                                                              │
+│  + Derived token_index for fuzzy matching                                   │
+│  + Derived kind_index for type filtering                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Types
+
+| Type | Purpose |
+|------|---------|
+| `EntitySnapshot` | In-memory indexes (alias, name, token, concept, kind) |
+| `EntityRow` | Entity record (id, kind, canonical_name, name_norm) |
+| `MentionExtractor` | N-gram scanner for entity mentions |
+| `MentionSpan` | Extracted mention with character positions and candidates |
+| `EntityLinkingService` | Resolution trait with scoring and evidence |
+| `EntityResolution` | Resolved entity with score and evidence trail |
+| `Evidence` | Tagged enum for disambiguation audit (ExactAlias, TokenOverlap, etc.) |
+
+### Commands
+
+```bash
+cd rust/
+
+# Compile entity snapshot from database
+DATABASE_URL="postgresql:///data_designer" cargo x entity compile [-v|--verbose]
+
+# Lint entity data for quality issues
+DATABASE_URL="postgresql:///data_designer" cargo x entity lint [--errors-only]
+
+# Show snapshot statistics
+cargo x entity stats [--snapshot <path>]
+```
+
+### Text Normalization
+
+Entity matching uses Unicode NFKC normalization:
+
+```rust
+use ob_poc::entity_linking::normalize_entity_text;
+
+// Basic normalization: lowercase, NFKC, strip punctuation
+normalize_entity_text("Goldman Sachs & Co.", false)  // → "goldman sachs co"
+
+// With legal suffix stripping
+normalize_entity_text("Apple Inc.", true)  // → "apple"
+normalize_entity_text("Ford Motor Company Ltd.", true)  // → "ford motor company"
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/entity_linking/mod.rs` | Module exports |
+| `rust/src/entity_linking/normalize.rs` | Unicode NFKC normalization, tokenization |
+| `rust/src/entity_linking/snapshot.rs` | `EntitySnapshot` with indexes |
+| `rust/src/entity_linking/mention.rs` | `MentionExtractor` for n-gram scanning |
+| `rust/src/entity_linking/resolver.rs` | `EntityLinkingService` trait and impl |
+| `rust/src/entity_linking/compiler.rs` | DB → snapshot compiler with SHA256 hash |
+| `rust/xtask/src/entity.rs` | CLI commands |
+| `rust/assets/entity.snapshot.bin` | Compiled snapshot artifact |
+| `rust/migrations/073_entity_linking_support.sql` | Schema additions |
+
+### Database Tables (073)
+
+| Table | Purpose |
+|-------|---------|
+| `ob-poc.entity_concept_link` | Links entities to semantic concepts with weights |
+| `ob-poc.entity_feature` | Entity feature flags (future: ML features) |
+| `ob-poc.entities.name_norm` | Normalized name column with auto-update trigger |
+
+### Views
+
+| View | Purpose |
+|------|---------|
+| `ob-poc.v_entity_linking_data` | Flattened entity data for snapshot compilation |
+| `ob-poc.v_entity_aliases` | Union of entity_names + agent.entity_aliases |
+| `ob-poc.v_entity_linking_stats` | Statistics for monitoring |
+
+---
+
 ## Key Directories
 
 ```
@@ -3660,6 +3861,8 @@ ob-poc/
 │       │   ├── custom_ops/     # Plugin handlers
 │       │   └── generic_executor.rs
 │       ├── domain_ops/         # CustomOperation implementations (~300+ ops)
+│       ├── lexicon/            # In-memory verb/domain/concept lookup (072)
+│       ├── entity_linking/     # In-memory entity resolution (073)
 │       ├── session/            # Session state
 │       ├── graph/              # Graph builders
 │       └── api/                # REST routes
@@ -3742,6 +3945,8 @@ When you see these in a task, read the corresponding annex first:
 | "macro", "operator vocabulary", "structure.setup", "constraint cascade" | CLAUDE.md §Operator Vocabulary & Macros (058) |
 | "onboarding pipeline", "RequirementPlanner", "OnboardingPlan", "ob-agentic" | CLAUDE.md §Structured Onboarding Pipeline |
 | "LSP", "language server", "completion", "diagnostics", "dsl-lsp" | CLAUDE.md §DSL Language Server |
+| "lexicon", "verb lookup", "domain lookup", "LexiconService" | CLAUDE.md §Lexicon Service (072) |
+| "entity linking", "mention extraction", "entity resolution", "EntityLinkingService" | CLAUDE.md §Entity Linking Service (073) |
 
 ---
 
