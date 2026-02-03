@@ -803,8 +803,15 @@ impl IntentPipeline {
             .ok_or_else(|| anyhow!("Verb not in registry: {}", top_verb))?;
 
         // Step 3: Extract arguments via LLM (structured output only)
+        // Pass scope_ctx for entity context (client_group_name, entity_filter from scope_phrase)
         let intent = self
-            .extract_arguments(instruction, &top_verb, verb_def, candidates[0].score)
+            .extract_arguments(
+                instruction,
+                &top_verb,
+                verb_def,
+                candidates[0].score,
+                &scope_ctx,
+            )
             .await?;
 
         // Step 3b: Check if this is a macro verb and expand it
@@ -998,12 +1005,17 @@ impl IntentPipeline {
     ///
     /// Problem A fix: Uses verb schema to determine if string needs resolution.
     /// Only fields with explicit `lookup` config in YAML are marked as Unresolved.
+    ///
+    /// The `scope_ctx` provides context from utterance segmentation:
+    /// - `client_group_name`: Current client context (e.g., "Allianz")
+    /// - `entity_filter`: Entity descriptors from scope_phrase (e.g., "irish funds", "lux cbus")
     async fn extract_arguments(
         &self,
         instruction: &str,
         verb: &str,
         verb_def: &RuntimeVerb,
         verb_confidence: f32,
+        scope_ctx: &ScopeContext,
     ) -> Result<StructuredIntent> {
         let llm = self.get_llm()?;
 
@@ -1026,11 +1038,27 @@ impl IntentPipeline {
             })
             .collect();
 
+        // Build context section from scope_ctx (helps LLM understand entity context)
+        let context_section = {
+            let mut parts = Vec::new();
+            if let Some(ref client) = scope_ctx.client_group_name {
+                parts.push(format!("Client context: {}", client));
+            }
+            if let Some(ref filter) = scope_ctx.entity_filter {
+                parts.push(format!("Entity filter: {} (use this to infer jurisdiction, entity type, or other filters)", filter));
+            }
+            if parts.is_empty() {
+                String::new()
+            } else {
+                format!("\nCONTEXT:\n{}\n", parts.join("\n"))
+            }
+        };
+
         let system_prompt = format!(
             r#"You are an argument extractor for a DSL system.
 
 Given a natural language instruction, extract argument values for the verb: {verb}
-
+{context}
 VERB PARAMETERS:
 {params}
 
@@ -1055,6 +1083,7 @@ RULES:
    - Example: "load allianz UK funds" → jurisdiction is "GB"
 6. If a required parameter cannot be found in the instruction, set value to null
 7. Do NOT write DSL syntax - only extract values
+8. Use CONTEXT above to infer missing parameters (e.g., "irish funds" implies jurisdiction=IE, type=fund)
 
 Respond with ONLY valid JSON:
 {{
@@ -1065,6 +1094,7 @@ Respond with ONLY valid JSON:
   "notes": ["any extraction notes"]
 }}"#,
             verb = verb,
+            context = context_section,
             params = params_desc.join("\n"),
         );
 

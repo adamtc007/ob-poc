@@ -984,7 +984,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         session.pending_intent_tier = None;
 
         // STAGE 0: UTTERANCE SEGMENTATION
-        // Segment input into verb_phrase, group_phrase, scope_phrase, residual_terms
+        // Segment input into verb_phrase, resolved_group (with UUID!), scope_phrase, residual_terms
         // This runs BEFORE the pipeline to protect entity context from verb matching
         let segmentation = segment_utterance(&request.message, &self.pool).await;
 
@@ -992,8 +992,9 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             original = %segmentation.original,
             verb_phrase = %segmentation.verb_phrase.text,
             verb_confidence = segmentation.verb_phrase.confidence,
-            group_phrase = ?segmentation.group_phrase.as_ref().map(|g| &g.text),
-            group_confidence = ?segmentation.group_phrase.as_ref().map(|g| g.confidence),
+            group_id = ?segmentation.group_id(),
+            group_name = ?segmentation.group_name(),
+            group_confidence = ?segmentation.group_confidence(),
             scope_phrase = ?segmentation.scope_phrase.as_ref().map(|s| &s.text),
             is_likely_typo = segmentation.is_likely_typo(),
             is_likely_garbage = segmentation.is_likely_garbage(),
@@ -1012,15 +1013,35 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             None
         };
 
+        // Build scope context from segmentation if group resolved, otherwise use session scope
+        // This is the KEY integration - segmentation's resolved group_id flows to pipeline
+        // Also pass scope_phrase as entity_filter for narrowing entity searches
+        let client_scope = if let Some(group_id) = segmentation.group_id() {
+            use crate::mcp::scope_resolution::ScopeContext;
+            let mut ctx = ScopeContext::new().with_client_group(
+                group_id,
+                segmentation.group_name().unwrap_or_default().to_string(),
+            );
+            // Add entity filter from scope_phrase (e.g., "irish funds", "lux cbus")
+            if let Some(scope_text) = segmentation.get_scope_text() {
+                ctx = ctx.with_entity_filter(scope_text.to_string());
+            }
+            Some(ctx)
+        } else {
+            // Use session's existing scope, but add entity_filter from this utterance
+            let mut ctx = session.context.client_scope.clone();
+            if let Some(scope_text) = segmentation.get_scope_text() {
+                if let Some(ref mut existing) = ctx {
+                    existing.entity_filter = Some(scope_text.to_string());
+                }
+            }
+            ctx
+        };
+
         let result = self
             .get_intent_pipeline()
             .with_session(session_arc)
-            .process_with_segmentation(
-                &request.message,
-                None,
-                session.context.client_scope.clone(),
-                verb_phrase_for_search,
-            )
+            .process_with_segmentation(&request.message, None, client_scope, verb_phrase_for_search)
             .await;
 
         match result {
@@ -1131,16 +1152,13 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // STAGE 1: TYPO CHECK using segmentation
         // If group resolved but verb weak, this is likely a typo (not garbage)
         if segmentation.is_likely_typo() {
-            let group_name = segmentation
-                .group_phrase
-                .as_ref()
-                .map(|g| g.text.as_str())
-                .unwrap_or("unknown");
+            let group_name = segmentation.group_name().unwrap_or("unknown");
             let verb_text = &segmentation.verb_phrase.text;
 
             tracing::info!(
                 verb_phrase = %verb_text,
-                group_phrase = %group_name,
+                resolved_group = %group_name,
+                group_id = ?segmentation.group_id(),
                 verb_confidence = segmentation.verb_phrase.confidence,
                 "Detected likely typo - group resolved but verb weak"
             );

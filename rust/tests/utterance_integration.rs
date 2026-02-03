@@ -76,8 +76,10 @@ async fn test_segment_work_on_allianz() {
         seg.verb_phrase.text, seg.verb_phrase.confidence
     );
     println!(
-        "Group phrase: {:?}",
-        seg.group_phrase.as_ref().map(|g| (&g.text, g.confidence))
+        "Resolved group: {:?}",
+        seg.resolved_group
+            .as_ref()
+            .map(|g| (&g.canonical_name, g.group_id, g.confidence))
     );
     println!(
         "Scope phrase: {:?}",
@@ -99,7 +101,8 @@ async fn test_segment_work_on_allianz() {
         seg.verb_phrase.confidence >= 0.5,
         "Verb confidence should be >= 0.5"
     );
-    assert!(seg.group_phrase.is_some(), "Group should be resolved");
+    assert!(seg.resolved_group.is_some(), "Group should be resolved");
+    assert!(seg.group_id().is_some(), "Group ID should be available");
     assert!(!seg.is_likely_typo(), "Should NOT be detected as typo");
 }
 

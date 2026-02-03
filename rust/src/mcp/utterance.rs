@@ -10,7 +10,7 @@
 //!     ↓
 //! segment_utterance()  ← THIS MODULE
 //!     ↓
-//! ├── group_phrase → ScopeResolver (sets client_group_id)
+//! ├── resolved_group → ScopeContext (group_id + canonical_name)
 //! ├── verb_phrase  → HybridVerbSearcher (verb discovery)
 //! └── scope_phrase → Entity search (search_entity_tags)
 //! ```
@@ -49,14 +49,31 @@ pub struct UtteranceSegmentation {
     pub tokens: Vec<Token>,
     /// Verb/action phrase (REQUIRED - may be low confidence)
     pub verb_phrase: Segment,
-    /// Client group anchor (optional)
-    pub group_phrase: Option<Segment>,
+    /// Resolved client group (optional - includes UUID for downstream use)
+    pub resolved_group: Option<ResolvedGroup>,
     /// Entity scope descriptor (optional)
     pub scope_phrase: Option<Segment>,
     /// Remaining unconsumed tokens
     pub residual_terms: Vec<Segment>,
     /// Debug/learning trace of segmentation steps
     pub method_trace: Vec<SegStep>,
+}
+
+/// A resolved client group with both the matched text and database ID
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolvedGroup {
+    /// The UUID from client_group table
+    pub group_id: uuid::Uuid,
+    /// Canonical group name from database
+    pub canonical_name: String,
+    /// The text that matched (user's input)
+    pub matched_text: String,
+    /// Byte span in normalized string
+    pub span: Span,
+    /// Match confidence (1.0 = exact, 0.9 = phonetic, 0.4-0.9 = trigram)
+    pub confidence: f32,
+    /// How the match was found
+    pub method: SegmentMethod,
 }
 
 /// A segment with text, span, confidence, and method
@@ -472,11 +489,28 @@ impl UtteranceSegmentation {
                 confidence: 0.0,
                 method: SegmentMethod::NoMatch,
             },
-            group_phrase: None,
+            resolved_group: None,
             scope_phrase: None,
             residual_terms: vec![],
             method_trace: vec![],
         }
+    }
+
+    /// Get the resolved group ID for scope context (if available)
+    pub fn group_id(&self) -> Option<uuid::Uuid> {
+        self.resolved_group.as_ref().map(|g| g.group_id)
+    }
+
+    /// Get the canonical group name (if resolved)
+    pub fn group_name(&self) -> Option<&str> {
+        self.resolved_group
+            .as_ref()
+            .map(|g| g.canonical_name.as_str())
+    }
+
+    /// Get group confidence (if resolved)
+    pub fn group_confidence(&self) -> Option<f32> {
+        self.resolved_group.as_ref().map(|g| g.confidence)
     }
 
     /// Check if input is likely garbage (nothing meaningful extracted)
@@ -489,7 +523,7 @@ impl UtteranceSegmentation {
         // No meaningful segments
         let has_verb = self.verb_phrase.confidence >= 0.3;
         let has_group = self
-            .group_phrase
+            .resolved_group
             .as_ref()
             .is_some_and(|g| g.confidence >= 0.5);
         let has_scope = self.scope_phrase.is_some();
@@ -504,7 +538,7 @@ impl UtteranceSegmentation {
     /// - verb_weak: confidence < 0.5 (no verb pattern match)
     pub fn is_likely_typo(&self) -> bool {
         let group_resolved = self
-            .group_phrase
+            .resolved_group
             .as_ref()
             .is_some_and(|g| g.confidence >= 0.6);
         let verb_weak = self.verb_phrase.confidence < 0.5;
@@ -517,9 +551,11 @@ impl UtteranceSegmentation {
         &self.verb_phrase.text
     }
 
-    /// Get the extracted group name for scope resolution
+    /// Get the matched group text (user's input that matched)
     pub fn get_group_text(&self) -> Option<&str> {
-        self.group_phrase.as_ref().map(|g| g.text.as_str())
+        self.resolved_group
+            .as_ref()
+            .map(|g| g.matched_text.as_str())
     }
 
     /// Get the extracted scope for entity search
@@ -550,14 +586,14 @@ pub async fn segment_utterance(input: &str, pool: &PgPool) -> UtteranceSegmentat
     let implied_verb = extract_group_prefix(&normalized)
         .and_then(|(prefix, _)| get_implied_verb_for_prefix(prefix));
 
-    // Pass 1: Group phrase extraction
-    let group_phrase =
+    // Pass 1: Group phrase extraction (returns ResolvedGroup with UUID)
+    let resolved_group =
         extract_group_phrase(&normalized, &tokens, &mut consumed, &mut trace, pool).await;
 
     // Pass 2: Verb phrase extraction
     // If we have an implied verb from a verb-group prefix, use that with high confidence
     let verb_phrase = if let Some(implied) = implied_verb {
-        if group_phrase.is_some() {
+        if resolved_group.is_some() {
             // The prefix was a verb-group prefix and group resolved successfully
             trace.push(SegStep {
                 pass: 2,
@@ -591,7 +627,7 @@ pub async fn segment_utterance(input: &str, pool: &PgPool) -> UtteranceSegmentat
         normalized,
         tokens,
         verb_phrase,
-        group_phrase,
+        resolved_group,
         scope_phrase,
         residual_terms,
         method_trace: trace,
@@ -628,7 +664,7 @@ pub fn segment_utterance_sync(input: &str) -> UtteranceSegmentation {
         normalized,
         tokens,
         verb_phrase,
-        group_phrase: None,
+        resolved_group: None, // No DB = no group resolution
         scope_phrase,
         residual_terms,
         method_trace: trace,
@@ -646,13 +682,13 @@ async fn extract_group_phrase(
     consumed: &mut HashSet<usize>,
     trace: &mut Vec<SegStep>,
     pool: &PgPool,
-) -> Option<Segment> {
+) -> Option<ResolvedGroup> {
     // Check for explicit group prefix
     if let Some((prefix, remainder)) = extract_group_prefix(normalized) {
         let remainder_trimmed = remainder.trim();
         if !remainder_trimmed.is_empty() {
             // Try to resolve the remainder as a group
-            if let Ok(Some((_group_id, group_name, confidence))) =
+            if let Ok(Some((group_id, group_name, confidence))) =
                 resolve_group(remainder_trimmed, pool).await
             {
                 // Mark tokens as consumed
@@ -673,15 +709,17 @@ async fn extract_group_phrase(
                 trace.push(SegStep {
                     pass: 1,
                     action: format!(
-                        "Group phrase '{}' resolved to '{}'",
-                        remainder_trimmed, group_name
+                        "Group phrase '{}' resolved to '{}' ({})",
+                        remainder_trimmed, group_name, group_id
                     ),
                     consumed_span: Some(Span::new(0, prefix.len() + remainder_trimmed.len())),
                     confidence: Some(confidence),
                 });
 
-                return Some(Segment {
-                    text: remainder_trimmed.to_string(),
+                return Some(ResolvedGroup {
+                    group_id,
+                    canonical_name: group_name,
+                    matched_text: remainder_trimmed.to_string(),
                     span: Span::new(prefix.len(), prefix.len() + remainder_trimmed.len()),
                     confidence,
                     method: SegmentMethod::AliasMatch,
@@ -703,7 +741,9 @@ async fn extract_group_phrase(
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            if let Ok(Some((_, _group_name, confidence))) = resolve_group(&candidate, pool).await {
+            if let Ok(Some((group_id, group_name, confidence))) =
+                resolve_group(&candidate, pool).await
+            {
                 // Mark consumed
                 consumed.insert(i); // preposition
                 for j in (i + 1)..tokens.len().min(i + 4) {
@@ -712,7 +752,10 @@ async fn extract_group_phrase(
 
                 trace.push(SegStep {
                     pass: 1,
-                    action: format!("Group phrase '{}' found after '{}'", candidate, tok.text),
+                    action: format!(
+                        "Group phrase '{}' found after '{}' → {} ({})",
+                        candidate, tok.text, group_name, group_id
+                    ),
                     consumed_span: Some(Span::new(
                         tok.span.start,
                         tokens.get(i + 3).map_or(tok.span.end, |t| t.span.end),
@@ -720,8 +763,10 @@ async fn extract_group_phrase(
                     confidence: Some(confidence),
                 });
 
-                return Some(Segment {
-                    text: candidate,
+                return Some(ResolvedGroup {
+                    group_id,
+                    canonical_name: group_name,
+                    matched_text: candidate,
                     span: Span::new(
                         tokens[i + 1].span.start,
                         tokens
@@ -735,19 +780,25 @@ async fn extract_group_phrase(
 
             // Try just the immediate next token
             let single = &tokens[i + 1].text;
-            if let Ok(Some((_, _group_name, confidence))) = resolve_group(single, pool).await {
+            if let Ok(Some((group_id, group_name, confidence))) = resolve_group(single, pool).await
+            {
                 consumed.insert(i);
                 consumed.insert(i + 1);
 
                 trace.push(SegStep {
                     pass: 1,
-                    action: format!("Group phrase '{}' found after '{}'", single, tok.text),
+                    action: format!(
+                        "Group phrase '{}' found after '{}' → {} ({})",
+                        single, tok.text, group_name, group_id
+                    ),
                     consumed_span: Some(tokens[i + 1].span),
                     confidence: Some(confidence),
                 });
 
-                return Some(Segment {
-                    text: single.clone(),
+                return Some(ResolvedGroup {
+                    group_id,
+                    canonical_name: group_name,
+                    matched_text: single.clone(),
                     span: tokens[i + 1].span,
                     confidence,
                     method: SegmentMethod::AliasMatch,

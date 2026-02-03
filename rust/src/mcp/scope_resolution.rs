@@ -147,6 +147,9 @@ pub struct ScopeContext {
     pub client_group_name: Option<String>,
     /// Active persona (kyc, trading, ops, onboarding)
     pub persona: Option<String>,
+    /// Entity filter from scope_phrase (e.g., "irish funds", "lux cbus")
+    /// Used to narrow entity resolution and provide context to LLM
+    pub entity_filter: Option<String>,
 }
 
 impl ScopeContext {
@@ -165,9 +168,22 @@ impl ScopeContext {
         self
     }
 
+    /// Add entity filter from scope_phrase (e.g., "irish funds", "lux cbus")
+    pub fn with_entity_filter(mut self, filter: String) -> Self {
+        if !filter.is_empty() {
+            self.entity_filter = Some(filter);
+        }
+        self
+    }
+
     /// Check if we have client scope set
     pub fn has_scope(&self) -> bool {
         self.client_group_id.is_some()
+    }
+
+    /// Check if we have an entity filter
+    pub fn has_entity_filter(&self) -> bool {
+        self.entity_filter.as_ref().is_some_and(|f| !f.is_empty())
     }
 }
 
