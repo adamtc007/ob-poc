@@ -1631,7 +1631,12 @@ async fn verify_b_evidence_empty_without_ensemble_mode() {
 ///
 /// When the same verb is returned from multiple channels (e.g., learned + semantic),
 /// the evidence arrays should be merged in normalize_candidates.
+///
+/// NOTE: This test requires OB_VERB_ENSEMBLE_MODE=1 set BEFORE process start
+/// because is_ensemble_mode_enabled() uses OnceLock. Run in isolation:
+///   OB_VERB_ENSEMBLE_MODE=1 cargo test verify_c_evidence_merges_during_dedupe -- --nocapture
 #[test]
+#[ignore]
 fn verify_c_evidence_merges_during_dedupe() {
     use ob_poc::mcp::verb_search::VerbEvidence;
 
@@ -2005,6 +2010,84 @@ async fn explore_query() {
         AMBIGUITY_MARGIN,
     );
     println!("\nOutcome: {:?}", outcome);
+}
+
+/// Explore multiple ambiguous phrases to verify disambiguation behavior
+#[cfg(feature = "database")]
+#[tokio::test]
+#[ignore]
+async fn explore_ambiguous_phrases() {
+    let harness = VerbSearchTestHarness::new()
+        .await
+        .expect("Failed to create harness");
+
+    let phrases = vec![
+        (
+            "set up a new fund",
+            vec!["cbu.create", "fund.create-standalone"],
+        ),
+        (
+            "create acme corp",
+            vec!["cbu.create", "entity.create-limited-company"],
+        ),
+        ("who owns this", vec!["ubo.discover", "control.build-graph"]),
+        ("start kyc", vec!["kyc-case.create", "kyc.start-case"]),
+        (
+            "add custody",
+            vec!["cbu.add-product", "custody.add-account"],
+        ),
+        ("go deeper", vec!["view.drill", "view.descend"]),
+        (
+            "request passport",
+            vec!["document.solicit", "document.request"],
+        ),
+        (
+            "load the book",
+            vec!["session.load-galaxy", "session.load-cluster"],
+        ),
+        ("create a fund", vec!["cbu.create", "fund.create-umbrella"]),
+    ];
+
+    println!("\n============================================================");
+    println!("  EXPLORING AMBIGUOUS PHRASES FOR DISAMBIGUATION");
+    println!("============================================================\n");
+
+    let threshold = harness.searcher.semantic_threshold();
+    println!("Semantic threshold: {:.2}\n", threshold);
+
+    for (phrase, expected_verbs) in phrases {
+        println!("─────────────────────────────────────────────────");
+        println!("Query: \"{}\"", phrase);
+        println!("Expected verbs: {:?}", expected_verbs);
+
+        let results = harness.search_raw(phrase, 5).await.unwrap();
+
+        if results.is_empty() {
+            println!("  ⚠ No results (all below threshold {:.2})", threshold);
+        } else {
+            for (i, r) in results.iter().enumerate() {
+                let above_threshold = if r.score >= threshold { "✓" } else { "✗" };
+                let expected_mark = if expected_verbs.contains(&r.verb.as_str()) {
+                    "★"
+                } else {
+                    " "
+                };
+                println!(
+                    "  {}{} {}. {} ({:.3}) via {:?}",
+                    expected_mark,
+                    above_threshold,
+                    i + 1,
+                    r.verb,
+                    r.score,
+                    r.source
+                );
+            }
+
+            let outcome = check_ambiguity_with_margin(&results, threshold, AMBIGUITY_MARGIN);
+            println!("  Outcome: {:?}", outcome);
+        }
+        println!();
+    }
 }
 
 // =============================================================================
