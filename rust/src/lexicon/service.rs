@@ -371,7 +371,7 @@ mod tests {
         let results = service.search_verbs("create cbu", None, 5);
         // Should find cbu.create via exact match (score 1.0) AND cbu.list via token overlap
         // (token "cbu" maps to both verbs). The exact match should be first (higher score).
-        assert!(results.len() >= 1, "Should find at least exact match");
+        assert!(!results.is_empty(), "Should find at least exact match");
         assert_eq!(
             results[0].dsl_verb, "cbu.create",
             "Exact match should be first"

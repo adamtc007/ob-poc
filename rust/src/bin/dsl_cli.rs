@@ -2083,7 +2083,6 @@ async fn cmd_repl(
                 subtype: None,
                 entity_pk: *uuid,
                 resolved: true,
-                source_sheet_id: None,
             });
         }
 
@@ -2437,7 +2436,6 @@ async fn cmd_repl(
                                                         subtype: None,
                                                         entity_pk: *id,
                                                         resolved: false,
-                                                        source_sheet_id: None,
                                                     });
                                                 }
                                             }

@@ -425,14 +425,14 @@ impl HybridVerbSearcher {
     ///
     /// Priority order:
     /// 0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy
-    /// 1. User-specific learned (exact) - score 1.0
-    /// 0.5. Lexicon (exact label/token overlap) - score 0.34-1.0 (Phase C of 072)
-    /// 2. Global learned (exact) - score 1.0
-    /// 3. User-specific learned (semantic) - score 0.8-0.99
-    /// 4. Global learned (semantic) - score 0.8-0.99
-    /// 5. Blocklist filter (rejects blocked verbs)
-    /// 6. Global semantic (cold start) - score fallback_threshold-0.95
-    /// 7. Phonetic fallback (typo handling) - score 0.5-0.7
+    /// 1. Lexicon (exact label/token overlap) - score 0.34-1.0 (Phase C of 072)
+    /// 2. User-specific learned (exact) - score 1.0
+    /// 3. Global learned (exact) - score 1.0
+    /// 4. User-specific learned (semantic) - score 0.8-0.99
+    /// 5. Global learned (semantic) - score 0.8-0.99
+    /// 6. Blocklist filter (rejects blocked verbs)
+    /// 7. Global semantic (cold start) - score fallback_threshold-0.95
+    /// 8. Phonetic fallback (typo handling) - score 0.5-0.7
     pub async fn search(
         &self,
         query: &str,
