@@ -1207,15 +1207,16 @@ fn hard_negative_scenarios() -> Vec<TestScenario> {
         .with_alternatives(&["entity.archive"]),
         // approve vs submit - workflow state transitions
         // Approving when user meant submit (or vice versa) is a workflow error
+        // Note: kyc-case.update-status is the actual verb for case state changes
         TestScenario::safety_first(
             "approve case (safety)",
             "approve the kyc case",
-            "kyc.approve-case",
+            "kyc-case.update-status",
         ),
         TestScenario::safety_first(
             "submit case (safety)",
             "submit the kyc case for review",
-            "kyc.submit-case",
+            "kyc-case.update-status",
         ),
         // disable vs delete - disable is reversible, delete is not
         // If unsure, better to ask than accidentally delete
