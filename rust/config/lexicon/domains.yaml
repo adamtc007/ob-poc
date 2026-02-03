@@ -1,0 +1,174 @@
+# Domains Lexicon
+#
+# Defines domain concepts with inference keywords.
+# Used for domain inference from natural language input.
+
+cbu:
+  label: "Client Business Unit"
+  parent: null
+  inference_keywords:
+    - "cbu"
+    - "fund"
+    - "client"
+    - "structure"
+    - "portfolio"
+    - "account"
+    - "onboard"
+    - "onboarding"
+
+entity:
+  label: "Entity Management"
+  parent: null
+  inference_keywords:
+    - "entity"
+    - "company"
+    - "person"
+    - "organization"
+    - "party"
+    - "counterparty"
+
+session:
+  label: "Session & Navigation"
+  parent: null
+  inference_keywords:
+    - "session"
+    - "load"
+    - "unload"
+    - "navigate"
+    - "switch"
+    - "work on"
+    - "focus"
+    - "clear"
+    - "undo"
+    - "redo"
+
+view:
+  label: "View & Visualization"
+  parent: session
+  inference_keywords:
+    - "view"
+    - "drill"
+    - "zoom"
+    - "surface"
+    - "enhance"
+    - "display"
+    - "show"
+
+ubo:
+  label: "Ultimate Beneficial Ownership"
+  parent: entity
+  inference_keywords:
+    - "ubo"
+    - "beneficial"
+    - "ownership"
+    - "owner"
+    - "control"
+    - "shareholder"
+    - "stake"
+
+kyc:
+  label: "Know Your Customer"
+  parent: null
+  inference_keywords:
+    - "kyc"
+    - "compliance"
+    - "due diligence"
+    - "screening"
+    - "verification"
+    - "case"
+    - "review"
+
+trading-profile:
+  label: "Trading Profile"
+  parent: cbu
+  inference_keywords:
+    - "trading"
+    - "profile"
+    - "mandate"
+    - "investment"
+    - "strategy"
+
+cbu-role:
+  label: "CBU Entity Roles"
+  parent: cbu
+  inference_keywords:
+    - "role"
+    - "assign"
+    - "depositary"
+    - "custodian"
+    - "manager"
+    - "administrator"
+
+gleif:
+  label: "GLEIF & LEI"
+  parent: entity
+  inference_keywords:
+    - "gleif"
+    - "lei"
+    - "legal entity identifier"
+    - "lookup"
+    - "hierarchy"
+    - "corporate"
+
+custody:
+  label: "Custody & Settlement"
+  parent: null
+  inference_keywords:
+    - "custody"
+    - "settlement"
+    - "ssi"
+    - "safekeeping"
+    - "broker"
+    - "clearing"
+
+scope:
+  label: "Entity Scope"
+  parent: null
+  inference_keywords:
+    - "scope"
+    - "select"
+    - "filter"
+    - "narrow"
+    - "bulk"
+    - "batch"
+
+contract:
+  label: "Legal Contracts"
+  parent: null
+  inference_keywords:
+    - "contract"
+    - "agreement"
+    - "isda"
+    - "csa"
+    - "legal"
+
+document:
+  label: "Documents"
+  parent: null
+  inference_keywords:
+    - "document"
+    - "file"
+    - "upload"
+    - "attachment"
+    - "requirement"
+
+workflow:
+  label: "Workflow & Tasks"
+  parent: null
+  inference_keywords:
+    - "workflow"
+    - "task"
+    - "process"
+    - "approval"
+    - "pending"
+
+client-group:
+  label: "Client Groups"
+  parent: null
+  inference_keywords:
+    - "client group"
+    - "book"
+    - "allianz"
+    - "blackrock"
+    - "aviva"
+    - "commercial client"

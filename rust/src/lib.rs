@@ -90,6 +90,9 @@ pub mod lint;
 // Macros module - Operator macro registry for business vocabulary
 pub mod macros;
 
+// Lexicon module - In-memory vocabulary lookup for verb discovery
+pub mod lexicon;
+
 // GLEIF integration - LEI data enrichment and corporate tree traversal
 #[cfg(feature = "database")]
 pub mod gleif;

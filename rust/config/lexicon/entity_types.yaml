@@ -1,0 +1,120 @@
+# Entity Types Lexicon
+#
+# Defines entity type concepts with searchable aliases.
+# Used for lexical entity type resolution in verb arguments.
+
+cbu:
+  pref_label: "cbu"
+  aliases:
+    - "client business unit"
+    - "business unit"
+    - "trading unit"
+    - "fund"
+    - "structure"
+    - "client"
+  domain: cbu
+
+entity:
+  pref_label: "entity"
+  aliases:
+    - "company"
+    - "person"
+    - "organization"
+    - "party"
+    - "counterparty"
+  domain: entity
+
+legal_entity:
+  pref_label: "legal entity"
+  aliases:
+    - "company"
+    - "corporation"
+    - "firm"
+    - "organization"
+    - "corporate"
+  domain: entity
+
+natural_person:
+  pref_label: "natural person"
+  aliases:
+    - "person"
+    - "individual"
+    - "human"
+  domain: entity
+
+trading_profile:
+  pref_label: "trading profile"
+  aliases:
+    - "mandate"
+    - "investment mandate"
+    - "trading mandate"
+    - "profile"
+  domain: trading-profile
+
+kyc_case:
+  pref_label: "kyc case"
+  aliases:
+    - "case"
+    - "kyc review"
+    - "due diligence"
+    - "compliance case"
+  domain: kyc
+
+entity_scope:
+  pref_label: "entity scope"
+  aliases:
+    - "scope"
+    - "entity set"
+    - "selection"
+  domain: scope
+
+jurisdiction:
+  pref_label: "jurisdiction"
+  aliases:
+    - "country"
+    - "region"
+    - "territory"
+  domain: reference
+
+instrument:
+  pref_label: "instrument"
+  aliases:
+    - "security"
+    - "product"
+    - "asset"
+    - "financial instrument"
+  domain: custody
+
+counterparty:
+  pref_label: "counterparty"
+  aliases:
+    - "trading partner"
+    - "broker"
+    - "dealer"
+    - "market maker"
+  domain: custody
+
+ssi:
+  pref_label: "ssi"
+  aliases:
+    - "standing settlement instruction"
+    - "settlement instruction"
+    - "settlement details"
+  domain: custody
+
+document:
+  pref_label: "document"
+  aliases:
+    - "file"
+    - "attachment"
+    - "upload"
+  domain: document
+
+client_group:
+  pref_label: "client group"
+  aliases:
+    - "client"
+    - "book"
+    - "commercial client"
+    - "apex"
+  domain: client-group

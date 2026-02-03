@@ -47,7 +47,11 @@ use uuid::Uuid;
 use crate::agent::learning::embedder::SharedEmbedder;
 use crate::agent::learning::warmup::SharedLearnedData;
 use crate::database::VerbService;
+use crate::lexicon::LexiconService;
 use crate::macros::OperatorMacroRegistry;
+
+/// Shared lexicon service type alias
+pub type SharedLexicon = Arc<dyn LexiconService>;
 
 /// A unified verb search result
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -83,6 +87,10 @@ pub enum VerbSearchSource {
     Phonetic,
     /// Operator macro match (business vocabulary layer)
     Macro,
+    /// Lexicon exact label match (lexical search lane)
+    LexiconExact,
+    /// Lexicon token overlap match (lexical search lane)
+    LexiconToken,
 }
 
 // ============================================================================
@@ -243,6 +251,8 @@ pub struct HybridVerbSearcher {
     embedder: Option<SharedEmbedder>,
     /// Operator macro registry for business vocabulary search
     macro_registry: Option<Arc<OperatorMacroRegistry>>,
+    /// Lexicon service for fast lexical search (runs BEFORE semantic embedding)
+    lexicon: Option<SharedLexicon>,
     /// Similarity threshold for learned semantic matches (high confidence, 0.80)
     semantic_threshold: f32,
     /// Similarity threshold for cold start / fallback semantic matches (0.65)
@@ -266,6 +276,7 @@ impl Clone for HybridVerbSearcher {
             learned_data: self.learned_data.clone(),
             embedder: self.embedder.clone(),
             macro_registry: self.macro_registry.clone(),
+            lexicon: self.lexicon.clone(),
             semantic_threshold: self.semantic_threshold,
             fallback_threshold: self.fallback_threshold,
             blocklist_threshold: self.blocklist_threshold,
@@ -292,6 +303,7 @@ impl HybridVerbSearcher {
             learned_data,
             embedder: None,       // Embedder added separately via with_embedder
             macro_registry: None, // Macro registry added separately via with_macro_registry
+            lexicon: None,        // Lexicon added separately via with_lexicon
             // BGE asymmetric mode thresholds (query→target is lower than target→target)
             semantic_threshold: 0.65,  // Decision gate for accepting match
             fallback_threshold: 0.55,  // Retrieval cutoff for DB queries
@@ -312,6 +324,7 @@ impl HybridVerbSearcher {
             learned_data: Some(learned_data),
             embedder: None,
             macro_registry: None,
+            lexicon: None,
             // BGE asymmetric mode thresholds
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
@@ -331,6 +344,7 @@ impl HybridVerbSearcher {
             learned_data: None,
             embedder: None,
             macro_registry: None,
+            lexicon: None,
             // BGE asymmetric mode thresholds
             semantic_threshold: 0.65,
             fallback_threshold: 0.55,
@@ -352,6 +366,12 @@ impl HybridVerbSearcher {
     /// Add macro registry for operator vocabulary search
     pub fn with_macro_registry(mut self, registry: Arc<OperatorMacroRegistry>) -> Self {
         self.macro_registry = Some(registry);
+        self
+    }
+
+    /// Add lexicon service for fast lexical search (runs BEFORE semantic embedding)
+    pub fn with_lexicon(mut self, lexicon: SharedLexicon) -> Self {
+        self.lexicon = Some(lexicon);
         self
     }
 
@@ -406,11 +426,13 @@ impl HybridVerbSearcher {
     /// Priority order:
     /// 0. Operator macros (business vocabulary) - score 1.0 exact, 0.95 fuzzy
     /// 1. User-specific learned (exact) - score 1.0
+    /// 0.5. Lexicon (exact label/token overlap) - score 0.34-1.0 (Phase C of 072)
     /// 2. Global learned (exact) - score 1.0
     /// 3. User-specific learned (semantic) - score 0.8-0.99
     /// 4. Global learned (semantic) - score 0.8-0.99
     /// 5. Blocklist filter (rejects blocked verbs)
     /// 6. Global semantic (cold start) - score fallback_threshold-0.95
+    /// 7. Phonetic fallback (typo handling) - score 0.5-0.7
     pub async fn search(
         &self,
         query: &str,
@@ -487,6 +509,45 @@ impl HybridVerbSearcher {
                 "VerbSearch: returning early with exact macro match"
             );
             return Ok(results);
+        }
+
+        // 0.5. Lexicon search (fast in-memory lexical matching - Phase C of 072)
+        // Runs BEFORE semantic embedding computation for two reasons:
+        // 1. Performance: if lexicon finds exact match, we might skip embedding entirely
+        // 2. Accuracy: lexicon provides high-confidence matches for known vocabulary
+        // The lexicon uses label_to_concepts (exact) and token_to_concepts (overlap)
+        if let Some(ref lexicon) = self.lexicon {
+            let lexicon_results = lexicon.search_verbs(&normalized, None, limit);
+            for candidate in lexicon_results {
+                if self.matches_domain(&candidate.dsl_verb, domain_filter)
+                    && !seen_verbs.contains(&candidate.dsl_verb)
+                {
+                    // Determine source based on score: exact (1.0) vs token overlap (<1.0)
+                    let source = if candidate.score >= 1.0 {
+                        VerbSearchSource::LexiconExact
+                    } else {
+                        VerbSearchSource::LexiconToken
+                    };
+
+                    let description = self.get_verb_description(&candidate.dsl_verb).await;
+
+                    tracing::debug!(
+                        verb = %candidate.dsl_verb,
+                        score = candidate.score,
+                        source = ?source,
+                        "VerbSearch: lexicon match"
+                    );
+
+                    seen_verbs.insert(candidate.dsl_verb.clone());
+                    results.push(VerbSearchResult {
+                        verb: candidate.dsl_verb,
+                        score: candidate.score,
+                        source,
+                        matched_phrase: query.to_string(),
+                        description,
+                    });
+                }
+            }
         }
 
         // 1. User-specific learned phrases (exact match)

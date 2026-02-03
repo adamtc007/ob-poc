@@ -100,6 +100,10 @@ crossbeam-channel = "0.5"
 
 # Serialization/Deserialization
 # serde is already included above
+bincode = "1.3"
+
+# Small vector optimization for bounded collections
+smallvec = { version = "1.11", features = ["serde"] }
 
 # WebAssembly support (if needed for client-side)
 # wasm-bindgen = "0.2"

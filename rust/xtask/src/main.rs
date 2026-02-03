@@ -15,6 +15,7 @@ mod gleif_crawl_dsl;
 mod gleif_import;
 mod gleif_load;
 mod gleif_test;
+mod lexicon;
 mod seed_allianz;
 mod ubo_test;
 mod verb_migrate;
@@ -316,6 +317,14 @@ enum Command {
         action: VerbsAction,
     },
 
+    /// Lexicon service commands (compile, lint, bench)
+    ///
+    /// Manages the lexical vocabulary snapshot used for fast verb discovery.
+    Lexicon {
+        #[command(subcommand)]
+        action: LexiconAction,
+    },
+
     /// Test verb search and semantic matching
     ///
     /// Runs the verb search integration tests to verify semantic matching
@@ -593,6 +602,51 @@ enum VerbsAction {
     },
 }
 
+#[derive(Subcommand)]
+enum LexiconAction {
+    /// Compile lexicon from YAML to binary snapshot
+    ///
+    /// Reads verb_concepts.yaml, entity_types.yaml, domains.yaml
+    /// and produces lexicon.snapshot.bin for fast runtime loading.
+    Compile {
+        /// Config root directory (default: config/)
+        #[arg(long, short = 'c')]
+        config_root: Option<std::path::PathBuf>,
+
+        /// Output snapshot file (default: assets/lexicon.snapshot.bin)
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+
+        /// Show verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Lint lexicon YAML files for consistency
+    Lint {
+        /// Config root directory (default: config/)
+        #[arg(long, short = 'c')]
+        config_root: Option<std::path::PathBuf>,
+
+        /// Show only errors, not warnings
+        #[arg(long)]
+        errors_only: bool,
+    },
+
+    /// Benchmark lexicon search performance
+    ///
+    /// Loads a compiled snapshot and runs search queries to measure latency.
+    Bench {
+        /// Path to compiled snapshot (default: assets/lexicon.snapshot.bin)
+        #[arg(long, short = 's')]
+        snapshot: Option<std::path::PathBuf>,
+
+        /// Number of iterations
+        #[arg(long, short = 'n', default_value = "10000")]
+        iterations: usize,
+    },
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let sh = Shell::new()?;
@@ -745,6 +799,21 @@ fn main() -> Result<()> {
                 } => lint_macros(errors_only, verbose),
             }
         }
+        Command::Lexicon { action } => match action {
+            LexiconAction::Compile {
+                config_root,
+                output,
+                verbose,
+            } => lexicon::compile(config_root.as_deref(), output.as_deref(), verbose),
+            LexiconAction::Lint {
+                config_root,
+                errors_only,
+            } => lexicon::lint(config_root.as_deref(), errors_only),
+            LexiconAction::Bench {
+                snapshot,
+                iterations,
+            } => lexicon::bench(snapshot.as_deref(), iterations),
+        },
         Command::LoadFundProgramme {
             config,
             input,

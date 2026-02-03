@@ -64,6 +64,8 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::agent::learning::warmup::LearningWarmup;
+
 // ============================================================================
 // Type Converters - Internal types to API types (ob_poc_types)
 // ============================================================================
@@ -973,8 +975,87 @@ impl AgentState {
             }
         };
 
-        // Build agent service with embedder - REQUIRED, no fallback
-        let agent_service = crate::api::agent_service::AgentService::new(pool.clone(), embedder);
+        // Load learned data (invocation_phrases, entity_aliases) for exact match lookup
+        // This enables step 2 (global learned exact match) in verb search
+        tracing::info!("Loading learned data for verb search...");
+        let warmup_start = std::time::Instant::now();
+        let warmup = LearningWarmup::new(pool.clone());
+        let learned_data = match warmup.warmup().await {
+            Ok((data, stats)) => {
+                tracing::info!(
+                    "Learned data loaded in {}ms: {} invocation phrases, {} entity aliases",
+                    warmup_start.elapsed().as_millis(),
+                    stats.invocation_phrases_loaded,
+                    stats.entity_aliases_loaded
+                );
+                Some(data)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Failed to load learned data: {}. Verb search will use semantic-only mode.",
+                    e
+                );
+                None
+            }
+        };
+
+        // Load lexicon snapshot for fast in-memory lexical verb search (Phase A of 072)
+        // This runs BEFORE semantic search for exact label/token matches
+        let lexicon: Option<crate::mcp::verb_search::SharedLexicon> = {
+            use crate::lexicon::{LexiconServiceImpl, LexiconSnapshot};
+            use std::path::Path;
+
+            // Look for snapshot in standard locations
+            let snapshot_paths = [
+                Path::new("rust/assets/lexicon.snapshot.bin"),
+                Path::new("assets/lexicon.snapshot.bin"),
+                Path::new("../rust/assets/lexicon.snapshot.bin"),
+            ];
+
+            let mut loaded = None;
+            for path in &snapshot_paths {
+                if path.exists() {
+                    match LexiconSnapshot::load_binary(path) {
+                        Ok(snapshot) => {
+                            tracing::info!(
+                                hash = %snapshot.hash,
+                                verbs = snapshot.verb_meta.len(),
+                                entity_types = snapshot.entity_types.len(),
+                                "Loaded lexicon snapshot from {}",
+                                path.display()
+                            );
+                            loaded = Some(Arc::new(LexiconServiceImpl::new(Arc::new(snapshot)))
+                                as Arc<dyn crate::lexicon::LexiconService>);
+                            break;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to load lexicon snapshot from {}: {}",
+                                path.display(),
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+
+            if loaded.is_none() {
+                tracing::warn!(
+                    "Lexicon snapshot not found. Lexical search disabled. \
+                     Run `cargo xtask lexicon compile` to generate."
+                );
+            }
+
+            loaded
+        };
+
+        // Build agent service with embedder, learned data, and lexicon
+        let agent_service = crate::api::agent_service::AgentService::new(
+            pool.clone(),
+            embedder,
+            learned_data,
+            lexicon,
+        );
         let expansion_audit =
             Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
 
@@ -2538,6 +2619,12 @@ async fn chat_session(
         &response.validation_results,
         &session.context.bindings,
     );
+
+    // =========================================================================
+    // DEBUG PAYLOAD (OB_CHAT_DEBUG=1) - Verb matching explainability
+    // TODO: Wire up when AgentChatResponse includes verb_candidates field
+    // =========================================================================
+    // let _debug_info: Option<ob_poc_types::ChatDebugInfo> = None;
 
     // Return response using API types (single source of truth)
     Ok(Json(ChatResponse {

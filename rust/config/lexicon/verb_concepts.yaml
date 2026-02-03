@@ -1,0 +1,427 @@
+# Verb Concepts Lexicon
+#
+# This file defines verb concepts with labels, synonyms, and invocation phrases
+# for the lexical search lane. It complements (not duplicates) verb_schemas.
+#
+# Ownership split:
+# - verb_concepts.yaml OWNS: labels, synonyms, invocation phrases, domain, target_types, crud_type
+# - verb_schemas/*.yaml OWNS: args, types, runtime behavior, validation
+#
+# Join key: dsl_verb (e.g., "cbu.create")
+
+# CBU Domain - Client Business Unit operations
+cbu.create:
+  pref_label: "create cbu"
+  alt_labels:
+    - "new cbu"
+    - "add cbu"
+    - "create fund"
+    - "new fund"
+    - "set up fund"
+    - "establish fund"
+    - "onboard client"
+    - "create client"
+    - "spin up a fund"
+    - "create business unit"
+  invocation_phrases:
+    - "create a new cbu"
+    - "set up a fund"
+    - "onboard a new client"
+    - "spin up a fund"
+    - "add a new fund"
+  domain: cbu
+  target_types: []
+  produces_type: cbu
+  crud_type: create
+
+cbu.list:
+  pref_label: "list cbus"
+  alt_labels:
+    - "show cbus"
+    - "get cbus"
+    - "display cbus"
+    - "view cbus"
+    - "list funds"
+    - "show funds"
+  invocation_phrases:
+    - "show all cbus"
+    - "list the funds"
+    - "what cbus do we have"
+  domain: cbu
+  target_types: []
+  crud_type: read
+
+cbu.get:
+  pref_label: "get cbu"
+  alt_labels:
+    - "show cbu"
+    - "view cbu"
+    - "cbu details"
+    - "cbu info"
+  invocation_phrases:
+    - "show cbu details"
+    - "get cbu info"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: read
+
+cbu.delete:
+  pref_label: "delete cbu"
+  alt_labels:
+    - "remove cbu"
+    - "close cbu"
+    - "terminate cbu"
+  invocation_phrases:
+    - "delete the cbu"
+    - "remove this cbu"
+    - "close the fund"
+  domain: cbu
+  target_types: [cbu]
+  crud_type: delete
+
+# Session Domain - Navigation and scope management
+session.load-galaxy:
+  pref_label: "load galaxy"
+  alt_labels:
+    - "load book"
+    - "load client"
+    - "open book"
+    - "switch to client"
+    - "work on client"
+  invocation_phrases:
+    - "load the allianz book"
+    - "work on allianz"
+    - "switch to blackrock"
+    - "open the aviva book"
+    - "load client book"
+  domain: session
+  target_types: []
+  crud_type: null
+
+session.load-cbu:
+  pref_label: "load cbu"
+  alt_labels:
+    - "focus cbu"
+    - "select cbu"
+    - "open cbu"
+    - "switch to cbu"
+  invocation_phrases:
+    - "load this cbu"
+    - "focus on the fund"
+    - "select the cbu"
+  domain: session
+  target_types: [cbu]
+  crud_type: null
+
+session.clear:
+  pref_label: "clear session"
+  alt_labels:
+    - "clear"
+    - "reset session"
+    - "start fresh"
+    - "unload all"
+  invocation_phrases:
+    - "clear the session"
+    - "start fresh"
+    - "reset everything"
+  domain: session
+  target_types: []
+  crud_type: null
+
+session.undo:
+  pref_label: "undo"
+  alt_labels:
+    - "go back"
+    - "revert"
+    - "undo last"
+  invocation_phrases:
+    - "undo that"
+    - "go back"
+    - "undo the last action"
+  domain: session
+  target_types: []
+  crud_type: null
+
+session.redo:
+  pref_label: "redo"
+  alt_labels:
+    - "go forward"
+    - "redo last"
+  invocation_phrases:
+    - "redo that"
+    - "go forward"
+  domain: session
+  target_types: []
+  crud_type: null
+
+# Entity Domain - Natural/legal person management
+entity.create:
+  pref_label: "create entity"
+  alt_labels:
+    - "new entity"
+    - "add entity"
+    - "create company"
+    - "add company"
+    - "create person"
+    - "add person"
+  invocation_phrases:
+    - "create a new entity"
+    - "add a company"
+    - "create a person"
+  domain: entity
+  target_types: []
+  produces_type: entity
+  crud_type: create
+
+entity.list:
+  pref_label: "list entities"
+  alt_labels:
+    - "show entities"
+    - "get entities"
+    - "list companies"
+    - "show companies"
+  invocation_phrases:
+    - "list all entities"
+    - "show the companies"
+  domain: entity
+  target_types: []
+  crud_type: read
+
+entity.get:
+  pref_label: "get entity"
+  alt_labels:
+    - "show entity"
+    - "entity details"
+    - "entity info"
+  invocation_phrases:
+    - "show entity details"
+    - "get entity info"
+  domain: entity
+  target_types: [entity]
+  crud_type: read
+
+# UBO Domain - Ultimate Beneficial Ownership
+ubo.discover:
+  pref_label: "discover ubo"
+  alt_labels:
+    - "find ubo"
+    - "trace ownership"
+    - "who owns"
+    - "ownership chain"
+    - "beneficial owners"
+  invocation_phrases:
+    - "who owns this company"
+    - "find the beneficial owners"
+    - "trace the ownership"
+    - "discover ubo"
+  domain: ubo
+  target_types: [entity]
+  crud_type: read
+
+ubo.trace-chains:
+  pref_label: "trace ubo chains"
+  alt_labels:
+    - "trace ownership chains"
+    - "ownership graph"
+    - "follow the money"
+  invocation_phrases:
+    - "trace the ownership chains"
+    - "show the ownership graph"
+    - "follow the money"
+  domain: ubo
+  target_types: [entity]
+  crud_type: read
+
+# KYC Domain - Know Your Customer
+kyc.open-case:
+  pref_label: "open kyc case"
+  alt_labels:
+    - "create kyc case"
+    - "new kyc case"
+    - "start kyc"
+    - "initiate kyc"
+  invocation_phrases:
+    - "open a kyc case"
+    - "start kyc for this entity"
+    - "initiate kyc review"
+  domain: kyc
+  target_types: [entity, cbu]
+  produces_type: kyc_case
+  crud_type: create
+
+kyc.list-cases:
+  pref_label: "list kyc cases"
+  alt_labels:
+    - "show kyc cases"
+    - "get cases"
+    - "pending cases"
+  invocation_phrases:
+    - "show all kyc cases"
+    - "list pending cases"
+  domain: kyc
+  target_types: []
+  crud_type: read
+
+# Trading Profile Domain
+trading-profile.create:
+  pref_label: "create trading profile"
+  alt_labels:
+    - "new trading profile"
+    - "add trading profile"
+    - "create mandate"
+    - "new mandate"
+  invocation_phrases:
+    - "create a trading profile"
+    - "add a new mandate"
+    - "set up trading profile"
+  domain: trading-profile
+  target_types: [cbu]
+  produces_type: trading_profile
+  crud_type: create
+
+trading-profile.list:
+  pref_label: "list trading profiles"
+  alt_labels:
+    - "show trading profiles"
+    - "list mandates"
+    - "show mandates"
+  invocation_phrases:
+    - "list the trading profiles"
+    - "show mandates for this cbu"
+  domain: trading-profile
+  target_types: [cbu]
+  crud_type: read
+
+# CBU Role Domain
+cbu-role.assign:
+  pref_label: "assign role"
+  alt_labels:
+    - "add role"
+    - "assign entity role"
+    - "give role"
+    - "set role"
+  invocation_phrases:
+    - "assign a role to entity"
+    - "add entity as depositary"
+    - "make them the custodian"
+  domain: cbu-role
+  target_types: [cbu, entity]
+  crud_type: create
+
+cbu-role.list:
+  pref_label: "list roles"
+  alt_labels:
+    - "show roles"
+    - "get roles"
+    - "who has roles"
+  invocation_phrases:
+    - "list all roles"
+    - "show who has roles"
+    - "what roles exist"
+  domain: cbu-role
+  target_types: [cbu]
+  crud_type: read
+
+# GLEIF Domain - LEI lookups
+gleif.lookup:
+  pref_label: "gleif lookup"
+  alt_labels:
+    - "lei lookup"
+    - "find lei"
+    - "search gleif"
+    - "lei search"
+  invocation_phrases:
+    - "look up the lei"
+    - "find lei for company"
+    - "search gleif"
+  domain: gleif
+  target_types: []
+  crud_type: read
+
+gleif.import-tree:
+  pref_label: "import gleif tree"
+  alt_labels:
+    - "import ownership tree"
+    - "import corporate hierarchy"
+    - "gleif import"
+  invocation_phrases:
+    - "import the corporate hierarchy from gleif"
+    - "import ownership tree"
+  domain: gleif
+  target_types: [entity]
+  crud_type: create
+
+# View Domain - ESPER navigation
+view.drill:
+  pref_label: "drill down"
+  alt_labels:
+    - "drill"
+    - "zoom in"
+    - "go deeper"
+    - "dive into"
+    - "enhance"
+  invocation_phrases:
+    - "drill down into this"
+    - "zoom in"
+    - "go deeper"
+    - "enhance"
+  domain: view
+  target_types: [entity, cbu]
+  crud_type: null
+
+view.surface:
+  pref_label: "surface up"
+  alt_labels:
+    - "surface"
+    - "zoom out"
+    - "go back up"
+    - "pull back"
+  invocation_phrases:
+    - "surface up"
+    - "zoom out"
+    - "go back up"
+  domain: view
+  target_types: []
+  crud_type: null
+
+view.cbu:
+  pref_label: "view cbu"
+  alt_labels:
+    - "focus cbu"
+    - "show cbu view"
+    - "cbu mode"
+  invocation_phrases:
+    - "show the cbu view"
+    - "switch to cbu mode"
+  domain: view
+  target_types: [cbu]
+  crud_type: null
+
+# Scope Domain - Entity scope management
+scope.commit:
+  pref_label: "commit scope"
+  alt_labels:
+    - "create scope"
+    - "define scope"
+    - "set scope"
+  invocation_phrases:
+    - "create a scope for irish funds"
+    - "define the scope"
+    - "commit this scope"
+  domain: scope
+  target_types: []
+  produces_type: entity_scope
+  crud_type: create
+
+scope.narrow:
+  pref_label: "narrow scope"
+  alt_labels:
+    - "filter scope"
+    - "refine scope"
+  invocation_phrases:
+    - "narrow the scope"
+    - "filter to legal entities only"
+  domain: scope
+  target_types: [entity_scope]
+  produces_type: entity_scope
+  crud_type: update

@@ -698,6 +698,98 @@ impl RunSheetEntryStatus {
     }
 }
 
+// ============================================================================
+// VERB MATCH SOURCE (shared enum for evidence attribution)
+// ============================================================================
+
+/// Source of a verb match for explainability and debugging
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum VerbMatchSource {
+    UserLearnedExact,
+    UserLearnedSemantic,
+    LearnedExact,
+    LearnedSemantic,
+    Semantic,
+    DirectDsl,
+    GlobalLearned,
+    PatternEmbedding,
+    Phonetic,
+    Macro,
+    /// Lexicon exact label match
+    LexiconExact,
+    /// Lexicon token overlap match
+    LexiconToken,
+    #[serde(other)]
+    Unknown,
+}
+
+// ============================================================================
+// CHAT DEBUG / EXPLAINABILITY (optional, gated by OB_CHAT_DEBUG=1)
+// ============================================================================
+
+/// Debug information included in chat response when OB_CHAT_DEBUG=1
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ChatDebugInfo {
+    /// Verb matching details
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verb_match: Option<VerbMatchDebug>,
+}
+
+/// Detailed verb matching information for debugging
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbMatchDebug {
+    /// The selected verb candidate (winner)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected: Option<VerbCandidateDebug>,
+
+    /// All candidates considered (including winner)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub candidates: Vec<VerbCandidateDebug>,
+
+    /// Selection policy used
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy: Option<VerbSelectionPolicyDebug>,
+}
+
+/// A single verb candidate with evidence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbCandidateDebug {
+    pub verb: String,
+    pub score: f32,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_source: Option<VerbMatchSource>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_phrase: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+
+    /// Evidence from multiple search channels
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<VerbEvidenceDebug>,
+}
+
+/// Evidence from a single search channel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbEvidenceDebug {
+    pub source: VerbMatchSource,
+    pub score: f32,
+    pub matched_phrase: String,
+}
+
+/// Verb selection policy information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VerbSelectionPolicyDebug {
+    pub algorithm: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accept_threshold: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ambiguity_margin: Option<f32>,
+}
+
 /// Chat response from agent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatResponse {

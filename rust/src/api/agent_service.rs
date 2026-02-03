@@ -118,7 +118,7 @@ use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
 use crate::macros::OperatorMacroRegistry;
 use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
-use crate::mcp::verb_search::HybridVerbSearcher;
+use crate::mcp::verb_search_factory::VerbSearcherFactory;
 use crate::ontology::SemanticStageRegistry;
 use crate::session::SessionScope;
 use crate::session::{ResolutionSubSession, SessionState, UnifiedSession, UnresolvedRefInfo};
@@ -453,6 +453,12 @@ pub struct AgentService {
     config: AgentServiceConfig,
     /// Embedder for semantic verb search - REQUIRED, no fallback path
     embedder: Arc<CandleEmbedder>,
+    /// Learned data for exact phrase matching (invocation_phrases, entity_aliases)
+    /// Loaded at startup via warmup - enables step 2 (global learned exact match)
+    learned_data: Option<crate::agent::learning::warmup::SharedLearnedData>,
+    /// Lexicon service for fast in-memory lexical verb search
+    /// Runs BEFORE semantic search for exact/token matches (Phase A of 072)
+    lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
 }
 
 #[allow(dead_code)]
@@ -461,17 +467,30 @@ impl AgentService {
     ///
     /// The embedder is REQUIRED for semantic verb search. All prompts go through
     /// the Candle intent pipeline - there is no fallback path.
-    pub fn new(pool: PgPool, embedder: Arc<CandleEmbedder>) -> Self {
+    ///
+    /// The learned_data enables step 2 (global learned exact match) for phrases
+    /// like "spin up a fund" → cbu.create. Without it, only semantic search is used.
+    ///
+    /// The lexicon enables step 0 (fast lexical matching) for exact label and
+    /// token overlap matches. Runs BEFORE semantic embedding computation.
+    pub fn new(
+        pool: PgPool,
+        embedder: Arc<CandleEmbedder>,
+        learned_data: Option<crate::agent::learning::warmup::SharedLearnedData>,
+        lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
+    ) -> Self {
         Self {
             pool,
             config: AgentServiceConfig::default(),
             embedder,
+            learned_data,
+            lexicon,
         }
     }
 
     /// Create IntentPipeline for processing user input
     fn get_intent_pipeline(&self) -> IntentPipeline {
-        let verb_service = Arc::new(VerbService::new(self.pool.clone()));
+        let _verb_service = Arc::new(VerbService::new(self.pool.clone()));
         let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
             self.embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
 
@@ -486,9 +505,16 @@ impl AgentService {
             OperatorMacroRegistry::new()
         });
 
-        let searcher = HybridVerbSearcher::new(verb_service, None)
-            .with_embedder(dyn_embedder)
-            .with_macro_registry(Arc::new(macro_reg));
+        // Use factory for consistent configuration across all call sites
+        // Note: lexicon is passed as None here; it will be wired via AgentService.lexicon field
+        // once the snapshot is loaded at server startup
+        let searcher = VerbSearcherFactory::build(
+            &self.pool,
+            dyn_embedder,
+            self.learned_data.clone(),
+            Arc::new(macro_reg),
+            self.lexicon.clone(),
+        );
 
         IntentPipeline::with_pool(searcher, self.pool.clone())
     }

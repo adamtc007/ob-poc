@@ -22,12 +22,14 @@ use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
-use crate::database::{VerbService, VisualizationRepository};
+use crate::database::VisualizationRepository;
 use crate::dsl_v2::{
     compile, expand_templates_simple, gateway_resolver, parse_program, registry, runtime_registry,
     AtomicExecutionResult, BatchPolicy, BestEffortExecutionResult, DslExecutor, ExecutionContext,
 };
+use crate::macros::OperatorMacroRegistry;
 use crate::mcp::verb_search::HybridVerbSearcher;
+use crate::mcp::verb_search_factory::VerbSearcherFactory;
 
 use crate::mcp::protocol::ToolCallResult;
 
@@ -89,6 +91,10 @@ pub struct ToolHandlers {
     embedder: SharedEmbedder,
     /// Feedback service for learning loop
     feedback_service: Option<Arc<ob_semantic_matcher::FeedbackService>>,
+    /// Operator macro registry for business vocabulary search
+    macro_registry: Option<Arc<OperatorMacroRegistry>>,
+    /// Lexicon service for fast in-memory lexical verb search (Phase A of 072)
+    lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
 }
 
 impl ToolHandlers {
@@ -107,7 +113,15 @@ impl ToolHandlers {
             learned_data: None,
             embedder,
             feedback_service: None,
+            macro_registry: None,
+            lexicon: None,
         }
+    }
+
+    /// Set the lexicon service for fast in-memory lexical verb search
+    pub fn with_lexicon(mut self, lexicon: crate::mcp::verb_search::SharedLexicon) -> Self {
+        self.lexicon = Some(lexicon);
+        self
     }
 
     /// Get the session store, or error if not configured
@@ -154,12 +168,25 @@ impl ToolHandlers {
             return Ok(searcher.clone());
         }
 
-        // Create VerbService for centralized DB access
-        let verb_service = Arc::new(VerbService::new(self.pool.clone()));
-
-        // Create searcher with VerbService and embedder (REQUIRED)
-        let searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone())
-            .with_embedder(self.embedder.clone());
+        // Use factory for consistent configuration across all call sites
+        let searcher = if let Some(ref macro_registry) = self.macro_registry {
+            VerbSearcherFactory::build(
+                &self.pool,
+                self.embedder.clone(),
+                self.learned_data.clone(),
+                macro_registry.clone(),
+                self.lexicon.clone(),
+            )
+        } else {
+            // Fallback without macro registry (should be rare)
+            VerbSearcherFactory::build(
+                &self.pool,
+                self.embedder.clone(),
+                self.learned_data.clone(),
+                Arc::new(crate::macros::OperatorMacroRegistry::new()),
+                self.lexicon.clone(),
+            )
+        };
 
         *guard = Some(searcher.clone());
         Ok(searcher)
