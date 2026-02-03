@@ -369,7 +369,7 @@ impl ConvergenceEngine {
 
         // For create verbs with no target_types, be lenient about entity matching
         // The entity might be context (e.g., "create fund for Allianz" where Allianz is the client)
-        if !type_match && !(is_create_verb && has_no_target_types) {
+        if !(type_match || (is_create_verb && has_no_target_types)) {
             // Type mismatch - this pair is invalid (unless it's a create verb)
             return (
                 0.0,

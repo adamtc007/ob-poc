@@ -769,21 +769,23 @@ impl IntentPipeline {
             }
         }
 
-        // If no exact match found, use segmented verb phrase (or full instruction if no override)
+        // If no exact match found, use FULL instruction for semantic search
+        //
+        // CRITICAL FIX: Previous code used verb_phrase_override ("create a") for semantic search,
+        // but semantic embeddings work better with full context ("create a fund"). The verb_phrase
+        // is useful for EXACT match lookups (handled above), but semantic search should see the
+        // complete phrase to find patterns like "create a fund" → cbu.create.
         if candidates.is_empty() {
-            let search_phrase = verb_phrase_override.unwrap_or(instruction);
-
             tracing::debug!(
                 full_instruction = instruction,
-                search_phrase = search_phrase,
                 verb_phrase_override = ?verb_phrase_override,
-                "Verb search: using search phrase for semantic matching"
+                "Verb search: using FULL instruction for semantic matching (ignoring verb_phrase_override)"
             );
 
             candidates = self
                 .verb_searcher
                 .search(
-                    search_phrase,
+                    instruction, // Always use full instruction for semantic search
                     Some(self.effective_user_id()),
                     domain_filter,
                     5,
@@ -859,11 +861,10 @@ impl IntentPipeline {
         // Fallback if convergence returned empty (error case)
         #[cfg(feature = "database")]
         let candidates = if candidates.is_empty() {
-            // Re-run verb search to get original candidates
-            let search_phrase = verb_phrase_override.unwrap_or(instruction);
+            // Re-run verb search with full instruction (same fix as above)
             self.verb_searcher
                 .search(
-                    search_phrase,
+                    instruction, // Always use full instruction for semantic search
                     Some(self.effective_user_id()),
                     domain_filter,
                     5,
