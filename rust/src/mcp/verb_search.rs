@@ -37,11 +37,18 @@
 //! - fallback_threshold: 0.55 (retrieval cutoff - must retrieve candidates)
 //! - semantic_threshold: 0.65 (decision gate - accepting a match)
 //! - blocklist_threshold: 0.80 (collision detection)
+//!
+//! ## Ensemble Mode (OB_VERB_ENSEMBLE_MODE=1)
+//!
+//! When enabled, evidence from all search channels is accumulated on each candidate.
+//! This enables multi-channel voting and explainability. When disabled (default),
+//! evidence is stripped to reduce memory and noise.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use uuid::Uuid;
 
 use crate::agent::learning::embedder::SharedEmbedder;
@@ -213,28 +220,65 @@ pub fn check_ambiguity_with_fallback(
     }
 }
 
-/// Normalize candidate list: dedupe by verb (keep highest score), sort desc, truncate
+/// Check if ensemble mode is enabled via OB_VERB_ENSEMBLE_MODE=1 env var.
+/// When enabled, evidence is accumulated from all search channels.
+/// When disabled (default), evidence is stripped to reduce memory and noise.
+fn is_ensemble_mode_enabled() -> bool {
+    static ENSEMBLE_MODE: OnceLock<bool> = OnceLock::new();
+    *ENSEMBLE_MODE.get_or_init(|| {
+        std::env::var("OB_VERB_ENSEMBLE_MODE")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false)
+    })
+}
+
+/// Attach self-evidence to a VerbSearchResult.
+/// This ensures every candidate has at least one evidence entry showing where it came from.
+/// Only attaches evidence when ensemble mode is enabled (OB_VERB_ENSEMBLE_MODE=1).
+fn attach_self_evidence(mut r: VerbSearchResult) -> VerbSearchResult {
+    if is_ensemble_mode_enabled() {
+        r.evidence.push(VerbEvidence {
+            source: r.source.clone(),
+            score: r.score,
+            matched_phrase: r.matched_phrase.clone(),
+        });
+    }
+    r
+}
+
+/// Normalize candidate list: dedupe by verb (merge evidence, keep best score), sort desc, truncate
 ///
 /// Essential for J/D correctness — candidates are appended tier-by-tier during search,
 /// so without this, candidates[0] is not guaranteed to be the best match.
 ///
 /// INVARIANT: When same verb appears from multiple sources (trie, semantic, phonetic),
-/// we keep the BEST score, not first-seen. This ensures the final ranking reflects
-/// true match quality across all discovery methods.
+/// we MERGE all evidence and keep the BEST score for headline fields.
+/// Evidence merging only happens when ensemble mode is enabled (OB_VERB_ENSEMBLE_MODE=1).
 pub fn normalize_candidates(
     mut results: Vec<VerbSearchResult>,
     limit: usize,
 ) -> Vec<VerbSearchResult> {
     use std::collections::HashMap;
 
-    // Deduplicate by verb (keep highest score; preserve best metadata)
+    let ensemble_mode = is_ensemble_mode_enabled();
+
+    // Deduplicate by verb: merge evidence (if ensemble mode), keep best headline fields
     let mut by_verb: HashMap<String, VerbSearchResult> = HashMap::new();
-    for r in results.drain(..) {
+    for mut r in results.drain(..) {
         by_verb
             .entry(r.verb.clone())
             .and_modify(|existing| {
+                // Merge evidence from all channels (only in ensemble mode)
+                if ensemble_mode {
+                    existing.evidence.append(&mut r.evidence);
+                }
+
+                // Keep the better headline match (higher score wins)
                 if r.score > existing.score {
-                    *existing = r.clone();
+                    existing.score = r.score;
+                    existing.source = r.source.clone();
+                    existing.matched_phrase = r.matched_phrase.clone();
+                    existing.description = r.description.clone();
                 }
             })
             .or_insert(r);
@@ -427,6 +471,90 @@ impl HybridVerbSearcher {
         self.embedder.is_some()
     }
 
+    /// Search for EXACT matches only (no embedding computation).
+    ///
+    /// Use this for the prefix loop in intent_pipeline where we're looking for
+    /// exact learned phrase matches. Skips semantic search entirely to avoid
+    /// computing embeddings for each prefix iteration.
+    ///
+    /// Checks:
+    /// 0. Operator macros (exact FQN/label match only, score 1.0)
+    /// 1. User-specific learned (exact match, score 1.0)
+    /// 2. Global learned (exact match, score 1.0)
+    ///
+    /// Returns empty vec if no exact match found.
+    pub async fn search_exact_only(
+        &self,
+        query: &str,
+        user_id: Option<Uuid>,
+        domain_filter: Option<&str>,
+    ) -> Result<Vec<VerbSearchResult>> {
+        let mut results = Vec::new();
+        let mut seen_verbs: HashSet<String> = HashSet::new();
+        let normalized = query.trim().to_lowercase();
+
+        // 0. Operator macro search (exact FQN/label only)
+        {
+            let macro_results = self.search_macros(query, 1);
+            for result in macro_results {
+                // Only accept exact matches (score 1.0)
+                if result.score >= 1.0
+                    && self.matches_domain(&result.verb, domain_filter)
+                    && !seen_verbs.contains(&result.verb)
+                {
+                    tracing::debug!(
+                        verb = %result.verb,
+                        score = result.score,
+                        label = %result.matched_phrase,
+                        "VerbSearch (exact): macro match"
+                    );
+                    seen_verbs.insert(result.verb.clone());
+                    results.push(result);
+                    return Ok(results); // Exact match found, return immediately
+                }
+            }
+        }
+
+        // 1. User-specific learned phrases (exact match)
+        if let Some(uid) = user_id {
+            if let Some(result) = self.search_user_learned_exact(uid, &normalized).await? {
+                if self.matches_domain(&result.verb, domain_filter) {
+                    tracing::debug!(
+                        verb = %result.verb,
+                        phrase = %normalized,
+                        "VerbSearch (exact): user learned match"
+                    );
+                    return Ok(vec![result]);
+                }
+            }
+        }
+
+        // 2. Global learned phrases (exact match)
+        if let Some(learned) = &self.learned_data {
+            let guard = learned.read().await;
+            if let Some(verb) = guard.resolve_phrase(&normalized) {
+                if self.matches_domain(verb, domain_filter) {
+                    let description = self.get_verb_description(verb).await;
+                    tracing::debug!(
+                        verb = verb,
+                        phrase = %normalized,
+                        "VerbSearch (exact): global learned match"
+                    );
+                    return Ok(vec![attach_self_evidence(VerbSearchResult {
+                        verb: verb.to_string(),
+                        score: 1.0,
+                        source: VerbSearchSource::LearnedExact,
+                        matched_phrase: query.to_string(),
+                        description,
+                        evidence: vec![],
+                    })]);
+                }
+            }
+        }
+
+        Ok(vec![]) // No exact match found
+    }
+
     /// Search for verbs matching user intent
     ///
     /// Priority order:
@@ -546,14 +674,14 @@ impl HybridVerbSearcher {
                         // Insert at front since learned exact (1.0) beats partial macro matches
                         results.insert(
                             0,
-                            VerbSearchResult {
+                            attach_self_evidence(VerbSearchResult {
                                 verb: verb.to_string(),
                                 score: 1.0,
                                 source: VerbSearchSource::LearnedExact,
                                 matched_phrase: query.to_string(),
                                 description,
                                 evidence: vec![],
-                            },
+                            }),
                         );
                         seen_verbs.insert(verb.to_string());
                     }
@@ -684,14 +812,14 @@ impl HybridVerbSearcher {
                             let phonetic_score = (pm.phonetic_score * 0.7) as f32;
                             let description = self.get_verb_description(&pm.verb).await;
                             seen_verbs.insert(pm.verb.clone());
-                            results.push(VerbSearchResult {
+                            results.push(attach_self_evidence(VerbSearchResult {
                                 verb: pm.verb,
                                 score: phonetic_score.max(0.5), // Floor at 0.5
                                 source: VerbSearchSource::Phonetic,
                                 matched_phrase: pm.pattern,
                                 description,
                                 evidence: vec![],
-                            });
+                            }));
                             if results.len() >= limit {
                                 break;
                             }
@@ -761,14 +889,14 @@ impl HybridVerbSearcher {
         match result {
             Some(m) => {
                 let description = self.get_verb_description(&m.verb).await;
-                Ok(Some(VerbSearchResult {
+                Ok(Some(attach_self_evidence(VerbSearchResult {
                     verb: m.verb,
                     score: m.confidence,
                     source: VerbSearchSource::UserLearnedExact,
                     matched_phrase: m.phrase,
                     description,
                     evidence: vec![],
-                }))
+                })))
             }
             None => Ok(None),
         }
@@ -802,14 +930,14 @@ impl HybridVerbSearcher {
         for m in matches {
             let description = self.get_verb_description(&m.verb).await;
             let score = (m.similarity as f32) * m.confidence.unwrap_or(1.0);
-            results.push(VerbSearchResult {
+            results.push(attach_self_evidence(VerbSearchResult {
                 verb: m.verb,
                 score,
                 source: VerbSearchSource::UserLearnedSemantic,
                 matched_phrase: m.phrase,
                 description,
                 evidence: vec![],
-            });
+            }));
         }
         Ok(results)
     }
@@ -1062,14 +1190,14 @@ impl HybridVerbSearcher {
 
                         candidates.insert(
                             verb.clone(),
-                            VerbSearchResult {
+                            attach_self_evidence(VerbSearchResult {
                                 verb: verb.clone(),
                                 score,
                                 source: VerbSearchSource::PatternEmbedding,
                                 matched_phrase: matched_phrase.clone(),
                                 description: None,
                                 evidence: vec![],
-                            },
+                            }),
                         );
                     }
                 } else if trace_enabled {
@@ -1131,25 +1259,29 @@ impl HybridVerbSearcher {
         // Convert to VerbSearchResult with source metadata
         let learned_results: Vec<VerbSearchResult> = learned_matches
             .into_iter()
-            .map(|m| VerbSearchResult {
-                verb: m.verb,
-                score: m.similarity as f32,
-                source: VerbSearchSource::GlobalLearned,
-                matched_phrase: m.phrase,
-                description: None,
-                evidence: vec![],
+            .map(|m| {
+                attach_self_evidence(VerbSearchResult {
+                    verb: m.verb,
+                    score: m.similarity as f32,
+                    source: VerbSearchSource::GlobalLearned,
+                    matched_phrase: m.phrase,
+                    description: None,
+                    evidence: vec![],
+                })
             })
             .collect();
 
         let pattern_results: Vec<VerbSearchResult> = pattern_matches
             .into_iter()
-            .map(|m| VerbSearchResult {
-                verb: m.verb,
-                score: m.similarity as f32,
-                source: VerbSearchSource::PatternEmbedding,
-                matched_phrase: m.phrase,
-                description: None,
-                evidence: vec![],
+            .map(|m| {
+                attach_self_evidence(VerbSearchResult {
+                    verb: m.verb,
+                    score: m.similarity as f32,
+                    source: VerbSearchSource::PatternEmbedding,
+                    matched_phrase: m.phrase,
+                    description: None,
+                    evidence: vec![],
+                })
             })
             .collect();
 
@@ -1234,28 +1366,28 @@ impl HybridVerbSearcher {
 
         // 1. Exact FQN match
         if let Some(macro_def) = registry.get(&query_lower) {
-            results.push(VerbSearchResult {
+            results.push(attach_self_evidence(VerbSearchResult {
                 verb: macro_def.fqn.clone(),
                 score: 1.0,
                 source: VerbSearchSource::Macro,
                 matched_phrase: macro_def.ui.label.clone(),
                 description: Some(macro_def.ui.description.clone()),
                 evidence: vec![],
-            });
+            }));
             return results; // Exact FQN is definitive
         }
 
         // 2. Exact label match (case-insensitive)
         for macro_def in registry.list(None) {
             if macro_def.ui.label.to_lowercase() == query_lower {
-                results.push(VerbSearchResult {
+                results.push(attach_self_evidence(VerbSearchResult {
                     verb: macro_def.fqn.clone(),
                     score: 1.0,
                     source: VerbSearchSource::Macro,
                     matched_phrase: macro_def.ui.label.clone(),
                     description: Some(macro_def.ui.description.clone()),
                     evidence: vec![],
-                });
+                }));
             }
         }
 
@@ -1321,14 +1453,14 @@ impl HybridVerbSearcher {
             }
 
             if score > 0.7 {
-                results.push(VerbSearchResult {
+                results.push(attach_self_evidence(VerbSearchResult {
                     verb: macro_def.fqn.clone(),
                     score,
                     source: VerbSearchSource::Macro,
                     matched_phrase: macro_def.ui.label.clone(),
                     description: Some(macro_def.ui.description.clone()),
                     evidence: vec![],
-                });
+                }));
             }
         }
 

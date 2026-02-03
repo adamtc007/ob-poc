@@ -336,12 +336,15 @@ impl IntentPipeline {
 
     /// Extract user_id from session if available, otherwise return None.
     /// This enables user-specific learned phrase matching in verb search.
-    fn effective_user_id(&self) -> Option<uuid::Uuid> {
+    /// Get effective user ID for learned phrase lookups.
+    /// Returns Uuid::nil() as fallback for global learning (not None).
+    /// This ensures the learning loop works even without a session.
+    fn effective_user_id(&self) -> uuid::Uuid {
         self.session
             .as_ref()
             .and_then(|s| s.read().ok())
             .map(|guard| guard.user_id)
-            .filter(|id| !id.is_nil())
+            .unwrap_or(uuid::Uuid::nil())
     }
 
     /// Full pipeline: instruction → structured intent → DSL
@@ -574,12 +577,14 @@ impl IntentPipeline {
 
         if verb_phrase_override.is_some() {
             // Try progressively shorter prefixes of the full instruction
+            // Use search_exact_only to avoid computing embeddings for each prefix
+            // (lazy embedding optimization - only compute embedding for final search phrase)
             let words: Vec<&str> = instruction.split_whitespace().collect();
 
             tracing::debug!(
                 word_count = words.len(),
                 full_instruction = instruction,
-                "Verb search: starting prefix matching loop"
+                "Verb search: starting prefix matching loop (exact-only, no embedding)"
             );
 
             for end in (1..=words.len()).rev() {
@@ -588,34 +593,26 @@ impl IntentPipeline {
                 tracing::trace!(
                     prefix = %prefix,
                     end = end,
-                    "Verb search: trying prefix"
+                    "Verb search: trying prefix (exact-only)"
                 );
 
+                // Use search_exact_only to skip embedding computation during prefix loop
                 let prefix_candidates = self
                     .verb_searcher
-                    .search(&prefix, self.effective_user_id(), domain_filter, 5)
+                    .search_exact_only(&prefix, Some(self.effective_user_id()), domain_filter)
                     .await?;
 
-                // If we got an exact match (score 1.0, LearnedExact source), use it
+                // search_exact_only only returns results with score >= 1.0
                 if let Some(first) = prefix_candidates.first() {
-                    tracing::trace!(
-                        prefix = %prefix,
+                    tracing::debug!(
                         verb = %first.verb,
-                        score = first.score,
                         source = ?first.source,
-                        "Verb search: prefix candidate result"
+                        matched_prefix = %prefix,
+                        full_instruction = instruction,
+                        "Verb search: found exact learned phrase match via prefix"
                     );
-                    if first.score >= 1.0 {
-                        tracing::debug!(
-                            verb = %first.verb,
-                            source = ?first.source,
-                            matched_prefix = %prefix,
-                            full_instruction = instruction,
-                            "Verb search: found exact learned phrase match via prefix"
-                        );
-                        candidates = prefix_candidates;
-                        break;
-                    }
+                    candidates = prefix_candidates;
+                    break;
                 }
             }
         }
@@ -633,7 +630,12 @@ impl IntentPipeline {
 
             candidates = self
                 .verb_searcher
-                .search(search_phrase, self.effective_user_id(), domain_filter, 5)
+                .search(
+                    search_phrase,
+                    Some(self.effective_user_id()),
+                    domain_filter,
+                    5,
+                )
                 .await?;
         }
 
