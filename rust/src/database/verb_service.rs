@@ -127,7 +127,7 @@ impl VerbService {
     ) -> Result<Option<UserLearnedExactMatch>, sqlx::Error> {
         let row = sqlx::query_as::<_, UserLearnedExactRow>(
             r#"
-            SELECT phrase, verb, confidence
+            SELECT phrase, verb, confidence::float4 as confidence
             FROM agent.user_learned_phrases
             WHERE user_id = $1 AND LOWER(phrase) = $2
             "#,
@@ -155,7 +155,7 @@ impl VerbService {
 
         let row = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
-            SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
+            SELECT phrase, verb, confidence::float4 as confidence, 1 - (embedding <=> $1::vector) as similarity
             FROM agent.user_learned_phrases
             WHERE user_id = $2
               AND embedding IS NOT NULL
@@ -192,7 +192,7 @@ impl VerbService {
 
         let rows = sqlx::query_as::<_, UserLearnedSemanticRow>(
             r#"
-            SELECT phrase, verb, confidence, 1 - (embedding <=> $1::vector) as similarity
+            SELECT phrase, verb, confidence::float4 as confidence, 1 - (embedding <=> $1::vector) as similarity
             FROM agent.user_learned_phrases
             WHERE user_id = $2
               AND embedding IS NOT NULL
