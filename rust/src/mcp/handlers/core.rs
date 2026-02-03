@@ -22,7 +22,7 @@ use crate::api::session::SessionStore;
 use crate::database::generation_log_repository::{
     CompileResult, GenerationAttempt, GenerationLogRepository, LintResult, ParseResult,
 };
-use crate::database::{VerbService, VisualizationRepository};
+use crate::database::VisualizationRepository;
 use crate::dsl_v2::{
     compile, expand_templates_simple, gateway_resolver, parse_program, registry, runtime_registry,
     AtomicExecutionResult, BatchPolicy, BestEffortExecutionResult, DslExecutor, ExecutionContext,
@@ -165,22 +165,30 @@ impl ToolHandlers {
     /// Lazy-initializes on first use. All DB access through VerbService.
     /// Includes macro registry for business vocabulary search (structure, case, mandate).
     async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher> {
+        use crate::mcp::verb_search_factory::VerbSearcherFactory;
+
         let mut guard = self.verb_searcher.lock().await;
         if let Some(searcher) = guard.as_ref() {
             return Ok(searcher.clone());
         }
 
-        // Create VerbService for centralized DB access
-        let verb_service = Arc::new(VerbService::new(self.pool.clone()));
-
-        // Create searcher with VerbService and embedder (REQUIRED)
-        let mut searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone())
-            .with_embedder(self.embedder.clone());
-
-        // Add macro registry if available (enables business vocabulary search)
-        if let Some(ref macro_registry) = self.macro_registry {
-            searcher = searcher.with_macro_registry(macro_registry.clone());
-        }
+        // Use factory for consistent configuration across all call sites
+        let searcher = if let Some(ref macro_registry) = self.macro_registry {
+            VerbSearcherFactory::build(
+                &self.pool,
+                self.embedder.clone(),
+                self.learned_data.clone(),
+                macro_registry.clone(),
+            )
+        } else {
+            // Fallback without macro registry (should be rare)
+            VerbSearcherFactory::build(
+                &self.pool,
+                self.embedder.clone(),
+                self.learned_data.clone(),
+                Arc::new(crate::macros::OperatorMacroRegistry::new()),
+            )
+        };
 
         *guard = Some(searcher.clone());
         Ok(searcher)

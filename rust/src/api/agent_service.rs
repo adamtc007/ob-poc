@@ -107,7 +107,7 @@ use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{DisambiguationItem, DisambiguationRequest, EntityMatchOption};
-use crate::database::{derive_semantic_state, VerbService};
+use crate::database::derive_semantic_state;
 use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::ref_resolver::ResolveResult;
@@ -119,7 +119,7 @@ use crate::graph::GraphScope;
 use crate::macros::OperatorMacroRegistry;
 use crate::mcp::intent_pipeline::{compute_dsl_hash, IntentArgValue, IntentPipeline};
 use crate::mcp::utterance::segment_utterance;
-use crate::mcp::verb_search::HybridVerbSearcher;
+
 use crate::ontology::SemanticStageRegistry;
 use crate::session::SessionScope;
 use crate::session::{ResolutionSubSession, SessionState, UnifiedSession, UnresolvedRefInfo};
@@ -491,7 +491,8 @@ impl AgentService {
 
     /// Create IntentPipeline for processing user input
     fn get_intent_pipeline(&self) -> IntentPipeline {
-        let verb_service = Arc::new(VerbService::new(self.pool.clone()));
+        use crate::mcp::verb_search_factory::VerbSearcherFactory;
+
         let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
             self.embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
 
@@ -506,11 +507,13 @@ impl AgentService {
             OperatorMacroRegistry::new()
         });
 
-        // Pass learned_data to enable step 2 (global learned exact match)
-        // Without this, phrases like "spin up a fund" won't match cbu.create
-        let searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone())
-            .with_embedder(dyn_embedder)
-            .with_macro_registry(Arc::new(macro_reg));
+        // Use factory for consistent configuration across all call sites
+        let searcher = VerbSearcherFactory::build(
+            &self.pool,
+            dyn_embedder,
+            self.learned_data.clone(),
+            Arc::new(macro_reg),
+        );
 
         IntentPipeline::with_pool(searcher, self.pool.clone())
     }
