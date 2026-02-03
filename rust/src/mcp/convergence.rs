@@ -194,7 +194,10 @@ impl Default for ConvergenceConfig {
         Self {
             min_verb_score: 0.50,
             min_entity_score: 0.40,
-            type_match_bonus: 0.15,
+            // Increased from 0.15 to 0.20 - entity type is a STRONG signal
+            // When verb.target_types explicitly contains the entity type,
+            // that's high-value information that should materially affect ranking
+            type_match_bonus: 0.20,
             ambiguity_gap: 0.10,
             max_ambiguous_pairs: 3,
         }
@@ -247,13 +250,18 @@ impl ConvergenceEngine {
         }
 
         // If no entities found, return top verb without entity
+        // FIX: Use verb's own score as convergence_score to avoid penalizing good verbs
         if entities.is_empty() {
             let top_verb = verbs.into_iter().next().unwrap();
+            let score = top_verb.score; // Preserve verb score
             return ConvergenceOutcome::Converged(ConvergedPair {
-                rationale: format!("Verb '{}' matched (no entity in input)", top_verb.verb),
+                rationale: format!(
+                    "Verb '{}' matched with score {:.2} (no entity in input)",
+                    top_verb.verb, score
+                ),
                 verb: top_verb,
                 entity: None,
-                convergence_score: 0.0, // Will be set below
+                convergence_score: score, // FIX: Use verb score, not 0.0
             });
         }
 
@@ -282,17 +290,19 @@ impl ConvergenceEngine {
         });
 
         // No valid pairs (type mismatches filtered everything)
+        // FIX: Don't penalize the verb - use its original score
         if pairs.is_empty() {
             // Fall back to top verb without entity constraint
             let top_verb = verbs.into_iter().next().unwrap();
+            let score = top_verb.score; // Preserve verb score
             return ConvergenceOutcome::Converged(ConvergedPair {
                 rationale: format!(
-                    "Verb '{}' matched (entity type mismatch filtered pairs)",
-                    top_verb.verb
+                    "Verb '{}' matched with score {:.2} (entity type mismatch filtered pairs)",
+                    top_verb.verb, score
                 ),
                 verb: top_verb,
                 entity: None,
-                convergence_score: 0.0,
+                convergence_score: score, // FIX: Use verb score, not 0.0
             });
         }
 
@@ -339,18 +349,28 @@ impl ConvergenceEngine {
     /// - verb match score
     /// - entity match score
     /// - type compatibility bonus
+    ///
+    /// Special handling for "create" verbs (verbs with produces_type):
+    /// - If verb produces an entity type, it doesn't need an existing target
+    /// - Still allow entity matches for context (e.g., "create fund for Allianz")
     fn score_pair(&self, verb: &VerbCandidate, entity: &EntityCandidate) -> (f32, String) {
         // Check type compatibility
         let verb_domain = verb.verb.split('.').next().unwrap_or("");
         let compatible_types = entity_types_for_domain(verb_domain);
         let compatible_domains = domains_for_entity_type(&entity.entity_type);
 
+        // Check if this is a "create" verb that produces entities
+        let is_create_verb = verb.produces_type.is_some();
+        let has_no_target_types = verb.target_types.is_empty();
+
         let type_match = verb.target_types.contains(&entity.entity_type)
             || compatible_types.contains(&entity.entity_type.as_str())
             || compatible_domains.contains(&verb_domain);
 
-        if !type_match {
-            // Type mismatch - this pair is invalid
+        // For create verbs with no target_types, be lenient about entity matching
+        // The entity might be context (e.g., "create fund for Allianz" where Allianz is the client)
+        if !type_match && !(is_create_verb && has_no_target_types) {
+            // Type mismatch - this pair is invalid (unless it's a create verb)
             return (
                 0.0,
                 format!(
@@ -362,17 +382,25 @@ impl ConvergenceEngine {
 
         // Calculate convergence score
         let base_score = (verb.score + entity.score) / 2.0;
+
+        // Determine bonus based on match strength
         let bonus = if verb.target_types.contains(&entity.entity_type) {
             self.config.type_match_bonus // Strong match - verb explicitly targets this type
+        } else if is_create_verb && has_no_target_types {
+            // Create verb - entity provides context, give small bonus
+            self.config.type_match_bonus / 3.0
         } else {
             self.config.type_match_bonus / 2.0 // Weak match - domain compatible but not explicit
         };
 
         let final_score = (base_score + bonus).min(1.0);
 
+        let create_note = if is_create_verb { " (create verb)" } else { "" };
+
         let rationale = format!(
-            "verb={} ({:.2}) + entity={} [{}] ({:.2}) + type_bonus={:.2} = {:.2}",
+            "verb={}{} ({:.2}) + entity={} [{}] ({:.2}) + type_bonus={:.2} = {:.2}",
             verb.verb,
+            create_note,
             verb.score,
             entity.name,
             entity.entity_type,

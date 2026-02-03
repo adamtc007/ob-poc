@@ -355,6 +355,7 @@ impl IntentPipeline {
     ///
     /// This is the key insight for maximizing intent-to-DSL hit rate:
     /// 1. Extract entity mentions from the input (proper nouns, quoted strings)
+    ///    PLUS use scope_phrase from utterance segmentation (higher recall)
     /// 2. Search for entities in the database
     /// 3. Cross-filter verb candidates against entity types
     /// 4. Re-rank based on convergence score (verb_score + entity_score + type_match_bonus)
@@ -370,8 +371,25 @@ impl IntentPipeline {
     ) -> Result<Vec<VerbSearchResult>> {
         use crate::mcp::convergence::search_entities_parallel;
 
-        // Step 1: Extract entity mentions from the input
-        let mentions = extract_entity_mentions(instruction);
+        // Step 1: Extract entity mentions from multiple sources (union for better recall)
+        // Source A: Heuristic extraction (capitalized words, quoted strings)
+        let mut mentions = extract_entity_mentions(instruction);
+
+        // Source B: scope_phrase from utterance segmentation (more reliable for entity descriptors)
+        // This catches lowercase mentions like "irish funds", "lux cbus" that heuristics miss
+        if let Some(ref entity_filter) = scope_ctx.entity_filter {
+            // Add scope_phrase tokens as potential mentions
+            for word in entity_filter.split_whitespace() {
+                let word_str = word.to_string();
+                if word.len() > 2 && !mentions.contains(&word_str) {
+                    mentions.push(word_str);
+                }
+            }
+            // Also add the full phrase if it's meaningful
+            if entity_filter.len() > 2 && !mentions.contains(entity_filter) {
+                mentions.push(entity_filter.clone());
+            }
+        }
 
         if mentions.is_empty() {
             tracing::debug!(
@@ -384,6 +402,7 @@ impl IntentPipeline {
         tracing::debug!(
             instruction = instruction,
             mentions = ?mentions,
+            entity_filter = ?scope_ctx.entity_filter,
             verb_candidate_count = verb_candidates.len(),
             "Convergence: found entity mentions, searching entities"
         );
@@ -431,9 +450,13 @@ impl IntentPipeline {
                 // Find the original VerbSearchResult and boost to top
                 let mut result = verb_candidates;
                 if let Some(idx) = result.iter().position(|v| v.verb == pair.verb.verb) {
-                    // Move matched verb to front with boosted score
                     let mut matched = result.remove(idx);
-                    matched.score = (matched.score + pair.convergence_score) / 2.0;
+                    // FIX: Only average scores when we have a real entity match with positive score
+                    // Don't penalize verbs due to type-mismatch fallback (convergence_score = 0)
+                    if pair.entity.is_some() && pair.convergence_score > 0.0 {
+                        matched.score = (matched.score + pair.convergence_score) / 2.0;
+                    }
+                    // Move matched verb to front
                     result.insert(0, matched);
                 }
                 Ok(result)
@@ -450,8 +473,10 @@ impl IntentPipeline {
                 let mut result = verb_candidates;
                 for (rank, pair) in pairs.iter().enumerate() {
                     if let Some(idx) = result.iter().position(|v| v.verb == pair.verb.verb) {
-                        // Boost score based on convergence rank
-                        result[idx].score = (result[idx].score + pair.convergence_score) / 2.0;
+                        // FIX: Only boost scores when we have real entity matches
+                        if pair.entity.is_some() && pair.convergence_score > 0.0 {
+                            result[idx].score = (result[idx].score + pair.convergence_score) / 2.0;
+                        }
                         // Move to appropriate position
                         let v = result.remove(idx);
                         result.insert(rank.min(result.len()), v);
