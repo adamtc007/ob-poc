@@ -634,14 +634,9 @@ impl HybridVerbSearcher {
             }
         }
 
-        // If we got a high-confidence macro match (exact label/FQN), return early
-        if !results.is_empty() && results[0].score >= 1.0 {
-            tracing::debug!(
-                verb = %results[0].verb,
-                "VerbSearch: returning early with exact macro match"
-            );
-            return Ok(results);
-        }
+        // NOTE: No early return here - we always run ALL pipes and let best score win.
+        // An exact macro match (1.0) will win in final sorting anyway, but running
+        // all pipes ensures we don't hide bugs or miss better matches from other sources.
 
         // 1. User-specific learned phrases (exact match)
         if let Some(uid) = user_id {
@@ -690,10 +685,11 @@ impl HybridVerbSearcher {
         }
 
         // 3. User-specific learned (SEMANTIC match) - top-k for ambiguity detection
-        if results.is_empty() && user_id.is_some() {
+        // Always run this pipe (don't skip based on earlier results) - let best score win
+        if let Some(uid) = user_id {
             if let Some(ref embedding) = query_embedding {
                 let user_results = self
-                    .search_user_learned_semantic_with_embedding(user_id.unwrap(), embedding, 3)
+                    .search_user_learned_semantic_with_embedding(uid, embedding, 3)
                     .await?;
                 for result in user_results {
                     if self.matches_domain(&result.verb, domain_filter)
@@ -731,18 +727,19 @@ impl HybridVerbSearcher {
             }
         }
 
-        // 6. Global semantic search (cold start fallback)
-        // Uses verb_pattern_embeddings for primary semantic lookup
-        if results.len() < limit {
+        // 6. Global semantic search (PRIMARY semantic lookup)
+        // Uses verb_pattern_embeddings - always run, don't skip based on earlier results
+        // The best score wins after normalize_candidates() at the end
+        {
             tracing::debug!(
                 results_so_far = results.len(),
                 has_embedding = query_embedding.is_some(),
-                "VerbSearch: checking global semantic search"
+                "VerbSearch: running global semantic search"
             );
             if let Some(ref embedding) = query_embedding {
                 tracing::debug!("VerbSearch: calling search_global_semantic_with_embedding...");
                 match self
-                    .search_global_semantic_with_embedding(embedding, limit - results.len())
+                    .search_global_semantic_with_embedding(embedding, limit)
                     .await
                 {
                     Ok(semantic_results) => {
@@ -767,10 +764,7 @@ impl HybridVerbSearcher {
 
                             seen_verbs.insert(result.verb.clone());
                             results.push(result);
-
-                            if results.len() >= limit {
-                                break;
-                            }
+                            // No early break - collect all candidates, normalize_candidates() sorts at end
                         }
                     }
                     Err(e) => {
@@ -781,20 +775,15 @@ impl HybridVerbSearcher {
         }
 
         // 7. Phonetic fallback (typo handling)
-        // If semantic search returned low-confidence results, try phonetic matching
-        // This handles typos like "allainz" → "allianz" via dmetaphone codes
-        let top_score = results.first().map(|r| r.score).unwrap_or(0.0);
-        if top_score < self.semantic_threshold && results.len() < limit {
+        // Always run - handles typos like "allainz" → "allianz" via dmetaphone codes
+        // Even if we have high-confidence semantic matches, phonetic might find something better
+        {
             if let Some(verb_service) = &self.verb_service {
                 tracing::debug!(
-                    top_score = top_score,
-                    threshold = self.semantic_threshold,
-                    "VerbSearch: semantic confidence low, trying phonetic fallback"
+                    results_so_far = results.len(),
+                    "VerbSearch: running phonetic search"
                 );
-                match verb_service
-                    .search_by_phonetic(query, (limit - results.len()) as i64)
-                    .await
-                {
+                match verb_service.search_by_phonetic(query, limit as i64).await {
                     Ok(phonetic_results) => {
                         tracing::debug!(
                             phonetic_results_count = phonetic_results.len(),
@@ -820,9 +809,7 @@ impl HybridVerbSearcher {
                                 description,
                                 evidence: vec![],
                             }));
-                            if results.len() >= limit {
-                                break;
-                            }
+                            // No early break - collect all, normalize_candidates() handles limit
                         }
                     }
                     Err(e) => {
@@ -832,7 +819,8 @@ impl HybridVerbSearcher {
             }
         }
 
-        // Dedupe by verb, sort by score descending, truncate (Issue J/D fix)
+        // ALL PIPES COMPLETE - now dedupe by verb, sort by score descending, truncate
+        // This is the ONLY place where limit is enforced - best scores win
         let mut results = normalize_candidates(results, limit);
 
         // Final blocklist filter across entire candidate list (ChatGPT review feedback)
