@@ -68,6 +68,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn constants_are_reasonable() {
         assert!(DEFAULT_REPEAT_DELAY_MS > 0);
         assert!(DEFAULT_REPEAT_RATE_MS > 0);

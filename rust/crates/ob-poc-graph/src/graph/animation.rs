@@ -623,7 +623,7 @@ mod tests {
         let scale = esper.scale();
 
         // Scale should be between 1.0 and 1.03 (settling from pulse)
-        assert!(scale >= 1.0 && scale <= 1.03);
+        assert!((1.0..=1.03).contains(&scale));
     }
 
     #[test]

@@ -742,7 +742,7 @@ mod tests {
         let result = parse_program(input).unwrap();
 
         if let Statement::VerbCall(vc) = &result.statements[0] {
-            if let Some(items) = vc.arguments[0].value.as_list() {
+            if let Some(_items) = vc.arguments[0].value.as_list() {
                 // No list in this test
             }
             // Check the inner verb call span

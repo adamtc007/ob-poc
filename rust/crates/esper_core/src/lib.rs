@@ -76,6 +76,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn constants_are_reasonable() {
         assert!(MAX_CONTEXT_DEPTH > 0);
         assert!(DWELL_TICKS > 0);

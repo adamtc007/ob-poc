@@ -1124,12 +1124,12 @@ mod tests {
     #[test]
     fn test_scope_extraction() {
         let normalized = "show irish funds";
-        let tokens = tokenize(&normalized);
+        let tokens = tokenize(normalized);
         let mut consumed = HashSet::new();
         consumed.insert(0); // "show" consumed by verb
         let mut trace = Vec::new();
 
-        let scope = extract_scope_phrase(&normalized, &tokens, &consumed, &mut trace);
+        let scope = extract_scope_phrase(normalized, &tokens, &consumed, &mut trace);
 
         assert!(scope.is_some());
         let scope = scope.unwrap();
@@ -1140,11 +1140,11 @@ mod tests {
     #[test]
     fn test_verb_pattern_matching() {
         let normalized = "trace ubo chain for irish funds";
-        let tokens = tokenize(&normalized);
+        let tokens = tokenize(normalized);
         let mut consumed = HashSet::new();
         let mut trace = Vec::new();
 
-        let verb = extract_verb_phrase(&normalized, &tokens, &mut consumed, &mut trace);
+        let verb = extract_verb_phrase(normalized, &tokens, &mut consumed, &mut trace);
 
         assert_eq!(verb.text, "trace ubo chain");
         assert_eq!(verb.confidence, 1.0);

@@ -397,7 +397,7 @@ mod tests {
     use crate::parser::parse_program;
 
     fn parse_single_viewport(dsl: &str) -> ViewportParseResult<ViewportVerb> {
-        let program = parse_program(dsl).map_err(|e| ViewportParseError::new(e))?;
+        let program = parse_program(dsl).map_err(ViewportParseError::new)?;
         let vc = match &program.statements[0] {
             crate::ast::Statement::VerbCall(vc) => vc,
             _ => return Err(ViewportParseError::new("Expected VerbCall")),
