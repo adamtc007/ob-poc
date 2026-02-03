@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod allianz_harness;
+mod entity;
 mod fund_programme;
 mod gleif_crawl_dsl;
 mod gleif_import;
@@ -479,6 +480,50 @@ enum Command {
         #[arg(long)]
         validate_only: bool,
     },
+
+    /// Entity linking service commands (compile, lint, stats)
+    ///
+    /// Manages the entity snapshot used for fast entity resolution.
+    Entity {
+        #[command(subcommand)]
+        action: EntityAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum EntityAction {
+    /// Compile entity snapshot from database
+    ///
+    /// Reads entities, aliases, and concept links from the database
+    /// and produces entity.snapshot.bin for fast runtime loading.
+    Compile {
+        /// Output snapshot file (default: assets/entity.snapshot.bin)
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+
+        /// Show verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Lint entity data for quality issues
+    ///
+    /// Checks for:
+    /// - Empty name_norm values
+    /// - Ambiguous aliases (same alias → multiple entities)
+    /// - Missing concept links
+    Lint {
+        /// Show only errors, not warnings
+        #[arg(long)]
+        errors_only: bool,
+    },
+
+    /// Show entity snapshot statistics
+    Stats {
+        /// Path to snapshot file (default: assets/entity.snapshot.bin)
+        #[arg(long, short = 's')]
+        snapshot: Option<std::path::PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -814,6 +859,16 @@ fn main() -> Result<()> {
                 iterations,
             } => lexicon::bench(snapshot.as_deref(), iterations),
         },
+        Command::Entity { action } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            match action {
+                EntityAction::Compile { output, verbose } => {
+                    rt.block_on(entity::compile(output.as_deref(), verbose))
+                }
+                EntityAction::Lint { errors_only } => rt.block_on(entity::lint(errors_only)),
+                EntityAction::Stats { snapshot } => entity::stats(snapshot.as_deref()),
+            }
+        }
         Command::LoadFundProgramme {
             config,
             input,

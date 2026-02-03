@@ -93,6 +93,10 @@ pub mod macros;
 // Lexicon module - In-memory vocabulary lookup for verb discovery
 pub mod lexicon;
 
+// Entity Linking module - In-memory entity resolution from utterances
+#[cfg(feature = "database")]
+pub mod entity_linking;
+
 // GLEIF integration - LEI data enrichment and corporate tree traversal
 #[cfg(feature = "database")]
 pub mod gleif;
