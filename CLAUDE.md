@@ -32,7 +32,7 @@
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
 > **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
 > **Utterance Segmentation (066):** ✅ Complete - 4-pass segmentation, typo detection, VERB_GROUP_PREFIXES for "work on" patterns
-> **Learned Phrase Prefix Matching (070):** ✅ Complete - Prefix-based learned phrase matching, macro priority fix
+> **Verb Search Pipeline (070):** ✅ Complete - All pipes run unconditionally, best score wins, macro unresolved_refs extraction
 > **Entity Scope DSL (067):** ✅ Complete - Pattern B runtime scope resolution, scope.commit/resolve/narrow/union verbs, entity-ids rewrite
 > **Proposal/Confirm Protocol (067):** ✅ Complete - exec.proposal/confirm/edit/cancel verbs, atomic execution, session-scoped security
 > **Narration Templates (068):** ✅ Complete - YAML-embedded templates, variable substitution, startup lint (NARR001-NARR006)
@@ -790,12 +790,17 @@ After teaching new phrases, just run `populate_embeddings` without `--force` to 
 
 All DB access goes through `VerbService` (no direct sqlx calls).
 
+**IMPORTANT (070 fix):** ALL pipes run unconditionally. No early returns, no conditional skips.
+Results accumulate from all sources, then `normalize_candidates()` dedupes by verb, sorts by
+score descending, and truncates to limit. The best score wins regardless of source.
+
+0. Operator macros (exact FQN/label) → score 1.0
 1. User learned exact → `agent.user_learned_phrases`
 2. Global learned exact → In-memory LearnedData
 3. User semantic → pgvector on user_learned_phrases
 4. Global semantic → pgvector on `verb_pattern_embeddings`
 5. Blocklist check → Filter blocked verbs
-6. **Global semantic fallback** ← Lower threshold, wider net
+6. Phonetic fallback → dmetaphone for typo handling
 
 **Pattern Sources (v_verb_intent_patterns view):**
 - `yaml_intent_patterns` - YAML invocation_phrases, overwritten on startup
