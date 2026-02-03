@@ -280,6 +280,14 @@ pub struct AgentChatResponse {
     /// User selection triggers POST /api/session/:id/select-intent-tier
     #[serde(skip_serializing_if = "Option::is_none")]
     pub intent_tier: Option<ob_poc_types::IntentTierRequest>,
+    /// Debug information (only populated when OB_CHAT_DEBUG=1)
+    /// Contains verb matching details, candidates, and selection policy
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debug: Option<ob_poc_types::ChatDebugInfo>,
+    /// Verb candidates from semantic search (for feedback capture)
+    /// Not serialized to API - internal use only
+    #[serde(skip)]
+    pub verb_candidates: Vec<crate::mcp::verb_search::VerbSearchResult>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -960,6 +968,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         dsl_hash: None,
                         verb_disambiguation: None,
                         intent_tier: None,
+                        debug: None,
+                        verb_candidates: vec![],
                     });
                 }
             }
@@ -1045,7 +1055,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         macro_verb, r.dsl
                     );
                     session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
-                    return Ok(self.staged_response(r.dsl, msg));
+                    return Ok(self.staged_response(r.dsl, msg, r.verb_candidates));
                 }
 
                 // Got valid DSL?
@@ -1070,7 +1080,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     // Data mutation - wait for user to say "run"
                     let msg = format!("Staged: {}\n\nSay 'run' to execute.", r.dsl);
                     session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
-                    return Ok(self.staged_response(r.dsl, msg));
+                    return Ok(self.staged_response(r.dsl, msg, r.verb_candidates));
                 }
 
                 // Ambiguous? Check if we should show intent tiers or direct verb disambiguation
@@ -1233,7 +1243,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         selected_verb, r.dsl
                     );
                     session.add_agent_message(msg.clone(), None, Some(r.dsl.clone()));
-                    return Ok(self.staged_response(r.dsl, msg));
+                    return Ok(self.staged_response(r.dsl, msg, r.verb_candidates));
                 }
 
                 // Pipeline gave an error
@@ -1371,6 +1381,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                                     dsl_hash: None,
                                     verb_disambiguation: None,
                                     intent_tier: None,
+                                    debug: None,
+                                    verb_candidates: vec![],
                                 });
                             }
                         }
@@ -1442,6 +1454,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     dsl_hash: None,
                     verb_disambiguation: None,
                     intent_tier: None,
+                    debug: None,
+                    verb_candidates: vec![],
                 })
             }
             Err(e) => {
@@ -1577,7 +1591,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         }
     }
 
-    fn staged_response(&self, dsl: String, msg: String) -> AgentChatResponse {
+    fn staged_response(
+        &self,
+        dsl: String,
+        msg: String,
+        candidates: Vec<crate::mcp::verb_search::VerbSearchResult>,
+    ) -> AgentChatResponse {
         AgentChatResponse {
             message: msg,
             dsl_source: Some(dsl),
@@ -1593,6 +1612,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: None,
+            debug: None,
+            verb_candidates: candidates,
         }
     }
 
@@ -1612,6 +1633,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: None,
+            debug: None,
+            verb_candidates: vec![],
         }
     }
 
@@ -1633,6 +1656,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: None,
+            debug: None,
+            verb_candidates: vec![],
         }
     }
 
@@ -1754,6 +1779,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: Some(disambiguation_request),
             intent_tier: None,
+            debug: None,
+            verb_candidates: vec![],
         }
     }
 
@@ -1830,6 +1857,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: Some(tier_request),
+            debug: None,
+            verb_candidates: vec![],
         }
     }
 
@@ -2041,6 +2070,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     dsl_hash: None,
                     verb_disambiguation: None,
                     intent_tier: None,
+                    debug: None,
+                    verb_candidates: vec![],
                 });
             } else {
                 return Some(AgentChatResponse {
@@ -2058,6 +2089,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     dsl_hash: None,
                     verb_disambiguation: None,
                     intent_tier: None,
+                    debug: None,
+                    verb_candidates: vec![],
                 });
             }
         }
@@ -2079,6 +2112,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 dsl_hash: None,
                 verb_disambiguation: None,
                 intent_tier: None,
+                debug: None,
+                verb_candidates: vec![],
             });
         }
 
@@ -2099,6 +2134,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 dsl_hash: None,
                 verb_disambiguation: None,
                 intent_tier: None,
+                debug: None,
+                verb_candidates: vec![],
             });
         }
 
@@ -2542,6 +2579,8 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash,
             verb_disambiguation: None,
             intent_tier: None,
+            debug: None,
+            verb_candidates: vec![],
         })
     }
 

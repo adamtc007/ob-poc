@@ -27,6 +27,7 @@ use crate::dsl_v2::{
     compile, expand_templates_simple, gateway_resolver, parse_program, registry, runtime_registry,
     AtomicExecutionResult, BatchPolicy, BestEffortExecutionResult, DslExecutor, ExecutionContext,
 };
+use crate::macros::OperatorMacroRegistry;
 use crate::mcp::verb_search::HybridVerbSearcher;
 
 use crate::mcp::protocol::ToolCallResult;
@@ -89,6 +90,8 @@ pub struct ToolHandlers {
     embedder: SharedEmbedder,
     /// Feedback service for learning loop
     feedback_service: Option<Arc<ob_semantic_matcher::FeedbackService>>,
+    /// Operator macro registry for business vocabulary search
+    macro_registry: Option<Arc<OperatorMacroRegistry>>,
 }
 
 impl ToolHandlers {
@@ -96,6 +99,17 @@ impl ToolHandlers {
     ///
     /// There is only ONE path - all tools require the Candle embedder for semantic search.
     pub fn new(pool: PgPool, embedder: SharedEmbedder) -> Self {
+        // Load operator macro registry for business vocabulary search
+        let macro_registry = match OperatorMacroRegistry::load_from_dir(std::path::Path::new(
+            "config/verb_schemas/macros",
+        )) {
+            Ok(registry) => Some(Arc::new(registry)),
+            Err(e) => {
+                tracing::warn!("Failed to load operator macro registry: {}", e);
+                None
+            }
+        };
+
         ToolHandlers {
             generation_log: GenerationLogRepository::new(pool.clone()),
             repo: VisualizationRepository::new(pool.clone()),
@@ -107,6 +121,7 @@ impl ToolHandlers {
             learned_data: None,
             embedder,
             feedback_service: None,
+            macro_registry,
         }
     }
 
@@ -148,6 +163,7 @@ impl ToolHandlers {
     /// Get or create HybridVerbSearcher for verb discovery
     ///
     /// Lazy-initializes on first use. All DB access through VerbService.
+    /// Includes macro registry for business vocabulary search (structure, case, mandate).
     async fn get_verb_searcher(&self) -> Result<HybridVerbSearcher> {
         let mut guard = self.verb_searcher.lock().await;
         if let Some(searcher) = guard.as_ref() {
@@ -158,8 +174,13 @@ impl ToolHandlers {
         let verb_service = Arc::new(VerbService::new(self.pool.clone()));
 
         // Create searcher with VerbService and embedder (REQUIRED)
-        let searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone())
+        let mut searcher = HybridVerbSearcher::new(verb_service, self.learned_data.clone())
             .with_embedder(self.embedder.clone());
+
+        // Add macro registry if available (enables business vocabulary search)
+        if let Some(ref macro_registry) = self.macro_registry {
+            searcher = searcher.with_macro_registry(macro_registry.clone());
+        }
 
         *guard = Some(searcher.clone());
         Ok(searcher)

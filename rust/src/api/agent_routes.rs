@@ -2378,6 +2378,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                debug: None,
             }));
         }
         // /commands <domain> or /verbs <domain> - show verbs for domain
@@ -2393,6 +2394,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                debug: None,
             }));
         }
         // /verbs (no args) - show all verbs
@@ -2408,6 +2410,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                debug: None,
             }));
         }
         _ => {} // Not a slash command, continue to LLM
@@ -2432,6 +2435,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                debug: None,
             }));
         }
     };
@@ -2463,6 +2467,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                debug: None,
             }));
         }
     };
@@ -2492,6 +2497,22 @@ async fn chat_session(
             is_agent_bound: true,
         };
 
+        // Convert verb_candidates to MatchResult format for alternatives
+        // This enables proper calibration - we now capture what the search actually returned
+        let alternatives: Vec<ob_semantic_matcher::MatchResult> = response
+            .verb_candidates
+            .iter()
+            .filter(|c| c.verb != first_intent.verb) // Exclude the selected verb
+            .map(|c| ob_semantic_matcher::MatchResult {
+                verb_name: c.verb.clone(),
+                pattern_phrase: c.matched_phrase.clone(),
+                similarity: c.score,
+                match_method: ob_semantic_matcher::MatchMethod::Semantic,
+                category: "chat".to_string(),
+                is_agent_bound: true,
+            })
+            .collect();
+
         match state
             .feedback_service
             .capture_match(
@@ -2499,7 +2520,7 @@ async fn chat_session(
                 &req.message,
                 ob_semantic_matcher::feedback::InputSource::Chat,
                 Some(&match_result),
-                &[], // No alternatives from LLM path
+                &alternatives, // Real alternatives from verb search
                 session.context.domain_hint.as_deref(),
                 session.context.stage_focus.as_deref(),
             )
@@ -2565,6 +2586,84 @@ async fn chat_session(
         &session.context.bindings,
     );
 
+    // =========================================================================
+    // BUILD DEBUG PAYLOAD (GATED BY OB_CHAT_DEBUG=1)
+    // This provides explainability for verb matching decisions
+    // =========================================================================
+    let debug_info = if std::env::var("OB_CHAT_DEBUG")
+        .map(|v| v == "1")
+        .unwrap_or(false)
+    {
+        // Build debug payload from verb candidates
+        let verb_match = if !response.verb_candidates.is_empty() {
+            use crate::mcp::verb_search::VerbSearchSource;
+            use ob_poc_types::{
+                VerbCandidateDebug, VerbEvidenceDebug, VerbMatchDebug, VerbMatchSource,
+                VerbSelectionPolicyDebug,
+            };
+
+            // Helper to convert VerbSearchSource to VerbMatchSource
+            let convert_source = |src: &VerbSearchSource| -> VerbMatchSource {
+                match src {
+                    VerbSearchSource::UserLearnedExact => VerbMatchSource::UserLearnedExact,
+                    VerbSearchSource::UserLearnedSemantic => VerbMatchSource::UserLearnedSemantic,
+                    VerbSearchSource::LearnedExact => VerbMatchSource::LearnedExact,
+                    VerbSearchSource::LearnedSemantic => VerbMatchSource::LearnedSemantic,
+                    VerbSearchSource::Semantic => VerbMatchSource::Semantic,
+                    VerbSearchSource::DirectDsl => VerbMatchSource::DirectDsl,
+                    VerbSearchSource::GlobalLearned => VerbMatchSource::GlobalLearned,
+                    VerbSearchSource::PatternEmbedding => VerbMatchSource::PatternEmbedding,
+                    VerbSearchSource::Phonetic => VerbMatchSource::Phonetic,
+                    VerbSearchSource::Macro => VerbMatchSource::Macro,
+                }
+            };
+
+            // Convert candidates to debug format
+            let candidates: Vec<VerbCandidateDebug> = response
+                .verb_candidates
+                .iter()
+                .map(|c| VerbCandidateDebug {
+                    verb: c.verb.clone(),
+                    score: c.score,
+                    primary_source: Some(convert_source(&c.source)),
+                    matched_phrase: Some(c.matched_phrase.clone()),
+                    description: c.description.clone(),
+                    evidence: c
+                        .evidence
+                        .iter()
+                        .map(|e| VerbEvidenceDebug {
+                            source: convert_source(&e.source),
+                            score: e.score,
+                            matched_phrase: e.matched_phrase.clone(),
+                        })
+                        .collect(),
+                })
+                .collect();
+
+            // First candidate is the selected one (if any)
+            let selected = candidates.first().cloned();
+
+            // Build policy info
+            let policy = Some(VerbSelectionPolicyDebug {
+                algorithm: "hybrid_7_tier".to_string(),
+                accept_threshold: Some(0.65),
+                ambiguity_margin: Some(0.05),
+            });
+
+            Some(VerbMatchDebug {
+                selected,
+                candidates,
+                policy,
+            })
+        } else {
+            None
+        };
+
+        Some(ob_poc_types::ChatDebugInfo { verb_match })
+    } else {
+        None
+    };
+
     // Return response using API types (single source of truth)
     Ok(Json(ChatResponse {
         message: response.message,
@@ -2583,6 +2682,7 @@ async fn chat_session(
             .map(|refs| api_unresolved_refs_to_api(refs)),
         current_ref_index: response.current_ref_index,
         dsl_hash: response.dsl_hash,
+        debug: debug_info, // Populated when OB_CHAT_DEBUG=1
     }))
 }
 

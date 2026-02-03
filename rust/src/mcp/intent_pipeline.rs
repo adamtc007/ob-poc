@@ -334,6 +334,16 @@ impl IntentPipeline {
         }
     }
 
+    /// Extract user_id from session if available, otherwise return None.
+    /// This enables user-specific learned phrase matching in verb search.
+    fn effective_user_id(&self) -> Option<uuid::Uuid> {
+        self.session
+            .as_ref()
+            .and_then(|s| s.read().ok())
+            .map(|guard| guard.user_id)
+            .filter(|id| !id.is_nil())
+    }
+
     /// Full pipeline: instruction → structured intent → DSL
     ///
     /// Handles both:
@@ -583,7 +593,7 @@ impl IntentPipeline {
 
                 let prefix_candidates = self
                     .verb_searcher
-                    .search(&prefix, None, domain_filter, 5)
+                    .search(&prefix, self.effective_user_id(), domain_filter, 5)
                     .await?;
 
                 // If we got an exact match (score 1.0, LearnedExact source), use it
@@ -623,7 +633,7 @@ impl IntentPipeline {
 
             candidates = self
                 .verb_searcher
-                .search(search_phrase, None, domain_filter, 5)
+                .search(search_phrase, self.effective_user_id(), domain_filter, 5)
                 .await?;
         }
 
@@ -1240,6 +1250,7 @@ Respond with ONLY valid JSON:
                 source: VerbSearchSource::DirectDsl,
                 matched_phrase: dsl.to_string(),
                 description: Some("Direct DSL input".to_string()),
+                evidence: vec![],
             }],
             dsl: dsl.to_string(),
             dsl_hash,

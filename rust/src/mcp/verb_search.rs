@@ -57,6 +57,10 @@ pub struct VerbSearchResult {
     pub source: VerbSearchSource,
     pub matched_phrase: String,
     pub description: Option<String>,
+    /// Evidence from all search channels that contributed to this match.
+    /// Empty when using legacy single-channel mode; populated in ensemble mode.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<VerbEvidence>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -83,6 +87,28 @@ pub enum VerbSearchSource {
     Phonetic,
     /// Operator macro match (business vocabulary layer)
     Macro,
+}
+
+// ============================================================================
+// Evidence Accumulation (Multi-Channel Voting)
+// ============================================================================
+
+/// Evidence from a single search channel contributing to a verb match.
+///
+/// When the same verb is discovered by multiple channels (macro, learned, semantic),
+/// each channel contributes evidence. The `VerbSearchResult.evidence` field collects
+/// all evidence, enabling:
+/// - Explainability: show users why a verb was selected
+/// - Calibration: tune channel weights based on feedback
+/// - Debugging: diagnose why a verb ranked higher/lower than expected
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct VerbEvidence {
+    /// Which search channel produced this evidence
+    pub source: VerbSearchSource,
+    /// Raw score from this channel (before any fusion/weighting)
+    pub score: f32,
+    /// The phrase that matched (from pattern DB or user input)
+    pub matched_phrase: String,
 }
 
 // ============================================================================
@@ -526,6 +552,7 @@ impl HybridVerbSearcher {
                                 source: VerbSearchSource::LearnedExact,
                                 matched_phrase: query.to_string(),
                                 description,
+                                evidence: vec![],
                             },
                         );
                         seen_verbs.insert(verb.to_string());
@@ -663,6 +690,7 @@ impl HybridVerbSearcher {
                                 source: VerbSearchSource::Phonetic,
                                 matched_phrase: pm.pattern,
                                 description,
+                                evidence: vec![],
                             });
                             if results.len() >= limit {
                                 break;
@@ -739,6 +767,7 @@ impl HybridVerbSearcher {
                     source: VerbSearchSource::UserLearnedExact,
                     matched_phrase: m.phrase,
                     description,
+                    evidence: vec![],
                 }))
             }
             None => Ok(None),
@@ -779,6 +808,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::UserLearnedSemantic,
                 matched_phrase: m.phrase,
                 description,
+                evidence: vec![],
             });
         }
         Ok(results)
@@ -1038,6 +1068,7 @@ impl HybridVerbSearcher {
                                 source: VerbSearchSource::PatternEmbedding,
                                 matched_phrase: matched_phrase.clone(),
                                 description: None,
+                                evidence: vec![],
                             },
                         );
                     }
@@ -1106,6 +1137,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::GlobalLearned,
                 matched_phrase: m.phrase,
                 description: None,
+                evidence: vec![],
             })
             .collect();
 
@@ -1117,6 +1149,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: m.phrase,
                 description: None,
+                evidence: vec![],
             })
             .collect();
 
@@ -1207,6 +1240,7 @@ impl HybridVerbSearcher {
                 source: VerbSearchSource::Macro,
                 matched_phrase: macro_def.ui.label.clone(),
                 description: Some(macro_def.ui.description.clone()),
+                evidence: vec![],
             });
             return results; // Exact FQN is definitive
         }
@@ -1220,6 +1254,7 @@ impl HybridVerbSearcher {
                     source: VerbSearchSource::Macro,
                     matched_phrase: macro_def.ui.label.clone(),
                     description: Some(macro_def.ui.description.clone()),
+                    evidence: vec![],
                 });
             }
         }
@@ -1292,6 +1327,7 @@ impl HybridVerbSearcher {
                     source: VerbSearchSource::Macro,
                     matched_phrase: macro_def.ui.label.clone(),
                     description: Some(macro_def.ui.description.clone()),
+                    evidence: vec![],
                 });
             }
         }
@@ -1358,6 +1394,7 @@ mod tests {
                 source: VerbSearchSource::LearnedSemantic,
                 matched_phrase: "make a cbu".to_string(),
                 description: None,
+                evidence: vec![],
             },
             VerbSearchResult {
                 verb: "cbu.ensure".to_string(),
@@ -1365,6 +1402,7 @@ mod tests {
                 source: VerbSearchSource::Semantic,
                 matched_phrase: "ensure cbu".to_string(),
                 description: None,
+                evidence: vec![],
             },
             VerbSearchResult {
                 verb: "cbu.create".to_string(),
@@ -1372,6 +1410,7 @@ mod tests {
                 source: VerbSearchSource::PatternEmbedding,
                 matched_phrase: "create cbu".to_string(),
                 description: None,
+                evidence: vec![],
             },
         ];
 
@@ -1404,6 +1443,7 @@ mod tests {
                 source: VerbSearchSource::Semantic,
                 matched_phrase: "create cbu".to_string(),
                 description: None,
+                evidence: vec![],
             },
             VerbSearchResult {
                 verb: "cbu.ensure".to_string(),
@@ -1411,6 +1451,7 @@ mod tests {
                 source: VerbSearchSource::Semantic,
                 matched_phrase: "ensure cbu".to_string(),
                 description: None,
+                evidence: vec![],
             },
         ];
 
@@ -1447,6 +1488,7 @@ mod tests {
                 source: VerbSearchSource::Semantic,
                 matched_phrase: "create cbu".to_string(),
                 description: None,
+                evidence: vec![],
             },
             VerbSearchResult {
                 verb: "cbu.ensure".to_string(),
@@ -1454,6 +1496,7 @@ mod tests {
                 source: VerbSearchSource::Semantic,
                 matched_phrase: "ensure cbu".to_string(),
                 description: None,
+                evidence: vec![],
             },
         ];
 
@@ -1479,6 +1522,7 @@ mod tests {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            evidence: vec![],
         }];
 
         let outcome = check_ambiguity(&candidates, threshold);
@@ -1498,6 +1542,7 @@ mod tests {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            evidence: vec![],
         }];
 
         let outcome = check_ambiguity(&candidates, threshold);
@@ -1525,6 +1570,7 @@ mod tests {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            evidence: vec![],
         }];
 
         let outcome = check_ambiguity(&candidates, threshold);

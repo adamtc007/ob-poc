@@ -1589,6 +1589,7 @@ fn test_ambiguity_detection() {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            evidence: vec![],
         },
         VerbSearchResult {
             verb: "entity.create-limited-company".to_string(),
@@ -1596,6 +1597,7 @@ fn test_ambiguity_detection() {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create company".to_string(),
             description: None,
+            evidence: vec![],
         },
     ];
 
@@ -1612,6 +1614,7 @@ fn test_ambiguity_detection() {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            evidence: vec![],
         },
         VerbSearchResult {
             verb: "entity.create-limited-company".to_string(),
@@ -1619,6 +1622,7 @@ fn test_ambiguity_detection() {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create company".to_string(),
             description: None,
+            evidence: vec![],
         },
     ];
 
@@ -1634,6 +1638,7 @@ fn test_ambiguity_detection() {
         source: VerbSearchSource::Semantic,
         matched_phrase: "create cbu".to_string(),
         description: None,
+        evidence: vec![],
     }];
 
     assert!(matches!(
@@ -1651,6 +1656,7 @@ fn test_normalize_candidates() {
             source: VerbSearchSource::LearnedSemantic,
             matched_phrase: "make a cbu".to_string(),
             description: None,
+            evidence: vec![],
         },
         VerbSearchResult {
             verb: "cbu.create".to_string(),
@@ -1658,6 +1664,7 @@ fn test_normalize_candidates() {
             source: VerbSearchSource::PatternEmbedding,
             matched_phrase: "create cbu".to_string(),
             description: None,
+            evidence: vec![],
         },
         VerbSearchResult {
             verb: "entity.create-limited-company".to_string(),
@@ -1665,6 +1672,7 @@ fn test_normalize_candidates() {
             source: VerbSearchSource::Semantic,
             matched_phrase: "create company".to_string(),
             description: None,
+            evidence: vec![],
         },
     ];
 

@@ -507,7 +507,7 @@ impl<'a> SubsetValidator<'a> {
     }
 
     fn skip_comment(&mut self) {
-        while let Some((_, c)) = self.chars.next() {
+        for (_, c) in self.chars.by_ref() {
             if c == '\n' {
                 break;
             }
@@ -515,7 +515,7 @@ impl<'a> SubsetValidator<'a> {
     }
 
     fn skip_until(&mut self, target: char) {
-        while let Some((_, c)) = self.chars.next() {
+        for (_, c) in self.chars.by_ref() {
             if c == target {
                 break;
             }

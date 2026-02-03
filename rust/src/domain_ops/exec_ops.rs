@@ -591,7 +591,7 @@ async fn execute_statements_atomic(
 
                     let executor =
                         crate::dsl_v2::generic_executor::GenericCrudExecutor::new(pool.clone());
-                    let gen_result = executor.execute_in_tx(&mut tx, &verb_def, &args).await?;
+                    let gen_result = executor.execute_in_tx(&mut tx, verb_def, &args).await?;
 
                     match gen_result {
                         crate::dsl_v2::generic_executor::GenericExecutionResult::Uuid(id) => {

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-02
+> **Last reviewed:** 2026-02-03
 > **Crates:** 22 Rust crates (includes ob-poc-macros + 5 esper_* crates)
 > **Verbs:** 541 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 58 schema migrations
@@ -37,6 +37,7 @@
 > **Proposal/Confirm Protocol (067):** ✅ Complete - exec.proposal/confirm/edit/cancel verbs, atomic execution, session-scoped security
 > **Narration Templates (068):** ✅ Complete - YAML-embedded templates, variable substitution, startup lint (NARR001-NARR006)
 > **DSL Executable Subset Validator (069):** ✅ Complete - EBNF grammar, fast pre-parse validation, two-stage pipeline integration
+> **Verb Discovery Explainability (071):** ✅ Complete - Multi-channel evidence, real alternatives in feedback, debug payload (OB_CHAT_DEBUG=1)
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
