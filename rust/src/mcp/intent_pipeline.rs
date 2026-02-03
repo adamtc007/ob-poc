@@ -975,10 +975,9 @@ impl IntentPipeline {
                     },
                 });
             }
-            VerbSearchOutcome::Matched(matched_verb) => {
+            VerbSearchOutcome::Matched(_) => {
                 // Clear winner - continue with LLM extraction
-                // Use matched_verb below
-                let _ = matched_verb; // We'll use candidates[0] for consistency
+                // We use candidates[0] for consistency across all paths
             }
         }
 
@@ -1036,6 +1035,29 @@ impl IntentPipeline {
                         let (valid, validation_error) = self.validate_dsl(&expanded_dsl);
                         let dsl_hash = Some(compute_dsl_hash(&expanded_dsl));
 
+                        // Extract unresolved refs from expanded DSL (same pattern as normal flow)
+                        let unresolved_refs = match parse_program(&expanded_dsl) {
+                            Ok(ast) => {
+                                let registry = runtime_registry_arc();
+                                let enriched = enrich_program(ast, &registry);
+                                let locations = find_unresolved_ref_locations(&enriched.program);
+                                locations
+                                    .into_iter()
+                                    .map(|loc| UnresolvedRef {
+                                        param_name: loc.arg_key,
+                                        search_value: loc.search_text,
+                                        entity_type: Some(loc.entity_type),
+                                        search_column: loc.search_column,
+                                        ref_id: loc.ref_id,
+                                    })
+                                    .collect()
+                            }
+                            Err(e) => {
+                                tracing::warn!(error = %e, "Failed to parse expanded macro DSL for ref extraction");
+                                vec![]
+                            }
+                        };
+
                         return Ok(PipelineResult {
                             intent,
                             verb_candidates: candidates,
@@ -1043,7 +1065,7 @@ impl IntentPipeline {
                             dsl_hash,
                             valid,
                             validation_error,
-                            unresolved_refs: vec![], // TODO: extract from expanded DSL
+                            unresolved_refs,
                             missing_required: vec![],
                             outcome: PipelineOutcome::MacroExpanded {
                                 macro_verb: top_verb.clone(),
