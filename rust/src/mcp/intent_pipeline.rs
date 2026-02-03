@@ -1486,7 +1486,8 @@ fn infer_domain_from_phrase(phrase: &str) -> Option<String> {
         return Some("view".to_string());
     }
 
-    // CBU domain - explicit cbu mention OR fund/structure with action
+    // CBU domain - explicit cbu mention OR fund/structure with action OR product operations
+    // "add product custody" = adding CUSTODY product to CBU, not custody domain
     if words.iter().any(|w| matches!(*w, "cbu" | "cbus"))
         || (words
             .iter()
@@ -1497,6 +1498,12 @@ fn infer_domain_from_phrase(phrase: &str) -> Option<String> {
                     "create" | "delete" | "update" | "assign" | "list" | "get" | "show" | "all"
                 )
             }))
+        || (words
+            .iter()
+            .any(|w| matches!(*w, "product" | "products" | "service" | "services"))
+            && words
+                .iter()
+                .any(|w| matches!(*w, "add" | "remove" | "enable" | "disable")))
     {
         return Some("cbu".to_string());
     }
