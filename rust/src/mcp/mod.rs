@@ -41,6 +41,7 @@
 //! DATABASE_URL=postgresql://localhost/ob-poc ./target/debug/dsl_mcp
 //! ```
 
+pub mod convergence;
 pub mod enrichment;
 pub mod handlers;
 pub mod intent_pipeline;
@@ -57,6 +58,10 @@ pub mod utterance;
 pub mod verb_search;
 pub mod verb_search_factory;
 
+pub use convergence::{
+    ConvergedPair, ConvergenceConfig, ConvergenceEngine, ConvergenceOutcome, EntityCandidate,
+    VerbCandidate,
+};
 pub use enrichment::{EntityContext, EntityEnricher, EntityType, OwnershipContext, RoleContext};
 pub use macro_integration::{
     check_macro_prereqs, get_all_verb_readiness, get_macro_schema, get_ready_verbs,

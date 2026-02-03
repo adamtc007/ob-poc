@@ -37,6 +37,10 @@ use ob_agentic::{create_llm_client, LlmClient};
 use crate::dsl_v2::ast::find_unresolved_ref_locations;
 use crate::dsl_v2::runtime_registry::{RuntimeArg, RuntimeVerb};
 use crate::dsl_v2::{compile, enrich_program, parse_program, registry, runtime_registry_arc};
+use crate::mcp::convergence::{
+    extract_entity_mentions, verb_result_to_candidate, ConvergenceEngine, ConvergenceOutcome,
+    VerbCandidate,
+};
 use crate::mcp::macro_integration::{
     intent_args_to_macro_args, is_macro, try_expand_macro, MacroAttemptResult,
 };
@@ -345,6 +349,129 @@ impl IntentPipeline {
             .and_then(|s| s.read().ok())
             .map(|guard| guard.user_id)
             .unwrap_or(uuid::Uuid::nil())
+    }
+
+    /// Apply bidirectional convergence to improve verb selection accuracy.
+    ///
+    /// This is the key insight for maximizing intent-to-DSL hit rate:
+    /// 1. Extract entity mentions from the input (proper nouns, quoted strings)
+    /// 2. Search for entities in the database
+    /// 3. Cross-filter verb candidates against entity types
+    /// 4. Re-rank based on convergence score (verb_score + entity_score + type_match_bonus)
+    ///
+    /// Returns re-ranked verb candidates with improved accuracy.
+    #[cfg(feature = "database")]
+    async fn apply_convergence(
+        &self,
+        instruction: &str,
+        verb_candidates: Vec<VerbSearchResult>,
+        scope_ctx: &ScopeContext,
+        pool: &PgPool,
+    ) -> Result<Vec<VerbSearchResult>> {
+        use crate::mcp::convergence::search_entities_parallel;
+
+        // Step 1: Extract entity mentions from the input
+        let mentions = extract_entity_mentions(instruction);
+
+        if mentions.is_empty() {
+            tracing::debug!(
+                instruction = instruction,
+                "Convergence: no entity mentions found, skipping"
+            );
+            return Ok(verb_candidates);
+        }
+
+        tracing::debug!(
+            instruction = instruction,
+            mentions = ?mentions,
+            verb_candidate_count = verb_candidates.len(),
+            "Convergence: found entity mentions, searching entities"
+        );
+
+        // Step 2: Search for entities in parallel
+        let client_group_id = scope_ctx.client_group_id;
+        let entity_candidates =
+            search_entities_parallel(pool, &mentions, client_group_id, 5).await?;
+
+        if entity_candidates.is_empty() {
+            tracing::debug!(
+                mentions = ?mentions,
+                "Convergence: no entities found for mentions, using original verb candidates"
+            );
+            return Ok(verb_candidates);
+        }
+
+        tracing::debug!(
+            entity_count = entity_candidates.len(),
+            entities = ?entity_candidates.iter().map(|e| (&e.name, &e.entity_type)).collect::<Vec<_>>(),
+            "Convergence: found entity candidates"
+        );
+
+        // Step 3: Convert verb results to convergence candidates
+        let verb_cands: Vec<VerbCandidate> = verb_candidates
+            .iter()
+            .map(verb_result_to_candidate)
+            .collect();
+
+        // Step 4: Run convergence algorithm
+        let engine = ConvergenceEngine::new();
+        let outcome = engine.converge(verb_cands, entity_candidates);
+
+        // Step 5: Map convergence outcome back to VerbSearchResult
+        match outcome {
+            ConvergenceOutcome::Converged(pair) => {
+                tracing::info!(
+                    verb = %pair.verb.verb,
+                    entity = pair.entity.as_ref().map(|e| e.name.as_str()),
+                    convergence_score = pair.convergence_score,
+                    rationale = %pair.rationale,
+                    "Convergence: found clear winner"
+                );
+
+                // Find the original VerbSearchResult and boost to top
+                let mut result = verb_candidates;
+                if let Some(idx) = result.iter().position(|v| v.verb == pair.verb.verb) {
+                    // Move matched verb to front with boosted score
+                    let mut matched = result.remove(idx);
+                    matched.score = (matched.score + pair.convergence_score) / 2.0;
+                    result.insert(0, matched);
+                }
+                Ok(result)
+            }
+
+            ConvergenceOutcome::Ambiguous { pairs, question } => {
+                tracing::info!(
+                    pair_count = pairs.len(),
+                    question = %question,
+                    "Convergence: ambiguous, returning top pairs for disambiguation"
+                );
+
+                // Re-rank verb candidates based on convergence pairs
+                let mut result = verb_candidates;
+                for (rank, pair) in pairs.iter().enumerate() {
+                    if let Some(idx) = result.iter().position(|v| v.verb == pair.verb.verb) {
+                        // Boost score based on convergence rank
+                        result[idx].score = (result[idx].score + pair.convergence_score) / 2.0;
+                        // Move to appropriate position
+                        let v = result.remove(idx);
+                        result.insert(rank.min(result.len()), v);
+                    }
+                }
+                Ok(result)
+            }
+
+            ConvergenceOutcome::NoMatch {
+                verb_candidates: _,
+                entity_candidates: _,
+                reason,
+            } => {
+                tracing::debug!(
+                    reason = %reason,
+                    "Convergence: no match, using original verb candidates"
+                );
+                Ok(verb_candidates)
+            }
+        }
     }
 
     /// Full pipeline: instruction → structured intent → DSL
@@ -680,6 +807,46 @@ impl IntentPipeline {
                 },
             });
         }
+
+        // =========================================================================
+        // Step 1a: BIDIRECTIONAL CONVERGENCE (Feature 071)
+        //
+        // When we have ambiguous verb candidates AND entity mentions in the input,
+        // use entity type information to cross-filter and re-rank verb candidates.
+        //
+        // This is the "major trick" for improving hit rate - we use BOTH clues:
+        // - Verb candidates from semantic search
+        // - Entity candidates from entity search
+        // Cross-filter by type compatibility to find the best (verb, entity) pair.
+        // =========================================================================
+        #[cfg(feature = "database")]
+        let candidates = if let Some(pool) = &self.pool {
+            self.apply_convergence(instruction, candidates, &scope_ctx, pool)
+                .await
+                .unwrap_or_else(|e| {
+                    tracing::warn!(error = %e, "Convergence failed, using original candidates");
+                    vec![] // Will be replaced by outer candidates
+                })
+        } else {
+            candidates
+        };
+
+        // Fallback if convergence returned empty (error case)
+        #[cfg(feature = "database")]
+        let candidates = if candidates.is_empty() {
+            // Re-run verb search to get original candidates
+            let search_phrase = verb_phrase_override.unwrap_or(instruction);
+            self.verb_searcher
+                .search(
+                    search_phrase,
+                    Some(self.effective_user_id()),
+                    domain_filter,
+                    5,
+                )
+                .await?
+        } else {
+            candidates
+        };
 
         // Step 1b: Check for ambiguity (Issue D/J)
         // Use searcher's semantic_threshold for consistent behavior
