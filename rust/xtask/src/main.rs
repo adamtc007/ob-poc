@@ -92,7 +92,7 @@ enum Command {
     /// Pre-commit hook: check + clippy + test
     PreCommit,
 
-    /// Build and deploy: WASM components + web server, then start
+    /// Build and deploy web server, then start
     Deploy {
         /// Build in release mode
         #[arg(long)]
@@ -100,19 +100,12 @@ enum Command {
         /// Port to listen on
         #[arg(long, default_value = "3000")]
         port: u16,
-        /// Skip WASM rebuild (faster if only Rust server changed)
-        #[arg(long)]
-        skip_wasm: bool,
         /// Don't start the server after building
         #[arg(long)]
         no_run: bool,
-    },
-
-    /// Build WASM component (ob-poc-ui only, includes ob-poc-graph as dependency)
-    Wasm {
-        /// Build in release mode
+        /// Skip React frontend build (faster for backend-only changes)
         #[arg(long)]
-        release: bool,
+        skip_frontend: bool,
     },
 
     /// Seed Allianz test data from scraped JSON
@@ -715,10 +708,9 @@ fn main() -> Result<()> {
         Command::Deploy {
             release,
             port,
-            skip_wasm,
             no_run,
-        } => deploy(&sh, release, port, skip_wasm, no_run),
-        Command::Wasm { release } => build_wasm(&sh, release),
+            skip_frontend,
+        } => deploy(&sh, release, port, no_run, skip_frontend),
         Command::SeedAllianz {
             file,
             limit,
@@ -1383,56 +1375,17 @@ fn pre_commit(sh: &Shell) -> Result<()> {
     Ok(())
 }
 
-fn build_wasm(sh: &Shell, release: bool) -> Result<()> {
-    let root = project_root()?;
-    let wasm_out = root.join("rust/crates/ob-poc-web/static/wasm");
-
-    // Ensure wasm-pack is installed
-    if cmd!(sh, "which wasm-pack").run().is_err() {
-        println!("Installing wasm-pack...");
-        cmd!(sh, "cargo install wasm-pack").run()?;
-    }
-
-    // Only build ob-poc-ui - it includes ob-poc-graph as a dependency
-    let wasm_crates = ["ob-poc-ui"];
-
-    for crate_name in wasm_crates {
-        println!("\n=== Building {} WASM ===", crate_name);
-        let crate_dir = root.join(format!("rust/crates/{}", crate_name));
-        sh.change_dir(&crate_dir);
-
-        let out_dir = wasm_out.to_str().context("Invalid wasm output path")?;
-        if release {
-            cmd!(
-                sh,
-                "wasm-pack build --release --target web --out-dir {out_dir}"
-            )
-            .run()
-            .with_context(|| format!("Failed to build {} WASM", crate_name))?;
-        } else {
-            cmd!(sh, "wasm-pack build --dev --target web --out-dir {out_dir}")
-                .run()
-                .with_context(|| format!("Failed to build {} WASM", crate_name))?;
-        }
-        println!("  {} built successfully", crate_name);
-    }
-
-    // Return to rust dir
-    sh.change_dir(root.join("rust"));
-
-    println!("\nWASM components built to: {}", wasm_out.display());
-    Ok(())
-}
-
-fn deploy(sh: &Shell, release: bool, port: u16, skip_wasm: bool, no_run: bool) -> Result<()> {
+fn deploy(sh: &Shell, release: bool, port: u16, no_run: bool, skip_frontend: bool) -> Result<()> {
     println!("===========================================");
     println!("  OB-POC Deploy Pipeline");
     println!("===========================================\n");
 
     let root = project_root()?;
+    let mut step = 1;
 
     // Step 1: Kill existing server (by name and by port)
-    println!("Step 1: Stopping existing server...");
+    println!("Step {}: Stopping existing server...", step);
+    step += 1;
     let _ = cmd!(sh, "pkill -f ob-poc-web").run(); // Ignore error if not running
     let port_str = port.to_string();
     // Also kill anything on the target port
@@ -1443,16 +1396,43 @@ fn deploy(sh: &Shell, release: bool, port: u16, skip_wasm: bool, no_run: bool) -
     });
     std::thread::sleep(std::time::Duration::from_millis(500));
 
-    // Step 2: Build WASM (unless skipped)
-    if !skip_wasm {
-        println!("\nStep 2: Building WASM components...");
-        build_wasm(sh, release)?;
+    // Step 2: Build React frontend (unless skipped)
+    if !skip_frontend {
+        println!("\nStep {}: Building React frontend...", step);
+        step += 1;
+        let react_dir = root.join("ob-poc-ui-react");
+        if react_dir.exists() {
+            sh.change_dir(&react_dir);
+
+            // Check if node_modules exists, if not run npm install
+            if !react_dir.join("node_modules").exists() {
+                println!("  Installing npm dependencies...");
+                cmd!(sh, "npm install")
+                    .run()
+                    .context("Failed to install npm dependencies")?;
+            }
+
+            // Build React app
+            cmd!(sh, "npm run build")
+                .run()
+                .context("Failed to build React frontend")?;
+            println!("  React frontend built successfully");
+        } else {
+            println!(
+                "  Warning: React frontend directory not found at {:?}",
+                react_dir
+            );
+            println!("  Skipping frontend build...");
+        }
     } else {
-        println!("\nStep 2: Skipping WASM build (--skip-wasm)");
+        println!("\nStep {}: Skipping React frontend (--skip-frontend)", step);
+        step += 1;
     }
 
     // Step 3: Build web server
-    println!("\nStep 3: Building web server...");
+    println!("\nStep {}: Building web server...", step);
+    step += 1;
+    let _ = step; // suppress unused warning
     sh.change_dir(root.join("rust"));
     if release {
         cmd!(sh, "cargo build -p ob-poc-web --release")

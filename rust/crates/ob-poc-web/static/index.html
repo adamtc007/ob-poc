@@ -1,42 +1,50 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OB-POC</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; height: 100%; overflow: hidden; background: #1a1a1a; }
-        canvas { width: 100%; height: 100%; display: block; }
-        #loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #888;
-            font-family: sans-serif;
-        }
-    </style>
-</head>
-<body>
-    <div id="loading">Loading OB-POC...</div>
-    <canvas id="app"></canvas>
-    <script type="module">
-        import init, { init_ui, start_app } from '/static/wasm/ob_poc_ui.js';
-
-        async function run() {
-            try {
-                await init();
-                init_ui();
-                start_app('app');
-                document.getElementById('loading').style.display = 'none';
-            } catch (e) {
-                document.getElementById('loading').textContent = 'Failed to load: ' + e;
-                console.error('Failed to start app:', e);
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>OB-POC</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
             }
-        }
-
-        run();
-    </script>
-</body>
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                background: #1a1a1a;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+            }
+            .container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                gap: 1rem;
+            }
+            h1 {
+                font-size: 2rem;
+                font-weight: 300;
+            }
+            p {
+                color: #888;
+            }
+            a {
+                color: #60a5fa;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>OB-POC API Server</h1>
+            <p>
+                React frontend will be served from <code>/app</code> once built.
+            </p>
+            <p>API endpoints available at <a href="/api">/api</a></p>
+        </div>
+    </body>
 </html>

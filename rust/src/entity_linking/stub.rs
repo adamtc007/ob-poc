@@ -75,7 +75,7 @@ mod tests {
 
     #[test]
     fn test_stub_default() {
-        let stub = StubEntityLinkingService::default();
+        let stub: StubEntityLinkingService = Default::default();
         assert_eq!(stub.entity_count(), 0);
     }
 }

@@ -211,7 +211,6 @@ members = [
     "crates/ob-workflow",
     "crates/dsl-lsp",
     "crates/ob-poc-graph",
-    "crates/ob-poc-ui",
     "crates/ob-poc-web",
     "crates/ob-poc-types",
     "crates/entity-gateway",
@@ -223,7 +222,6 @@ members = [
     "crates/esper_input",
     "crates/esper_compiler",
     "crates/esper_policy",
-    "crates/esper_egui",
     "xtask", "crates/playbook-core", "crates/playbook-lower",
     "crates/inspector-projection",
 ]

@@ -1,10 +1,13 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-02-04
-> **Crates:** 23 Rust crates (includes ob-poc-macros + 5 esper_* crates + inspector-projection)
+> **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
+> **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
+> **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 73 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
+> **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
@@ -30,7 +33,7 @@
 > **LSP Test Harness (063):** ✅ Complete - 150+ parser tests, golden file validation, syntax edge cases
 > **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
-> **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
+> **ESPER Navigation Crates (065):** ⚠️ Deprecated - esper_* crates retained for reference, replaced by React UI
 > **Unified Lookup Service (074):** ✅ Complete - Verb-first dual search combining verb discovery + entity linking
 > **Lexicon Service (072):** ✅ Complete - In-memory verb/domain/concept lookup with bincode snapshots
 > **Entity Linking Service (073):** ✅ Complete - In-memory entity resolution with mention extraction, token overlap matching
@@ -52,13 +55,91 @@ cargo x pre-commit          # Format + clippy + unit tests
 # Full check
 cargo x check --db          # Include database integration tests
 
-# Deploy (UI development)
-cargo x deploy              # Full: WASM + server + start
-cargo x deploy --skip-wasm  # Skip WASM rebuild
+# Deploy (Full stack: React frontend + Rust backend)
+cargo x deploy              # Build React + server + start
+cargo x deploy --skip-frontend  # Skip React rebuild (backend only)
 
-# Run server directly
+# Run server directly (serves React from ob-poc-ui-react/dist/)
 DATABASE_URL="postgresql:///data_designer" cargo run -p ob-poc-web
+
+# React development (hot reload)
+cd ob-poc-ui-react && npm run dev  # Runs on port 5173, proxies API to :3000
 ```
+
+---
+
+## React Frontend (ob-poc-ui-react)
+
+> **UI Migration:** The UI has been migrated from egui/WASM to React/TypeScript. The old `ob-poc-ui` and `esper_egui` crates are deprecated.
+
+### Architecture
+
+```
+ob-poc-ui-react/
+├── src/
+│   ├── api/              # API client (chat.ts, scope.ts)
+│   ├── features/
+│   │   ├── chat/         # Agent chat UI with scope panel
+│   │   ├── inspector/    # Projection inspector (tree + detail)
+│   │   └── settings/     # App settings
+│   ├── stores/           # Zustand state management
+│   ├── types/            # TypeScript types
+│   └── lib/              # Utilities, query client
+├── dist/                 # Production build (served by Rust)
+└── package.json
+```
+
+### Key Endpoints (Backend → React)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/session` | Create agent session |
+| `GET /api/session/:id` | Get session with messages |
+| `POST /api/session/:id/chat` | Send chat message |
+| `GET /api/session/:id/scope-graph` | Get loaded CBUs (scope) |
+| `GET /api/cbu/:id/graph` | Get single CBU's entity graph |
+| `GET /api/projections/:id` | Get Inspector projection |
+
+### Development
+
+```bash
+cd ob-poc-ui-react
+
+# Install dependencies
+npm install
+
+# Development server (hot reload, proxies to :3000)
+npm run dev
+
+# Production build
+npm run build
+
+# Type check
+npm run typecheck
+
+# Lint
+npm run lint
+```
+
+### Chat Page Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  [Sessions]  │  [Chat Messages]                    │  [Scope Panel] │
+│              │                                     │                │
+│  Session 1   │  User: load allianz book            │  Scope (100)   │
+│  Session 2   │  Agent: 100 CBUs in scope           │  ├─ Allianz A  │
+│  + New       │                                     │  ├─ Allianz B  │
+│              │  [Input: Type a message...]         │  └─ ...        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Scope Panel
+
+The right-side panel shows loaded CBUs and supports drill-down:
+- **CBU List**: Click any CBU to see its entities
+- **Entity View**: Shows entities within the CBU (persons, organizations)
+- **Auto-refresh**: Updates every 5 seconds to reflect DSL execution
 
 ---
 
@@ -272,7 +353,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | **Session & navigation** | `docs/session-visualization-architecture.md` | Scopes, filters, ESPER verbs, history |
 | **Data model (CBU/Entity/UBO)** | `docs/strategy-patterns.md` §1 | Why CBU is a lens, UBO discovery, holdings |
 | **Verb authoring** | `docs/verb-definition-spec.md` | YAML structure, valid values, common errors |
-| **egui/UI patterns** | `docs/strategy-patterns.md` §3 | Immediate mode, action enums, lock patterns |
+| **React frontend** | CLAUDE.md §React Frontend | Chat UI, scope panel, API endpoints |
 | **Entity model & schema** | `docs/entity-model-ascii.md` | Full ERD, table relationships |
 | **DSL pipeline** | `docs/dsl-verb-flow.md` | Parser, compiler, executor, plugins |
 | **Research workflows** | `docs/research-agent-annex.md` | GLEIF, agent mode, invocation phrases |
@@ -4199,20 +4280,28 @@ If `entity_linker` is not configured (no snapshot), `get_lookup_service()` retur
 
 ```
 ob-poc/
+├── ob-poc-ui-react/            # React/TypeScript frontend (PRIMARY UI)
+│   ├── src/
+│   │   ├── api/                # API client modules
+│   │   ├── features/           # Chat, Inspector, Settings
+│   │   ├── stores/             # Zustand state
+│   │   └── types/              # TypeScript types
+│   └── dist/                   # Production build (served by Rust)
 ├── rust/
 │   ├── config/verbs/           # 103 YAML verb definitions
 │   ├── crates/
-│   │   ├── esper_snapshot/     # SoA data layout, serialization
-│   │   ├── esper_core/         # Verb enum, DroneState, EffectSet
-│   │   ├── esper_input/        # Unified input handling
-│   │   ├── esper_policy/       # Access control, PolicyGuard
-│   │   ├── esper_egui/         # egui rendering layer
 │   │   ├── dsl-core/           # Parser, AST, compiler (no DB)
 │   │   ├── dsl-lsp/            # LSP server + Zed extension + tree-sitter grammar
 │   │   ├── ob-agentic/         # Onboarding pipeline (Intent→Plan→DSL)
 │   │   ├── ob-poc-macros/      # Proc macros (#[register_custom_op], #[derive(IdType)])
-│   │   ├── ob-poc-ui/          # egui/WASM UI
-│   │   └── ob-poc-graph/       # Graph visualization
+│   │   ├── ob-poc-graph/       # Graph data structures
+│   │   ├── ob-poc-web/         # Axum web server (serves React + API)
+│   │   ├── inspector-projection/ # Projection schema generation
+│   │   ├── esper_snapshot/     # SoA data layout (deprecated - for legacy)
+│   │   ├── esper_core/         # Navigation state (deprecated)
+│   │   ├── esper_input/        # Input handling (deprecated)
+│   │   ├── esper_policy/       # Access control (deprecated)
+│   │   └── esper_egui/         # egui rendering (deprecated)
 │   └── src/
 │       ├── dsl_v2/             # DSL execution
 │       │   ├── custom_ops/     # Plugin handlers
@@ -4288,7 +4377,7 @@ When you see these in a task, read the corresponding annex first:
 | Phrase | Read |
 |--------|------|
 | "add verb", "create verb", "verb YAML" | `docs/verb-definition-spec.md` |
-| "egui", "viewport", "immediate mode" | `docs/strategy-patterns.md` §3 |
+| "React", "frontend", "chat UI", "scope panel" | CLAUDE.md §React Frontend |
 | "entity model", "CBU", "UBO", "holdings" | `docs/strategy-patterns.md` §1 |
 | "agent", "MCP", "verb_search" | `docs/agent-architecture.md` |
 | "session", "scope", "navigation" | `docs/session-visualization-architecture.md` |

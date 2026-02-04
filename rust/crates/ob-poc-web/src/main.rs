@@ -1,6 +1,6 @@
 //! OB-POC Web Server
 //!
-//! Serves the egui-based UI via WASM and provides all API endpoints
+//! Serves the React frontend and provides all API endpoints
 //! for DSL generation, entity search, attributes, and DSL viewer.
 
 mod routes;
@@ -14,7 +14,7 @@ use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::{
     cors::{Any, CorsLayer},
-    services::ServeDir,
+    services::{ServeDir, ServeFile},
     set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
 };
@@ -414,6 +414,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
+    // React dist directory - serve assets from React build
+    let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
+        // Try to find React dist relative to the crate
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let candidates = [
+            format!("{}/../../ob-poc-ui-react/dist", manifest_dir),
+            format!("{}/../../../ob-poc-ui-react/dist", manifest_dir),
+        ];
+        for candidate in &candidates {
+            if std::path::Path::new(candidate).exists() {
+                return candidate.clone();
+            }
+        }
+        // Fallback to placeholder
+        format!("{}/static", manifest_dir)
+    });
+    tracing::info!("Serving React assets from: {}", react_dist_dir);
+
     // Build main app router with state
     // Session routes (including /bind) share session store via create_agent_router_with_semantic
     // Note: CBU routes (/api/cbu, /api/cbu/:id, /api/cbu/:id/graph) are provided by create_graph_router in api_router
@@ -422,7 +440,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/cbu/search", get(routes::api::search_cbus))
         // SSE streaming for agent chat
         .route("/api/chat/stream", get(routes::chat::chat_stream))
-        // Static files (JS, CSS, WASM) with no-cache headers for development
+        // React assets (JS, CSS bundles) - served from /assets/ path
+        .nest_service(
+            "/assets",
+            ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::overriding(
+                    CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=31536000, immutable"),
+                ))
+                .service(ServeDir::new(format!("{}/assets", react_dist_dir)).precompressed_gzip()),
+        )
+        // Legacy static files (kept for backwards compatibility)
         .nest_service(
             "/static",
             ServiceBuilder::new()
@@ -432,7 +460,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ))
                 .service(ServeDir::new(&static_dir).precompressed_gzip()),
         )
-        // Index.html at root (egui app)
+        // Vite favicon
+        .nest_service(
+            "/vite.svg",
+            ServeFile::new(format!("{}/vite.svg", react_dist_dir)),
+        )
+        // Index.html at root (React app)
         .route("/", get(routes::static_files::serve_index))
         // Add state
         .with_state(state)

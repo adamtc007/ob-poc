@@ -76,21 +76,21 @@ fn create_test_snapshot() -> EntitySnapshot {
         // Alias index (normalized name)
         alias_index
             .entry(row.canonical_name_norm.clone())
-            .or_insert_with(smallvec::SmallVec::new)
+            .or_default()
             .push(row.entity_id);
 
         // Token index
         for token in row.canonical_name_norm.split_whitespace() {
             token_index
                 .entry(token.to_string())
-                .or_insert_with(smallvec::SmallVec::new)
+                .or_default()
                 .push(row.entity_id);
         }
 
         // Kind index
         kind_index
             .entry(row.entity_kind.clone())
-            .or_insert_with(smallvec::SmallVec::new)
+            .or_default()
             .push(row.entity_id);
     }
 
@@ -210,7 +210,7 @@ fn test_resolve_multiple_mentions() {
 
     // Check we found entities (may be exact match or token overlap)
     assert!(
-        results.len() >= 1,
+        !results.is_empty(),
         "Should find at least one entity mention, got: {:?}",
         mention_texts
     );
@@ -462,7 +462,7 @@ mod database_tests {
             .expect("Should compile snapshot");
 
         // Verify basics
-        assert!(snapshot.entities.len() > 0, "Should have entities");
+        assert!(!snapshot.entities.is_empty(), "Should have entities");
         assert!(!snapshot.hash.is_empty(), "Should have hash");
 
         // Create service and test
