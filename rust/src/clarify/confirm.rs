@@ -105,56 +105,6 @@ pub fn validate_confirm_token(
     Ok(())
 }
 
-/// Check if a token is expired without validating against expected value.
-///
-/// Useful for UI timeout display.
-pub fn is_token_expired(token: &str, ttl: Option<Duration>) -> bool {
-    let Ok(token_bytes) = URL_SAFE_NO_PAD.decode(token) else {
-        return true;
-    };
-
-    if token_bytes.len() != RANDOM_BYTES_LEN + 8 {
-        return true;
-    }
-
-    let mut timestamp_bytes = [0u8; 8];
-    timestamp_bytes.copy_from_slice(&token_bytes[RANDOM_BYTES_LEN..]);
-    let token_timestamp = u64::from_le_bytes(timestamp_bytes);
-
-    let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) else {
-        return true;
-    };
-
-    let ttl_secs = ttl.map(|d| d.as_secs()).unwrap_or(DEFAULT_TOKEN_TTL_SECS);
-    now.as_secs().saturating_sub(token_timestamp) > ttl_secs
-}
-
-/// Get remaining TTL for a token in seconds.
-///
-/// Returns 0 if token is expired or invalid.
-pub fn token_remaining_secs(token: &str, ttl: Option<Duration>) -> u64 {
-    let Ok(token_bytes) = URL_SAFE_NO_PAD.decode(token) else {
-        return 0;
-    };
-
-    if token_bytes.len() != RANDOM_BYTES_LEN + 8 {
-        return 0;
-    }
-
-    let mut timestamp_bytes = [0u8; 8];
-    timestamp_bytes.copy_from_slice(&token_bytes[RANDOM_BYTES_LEN..]);
-    let token_timestamp = u64::from_le_bytes(timestamp_bytes);
-
-    let Ok(now) = SystemTime::now().duration_since(UNIX_EPOCH) else {
-        return 0;
-    };
-
-    let ttl_secs = ttl.map(|d| d.as_secs()).unwrap_or(DEFAULT_TOKEN_TTL_SECS);
-    let elapsed = now.as_secs().saturating_sub(token_timestamp);
-
-    ttl_secs.saturating_sub(elapsed)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,23 +149,6 @@ mod tests {
         sleep(Duration::from_secs(2));
         let result = validate_confirm_token(&token, &token, Some(Duration::from_secs(1)));
         assert!(matches!(result, Err(ConfirmTokenError::Expired)));
-    }
-
-    #[test]
-    fn test_is_token_expired() {
-        let token = generate_confirm_token().unwrap();
-        assert!(!is_token_expired(&token, None));
-        // Token timestamps have 1-second granularity
-        // Sleep and use short TTL to guarantee expiry
-        sleep(Duration::from_secs(2));
-        assert!(is_token_expired(&token, Some(Duration::from_secs(1))));
-    }
-
-    #[test]
-    fn test_token_remaining_secs() {
-        let token = generate_confirm_token().unwrap();
-        let remaining = token_remaining_secs(&token, Some(Duration::from_secs(30)));
-        assert!(remaining > 0 && remaining <= 30);
     }
 
     #[test]

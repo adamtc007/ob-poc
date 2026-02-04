@@ -4,8 +4,8 @@
 //! NO hallucination - never invent entities, counts, verbs, or effects.
 
 use ob_poc_types::{
-    ClarificationPayload, DecisionKind, DecisionPacket, EffectMode, GroupClarificationPayload,
-    ProposalPayload, RefusePayload, ScopePayload, VerbPayload,
+    ClarificationPayload, DecisionPacket, EffectMode, GroupClarificationPayload, ProposalPayload,
+    RefusePayload, ScopePayload, VerbPayload,
 };
 
 /// Render a DecisionPacket to user-facing markdown text.
@@ -87,12 +87,12 @@ pub fn render_group_clarification(
     _packet: &DecisionPacket,
     payload: &GroupClarificationPayload,
 ) -> String {
-    let mut lines = Vec::new();
-
-    lines.push("## Select Client Group".to_string());
-    lines.push(String::new());
-    lines.push("Multiple client groups match your input. Please select one:".to_string());
-    lines.push(String::new());
+    let mut lines = vec![
+        "## Select Client Group".to_string(),
+        String::new(),
+        "Multiple client groups match your input. Please select one:".to_string(),
+        String::new(),
+    ];
 
     for (i, option) in payload.options.iter().enumerate() {
         let key = (b'A' + i as u8) as char;
@@ -117,12 +117,12 @@ pub fn render_group_clarification(
 
 /// Render a Verb clarification (verb disambiguation)
 pub fn render_verb_clarification(_packet: &DecisionPacket, payload: &VerbPayload) -> String {
-    let mut lines = Vec::new();
-
-    lines.push("## Clarify Intent".to_string());
-    lines.push(String::new());
-    lines.push("Multiple operations match your request. Which did you mean?".to_string());
-    lines.push(String::new());
+    let mut lines = vec![
+        "## Clarify Intent".to_string(),
+        String::new(),
+        "Multiple operations match your request. Which did you mean?".to_string(),
+        String::new(),
+    ];
 
     if let Some(hint) = &payload.context_hint {
         lines.push(format!("_Context: {}_", hint));
@@ -152,12 +152,12 @@ pub fn render_verb_clarification(_packet: &DecisionPacket, payload: &VerbPayload
 
 /// Render a Scope clarification (scope/tier selection)
 pub fn render_scope_clarification(_packet: &DecisionPacket, payload: &ScopePayload) -> String {
-    let mut lines = Vec::new();
-
-    lines.push("## Select Scope".to_string());
-    lines.push(String::new());
-    lines.push("What scope should this apply to?".to_string());
-    lines.push(String::new());
+    let mut lines = vec![
+        "## Select Scope".to_string(),
+        String::new(),
+        "What scope should this apply to?".to_string(),
+        String::new(),
+    ];
 
     if let Some(hint) = &payload.context_hint {
         lines.push(format!("_Context: {}_", hint));
@@ -220,62 +220,12 @@ pub fn render_refuse(_packet: &DecisionPacket, payload: &RefusePayload) -> Strin
     lines.join("\n")
 }
 
-/// Render a compact single-line summary for status display
-pub fn render_compact_summary(packet: &DecisionPacket) -> String {
-    match &packet.kind {
-        DecisionKind::Proposal => {
-            if let ClarificationPayload::Proposal(p) = &packet.payload {
-                format!("Ready: {} [CONFIRM to execute]", truncate(&p.summary, 50))
-            } else {
-                "Ready to execute".to_string()
-            }
-        }
-        DecisionKind::ClarifyGroup => {
-            if let ClarificationPayload::Group(g) = &packet.payload {
-                format!("Select group: {} options", g.options.len())
-            } else {
-                "Select client group".to_string()
-            }
-        }
-        DecisionKind::ClarifyVerb => {
-            if let ClarificationPayload::Verb(v) = &packet.payload {
-                format!("Clarify intent: {} verbs match", v.options.len())
-            } else {
-                "Clarify intent".to_string()
-            }
-        }
-        DecisionKind::ClarifyScope => {
-            if let ClarificationPayload::Scope(s) = &packet.payload {
-                format!("Select scope: {} options", s.options.len())
-            } else {
-                "Select scope".to_string()
-            }
-        }
-        DecisionKind::Refuse => {
-            if let ClarificationPayload::Refuse(r) = &packet.payload {
-                format!("Cannot proceed: {}", truncate(&r.reason, 50))
-            } else {
-                "Cannot proceed".to_string()
-            }
-        }
-    }
-}
-
-/// Truncate string with ellipsis
-fn truncate(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len.saturating_sub(3)])
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use ob_poc_types::{
-        AffectedEntityPreview, DecisionTrace, EffectsPreview, GroupOption, ScopeOption,
-        ScopeSample, SessionStateView, UserChoice, VerbOption,
+        AffectedEntityPreview, DecisionKind, DecisionTrace, EffectsPreview, GroupOption,
+        SessionStateView, UserChoice, VerbOption,
     };
 
     fn make_proposal_packet() -> DecisionPacket {
@@ -446,20 +396,5 @@ mod tests {
         assert!(rendered.contains("Clarify Intent"));
         assert!(rendered.contains("session.load-galaxy"));
         assert!(rendered.contains("85%"));
-    }
-
-    #[test]
-    fn test_render_compact_summary() {
-        let packet = make_proposal_packet();
-        let summary = render_compact_summary(&packet);
-
-        assert!(summary.contains("Ready:"));
-        assert!(summary.contains("CONFIRM"));
-    }
-
-    #[test]
-    fn test_truncate() {
-        assert_eq!(truncate("short", 10), "short");
-        assert_eq!(truncate("this is a long string", 10), "this is...");
     }
 }

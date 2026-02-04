@@ -69,13 +69,11 @@ pub fn parse_user_reply(input: &str, packet: &DecisionPacket) -> Result<UserRepl
     let max_choices = packet.choices.len();
 
     // 1. Check for CONFIRM (only valid for Proposal packets)
-    if matches!(packet.kind, DecisionKind::Proposal) {
-        if is_confirm_phrase(&input_lower) {
-            if let Some(token) = &packet.confirm_token {
-                return Ok(UserReply::Confirm {
-                    token: token.clone(),
-                });
-            }
+    if matches!(packet.kind, DecisionKind::Proposal) && is_confirm_phrase(&input_lower) {
+        if let Some(token) = &packet.confirm_token {
+            return Ok(UserReply::Confirm {
+                token: token.clone(),
+            });
         }
     }
 
@@ -204,19 +202,6 @@ fn parse_number_selection(input: &str, max_choices: usize) -> Option<usize> {
     }
 
     None
-}
-
-/// Validate that a selection index is valid for the packet
-pub fn validate_selection(packet: &DecisionPacket, index: usize) -> Result<(), ParseError> {
-    if index >= packet.choices.len() {
-        return Err(ParseError::SelectionOutOfRange(index, packet.choices.len()));
-    }
-    Ok(())
-}
-
-/// Get the choice ID for a given index
-pub fn get_choice_id(packet: &DecisionPacket, index: usize) -> Option<&str> {
-    packet.choices.get(index).map(|c| c.id.as_str())
 }
 
 #[cfg(test)]

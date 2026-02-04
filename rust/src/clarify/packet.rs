@@ -5,9 +5,9 @@
 //! IntentTierRequest, etc.).
 
 use ob_poc_types::{
-    ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace, EffectMode, EffectsPreview,
-    GroupClarificationPayload, GroupOption, PlanPreview, ProposalPayload, RefusePayload,
-    ScopeOption, ScopePayload, SessionStateView, UserChoice, VerbOption, VerbPayload,
+    ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace, GroupClarificationPayload,
+    PlanPreview, ProposalPayload, RefusePayload, ScopePayload, SessionStateView, UserChoice,
+    VerbPayload,
 };
 use thiserror::Error;
 use uuid::Uuid;
@@ -351,132 +351,28 @@ fn letter_key(index: usize) -> String {
     letter.to_string()
 }
 
-// Convenience constructors for common patterns
-
-/// Helper to create a simple proposal
-pub fn build_proposal(
-    utterance: impl Into<String>,
-    dsl_source: impl Into<String>,
-    summary: impl Into<String>,
-) -> Result<DecisionPacket, PacketBuildError> {
-    DecisionPacketBuilder::new()
-        .utterance(utterance)
-        .proposal(ProposalPayload {
-            dsl_source: dsl_source.into(),
-            summary: summary.into(),
-            affected_entities: vec![],
-            effects: EffectsPreview {
-                mode: EffectMode::Write,
-                summary: "Will create/modify entities".to_string(),
-                affected_count: None,
-            },
-            warnings: vec![],
-        })
-        .build()
-}
-
-/// Helper to create a group clarification
-pub fn build_group_clarification(
-    utterance: impl Into<String>,
-    options: Vec<GroupOption>,
-) -> Result<DecisionPacket, PacketBuildError> {
-    DecisionPacketBuilder::new()
-        .utterance(utterance)
-        .clarify_group(GroupClarificationPayload { options })
-        .build()
-}
-
-/// Helper to create a verb clarification
-pub fn build_verb_clarification(
-    utterance: impl Into<String>,
-    options: Vec<VerbOption>,
-) -> Result<DecisionPacket, PacketBuildError> {
-    DecisionPacketBuilder::new()
-        .utterance(utterance)
-        .clarify_verb(VerbPayload {
-            options,
-            context_hint: None,
-        })
-        .build()
-}
-
-/// Helper to create a refuse packet
-pub fn build_refuse(
-    utterance: impl Into<String>,
-    reason: impl Into<String>,
-    suggestion: Option<String>,
-) -> Result<DecisionPacket, PacketBuildError> {
-    DecisionPacketBuilder::new()
-        .utterance(utterance)
-        .refuse(RefusePayload {
-            reason: reason.into(),
-            suggestion,
-        })
-        .build()
-}
-
-/// Convert existing VerbDisambiguationRequest to DecisionPacket
-#[cfg(feature = "database")]
-pub fn from_verb_disambiguation(
-    request: &ob_poc_types::VerbDisambiguationRequest,
-) -> Result<DecisionPacket, PacketBuildError> {
-    let options: Vec<VerbOption> = request
-        .options
-        .iter()
-        .map(|opt| VerbOption {
-            verb_fqn: opt.verb_fqn.clone(),
-            description: opt.description.clone(),
-            score: opt.score,
-            example: opt.example.clone(),
-            matched_phrase: None,
-            domain_label: None,
-            category_label: None,
-        })
-        .collect();
-
-    build_verb_clarification(&request.original_input, options)
-}
-
-/// Convert existing IntentTierRequest to DecisionPacket
-#[cfg(feature = "database")]
-pub fn from_intent_tier(
-    request: &ob_poc_types::IntentTierRequest,
-) -> Result<DecisionPacket, PacketBuildError> {
-    let options: Vec<ScopeOption> = request
-        .options
-        .iter()
-        .map(|opt| ScopeOption {
-            desc: opt.label.clone(),
-            method: "tier".to_string(),
-            score: 1.0, // Intent tiers don't have scores
-            expect_count: Some(opt.verb_count),
-            sample: vec![],
-            snapshot_id: None,
-        })
-        .collect();
-
-    DecisionPacketBuilder::new()
-        .utterance(&request.original_input)
-        .prompt(&request.prompt)
-        .clarify_scope(ScopePayload {
-            options,
-            context_hint: None,
-        })
-        .build()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ob_poc_types::{EffectMode, EffectsPreview, GroupOption};
 
     #[test]
     fn test_build_proposal() {
-        let packet = build_proposal(
-            "create a fund",
-            "(cbu.create :name \"Test\")",
-            "Create a new CBU named Test",
-        )
-        .unwrap();
+        let packet = DecisionPacketBuilder::new()
+            .utterance("create a fund")
+            .proposal(ProposalPayload {
+                dsl_source: "(cbu.create :name \"Test\")".to_string(),
+                summary: "Create a new CBU named Test".to_string(),
+                affected_entities: vec![],
+                effects: EffectsPreview {
+                    mode: EffectMode::Write,
+                    summary: "Will create/modify entities".to_string(),
+                    affected_count: None,
+                },
+                warnings: vec![],
+            })
+            .build()
+            .unwrap();
 
         assert!(matches!(packet.kind, DecisionKind::Proposal));
         assert!(packet.confirm_token.is_some());
@@ -487,24 +383,26 @@ mod tests {
 
     #[test]
     fn test_build_group_clarification() {
-        let packet = build_group_clarification(
-            "load allianz",
-            vec![
-                GroupOption {
-                    id: Uuid::new_v4().to_string(),
-                    alias: "Allianz Global Investors".to_string(),
-                    score: 0.95,
-                    method: "alias".to_string(),
-                },
-                GroupOption {
-                    id: Uuid::new_v4().to_string(),
-                    alias: "Allianz SE".to_string(),
-                    score: 0.85,
-                    method: "alias".to_string(),
-                },
-            ],
-        )
-        .unwrap();
+        let packet = DecisionPacketBuilder::new()
+            .utterance("load allianz")
+            .clarify_group(GroupClarificationPayload {
+                options: vec![
+                    GroupOption {
+                        id: Uuid::new_v4().to_string(),
+                        alias: "Allianz Global Investors".to_string(),
+                        score: 0.95,
+                        method: "alias".to_string(),
+                    },
+                    GroupOption {
+                        id: Uuid::new_v4().to_string(),
+                        alias: "Allianz SE".to_string(),
+                        score: 0.85,
+                        method: "alias".to_string(),
+                    },
+                ],
+            })
+            .build()
+            .unwrap();
 
         assert!(matches!(packet.kind, DecisionKind::ClarifyGroup));
         assert!(packet.confirm_token.is_none());
@@ -516,12 +414,14 @@ mod tests {
 
     #[test]
     fn test_build_refuse() {
-        let packet = build_refuse(
-            "delete everything",
-            "Bulk delete is not allowed",
-            Some("Try deleting items individually".to_string()),
-        )
-        .unwrap();
+        let packet = DecisionPacketBuilder::new()
+            .utterance("delete everything")
+            .refuse(RefusePayload {
+                reason: "Bulk delete is not allowed".to_string(),
+                suggestion: Some("Try deleting items individually".to_string()),
+            })
+            .build()
+            .unwrap();
 
         assert!(matches!(packet.kind, DecisionKind::Refuse));
         assert!(packet.confirm_token.is_none());
