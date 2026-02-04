@@ -1212,6 +1212,11 @@ fn create_agent_router_with_state(state: AgentState) -> Router {
             "/api/session/:id/abandon-disambiguation",
             post(abandon_disambiguation),
         )
+        // Unified decision reply (NEW - handles all clarification responses)
+        .route(
+            "/api/session/:id/decision/reply",
+            post(handle_decision_reply),
+        )
         .with_state(state)
 }
 
@@ -7679,6 +7684,186 @@ fn extract_simple_args(
     }
 
     args
+}
+
+// ============================================================================
+// Decision Reply Handler (Unified Clarification UX)
+// ============================================================================
+
+/// POST /api/session/:id/decision/reply
+///
+/// Unified endpoint for all decision packet responses.
+/// Handles: Select (A/B/C), Confirm (token), Type (free text), Narrow (filter), Cancel
+///
+/// This is the NEW unified path that will eventually replace:
+/// - /api/session/:id/select-verb
+/// - /api/session/:id/abandon-disambiguation
+/// - /api/session/:id/select-intent-tier
+async fn handle_decision_reply(
+    State(state): State<AgentState>,
+    Path(session_id): Path<Uuid>,
+    Json(req): Json<ob_poc_types::DecisionReplyRequest>,
+) -> Result<Json<ob_poc_types::DecisionReplyResponse>, StatusCode> {
+    use crate::clarify::{validate_confirm_token, ConfirmTokenError};
+    use ob_poc_types::{DecisionKind, DecisionReplyResponse, UserReply};
+
+    tracing::info!(
+        session_id = %session_id,
+        packet_id = %req.packet_id,
+        "Handling decision reply"
+    );
+
+    // Get session
+    let mut sessions = state.sessions.write().await;
+    let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
+
+    // Take the pending decision packet (moves ownership to avoid borrow issues)
+    let packet = session.pending_decision.take().ok_or_else(|| {
+        tracing::warn!(session_id = %session_id, "No pending decision");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    // Verify packet_id matches
+    if packet.packet_id != req.packet_id {
+        tracing::warn!(
+            expected = %packet.packet_id,
+            received = %req.packet_id,
+            "Packet ID mismatch"
+        );
+        // Put it back since we're rejecting
+        session.pending_decision = Some(packet);
+        return Err(StatusCode::CONFLICT);
+    }
+
+    // Handle based on reply type (using ob_poc_types::UserReply)
+    let response = match &req.reply {
+        UserReply::Select { index } => {
+            // User selected an option (A/B/C)
+            let choice = packet.choices.get(*index).ok_or_else(|| {
+                tracing::warn!(
+                    index = index,
+                    max = packet.choices.len(),
+                    "Invalid selection"
+                );
+                StatusCode::BAD_REQUEST
+            })?;
+
+            tracing::info!(
+                choice_id = %choice.id,
+                choice_label = %choice.label,
+                "User selected option"
+            );
+
+            // Route based on decision kind
+            let message = match &packet.kind {
+                DecisionKind::ClarifyVerb => {
+                    format!("Selected verb option: {}", choice.label)
+                }
+                DecisionKind::ClarifyGroup => {
+                    format!("Selected group: {}", choice.label)
+                }
+                DecisionKind::ClarifyScope => {
+                    format!("Selected scope: {}", choice.label)
+                }
+                _ => format!("Selected: {}", choice.label),
+            };
+
+            DecisionReplyResponse {
+                next_packet: None,
+                execution_result: None,
+                message,
+                complete: true,
+            }
+        }
+
+        UserReply::Confirm { token } => {
+            // User confirmed execution
+            if let Some(expected_token) = packet.confirm_token.as_ref() {
+                // Validate token if provided
+                if let Some(user_token) = token {
+                    validate_confirm_token(user_token, expected_token, None).map_err(|e| {
+                        match e {
+                            ConfirmTokenError::Expired => {
+                                tracing::warn!("Confirm token expired");
+                                StatusCode::GONE // 410 Gone - token expired
+                            }
+                            ConfirmTokenError::Mismatch => {
+                                tracing::warn!("Confirm token mismatch");
+                                StatusCode::UNAUTHORIZED
+                            }
+                            _ => StatusCode::BAD_REQUEST,
+                        }
+                    })?;
+                }
+            }
+
+            tracing::info!("Execution confirmed");
+
+            // Packet already taken at start of handler
+            // TODO: Execute the DSL and return result
+            DecisionReplyResponse {
+                next_packet: None,
+                execution_result: None,
+                message: "Execution confirmed".to_string(),
+                complete: true,
+            }
+        }
+
+        UserReply::TypeExact { text } => {
+            // User typed exact text - treat as new input
+            tracing::info!(text = %text, "User typed exact text");
+
+            // Packet already taken at start of handler
+            DecisionReplyResponse {
+                next_packet: None,
+                execution_result: None,
+                message: format!("Processing: {}", text),
+                complete: true,
+            }
+        }
+
+        UserReply::Narrow { term } => {
+            // User wants to narrow/filter
+            tracing::info!(term = %term, "User wants to narrow search");
+
+            // Put packet back since we're continuing the flow
+            // (Could filter options here and return modified packet)
+            DecisionReplyResponse {
+                next_packet: Some(Box::new(packet.clone())),
+                execution_result: None,
+                message: format!("Narrowing by: {}", term),
+                complete: false,
+            }
+        }
+
+        UserReply::More { kind } => {
+            // User wants more options
+            tracing::info!(kind = ?kind, "User wants more options");
+
+            // Put packet back since we're continuing the flow
+            DecisionReplyResponse {
+                next_packet: Some(Box::new(packet.clone())),
+                execution_result: None,
+                message: "Showing more options".to_string(),
+                complete: false,
+            }
+        }
+
+        UserReply::Cancel => {
+            // User cancelled
+            tracing::info!("User cancelled decision");
+
+            // Packet already taken at start of handler
+            DecisionReplyResponse {
+                next_packet: None,
+                execution_result: None,
+                message: "Cancelled".to_string(),
+                complete: true,
+            }
+        }
+    };
+
+    Ok(Json(response))
 }
 
 #[cfg(test)]

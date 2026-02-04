@@ -739,6 +739,27 @@ pub async fn abandon_verb_disambiguation(
 }
 
 // =============================================================================
+// Decision Reply API (Unified Clarification)
+// =============================================================================
+
+/// Send a reply to a decision packet
+///
+/// Called when user responds to a DecisionPacket (select, confirm, type, narrow, cancel).
+/// Returns the next packet (if any) or execution result.
+pub async fn send_decision_reply(
+    session_id: Uuid,
+    packet_id: String,
+    reply: ob_poc_types::UserReply,
+) -> Result<ob_poc_types::DecisionReplyResponse, String> {
+    let request = ob_poc_types::DecisionReplyRequest { packet_id, reply };
+    post(
+        &format!("/api/session/{}/decision/reply", session_id),
+        &request,
+    )
+    .await
+}
+
+// =============================================================================
 // Taxonomy Navigation API
 // =============================================================================
 

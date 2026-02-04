@@ -140,6 +140,9 @@ pub mod document_bundles;
 #[cfg(feature = "database")]
 pub mod placeholder;
 
+// Clarify module - Unified DecisionPacket-based clarification UX
+pub mod clarify;
+
 // Database integration re-exports (when database feature is enabled)
 #[cfg(feature = "database")]
 pub use database::DictionaryDatabaseService;

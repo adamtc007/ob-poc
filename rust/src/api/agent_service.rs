@@ -279,6 +279,12 @@ pub struct AgentChatResponse {
     /// User selection triggers POST /api/session/:id/select-intent-tier
     #[serde(skip_serializing_if = "Option::is_none")]
     pub intent_tier: Option<ob_poc_types::IntentTierRequest>,
+    /// Unified decision packet (NEW - wraps all clarification types)
+    /// When present, UI should render a decision card with choices
+    /// User selection triggers POST /api/session/:id/decision/reply
+    /// This will eventually replace verb_disambiguation and intent_tier
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub decision: Option<ob_poc_types::DecisionPacket>,
 }
 
 // Re-export AgentCommand from ob_poc_types as the single source of truth
@@ -1115,6 +1121,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                         dsl_hash: None,
                         verb_disambiguation: None,
                         intent_tier: None,
+                        decision: None,
                     });
                 }
             }
@@ -1567,6 +1574,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                                     dsl_hash: None,
                                     verb_disambiguation: None,
                                     intent_tier: None,
+                                    decision: None,
                                 });
                             }
                         }
@@ -1638,6 +1646,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     dsl_hash: None,
                     verb_disambiguation: None,
                     intent_tier: None,
+                    decision: None,
                 })
             }
             Err(e) => {
@@ -1789,6 +1798,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: None,
+            decision: None,
         }
     }
 
@@ -1808,6 +1818,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: None,
+            decision: None,
         }
     }
 
@@ -1829,6 +1840,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: None,
+            decision: None,
         }
     }
 
@@ -1950,6 +1962,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: Some(disambiguation_request),
             intent_tier: None,
+            decision: None,
         }
     }
 
@@ -2026,6 +2039,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash: None,
             verb_disambiguation: None,
             intent_tier: Some(tier_request),
+            decision: None,
         }
     }
 
@@ -2237,6 +2251,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     dsl_hash: None,
                     verb_disambiguation: None,
                     intent_tier: None,
+                    decision: None,
                 });
             } else {
                 return Some(AgentChatResponse {
@@ -2254,6 +2269,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                     dsl_hash: None,
                     verb_disambiguation: None,
                     intent_tier: None,
+                    decision: None,
                 });
             }
         }
@@ -2275,6 +2291,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 dsl_hash: None,
                 verb_disambiguation: None,
                 intent_tier: None,
+                decision: None,
             });
         }
 
@@ -2295,6 +2312,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 dsl_hash: None,
                 verb_disambiguation: None,
                 intent_tier: None,
+                decision: None,
             });
         }
 
@@ -2738,6 +2756,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             dsl_hash,
             verb_disambiguation: None,
             intent_tier: None,
+            decision: None,
         })
     }
 

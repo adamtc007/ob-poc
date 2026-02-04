@@ -190,6 +190,10 @@ pub struct AppState {
     /// Macro expansion wizard UI state (for partial macro invocations)
     pub macro_expansion_ui: MacroExpansionState,
 
+    /// Unified decision UI state (wraps verb disambiguation, intent tier, proposal confirm)
+    /// Check this FIRST, then fall back to legacy states
+    pub decision_ui: DecisionState,
+
     /// Container browse panel state (slide-in panel for browsing container contents)
     pub container_browse: ContainerBrowseState,
 
@@ -299,6 +303,7 @@ impl Default for AppState {
             verb_disambiguation_ui: VerbDisambiguationState::default(),
             intent_tier_ui: IntentTierState::default(),
             macro_expansion_ui: MacroExpansionState::default(),
+            decision_ui: DecisionState::default(),
             container_browse: ContainerBrowseState::default(),
             token_registry: TokenRegistry::load_defaults().unwrap_or_else(|e| {
                 web_sys::console::warn_1(
@@ -794,6 +799,66 @@ impl IntentTierState {
         self.active = true;
         self.request = Some(request);
         self.original_input = original_input;
+        self.shown_at = Some(current_time);
+        self.loading = false;
+    }
+}
+
+// =============================================================================
+// UNIFIED DECISION STATE (NEW - wraps all clarification UI)
+// =============================================================================
+
+/// Unified decision state for all clarification types
+///
+/// This is the NEW unified state that will eventually replace:
+/// - VerbDisambiguationState
+/// - IntentTierState
+///
+/// The UI should check this FIRST, then fall back to the legacy states.
+#[derive(Clone, Debug, Default)]
+pub struct DecisionState {
+    /// Whether a decision is currently pending
+    pub active: bool,
+    /// The decision packet from the server
+    pub packet: Option<ob_poc_types::DecisionPacket>,
+    /// When the decision was shown (for timeout handling)
+    pub shown_at: Option<f64>,
+    /// Loading flag while processing user response
+    pub loading: bool,
+}
+
+impl DecisionState {
+    /// Check if decision has timed out (30 seconds)
+    pub fn is_timed_out(&self, current_time: f64) -> bool {
+        const TIMEOUT_SECS: f64 = 30.0;
+        if let Some(shown_at) = self.shown_at {
+            (current_time - shown_at) > TIMEOUT_SECS
+        } else {
+            false
+        }
+    }
+
+    /// Get remaining time until timeout (for countdown display)
+    pub fn remaining_secs(&self, current_time: f64) -> Option<f64> {
+        const TIMEOUT_SECS: f64 = 30.0;
+        self.shown_at.map(|shown_at| {
+            let elapsed = current_time - shown_at;
+            (TIMEOUT_SECS - elapsed).max(0.0)
+        })
+    }
+
+    /// Clear the decision state
+    pub fn clear(&mut self) {
+        self.active = false;
+        self.packet = None;
+        self.shown_at = None;
+        self.loading = false;
+    }
+
+    /// Set decision from server response
+    pub fn set_from_response(&mut self, packet: ob_poc_types::DecisionPacket, current_time: f64) {
+        self.active = true;
+        self.packet = Some(packet);
         self.shown_at = Some(current_time);
         self.loading = false;
     }

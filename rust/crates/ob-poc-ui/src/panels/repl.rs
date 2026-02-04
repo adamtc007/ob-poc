@@ -13,8 +13,9 @@ use crate::panels::macro_wizard::{macro_wizard_modal, MacroWizardAction};
 use crate::state::{AppState, ChatMessage, MessageRole};
 use egui::{Color32, RichText, ScrollArea, TextEdit, Ui};
 use ob_poc_types::{
-    EntityMatchResponse, ResolutionStateResponse, ResolvedRefResponse, ReviewRequirement, RunSheet,
-    RunSheetEntry, UnresolvedRefResponse, VerbOption,
+    DecisionKind, DecisionPacket, EntityMatchResponse, ResolutionStateResponse,
+    ResolvedRefResponse, ReviewRequirement, RunSheet, RunSheetEntry, UnresolvedRefResponse,
+    UserChoice, VerbOption,
 };
 
 /// Action returned from verb disambiguation card
@@ -35,6 +36,23 @@ pub enum IntentTierAction {
     Cancel,
 }
 
+/// Action returned from unified decision card
+#[derive(Debug, Clone)]
+pub enum DecisionAction {
+    /// User selected a choice by index
+    Select { index: usize },
+    /// User confirmed a proposal (with token if required)
+    Confirm { token: Option<String> },
+    /// User typed exact text
+    TypeExact { text: String },
+    /// User wants to narrow search
+    Narrow { term: String },
+    /// User wants more options
+    More,
+    /// User cancelled
+    Cancel,
+}
+
 /// Combined action enum for all REPL panel actions
 #[derive(Debug, Clone)]
 pub enum ReplAction {
@@ -44,6 +62,8 @@ pub enum ReplAction {
     IntentTier(IntentTierAction),
     /// Macro wizard action
     MacroWizard(MacroWizardAction),
+    /// Unified decision action (new)
+    Decision(DecisionAction),
 }
 
 /// Main REPL panel - combines chat, resolution, and DSL
@@ -66,9 +86,19 @@ pub fn repl_panel(ui: &mut Ui, state: &mut AppState) -> Option<ReplAction> {
                 // Chat history
                 render_chat_history(ui, state);
 
+                // Unified decision card (NEW - takes priority over legacy cards)
+                // When active, this replaces verb_disambiguation_ui and intent_tier_ui
+                if state.decision_ui.active {
+                    ui.add_space(8.0);
+                    if let Some(a) = render_decision_card(ui, state) {
+                        action = Some(ReplAction::Decision(a));
+                    }
+                }
+
                 // Intent tier card (when candidates span multiple intents)
                 // This is shown BEFORE verb disambiguation to reduce cognitive load
-                if state.intent_tier_ui.active {
+                // LEGACY: Will be replaced by decision_ui
+                if state.intent_tier_ui.active && !state.decision_ui.active {
                     ui.add_space(8.0);
                     if let Some(a) = render_intent_tier_card(ui, state) {
                         action = Some(ReplAction::IntentTier(a));
@@ -77,7 +107,8 @@ pub fn repl_panel(ui: &mut Ui, state: &mut AppState) -> Option<ReplAction> {
 
                 // Verb disambiguation card (when multiple verbs match user input)
                 // This is higher priority than entity resolution - happens earlier in pipeline
-                if state.verb_disambiguation_ui.active {
+                // LEGACY: Will be replaced by decision_ui
+                if state.verb_disambiguation_ui.active && !state.decision_ui.active {
                     ui.add_space(8.0);
                     if let Some(a) = render_verb_disambiguation_card(ui, state) {
                         action = Some(ReplAction::VerbDisambiguation(a));
@@ -189,6 +220,277 @@ fn render_message(ui: &mut Ui, msg: &ChatMessage) {
 
             ui.label(RichText::new(&msg.content).size(24.0).color(Color32::WHITE));
         });
+}
+
+// =============================================================================
+// UNIFIED DECISION CARD (NEW)
+// =============================================================================
+
+/// Render unified decision card for all clarification types
+///
+/// Border colors by DecisionKind:
+/// - Proposal: green (ready to confirm)
+/// - ClarifyVerb/ClarifyScope/ClarifyGroup: blue (clarification needed)
+/// - Refuse: red (cannot proceed)
+fn render_decision_card(ui: &mut Ui, state: &AppState) -> Option<DecisionAction> {
+    let mut action = None;
+
+    let packet = state.decision_ui.packet.as_ref()?;
+    let is_loading = state.decision_ui.loading;
+
+    // Determine border color based on DecisionKind
+    let (border_color, header_icon) = match packet.kind {
+        DecisionKind::Proposal => (Color32::from_rgb(80, 180, 100), "✓"), // Green
+        DecisionKind::ClarifyVerb | DecisionKind::ClarifyScope | DecisionKind::ClarifyGroup => {
+            (Color32::from_rgb(80, 130, 180), "?") // Blue
+        }
+        DecisionKind::Refuse => (Color32::from_rgb(180, 80, 80), "✗"), // Red
+    };
+
+    // Card frame
+    egui::Frame::default()
+        .fill(Color32::from_rgb(40, 45, 50))
+        .stroke(egui::Stroke::new(2.0, border_color))
+        .inner_margin(12.0)
+        .rounding(8.0)
+        .show(ui, |ui| {
+            // Header
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(header_icon).size(18.0).color(border_color));
+                ui.label(RichText::new(&packet.prompt).strong().color(Color32::WHITE));
+
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Show original user utterance
+                    ui.label(
+                        RichText::new(format!("\"{}\"", packet.utterance))
+                            .small()
+                            .color(Color32::LIGHT_GRAY)
+                            .italics(),
+                    );
+                });
+            });
+
+            ui.add_space(8.0);
+
+            // Trace info (collapsible for debugging)
+            // Show config version for audit trail
+            ui.collapsing(
+                RichText::new("Trace").small().color(Color32::DARK_GRAY),
+                |ui| {
+                    ui.label(
+                        RichText::new(format!("Config: {}", packet.trace.config_version))
+                            .small()
+                            .color(Color32::DARK_GRAY),
+                    );
+                    if let Some(ref hash) = packet.trace.entity_snapshot_hash {
+                        ui.label(
+                            RichText::new(format!("Entity snapshot: {}", hash))
+                                .small()
+                                .color(Color32::DARK_GRAY),
+                        );
+                    }
+                },
+            );
+
+            ui.add_space(8.0);
+
+            // Choices
+            if is_loading {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(RichText::new("Processing...").color(Color32::LIGHT_GRAY));
+                });
+            } else {
+                // Render choices based on kind
+                match packet.kind {
+                    DecisionKind::Proposal => {
+                        // Show proposal with CONFIRM button
+                        render_proposal_choices(ui, packet, &mut action);
+                    }
+                    DecisionKind::Refuse => {
+                        // Show refusal message with suggestions
+                        render_refuse_content(ui, packet);
+                    }
+                    _ => {
+                        // Show selectable choices (verb, scope, group)
+                        render_selectable_choices(ui, packet, &mut action);
+                    }
+                }
+            }
+
+            ui.add_space(8.0);
+
+            // Footer: Cancel button + timeout
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    // Cancel button (not for Refuse - just dismiss)
+                    let cancel_label = if matches!(packet.kind, DecisionKind::Refuse) {
+                        "Dismiss"
+                    } else {
+                        "Cancel"
+                    };
+                    if ui
+                        .add_enabled(!is_loading, egui::Button::new(cancel_label))
+                        .clicked()
+                    {
+                        action = Some(DecisionAction::Cancel);
+                    }
+
+                    // Timeout indicator
+                    if let Some(remaining) = state.decision_ui.remaining_secs(get_current_time()) {
+                        let remaining_int = remaining as i32;
+                        if remaining_int > 0 && remaining_int <= 10 {
+                            ui.label(
+                                RichText::new(format!("{}s", remaining_int))
+                                    .small()
+                                    .color(Color32::from_rgb(220, 80, 80)),
+                            );
+                        }
+                    }
+                });
+            });
+        });
+
+    action
+}
+
+/// Render proposal choices (CONFIRM button + optional preview)
+fn render_proposal_choices(
+    ui: &mut Ui,
+    packet: &DecisionPacket,
+    action: &mut Option<DecisionAction>,
+) {
+    // Show what will be executed (if available in choices)
+    for choice in &packet.choices {
+        if choice.id != "confirm" {
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new(&choice.label)
+                        .small()
+                        .color(Color32::LIGHT_GRAY),
+                );
+            });
+        }
+    }
+
+    ui.add_space(8.0);
+
+    // Big CONFIRM button
+    let confirm_btn = egui::Button::new(RichText::new("CONFIRM").strong().color(Color32::WHITE))
+        .fill(Color32::from_rgb(60, 140, 80))
+        .min_size(egui::vec2(120.0, 36.0));
+
+    if ui.add(confirm_btn).clicked() {
+        *action = Some(DecisionAction::Confirm {
+            token: packet.confirm_token.clone(),
+        });
+    }
+}
+
+/// Render refusal content (error message + suggestions)
+fn render_refuse_content(ui: &mut Ui, packet: &DecisionPacket) {
+    // Show choices as suggestions
+    if !packet.choices.is_empty() {
+        ui.label(
+            RichText::new("Suggestions:")
+                .small()
+                .color(Color32::LIGHT_GRAY),
+        );
+        for choice in &packet.choices {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new("•").color(Color32::GRAY));
+                ui.label(
+                    RichText::new(&choice.label)
+                        .small()
+                        .color(Color32::LIGHT_GRAY),
+                );
+            });
+        }
+    }
+}
+
+/// Render selectable choices (A/B/C style buttons)
+fn render_selectable_choices(
+    ui: &mut Ui,
+    packet: &DecisionPacket,
+    action: &mut Option<DecisionAction>,
+) {
+    for (index, choice) in packet.choices.iter().enumerate() {
+        if let Some(a) = render_choice_button(ui, index, choice) {
+            *action = Some(a);
+        }
+        ui.add_space(4.0);
+    }
+}
+
+/// Render a single choice as a clickable button
+fn render_choice_button(ui: &mut Ui, index: usize, choice: &UserChoice) -> Option<DecisionAction> {
+    let mut action = None;
+
+    // Letter label (A, B, C, ...)
+    let letter = (b'A' + index as u8) as char;
+
+    // Button frame
+    let response = egui::Frame::default()
+        .fill(Color32::from_rgb(50, 55, 65))
+        .inner_margin(10.0)
+        .rounding(6.0)
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                // Letter badge
+                ui.label(
+                    RichText::new(format!("[{}]", letter))
+                        .strong()
+                        .color(Color32::from_rgb(100, 180, 255)),
+                );
+
+                // Main content
+                ui.vertical(|ui| {
+                    // Label (main text)
+                    ui.label(RichText::new(&choice.label).strong().color(Color32::WHITE));
+
+                    // Description (if not empty)
+                    if !choice.description.is_empty() {
+                        ui.label(
+                            RichText::new(&choice.description)
+                                .small()
+                                .color(Color32::LIGHT_GRAY),
+                        );
+                    }
+                });
+            });
+        })
+        .response;
+
+    // Make the whole frame clickable
+    if response.interact(egui::Sense::click()).clicked() {
+        action = Some(DecisionAction::Select { index });
+    }
+
+    // Hover effect
+    if response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+
+    action
+}
+
+/// Get current time in seconds (helper for timeout calculation)
+fn get_current_time() -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        web_sys::window()
+            .and_then(|w| w.performance())
+            .map(|p| p.now() / 1000.0)
+            .unwrap_or(0.0)
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0)
+    }
 }
 
 // =============================================================================

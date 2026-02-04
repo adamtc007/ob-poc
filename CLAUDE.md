@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-03
+> **Last reviewed:** 2026-02-04
 > **Crates:** 22 Rust crates (includes ob-poc-macros + 5 esper_* crates)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 73 schema migrations
@@ -34,6 +34,7 @@
 > **Unified Lookup Service (074):** ✅ Complete - Verb-first dual search combining verb discovery + entity linking
 > **Lexicon Service (072):** ✅ Complete - In-memory verb/domain/concept lookup with bincode snapshots
 > **Entity Linking Service (073):** ✅ Complete - In-memory entity resolution with mention extraction, token overlap matching
+> **Clarification UX Wiring (075):** ✅ Complete - Unified DecisionPacket system for verb/scope/group disambiguation with confirm tokens
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 

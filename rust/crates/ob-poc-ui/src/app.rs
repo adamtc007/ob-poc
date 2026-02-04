@@ -11,7 +11,7 @@ use crate::panels::{
     dsl_editor_panel, entity_detail_panel, investor_register_panel, repl_panel, resolution_modal,
     results_panel, service_taxonomy_panel, taxonomy_panel, toolbar, trading_matrix_panel,
     CbuSearchAction, CbuSearchData, ContainerBrowseAction, ContainerBrowseData, ContextPanelAction,
-    DslEditorAction, EntityMatchDisplay, IntentTierAction, InvestorRegisterAction,
+    DecisionAction, DslEditorAction, EntityMatchDisplay, IntentTierAction, InvestorRegisterAction,
     MacroWizardAction, ReplAction, ResolutionPanelAction, ResolutionPanelData,
     ServiceTaxonomyPanelAction, TaxonomyPanelAction, ToolbarAction, ToolbarData,
     TradingMatrixPanelAction, VerbDisambiguationAction,
@@ -184,6 +184,7 @@ impl App {
             verb_disambiguation_ui: crate::state::VerbDisambiguationState::default(),
             intent_tier_ui: crate::state::IntentTierState::default(),
             macro_expansion_ui: crate::state::MacroExpansionState::default(),
+            decision_ui: crate::state::DecisionState::default(),
         };
 
         // Try to restore session from localStorage
@@ -3289,6 +3290,106 @@ impl App {
         }
     }
 
+    /// Handle unified decision card actions
+    fn handle_decision_action(&mut self, action: DecisionAction) {
+        match action {
+            DecisionAction::Select { index } => {
+                web_sys::console::log_1(&format!("Decision: Select index {}", index).into());
+                self.send_decision_reply(ob_poc_types::UserReply::Select { index });
+            }
+            DecisionAction::Confirm { token } => {
+                web_sys::console::log_1(&format!("Decision: Confirm token={:?}", token).into());
+                self.send_decision_reply(ob_poc_types::UserReply::Confirm { token });
+            }
+            DecisionAction::TypeExact { text } => {
+                web_sys::console::log_1(&format!("Decision: TypeExact '{}'", text).into());
+                self.send_decision_reply(ob_poc_types::UserReply::TypeExact { text });
+            }
+            DecisionAction::Narrow { term } => {
+                web_sys::console::log_1(&format!("Decision: Narrow '{}'", term).into());
+                self.send_decision_reply(ob_poc_types::UserReply::Narrow { term });
+            }
+            DecisionAction::More => {
+                web_sys::console::log_1(&"Decision: More".into());
+                self.send_decision_reply(ob_poc_types::UserReply::More { kind: None });
+            }
+            DecisionAction::Cancel => {
+                web_sys::console::log_1(&"Decision: Cancel".into());
+                self.send_decision_reply(ob_poc_types::UserReply::Cancel);
+            }
+        }
+    }
+
+    /// Send decision reply to backend and handle response
+    fn send_decision_reply(&mut self, reply: ob_poc_types::UserReply) {
+        let Some(session_id) = self.state.session_id else {
+            web_sys::console::error_1(&"No session ID for decision reply".into());
+            return;
+        };
+
+        let Some(ref packet) = self.state.decision_ui.packet else {
+            web_sys::console::error_1(&"No decision packet to reply to".into());
+            return;
+        };
+
+        let packet_id = packet.packet_id.clone();
+
+        // Set loading state
+        self.state.decision_ui.loading = true;
+
+        let async_state = self.state.async_state.clone();
+        let ctx = self.state.ctx.clone();
+
+        spawn_local(async move {
+            let result =
+                api::send_decision_reply(session_id, packet_id.clone(), reply.clone()).await;
+
+            match result {
+                Ok(response) => {
+                    if let Ok(mut state) = async_state.lock() {
+                        // Clear decision UI loading
+                        // Note: We handle the response in process_async_results
+                        // For now, just mark loading as false
+
+                        // If response has next_packet, we'll need to show it
+                        // If response.complete is true, clear the decision state
+                        if response.complete {
+                            // Will be processed by next frame
+                            state.pending_session_refetch = true;
+                        }
+                        // TODO: Add pending_decision_response field to AsyncState
+                        // For now, log the result
+                        web_sys::console::log_1(
+                            &format!(
+                                "Decision reply response: complete={}, has_next={}, has_result={}",
+                                response.complete,
+                                response.next_packet.is_some(),
+                                response.execution_result.is_some()
+                            )
+                            .into(),
+                        );
+                    }
+                }
+                Err(e) => {
+                    web_sys::console::error_1(&format!("Decision reply failed: {}", e).into());
+                    if let Ok(mut state) = async_state.lock() {
+                        state.last_error = Some(format!("Decision reply failed: {}", e));
+                    }
+                }
+            }
+
+            // Request repaint
+            if let Some(ctx) = ctx {
+                ctx.request_repaint();
+            }
+        });
+
+        // Clear the decision UI after sending (optimistic)
+        // The response will set up the next state
+        self.state.decision_ui.loading = false;
+        self.state.decision_ui.clear();
+    }
+
     /// Render simplified layout:
     /// - Top 90%: Single viewport (graph widget)
     /// - Bottom 10%: Split - Chat (left 50%) + Session/REPL (right 50%)
@@ -3814,6 +3915,9 @@ impl App {
                     },
                     ReplAction::MacroWizard(wizard_action) => {
                         self.handle_macro_wizard_action(wizard_action);
+                    }
+                    ReplAction::Decision(decision_action) => {
+                        self.handle_decision_action(decision_action);
                     }
                 }
             }

@@ -59,6 +59,13 @@ pub struct UnifiedSession {
     #[serde(default)]
     pub pending_intent_tier: Option<PendingIntentTier>,
 
+    // === Unified Decision Packet (NEW - wraps verb/tier/group clarification) ===
+    /// When Some, user needs to respond to a decision point
+    /// This is the unified envelope for all clarification UX (WRAP strategy)
+    /// Eventually replaces pending_verb_disambiguation and pending_intent_tier
+    #[serde(default)]
+    pub pending_decision: Option<ob_poc_types::DecisionPacket>,
+
     // === Conversation ===
     pub messages: Vec<ChatMessage>,
 
@@ -1561,6 +1568,7 @@ impl UnifiedSession {
             resolution: None,
             pending_verb_disambiguation: None,
             pending_intent_tier: None,
+            pending_decision: None,
             messages: Vec::new(),
             bindings: HashMap::new(),
             // Constraint cascade (starts empty, narrowed as user works)
