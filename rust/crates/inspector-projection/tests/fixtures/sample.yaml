@@ -1,0 +1,315 @@
+# Sample Inspector Projection fixture
+# Demonstrates all node kinds and $ref linking patterns
+
+snapshot:
+  schema_version: 1
+  source_hash: "abc123def456"
+  policy_hash: "policy789"
+  created_at: "2026-02-04T12:00:00Z"
+
+render_policy:
+  lod: 2
+  max_depth: 10
+  max_items_per_list: 50
+
+ui_hints:
+  shorthand_labels: true
+  breadcrumb: true
+  history: true
+
+root:
+  cbu:
+    $ref: "cbu:allianz-ie"
+
+nodes:
+  # ============================================
+  # CBU (Client Business Unit) - Root Node
+  # ============================================
+  "cbu:allianz-ie":
+    kind: CBU
+    id: "cbu:allianz-ie"
+    label_short: "Allianz IE"
+    label_full: "Allianz Ireland ETF SICAV"
+    glyph: "cbu"
+    branches:
+      members:
+        $ref: "memberlist:allianz-ie"
+      products:
+        $ref: "producttree:allianz-ie"
+      matrix:
+        $ref: "matrix:allianz-ie"
+      investor_register:
+        $ref: "investorregister:allianz-ie"
+      control_register:
+        $ref: "controlregister:allianz-ie"
+
+  # ============================================
+  # Member List (Entity container)
+  # ============================================
+  "memberlist:allianz-ie":
+    kind: MemberList
+    id: "memberlist:allianz-ie"
+    label_short: "Members"
+    label_full: "CBU Member Entities"
+    glyph: "members"
+    branches:
+      items:
+        paging:
+          limit: 50
+          total: 4
+        items:
+          - $ref: "entity:uuid-fund-001"
+          - $ref: "entity:uuid-im-001"
+          - $ref: "entity:uuid-custodian-001"
+          - $ref: "entity:uuid-depositary-001"
+
+  # ============================================
+  # Entities (Fund, IM, Custodian, Depositary)
+  # ============================================
+  "entity:uuid-fund-001":
+    kind: Entity
+    id: "entity:uuid-fund-001"
+    label_short: "Fund"
+    label_full: "Allianz IE ETF SICAV"
+    glyph: "fund"
+    attributes:
+      entity_type: "FUND"
+      lei: "5493001KJTIIGC8Y1R12"
+      jurisdiction: "IE"
+
+  "entity:uuid-im-001":
+    kind: Entity
+    id: "entity:uuid-im-001"
+    label_short: "IM"
+    label_full: "Allianz Global Investors GmbH"
+    glyph: "company"
+    attributes:
+      entity_type: "COMPANY"
+      lei: "529900DXZQ4JRB7JC858"
+      jurisdiction: "DE"
+
+  "entity:uuid-custodian-001":
+    kind: Entity
+    id: "entity:uuid-custodian-001"
+    label_short: "Custodian"
+    label_full: "State Street Bank Ireland"
+    glyph: "bank"
+    attributes:
+      entity_type: "BANK"
+      lei: "571474TGEMMWANRLN572"
+      jurisdiction: "IE"
+
+  "entity:uuid-depositary-001":
+    kind: Entity
+    id: "entity:uuid-depositary-001"
+    label_short: "Depositary"
+    label_full: "State Street Custodial Services Ireland"
+    glyph: "bank"
+    attributes:
+      entity_type: "BANK"
+      lei: "571474TGEMMWANRLN573"
+      jurisdiction: "IE"
+
+  # ============================================
+  # Product Tree
+  # ============================================
+  "producttree:allianz-ie":
+    kind: ProductTree
+    id: "producttree:allianz-ie"
+    label_short: "Products"
+    label_full: "Product Taxonomy"
+    glyph: "products"
+    branches:
+      equity:
+        $ref: "product:equity"
+      fixed_income:
+        $ref: "product:fixed-income"
+
+  "product:equity":
+    kind: Product
+    id: "product:equity"
+    label_short: "Equity"
+    label_full: "Equity Products"
+    glyph: "equity"
+    attributes:
+      asset_class: "EQUITY"
+      settlement_cycle: "T+2"
+
+  "product:fixed-income":
+    kind: Product
+    id: "product:fixed-income"
+    label_short: "Fixed Income"
+    label_full: "Fixed Income Products"
+    glyph: "bond"
+    attributes:
+      asset_class: "FIXED_INCOME"
+      settlement_cycle: "T+2"
+
+  # ============================================
+  # Instrument Matrix
+  # ============================================
+  "matrix:allianz-ie":
+    kind: InstrumentMatrix
+    id: "matrix:allianz-ie"
+    label_short: "Matrix"
+    label_full: "Trading Matrix"
+    glyph: "matrix"
+    branches:
+      xlon:
+        $ref: "matrixslice:xlon"
+      xetr:
+        $ref: "matrixslice:xetr"
+      xnys:
+        $ref: "matrixslice:xnys"
+
+  "matrixslice:xlon":
+    kind: MatrixSlice
+    id: "matrixslice:xlon"
+    label_short: "XLON"
+    label_full: "London Stock Exchange"
+    glyph: "market"
+    attributes:
+      mic: "XLON"
+      currency: "GBP"
+      timezone: "Europe/London"
+
+  "matrixslice:xetr":
+    kind: MatrixSlice
+    id: "matrixslice:xetr"
+    label_short: "XETR"
+    label_full: "Deutsche Boerse Xetra"
+    glyph: "market"
+    attributes:
+      mic: "XETR"
+      currency: "EUR"
+      timezone: "Europe/Berlin"
+
+  "matrixslice:xnys":
+    kind: MatrixSlice
+    id: "matrixslice:xnys"
+    label_short: "NYSE"
+    label_full: "New York Stock Exchange"
+    glyph: "market"
+    attributes:
+      mic: "XNYS"
+      currency: "USD"
+      timezone: "America/New_York"
+
+  # ============================================
+  # Investor Register
+  # ============================================
+  "investorregister:allianz-ie":
+    kind: InvestorRegister
+    id: "investorregister:allianz-ie"
+    label_short: "Investors"
+    label_full: "Investor Register"
+    glyph: "investors"
+    branches:
+      holdings:
+        $ref: "holdingedgelist:allianz-ie"
+
+  "holdingedgelist:allianz-ie":
+    kind: HoldingEdgeList
+    id: "holdingedgelist:allianz-ie"
+    label_short: "Holdings"
+    label_full: "Holding Relationships"
+    glyph: "holdings"
+    branches:
+      items:
+        paging:
+          limit: 50
+          total: 2
+        items:
+          - $ref: "holdingedge:pension-fund-001"
+          - $ref: "holdingedge:insurance-001"
+
+  "holdingedge:pension-fund-001":
+    kind: HoldingEdge
+    id: "holdingedge:pension-fund-001"
+    label_short: "Pension Fund"
+    label_full: "Allianz Pensionskasse AG"
+    glyph: "investor"
+    attributes:
+      holder_entity_id: "entity:uuid-pension-001"
+      held_entity_id: "entity:uuid-fund-001"
+      holding_pct: 15.5
+      holding_type: "DIRECT"
+    provenance:
+      sources:
+        - "investor_disclosure"
+      asserted_at: "2026-01-31"
+      confidence: 0.95
+
+  "holdingedge:insurance-001":
+    kind: HoldingEdge
+    id: "holdingedge:insurance-001"
+    label_short: "Insurance"
+    label_full: "Allianz Lebensversicherung AG"
+    glyph: "investor"
+    attributes:
+      holder_entity_id: "entity:uuid-insurance-001"
+      held_entity_id: "entity:uuid-fund-001"
+      holding_pct: 8.2
+      holding_type: "DIRECT"
+    provenance:
+      sources:
+        - "investor_disclosure"
+      asserted_at: "2026-01-31"
+      confidence: 0.90
+
+  # ============================================
+  # Control Register
+  # ============================================
+  "controlregister:allianz-ie":
+    kind: ControlRegister
+    id: "controlregister:allianz-ie"
+    label_short: "Control"
+    label_full: "Control Register"
+    glyph: "control"
+    branches:
+      control_tree:
+        $ref: "controltree:allianz-ie"
+
+  "controltree:allianz-ie":
+    kind: ControlTree
+    id: "controltree:allianz-ie"
+    label_short: "Control Tree"
+    label_full: "Control Hierarchy"
+    glyph: "tree"
+    branches:
+      root:
+        $ref: "controlnode:allianz-se"
+
+  "controlnode:allianz-se":
+    kind: ControlNode
+    id: "controlnode:allianz-se"
+    label_short: "Allianz SE"
+    label_full: "Allianz SE (Ultimate Parent)"
+    glyph: "parent"
+    attributes:
+      entity_id: "entity:uuid-allianz-se"
+      control_type: "ULTIMATE_PARENT"
+    branches:
+      children:
+        paging:
+          limit: 50
+          total: 1
+        items:
+          - $ref: "controledge:allianz-se-to-agi"
+
+  "controledge:allianz-se-to-agi":
+    kind: ControlEdge
+    id: "controledge:allianz-se-to-agi"
+    label_short: "→ AGI"
+    label_full: "Allianz SE → Allianz Global Investors"
+    glyph: "edge"
+    attributes:
+      controller_id: "entity:uuid-allianz-se"
+      controlled_id: "entity:uuid-im-001"
+      voting_pct: 100.0
+      control_type: "DIRECT"
+    provenance:
+      sources:
+        - "gleif"
+      asserted_at: "2026-01-15"
+      confidence: 0.99

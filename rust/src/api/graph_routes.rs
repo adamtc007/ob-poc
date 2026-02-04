@@ -30,6 +30,9 @@ use crate::graph::{
     CbuGraph, CbuSummary, ConfigDrivenGraphBuilder, EntityGraph, GraphScope, LayoutEngineV2,
     LayoutOverride, NodeOffset, NodeSizeOverride,
 };
+use inspector_projection::{
+    generator::cbu::generate_from_cbu_graph, InspectorProjection, RenderPolicy,
+};
 use ob_poc_types::galaxy::{NodeType, Route, RouteResponse, RouteWaypoint, ViewLevel};
 
 /// Query parameters for graph endpoint
@@ -824,6 +827,125 @@ fn hash_to_position(id: &str) -> (f32, f32) {
     (x, y)
 }
 
+// =============================================================================
+// INSPECTOR PROJECTION ENDPOINT
+// =============================================================================
+
+/// Query parameters for inspector projection endpoint
+#[derive(Debug, Deserialize)]
+pub struct InspectorQuery {
+    /// Level of detail (0-3, default 2)
+    pub lod: Option<u8>,
+    /// Maximum tree depth (default 10)
+    pub max_depth: Option<usize>,
+    /// Maximum items per list (default 50)
+    pub max_items: Option<usize>,
+}
+
+/// GET /api/cbu/{cbu_id}/inspector
+///
+/// Returns an Inspector projection for the CBU, suitable for tree/table rendering.
+/// This transforms the graph data into a deterministic projection schema with
+/// `$ref` linking for node relationships.
+///
+/// Query parameters:
+/// - `lod`: Level of detail (0=icon only, 1=short labels, 2=tags+summary, 3=full)
+/// - `max_depth`: Maximum tree depth to include (default 10)
+/// - `max_items`: Maximum items per paginated list (default 50)
+pub async fn get_cbu_inspector(
+    State(pool): State<PgPool>,
+    Path(cbu_id): Path<Uuid>,
+    Query(params): Query<InspectorQuery>,
+) -> Result<Json<InspectorProjection>, (StatusCode, String)> {
+    // Build render policy from query params
+    let policy = RenderPolicy {
+        lod: params.lod.unwrap_or(2),
+        max_depth: params.max_depth.unwrap_or(10) as u8,
+        max_items_per_list: params.max_items.unwrap_or(50),
+        ..Default::default()
+    };
+
+    // First, get the CBU graph data using the existing builder
+    let builder = ConfigDrivenGraphBuilder::new(&pool, cbu_id, "TRADING")
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to initialize graph builder: {}", e),
+            )
+        })?;
+
+    let repo = VisualizationRepository::new(pool.clone());
+    let graph = builder.build(&repo).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to build graph: {}", e),
+        )
+    })?;
+
+    // Convert LegacyGraphNode to ob_poc_types::GraphNode
+    // LegacyGraphNode uses typed enums while GraphNode uses strings
+    let cbu_graph_response = ob_poc_types::CbuGraphResponse {
+        cbu_id: graph.cbu_id.to_string(),
+        label: graph.label.clone(),
+        cbu_category: graph.cbu_category.clone(),
+        jurisdiction: graph.jurisdiction.clone(),
+        nodes: graph
+            .nodes
+            .iter()
+            .map(|n| ob_poc_types::GraphNode {
+                id: n.id.clone(),
+                // Convert enums to their string representations
+                node_type: format!("{:?}", n.node_type),
+                layer: format!("{:?}", n.layer),
+                label: n.label.clone(),
+                sublabel: n.sublabel.clone(),
+                status: format!("{:?}", n.status),
+                roles: n.roles.clone(),
+                role_categories: n.role_categories.clone(),
+                primary_role: n.primary_role.clone(),
+                jurisdiction: n.jurisdiction.clone(),
+                ownership_pct: None, // LegacyGraphNode doesn't have this field
+                role_priority: n.role_priority,
+                data: Some(n.data.clone()),
+                x: n.x.map(|v| v as f64),
+                y: n.y.map(|v| v as f64),
+                importance: n.importance,
+                hierarchy_depth: None, // LegacyGraphNode doesn't have this field
+                kyc_completion: n.kyc_completion,
+                verification_summary: None, // LegacyGraphNode has verification_status string instead
+                needs_attention: false,     // LegacyGraphNode doesn't have this field
+                entity_category: n.entity_category.clone(),
+                person_state: None, // LegacyGraphNode has person_state embedded differently
+                is_container: n.is_container,
+                contains_type: n.contains_type.clone(),
+                child_count: n.child_count,
+                browse_nickname: n.browse_nickname.clone(),
+                parent_key: n.parent_key.clone(),
+                container_parent_id: n.container_parent_id.clone(),
+            })
+            .collect(),
+        edges: graph
+            .edges
+            .iter()
+            .map(|e| ob_poc_types::GraphEdge {
+                id: e.id.clone(),
+                source: e.source.clone(),
+                target: e.target.clone(),
+                edge_type: format!("{:?}", e.edge_type),
+                label: e.label.clone(),
+                weight: None,              // LegacyGraphEdge doesn't have weight
+                verification_status: None, // LegacyGraphEdge doesn't have verification_status
+            })
+            .collect(),
+    };
+
+    // Generate the inspector projection
+    let projection = generate_from_cbu_graph(&cbu_graph_response, &policy);
+
+    Ok(Json(projection))
+}
+
 /// Create the graph router
 pub fn create_graph_router(pool: PgPool) -> Router {
     Router::new()
@@ -831,6 +953,7 @@ pub fn create_graph_router(pool: PgPool) -> Router {
         .route("/api/cbu", get(list_cbus))
         .route("/api/cbu/:cbu_id", get(get_cbu))
         .route("/api/cbu/:cbu_id/graph", get(get_cbu_graph))
+        .route("/api/cbu/:cbu_id/inspector", get(get_cbu_inspector))
         .route("/api/cbu/:cbu_id/layout", get(get_cbu_layout))
         .route("/api/cbu/:cbu_id/layout", post(save_cbu_layout))
         // Unified graph endpoints (using GraphRepository + EntityGraph)

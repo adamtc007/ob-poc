@@ -185,6 +185,8 @@ impl App {
             intent_tier_ui: crate::state::IntentTierState::default(),
             macro_expansion_ui: crate::state::MacroExpansionState::default(),
             decision_ui: crate::state::DecisionState::default(),
+            inspector_state: crate::panels::InspectorState::default(),
+            inspector_projection: None,
         };
 
         // Try to restore session from localStorage

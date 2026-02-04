@@ -263,6 +263,12 @@ pub struct AppState {
     /// Pending navigation verb from typed command (needs App context to execute)
     pub pending_navigation_verb: Option<crate::command::NavigationVerb>,
 
+    /// Inspector panel UI state (tree expansion, selection, focus stack)
+    pub inspector_state: crate::panels::InspectorState,
+
+    /// Inspector projection data (loaded from server)
+    pub inspector_projection: Option<inspector_projection::InspectorProjection>,
+
     // =========================================================================
     // ASYNC COORDINATION
     // =========================================================================
@@ -330,6 +336,8 @@ impl Default for AppState {
             current_scope: None,
             investor_register_ui: InvestorRegisterUi::default(),
             pending_navigation_verb: None,
+            inspector_state: crate::panels::InspectorState::default(),
+            inspector_projection: None,
 
             // Async coordination
             async_state: Arc::new(Mutex::new(AsyncState::default())),

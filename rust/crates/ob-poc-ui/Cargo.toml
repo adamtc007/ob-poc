@@ -31,6 +31,7 @@ serde-wasm-bindgen = "0.6"
 # Internal crates
 ob-poc-types = { path = "../ob-poc-types" }
 ob-poc-graph = { path = "../ob-poc-graph" }
+inspector-projection = { path = "../inspector-projection" }
 
 # Utils
 uuid = { version = "1", features = ["v4", "serde", "js"] }

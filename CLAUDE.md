@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 > **Last reviewed:** 2026-02-04
-> **Crates:** 22 Rust crates (includes ob-poc-macros + 5 esper_* crates)
+> **Crates:** 23 Rust crates (includes ob-poc-macros + 5 esper_* crates + inspector-projection)
 > **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
 > **Migrations:** 73 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
@@ -35,6 +35,7 @@
 > **Lexicon Service (072):** ✅ Complete - In-memory verb/domain/concept lookup with bincode snapshots
 > **Entity Linking Service (073):** ✅ Complete - In-memory entity resolution with mention extraction, token overlap matching
 > **Clarification UX Wiring (075):** ✅ Complete - Unified DecisionPacket system for verb/scope/group disambiguation with confirm tokens
+> **Inspector-First Visualization (076):** ✅ Complete - Deterministic tree/table Inspector UI, projection schema with $ref linking, 82 tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -3640,6 +3641,171 @@ let w = node_width();
 ```
 
 Deprecation warnings guide migration to config-driven accessors.
+
+---
+
+## Inspector-First Visualization (076)
+
+> ✅ **IMPLEMENTED (2026-02-04)**: Deterministic tree/table-based Inspector UI replacing 3D visualization, with projection schema and `$ref` linking.
+
+The Inspector-First Visualization provides a deterministic, compliance-focused alternative to the ESPER 3D visualization. It uses a flat node map with `$ref` linking for node-to-node relationships, enabling explainable and auditable visualizations.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    INSPECTOR PROJECTION PIPELINE                             │
+│                                                                              │
+│  CBU Graph Data (entities, matrix, registers)                               │
+│         │                                                                    │
+│         ▼                                                                    │
+│  CbuGenerator / MatrixGenerator                                             │
+│         │   - Converts domain types to projection nodes                     │
+│         │   - Creates flat node map with $ref links                         │
+│         │   - Applies RenderPolicy (LOD, depth, filters)                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  InspectorProjection                                                        │
+│         │   - snapshot: schema_version, source_hash, policy_hash            │
+│         │   - render_policy: lod, max_depth, filters                        │
+│         │   - root: BTreeMap<chamber, RefValue>                             │
+│         │   - nodes: BTreeMap<NodeId, Node>                                 │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Inspector Panel (egui)                                                     │
+│         │   - Three-panel layout (nav tree, main view, detail pane)         │
+│         │   - Table rendering for matrix/holdings/control                   │
+│         │   - LOD controls, chamber toggles, filters                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Principles
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Correctness over polish** | Every visualization is explainable and traceable |
+| **Determinism** | Same input + policy = same output, always |
+| **Separation of concerns** | Projection contract independent of renderer |
+| **Compliance-first** | Provenance, confidence, audit trails are first-class |
+
+### Core Types
+
+**NodeId** - Stable path-based identifier:
+```rust
+// Format: {kind}:{qualifier}[:{subpath}]
+// Examples: "cbu:allianz-ie", "matrix:focus:mic:XLON", "entity:uuid:..."
+// Pattern: ^[a-z]+:[A-Za-z0-9_:-]+$
+```
+
+**RefValue** - `$ref` linking (flat node map, no recursive embedding):
+```rust
+// Serializes as: { "$ref": "node_id" }
+pub struct RefValue {
+    #[serde(rename = "$ref")]
+    pub target: NodeId,
+}
+```
+
+**NodeKind** - 20 node type variants:
+- CBU, MemberList, Entity
+- ProductTree, Product, Service, Resource, ProductBinding
+- InstrumentMatrix, MatrixSlice, SparseCellPage
+- InvestorRegister, HoldingEdgeList, HoldingEdge
+- ControlRegister, ControlTree, ControlNode, ControlEdge
+
+**RenderPolicy** - LOD levels 0-3:
+
+| LOD | Display |
+|-----|---------|
+| 0 | Glyph + ID only |
+| 1 | Glyph + label_short |
+| 2 | + tags, summary, collapsed branches |
+| 3 | + label_full, attributes, provenance, expanded branches |
+
+### API Endpoint
+
+```
+GET /api/cbu/:cbu_id/inspector?lod=2&max_depth=5
+```
+
+Returns `InspectorProjection` with full node tree for the CBU.
+
+### UI Panel Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ [Search] [LOD: ▼] [Depth: ▼] [Chambers: ▼] [Filters: ▼] [Reset]    │
+├─────────────────────────────────────────────────────────────────────┤
+│ Breadcrumb: CBU > Members > Fund: Allianz IE ETF SICAV              │
+├───────────────────┬─────────────────────────┬───────────────────────┤
+│ Navigation Tree   │ Main View               │ Detail Pane           │
+│ (30%)             │ (45%)                   │ (25%)                 │
+│                   │                         │                       │
+│ - CBU             │ [Tree or Table based    │ Kind: Entity          │
+│   - Members       │  on focused node kind]  │ ID: entity:uuid:...   │
+│     - Fund ←      │                         │ Label: Fund: ...      │
+│     - IM          │                         │ Attributes: {...}     │
+│   - Products      │                         │ Provenance: {...}     │
+│   - Matrix        │                         │ Links: [...]          │
+│   - Registers     │                         │                       │
+└───────────────────┴─────────────────────────┴───────────────────────┘
+```
+
+### Table Rendering
+
+For matrix slices, holdings, and control trees, the Inspector uses `egui_extras::TableBuilder`:
+
+| View | Columns | Features |
+|------|---------|----------|
+| Matrix Slice | Instrument, Market, Currency, Status | Color-coded status, cell selection |
+| Holdings | Holder, Amount, Percentage, Confidence | Sortable, provenance tooltips |
+| Control Tree | Controller, Controlled, Voting %, Provenance | Hierarchical with expand/collapse |
+
+### Validation
+
+Pre-render validation ensures projection integrity:
+1. **Dangling refs** - All `$ref` targets must exist in `nodes`
+2. **Cycle detection** - DFS with visited set, report cycles as warnings
+3. **Root validation** - All root refs must exist
+4. **Provenance** - `HoldingEdge` and `ControlEdge` MUST have provenance
+5. **Confidence range** - Must be 0.0-1.0 if present
+
+### Crate Structure
+
+```
+rust/crates/inspector-projection/
+├── src/
+│   ├── lib.rs              # Public API exports
+│   ├── model.rs            # InspectorProjection, Node, NodeKind
+│   ├── node_id.rs          # NodeId newtype with regex validation
+│   ├── ref_value.rs        # RefValue $ref linking
+│   ├── validate.rs         # Referential integrity, cycle detection
+│   ├── policy.rs           # RenderPolicy (LOD, filters)
+│   ├── error.rs            # ValidationError enum
+│   └── generator/
+│       ├── mod.rs          # Generator traits
+│       ├── cbu.rs          # CbuGenerator (graph → projection)
+│       └── matrix.rs       # MatrixGenerator (trading matrix → projection)
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/crates/inspector-projection/src/model.rs` | Core types: Node, NodeKind, InspectorProjection |
+| `rust/crates/inspector-projection/src/node_id.rs` | NodeId with regex validation |
+| `rust/crates/inspector-projection/src/validate.rs` | Projection validation |
+| `rust/crates/inspector-projection/src/generator/cbu.rs` | CbuGenerator |
+| `rust/crates/ob-poc-ui/src/panels/inspector.rs` | egui Inspector panel |
+| `rust/src/api/graph_routes.rs` | `/api/cbu/:cbu_id/inspector` endpoint |
+| `rust/tests/fixtures/inspector/sample.yaml` | Test fixture with all node kinds |
+
+### Test Coverage
+
+- 48 unit tests in `inspector-projection` crate
+- 32 integration tests in `rust/tests/`
+- 2 doc tests
+- Sample YAML fixture with comprehensive node coverage
 
 ---
 

@@ -12,6 +12,7 @@ rust-version = "1.84"
 [dependencies]
 # Workspace crates
 dsl-core = { path = "crates/dsl-core" }
+inspector-projection = { path = "crates/inspector-projection" }
 ob-agentic = { path = "crates/ob-agentic", features = ["gateway"] }
 ob-semantic-matcher = { path = "crates/ob-semantic-matcher" }
 ob-templates = { path = "crates/ob-templates" }
@@ -224,4 +225,5 @@ members = [
     "crates/esper_policy",
     "crates/esper_egui",
     "xtask", "crates/playbook-core", "crates/playbook-lower",
+    "crates/inspector-projection",
 ]

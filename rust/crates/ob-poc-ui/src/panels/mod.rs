@@ -12,6 +12,7 @@ mod context;
 mod disambiguation;
 mod dsl_editor;
 mod entity_detail;
+mod inspector;
 mod investor_register;
 mod macro_wizard;
 mod repl;
@@ -32,6 +33,7 @@ pub use context::{context_panel, ContextPanelAction};
 pub use disambiguation::{disambiguation_modal, DisambiguationAction, DisambiguationModalData};
 pub use dsl_editor::{dsl_editor_panel, DslEditorAction};
 pub use entity_detail::entity_detail_panel;
+pub use inspector::InspectorState;
 pub use investor_register::{investor_register_panel, InvestorRegisterAction};
 pub use macro_wizard::MacroWizardAction;
 pub use repl::{
