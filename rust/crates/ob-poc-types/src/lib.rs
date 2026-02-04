@@ -734,6 +734,72 @@ pub struct ChatDebugInfo {
     /// Verb matching details
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verb_match: Option<VerbMatchDebug>,
+
+    /// Entity resolution details (from EntityLinkingService)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_resolution: Option<EntityResolutionDebug>,
+}
+
+/// Entity resolution debug information from EntityLinkingService
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityResolutionDebug {
+    /// Snapshot hash used for resolution
+    pub snapshot_hash: String,
+
+    /// Entity count in snapshot
+    pub entity_count: usize,
+
+    /// Extracted entity mentions with candidates
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mentions: Vec<EntityMentionDebug>,
+
+    /// Dominant entity (if deterministic selection possible)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dominant_entity: Option<EntityCandidateDebug>,
+
+    /// Expected entity kinds inferred from verb context
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub expected_kinds: Vec<String>,
+}
+
+/// A single entity mention with candidates
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityMentionDebug {
+    /// Character span in original utterance (start, end)
+    pub span: (usize, usize),
+
+    /// Original mention text
+    pub text: String,
+
+    /// Top candidates (sorted by score)
+    pub candidates: Vec<EntityCandidateDebug>,
+
+    /// Selected winner (if unambiguous)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_id: Option<String>,
+
+    /// Confidence in selection
+    pub confidence: f32,
+}
+
+/// A single entity candidate with score and evidence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityCandidateDebug {
+    /// Entity UUID
+    pub entity_id: String,
+
+    /// Entity kind/type
+    pub entity_kind: String,
+
+    /// Canonical display name
+    pub canonical_name: String,
+
+    /// Match score (0.0-1.0)
+    pub score: f32,
+
+    /// Evidence explaining the score
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<String>,
 }
 
 /// Detailed verb matching information for debugging

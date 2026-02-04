@@ -44,6 +44,7 @@ pub mod mention;
 pub mod normalize;
 pub mod resolver;
 pub mod snapshot;
+pub mod stub;
 
 // Re-exports
 pub use compiler::{compile_entity_snapshot, lint_entity_data, LintSeverity, LintWarning};
@@ -53,3 +54,4 @@ pub use resolver::{
     EntityCandidate, EntityLinkingService, EntityLinkingServiceImpl, EntityResolution, Evidence,
 };
 pub use snapshot::{EntityId, EntityRow, EntitySnapshot, SnapshotStats, SNAPSHOT_VERSION};
+pub use stub::StubEntityLinkingService;

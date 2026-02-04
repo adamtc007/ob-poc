@@ -3836,6 +3836,77 @@ normalize_entity_text("Ford Motor Company Ltd.", true)  // → "ford motor compa
 | `ob-poc.v_entity_aliases` | Union of entity_names + agent.entity_aliases |
 | `ob-poc.v_entity_linking_stats` | Statistics for monitoring |
 
+### Agent Pipeline Integration
+
+The EntityLinkingService is integrated into the agent chat pipeline for:
+1. **Pre-resolution** - Entity mentions extracted BEFORE verb search
+2. **Kind hints** - Resolved entity kinds inform verb argument expectations
+3. **Dominant entity** - Highest confidence entity stored in session context
+4. **Debug info** - Entity resolution details in `ChatDebugInfo.entity_resolution`
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  AGENT PIPELINE WITH ENTITY LINKING                                          │
+│                                                                              │
+│  User: "Set up ISDA with Goldman Sachs"                                     │
+│         │                                                                    │
+│         ▼                                                                    │
+│  1. EntityLinkingService.resolve_mentions()                                 │
+│         │   └─► "Goldman Sachs" → entity_id (score: 0.95)                   │
+│         │   └─► dominant_entity_id stored in session.context                │
+│         │                                                                    │
+│         ▼                                                                    │
+│  2. HybridVerbSearcher.search() (verb discovery)                            │
+│         │   └─► "isda.create" (score: 0.88)                                 │
+│         │                                                                    │
+│         ▼                                                                    │
+│  3. LLM extracts arguments (JSON)                                           │
+│         │                                                                    │
+│         ▼                                                                    │
+│  4. DSL generation with entity resolution                                   │
+│         │   └─► (isda.create :counterparty <Goldman Sachs>)                 │
+│         │                                                                    │
+│         ▼                                                                    │
+│  5. Stage for execution or auto-run (navigation verbs)                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Key Integration Points:**
+
+| Component | File | Integration |
+|-----------|------|-------------|
+| `AgentState` | `api/agent_routes.rs` | Loads snapshot at startup, field `entity_linker` |
+| `AgentService` | `api/agent_service.rs` | `extract_entity_mentions()` in `process_chat()` |
+| `SessionContext` | `api/session.rs` | `dominant_entity_id` field for implicit resolution |
+| `ChatDebugInfo` | `ob-poc-types/src/lib.rs` | `entity_resolution` field for explainability |
+
+**Debug Output (when OB_CHAT_DEBUG=1):**
+
+```json
+{
+  "entity_resolution": {
+    "snapshot_hash": "a1b2c3d4...",
+    "entity_count": 1452,
+    "mentions": [{
+      "span": [15, 28],
+      "text": "Goldman Sachs",
+      "candidates": [{"entity_id": "...", "score": 0.95, "entity_kind": "company"}],
+      "selected_id": "...",
+      "confidence": 0.95
+    }],
+    "dominant_entity": {"entity_id": "...", "canonical_name": "Goldman Sachs Group Inc"},
+    "expected_kinds": ["company"]
+  }
+}
+```
+
+**Graceful Degradation:**
+
+If no entity snapshot is available, `StubEntityLinkingService` is used:
+- Returns empty results for all lookups
+- Pipeline continues without entity pre-resolution
+- Full functionality restored when snapshot is compiled
+
 ---
 
 ## Key Directories

@@ -459,6 +459,9 @@ pub struct AgentService {
     /// Lexicon service for fast in-memory lexical verb search
     /// Runs BEFORE semantic search for exact/token matches (Phase A of 072)
     lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
+    /// Entity linking service for in-memory entity mention extraction and resolution
+    /// Used to extract entity mentions BEFORE verb search for context enrichment
+    entity_linker: Option<Arc<dyn crate::entity_linking::EntityLinkingService>>,
 }
 
 #[allow(dead_code)]
@@ -473,6 +476,9 @@ impl AgentService {
     ///
     /// The lexicon enables step 0 (fast lexical matching) for exact label and
     /// token overlap matches. Runs BEFORE semantic embedding computation.
+    ///
+    /// The entity_linker enables entity mention extraction from utterances for
+    /// context enrichment and disambiguation.
     pub fn new(
         pool: PgPool,
         embedder: Arc<CandleEmbedder>,
@@ -485,7 +491,124 @@ impl AgentService {
             embedder,
             learned_data,
             lexicon,
+            entity_linker: None,
         }
+    }
+
+    /// Set entity linker for in-memory entity resolution
+    pub fn with_entity_linker(
+        mut self,
+        entity_linker: Arc<dyn crate::entity_linking::EntityLinkingService>,
+    ) -> Self {
+        self.entity_linker = Some(entity_linker);
+        self
+    }
+
+    /// Extract entity mentions from utterance and build debug info
+    ///
+    /// Returns (entity_resolution_debug, dominant_entity_id, expected_kinds)
+    /// The dominant_entity_id can be used to constrain verb argument resolution.
+    fn extract_entity_mentions(
+        &self,
+        utterance: &str,
+        expected_kinds: Option<&[String]>,
+    ) -> (
+        Option<ob_poc_types::EntityResolutionDebug>,
+        Option<uuid::Uuid>,
+        Vec<String>,
+    ) {
+        let Some(linker) = &self.entity_linker else {
+            return (None, None, vec![]);
+        };
+
+        // Extract entity mentions from utterance
+        let resolutions = linker.resolve_mentions(
+            utterance,
+            expected_kinds,
+            None, // No context concepts for now
+            5,    // Top 5 candidates per mention
+        );
+
+        if resolutions.is_empty() {
+            // No mentions found - still return debug info showing snapshot was checked
+            let debug = ob_poc_types::EntityResolutionDebug {
+                snapshot_hash: linker.snapshot_hash().to_string(),
+                entity_count: linker.entity_count(),
+                mentions: vec![],
+                dominant_entity: None,
+                expected_kinds: expected_kinds.map(|k| k.to_vec()).unwrap_or_default(),
+            };
+            return (Some(debug), None, vec![]);
+        }
+
+        // Build debug info
+        let mentions: Vec<ob_poc_types::EntityMentionDebug> = resolutions
+            .iter()
+            .map(|r| {
+                let candidates: Vec<ob_poc_types::EntityCandidateDebug> = r
+                    .candidates
+                    .iter()
+                    .take(3)
+                    .map(|c| ob_poc_types::EntityCandidateDebug {
+                        entity_id: c.entity_id.to_string(),
+                        entity_kind: c.entity_kind.clone(),
+                        canonical_name: c.canonical_name.clone(),
+                        score: c.score,
+                        evidence: c.evidence.iter().map(|e| format!("{:?}", e)).collect(),
+                    })
+                    .collect();
+
+                ob_poc_types::EntityMentionDebug {
+                    span: r.mention_span,
+                    text: r.mention_text.clone(),
+                    candidates,
+                    selected_id: r.selected.map(|id| id.to_string()),
+                    confidence: r.confidence,
+                }
+            })
+            .collect();
+
+        // Find dominant entity (highest confidence with selection)
+        let dominant = resolutions
+            .iter()
+            .filter(|r| r.selected.is_some() && r.confidence > 0.5)
+            .max_by(|a, b| {
+                a.confidence
+                    .partial_cmp(&b.confidence)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+        let dominant_debug = dominant.and_then(|r| {
+            r.candidates
+                .first()
+                .map(|c| ob_poc_types::EntityCandidateDebug {
+                    entity_id: c.entity_id.to_string(),
+                    entity_kind: c.entity_kind.clone(),
+                    canonical_name: c.canonical_name.clone(),
+                    score: c.score,
+                    evidence: c.evidence.iter().map(|e| format!("{:?}", e)).collect(),
+                })
+        });
+
+        let dominant_id = dominant.and_then(|r| r.selected);
+
+        // Collect entity kinds from resolved mentions for verb search hints
+        let resolved_kinds: Vec<String> = resolutions
+            .iter()
+            .filter(|r| r.selected.is_some())
+            .filter_map(|r| r.candidates.first())
+            .map(|c| c.entity_kind.clone())
+            .collect();
+
+        let debug = ob_poc_types::EntityResolutionDebug {
+            snapshot_hash: linker.snapshot_hash().to_string(),
+            entity_count: linker.entity_count(),
+            mentions,
+            dominant_entity: dominant_debug,
+            expected_kinds: expected_kinds.map(|k| k.to_vec()).unwrap_or_default(),
+        };
+
+        (Some(debug), dominant_id, resolved_kinds)
     }
 
     /// Create IntentPipeline for processing user input
@@ -981,6 +1104,30 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
         // Clear pending intent tier if user typed something new
         session.pending_intent_tier = None;
+
+        // ENTITY LINKING - Extract entity mentions BEFORE verb search
+        // This provides:
+        // 1. Entity context for verb search (kind hints)
+        // 2. Pre-resolved entities for DSL generation
+        // 3. Debug info for explainability
+        let (entity_resolution_debug, dominant_entity_id, resolved_kinds) =
+            self.extract_entity_mentions(&request.message, None);
+
+        if let Some(ref er_debug) = entity_resolution_debug {
+            tracing::debug!(
+                snapshot_hash = %er_debug.snapshot_hash,
+                entity_count = er_debug.entity_count,
+                mention_count = er_debug.mentions.len(),
+                dominant = ?er_debug.dominant_entity.as_ref().map(|e| &e.canonical_name),
+                resolved_kinds = ?resolved_kinds,
+                "Entity linking completed"
+            );
+        }
+
+        // Store dominant entity in session context for downstream resolution
+        if let Some(entity_id) = dominant_entity_id {
+            session.context.dominant_entity_id = Some(entity_id);
+        }
 
         // ONE PIPELINE - generate/validate DSL
         // Wrap session for macro expansion (macros need session state for prereqs/context)

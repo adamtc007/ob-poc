@@ -85,6 +85,9 @@ pub trait EntityLinkingService: Send + Sync {
     /// Get snapshot version
     fn snapshot_version(&self) -> u32;
 
+    /// Number of entities in snapshot (for logging)
+    fn entity_count(&self) -> usize;
+
     /// Resolve entity mentions from utterance.
     /// Returns multiple EntityResolution entries (one per mention span).
     fn resolve_mentions(
@@ -148,6 +151,10 @@ impl EntityLinkingService for EntityLinkingServiceImpl {
 
     fn snapshot_version(&self) -> u32 {
         self.snapshot.version
+    }
+
+    fn entity_count(&self) -> usize {
+        self.snapshot.entities.len()
     }
 
     fn resolve_mentions(

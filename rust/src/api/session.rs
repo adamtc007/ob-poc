@@ -2127,6 +2127,10 @@ pub struct SessionContext {
     /// All entities created in this session
     #[serde(default)]
     pub entity_ids: Vec<Uuid>,
+    /// Dominant entity from entity linking (highest confidence mention in last utterance)
+    /// Used for implicit entity reference resolution in DSL generation
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dominant_entity_id: Option<Uuid>,
     /// Domain hint for RAG context
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain_hint: Option<String>,

@@ -65,6 +65,9 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::agent::learning::warmup::LearningWarmup;
+use crate::entity_linking::{
+    EntityLinkingService, EntityLinkingServiceImpl, StubEntityLinkingService,
+};
 
 // ============================================================================
 // Type Converters - Internal types to API types (ob_poc_types)
@@ -938,6 +941,8 @@ pub struct AgentState {
     pub agent_service: Arc<crate::api::agent_service::AgentService>,
     pub feedback_service: Arc<ob_semantic_matcher::FeedbackService>,
     pub expansion_audit: Arc<crate::database::ExpansionAuditRepository>,
+    /// Entity linking service for in-memory entity resolution
+    pub entity_linker: Arc<dyn EntityLinkingService>,
 }
 
 impl AgentState {
@@ -1049,13 +1054,63 @@ impl AgentState {
             loaded
         };
 
-        // Build agent service with embedder, learned data, and lexicon
+        // Load entity linking snapshot for in-memory entity resolution (Phase 073)
+        // This enables fast entity mention extraction without DB queries
+        let entity_linker: Arc<dyn EntityLinkingService> = {
+            let snapshot_path = std::env::var("ENTITY_SNAPSHOT_PATH")
+                .unwrap_or_else(|_| "rust/assets/entity.snapshot.bin".to_string());
+            let path = std::path::Path::new(&snapshot_path);
+
+            // Also check alternate paths if primary doesn't exist
+            let paths_to_try = [
+                path.to_path_buf(),
+                std::path::PathBuf::from("assets/entity.snapshot.bin"),
+                std::path::PathBuf::from("../rust/assets/entity.snapshot.bin"),
+            ];
+
+            let mut loaded: Option<Arc<dyn EntityLinkingService>> = None;
+            for try_path in &paths_to_try {
+                if try_path.exists() {
+                    match EntityLinkingServiceImpl::load_from(try_path) {
+                        Ok(svc) => {
+                            tracing::info!(
+                                entities = svc.entity_count(),
+                                version = svc.snapshot_version(),
+                                hash = %&svc.snapshot_hash()[..12.min(svc.snapshot_hash().len())],
+                                path = %try_path.display(),
+                                "Loaded entity linking snapshot"
+                            );
+                            loaded = Some(Arc::new(svc));
+                            break;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                path = %try_path.display(),
+                                error = %e,
+                                "Failed to load entity snapshot"
+                            );
+                        }
+                    }
+                }
+            }
+
+            loaded.unwrap_or_else(|| {
+                tracing::info!(
+                    "Entity snapshot not found. Entity linking disabled. \
+                     Run `cargo xtask entity compile` to generate."
+                );
+                Arc::new(StubEntityLinkingService::new())
+            })
+        };
+
+        // Build agent service with embedder, learned data, lexicon, and entity linker
         let agent_service = crate::api::agent_service::AgentService::new(
             pool.clone(),
             embedder,
             learned_data,
             lexicon,
-        );
+        )
+        .with_entity_linker(entity_linker.clone());
         let expansion_audit =
             Arc::new(crate::database::ExpansionAuditRepository::new(pool.clone()));
 
@@ -1070,6 +1125,7 @@ impl AgentState {
             agent_service: Arc::new(agent_service),
             feedback_service,
             expansion_audit,
+            entity_linker,
         }
     }
 }
@@ -1133,6 +1189,8 @@ fn create_agent_router_with_state(state: AgentState) -> Router {
         .route("/api/agent/health", get(health_check))
         // Completions (LSP-style lookup via EntityGateway)
         .route("/api/agent/complete", post(complete_entity))
+        // Entity mention extraction (in-memory, no DB)
+        .route("/api/agent/extract-entities", post(extract_entity_mentions))
         // Onboarding
         .route("/api/agent/onboard", post(generate_onboarding_dsl))
         // Enhanced generation with tool use
@@ -6267,6 +6325,188 @@ async fn complete_entity(
 
     let total = items.len();
     Ok(Json(CompleteResponse { items, total }))
+}
+
+// ============================================================================
+// Entity Mention Extraction (In-Memory via EntityLinkingService)
+// ============================================================================
+
+/// Request for entity mention extraction
+#[derive(Debug, Deserialize)]
+pub struct ExtractEntitiesRequest {
+    /// The utterance to extract entity mentions from
+    pub utterance: String,
+    /// Optional: limit entity kinds to these values (e.g., ["company", "fund"])
+    #[serde(default)]
+    pub expected_kinds: Option<Vec<String>>,
+    /// Optional: context concepts for boosting (e.g., ["otc", "trading"])
+    #[serde(default)]
+    pub context_concepts: Option<Vec<String>>,
+    /// Maximum candidates per mention (default: 5)
+    #[serde(default = "default_mention_limit")]
+    pub limit: usize,
+}
+
+fn default_mention_limit() -> usize {
+    5
+}
+
+/// A candidate entity match
+#[derive(Debug, Serialize)]
+pub struct EntityCandidateResponse {
+    pub entity_id: String,
+    pub entity_kind: String,
+    pub canonical_name: String,
+    pub score: f32,
+    pub evidence: Vec<EvidenceResponse>,
+}
+
+/// Evidence for a match (stable wire format)
+#[derive(Debug, Serialize)]
+pub struct EvidenceResponse {
+    pub kind: String,
+    pub details: serde_json::Value,
+}
+
+/// A single entity mention extracted from the utterance
+#[derive(Debug, Serialize)]
+pub struct EntityMentionResponse {
+    /// Character span in original utterance (start, end)
+    pub span: (usize, usize),
+    /// The text that was matched
+    pub text: String,
+    /// Candidate entities (sorted by score)
+    pub candidates: Vec<EntityCandidateResponse>,
+    /// Selected entity ID (if unambiguous)
+    pub selected_id: Option<String>,
+    /// Confidence in selection
+    pub confidence: f32,
+}
+
+/// Response from entity mention extraction
+#[derive(Debug, Serialize)]
+pub struct ExtractEntitiesResponse {
+    /// Snapshot metadata for cache invalidation
+    pub snapshot_hash: String,
+    pub snapshot_version: u32,
+    pub entity_count: usize,
+    /// Extracted mentions
+    pub mentions: Vec<EntityMentionResponse>,
+    /// Dominant entity (if a clear winner exists across mentions)
+    pub dominant_entity: Option<EntityCandidateResponse>,
+    /// Dominant entity kind (for verb boosting)
+    pub dominant_kind: Option<String>,
+}
+
+/// POST /api/agent/extract-entities - Extract entity mentions from utterance
+///
+/// Uses the in-memory EntityLinkingService to extract entity mentions
+/// without database queries. Useful for:
+/// - Pre-filtering entity resolution before DSL generation
+/// - Debugging entity recognition
+/// - Verb boosting based on entity kinds
+async fn extract_entity_mentions(
+    State(state): State<AgentState>,
+    Json(req): Json<ExtractEntitiesRequest>,
+) -> Json<ExtractEntitiesResponse> {
+    use crate::entity_linking::Evidence;
+
+    // Convert evidence to wire format
+    fn evidence_to_response(ev: &Evidence) -> EvidenceResponse {
+        match ev {
+            Evidence::AliasExact { alias } => EvidenceResponse {
+                kind: "alias_exact".to_string(),
+                details: serde_json::json!({ "alias": alias }),
+            },
+            Evidence::AliasTokenOverlap { tokens, overlap } => EvidenceResponse {
+                kind: "token_overlap".to_string(),
+                details: serde_json::json!({ "tokens": tokens, "overlap": overlap }),
+            },
+            Evidence::KindMatchBoost {
+                expected,
+                actual,
+                boost,
+            } => EvidenceResponse {
+                kind: "kind_match_boost".to_string(),
+                details: serde_json::json!({ "expected": expected, "actual": actual, "boost": boost }),
+            },
+            Evidence::KindMismatchPenalty {
+                expected,
+                actual,
+                penalty,
+            } => EvidenceResponse {
+                kind: "kind_mismatch_penalty".to_string(),
+                details: serde_json::json!({ "expected": expected, "actual": actual, "penalty": penalty }),
+            },
+            Evidence::ConceptOverlapBoost { concepts, boost } => EvidenceResponse {
+                kind: "concept_overlap_boost".to_string(),
+                details: serde_json::json!({ "concepts": concepts, "boost": boost }),
+            },
+        }
+    }
+
+    let expected_kinds: Option<Vec<String>> = req.expected_kinds;
+    let context_concepts: Option<Vec<String>> = req.context_concepts;
+
+    // Call entity linking service
+    let resolutions = state.entity_linker.resolve_mentions(
+        &req.utterance,
+        expected_kinds.as_deref(),
+        context_concepts.as_deref(),
+        req.limit,
+    );
+
+    // Convert to response format
+    let mentions: Vec<EntityMentionResponse> = resolutions
+        .iter()
+        .map(|r| EntityMentionResponse {
+            span: r.mention_span,
+            text: r.mention_text.clone(),
+            candidates: r
+                .candidates
+                .iter()
+                .map(|c| EntityCandidateResponse {
+                    entity_id: c.entity_id.to_string(),
+                    entity_kind: c.entity_kind.clone(),
+                    canonical_name: c.canonical_name.clone(),
+                    score: c.score,
+                    evidence: c.evidence.iter().map(evidence_to_response).collect(),
+                })
+                .collect(),
+            selected_id: r.selected.map(|id| id.to_string()),
+            confidence: r.confidence,
+        })
+        .collect();
+
+    // Find dominant entity (highest confidence selected across all mentions)
+    let dominant = resolutions
+        .iter()
+        .filter(|r| r.selected.is_some() && r.confidence >= 0.5)
+        .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap())
+        .and_then(|r| {
+            r.candidates
+                .iter()
+                .find(|c| Some(c.entity_id) == r.selected)
+        });
+
+    let dominant_entity = dominant.map(|c| EntityCandidateResponse {
+        entity_id: c.entity_id.to_string(),
+        entity_kind: c.entity_kind.clone(),
+        canonical_name: c.canonical_name.clone(),
+        score: c.score,
+        evidence: c.evidence.iter().map(evidence_to_response).collect(),
+    });
+
+    let dominant_kind = dominant.map(|c| c.entity_kind.clone());
+
+    Json(ExtractEntitiesResponse {
+        snapshot_hash: state.entity_linker.snapshot_hash().to_string(),
+        snapshot_version: state.entity_linker.snapshot_version(),
+        entity_count: state.entity_linker.entity_count(),
+        mentions,
+        dominant_entity,
+        dominant_kind,
+    })
 }
 
 // ============================================================================
