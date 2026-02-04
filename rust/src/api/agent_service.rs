@@ -460,11 +460,8 @@ pub struct AgentService {
     /// Runs BEFORE semantic search for exact/token matches (Phase A of 072)
     lexicon: Option<crate::mcp::verb_search::SharedLexicon>,
     /// Entity linking service for in-memory entity mention extraction and resolution
-    /// Used to extract entity mentions BEFORE verb search for context enrichment
+    /// Used by LookupService for verb-first entity resolution
     entity_linker: Option<Arc<dyn crate::entity_linking::EntityLinkingService>>,
-    /// Unified lookup service combining verb search + entity linking
-    /// Implements verb-first ordering: verbs → expected_kinds → entity resolution
-    lookup_service: Option<Arc<crate::lookup::LookupService>>,
 }
 
 #[allow(dead_code)]
@@ -495,7 +492,6 @@ impl AgentService {
             learned_data,
             lexicon,
             entity_linker: None,
-            lookup_service: None,
         }
     }
 
@@ -505,19 +501,6 @@ impl AgentService {
         entity_linker: Arc<dyn crate::entity_linking::EntityLinkingService>,
     ) -> Self {
         self.entity_linker = Some(entity_linker);
-        self
-    }
-
-    /// Set unified lookup service for verb-first dual search
-    ///
-    /// When set, process_chat() uses LookupService.analyze() instead of
-    /// separate entity linking and verb search calls. This implements
-    /// verb-first ordering: verbs → expected_kinds → entity resolution.
-    pub fn with_lookup_service(
-        mut self,
-        lookup_service: Arc<crate::lookup::LookupService>,
-    ) -> Self {
-        self.lookup_service = Some(lookup_service);
         self
     }
 
@@ -662,16 +645,9 @@ impl AgentService {
 
     /// Get or build the LookupService for unified verb + entity discovery
     ///
-    /// Returns None if entity_linker is not configured (graceful degradation)
+    /// Returns None if entity_linker is not configured (graceful degradation).
+    /// Builds on-demand using existing components (entity_linker, verb_searcher, lexicon).
     fn get_lookup_service(&self) -> Option<crate::lookup::LookupService> {
-        // If already configured externally, rebuild with current components
-        if self.lookup_service.is_some() {
-            return Some(
-                crate::lookup::LookupService::new(self.entity_linker.clone()?)
-                    .with_verb_searcher(Arc::new(self.build_verb_searcher())),
-            );
-        }
-
         // Build on demand if we have entity_linker
         let entity_linker = self.entity_linker.clone()?;
         let verb_searcher = Arc::new(self.build_verb_searcher());
