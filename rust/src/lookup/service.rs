@@ -4,7 +4,7 @@
 //! using verb schema to constrain entity kinds.
 
 use crate::entity_linking::{EntityLinkingService, EntityResolution, StubEntityLinkingService};
-use crate::lexicon::{LexiconService, StubLexiconService};
+use crate::lexicon::LexiconService;
 use crate::mcp::verb_search::{HybridVerbSearcher, VerbSearchResult};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -98,14 +98,7 @@ impl LookupService {
     /// 2. Derive expected entity kinds from verb schema
     /// 3. Resolve entities with kind constraints
     pub async fn analyze(&self, utterance: &str, limit: usize) -> LookupResult {
-        // Step 1: Extract concepts (if lexicon available)
-        let concepts = self
-            .lexicon
-            .as_ref()
-            .map(|l| l.extract_concepts(utterance))
-            .unwrap_or_default();
-
-        // Step 2: Verb search
+        // Step 1: Verb search (verb-first ordering)
         let verbs = if let Some(searcher) = &self.verb_searcher {
             searcher
                 .search(utterance, None, None, limit)
@@ -120,10 +113,10 @@ impl LookupService {
             .map(|v| v.score >= 0.65) // Clear match threshold
             .unwrap_or(false);
 
-        // Step 3: Derive expected kinds from top verb(s)
+        // Step 2: Derive expected kinds from top verb(s)
         let expected_kinds = self.derive_expected_kinds(&verbs);
 
-        // Step 4: Entity resolution with kind constraints
+        // Step 3: Entity resolution with kind constraints (informed by verb schema)
         let kind_refs: Vec<String> = expected_kinds.clone();
         let kind_constraint = if kind_refs.is_empty() {
             None
@@ -134,26 +127,22 @@ impl LookupService {
         let entities = self.entity_linker.resolve_mentions(
             utterance,
             kind_constraint,
-            if concepts.is_empty() {
-                None
-            } else {
-                Some(&concepts)
-            },
+            None, // No concept context for now
             limit,
         );
 
-        // Step 5: Find dominant entity
+        // Step 4: Find dominant entity
         let dominant_entity = self.find_dominant(&entities);
-        let entities_resolved = dominant_entity.is_some();
+        let has_dominant = dominant_entity.is_some();
 
         LookupResult {
             verbs,
             entities,
             dominant_entity,
             expected_kinds,
-            concepts,
+            concepts: vec![], // Concepts not extracted in this version
             verb_matched,
-            entities_resolved,
+            entities_resolved: has_dominant,
         }
     }
 
@@ -176,6 +165,7 @@ impl LookupService {
         );
 
         let dominant_entity = self.find_dominant(&entities);
+        let has_dominant = dominant_entity.is_some();
 
         LookupResult {
             verbs: vec![],
@@ -184,7 +174,7 @@ impl LookupService {
             expected_kinds: expected_kinds.to_vec(),
             concepts: vec![],
             verb_matched: false,
-            entities_resolved: dominant_entity.is_some(),
+            entities_resolved: has_dominant,
         }
     }
 
@@ -195,7 +185,7 @@ impl LookupService {
     fn derive_expected_kinds(&self, verbs: &[VerbSearchResult]) -> Vec<String> {
         use crate::dsl_v2::verb_registry::registry;
 
-        let mut kinds = Vec::new();
+        let mut kinds: Vec<String> = Vec::new();
         let reg = registry();
 
         // Check top 3 verb candidates
@@ -205,7 +195,7 @@ impl LookupService {
                 continue;
             }
 
-            if let Some(verb_def) = reg.get_verb(parts[0], parts[1]) {
+            if let Some(verb_def) = reg.get_runtime_verb(parts[0], parts[1]) {
                 for arg in &verb_def.args {
                     // Args with lookup config expect entity types
                     if let Some(lookup) = &arg.lookup {

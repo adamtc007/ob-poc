@@ -97,6 +97,10 @@ pub mod lexicon;
 #[cfg(feature = "database")]
 pub mod entity_linking;
 
+// Lookup module - Unified verb search + entity linking with verb-first ordering
+#[cfg(feature = "database")]
+pub mod lookup;
+
 // GLEIF integration - LEI data enrichment and corporate tree traversal
 #[cfg(feature = "database")]
 pub mod gleif;

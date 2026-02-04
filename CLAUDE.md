@@ -31,6 +31,7 @@
 > **Macro Vocabulary (063):** ✅ Complete - party.yaml macros, macro/implementation separation documented
 > **CBU Structure Macros (064):** ✅ Complete - M1-M18 jurisdiction macros, document bundles, placeholder entities, role cardinality, wizard UI
 > **ESPER Navigation Crates (065):** ✅ Complete - 5 new crates (esper_snapshot, esper_core, esper_input, esper_policy, esper_egui), 158 tests
+> **Unified Lookup Service (074):** ✅ Complete - Verb-first dual search combining verb discovery + entity linking
 > **Lexicon Service (072):** ✅ Complete - In-memory verb/domain/concept lookup with bincode snapshots
 > **Entity Linking Service (073):** ✅ Complete - In-memory entity resolution with mention extraction, token overlap matching
 
@@ -3909,6 +3910,124 @@ If no entity snapshot is available, `StubEntityLinkingService` is used:
 
 ---
 
+## Unified Lookup Service (074)
+
+> ✅ **IMPLEMENTED (2026-02-04)**: Consolidated verb search + entity linking with verb-first ordering.
+
+The LookupService unifies verb discovery and entity resolution into a single analysis pass, implementing **verb-first ordering**: verbs are searched first, then expected entity kinds are derived from verb schema, and finally entities are resolved with kind constraints.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  UNIFIED LOOKUP SERVICE - Verb-First Ordering                                │
+│                                                                              │
+│  User: "Load the Allianz book"                                              │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Step 1: VERB SEARCH (HybridVerbSearcher)                           │    │
+│  │  "load the allianz book" → session.load-galaxy (score: 0.85)        │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Step 2: DERIVE EXPECTED KINDS (from verb schema)                   │    │
+│  │  session.load-galaxy has :apex-entity-id arg with lookup config     │    │
+│  │  → expected_kinds: ["company", "client_group"]                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Step 3: ENTITY RESOLUTION (EntityLinkingService)                   │    │
+│  │  "allianz" + kind_constraint → Allianz SE (score: 0.92)            │    │
+│  │  Kind constraint boosts company matches, penalizes person matches   │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  LookupResult {                                                              │
+│    verbs: [session.load-galaxy @ 0.85, ...],                                │
+│    entities: [Allianz SE @ 0.92],                                           │
+│    dominant_entity: Allianz SE,                                             │
+│    expected_kinds: ["company", "client_group"],                             │
+│    verb_matched: true,                                                       │
+│    entities_resolved: true                                                   │
+│  }                                                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Insight: Verb-First vs Entity-First
+
+| Approach | Flow | Problem |
+|----------|------|---------|
+| **Entity-first** | Entities → Verbs | "Goldman" matches 50 people AND the company |
+| **Verb-first** | Verbs → Expected Kinds → Entities | "isda.create" expects company → "Goldman" = Goldman Sachs Group |
+
+Verb-first ordering uses verb schema to **constrain** entity resolution, dramatically improving accuracy.
+
+### Key Types
+
+| Type | Module | Purpose |
+|------|--------|---------|
+| `LookupService` | `lookup::service` | Unified analysis combining verb search + entity linking |
+| `LookupResult` | `lookup::service` | Combined result with verbs, entities, dominant entity |
+| `DominantEntity` | `lookup::service` | Highest confidence resolved entity |
+
+### LookupResult Fields
+
+```rust
+pub struct LookupResult {
+    /// Verb candidates from search (sorted by score)
+    pub verbs: Vec<VerbSearchResult>,
+    
+    /// Entity resolutions with kind-constrained scoring
+    pub entities: Vec<EntityResolution>,
+    
+    /// Dominant entity (highest confidence, kind-matched)
+    pub dominant_entity: Option<DominantEntity>,
+    
+    /// Expected entity kinds derived from top verb(s)
+    pub expected_kinds: Vec<String>,
+    
+    /// Whether verb search found a clear winner (score >= 0.65)
+    pub verb_matched: bool,
+    
+    /// Whether entity resolution found unambiguous matches
+    pub entities_resolved: bool,
+}
+```
+
+### Integration in AgentService
+
+The `LookupService` is built on-demand in `AgentService.get_lookup_service()` using existing components:
+
+```rust
+// AgentService.process_chat() uses unified lookup when entity_linker is configured
+let (entity_resolution_debug, dominant_entity_id, resolved_kinds) =
+    if let Some(lookup_service) = self.get_lookup_service() {
+        // Unified path: verb-first ordering
+        let lookup_result = lookup_service.analyze(&request.message, 5).await;
+        // ... build debug info from lookup_result
+    } else {
+        // Legacy path: separate entity linking
+        self.extract_entity_mentions(&request.message, None)
+    };
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/lookup/mod.rs` | Module exports |
+| `rust/src/lookup/service.rs` | `LookupService` implementation |
+| `rust/src/api/agent_service.rs` | `get_lookup_service()` builder, integration in `process_chat()` |
+
+### Graceful Degradation
+
+If `entity_linker` is not configured (no snapshot), `get_lookup_service()` returns `None` and the legacy path is used. This ensures the pipeline always works, with enhanced accuracy when entity linking is available.
+
+---
+
 ## Key Directories
 
 ```
@@ -4018,6 +4137,7 @@ When you see these in a task, read the corresponding annex first:
 | "LSP", "language server", "completion", "diagnostics", "dsl-lsp" | CLAUDE.md §DSL Language Server |
 | "lexicon", "verb lookup", "domain lookup", "LexiconService" | CLAUDE.md §Lexicon Service (072) |
 | "entity linking", "mention extraction", "entity resolution", "EntityLinkingService" | CLAUDE.md §Entity Linking Service (073) |
+| "lookup service", "verb-first", "dual search", "LookupService" | CLAUDE.md §Unified Lookup Service (074) |
 
 ---
 

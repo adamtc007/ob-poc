@@ -107,7 +107,7 @@ use crate::api::client_group_adapter::ClientGroupEmbedderAdapter;
 use crate::api::dsl_builder::{build_dsl_program, build_user_dsl_program, validate_intent};
 use crate::api::intent::{IntentValidation, ParamValue, VerbIntent};
 use crate::api::session::{DisambiguationItem, DisambiguationRequest, EntityMatchOption};
-use crate::database::{derive_semantic_state, VerbService};
+use crate::database::derive_semantic_state;
 use crate::dsl_v2::ast::AstNode;
 use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::ref_resolver::ResolveResult;
@@ -462,6 +462,9 @@ pub struct AgentService {
     /// Entity linking service for in-memory entity mention extraction and resolution
     /// Used to extract entity mentions BEFORE verb search for context enrichment
     entity_linker: Option<Arc<dyn crate::entity_linking::EntityLinkingService>>,
+    /// Unified lookup service combining verb search + entity linking
+    /// Implements verb-first ordering: verbs → expected_kinds → entity resolution
+    lookup_service: Option<Arc<crate::lookup::LookupService>>,
 }
 
 #[allow(dead_code)]
@@ -492,6 +495,7 @@ impl AgentService {
             learned_data,
             lexicon,
             entity_linker: None,
+            lookup_service: None,
         }
     }
 
@@ -501,6 +505,19 @@ impl AgentService {
         entity_linker: Arc<dyn crate::entity_linking::EntityLinkingService>,
     ) -> Self {
         self.entity_linker = Some(entity_linker);
+        self
+    }
+
+    /// Set unified lookup service for verb-first dual search
+    ///
+    /// When set, process_chat() uses LookupService.analyze() instead of
+    /// separate entity linking and verb search calls. This implements
+    /// verb-first ordering: verbs → expected_kinds → entity resolution.
+    pub fn with_lookup_service(
+        mut self,
+        lookup_service: Arc<crate::lookup::LookupService>,
+    ) -> Self {
+        self.lookup_service = Some(lookup_service);
         self
     }
 
@@ -611,9 +628,8 @@ impl AgentService {
         (Some(debug), dominant_id, resolved_kinds)
     }
 
-    /// Create IntentPipeline for processing user input
-    fn get_intent_pipeline(&self) -> IntentPipeline {
-        let _verb_service = Arc::new(VerbService::new(self.pool.clone()));
+    /// Build the verb searcher with macro registry
+    fn build_verb_searcher(&self) -> crate::mcp::verb_search::HybridVerbSearcher {
         let dyn_embedder: Arc<dyn crate::agent::learning::embedder::Embedder> =
             self.embedder.clone() as Arc<dyn crate::agent::learning::embedder::Embedder>;
 
@@ -629,17 +645,45 @@ impl AgentService {
         });
 
         // Use factory for consistent configuration across all call sites
-        // Note: lexicon is passed as None here; it will be wired via AgentService.lexicon field
-        // once the snapshot is loaded at server startup
-        let searcher = VerbSearcherFactory::build(
+        VerbSearcherFactory::build(
             &self.pool,
             dyn_embedder,
             self.learned_data.clone(),
             Arc::new(macro_reg),
             self.lexicon.clone(),
-        );
+        )
+    }
 
+    /// Create IntentPipeline for processing user input
+    fn get_intent_pipeline(&self) -> IntentPipeline {
+        let searcher = self.build_verb_searcher();
         IntentPipeline::with_pool(searcher, self.pool.clone())
+    }
+
+    /// Get or build the LookupService for unified verb + entity discovery
+    ///
+    /// Returns None if entity_linker is not configured (graceful degradation)
+    fn get_lookup_service(&self) -> Option<crate::lookup::LookupService> {
+        // If already configured externally, rebuild with current components
+        if self.lookup_service.is_some() {
+            return Some(
+                crate::lookup::LookupService::new(self.entity_linker.clone()?)
+                    .with_verb_searcher(Arc::new(self.build_verb_searcher())),
+            );
+        }
+
+        // Build on demand if we have entity_linker
+        let entity_linker = self.entity_linker.clone()?;
+        let verb_searcher = Arc::new(self.build_verb_searcher());
+
+        let mut lookup_svc = crate::lookup::LookupService::new(entity_linker);
+        lookup_svc = lookup_svc.with_verb_searcher(verb_searcher);
+
+        if let Some(ref lexicon) = self.lexicon {
+            lookup_svc = lookup_svc.with_lexicon(lexicon.clone());
+        }
+
+        Some(lookup_svc)
     }
 
     /// Pre-resolve available entities from EntityGateway before LLM call
@@ -1105,13 +1149,101 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // Clear pending intent tier if user typed something new
         session.pending_intent_tier = None;
 
-        // ENTITY LINKING - Extract entity mentions BEFORE verb search
-        // This provides:
-        // 1. Entity context for verb search (kind hints)
-        // 2. Pre-resolved entities for DSL generation
-        // 3. Debug info for explainability
+        // UNIFIED LOOKUP - Verb-first dual search
+        // If LookupService is available (entity_linker configured), use it for combined
+        // verb + entity discovery. Otherwise fall back to separate entity linking.
         let (entity_resolution_debug, dominant_entity_id, resolved_kinds) =
-            self.extract_entity_mentions(&request.message, None);
+            if let Some(lookup_service) = self.get_lookup_service() {
+                // Unified path: verb-first ordering
+                let lookup_result = lookup_service.analyze(&request.message, 5).await;
+
+                tracing::debug!(
+                    verb_matched = lookup_result.verb_matched,
+                    entities_resolved = lookup_result.entities_resolved,
+                    verb_count = lookup_result.verbs.len(),
+                    entity_count = lookup_result.entities.len(),
+                    expected_kinds = ?lookup_result.expected_kinds,
+                    "LookupService analysis completed"
+                );
+
+                // Build debug info from lookup result
+                let er_debug = if !lookup_result.entities.is_empty()
+                    || lookup_result.dominant_entity.is_some()
+                {
+                    let mentions: Vec<ob_poc_types::EntityMentionDebug> = lookup_result
+                        .entities
+                        .iter()
+                        .map(|r| {
+                            let candidates: Vec<ob_poc_types::EntityCandidateDebug> = r
+                                .candidates
+                                .iter()
+                                .take(3)
+                                .map(|c| ob_poc_types::EntityCandidateDebug {
+                                    entity_id: c.entity_id.to_string(),
+                                    entity_kind: c.entity_kind.clone(),
+                                    canonical_name: c.canonical_name.clone(),
+                                    score: c.score,
+                                    evidence: c
+                                        .evidence
+                                        .iter()
+                                        .map(|e| format!("{:?}", e))
+                                        .collect(),
+                                })
+                                .collect();
+
+                            ob_poc_types::EntityMentionDebug {
+                                span: r.mention_span,
+                                text: r.mention_text.clone(),
+                                candidates,
+                                selected_id: r.selected.map(|id| id.to_string()),
+                                confidence: r.confidence,
+                            }
+                        })
+                        .collect();
+
+                    let dominant_debug = lookup_result.dominant_entity.as_ref().map(|d| {
+                        ob_poc_types::EntityCandidateDebug {
+                            entity_id: d.entity_id.to_string(),
+                            entity_kind: d.entity_kind.clone(),
+                            canonical_name: d.canonical_name.clone(),
+                            score: d.confidence,
+                            evidence: vec![],
+                        }
+                    });
+
+                    Some(ob_poc_types::EntityResolutionDebug {
+                        snapshot_hash: self
+                            .entity_linker
+                            .as_ref()
+                            .map(|l| l.snapshot_hash().to_string())
+                            .unwrap_or_else(|| "unknown".to_string()),
+                        entity_count: self
+                            .entity_linker
+                            .as_ref()
+                            .map(|l| l.entity_count())
+                            .unwrap_or(0),
+                        mentions,
+                        dominant_entity: dominant_debug,
+                        expected_kinds: lookup_result.expected_kinds.clone(),
+                    })
+                } else {
+                    None
+                };
+
+                let dominant_id = lookup_result.dominant_entity.as_ref().map(|d| d.entity_id);
+                let kinds: Vec<String> = lookup_result
+                    .entities
+                    .iter()
+                    .filter(|r| r.selected.is_some())
+                    .filter_map(|r| r.candidates.first())
+                    .map(|c| c.entity_kind.clone())
+                    .collect();
+
+                (er_debug, dominant_id, kinds)
+            } else {
+                // Legacy path: separate entity linking
+                self.extract_entity_mentions(&request.message, None)
+            };
 
         if let Some(ref er_debug) = entity_resolution_debug {
             tracing::debug!(
@@ -1120,7 +1252,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
                 mention_count = er_debug.mentions.len(),
                 dominant = ?er_debug.dominant_entity.as_ref().map(|e| &e.canonical_name),
                 resolved_kinds = ?resolved_kinds,
-                "Entity linking completed"
+                "Entity resolution completed"
             );
         }
 
