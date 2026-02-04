@@ -8,6 +8,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  ExternalLink,
   Loader2,
   MapPin,
   User,
@@ -178,6 +179,23 @@ export function ScopePanel({ sessionId, className = "" }: ScopePanelProps) {
     refetchInterval: 5000, // Refresh every 5 seconds to catch scope changes
   });
 
+  // Open viewport in new window
+  const handlePopOut = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Don't toggle expand/collapse
+    if (!sessionId) return;
+
+    const width = 1200;
+    const height = 800;
+    const left = window.screenX + (window.outerWidth - width) / 2;
+    const top = window.screenY + (window.outerHeight - height) / 2;
+
+    window.open(
+      `/viewport/${sessionId}`,
+      `viewport-${sessionId}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`,
+    );
+  };
+
   // Don't render if no session
   if (!sessionId) {
     return null;
@@ -202,11 +220,11 @@ export function ScopePanel({ sessionId, className = "" }: ScopePanelProps) {
       className={`border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] ${className}`}
     >
       {/* Header */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-[var(--bg-tertiary)] border-b border-[var(--border-primary)]"
-      >
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-primary)]">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-2 hover:bg-[var(--bg-tertiary)] rounded px-1 py-0.5 -ml-1"
+        >
           {isExpanded ? (
             <ChevronDown size={16} className="text-[var(--text-muted)]" />
           ) : (
@@ -220,14 +238,23 @@ export function ScopePanel({ sessionId, className = "" }: ScopePanelProps) {
               {cbuCount}
             </span>
           )}
+        </button>
+        <div className="flex items-center gap-1">
+          {isLoading && (
+            <Loader2
+              size={14}
+              className="animate-spin text-[var(--text-muted)]"
+            />
+          )}
+          <button
+            onClick={handlePopOut}
+            className="p-1 hover:bg-[var(--bg-tertiary)] rounded"
+            title="Open in new window"
+          >
+            <ExternalLink size={14} className="text-[var(--text-muted)]" />
+          </button>
         </div>
-        {isLoading && (
-          <Loader2
-            size={14}
-            className="animate-spin text-[var(--text-muted)]"
-          />
-        )}
-      </button>
+      </div>
 
       {/* Content */}
       {isExpanded && (

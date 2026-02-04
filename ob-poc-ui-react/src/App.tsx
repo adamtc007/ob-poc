@@ -5,6 +5,7 @@ import { AppShell, ErrorBoundary } from "./components";
 import { InspectorPage } from "./features/inspector/InspectorPage";
 import { ChatPage } from "./features/chat/ChatPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
+import { ViewportPage } from "./features/viewport/ViewportPage";
 
 function App() {
   return (
@@ -12,8 +13,19 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
           <Routes>
+            {/* Pop-out viewport window (no AppShell) */}
+            <Route
+              path="viewport/:sessionId"
+              element={
+                <ErrorBoundary>
+                  <ViewportPage />
+                </ErrorBoundary>
+              }
+            />
+
+            {/* Main app with navigation shell */}
             <Route path="/" element={<AppShell />}>
-              <Route index element={<Navigate to="/inspector" replace />} />
+              <Route index element={<Navigate to="/chat" replace />} />
               <Route
                 path="inspector"
                 element={
