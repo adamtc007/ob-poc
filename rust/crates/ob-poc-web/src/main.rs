@@ -467,6 +467,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         // Index.html at root (React app)
         .route("/", get(routes::static_files::serve_index))
+        // SPA fallback: serve index.html for client-side routing
+        // This catches routes like /chat/:id, /viewport/:id, /inspector/:id
+        .fallback(get(routes::static_files::serve_index))
         // Add state
         .with_state(state)
         // Merge stateless API routes (includes session, agent, entity, dsl viewer)
