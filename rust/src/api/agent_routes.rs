@@ -7765,6 +7765,43 @@ async fn handle_decision_reply(
                 DecisionKind::ClarifyScope => {
                     format!("Selected scope: {}", choice.label)
                 }
+                DecisionKind::ClarifyDeal => {
+                    // Handle deal selection
+                    if choice.id == "NEW" {
+                        // User wants to create a new deal
+                        "Let's create a new deal. What would you like to name it?".to_string()
+                    } else if choice.id == "SKIP" {
+                        // User wants to skip deal context
+                        session.context.deal_id = None;
+                        session.context.deal_name = None;
+                        "Continuing without deal context. You can set one later with 'load deal'."
+                            .to_string()
+                    } else {
+                        // User selected an existing deal - extract from payload
+                        if let ob_poc_types::ClarificationPayload::Deal(deal_payload) =
+                            &packet.payload
+                        {
+                            if let Ok(idx) = choice.id.parse::<usize>() {
+                                if let Some(deal) = deal_payload.deals.get(idx.saturating_sub(1)) {
+                                    // Set deal context in session
+                                    if let Ok(deal_uuid) = uuid::Uuid::parse_str(&deal.deal_id) {
+                                        session.context.deal_id = Some(deal_uuid);
+                                        session.context.deal_name = Some(deal.deal_name.clone());
+                                        format!("Now working on deal: {}", deal.deal_name)
+                                    } else {
+                                        "Invalid deal ID".to_string()
+                                    }
+                                } else {
+                                    format!("Selected deal: {}", choice.label)
+                                }
+                            } else {
+                                format!("Selected deal: {}", choice.label)
+                            }
+                        } else {
+                            format!("Selected deal: {}", choice.label)
+                        }
+                    }
+                }
                 _ => format!("Selected: {}", choice.label),
             };
 

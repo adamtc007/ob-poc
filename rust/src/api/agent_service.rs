@@ -1132,6 +1132,20 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // Clear pending intent tier if user typed something new
         session.pending_intent_tier = None;
 
+        // =====================================================================
+        // SESSION CONTEXT CHECK - Client Group → Deal flow
+        // =====================================================================
+        // At the start of a session, we need:
+        // 1. Client group set (who are we working with?)
+        // 2. Deal context (which deal are we working on?)
+        //
+        // If client group is set but no deal, check for existing deals and prompt.
+        // This makes "deal" a first-class concept the agent understands.
+        // =====================================================================
+        if let Some(decision) = self.check_session_context(session).await {
+            return Ok(decision);
+        }
+
         // UNIFIED LOOKUP - Verb-first dual search
         // If LookupService is available (entity_linker configured), use it for combined
         // verb + entity discovery. Otherwise fall back to separate entity linking.
@@ -1373,6 +1387,170 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return true;
         }
         false
+    }
+
+    /// Check session context and prompt for client group or deal if needed
+    ///
+    /// Returns Some(response) if context needs to be set, None to continue processing
+    async fn check_session_context(
+        &self,
+        session: &mut UnifiedSession,
+    ) -> Option<AgentChatResponse> {
+        use crate::database::DealRepository;
+        use ob_poc_types::{
+            ClarificationPayload, DealClarificationPayload, DealOption, DecisionKind,
+            DecisionPacket, DecisionTrace, SessionStateView, UserChoice,
+        };
+
+        // Skip context check if session already has deal context
+        if session.context.deal_id.is_some() {
+            return None;
+        }
+
+        // Check if client group is set
+        let client_group_id = match session.context.client_group_id() {
+            Some(id) => id,
+            None => {
+                // No client group - let the normal flow handle ClarifyGroup
+                // or user can say "work on Allianz" etc.
+                return None;
+            }
+        };
+
+        let client_group_name = session
+            .context
+            .client_group_name()
+            .unwrap_or("Unknown")
+            .to_string();
+
+        // Client group is set but no deal - check for existing deals
+        let deals =
+            match DealRepository::get_deals_for_client_group(&self.pool, client_group_id).await {
+                Ok(deals) => deals,
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to fetch deals for client group");
+                    return None; // Continue without deal context
+                }
+            };
+
+        // Build deal options
+        let deal_options: Vec<DealOption> = deals
+            .iter()
+            .map(|d| DealOption {
+                deal_id: d.deal_id.to_string(),
+                deal_name: d.deal_name.clone(),
+                deal_status: d.deal_status.clone(),
+                product_count: d.product_count,
+                summary: Some(format!(
+                    "{} products, {}",
+                    d.product_count,
+                    d.deal_status.to_lowercase()
+                )),
+            })
+            .collect();
+
+        // Build choices for UI
+        let mut choices: Vec<UserChoice> = deal_options
+            .iter()
+            .enumerate()
+            .map(|(i, d)| UserChoice {
+                id: format!("{}", i + 1),
+                label: d.deal_name.clone(),
+                description: d.summary.clone().unwrap_or_default(),
+                is_escape: false,
+            })
+            .collect();
+
+        // Add "Create new deal" option
+        choices.push(UserChoice {
+            id: "NEW".to_string(),
+            label: "Create new deal".to_string(),
+            description: format!("Start a new deal for {}", client_group_name),
+            is_escape: true,
+        });
+
+        // Add "Skip" option to work without deal context
+        choices.push(UserChoice {
+            id: "SKIP".to_string(),
+            label: "Skip for now".to_string(),
+            description: "Continue without deal context".to_string(),
+            is_escape: true,
+        });
+
+        let prompt = if deals.is_empty() {
+            format!(
+                "No deals found for {}. Would you like to create one?",
+                client_group_name
+            )
+        } else {
+            format!(
+                "Found {} deal(s) for {}. Which one would you like to work on?",
+                deals.len(),
+                client_group_name
+            )
+        };
+
+        let payload = DealClarificationPayload {
+            client_group_id: client_group_id.to_string(),
+            client_group_name: client_group_name.clone(),
+            deals: deal_options,
+            can_create: true,
+        };
+
+        let packet = DecisionPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            kind: DecisionKind::ClarifyDeal,
+            session: SessionStateView {
+                session_id: Some(session.id),
+                client_group_anchor: Some(client_group_id.to_string()),
+                client_group_name: Some(client_group_name.clone()),
+                persona: None,
+                last_confirmed_verb: None,
+            },
+            utterance: String::new(),
+            payload: ClarificationPayload::Deal(payload),
+            prompt: prompt.clone(),
+            choices,
+            best_plan: None,
+            alternatives: vec![],
+            requires_confirm: false,
+            confirm_token: None,
+            trace: DecisionTrace {
+                config_version: "1.0".to_string(),
+                entity_snapshot_hash: None,
+                lexicon_snapshot_hash: None,
+                semantic_lane_enabled: false,
+                embedding_model_id: None,
+                verb_margin: 0.0,
+                scope_margin: 0.0,
+                kind_margin: 0.0,
+                decision_reason: "session_context_check".to_string(),
+            },
+        };
+
+        // Store pending decision in session
+        session.pending_decision = Some(packet.clone());
+
+        let message = prompt;
+        session.add_agent_message(message.clone(), None, None);
+
+        Some(AgentChatResponse {
+            message,
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::PendingValidation,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: Some(packet),
+        })
     }
 
     /// Handle verb selection from disambiguation (either numeric input or API call)

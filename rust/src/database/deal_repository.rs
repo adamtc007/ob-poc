@@ -192,6 +192,51 @@ impl DealRepository {
         Ok(count.0)
     }
 
+    /// Get deals for a client group (convenience method for session context)
+    /// Returns active deals (excludes CANCELLED, OFFBOARDED)
+    pub async fn get_deals_for_client_group(
+        pool: &PgPool,
+        client_group_id: Uuid,
+    ) -> Result<Vec<DealSummary>> {
+        let rows = sqlx::query_as::<_, DealSummaryRow>(
+            r#"
+            SELECT
+                d.deal_id,
+                d.deal_name,
+                d.deal_reference,
+                d.deal_status,
+                d.primary_client_group_id,
+                cg.canonical_name as client_group_name,
+                d.sales_owner,
+                d.sales_team,
+                d.estimated_revenue,
+                d.currency_code,
+                d.opened_at,
+                d.qualified_at,
+                d.contracted_at,
+                d.active_at,
+                d.closed_at,
+                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_products WHERE deal_id = d.deal_id), 0)::int as product_count,
+                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_rate_cards WHERE deal_id = d.deal_id), 0)::int as rate_card_count,
+                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_participants WHERE deal_id = d.deal_id), 0)::int as participant_count,
+                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_contracts WHERE deal_id = d.deal_id), 0)::int as contract_count,
+                0::int as onboarding_request_count
+            FROM "ob-poc".deals d
+            LEFT JOIN "ob-poc".client_group cg ON cg.id = d.primary_client_group_id
+            WHERE d.primary_client_group_id = $1
+              AND d.deal_status NOT IN ('CANCELLED', 'OFFBOARDED')
+            ORDER BY d.opened_at DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(client_group_id)
+        .fetch_all(pool)
+        .await
+        .context("Failed to fetch deals for client group")?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     // ========================================================================
     // Deal Products Queries
     // ========================================================================

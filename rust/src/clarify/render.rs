@@ -4,8 +4,8 @@
 //! NO hallucination - never invent entities, counts, verbs, or effects.
 
 use ob_poc_types::{
-    ClarificationPayload, DecisionPacket, EffectMode, GroupClarificationPayload, ProposalPayload,
-    RefusePayload, ScopePayload, VerbPayload,
+    ClarificationPayload, DealClarificationPayload, DecisionPacket, EffectMode,
+    GroupClarificationPayload, ProposalPayload, RefusePayload, ScopePayload, VerbPayload,
 };
 
 /// Render a DecisionPacket to user-facing markdown text.
@@ -16,6 +16,7 @@ pub fn render_decision_packet(packet: &DecisionPacket) -> String {
     match &packet.payload {
         ClarificationPayload::Proposal(p) => render_proposal(packet, p),
         ClarificationPayload::Group(g) => render_group_clarification(packet, g),
+        ClarificationPayload::Deal(d) => render_deal_clarification(packet, d),
         ClarificationPayload::Verb(v) => render_verb_clarification(packet, v),
         ClarificationPayload::Scope(s) => render_scope_clarification(packet, s),
         ClarificationPayload::Refuse(r) => render_refuse(packet, r),
@@ -196,6 +197,54 @@ pub fn render_scope_clarification(_packet: &DecisionPacket, payload: &ScopePaylo
         "Type a letter (A/B/C...) to select, or **NARROW** followed by a term to filter."
             .to_string(),
     );
+
+    lines.join("\n")
+}
+
+/// Render a Deal clarification (deal selection)
+pub fn render_deal_clarification(
+    _packet: &DecisionPacket,
+    payload: &DealClarificationPayload,
+) -> String {
+    let mut lines = Vec::new();
+
+    if payload.deals.is_empty() {
+        lines.push("## No Deals Found".to_string());
+        lines.push(String::new());
+        lines.push(format!(
+            "No active deals found for **{}**.",
+            payload.client_group_name
+        ));
+        lines.push(String::new());
+        lines.push("Would you like to:".to_string());
+        lines.push(String::new());
+        lines.push("**NEW** - Create a new deal".to_string());
+        lines.push("**SKIP** - Continue without deal context".to_string());
+    } else {
+        lines.push("## Select Deal".to_string());
+        lines.push(String::new());
+        lines.push(format!(
+            "Found {} deal(s) for **{}**. Which one would you like to work on?",
+            payload.deals.len(),
+            payload.client_group_name
+        ));
+        lines.push(String::new());
+
+        for (i, deal) in payload.deals.iter().enumerate() {
+            let key = i + 1;
+            lines.push(format!(
+                "**{}. {}** [{}]",
+                key, deal.deal_name, deal.deal_status
+            ));
+            if let Some(summary) = &deal.summary {
+                lines.push(format!("   {}", summary));
+            }
+            lines.push(String::new());
+        }
+
+        lines.push("---".to_string());
+        lines.push("Type a number to select, **NEW** to create a new deal, or **SKIP** to continue without deal context.".to_string());
+    }
 
     lines.join("\n")
 }

@@ -2634,6 +2634,8 @@ pub enum DecisionKind {
     Proposal,
     /// Missing/ambiguous client group anchor
     ClarifyGroup,
+    /// Select deal from client's deals (0..n deals available)
+    ClarifyDeal,
     /// Ambiguous verb intent (wraps VerbDisambiguationRequest)
     ClarifyVerb,
     /// Ambiguous scope/tier (wraps IntentTierRequest)
@@ -2729,6 +2731,8 @@ pub enum ClarificationPayload {
     Proposal(ProposalPayload),
     /// Client group selection
     Group(GroupClarificationPayload),
+    /// Deal selection (after client group is set)
+    Deal(DealClarificationPayload),
     /// Verb disambiguation (wraps existing type)
     Verb(VerbPayload),
     /// Scope/tier disambiguation (wraps existing type)
@@ -2801,6 +2805,36 @@ pub struct GroupOption {
     pub score: f32,
     /// How it was found: alias, session, explicit
     pub method: String,
+}
+
+/// Deal clarification payload - select from client's deals
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DealClarificationPayload {
+    /// Client group context
+    pub client_group_id: String,
+    /// Client group name for display
+    pub client_group_name: String,
+    /// Deal options (empty = no deals, offer to create)
+    pub deals: Vec<DealOption>,
+    /// Whether user can create a new deal
+    #[serde(default = "default_true")]
+    pub can_create: bool,
+}
+
+/// A single deal option
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DealOption {
+    /// Deal ID
+    pub deal_id: String,
+    /// Deal name
+    pub deal_name: String,
+    /// Deal status (PROSPECT, QUALIFYING, NEGOTIATING, etc.)
+    pub deal_status: String,
+    /// Product count in deal
+    pub product_count: i32,
+    /// Brief summary
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
 }
 
 /// Verb clarification payload (wraps verb options)
