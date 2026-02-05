@@ -2241,6 +2241,59 @@ legal_contracts (client_label: "allianz")
 
 ---
 
+## Deals
+
+**Commands:**
+| Command | Description |
+|---------|-------------|
+| `deal_get` | Get deal details with products, rate cards, participants |
+| `deal_list` | List deals (filter by client group) |
+| `deal_create` | Create new deal for client |
+| `deal_graph` | Get deal taxonomy graph for visualization |
+
+**Natural Language:**
+| Say | DSL |
+|-----|-----|
+| "show the Allianz deal" | `(session.load-deal :deal-name "Allianz")` |
+| "load deal" | Prompts to select from available deals |
+| "create a deal for Aviva" | `(deal.create :client-group "Aviva" :name "Aviva Custody 2024")` |
+| "what deals are there?" | `(deal.list)` |
+| "show deal products" | `(deal.list-products :deal-id @deal)` |
+| "add product to deal" | `(deal.add-product :deal-id @deal :product-code "CUSTODY")` |
+
+**Deal Hierarchy:**
+```
+Deal (root)
+├── Products (commercial scope)
+│   └── Rate Cards
+│       └── Rate Card Lines
+├── Participants (regional LEIs)
+├── Contracts (legal agreements)
+├── Onboarding Requests
+│   └── CBU (if onboarded)
+└── Billing Profiles
+```
+
+**DSL Syntax:**
+```clojure
+;; Load deal into session context
+(session.load-deal :deal-name "Allianz Global Custody")
+
+;; Create a new deal
+(deal.create :client-group-id @client :name "Aviva Custody 2024" :as @deal)
+
+;; Add products and rate cards
+(deal.add-product :deal-id @deal :product-code "CUSTODY")
+(deal.add-rate-card :deal-id @deal :product-code "CUSTODY" :effective-date "2024-01-01")
+
+;; Get deal graph for visualization
+(deal.graph :deal-id @deal :view-mode "COMMERCIAL")
+```
+
+**Response:** `{"deal_id": "...", "deal_name": "Allianz Global Custody", "products": [...], "participants": [...]}`
+
+---
+
 ## Workflow & Templates
 
 **Commands:**
