@@ -15,6 +15,8 @@ We provide **custody and fund administration services** to investment funds. To 
 │                        THE QUESTIONS WE MUST ANSWER                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
+│  HOW did we win this business?          →  Deal Record & Fee Billing        │
+│                                                                              │
 │  WHO owns/controls this structure?      →  Ownership & Control Model        │
 │                                                                              │
 │  WHAT services do we provide?           →  Products & Subscriptions         │
@@ -930,7 +932,128 @@ We provide **custody and fund administration services** to investment funds. To 
 
 ---
 
-## 11. How It All Fits Together
+## 11. Deal Record & Fee Billing: HOW did we win this business?
+
+**Business Problem:** Before we can service a fund, we must WIN the business. Deals track the commercial origination lifecycle - from first conversation through signed contracts to billing.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│                         DEAL LIFECYCLE                                       │
+│                                                                              │
+│   PROSPECT → QUALIFYING → NEGOTIATING → CONTRACTED → ONBOARDING → ACTIVE    │
+│                                                          │                   │
+│                                                          ▼                   │
+│                                                    ┌──────────┐              │
+│                                                    │  CBUs    │              │
+│                                                    │ Created  │              │
+│                                                    └──────────┘              │
+│                                                                              │
+│   ┌─────────────────────────────────────────────────────────────────┐       │
+│   │                                                                 │       │
+│   │                      DEAL STRUCTURE                             │       │
+│   │                                                                 │       │
+│   │                    ┌──────────────┐                             │       │
+│   │                    │              │                             │       │
+│   │                    │     DEAL     │ "Blackrock PB 2026"         │       │
+│   │                    │              │                             │       │
+│   │                    └──────┬───────┘                             │       │
+│   │                           │                                     │       │
+│   │    ┌──────────────────────┼──────────────────────┐             │       │
+│   │    │                      │                      │             │       │
+│   │    ▼                      ▼                      ▼             │       │
+│   │ ┌─────────────┐    ┌─────────────┐       ┌─────────────┐       │       │
+│   │ │ PARTICIPANTS│    │  RATE CARDS │       │  CONTRACTS  │       │       │
+│   │ │             │    │             │       │             │       │       │
+│   │ │ Blackrock   │    │ Custody:    │       │ MSA #1234   │       │       │
+│   │ │ UK Ltd      │    │ 5 bps AUM   │       │             │       │       │
+│   │ │ (Primary)   │    │             │       │ Schedule A  │       │       │
+│   │ └─────────────┘    └─────────────┘       └─────────────┘       │       │
+│   │                           │                                     │       │
+│   │                           ▼                                     │       │
+│   │                    ┌─────────────┐                             │       │
+│   │                    │  ONBOARDING │                             │       │
+│   │                    │  REQUESTS   │                             │       │
+│   │                    │             │                             │       │
+│   │                    │ Fund 1 ───► │ → CBU Created               │       │
+│   │                    │ Fund 2 ───► │ → CBU Created               │       │
+│   │                    └─────────────┘                             │       │
+│   │                                                                 │       │
+│   └─────────────────────────────────────────────────────────────────┘       │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### The Closed-Loop Billing Model
+
+**The key insight:** The same rate agreed in the deal MUST match the rate we bill.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│                     NEGOTIATION → BILLING AUDIT TRAIL                        │
+│                                                                              │
+│                                                                              │
+│    DEAL PHASE                    BILLING PHASE                              │
+│    ══════════                    ═════════════                              │
+│                                                                              │
+│    deal_rate_card_lines          fee_billing_account_targets                │
+│    ┌────────────────────┐        ┌────────────────────┐                     │
+│    │ line_id: ABC-123   │───────►│ rate_card_line_id: │                     │
+│    │ fee_type: CUSTODY  │        │    ABC-123         │                     │
+│    │ rate_bps: 5.0      │        │                    │                     │
+│    │ status: AGREED     │        │ Billable Account   │                     │
+│    └────────────────────┘        └─────────┬──────────┘                     │
+│                                            │                                 │
+│                                            ▼                                 │
+│                                  fee_billing_period_lines                   │
+│                                  ┌────────────────────┐                     │
+│                                  │ rate_card_line_id: │                     │
+│                                  │    ABC-123         │                     │
+│                                  │                    │                     │
+│                                  │ calculated_amount: │                     │
+│                                  │    $50,000         │                     │
+│                                  └────────────────────┘                     │
+│                                                                              │
+│    ═══════════════════════════════════════════════════════════════════      │
+│                                                                              │
+│    AUDIT PROOF: Line ABC-123 agreed at 5 bps, billed at 5 bps.             │
+│                 Same line_id from negotiation through invoice.              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Tables
+
+| Table | Purpose |
+|-------|---------|
+| `deals` | Master deal record linked to client_group |
+| `deal_participants` | Contracting parties (entities with roles) |
+| `deal_rate_cards` | Pricing proposals (DRAFT → PROPOSED → AGREED) |
+| `deal_rate_card_lines` | Individual fee schedules |
+| `deal_contracts` | Links to legal_contracts |
+| `deal_onboarding_requests` | Handoff to onboarding → CBU creation |
+| `fee_billing_profiles` | Billing configuration per CBU + Product |
+| `fee_billing_periods` | Monthly/quarterly billing cycles |
+| `fee_billing_period_lines` | Calculated fees linked back to agreed rates |
+
+### Pricing Models
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│   Pricing Model   │   Description           │   Required     │
+├───────────────────┼─────────────────────────┼────────────────┤
+│   FLAT            │   Fixed amount/period   │   flat_amount  │
+│   BPS             │   Basis points on AUM   │   rate_bps,    │
+│                   │                         │   fee_basis    │
+│   TIERED          │   Tiered brackets       │   tier_brackets│
+│   PER_TX          │   Per transaction       │   per_tx_rate  │
+└───────────────────┴─────────────────────────┴────────────────┘
+```
+
+---
+
+## 12. How It All Fits Together
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -994,6 +1117,8 @@ We provide **custody and fund administration services** to investment funds. To 
 
 | Business Need | Model Component | Why This Design |
 |---------------|-----------------|-----------------|
+| Track commercial origination | **Deal Record** | Full lifecycle from prospect to onboarded, linked to client_group |
+| Audit fee billing | **Fee Billing + Rate Cards** | Same line_id from negotiation → invoice (closed-loop proof) |
 | Service multiple fund types uniformly | **CBU** | Single abstraction for UCITS, AIF, PE, Mandates |
 | Track who's involved | **Entity + Role** | Same person can be Director of Fund A and Investor in Fund B |
 | Identify beneficial owners | **Ownership Chain** | Follow the money up the structure |
@@ -1026,17 +1151,28 @@ We provide **custody and fund administration services** to investment funds. To 
 
 | Term | Definition |
 |------|------------|
+| **AML** | Anti-Money Laundering - regulatory compliance |
+| **AUM** | Assets Under Management - total value of assets serviced |
+| **BPS** | Basis Points - 1/100th of a percent (5 bps = 0.05%) |
 | **CBU** | Client Business Unit - the fund/mandate we service |
+| **Client Group** | Commercial client entity that owns multiple CBUs (e.g., "Allianz") |
+| **CSA** | Credit Support Annex - collateral agreement under ISDA |
+| **Deal** | A commercial opportunity being pursued, from prospect through onboarding |
+| **Deal Participant** | An entity playing a role in the deal (primary contracting party, fee payer, etc.) |
 | **Entity** | Any person (natural) or organization (legal) |
-| **Role** | The capacity in which an entity participates (Director, Custodian, etc.) |
+| **Fee Billing Account Target** | Links a CBU to billable products via the negotiated rate card line |
+| **Fee Billing Period** | A billing cycle (monthly/quarterly) for generating invoices |
+| **Fee Billing Profile** | Billing configuration for a CBU under a contract/product combination |
+| **ISDA** | International Swaps and Derivatives Association master agreement |
+| **KYC** | Know Your Customer - due diligence requirements |
+| **ManCo** | Management Company - the entity that manages the fund |
+| **Onboarding Request** | A request to create a CBU from a deal, triggers handoff to operations |
 | **Product** | A commercial service we sell (Custody, Fund Admin, Transfer Agency) - appears on contracts |
-| **Service** | A business-generic capability (Safekeeping, Settlement, NAV Calc) - what we actually do |
+| **Rate Card** | A set of fee schedules for a deal (DRAFT → PROPOSED → AGREED → SUPERSEDED) |
+| **Rate Card Line** | A single fee schedule (e.g., "Custody at 5 bps on AUM") - flows through to billing |
 | **Resource** | A BNY proprietary delivery endpoint (IBOR System, NAV Engine, Custody Account) - where work runs |
+| **Role** | The capacity in which an entity participates (Director, Custodian, etc.) |
+| **Service** | A business-generic capability (Safekeeping, Settlement, NAV Calc) - what we actually do |
+| **SSI** | Standing Settlement Instructions - where to settle trades |
 | **Subscription** | A CBU's enrollment in a Product via a Contract |
 | **UBO** | Ultimate Beneficial Owner - the human who ultimately owns/controls |
-| **ISDA** | International Swaps and Derivatives Association master agreement |
-| **CSA** | Credit Support Annex - collateral agreement under ISDA |
-| **SSI** | Standing Settlement Instructions - where to settle trades |
-| **KYC** | Know Your Customer - due diligence requirements |
-| **AML** | Anti-Money Laundering - regulatory compliance |
-| **ManCo** | Management Company - the entity that manages the fund |
