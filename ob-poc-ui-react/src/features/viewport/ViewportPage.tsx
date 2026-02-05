@@ -3,6 +3,10 @@
  *
  * This page is designed to be opened in a separate browser window,
  * showing the session's scope (loaded CBUs) in a detailed graph/list view.
+ *
+ * Tabs:
+ * - Structures: List of CBUs with entity drill-down
+ * - Trading Matrix: Hierarchical view of trading universe, SSIs, ISDAs, etc.
  */
 
 import { useParams } from "react-router-dom";
@@ -11,6 +15,7 @@ import {
   Building2,
   ChevronRight,
   ExternalLink,
+  Grid3X3,
   Loader2,
   MapPin,
   RefreshCw,
@@ -20,7 +25,51 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { scopeApi, type CbuSummary, type EntitySummary } from "../../api/scope";
+import { getTradingMatrix } from "../../api/tradingMatrix";
+import { TradingMatrixTree } from "./components/TradingMatrixTree";
 import { queryKeys } from "../../lib/query";
+
+// =============================================================================
+// VIEW TABS
+// =============================================================================
+
+type ViewTab = "structures" | "matrix";
+
+function TabButton({
+  tab,
+  activeTab,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  tab: ViewTab;
+  activeTab: ViewTab;
+  onClick: () => void;
+  icon: React.ElementType;
+  label: string;
+}) {
+  const isActive = tab === activeTab;
+  return (
+    <button
+      onClick={onClick}
+      className={`
+        flex items-center gap-2 px-4 py-2 rounded-lg transition-colors
+        ${
+          isActive
+            ? "bg-[var(--accent-blue)] text-white"
+            : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]"
+        }
+      `}
+    >
+      <Icon size={16} />
+      <span className="text-sm font-medium">{label}</span>
+    </button>
+  );
+}
+
+// =============================================================================
+// STRUCTURE TAB COMPONENTS
+// =============================================================================
 
 function CbuCard({
   cbu,
@@ -73,12 +122,20 @@ function EntityCard({ entity }: { entity: EntitySummary }) {
     <div className="p-3 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
       <div className="flex items-start gap-3">
         {entity.entityType === "person" ? (
-          <User size={18} className="text-[var(--accent-green)] flex-shrink-0 mt-0.5" />
+          <User
+            size={18}
+            className="text-[var(--accent-green)] flex-shrink-0 mt-0.5"
+          />
         ) : (
-          <Users size={18} className="text-[var(--accent-purple)] flex-shrink-0 mt-0.5" />
+          <Users
+            size={18}
+            className="text-[var(--accent-purple)] flex-shrink-0 mt-0.5"
+          />
         )}
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-[var(--text-primary)]">{entity.name}</div>
+          <div className="font-medium text-[var(--text-primary)]">
+            {entity.name}
+          </div>
           <div className="flex items-center gap-2 mt-1 text-sm text-[var(--text-muted)]">
             {entity.entityType && <span>{entity.entityType}</span>}
             {entity.role && (
@@ -126,11 +183,16 @@ function CbuDetailPanel({ cbu }: { cbu: CbuSummary }) {
       <div className="flex-1 overflow-auto p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
-            <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
+            <Loader2
+              size={24}
+              className="animate-spin text-[var(--text-muted)]"
+            />
           </div>
         ) : error ? (
           <div className="text-[var(--accent-red)] text-center py-8">
-            {error instanceof Error ? error.message : "Failed to load CBU details"}
+            {error instanceof Error
+              ? error.message
+              : "Failed to load CBU details"}
           </div>
         ) : (
           <div className="space-y-4">
@@ -159,9 +221,184 @@ function CbuDetailPanel({ cbu }: { cbu: CbuSummary }) {
   );
 }
 
+function StructuresTab({
+  cbus,
+  cbuCount,
+  isLoading,
+  error,
+  errorMessage,
+}: {
+  cbus: CbuSummary[];
+  cbuCount: number;
+  isLoading: boolean;
+  error: Error | null;
+  errorMessage?: string;
+}) {
+  const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
+
+  return (
+    <div className="flex-1 flex overflow-hidden">
+      {/* CBU list (left panel) */}
+      <div className="w-80 flex-shrink-0 border-r border-[var(--border-primary)] overflow-auto p-4">
+        <h2 className="font-medium text-[var(--text-primary)] mb-3">
+          Structures ({cbuCount})
+        </h2>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2
+              size={24}
+              className="animate-spin text-[var(--text-muted)]"
+            />
+          </div>
+        ) : error ? (
+          <div className="text-[var(--accent-red)] text-center py-8">
+            {error.message}
+          </div>
+        ) : errorMessage ? (
+          <div className="text-[var(--text-muted)] text-center py-8">
+            {errorMessage}
+          </div>
+        ) : cbus.length === 0 ? (
+          <div className="text-[var(--text-muted)] text-center py-8">
+            <p>No CBUs loaded.</p>
+            <p className="text-sm mt-2">
+              Use the chat to load a client book or CBU set.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {cbus.map((cbu) => (
+              <CbuCard
+                key={cbu.id}
+                cbu={cbu}
+                isSelected={selectedCbu?.id === cbu.id}
+                onClick={() => setSelectedCbu(cbu)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Detail panel (right) */}
+      <div className="flex-1 overflow-hidden">
+        {selectedCbu ? (
+          <CbuDetailPanel cbu={selectedCbu} />
+        ) : (
+          <div className="h-full flex items-center justify-center text-[var(--text-muted)]">
+            <div className="text-center">
+              <Building2 size={48} className="mx-auto mb-4 opacity-30" />
+              <p>Select a structure to view details</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// TRADING MATRIX TAB
+// =============================================================================
+
+function TradingMatrixTab({
+  cbus,
+  isLoading: scopeLoading,
+}: {
+  cbus: CbuSummary[];
+  isLoading: boolean;
+}) {
+  const [selectedCbuId, setSelectedCbuId] = useState<string | null>(
+    cbus.length > 0 ? cbus[0].id : null,
+  );
+
+  // Fetch trading matrix for selected CBU
+  const {
+    data: matrixData,
+    isLoading: matrixLoading,
+    error: matrixError,
+  } = useQuery({
+    queryKey: ["trading-matrix", selectedCbuId],
+    queryFn: () => getTradingMatrix(selectedCbuId!),
+    enabled: !!selectedCbuId,
+  });
+
+  // Update selection when CBUs change
+  if (cbus.length > 0 && !selectedCbuId) {
+    setSelectedCbuId(cbus[0].id);
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* CBU selector */}
+      {cbus.length > 1 && (
+        <div className="flex-shrink-0 p-3 border-b border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-[var(--text-muted)]">
+              Structure:
+            </label>
+            <select
+              value={selectedCbuId || ""}
+              onChange={(e) => setSelectedCbuId(e.target.value)}
+              className="flex-1 max-w-xs px-3 py-1.5 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-primary)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent-blue)]/50"
+            >
+              {cbus.map((cbu) => (
+                <option key={cbu.id} value={cbu.id}>
+                  {cbu.name} {cbu.jurisdiction && `(${cbu.jurisdiction})`}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Matrix content */}
+      <div className="flex-1 overflow-hidden">
+        {scopeLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2
+              size={24}
+              className="animate-spin text-[var(--text-muted)]"
+            />
+            <span className="ml-2 text-[var(--text-muted)]">
+              Loading scope...
+            </span>
+          </div>
+        ) : cbus.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-[var(--text-muted)]">
+            <div className="text-center">
+              <Grid3X3 size={48} className="mx-auto mb-4 opacity-30" />
+              <p>No CBUs loaded</p>
+              <p className="text-sm mt-2">
+                Load a structure to view its trading matrix
+              </p>
+            </div>
+          </div>
+        ) : (
+          <TradingMatrixTree
+            data={matrixData || null}
+            loading={matrixLoading}
+            error={
+              matrixError
+                ? matrixError instanceof Error
+                  ? matrixError.message
+                  : "Failed to load matrix"
+                : undefined
+            }
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// MAIN VIEWPORT PAGE
+// =============================================================================
+
 export function ViewportPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [selectedCbu, setSelectedCbu] = useState<CbuSummary | null>(null);
+  const [activeTab, setActiveTab] = useState<ViewTab>("structures");
 
   const { data, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: queryKeys.scope(sessionId || ""),
@@ -207,6 +444,26 @@ export function ViewportPage() {
             </p>
           </div>
         </div>
+
+        {/* Tab buttons */}
+        <div className="flex items-center gap-2">
+          <TabButton
+            tab="structures"
+            activeTab={activeTab}
+            onClick={() => setActiveTab("structures")}
+            icon={Building2}
+            label="Structures"
+          />
+          <TabButton
+            tab="matrix"
+            activeTab={activeTab}
+            onClick={() => setActiveTab("matrix")}
+            icon={Grid3X3}
+            label="Trading Matrix"
+          />
+        </div>
+
+        {/* Actions */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => refetch()}
@@ -229,61 +486,18 @@ export function ViewportPage() {
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* CBU list (left panel) */}
-        <div className="w-80 flex-shrink-0 border-r border-[var(--border-primary)] overflow-auto p-4">
-          <h2 className="font-medium text-[var(--text-primary)] mb-3">
-            Structures ({cbuCount})
-          </h2>
-
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-[var(--text-muted)]" />
-            </div>
-          ) : error ? (
-            <div className="text-[var(--accent-red)] text-center py-8">
-              {error instanceof Error ? error.message : "Failed to load scope"}
-            </div>
-          ) : data?.error ? (
-            <div className="text-[var(--text-muted)] text-center py-8">
-              {data.error}
-            </div>
-          ) : cbus.length === 0 ? (
-            <div className="text-[var(--text-muted)] text-center py-8">
-              <p>No CBUs loaded.</p>
-              <p className="text-sm mt-2">
-                Use the chat to load a client book or CBU set.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {cbus.map((cbu) => (
-                <CbuCard
-                  key={cbu.id}
-                  cbu={cbu}
-                  isSelected={selectedCbu?.id === cbu.id}
-                  onClick={() => setSelectedCbu(cbu)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Detail panel (right) */}
-        <div className="flex-1 overflow-hidden">
-          {selectedCbu ? (
-            <CbuDetailPanel cbu={selectedCbu} />
-          ) : (
-            <div className="h-full flex items-center justify-center text-[var(--text-muted)]">
-              <div className="text-center">
-                <Building2 size={48} className="mx-auto mb-4 opacity-30" />
-                <p>Select a structure to view details</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Main content - tab views */}
+      {activeTab === "structures" ? (
+        <StructuresTab
+          cbus={cbus}
+          cbuCount={cbuCount}
+          isLoading={isLoading}
+          error={error}
+          errorMessage={data?.error}
+        />
+      ) : (
+        <TradingMatrixTab cbus={cbus} isLoading={isLoading} />
+      )}
     </div>
   );
 }
