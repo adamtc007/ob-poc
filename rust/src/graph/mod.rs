@@ -17,6 +17,8 @@
 
 #[cfg(feature = "database")]
 pub mod config_driven_builder;
+#[cfg(feature = "database")]
+pub mod deal_graph_builder;
 pub mod filters;
 pub mod investor_register;
 pub mod layout_v2;
@@ -28,6 +30,8 @@ pub mod viewport;
 
 #[cfg(feature = "database")]
 pub use config_driven_builder::{ConfigDrivenGraphBuilder, EdgeLayoutHints, NodeRenderingHints};
+#[cfg(feature = "database")]
+pub use deal_graph_builder::DealGraphBuilder;
 pub use filters::{FilterBuilder, GraphFilterOps};
 pub use investor_register::{
     AggregateBreakdown, AggregateInvestorsNode, ControlHolderNode, InvestorFilters,

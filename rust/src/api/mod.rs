@@ -82,6 +82,12 @@ pub mod display_nouns;
 pub mod projection_routes;
 
 #[cfg(feature = "server")]
+pub mod deal_types;
+
+#[cfg(feature = "server")]
+pub mod deal_routes;
+
+#[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
 #[cfg(feature = "server")]
@@ -149,3 +155,14 @@ pub use display_nouns::{translate_json, translate_string, DisplayNounTranslator}
 
 #[cfg(feature = "server")]
 pub use projection_routes::create_projection_router;
+
+#[cfg(feature = "server")]
+pub use deal_types::{
+    DealContractSummary, DealFilters, DealGraphResponse, DealListResponse, DealParticipantSummary,
+    DealProductSummary, DealSummary, DealViewMode, LoadDealRequest, LoadDealResponse,
+    OnboardingRequestSummary, RateCardDetail, RateCardLineSummary, RateCardSummary,
+    SessionDealContext,
+};
+
+#[cfg(feature = "server")]
+pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};

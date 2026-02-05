@@ -2,8 +2,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { queryClient } from "./lib/query";
 import { AppShell, ErrorBoundary } from "./components";
-import { InspectorPage } from "./features/inspector/InspectorPage";
 import { ChatPage } from "./features/chat/ChatPage";
+import { DealPage } from "./features/deal/DealPage";
+import { InspectorPage } from "./features/inspector/InspectorPage";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ViewportPage } from "./features/viewport/ViewportPage";
 
@@ -63,6 +64,14 @@ function App() {
                 element={
                   <ErrorBoundary>
                     <SettingsPage />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="deal/:dealId"
+                element={
+                  <ErrorBoundary>
+                    <DealPage />
                   </ErrorBoundary>
                 }
               />

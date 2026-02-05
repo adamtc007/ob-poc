@@ -2208,6 +2208,18 @@ pub struct SessionContext {
     pub client_scope: Option<ScopeContext>,
 
     // =========================================================================
+    // Deal Context - For deal taxonomy navigation
+    // =========================================================================
+    /// Current deal ID (for deal taxonomy navigation)
+    /// Set by session.load-deal verb. When set, UI shows deal taxonomy panel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deal_id: Option<Uuid>,
+
+    /// Deal name for display in UI
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deal_name: Option<String>,
+
+    // =========================================================================
     // View State Fields - For REPL/View synchronization
     // =========================================================================
     /// Current view mode (e.g., "KYC_UBO", "UBO_ONLY", "SERVICE_DELIVERY", "PRODUCTS_ONLY")

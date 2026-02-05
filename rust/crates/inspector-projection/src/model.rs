@@ -20,8 +20,7 @@ use std::collections::BTreeMap;
 ///
 /// This is the wire format for loading/saving projections.
 /// The projection is deterministic: same input + policy = same output.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct InspectorProjection {
     /// Envelope metadata (version, hashes, timestamp).
     pub snapshot: SnapshotMeta,
@@ -43,7 +42,6 @@ pub struct InspectorProjection {
     #[serde(default)]
     pub nodes: BTreeMap<NodeId, Node>,
 }
-
 
 impl InspectorProjection {
     /// Create a new empty projection.
@@ -322,6 +320,32 @@ pub enum NodeKind {
     // Paging
     #[serde(rename = "PageToken")]
     PageToken,
+
+    // Deal Taxonomy
+    #[serde(rename = "Deal")]
+    Deal,
+    #[serde(rename = "DealProductList")]
+    DealProductList,
+    #[serde(rename = "DealProduct")]
+    DealProduct,
+    #[serde(rename = "DealRateCardList")]
+    DealRateCardList,
+    #[serde(rename = "DealRateCard")]
+    DealRateCard,
+    #[serde(rename = "DealRateCardLine")]
+    DealRateCardLine,
+    #[serde(rename = "DealParticipantList")]
+    DealParticipantList,
+    #[serde(rename = "DealParticipant")]
+    DealParticipant,
+    #[serde(rename = "DealContractList")]
+    DealContractList,
+    #[serde(rename = "DealContract")]
+    DealContract,
+    #[serde(rename = "DealOnboardingRequestList")]
+    DealOnboardingRequestList,
+    #[serde(rename = "DealOnboardingRequest")]
+    DealOnboardingRequest,
 }
 
 impl NodeKind {
@@ -347,6 +371,19 @@ impl NodeKind {
             Self::ControlNode => "●",
             Self::ControlEdge => "⬇",
             Self::PageToken => "📑",
+            // Deal Taxonomy
+            Self::Deal => "📝",
+            Self::DealProductList => "📦",
+            Self::DealProduct => "🧱",
+            Self::DealRateCardList => "💳",
+            Self::DealRateCard => "💵",
+            Self::DealRateCardLine => "📋",
+            Self::DealParticipantList => "👥",
+            Self::DealParticipant => "🏛",
+            Self::DealContractList => "📜",
+            Self::DealContract => "✍",
+            Self::DealOnboardingRequestList => "🚀",
+            Self::DealOnboardingRequest => "📋",
         }
     }
 
@@ -370,6 +407,15 @@ impl NodeKind {
                 | Self::ControlRegister
                 | Self::ControlTree
                 | Self::ControlNode
+                // Deal Taxonomy
+                | Self::Deal
+                | Self::DealProductList
+                | Self::DealProduct
+                | Self::DealRateCardList
+                | Self::DealRateCard
+                | Self::DealParticipantList
+                | Self::DealContractList
+                | Self::DealOnboardingRequestList
         )
     }
 }

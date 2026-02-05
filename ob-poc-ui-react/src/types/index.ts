@@ -2,5 +2,6 @@
  * Type Exports
  */
 
-export * from './projection';
-export * from './chat';
+export * from "./chat";
+export * from "./deal";
+export * from "./projection";

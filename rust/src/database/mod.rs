@@ -25,6 +25,7 @@ pub mod expansion_audit;
 pub mod semantic_state_service;
 // Fuzzy search is now handled by EntityGateway gRPC service.
 // See rust/crates/entity-gateway/ for the central lookup service.
+pub mod deal_repository;
 pub mod generation_log_repository;
 pub mod graph_repository;
 pub mod locks;
@@ -126,6 +127,8 @@ pub use viewport_service::{
 };
 
 pub use semantic_state_service::derive_semantic_state;
+
+pub use deal_repository::DealRepository;
 
 /// Database configuration
 #[derive(Debug, Clone)]

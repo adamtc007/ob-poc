@@ -25,8 +25,8 @@ use crate::state::AppState;
 // Import API routers from main ob-poc crate
 use ob_poc::api::{
     control_routes, create_agent_router_with_semantic, create_attribute_router,
-    create_cbu_session_router_with_pool, create_client_router, create_dsl_viewer_router,
-    create_entity_router, create_graph_router, create_resolution_router,
+    create_cbu_session_router_with_pool, create_client_router, create_deal_router,
+    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
     create_scoped_entity_router, create_session_graph_router, create_session_store,
     create_taxonomy_router, create_trading_matrix_router, create_universe_router,
     create_verb_discovery_router, service_resource_router,
@@ -356,6 +356,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(create_trading_matrix_router(pool.clone()))
         // Taxonomy navigation router (fractal drill-down)
         .merge(create_taxonomy_router(pool.clone(), sessions.clone()))
+        // Deal taxonomy router (deal visualization and navigation)
+        .merge(create_deal_router(pool.clone(), sessions.clone()))
         // Graph visualization (legacy CBU endpoints)
         .merge(create_graph_router(pool.clone()))
         // Session-scoped graph (shares state with REPL and taxonomy)

@@ -10,6 +10,8 @@ use clap::{Parser, Subcommand};
 use xshell::{cmd, Shell};
 
 mod allianz_harness;
+mod aviva_deal_harness;
+mod deal_harness;
 mod entity;
 mod fund_programme;
 mod gleif_crawl_dsl;
@@ -480,6 +482,48 @@ enum Command {
         #[command(subcommand)]
         action: EntityAction,
     },
+
+    /// Deal Hierarchy Test Harness - Tests Deal → Products → Rate Cards DAG
+    ///
+    /// Creates test data using DSL verbs only (no direct SQL):
+    /// - Creates a deal with products
+    /// - Creates contracts and links to deal
+    /// - Creates rate cards linked to products/contracts
+    /// - Validates all deal.products are linked to a contract
+    /// - Validates precedence constraints (one AGREED rate card per combo)
+    DealHarness {
+        /// Verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+
+        /// Dry run - show what would be done without making changes
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+
+        /// Clean up test data after harness completes
+        #[arg(long)]
+        cleanup: bool,
+    },
+
+    /// Aviva Deal Test Harness - Full deal setup for Aviva Investors
+    ///
+    /// Creates a complete deal using DSL verbs only (idempotent, re-runnable):
+    /// - Creates a deal for Aviva Investors client group
+    /// - Adds all products to the deal scope
+    /// - Creates 2 contracts (Core Services + Ancillary Services)
+    /// - Links Custody and Fund Accounting to Contract 1
+    /// - Links all other products to Contract 2
+    /// - Creates rate cards with made-up rates for all products
+    /// - Adds fee lines to each rate card
+    AvivaDealHarness {
+        /// Verbose output - show DSL statements
+        #[arg(long, short = 'v')]
+        verbose: bool,
+
+        /// Dry run - show what would be done without making changes
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -870,6 +914,18 @@ fn main() -> Result<()> {
             irish_funds,
             filter,
         } => test_runbook(&sh, all, staging, lifecycle, dag, irish_funds, filter),
+        Command::DealHarness {
+            verbose,
+            dry_run,
+            cleanup,
+        } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(run_deal_harness(verbose, dry_run, cleanup))
+        }
+        Command::AvivaDealHarness { verbose, dry_run } => {
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(run_aviva_deal_harness(verbose, dry_run))
+        }
     }
 }
 
@@ -1774,7 +1830,7 @@ fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
 
     let mut total_errors = 0;
     let mut total_warnings = 0;
-    let mut files_with_issues = 0;
+    let mut _files_with_issues = 0;
 
     for path in &yaml_files {
         let file_name = path.file_name().unwrap().to_string_lossy();
@@ -1846,7 +1902,7 @@ fn lint_macros(errors_only: bool, verbose: bool) -> Result<()> {
         }
 
         if total_errors > 0 || total_warnings > 0 {
-            files_with_issues += 1;
+            _files_with_issues += 1;
         }
     }
 
@@ -1989,8 +2045,69 @@ fn inline_lint_yaml(content: &str) -> Vec<(&'static str, &'static str, String, S
 }
 
 // ============================================================================
-// Playbook Check
+// Deal Harness
 // ============================================================================
+
+async fn run_deal_harness(verbose: bool, dry_run: bool, cleanup: bool) -> Result<()> {
+    use sqlx::PgPool;
+
+    println!("===========================================");
+    println!("  Deal Hierarchy Test Harness");
+    println!("  (Deal → Products → Rate Cards DAG)");
+    println!("===========================================\n");
+
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let pool = PgPool::connect(&database_url).await?;
+
+    let results = deal_harness::run_deal_harness(pool, verbose, dry_run, cleanup).await?;
+
+    println!("\n===========================================");
+    println!("  Deal Harness Summary");
+    println!("===========================================");
+    println!("Passed: {}", results.passed);
+    println!("Failed: {}", results.failed);
+
+    if results.failed > 0 {
+        println!("\nFailed steps:");
+        for step in &results.steps {
+            if !step.success {
+                println!(
+                    "  - {}: {}",
+                    step.step,
+                    step.error.as_deref().unwrap_or("unknown")
+                );
+            }
+        }
+        anyhow::bail!("Deal harness failed with {} errors", results.failed);
+    }
+
+    println!("\nAll deal hierarchy tests passed!");
+    Ok(())
+}
+
+// ============================================================================
+// Aviva Deal Harness
+// ============================================================================
+
+async fn run_aviva_deal_harness(verbose: bool, dry_run: bool) -> Result<()> {
+    use sqlx::PgPool;
+
+    let database_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql:///data_designer".to_string());
+    let pool = PgPool::connect(&database_url).await?;
+
+    let results = aviva_deal_harness::run_aviva_deal_harness(pool, verbose, dry_run).await?;
+
+    if results.steps_failed > 0 {
+        anyhow::bail!(
+            "Aviva deal harness completed with {} errors",
+            results.steps_failed
+        );
+    }
+
+    Ok(())
+}
 
 // ============================================================================
 // Playbook Check

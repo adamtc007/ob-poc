@@ -305,11 +305,10 @@ impl ConfigLoader {
                 // Generate phrases combining action + domain
                 let generated = generate_phrases(domain_name, verb_name, &existing);
 
-                // Only update if we generated new phrases
-                if generated.len() > existing.len() {
-                    verb_config.invocation_phrases = generated;
-                    generated_count += 1;
-                } else if verb_config.invocation_phrases.is_empty() && !generated.is_empty() {
+                // Only update if we generated more phrases than existing, or if existing was empty
+                let should_update = generated.len() > existing.len()
+                    || (verb_config.invocation_phrases.is_empty() && !generated.is_empty());
+                if should_update {
                     verb_config.invocation_phrases = generated;
                     generated_count += 1;
                 }

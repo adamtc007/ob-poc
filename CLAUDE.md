@@ -1795,7 +1795,55 @@ CANCELLED REJECTED    REJECTED       REJECTED
 | `rust/config/verbs/billing.yaml` | 14 billing verbs |
 | `rust/src/domain_ops/deal_ops.rs` | Deal custom operations |
 | `rust/src/domain_ops/billing_ops.rs` | Billing custom operations |
+| `rust/src/api/deal_types.rs` | Deal API types (DealSummary, DealGraphResponse) |
+| `rust/src/api/deal_routes.rs` | Deal REST API endpoints |
+| `rust/src/database/deal_repository.rs` | Deal database queries |
+| `rust/src/graph/deal_graph_builder.rs` | Deal taxonomy graph construction |
 | `docs/DEAL_RECORD_IMPLEMENTATION_PLAN.md` | Implementation details |
+
+### Deal Graph API
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/deal/:id/graph?view_mode=COMMERCIAL` | Get deal taxonomy graph |
+| `GET /api/deal/:id/products` | List deal products |
+| `GET /api/deal/:id/rate-cards` | List deal rate cards |
+| `GET /api/deal/rate-card/:id/lines` | Get rate card fee lines |
+| `GET /api/deal/rate-card/:id/history` | Rate card supersession chain |
+
+### Deal Taxonomy Hierarchy
+
+```
+Deal (root)
+├── Products (commercial scope)
+│   └── Rate Cards
+│       └── Rate Card Lines (fee definitions)
+├── Participants (sales/relationship team)
+├── Contracts (legal agreements)
+├── Onboarding Requests
+│   └── CBU (if onboarded)
+└── Billing Profiles
+    └── Account Targets
+```
+
+### Test Harness
+
+```bash
+# Create complete deal for Aviva Investors (idempotent)
+cargo x aviva-deal-harness
+
+# Dry run to see DSL without execution
+cargo x aviva-deal-harness --dry-run
+
+# Verbose mode shows all DSL statements
+cargo x aviva-deal-harness --verbose
+```
+
+The harness creates:
+- Deal for Aviva Investors (MSA 2024)
+- 2 Contracts (Core Services + Ancillary Services)
+- 9 Products with rate cards
+- Fee lines with BPS, FLAT, PER_TRANSACTION pricing
 
 ---
 

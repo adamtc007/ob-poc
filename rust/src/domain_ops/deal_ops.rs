@@ -791,6 +791,239 @@ impl CustomOperation for DealRemoveContractOp {
 }
 
 // =============================================================================
+// Deal Product Operations
+// =============================================================================
+
+/// Add a product to the deal's commercial scope
+#[register_custom_op]
+pub struct DealAddProductOp;
+
+#[async_trait]
+impl CustomOperation for DealAddProductOp {
+    fn domain(&self) -> &'static str {
+        "deal"
+    }
+    fn verb(&self) -> &'static str {
+        "add-product"
+    }
+    fn rationale(&self) -> &'static str {
+        "Adds product to deal scope and records PRODUCT_ADDED event"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let deal_id = extract_uuid(verb_call, ctx, "deal-id")?;
+        let product_id = extract_uuid(verb_call, ctx, "product-id")?;
+        let product_status = extract_string_opt(verb_call, "product-status")
+            .unwrap_or_else(|| "PROPOSED".to_string());
+        let indicative_revenue: Option<f64> = verb_call
+            .get_arg("indicative-revenue")
+            .and_then(|v| v.value.as_decimal())
+            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0));
+        let currency_code =
+            extract_string_opt(verb_call, "currency-code").unwrap_or_else(|| "USD".to_string());
+        let notes = extract_string_opt(verb_call, "notes");
+
+        let deal_product_id: (Uuid,) = sqlx::query_as(
+            r#"
+            INSERT INTO "ob-poc".deal_products
+                (deal_id, product_id, product_status, indicative_revenue, currency_code, notes, added_at)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+            ON CONFLICT (deal_id, product_id) DO UPDATE SET
+                product_status = EXCLUDED.product_status,
+                indicative_revenue = COALESCE(EXCLUDED.indicative_revenue, "ob-poc".deal_products.indicative_revenue),
+                currency_code = EXCLUDED.currency_code,
+                notes = COALESCE(EXCLUDED.notes, "ob-poc".deal_products.notes),
+                updated_at = NOW()
+            RETURNING deal_product_id
+            "#,
+        )
+        .bind(deal_id)
+        .bind(product_id)
+        .bind(&product_status)
+        .bind(indicative_revenue)
+        .bind(&currency_code)
+        .bind(&notes)
+        .fetch_one(pool)
+        .await?;
+
+        // Record event
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
+            VALUES ($1, 'PRODUCT_ADDED', 'PRODUCT', $2, $3)
+            "#,
+        )
+        .bind(deal_id)
+        .bind(product_id)
+        .bind(&product_status)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Uuid(deal_product_id.0))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Uuid(Uuid::new_v4()))
+    }
+}
+
+/// Update the status of a product in the deal scope
+#[register_custom_op]
+pub struct DealUpdateProductStatusOp;
+
+#[async_trait]
+impl CustomOperation for DealUpdateProductStatusOp {
+    fn domain(&self) -> &'static str {
+        "deal"
+    }
+    fn verb(&self) -> &'static str {
+        "update-product-status"
+    }
+    fn rationale(&self) -> &'static str {
+        "Updates product status with event recording"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let deal_id = extract_uuid(verb_call, ctx, "deal-id")?;
+        let product_id = extract_uuid(verb_call, ctx, "product-id")?;
+        let product_status = extract_string(verb_call, "product-status")?;
+
+        // Update with AGREED timestamp if status is AGREED
+        let result = if product_status == "AGREED" {
+            sqlx::query(
+                r#"
+                UPDATE "ob-poc".deal_products
+                SET product_status = $3, agreed_at = NOW(), updated_at = NOW()
+                WHERE deal_id = $1 AND product_id = $2
+                "#,
+            )
+            .bind(deal_id)
+            .bind(product_id)
+            .bind(&product_status)
+            .execute(pool)
+            .await?
+        } else {
+            sqlx::query(
+                r#"
+                UPDATE "ob-poc".deal_products
+                SET product_status = $3, updated_at = NOW()
+                WHERE deal_id = $1 AND product_id = $2
+                "#,
+            )
+            .bind(deal_id)
+            .bind(product_id)
+            .bind(&product_status)
+            .execute(pool)
+            .await?
+        };
+
+        // Record event
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
+            VALUES ($1, 'PRODUCT_STATUS_CHANGED', 'PRODUCT', $2, $3)
+            "#,
+        )
+        .bind(deal_id)
+        .bind(product_id)
+        .bind(&product_status)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Affected(result.rows_affected()))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+/// Remove a product from the deal scope (sets status to REMOVED)
+#[register_custom_op]
+pub struct DealRemoveProductOp;
+
+#[async_trait]
+impl CustomOperation for DealRemoveProductOp {
+    fn domain(&self) -> &'static str {
+        "deal"
+    }
+    fn verb(&self) -> &'static str {
+        "remove-product"
+    }
+    fn rationale(&self) -> &'static str {
+        "Soft-deletes product from deal by setting status to REMOVED"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let deal_id = extract_uuid(verb_call, ctx, "deal-id")?;
+        let product_id = extract_uuid(verb_call, ctx, "product-id")?;
+
+        let result = sqlx::query(
+            r#"
+            UPDATE "ob-poc".deal_products
+            SET product_status = 'REMOVED', updated_at = NOW()
+            WHERE deal_id = $1 AND product_id = $2
+            "#,
+        )
+        .bind(deal_id)
+        .bind(product_id)
+        .execute(pool)
+        .await?;
+
+        // Record event
+        sqlx::query(
+            r#"
+            INSERT INTO "ob-poc".deal_events (deal_id, event_type, subject_type, subject_id, description)
+            VALUES ($1, 'PRODUCT_REMOVED', 'PRODUCT', $2, 'Product removed from deal scope')
+            "#,
+        )
+        .bind(deal_id)
+        .bind(product_id)
+        .execute(pool)
+        .await?;
+
+        Ok(ExecutionResult::Affected(result.rows_affected()))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Ok(ExecutionResult::Affected(1))
+    }
+}
+
+// =============================================================================
 // Rate Card Operations
 // =============================================================================
 

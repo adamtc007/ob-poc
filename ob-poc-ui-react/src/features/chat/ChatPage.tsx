@@ -10,6 +10,7 @@ import { chatApi } from "../../api/chat";
 import { queryKeys, queryClient } from "../../lib/query";
 import { useChatStore } from "../../stores/chat";
 import { ChatSidebar, ChatMessage, ChatInput, ScopePanel } from "./components";
+import { DealPanel } from "../deal/components";
 import type { DecisionReply } from "../../types/chat";
 
 export function ChatPage() {
@@ -185,8 +186,14 @@ export function ChatPage() {
         />
       </div>
 
-      {/* Right sidebar - Scope panel showing loaded CBUs */}
-      <ScopePanel sessionId={sessionId} className="w-64 flex-shrink-0" />
+      {/* Right sidebar - Scope and Deal panels */}
+      <div className="w-64 flex-shrink-0 border-l border-[var(--border-primary)] bg-[var(--bg-secondary)] flex flex-col">
+        {/* Deal context panel */}
+        {sessionId && <DealPanel sessionId={sessionId} />}
+
+        {/* Scope panel showing loaded CBUs */}
+        <ScopePanel sessionId={sessionId} className="flex-1" />
+      </div>
     </div>
   );
 }

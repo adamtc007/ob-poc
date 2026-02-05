@@ -1486,5 +1486,191 @@ impl CustomOperation for SessionSetMandateOp {
 }
 
 // =============================================================================
+// Deal Taxonomy Navigation Operations
+// =============================================================================
+
+/// Result type for load-deal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoadDealResult {
+    pub deal_id: Uuid,
+    pub deal_name: String,
+    pub deal_status: String,
+    pub client_group_name: Option<String>,
+    pub product_count: i32,
+    pub rate_card_count: i32,
+}
+
+/// Result type for unload-deal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UnloadDealResult {
+    pub previous_deal_id: Option<Uuid>,
+    pub previous_deal_name: Option<String>,
+}
+
+// -----------------------------------------------------------------------------
+// session.load-deal
+// -----------------------------------------------------------------------------
+
+#[register_custom_op]
+pub struct SessionLoadDealOp;
+
+#[async_trait]
+impl CustomOperation for SessionLoadDealOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "load-deal"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Sets deal context in session for taxonomy visualization"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        // Get deal_id from args (either direct UUID or resolved from deal_name)
+        let deal_id = get_optional_uuid(verb_call, "deal-id", ctx);
+        let deal_name_arg = get_optional_string(verb_call, "deal-name");
+
+        let deal_id = match (deal_id, deal_name_arg) {
+            (Some(id), _) => id,
+            (None, Some(name)) => {
+                // Search for deal by name
+                let deal = sqlx::query!(
+                    r#"
+                    SELECT deal_id FROM "ob-poc".deals
+                    WHERE deal_name ILIKE '%' || $1 || '%'
+                    ORDER BY
+                        CASE WHEN deal_name ILIKE $1 THEN 0
+                             WHEN deal_name ILIKE $1 || '%' THEN 1
+                             ELSE 2 END,
+                        deal_name
+                    LIMIT 1
+                    "#,
+                    name
+                )
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("No deal found matching: {}", name))?;
+                deal.deal_id
+            }
+            (None, None) => {
+                return Err(anyhow::anyhow!(
+                    "Either :deal-id or :deal-name must be provided"
+                ));
+            }
+        };
+
+        // Fetch deal details
+        let deal = sqlx::query!(
+            r#"
+            SELECT
+                d.deal_id,
+                d.deal_name,
+                d.deal_status,
+                cg.canonical_name as "client_group_name?",
+                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_products WHERE deal_id = d.deal_id), 0)::int as "product_count!",
+                COALESCE((SELECT COUNT(*) FROM "ob-poc".deal_rate_cards WHERE deal_id = d.deal_id), 0)::int as "rate_card_count!"
+            FROM "ob-poc".deals d
+            LEFT JOIN "ob-poc".client_group cg ON cg.id = d.primary_client_group_id
+            WHERE d.deal_id = $1
+            "#,
+            deal_id
+        )
+        .fetch_optional(pool)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Deal not found: {}", deal_id))?;
+
+        // Update session context
+        let session = ctx.get_or_create_session_mut();
+        session.context.deal_id = Some(deal.deal_id);
+        session.context.deal_name = Some(deal.deal_name.clone());
+
+        let result = LoadDealResult {
+            deal_id: deal.deal_id,
+            deal_name: deal.deal_name,
+            deal_status: deal.deal_status,
+            client_group_name: deal.client_group_name.clone(),
+            product_count: deal.product_count,
+            rate_card_count: deal.rate_card_count,
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// -----------------------------------------------------------------------------
+// session.unload-deal
+// -----------------------------------------------------------------------------
+
+#[register_custom_op]
+pub struct SessionUnloadDealOp;
+
+#[async_trait]
+impl CustomOperation for SessionUnloadDealOp {
+    fn domain(&self) -> &'static str {
+        "session"
+    }
+
+    fn verb(&self) -> &'static str {
+        "unload-deal"
+    }
+
+    fn rationale(&self) -> &'static str {
+        "Clears deal context from session"
+    }
+
+    #[cfg(feature = "database")]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        ctx: &mut ExecutionContext,
+        _pool: &PgPool,
+    ) -> Result<ExecutionResult> {
+        let session = ctx.get_or_create_session_mut();
+
+        // Capture previous values before clearing
+        let previous_deal_id = session.context.deal_id.take();
+        let previous_deal_name = session.context.deal_name.take();
+
+        let result = UnloadDealResult {
+            previous_deal_id,
+            previous_deal_name,
+        };
+
+        Ok(ExecutionResult::Record(json!(result)))
+    }
+
+    #[cfg(not(feature = "database"))]
+    async fn execute(
+        &self,
+        _verb_call: &VerbCall,
+        _ctx: &mut ExecutionContext,
+    ) -> Result<ExecutionResult> {
+        Err(anyhow::anyhow!(
+            "Database feature required for session operations"
+        ))
+    }
+}
+
+// =============================================================================
 // REGISTRATION
 // =============================================================================

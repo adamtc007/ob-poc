@@ -102,6 +102,7 @@ pub struct ColumnMapping {
 
 /// A parsed fund record from CSV
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct FundRecord {
     pub lei: Option<String>,
     pub entity_name: String,
@@ -119,6 +120,7 @@ pub struct FundRecord {
 
 /// Result of loading a fund programme
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct LoadResult {
     pub entities_created: usize,
     pub entities_updated: usize,

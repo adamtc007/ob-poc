@@ -543,3 +543,84 @@ domains:
         effects:
           - "Sets session.current_mandate"
           - "Sets dag_state flag 'mandate.selected' = true"
+
+      # ============================================
+      # Deal Taxonomy Navigation
+      # ============================================
+
+      load-deal:
+        description: "Load a deal into session context for taxonomy visualization"
+        behavior: plugin
+        handler: SessionLoadDealOp
+        invocation_phrases:
+          - "load deal"
+          - "show deal"
+          - "open deal"
+          - "work on deal"
+          - "view deal"
+          - "select deal"
+          - "focus on deal"
+          - "deal taxonomy"
+          - "show deal taxonomy"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: deal
+          tags: [context, deal, taxonomy, navigation]
+        args:
+          - name: deal-id
+            type: uuid
+            required: false
+            description: "Deal UUID to load"
+            lookup:
+              table: deals
+              entity_type: deal
+              schema: ob-poc
+              search_key: deal_name
+              primary_key: deal_id
+          - name: deal-name
+            type: string
+            required: false
+            description: "Search by deal name (fuzzy match)"
+        validation:
+          one_of_required: [deal-id, deal-name]
+        returns:
+          type: record
+          fields:
+            [
+              deal_id,
+              deal_name,
+              deal_status,
+              client_group_name,
+              product_count,
+              rate_card_count,
+            ]
+        effects:
+          - "Sets session.context.deal_id"
+          - "Sets session.context.deal_name"
+          - "UI shows deal taxonomy panel"
+
+      unload-deal:
+        description: "Clear deal context from session"
+        behavior: plugin
+        handler: SessionUnloadDealOp
+        invocation_phrases:
+          - "unload deal"
+          - "close deal"
+          - "clear deal"
+          - "hide deal"
+          - "dismiss deal"
+          - "exit deal"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: deal
+          tags: [context, deal, clear]
+        args: []
+        returns:
+          type: record
+          fields: [previous_deal_id, previous_deal_name]
+        effects:
+          - "Clears session.context.deal_id"
+          - "Clears session.context.deal_name"
+          - "UI hides deal taxonomy panel"
