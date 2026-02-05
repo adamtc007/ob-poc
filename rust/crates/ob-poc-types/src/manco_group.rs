@@ -249,19 +249,22 @@ impl PrimaryGovernanceController {
 // ============================================================================
 
 /// Classification of control based on shareholding percentage
+///
+/// Ordered from lowest to highest control level (Minority < Notifiable < ... < Controlling)
+/// so that Ord comparisons work naturally: `Controlling > SignificantInfluence`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ControlType {
-    /// ≥ 50% (or issuer-specific control threshold)
-    Controlling,
-    /// ≥ 25% (or issuer-specific significant threshold)
-    SignificantInfluence,
-    /// ≥ 10% (or issuer-specific material threshold)
-    Material,
-    /// ≥ 5% (or issuer-specific disclosure threshold)
-    Notifiable,
     /// < disclosure threshold but tracked
     Minority,
+    /// ≥ 5% (or issuer-specific disclosure threshold)
+    Notifiable,
+    /// ≥ 10% (or issuer-specific material threshold)
+    Material,
+    /// ≥ 25% (or issuer-specific significant threshold)
+    SignificantInfluence,
+    /// ≥ 50% (or issuer-specific control threshold)
+    Controlling,
 }
 
 impl ControlType {

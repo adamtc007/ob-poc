@@ -6,6 +6,7 @@ use anyhow::{anyhow, Context, Result};
 use std::path::Path;
 use tracing::info;
 
+use super::phrase_gen::generate_phrases;
 use super::types::{ArgType, CsgRulesConfig, VerbBehavior, VerbsConfig};
 
 pub struct ConfigLoader {
@@ -126,10 +127,13 @@ impl ConfigLoader {
         let content = std::fs::read_to_string(&path)
             .with_context(|| format!("Failed to read {}", path.display()))?;
 
-        let config: VerbsConfig = serde_yaml::from_str(&content)
+        let mut config: VerbsConfig = serde_yaml::from_str(&content)
             .with_context(|| format!("Failed to parse {}", path.display()))?;
 
         self.validate_verbs(&config)?;
+
+        // Auto-generate invocation phrases for verbs without them
+        self.enrich_with_generated_phrases(&mut config);
 
         info!(
             "Loaded {} domains with {} total verbs",
@@ -193,6 +197,9 @@ impl ConfigLoader {
         }
 
         self.validate_verbs(&merged_config)?;
+
+        // Auto-generate invocation phrases for verbs without them
+        self.enrich_with_generated_phrases(&mut merged_config);
 
         info!(
             "Loaded {} domains with {} total verbs from split config",
@@ -281,6 +288,40 @@ impl ConfigLoader {
         }
 
         Ok(())
+    }
+
+    /// Auto-generate invocation phrases for verbs that don't have any.
+    ///
+    /// This ensures all verbs are discoverable via semantic search without
+    /// requiring manual phrase curation. Existing phrases are preserved.
+    fn enrich_with_generated_phrases(&self, config: &mut VerbsConfig) {
+        let mut generated_count = 0;
+
+        for (domain_name, domain_config) in &mut config.domains {
+            for (verb_name, verb_config) in &mut domain_config.verbs {
+                // Get existing phrases (if any)
+                let existing: Vec<String> = verb_config.invocation_phrases.clone();
+
+                // Generate phrases combining action + domain
+                let generated = generate_phrases(domain_name, verb_name, &existing);
+
+                // Only update if we generated new phrases
+                if generated.len() > existing.len() {
+                    verb_config.invocation_phrases = generated;
+                    generated_count += 1;
+                } else if verb_config.invocation_phrases.is_empty() && !generated.is_empty() {
+                    verb_config.invocation_phrases = generated;
+                    generated_count += 1;
+                }
+            }
+        }
+
+        if generated_count > 0 {
+            info!(
+                "Auto-generated invocation phrases for {} verbs",
+                generated_count
+            );
+        }
     }
 
     fn validate_csg_rules(&self, config: &CsgRulesConfig) -> Result<()> {

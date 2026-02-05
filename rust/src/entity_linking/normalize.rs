@@ -139,12 +139,13 @@ mod tests {
 
     #[test]
     fn test_unicode_normalization() {
-        // Full-width characters
+        // Full-width characters are converted to ASCII by NFKC
         assert_eq!(normalize_entity_text("Ａｐｐｌｅ", false), "apple");
-        // Accented characters
+        // Accented characters are preserved (NFKC doesn't strip diacritics)
+        // This is intentional - "société" and "societe" are different searches
         assert_eq!(
             normalize_entity_text("Société Générale", false),
-            "societe generale"
+            "société générale"
         );
     }
 

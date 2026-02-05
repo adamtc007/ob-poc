@@ -4,11 +4,11 @@
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
-> **Verbs:** 581 canonical verbs (V2 schema), 12,442 intent patterns (DB-sourced)
-> **Migrations:** 74 schema migrations
-> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
+> **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
+> **Migrations:** 68 schema migrations
+> **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
-> **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
+> **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
@@ -867,145 +867,113 @@ This path is deterministic end-to-end (no LLM) but requires the lexicon to cover
 
 ---
 
-## V2 Verb Schema Pipeline (057)
+## Verb Phrase Generation (Auto-Generated)
 
-> ✅ **IMPLEMENTED (2026-01-27)**: Canonical V2 YAML schema with deterministic phrase generation and compiled registry.
+> ✅ **IMPLEMENTED (2026-02-05)**: Invocation phrases auto-generated on V1 YAML load. No separate V2 registry needed.
 
-The V2 schema pipeline provides a canonical verb definition format with:
-- Inline args (HashMap-style) instead of nested arrays
-- Deterministic invocation phrase generation (no LLM)
-- Compiled registry.json artifact for fast server startup
-- Alias collision detection for disambiguation
+The verb loader automatically generates invocation phrases for all verbs without manual curation. This enables semantic search discovery for new verbs immediately after adding them to YAML.
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    V2 SCHEMA PIPELINE                                        │
+│                    V1 VERB LOADING WITH AUTO-GENERATED PHRASES               │
 │                                                                              │
 │  V1 YAML (config/verbs/*.yaml)                                              │
+│         │   - Full verb definitions (behavior, handlers, CRUD, lifecycle)   │
+│         │   - Optional manual invocation_phrases (preserved)                │
 │         │                                                                    │
 │         ▼                                                                    │
-│  cargo x verbs migrate-v2                                                   │
-│         │                                                                    │
-│         ├─► V2 YAML (config/verb_schemas/generated/*.yaml)                  │
-│         │   - Canonical format with inline args                             │
-│         │   - Generated invocation_phrases (deterministic)                  │
-│         │                                                                    │
-│         └─► Lint pass (0 errors, 0 warnings required)                       │
-│                                                                              │
-│  cargo x verbs build-registry                                               │
-│         │                                                                    │
-│         ▼                                                                    │
-│  registry.json (config/verb_schemas/registry.json)                          │
-│         │   - 534 canonical verbs                                            │
-│         │   - 480 aliases (short forms)                                      │
-│         │   - 76 alias collisions (for disambiguation)                       │
+│  ConfigLoader.load_verbs()                                                  │
+│         │   - Loads verb definitions                                        │
+│         │   - Calls enrich_with_generated_phrases()                         │
+│         │   - Auto-generates phrases from domain + action synonyms          │
 │         │                                                                    │
 │         ▼                                                                    │
 │  Server startup (ob-poc-web)                                                │
-│         │   - Auto-detects registry.json                                    │
-│         │   - Loads V2Registry with invocation phrases                      │
+│         │   - VerbSyncService.sync_all_with_phrases()                       │
 │         │   - Syncs to dsl_verbs.yaml_intent_patterns                       │
 │         │                                                                    │
 │         ▼                                                                    │
 │  populate_embeddings                                                        │
 │         │   - Delta loading (only new patterns)                             │
-│         │   - 10,160 total patterns vectorized                              │
 │         │                                                                    │
 │         ▼                                                                    │
 │  HybridVerbSearcher (semantic search ready)                                 │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### V2 Schema Format
+### How It Works
 
-```yaml
-# config/verb_schemas/generated/cbu.yaml
-cbu.create:
-  verb: cbu.create
-  domain: cbu
-  action: create
-  description: "Create a new Client Business Unit"
-  behavior: plugin
-  
-  # Inline args (HashMap style, not nested arrays)
-  args:
-    name: { type: str, required: true, description: "CBU name" }
-    type: { type: str, required: false, valid_values: [FUND, MANDATE, SEGREGATED] }
-    jurisdiction: { type: str, required: false }
-  
-  # Positional sugar for common patterns
-  positional_sugar: [name]
-  
-  # Auto-generated invocation phrases
-  invocation_phrases:
-    - "create cbu"
-    - "add cbu"
-    - "new client business unit"
-    - "register trading unit"
+When verbs are loaded from YAML, the `ConfigLoader` automatically generates invocation phrases by combining:
+1. **Verb action synonyms** (create → add, new, make, register)
+2. **Domain nouns** (cbu → client business unit, trading unit)
+
+```rust
+// dsl-core/src/config/phrase_gen.rs
+generate_phrases("cbu", "create", &[])
+// Returns: ["create cbu", "add cbu", "new client business unit", ...]
+
+generate_phrases("deal", "create", &[])
+// Returns: ["create deal", "add deal record", "new client deal", ...]
 ```
 
-### Commands
+### Key Benefits
+
+- **No manual step required** - New verbs are discoverable immediately
+- **Single source of truth** - V1 YAML is the only verb format
+- **Existing phrases preserved** - Manual phrases merged with generated
+- **No build artifacts** - No registry.json to rebuild
+
+### Adding New Verbs
+
+Simply add the verb to V1 YAML and restart the server:
+
+```yaml
+# config/verbs/deal.yaml
+domains:
+  deal:
+    verbs:
+      create:
+        description: "Create a new deal record"
+        behavior: plugin
+        # invocation_phrases auto-generated: ["create deal", "add deal", ...]
+```
+
+Then run embeddings to enable semantic search:
 
 ```bash
-cd rust/
-
-# Migrate V1 → V2 (dry-run first)
-cargo x verbs migrate-v2 --dry-run
-cargo x verbs migrate-v2
-
-# Lint V2 schemas (must pass with 0 errors/warnings)
-cargo x verbs lint-v2
-
-# Build compiled registry
-cargo x verbs build-registry
-
-# After server startup, populate embeddings
 DATABASE_URL="postgresql:///data_designer" \
   cargo run --release --package ob-semantic-matcher --bin populate_embeddings
 ```
+
+### Phrase Synonym Dictionaries
+
+| Action | Synonyms |
+|--------|----------|
+| create | add, new, make, register |
+| list | show, get all, display, enumerate |
+| get | show, fetch, retrieve, read |
+| update | edit, modify, change, set |
+| delete | remove, drop, terminate |
+| record | log, capture, enter |
+| generate | create, produce, build |
+
+| Domain | Nouns |
+|--------|-------|
+| cbu | client business unit, trading unit |
+| entity | company, person |
+| deal | deal record, client deal, sales deal |
+| billing | billing profile, fee billing, invoice |
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `rust/xtask/src/verb_migrate.rs` | Migration logic, phrase generation |
-| `rust/src/dsl_v2/v2_registry.rs` | V2Registry loader, type conversion |
-| `rust/src/session/verb_sync.rs` | `sync_v2_invocation_phrases()` |
-| `rust/crates/ob-poc-web/src/main.rs` | V2 auto-detection on startup |
-| `config/verb_schemas/generated/` | V2 YAML output directory |
-| `config/verb_schemas/registry.json` | Compiled registry artifact |
-
-### Phrase Generation (Deterministic)
-
-Phrases are generated using synonym dictionaries - no LLM required:
-
-```rust
-// Verb synonyms (CRUD operations)
-"create" → ["add", "new", "make", "register"]
-"list"   → ["show", "get all", "display", "enumerate"]
-"update" → ["edit", "modify", "change"]
-"delete" → ["remove", "drop"]
-
-// Domain nouns
-"cbu"    → ["cbu", "client business unit", "trading unit"]
-"entity" → ["entity", "company", "person"]
-"fund"   → ["fund", "investment fund", "portfolio"]
-```
-
-Each verb gets 3+ phrases combining verb synonyms with domain nouns.
-
-### Alias Collisions
-
-Short aliases like `create`, `list`, `delete` map to multiple verbs:
-
-```
-'create' → ["cbu.create", "entity.create", "user.create", ...]
-'delete' → ["entity.delete", "cbu.delete", "identifier.remove", ...]
-```
-
-These are intentional - the semantic search uses full phrases to disambiguate, and the UI can show disambiguation options when the user types a bare alias.
+| `rust/crates/dsl-core/src/config/phrase_gen.rs` | Phrase generation with synonym dictionaries |
+| `rust/crates/dsl-core/src/config/loader.rs` | `enrich_with_generated_phrases()` on load |
+| `rust/src/session/verb_sync.rs` | `sync_all_with_phrases()` to DB |
+| `rust/crates/ob-poc-web/src/main.rs` | Server startup verb sync |
 
 ---
 
@@ -4047,6 +4015,115 @@ rust/crates/inspector-projection/
 - 32 integration tests in `rust/tests/`
 - 2 doc tests
 - Sample YAML fixture with comprehensive node coverage
+
+---
+
+## Deal Record & Fee Billing (067)
+
+> ✅ **IMPLEMENTED (2026-02-05)**: Commercial origination hub with rate card negotiation, onboarding handoff, and closed-loop billing.
+
+The Deal domain provides end-to-end tracking of client relationships from first contact through billing, with full audit trail connecting negotiated rates to invoiced fees.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  DEAL LIFECYCLE                                                              │
+│                                                                              │
+│  deals ─────────┬──→ client_group(id)           (primary client relationship)│
+│                 │                                                            │
+│                 ├── deal_participants ──→ entities (contracting parties)    │
+│                 ├── deal_contracts ──→ legal_contracts                      │
+│                 ├── deal_documents ──→ document_catalog                     │
+│                 ├── deal_rate_cards ──→ legal_contracts + products          │
+│                 │   └── deal_rate_card_lines (fee schedules)                │
+│                 ├── deal_slas ──→ contracts + products + services           │
+│                 ├── deal_ubo_assessments ──→ entities + kyc.cases           │
+│                 ├── deal_onboarding_requests ──→ cbus + products            │
+│                 └── deal_events (audit trail)                               │
+│                                                                              │
+│  BILLING CLOSED LOOP                                                         │
+│                                                                              │
+│  fee_billing_profiles ──→ legal_contracts + deal_rate_cards + cbus          │
+│      │                                                                       │
+│      ├── fee_billing_account_targets ──→ cbu_resource_instances             │
+│      │       └── rate_card_line_id (links to agreed rates)                  │
+│      │                                                                       │
+│      └── fee_billing_periods                                                 │
+│              └── fee_billing_period_lines ──→ targets + rate_card_lines     │
+│                      └── Same line ID from negotiation → invoice (audit)    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Deal Status Lifecycle
+
+```
+PROSPECT → QUALIFYING → NEGOTIATING → CONTRACTED → ONBOARDING → ACTIVE → WINDING_DOWN → OFFBOARDED
+                                                                    ↓
+                                                              CANCELLED
+```
+
+### Key Tables (14 total)
+
+| Table | Purpose |
+|-------|---------|
+| `deals` | Master deal record with client_group linkage |
+| `deal_participants` | Contracting parties (entities) |
+| `deal_contracts` | Links to legal_contracts |
+| `deal_documents` | Deal-related documents |
+| `deal_rate_cards` | Pricing proposals (DRAFT→AGREED) |
+| `deal_rate_card_lines` | Fee schedules with pricing models |
+| `deal_slas` | Service level agreements |
+| `deal_ubo_assessments` | UBO/KYC assessments for participants |
+| `deal_onboarding_requests` | Handoff to onboarding (CBU creation) |
+| `deal_events` | Audit trail |
+| `fee_billing_profiles` | Billing configuration per CBU+product |
+| `fee_billing_account_targets` | Billable accounts |
+| `fee_billing_periods` | Billing cycles |
+| `fee_billing_period_lines` | Calculated fee lines |
+
+### Rate Card Pricing Models
+
+```sql
+-- Supported fee_pricing_model values:
+'FLAT'    -- Fixed amount per period
+'BPS'     -- Basis points on AUM/volume (requires fee_rate_bps, fee_basis)
+'TIERED'  -- Tiered pricing (requires tier_brackets JSONB)
+'PER_TX'  -- Per transaction (requires per_tx_rate)
+```
+
+### Key Verbs
+
+| Verb | Purpose |
+|------|---------|
+| `deal.create` | Create deal for client_group |
+| `deal.add-participant` | Add contracting party |
+| `deal.create-rate-card` | Create pricing proposal |
+| `deal.add-rate-card-line` | Add fee schedule line |
+| `deal.agree-rate-card` | Lock rate card (immutable after) |
+| `deal.request-onboarding` | Trigger CBU onboarding |
+| `billing.create-profile` | Create billing config |
+| `billing.add-account-target` | Add billable account |
+| `billing.calculate-period` | Calculate fees for period |
+| `billing.approve-period` | Approve for invoicing |
+
+### Closed-Loop Audit Trail
+
+The same `rate_card_line_id` flows through:
+1. `deal_rate_card_lines.line_id` - Negotiated rate
+2. `fee_billing_account_targets.rate_card_line_id` - Applied rate
+3. `fee_billing_period_lines.rate_card_line_id` - Invoiced rate
+
+This proves the billed rate matches the contractually agreed rate.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/067_deal_record_fee_billing.sql` | Schema (14 tables) |
+| `migrations/068_deal_billing_constraints.sql` | CHECK constraints, uuidv7() |
+| `rust/config/verbs/deal.yaml` | 35 deal verbs |
+| `rust/config/verbs/billing.yaml` | 17 billing verbs |
 
 ---
 

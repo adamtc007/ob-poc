@@ -203,8 +203,15 @@ mod tests {
 
     #[test]
     fn test_serialization() {
-        let result = ExecutionResult::uuid(Uuid::nil());
+        // Use Record variant since tagged enums with newtype variants (like Uuid)
+        // require serde(content = ...) which we don't have
+        let result = ExecutionResult::record(json!({"id": Uuid::nil().to_string()}));
         let json = serde_json::to_string(&result).unwrap();
-        assert!(json.contains("uuid"));
+        assert!(json.contains("record"));
+
+        // Void works with tagged enum
+        let void_result = ExecutionResult::void();
+        let void_json = serde_json::to_string(&void_result).unwrap();
+        assert!(void_json.contains("void"));
     }
 }

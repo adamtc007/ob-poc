@@ -21,7 +21,9 @@
 //! ```
 
 pub mod loader;
+pub mod phrase_gen;
 pub mod types;
 
 pub use loader::ConfigLoader;
+pub use phrase_gen::generate_phrases;
 pub use types::*;
