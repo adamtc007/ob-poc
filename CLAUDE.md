@@ -5,7 +5,7 @@
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
-> **Migrations:** 68 schema migrations
+> **Migrations:** 69 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)

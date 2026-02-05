@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dRbQf1IuMbFSyqsWh3CT2GOgDEzfkpKulaaKpQyNgsmSyzWxozmB8IxVi5WaxJf
+\restrict iKuzBDetvGoogIDduGmp5ql4scyHHHQaCdyD6B0th5FXcxC0VkbIc8oKwwg7eI5
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -7514,6 +7514,74 @@ COMMENT ON FUNCTION "ob-poc".stage_command(p_runbook_id uuid, p_dsl_raw text, p_
 
 
 --
+-- Name: supersede_rate_card(uuid, uuid); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".supersede_rate_card(p_old_rate_card_id uuid, p_new_rate_card_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    old_card RECORD;
+    new_card RECORD;
+BEGIN
+    -- Lock both cards
+    SELECT * INTO old_card FROM "ob-poc".deal_rate_cards
+    WHERE rate_card_id = p_old_rate_card_id FOR UPDATE;
+
+    SELECT * INTO new_card FROM "ob-poc".deal_rate_cards
+    WHERE rate_card_id = p_new_rate_card_id FOR UPDATE;
+
+    IF old_card IS NULL THEN
+        RAISE EXCEPTION 'Old rate card not found: %', p_old_rate_card_id;
+    END IF;
+
+    IF new_card IS NULL THEN
+        RAISE EXCEPTION 'New rate card not found: %', p_new_rate_card_id;
+    END IF;
+
+    -- Validate same deal/contract/product
+    IF old_card.deal_id != new_card.deal_id
+       OR old_card.contract_id != new_card.contract_id
+       OR old_card.product_id != new_card.product_id THEN
+        RAISE EXCEPTION 'Rate cards must be for the same deal/contract/product';
+    END IF;
+
+    -- Old card must be AGREED to be superseded
+    IF old_card.status != 'AGREED' THEN
+        RAISE EXCEPTION 'Can only supersede an AGREED rate card, current status: %', old_card.status;
+    END IF;
+
+    -- New card must be in a state ready to become AGREED
+    IF new_card.status NOT IN ('DRAFT', 'PROPOSED', 'COUNTER_PROPOSED') THEN
+        RAISE EXCEPTION 'New rate card must be in DRAFT, PROPOSED, or COUNTER_PROPOSED status, got: %', new_card.status;
+    END IF;
+
+    -- Perform the supersession atomically
+    -- 1. Mark old card as SUPERSEDED (trigger validates this)
+    UPDATE "ob-poc".deal_rate_cards
+    SET status = 'SUPERSEDED',
+        superseded_by = p_new_rate_card_id,
+        updated_at = NOW()
+    WHERE rate_card_id = p_old_rate_card_id;
+
+    -- 2. Mark new card as AGREED
+    UPDATE "ob-poc".deal_rate_cards
+    SET status = 'AGREED',
+        updated_at = NOW()
+    WHERE rate_card_id = p_new_rate_card_id;
+
+END;
+$$;
+
+
+--
+-- Name: FUNCTION supersede_rate_card(p_old_rate_card_id uuid, p_new_rate_card_id uuid); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".supersede_rate_card(p_old_rate_card_id uuid, p_new_rate_card_id uuid) IS 'Atomically supersedes an existing AGREED rate card with a new one';
+
+
+--
 -- Name: sync_commercial_client_role(); Type: FUNCTION; Schema: ob-poc; Owner: -
 --
 
@@ -7969,6 +8037,73 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".validate_picker_selection(p_command_id uuid, p_entity_ids uuid[]) IS 'CRITICAL: Validates picker entity_ids against stored candidates. Prevents agent from fabricating UUIDs.';
+
+
+--
+-- Name: validate_rate_card_supersession(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".validate_rate_card_supersession() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    superseding_card RECORD;
+    old_card RECORD;
+BEGIN
+    -- Only validate when superseded_by is being set
+    IF NEW.superseded_by IS NOT NULL THEN
+        -- The card being superseded must have status SUPERSEDED
+        IF NEW.status != 'SUPERSEDED' THEN
+            RAISE EXCEPTION 'Rate card with superseded_by set must have status SUPERSEDED, got: %', NEW.status;
+        END IF;
+
+        -- Fetch the superseding card
+        SELECT * INTO superseding_card
+        FROM "ob-poc".deal_rate_cards
+        WHERE rate_card_id = NEW.superseded_by;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'superseded_by references non-existent rate card: %', NEW.superseded_by;
+        END IF;
+
+        -- The superseding card must be for the same deal/contract/product
+        IF superseding_card.deal_id != NEW.deal_id
+           OR superseding_card.contract_id != NEW.contract_id
+           OR superseding_card.product_id != NEW.product_id THEN
+            RAISE EXCEPTION 'superseded_by must reference a rate card for the same deal/contract/product';
+        END IF;
+
+        -- The superseding card should not be CANCELLED or SUPERSEDED itself
+        IF superseding_card.status IN ('CANCELLED', 'SUPERSEDED') THEN
+            RAISE EXCEPTION 'Cannot supersede to a CANCELLED or SUPERSEDED rate card';
+        END IF;
+    END IF;
+
+    -- When status changes TO 'AGREED', check no other AGREED exists
+    -- (The unique index handles this, but we provide a better error message)
+    IF NEW.status = 'AGREED' AND (TG_OP = 'INSERT' OR OLD.status != 'AGREED') THEN
+        IF EXISTS (
+            SELECT 1 FROM "ob-poc".deal_rate_cards
+            WHERE deal_id = NEW.deal_id
+            AND contract_id = NEW.contract_id
+            AND product_id = NEW.product_id
+            AND status = 'AGREED'
+            AND rate_card_id != NEW.rate_card_id
+        ) THEN
+            RAISE EXCEPTION 'Cannot set status to AGREED: another AGREED rate card exists for this deal/contract/product. Supersede the existing card first.';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: FUNCTION validate_rate_card_supersession(); Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON FUNCTION "ob-poc".validate_rate_card_supersession() IS 'Validates rate card supersession chain integrity';
 
 
 --
@@ -14705,6 +14840,40 @@ COMMENT ON COLUMN "ob-poc".deal_participants.participant_role IS 'CONTRACTING_PA
 
 
 --
+-- Name: deal_products; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".deal_products (
+    deal_product_id uuid DEFAULT uuidv7() NOT NULL,
+    deal_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    product_status character varying(50) DEFAULT 'PROPOSED'::character varying NOT NULL,
+    indicative_revenue numeric(18,2),
+    currency_code character varying(3) DEFAULT 'USD'::character varying,
+    notes text,
+    added_at timestamp with time zone DEFAULT now(),
+    agreed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT deal_products_status_check CHECK (((product_status)::text = ANY ((ARRAY['PROPOSED'::character varying, 'NEGOTIATING'::character varying, 'AGREED'::character varying, 'DECLINED'::character varying, 'REMOVED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE deal_products; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".deal_products IS 'Products covered by a deal - the commercial scope before rate card negotiation';
+
+
+--
+-- Name: COLUMN deal_products.product_status; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON COLUMN "ob-poc".deal_products.product_status IS 'PROPOSED | NEGOTIATING | AGREED | DECLINED | REMOVED';
+
+
+--
 -- Name: deal_rate_card_lines; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -19561,6 +19730,42 @@ COMMENT ON TABLE "ob-poc".ubo_treatments IS 'Reference table for UBO calculation
 
 
 --
+-- Name: v_active_rate_cards; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_active_rate_cards AS
+ SELECT drc.rate_card_id,
+    drc.deal_id,
+    drc.contract_id,
+    drc.product_id,
+    drc.rate_card_name,
+    drc.effective_from,
+    drc.effective_to,
+    drc.negotiation_round,
+    d.deal_name,
+    lc.client_label AS contract_client,
+    p.name AS product_name,
+    ( SELECT count(*) AS count
+           FROM "ob-poc".deal_rate_card_lines drcl
+          WHERE (drcl.rate_card_id = drc.rate_card_id)) AS line_count,
+    ( SELECT count(*) AS count
+           FROM "ob-poc".deal_rate_cards prev
+          WHERE (prev.superseded_by = drc.rate_card_id)) AS superseded_count
+   FROM ((("ob-poc".deal_rate_cards drc
+     JOIN "ob-poc".deals d ON ((drc.deal_id = d.deal_id)))
+     JOIN "ob-poc".legal_contracts lc ON ((drc.contract_id = lc.contract_id)))
+     JOIN "ob-poc".products p ON ((drc.product_id = p.product_id)))
+  WHERE ((drc.status)::text = 'AGREED'::text);
+
+
+--
+-- Name: VIEW v_active_rate_cards; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_active_rate_cards IS 'Currently active (AGREED) rate cards per deal/contract/product';
+
+
+--
 -- Name: v_active_trading_profiles; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -20914,14 +21119,18 @@ CREATE VIEW "ob-poc".v_deal_summary AS
     d.currency_code,
     d.opened_at,
     cg.canonical_name AS client_group_name,
+    count(DISTINCT dprod.product_id) AS product_count,
+    count(DISTINCT dprod.product_id) FILTER (WHERE ((dprod.product_status)::text = 'AGREED'::text)) AS agreed_product_count,
     count(DISTINCT dp.entity_id) AS participant_count,
     count(DISTINCT dc.contract_id) AS contract_count,
     count(DISTINCT dr.rate_card_id) AS rate_card_count,
+    count(DISTINCT dr.rate_card_id) FILTER (WHERE ((dr.status)::text = 'AGREED'::text)) AS agreed_rate_card_count,
     count(DISTINCT dor.request_id) AS onboarding_request_count,
     count(DISTINCT dor.request_id) FILTER (WHERE ((dor.request_status)::text = 'COMPLETED'::text)) AS completed_onboarding_count,
     count(DISTINCT fb.profile_id) AS billing_profile_count
-   FROM (((((("ob-poc".deals d
+   FROM ((((((("ob-poc".deals d
      LEFT JOIN "ob-poc".client_group cg ON ((d.primary_client_group_id = cg.id)))
+     LEFT JOIN "ob-poc".deal_products dprod ON ((d.deal_id = dprod.deal_id)))
      LEFT JOIN "ob-poc".deal_participants dp ON ((d.deal_id = dp.deal_id)))
      LEFT JOIN "ob-poc".deal_contracts dc ON ((d.deal_id = dc.deal_id)))
      LEFT JOIN "ob-poc".deal_rate_cards dr ON ((d.deal_id = dr.deal_id)))
@@ -20934,7 +21143,7 @@ CREATE VIEW "ob-poc".v_deal_summary AS
 -- Name: VIEW v_deal_summary; Type: COMMENT; Schema: ob-poc; Owner: -
 --
 
-COMMENT ON VIEW "ob-poc".v_deal_summary IS 'Summary view of deals with related entity counts';
+COMMENT ON VIEW "ob-poc".v_deal_summary IS 'Summary view of deals with related entity counts including products';
 
 
 --
@@ -21314,6 +21523,69 @@ CREATE VIEW "ob-poc".v_provisioning_pending AS
 --
 
 COMMENT ON VIEW "ob-poc".v_provisioning_pending IS 'Provisioning requests that are not yet completed or failed.';
+
+
+--
+-- Name: v_rate_card_history; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_rate_card_history AS
+ WITH RECURSIVE chain AS (
+         SELECT deal_rate_cards.rate_card_id,
+            deal_rate_cards.deal_id,
+            deal_rate_cards.contract_id,
+            deal_rate_cards.product_id,
+            deal_rate_cards.rate_card_name,
+            deal_rate_cards.status,
+            deal_rate_cards.negotiation_round,
+            deal_rate_cards.effective_from,
+            deal_rate_cards.superseded_by,
+            deal_rate_cards.created_at,
+            0 AS chain_depth,
+            ARRAY[deal_rate_cards.rate_card_id] AS chain_path
+           FROM "ob-poc".deal_rate_cards
+          WHERE ((deal_rate_cards.status)::text = 'AGREED'::text)
+        UNION ALL
+         SELECT drc.rate_card_id,
+            drc.deal_id,
+            drc.contract_id,
+            drc.product_id,
+            drc.rate_card_name,
+            drc.status,
+            drc.negotiation_round,
+            drc.effective_from,
+            drc.superseded_by,
+            drc.created_at,
+            (c.chain_depth + 1),
+            (c.chain_path || drc.rate_card_id)
+           FROM ("ob-poc".deal_rate_cards drc
+             JOIN chain c ON ((drc.superseded_by = c.rate_card_id)))
+          WHERE ((drc.rate_card_id <> ALL (c.chain_path)) AND (c.chain_depth < 100))
+        )
+ SELECT rate_card_id,
+    deal_id,
+    contract_id,
+    product_id,
+    rate_card_name,
+    status,
+    negotiation_round,
+    effective_from,
+    superseded_by,
+    created_at,
+    chain_depth,
+        CASE
+            WHEN (chain_depth = 0) THEN 'CURRENT'::text
+            ELSE 'SUPERSEDED'::text
+        END AS chain_status
+   FROM chain
+  ORDER BY deal_id, contract_id, product_id, chain_depth;
+
+
+--
+-- Name: VIEW v_rate_card_history; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON VIEW "ob-poc".v_rate_card_history IS 'Full rate card history with supersession chain';
 
 
 --
@@ -25235,6 +25507,22 @@ ALTER TABLE ONLY "ob-poc".deal_participants
 
 ALTER TABLE ONLY "ob-poc".deal_participants
     ADD CONSTRAINT deal_participants_pkey PRIMARY KEY (deal_participant_id);
+
+
+--
+-- Name: deal_products deal_products_deal_id_product_id_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".deal_products
+    ADD CONSTRAINT deal_products_deal_id_product_id_key UNIQUE (deal_id, product_id);
+
+
+--
+-- Name: deal_products deal_products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".deal_products
+    ADD CONSTRAINT deal_products_pkey PRIMARY KEY (deal_product_id);
 
 
 --
@@ -30108,6 +30396,27 @@ CREATE UNIQUE INDEX idx_deal_participants_one_primary ON "ob-poc".deal_participa
 
 
 --
+-- Name: idx_deal_products_deal; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_deal_products_deal ON "ob-poc".deal_products USING btree (deal_id);
+
+
+--
+-- Name: idx_deal_products_product; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_deal_products_product ON "ob-poc".deal_products USING btree (product_id);
+
+
+--
+-- Name: idx_deal_products_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_deal_products_status ON "ob-poc".deal_products USING btree (product_status);
+
+
+--
 -- Name: idx_deal_rate_card_lines_card; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -30126,6 +30435,20 @@ CREATE INDEX idx_deal_rate_cards_contract ON "ob-poc".deal_rate_cards USING btre
 --
 
 CREATE INDEX idx_deal_rate_cards_deal ON "ob-poc".deal_rate_cards USING btree (deal_id);
+
+
+--
+-- Name: idx_deal_rate_cards_one_agreed; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_deal_rate_cards_one_agreed ON "ob-poc".deal_rate_cards USING btree (deal_id, contract_id, product_id) WHERE ((status)::text = 'AGREED'::text);
+
+
+--
+-- Name: INDEX idx_deal_rate_cards_one_agreed; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON INDEX "ob-poc".idx_deal_rate_cards_one_agreed IS 'Enforces only ONE AGREED rate card per deal/contract/product';
 
 
 --
@@ -33774,6 +34097,13 @@ CREATE TRIGGER trg_ubo_status_transition BEFORE UPDATE ON "ob-poc".ubo_registry 
 
 
 --
+-- Name: deal_rate_cards trg_validate_rate_card_supersession; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_validate_rate_card_supersession BEFORE INSERT OR UPDATE ON "ob-poc".deal_rate_cards FOR EACH ROW EXECUTE FUNCTION "ob-poc".validate_rate_card_supersession();
+
+
+--
 -- Name: dsl_verbs trg_verb_search_text; Type: TRIGGER; Schema: ob-poc; Owner: -
 --
 
@@ -36092,6 +36422,22 @@ ALTER TABLE ONLY "ob-poc".deal_participants
 
 
 --
+-- Name: deal_products deal_products_deal_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".deal_products
+    ADD CONSTRAINT deal_products_deal_id_fkey FOREIGN KEY (deal_id) REFERENCES "ob-poc".deals(deal_id) ON DELETE CASCADE;
+
+
+--
+-- Name: deal_products deal_products_product_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".deal_products
+    ADD CONSTRAINT deal_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES "ob-poc".products(product_id);
+
+
+--
 -- Name: deal_rate_card_lines deal_rate_card_lines_rate_card_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -38055,5 +38401,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dRbQf1IuMbFSyqsWh3CT2GOgDEzfkpKulaaKpQyNgsmSyzWxozmB8IxVi5WaxJf
+\unrestrict iKuzBDetvGoogIDduGmp5ql4scyHHHQaCdyD6B0th5FXcxC0VkbIc8oKwwg7eI5
 
