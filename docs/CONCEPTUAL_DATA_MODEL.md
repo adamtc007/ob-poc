@@ -951,33 +951,51 @@ We provide **custody and fund administration services** to investment funds. To 
 │                                                                              │
 │   ┌─────────────────────────────────────────────────────────────────┐       │
 │   │                                                                 │       │
-│   │                      DEAL STRUCTURE                             │       │
+│   │          DEAL HIERARCHY (DAG with Precedence Constraints)       │       │
 │   │                                                                 │       │
 │   │                    ┌──────────────┐                             │       │
-│   │                    │              │                             │       │
 │   │                    │     DEAL     │ "Blackrock PB 2026"         │       │
-│   │                    │              │                             │       │
 │   │                    └──────┬───────┘                             │       │
 │   │                           │                                     │       │
-│   │    ┌──────────────────────┼──────────────────────┐             │       │
-│   │    │                      │                      │             │       │
-│   │    ▼                      ▼                      ▼             │       │
-│   │ ┌─────────────┐    ┌─────────────┐       ┌─────────────┐       │       │
-│   │ │ PARTICIPANTS│    │  RATE CARDS │       │  CONTRACTS  │       │       │
-│   │ │             │    │             │       │             │       │       │
-│   │ │ Blackrock   │    │ Custody:    │       │ MSA #1234   │       │       │
-│   │ │ UK Ltd      │    │ 5 bps AUM   │       │             │       │       │
-│   │ │ (Primary)   │    │             │       │ Schedule A  │       │       │
-│   │ └─────────────┘    └─────────────┘       └─────────────┘       │       │
-│   │                           │                                     │       │
-│   │                           ▼                                     │       │
-│   │                    ┌─────────────┐                             │       │
-│   │                    │  ONBOARDING │                             │       │
-│   │                    │  REQUESTS   │                             │       │
-│   │                    │             │                             │       │
-│   │                    │ Fund 1 ───► │ → CBU Created               │       │
-│   │                    │ Fund 2 ───► │ → CBU Created               │       │
-│   │                    └─────────────┘                             │       │
+│   │         ┌─────────────────┼─────────────────┐                  │       │
+│   │         │                 │                 │                  │       │
+│   │         ▼                 ▼                 ▼                  │       │
+│   │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │       │
+│   │  │ PARTICIPANTS│  │  PRODUCTS   │  │  CONTRACTS  │            │       │
+│   │  │             │  │ (scope)     │  │             │            │       │
+│   │  │ Blackrock   │  │             │  │ MSA #1234   │            │       │
+│   │  │ UK Ltd      │  │ • Custody   │  │ Schedule A  │            │       │
+│   │  └─────────────┘  │ • Fund Acct │  └──────┬──────┘            │       │
+│   │                   └──────┬──────┘         │                   │       │
+│   │                          │                │                   │       │
+│   │                          └────────┬───────┘                   │       │
+│   │                                   │                           │       │
+│   │                                   ▼                           │       │
+│   │                         ┌─────────────────┐                   │       │
+│   │                         │   RATE CARDS    │                   │       │
+│   │                         │ (per product    │                   │       │
+│   │                         │  per contract)  │                   │       │
+│   │                         │                 │                   │       │
+│   │                         │ Only ONE AGREED │ ← Precedence      │       │
+│   │                         │ per combination │   Constraint      │       │
+│   │                         └────────┬────────┘                   │       │
+│   │                                  │                            │       │
+│   │                                  ▼                            │       │
+│   │                         ┌─────────────────┐                   │       │
+│   │                         │ RATE CARD LINES │                   │       │
+│   │                         │                 │                   │       │
+│   │                         │ Custody: 5 bps  │                   │       │
+│   │                         │ Settlement: $5  │                   │       │
+│   │                         └────────┬────────┘                   │       │
+│   │                                  │                            │       │
+│   │                                  ▼                            │       │
+│   │                         ┌─────────────────┐                   │       │
+│   │                         │   ONBOARDING    │                   │       │
+│   │                         │   REQUESTS      │                   │       │
+│   │                         │                 │                   │       │
+│   │                         │ Fund 1 → CBU    │                   │       │
+│   │                         │ Fund 2 → CBU    │                   │       │
+│   │                         └─────────────────┘                   │       │
 │   │                                                                 │       │
 │   └─────────────────────────────────────────────────────────────────┘       │
 │                                                                              │
@@ -1029,13 +1047,38 @@ We provide **custody and fund administration services** to investment funds. To 
 |-------|---------|
 | `deals` | Master deal record linked to client_group |
 | `deal_participants` | Contracting parties (entities with roles) |
-| `deal_rate_cards` | Pricing proposals (DRAFT → PROPOSED → AGREED) |
-| `deal_rate_card_lines` | Individual fee schedules |
+| `deal_products` | **Products in scope** (must exist before rate cards) |
 | `deal_contracts` | Links to legal_contracts |
+| `deal_rate_cards` | Pricing proposals per product/contract (only ONE AGREED per combo) |
+| `deal_rate_card_lines` | Individual fee schedules |
 | `deal_onboarding_requests` | Handoff to onboarding → CBU creation |
 | `fee_billing_profiles` | Billing configuration per CBU + Product |
 | `fee_billing_periods` | Monthly/quarterly billing cycles |
 | `fee_billing_period_lines` | Calculated fees linked back to agreed rates |
+
+### Precedence Constraints (Database-Enforced)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│   1. DEAL → PRODUCTS (deal_products)                                        │
+│      Products must be added to a deal before rate cards can be created      │
+│                                                                              │
+│   2. RATE CARD UNIQUENESS                                                   │
+│      Only ONE rate card with status='AGREED' per (deal, contract, product)  │
+│      Enforced by partial unique index: idx_deal_rate_cards_one_agreed       │
+│                                                                              │
+│   3. SUPERSESSION CHAIN                                                     │
+│      Old AGREED card → status='SUPERSEDED', superseded_by=new_card_id       │
+│      New card → status='AGREED'                                             │
+│      Atomic via: SELECT "ob-poc".supersede_rate_card(old_id, new_id)        │
+│                                                                              │
+│   4. RATE CARD → BILLING CLOSED LOOP                                        │
+│      Same rate_card_line_id flows from negotiation → invoice                │
+│      deal_rate_card_lines.line_id = fee_billing_period_lines.rate_card_line_id
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Pricing Models
 

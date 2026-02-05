@@ -133,7 +133,18 @@ domains:
             type: string
             required: false
             maps_to: deal_status
-            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
+            valid_values:
+              [
+                PROSPECT,
+                QUALIFYING,
+                NEGOTIATING,
+                CONTRACTED,
+                ONBOARDING,
+                ACTIVE,
+                WINDING_DOWN,
+                OFFBOARDED,
+                CANCELLED,
+              ]
           - name: sales-owner
             type: string
             required: false
@@ -220,7 +231,18 @@ domains:
             type: string
             required: true
             maps_to: deal_status
-            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
+            valid_values:
+              [
+                PROSPECT,
+                QUALIFYING,
+                NEGOTIATING,
+                CONTRACTED,
+                ONBOARDING,
+                ACTIVE,
+                WINDING_DOWN,
+                OFFBOARDED,
+                CANCELLED,
+              ]
         returns:
           type: affected
 
@@ -285,7 +307,14 @@ domains:
             required: false
             maps_to: participant_role
             default: "CONTRACTING_PARTY"
-            valid_values: [CONTRACTING_PARTY, GUARANTOR, INTRODUCER, INVESTMENT_MANAGER, FUND_ADMIN]
+            valid_values:
+              [
+                CONTRACTING_PARTY,
+                GUARANTOR,
+                INTRODUCER,
+                INVESTMENT_MANAGER,
+                FUND_ADMIN,
+              ]
           - name: lei
             type: string
             required: false
@@ -348,6 +377,148 @@ domains:
             type: uuid
             required: true
             maps_to: deal_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # DEAL PRODUCTS (Commercial Scope)
+      # =========================================================================
+      # Products must be added to a deal BEFORE rate cards can be created.
+      # This establishes the DAG: Deal → Products → Rate Cards
+
+      add-product:
+        description: "Add a product to the deal's commercial scope"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_product
+        invocation_phrases:
+          - "add product to deal"
+          - "include product in deal"
+          - "deal covers product"
+          - "add service to deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+            lookup:
+              table: products
+              entity_type: product
+              schema: ob-poc
+              search_key: name
+              primary_key: product_id
+          - name: product-status
+            type: string
+            required: false
+            maps_to: product_status
+            default: "PROPOSED"
+            valid_values: [PROPOSED, NEGOTIATING, AGREED, DECLINED, REMOVED]
+          - name: indicative-revenue
+            type: decimal
+            required: false
+            maps_to: indicative_revenue
+            description: "Estimated annual revenue for this product"
+          - name: currency-code
+            type: string
+            required: false
+            maps_to: currency_code
+            default: "USD"
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: deal_product_id
+          capture: true
+
+      update-product-status:
+        description: "Update the status of a product in the deal scope"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_product
+        invocation_phrases:
+          - "update deal product status"
+          - "agree product"
+          - "decline product"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+          - name: product-status
+            type: string
+            required: true
+            maps_to: product_status
+            valid_values: [PROPOSED, NEGOTIATING, AGREED, DECLINED, REMOVED]
+        returns:
+          type: affected
+
+      remove-product:
+        description: "Remove a product from the deal scope (sets status to REMOVED)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_product
+        invocation_phrases:
+          - "remove product from deal"
+          - "drop product from deal"
+          - "exclude product"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+        returns:
+          type: affected
+
+      list-products:
+        description: "List all products in the deal's commercial scope"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_products
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_product
+        invocation_phrases:
+          - "list deal products"
+          - "show deal products"
+          - "what products in deal"
+          - "deal scope"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: status
+            type: string
+            required: false
+            maps_to: product_status
+            valid_values: [PROPOSED, NEGOTIATING, AGREED, DECLINED, REMOVED]
         returns:
           type: record_set
 
@@ -522,7 +693,8 @@ domains:
             type: string
             required: true
             maps_to: pricing_model
-            valid_values: [BPS, FLAT, PER_TRANSACTION, TIERED, SPREAD, MINIMUM_FEE]
+            valid_values:
+              [BPS, FLAT, PER_TRANSACTION, TIERED, SPREAD, MINIMUM_FEE]
           - name: rate-value
             type: decimal
             required: false
@@ -710,6 +882,117 @@ domains:
         returns:
           type: affected
 
+      supersede-rate-card:
+        description: "Replace an AGREED rate card with a new one (atomic supersession)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "supersede rate card"
+          - "replace rate card"
+          - "new rate card version"
+          - "update agreed rates"
+        args:
+          - name: old-rate-card-id
+            type: uuid
+            required: true
+            description: "The currently AGREED rate card to supersede"
+          - name: new-rate-card-id
+            type: uuid
+            required: true
+            description: "The new rate card (must be DRAFT/PROPOSED/COUNTER_PROPOSED)"
+        returns:
+          type: affected
+
+      list-rate-cards:
+        description: "List all rate cards for a deal with status"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_rate_cards
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "list deal rate cards"
+          - "show rate cards"
+          - "deal pricing history"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: product-id
+            type: uuid
+            required: false
+            maps_to: product_id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            valid_values:
+              [DRAFT, PROPOSED, COUNTER_PROPOSED, AGREED, SUPERSEDED, CANCELLED]
+        returns:
+          type: record_set
+
+      active-rate-cards:
+        description: "List only the currently AGREED rate cards for a deal"
+        behavior: crud
+        crud:
+          operation: select
+          table: v_active_rate_cards
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "active rate cards"
+          - "current pricing"
+          - "agreed rate cards"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: record_set
+
+      rate-card-history:
+        description: "Show rate card supersession chain history"
+        behavior: crud
+        crud:
+          operation: select
+          table: v_rate_card_history
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "rate card history"
+          - "pricing history"
+          - "rate card versions"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: product-id
+            type: uuid
+            required: false
+            maps_to: product_id
+        returns:
+          type: record_set
+
       # =========================================================================
       # SLAs
       # =========================================================================
@@ -859,13 +1142,26 @@ domains:
             type: string
             required: true
             maps_to: document_type
-            valid_values: [CONTRACT, TERM_SHEET, SIDE_LETTER, NDA, RATE_SCHEDULE, SLA, PROPOSAL, RFP_RESPONSE, BOARD_APPROVAL, LEGAL_OPINION]
+            valid_values:
+              [
+                CONTRACT,
+                TERM_SHEET,
+                SIDE_LETTER,
+                NDA,
+                RATE_SCHEDULE,
+                SLA,
+                PROPOSAL,
+                RFP_RESPONSE,
+                BOARD_APPROVAL,
+                LEGAL_OPINION,
+              ]
           - name: document-status
             type: string
             required: false
             maps_to: document_status
             default: "DRAFT"
-            valid_values: [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
+            valid_values:
+              [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
         returns:
           type: affected
 
@@ -894,7 +1190,8 @@ domains:
             type: string
             required: true
             maps_to: document_status
-            valid_values: [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
+            valid_values:
+              [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
         returns:
           type: affected
 
@@ -977,7 +1274,8 @@ domains:
             type: string
             required: false
             maps_to: assessment_status
-            valid_values: [PENDING, IN_PROGRESS, COMPLETED, REQUIRES_EDD, BLOCKED]
+            valid_values:
+              [PENDING, IN_PROGRESS, COMPLETED, REQUIRES_EDD, BLOCKED]
           - name: risk-rating
             type: string
             required: false
@@ -1112,7 +1410,16 @@ domains:
             type: string
             required: true
             maps_to: request_status
-            valid_values: [REQUESTED, KYC_PENDING, KYC_CLEARED, IN_PROGRESS, COMPLETED, BLOCKED, CANCELLED]
+            valid_values:
+              [
+                REQUESTED,
+                KYC_PENDING,
+                KYC_CLEARED,
+                IN_PROGRESS,
+                COMPLETED,
+                BLOCKED,
+                CANCELLED,
+              ]
           - name: kyc-case-id
             type: uuid
             required: false
