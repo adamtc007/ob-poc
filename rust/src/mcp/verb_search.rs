@@ -416,9 +416,26 @@ impl HybridVerbSearcher {
         self.fallback_threshold
     }
 
-    /// Check if semantic search is available (embedder configured)
+    /// Check if semantic search is available (embedder AND verb_service configured)
+    ///
+    /// Note: Both embedder and verb_service are required for semantic search.
+    /// - embedder: generates query embeddings
+    /// - verb_service: queries verb_pattern_embeddings table
     pub fn has_semantic_search(&self) -> bool {
-        self.embedder.is_some()
+        let has_embedder = self.embedder.is_some();
+        let has_verb_service = self.verb_service.is_some();
+
+        if has_embedder && !has_verb_service {
+            tracing::debug!(
+                "Embedder configured but verb_service missing - semantic search disabled"
+            );
+        } else if !has_embedder && has_verb_service {
+            tracing::debug!(
+                "VerbService configured but embedder missing - semantic search disabled"
+            );
+        }
+
+        has_embedder && has_verb_service
     }
 
     /// Search for verbs matching user intent
@@ -756,9 +773,10 @@ impl HybridVerbSearcher {
         self.search(query, None, domain_filter, limit).await
     }
 
-    /// Check if semantic search is available
+    /// Check if semantic search is available (internal alias for has_semantic_search)
     fn has_semantic_capability(&self) -> bool {
-        self.verb_service.is_some() && self.embedder.is_some()
+        // Delegate to public method to ensure consistent behavior
+        self.has_semantic_search()
     }
 
     /// Search user-specific learned phrases by exact match

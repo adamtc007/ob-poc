@@ -826,6 +826,58 @@ impl From<OnboardingRequestRow> for OnboardingRequestSummary {
     }
 }
 
+// ============================================================================
+// Client Group Summary
+// ============================================================================
+
+/// Summary of a client group for selection UI
+#[derive(Debug, Clone)]
+pub struct ClientGroupSummary {
+    pub id: Uuid,
+    pub canonical_name: String,
+    pub deal_count: i32,
+}
+
+#[derive(sqlx::FromRow)]
+struct ClientGroupRow {
+    id: Uuid,
+    canonical_name: String,
+    deal_count: i32,
+}
+
+impl DealRepository {
+    /// Get all client groups with their deal counts
+    pub async fn get_all_client_groups(pool: &PgPool) -> Result<Vec<ClientGroupSummary>> {
+        let rows = sqlx::query_as::<_, ClientGroupRow>(
+            r#"
+            SELECT
+                cg.id,
+                cg.canonical_name,
+                COALESCE((
+                    SELECT COUNT(*)
+                    FROM "ob-poc".deals d
+                    WHERE d.primary_client_group_id = cg.id
+                    AND d.deal_status NOT IN ('CANCELLED', 'OFFBOARDED')
+                ), 0)::int as deal_count
+            FROM "ob-poc".client_group cg
+            ORDER BY cg.canonical_name
+            "#,
+        )
+        .fetch_all(pool)
+        .await
+        .context("Failed to fetch client groups")?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ClientGroupSummary {
+                id: row.id,
+                canonical_name: row.canonical_name,
+                deal_count: row.deal_count,
+            })
+            .collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

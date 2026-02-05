@@ -157,6 +157,20 @@ export const chatApi = {
       intent_tier?: unknown;
       clarification?: unknown;
       error?: string;
+      // Backend DecisionPacket for client group/deal/verb clarification
+      decision?: {
+        packet_id: string;
+        kind: string; // "ClarifyGroup" | "ClarifyDeal" | "ClarifyVerb" | "ClarifyScope"
+        prompt: string;
+        choices: Array<{
+          id: string;
+          label: string;
+          description: string;
+          is_escape?: boolean;
+        }>;
+        payload: unknown;
+        confirm_token?: string;
+      };
     }>(`/session/${sessionId}/chat`, { message: request.message });
 
     // Extract content from response - backend uses 'message' field
@@ -223,6 +237,23 @@ export const chatApi = {
             value: opt.value,
           })),
         },
+      };
+    } else if (response.decision) {
+      // Handle backend DecisionPacket for client group/deal selection
+      // Maps backend DecisionPacket to frontend ClarificationPayload format
+      assistantMessage.decision_packet = {
+        id: response.decision.packet_id,
+        kind: "clarification", // All clarify kinds map to 'clarification'
+        payload: {
+          question: response.decision.prompt,
+          options: response.decision.choices.map((choice) => ({
+            id: choice.id,
+            label: choice.label,
+            description: choice.description,
+            value: choice.id, // Use ID as value for selection
+          })),
+        },
+        confirm_token: response.decision.confirm_token,
       };
     }
 

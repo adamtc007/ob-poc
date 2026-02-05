@@ -1129,6 +1129,74 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             session.pending_verb_disambiguation = None;
         }
 
+        // 3. Check for pending decision (client group or deal selection)
+        if let Some(ref pending) = session.pending_decision.clone() {
+            // Check if input is a number (1, 2, 3, etc.) or special keyword
+            let input_upper = input.trim().to_uppercase();
+            if input_upper == "NEW"
+                || input_upper == "SKIP"
+                || input.trim().parse::<usize>().is_ok()
+            {
+                // User is responding to the decision prompt
+                let choice_id = if input_upper == "NEW" {
+                    "NEW".to_string()
+                } else if input_upper == "SKIP" {
+                    "SKIP".to_string()
+                } else {
+                    input.trim().to_string()
+                };
+
+                // Find the matching choice
+                if let Some(choice) = pending.choices.iter().find(|c| c.id == choice_id) {
+                    let choice = choice.clone();
+                    let packet = pending.clone();
+                    session.pending_decision = None;
+
+                    // Handle the selection based on decision kind
+                    return self
+                        .handle_decision_selection(session, &packet, &choice)
+                        .await;
+                } else if let Ok(idx) = input.trim().parse::<usize>() {
+                    // Try index-based selection
+                    if idx >= 1 && idx <= pending.choices.len() {
+                        let choice = pending.choices[idx - 1].clone();
+                        let packet = pending.clone();
+                        session.pending_decision = None;
+
+                        return self
+                            .handle_decision_selection(session, &packet, &choice)
+                            .await;
+                    }
+                }
+
+                // Invalid selection
+                let msg = format!(
+                    "Please select a valid option (1-{}) or type NEW/SKIP.",
+                    pending.choices.len()
+                );
+                session.add_agent_message(msg.clone(), None, None);
+                return Ok(AgentChatResponse {
+                    message: msg,
+                    intents: vec![],
+                    validation_results: vec![],
+                    session_state: SessionState::PendingValidation,
+                    can_execute: false,
+                    dsl_source: None,
+                    ast: None,
+                    disambiguation: None,
+                    commands: None,
+                    unresolved_refs: None,
+                    current_ref_index: None,
+                    dsl_hash: None,
+                    verb_disambiguation: None,
+                    intent_tier: None,
+                    decision: Some(pending.clone()),
+                });
+            }
+            // Not a selection - clear pending and process as new input
+            session.pending_decision = None;
+        }
+
         // Clear pending intent tier if user typed something new
         session.pending_intent_tier = None;
 
@@ -1407,13 +1475,12 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             return None;
         }
 
-        // Check if client group is set
+        // Check if client group is set - if not, prompt for it first
         let client_group_id = match session.context.client_group_id() {
             Some(id) => id,
             None => {
-                // No client group - let the normal flow handle ClarifyGroup
-                // or user can say "work on Allianz" etc.
-                return None;
+                // No client group - prompt user to select one
+                return self.prompt_for_client_group(session).await;
             }
         };
 
@@ -1550,6 +1617,219 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             verb_disambiguation: None,
             intent_tier: None,
             decision: Some(packet),
+        })
+    }
+
+    /// Prompt user to select a client group at session start
+    ///
+    /// This is the first step in the context flow:
+    /// Client Group → Deal → CBU/Entity
+    async fn prompt_for_client_group(
+        &self,
+        session: &mut UnifiedSession,
+    ) -> Option<AgentChatResponse> {
+        use crate::database::DealRepository;
+        use ob_poc_types::{
+            ClarificationPayload, DecisionKind, DecisionPacket, DecisionTrace,
+            GroupClarificationPayload, GroupOption, SessionStateView, UserChoice,
+        };
+
+        // Fetch all client groups
+        let client_groups = match DealRepository::get_all_client_groups(&self.pool).await {
+            Ok(groups) => groups,
+            Err(e) => {
+                tracing::warn!(error = %e, "Failed to fetch client groups");
+                return None; // Continue without context
+            }
+        };
+
+        if client_groups.is_empty() {
+            tracing::info!("No client groups found in database");
+            return None;
+        }
+
+        // Build group options for UI
+        let group_options: Vec<GroupOption> = client_groups
+            .iter()
+            .map(|g| GroupOption {
+                id: g.id.to_string(),
+                alias: g.canonical_name.clone(),
+                score: 1.0,
+                method: "list".to_string(),
+            })
+            .collect();
+
+        // Build choices for UI
+        let choices: Vec<UserChoice> = client_groups
+            .iter()
+            .enumerate()
+            .map(|(i, g)| UserChoice {
+                id: format!("{}", i + 1),
+                label: g.canonical_name.clone(),
+                description: format!("{} active deal(s)", g.deal_count),
+                is_escape: false,
+            })
+            .collect();
+
+        let prompt = "Welcome! Which client would you like to work with today?".to_string();
+
+        let payload = GroupClarificationPayload {
+            options: group_options,
+        };
+
+        let packet = DecisionPacket {
+            packet_id: uuid::Uuid::new_v4().to_string(),
+            kind: DecisionKind::ClarifyGroup,
+            session: SessionStateView {
+                session_id: Some(session.id),
+                client_group_anchor: None,
+                client_group_name: None,
+                persona: None,
+                last_confirmed_verb: None,
+            },
+            utterance: String::new(),
+            payload: ClarificationPayload::Group(payload),
+            prompt: prompt.clone(),
+            choices,
+            best_plan: None,
+            alternatives: vec![],
+            requires_confirm: false,
+            confirm_token: None,
+            trace: DecisionTrace {
+                config_version: "1.0".to_string(),
+                entity_snapshot_hash: None,
+                lexicon_snapshot_hash: None,
+                semantic_lane_enabled: false,
+                embedding_model_id: None,
+                verb_margin: 0.0,
+                scope_margin: 0.0,
+                kind_margin: 0.0,
+                decision_reason: "session_start_client_group".to_string(),
+            },
+        };
+
+        // Store pending decision in session
+        session.pending_decision = Some(packet.clone());
+
+        session.add_agent_message(prompt.clone(), None, None);
+
+        Some(AgentChatResponse {
+            message: prompt,
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::PendingValidation,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: Some(packet),
+        })
+    }
+
+    /// Handle a decision selection (client group or deal selection from pending_decision)
+    async fn handle_decision_selection(
+        &self,
+        session: &mut UnifiedSession,
+        packet: &ob_poc_types::DecisionPacket,
+        choice: &ob_poc_types::UserChoice,
+    ) -> Result<AgentChatResponse, String> {
+        use ob_poc_types::{ClarificationPayload, DecisionKind};
+
+        let message = match &packet.kind {
+            DecisionKind::ClarifyGroup => {
+                // Handle client group selection
+                if let ClarificationPayload::Group(group_payload) = &packet.payload {
+                    // Find the selected group by index
+                    if let Ok(idx) = choice.id.parse::<usize>() {
+                        if let Some(group) = group_payload.options.get(idx.saturating_sub(1)) {
+                            // Set client group context in session
+                            if let Ok(group_uuid) = uuid::Uuid::parse_str(&group.id) {
+                                let scope = crate::mcp::scope_resolution::ScopeContext::new()
+                                    .with_client_group(group_uuid, group.alias.clone());
+                                session.context.set_client_scope(scope);
+                                format!("Now working with client: {}. Let me check for any existing deals...", group.alias)
+                            } else {
+                                "Invalid group ID".to_string()
+                            }
+                        } else {
+                            format!("Selected client: {}", choice.label)
+                        }
+                    } else {
+                        format!("Selected client: {}", choice.label)
+                    }
+                } else {
+                    format!("Selected client: {}", choice.label)
+                }
+            }
+            DecisionKind::ClarifyDeal => {
+                // Handle deal selection
+                if choice.id == "NEW" {
+                    "Let's create a new deal. What would you like to name it?".to_string()
+                } else if choice.id == "SKIP" {
+                    session.context.deal_id = None;
+                    session.context.deal_name = None;
+                    "Continuing without deal context. You can set one later with 'load deal'."
+                        .to_string()
+                } else {
+                    // User selected an existing deal
+                    if let ClarificationPayload::Deal(deal_payload) = &packet.payload {
+                        if let Ok(idx) = choice.id.parse::<usize>() {
+                            if let Some(deal) = deal_payload.deals.get(idx.saturating_sub(1)) {
+                                if let Ok(deal_uuid) = uuid::Uuid::parse_str(&deal.deal_id) {
+                                    session.context.deal_id = Some(deal_uuid);
+                                    session.context.deal_name = Some(deal.deal_name.clone());
+                                    format!(
+                                        "Now working on deal: {}. How can I help you today?",
+                                        deal.deal_name
+                                    )
+                                } else {
+                                    "Invalid deal ID".to_string()
+                                }
+                            } else {
+                                format!("Selected deal: {}", choice.label)
+                            }
+                        } else {
+                            format!("Selected deal: {}", choice.label)
+                        }
+                    } else {
+                        format!("Selected deal: {}", choice.label)
+                    }
+                }
+            }
+            _ => format!("Selected: {}", choice.label),
+        };
+
+        session.add_agent_message(message.clone(), None, None);
+
+        // After setting client group, check for deals
+        if matches!(packet.kind, DecisionKind::ClarifyGroup) {
+            if let Some(deal_decision) = self.check_session_context(session).await {
+                return Ok(deal_decision);
+            }
+        }
+
+        Ok(AgentChatResponse {
+            message,
+            intents: vec![],
+            validation_results: vec![],
+            session_state: SessionState::Scoped,
+            can_execute: false,
+            dsl_source: None,
+            ast: None,
+            disambiguation: None,
+            commands: None,
+            unresolved_refs: None,
+            current_ref_index: None,
+            dsl_hash: None,
+            verb_disambiguation: None,
+            intent_tier: None,
+            decision: None,
         })
     }
 

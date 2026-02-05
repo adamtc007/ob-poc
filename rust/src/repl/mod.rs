@@ -1,4 +1,8 @@
-//! Staged Runbook REPL
+//! REPL Module
+//!
+//! This module contains two subsystems:
+//!
+//! ## 1. Staged Runbook REPL (Legacy)
 //!
 //! Anti-hallucination execution model for DSL commands:
 //! 1. Commands are staged (no side effects)
@@ -6,47 +10,20 @@
 //! 3. DAG analysis determines execution order
 //! 4. Execution only happens on explicit user confirmation
 //!
-//! # Architecture
+//! ## 2. REPL State Machine (New)
 //!
-//! ```text
-//! User prompt
-//!     │
-//!     ▼
-//! Intent Classification (Candle)
-//!     │
-//!     ├── StageCommand (default)
-//!     │       │
-//!     │       ▼
-//!     │   runbook_stage tool
-//!     │       │
-//!     │       ▼
-//!     │   Parse DSL → Resolve entities → Stage command
-//!     │       │
-//!     │       ▼
-//!     │   CommandStaged / ResolutionAmbiguous / StageFailed event
-//!     │
-//!     ├── RunRunbook
-//!     │       │
-//!     │       ▼
-//!     │   runbook_run tool
-//!     │       │
-//!     │       ▼
-//!     │   Validate readiness → DAG sort → Execute in order
-//!     │
-//!     └── EditRunbook / ShowRunbook / AbortRunbook
-//!             │
-//!             ▼
-//!         Corresponding tool
-//! ```
+//! Clean redesign with explicit state machine:
+//! 1. Command Ledger as single source of truth
+//! 2. All state derived from ledger entries
+//! 3. Pure IntentMatcher service (no side effects)
+//! 4. Clear state transitions (Idle → IntentMatching → Clarifying/DslReady → Executing)
 //!
-//! # Non-Negotiable Invariants
-//!
-//! 1. **No side-effects unless user explicitly says** `run/execute/commit`
-//! 2. **No invented UUIDs** - All UUIDs from DB resolution or picker validation
-//! 3. **No ambiguous refs** - Ambiguous → picker required before execution
-//! 4. **DAG reordering transparent** - Diff shown to user
-//! 5. **Agent must call tools** - Never answer with invented actions
-//! 6. **Picker entity_ids from events only** - Cannot fabricate UUIDs
+//! The new state machine (`orchestrator`, `intent_matcher`, `session`, `types`, `response`)
+//! will eventually replace the staged runbook subsystem.
+
+// ============================================================================
+// Staged Runbook Subsystem (Legacy)
+// ============================================================================
 
 pub mod dag_analyzer;
 pub mod events;
@@ -59,7 +36,7 @@ pub mod repository;
 #[cfg(feature = "database")]
 pub mod service;
 
-// Re-exports for convenience
+// Re-exports for staged runbook
 pub use dag_analyzer::{DagAnalyzer, DagError, DependencyEdge, ReorderDiff, ReorderMove};
 pub use events::{
     BlockingCommand, CommandResult, EntityFootprintEntry, LearnedTag, PickerCandidate,
@@ -75,3 +52,26 @@ pub use repository::StagedRunbookRepository;
 
 #[cfg(feature = "database")]
 pub use service::{PickError, PickResult, RunError, RunbookService, StageError, StageResult};
+
+// ============================================================================
+// REPL State Machine Subsystem (New)
+// ============================================================================
+
+pub mod intent_matcher;
+pub mod orchestrator;
+mod response;
+pub mod session;
+pub mod types;
+
+// Re-export new state machine types
+pub use types::{
+    ClarifyingKind, ClarifyingState, ClientGroupOption, EntityCandidate, EntityMention,
+    EntryStatus, IntentMatchResult, IntentTierOption, LedgerEntry, LedgerExecutionResult,
+    MatchContext, MatchDebugInfo, MatchOutcome, ReplCommand, ReplState, ScopeCandidate,
+    ScopeContext, UnresolvedRef, UserInput, VerbCandidate,
+};
+
+pub use intent_matcher::{EntityLinkingService, HybridIntentMatcher, IntentMatcher, LlmClient};
+pub use orchestrator::{ClientGroupProvider, DslExecutor, ReplOrchestrator};
+pub use response::{ReplResponse, ReplResponseKind};
+pub use session::{ChatMessage, DerivedState, MessageRole, ReplSession};

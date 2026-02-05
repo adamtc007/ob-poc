@@ -903,6 +903,11 @@ pub struct ChatResponse {
     /// UI must pass this back when resolving refs to prevent stale commits
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dsl_hash: Option<String>,
+
+    /// Decision packet for client group or deal selection
+    /// When present, UI should show decision prompt with choices
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision: Option<DecisionPacket>,
 }
 
 /// Session state enum for typed responses - matches server's SessionState

@@ -2499,6 +2499,22 @@ fn generate_verbs_help(domain_filter: Option<&str>) -> String {
 /// - Intent extraction via LLM
 /// - Entity resolution via EntityGateway
 /// - DSL generation with validation/retry loop
+///
+/// ## Migration Note (REPL Redesign)
+///
+/// This endpoint is being replaced by the new REPL state machine at `/api/repl/*`.
+/// The new architecture provides:
+/// - Explicit state machine with clear transitions
+/// - Single source of truth (command ledger)
+/// - Pure intent matching service (no side effects)
+/// - Replayable sessions from ledger
+///
+/// To use the new REPL API:
+/// - `POST /api/repl/session` - Create session
+/// - `POST /api/repl/session/:id/input` - Send any input (unified endpoint)
+/// - `GET /api/repl/session/:id` - Get full session state
+///
+/// This endpoint remains for backwards compatibility during migration.
 async fn chat_session(
     State(state): State<AgentState>,
     Path(session_id): Path<Uuid>,
@@ -2549,6 +2565,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                decision: None,
             }));
         }
         // /commands <domain> or /verbs <domain> - show verbs for domain
@@ -2564,6 +2581,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                decision: None,
             }));
         }
         // /verbs (no args) - show all verbs
@@ -2579,6 +2597,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                decision: None,
             }));
         }
         _ => {} // Not a slash command, continue to LLM
@@ -2603,6 +2622,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                decision: None,
             }));
         }
     };
@@ -2634,6 +2654,7 @@ async fn chat_session(
                 unresolved_refs: None,
                 current_ref_index: None,
                 dsl_hash: None,
+                decision: None,
             }));
         }
     };
@@ -2760,6 +2781,7 @@ async fn chat_session(
             .map(|refs| api_unresolved_refs_to_api(refs)),
         current_ref_index: response.current_ref_index,
         dsl_hash: response.dsl_hash,
+        decision: response.decision,
     }))
 }
 
@@ -7813,7 +7835,31 @@ async fn handle_decision_reply(
                     format!("Selected verb option: {}", choice.label)
                 }
                 DecisionKind::ClarifyGroup => {
-                    format!("Selected group: {}", choice.label)
+                    // Handle client group selection
+                    if let ob_poc_types::ClarificationPayload::Group(group_payload) =
+                        &packet.payload
+                    {
+                        // Find the selected group by index
+                        if let Ok(idx) = choice.id.parse::<usize>() {
+                            if let Some(group) = group_payload.options.get(idx.saturating_sub(1)) {
+                                // Set client group context in session
+                                if let Ok(group_uuid) = uuid::Uuid::parse_str(&group.id) {
+                                    let scope = crate::mcp::scope_resolution::ScopeContext::new()
+                                        .with_client_group(group_uuid, group.alias.clone());
+                                    session.context.set_client_scope(scope);
+                                    format!("Now working with client: {}", group.alias)
+                                } else {
+                                    "Invalid group ID".to_string()
+                                }
+                            } else {
+                                format!("Selected client: {}", choice.label)
+                            }
+                        } else {
+                            format!("Selected client: {}", choice.label)
+                        }
+                    } else {
+                        format!("Selected client: {}", choice.label)
+                    }
                 }
                 DecisionKind::ClarifyScope => {
                     format!("Selected scope: {}", choice.label)
