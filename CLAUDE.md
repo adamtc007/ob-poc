@@ -12,6 +12,7 @@
 > **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
 > **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
+> **REPL Pipeline Redesign (077):** ✅ Complete - Explicit state machine, command ledger, unified `/api/repl/*` API
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
 > **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
@@ -372,7 +373,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | Trading matrix pivot | `ai-thoughts/027-trading-matrix-canonical-pivot.md` | ✅ Done |
 | Verb governance | `ai-thoughts/028-verb-lexicon-governance.md` | ✅ Done |
 | Entity resolution wiring | `ai-thoughts/033-entity-resolution-wiring-plan.md` | ✅ Done |
-| REPL state model | `ai-thoughts/034-repl-state-model-dsl-agent-protocol.md` | ⚠️ In Progress |
+| REPL state model | `ai-thoughts/034-repl-state-model-dsl-agent-protocol.md` | ✅ Done |
 | Session-runsheet-viewport | `ai-thoughts/035-session-runsheet-viewport-integration.md` | ✅ Done |
 | Session rip-and-replace | `ai-thoughts/036-session-rip-and-replace.md` | ✅ Done |
 | Solar navigation | `ai-thoughts/038-solar-navigation-unified-design.md` | ✅ Done |
@@ -3575,6 +3576,172 @@ Template batch operations can use `@session_cbus` as source to iterate over all 
 
 ---
 
+## REPL Pipeline Redesign (077)
+
+> ✅ **IMPLEMENTED (2026-02-05)**: Complete architectural redesign with explicit state machine, command ledger, and unified input API.
+
+**Problem Solved:** The previous implementation had accumulated complexity:
+- 7 early-return branches in `process_chat()` (~2500 lines)
+- 4 overlapping pending states (verb_disambiguation, intent_tier, decision, resolution)
+- Duplicated state across UnifiedSession and SessionContext
+- No clear state machine - transitions were implicit
+- Session state not replayable from DSL history
+
+### New Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                    REPL STATE MACHINE                            │
+│                                                                  │
+│  ┌────────┐                                                     │
+│  │  IDLE  │ ◄─────────────────────────────────────────┐         │
+│  └───┬────┘                                           │         │
+│      │ user input                                     │         │
+│      ▼                                                │         │
+│  ┌────────────────┐                                   │         │
+│  │ INTENT_MATCHING│                                   │         │
+│  └───┬────────────┘                                   │         │
+│      │                                                │         │
+│      ├─► Matched (clear winner)      ──► DSL_READY ──┼─► IDLE  │
+│      │                                       │        │  (after │
+│      ├─► Ambiguous (verb options)    ──► CLARIFYING ─┘  exec)  │
+│      │                                       │                  │
+│      ├─► NeedsScopeSelection         ──► CLARIFYING            │
+│      │                                       │                  │
+│      ├─► NeedsEntityResolution       ──► CLARIFYING            │
+│      │                                       │                  │
+│      └─► NoMatch / Error             ──► IDLE (with error)     │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### Key Principles
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Explicit State Machine** | `ReplState` enum with clear transitions in `ReplOrchestrator` |
+| **Single Source of Truth** | Command ledger (`Vec<LedgerEntry>`) is the authority |
+| **Pure Intent Matching** | `IntentMatcher` trait with no side effects |
+| **Replayable Sessions** | `recompute_derived()` rebuilds state from ledger |
+| **Unified Input API** | Single `/input` endpoint handles all interaction types |
+
+### Core Types (`rust/src/repl/types.rs`)
+
+```rust
+/// REPL state machine states
+pub enum ReplState {
+    Idle,
+    IntentMatching { started_at: DateTime<Utc> },
+    Clarifying(ClarifyingState),
+    DslReady { dsl: String, verb: String, can_auto_execute: bool },
+    Executing { dsl: String, started_at: DateTime<Utc> },
+}
+
+/// What we're waiting for user to clarify
+pub enum ClarifyingState {
+    VerbSelection { options, original_input, margin },
+    ScopeSelection { options, context },
+    EntityResolution { unresolved_refs, partial_dsl },
+    Confirmation { dsl, summary },
+    IntentTier { tier_number, options, prompt },
+    ClientGroupSelection { options, prompt },
+}
+
+/// Single entry in the command ledger
+pub struct LedgerEntry {
+    pub id: Uuid,
+    pub timestamp: DateTime<Utc>,
+    pub input: UserInput,
+    pub intent_result: Option<IntentMatchResult>,
+    pub dsl: Option<String>,
+    pub execution_result: Option<LedgerExecutionResult>,
+    pub status: EntryStatus,
+}
+
+/// All user input types (unified)
+pub enum UserInput {
+    Message { content: String },
+    VerbSelection { option_index, selected_verb, original_input },
+    ScopeSelection { option_id, option_name },
+    EntitySelection { ref_id, entity_id, entity_name },
+    Confirmation { confirmed: bool },
+    IntentTierSelection { tier, selected_id },
+    ClientGroupSelection { group_id, group_name },
+    Command { command: ReplCommand },
+}
+```
+
+### API Endpoints (`/api/repl/*`)
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/repl/session` | Create new REPL session |
+| `GET /api/repl/session/:id` | Get full session state (for page reload recovery) |
+| `POST /api/repl/session/:id/input` | **Unified endpoint** - handles ALL user interactions |
+| `DELETE /api/repl/session/:id` | Delete session |
+
+**Input Request Format:**
+```typescript
+type InputRequest =
+  | { type: "message"; content: string }
+  | { type: "verb_selection"; option_index: number; selected_verb: string; original_input: string }
+  | { type: "scope_selection"; option_id: string; option_name: string }
+  | { type: "entity_selection"; ref_id: string; entity_id: string; entity_name: string }
+  | { type: "confirmation"; confirmed: boolean }
+  | { type: "intent_tier_selection"; tier: number; selected_id: string }
+  | { type: "client_group_selection"; group_id: string; group_name: string }
+  | { type: "command"; command: "run" | "undo" | "redo" | "clear" | "cancel" };
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/repl/types.rs` | Core types: ReplState, LedgerEntry, UserInput, MatchContext |
+| `rust/src/repl/intent_matcher.rs` | IntentMatcher trait, HybridIntentMatcher implementation |
+| `rust/src/repl/orchestrator.rs` | ReplOrchestrator state machine (single `process()` entry point) |
+| `rust/src/repl/session.rs` | ReplSession with ledger and DerivedState |
+| `rust/src/repl/response.rs` | ReplResponse types for API |
+| `rust/src/api/repl_routes.rs` | HTTP endpoints with ReplRouteState |
+| `ob-poc-ui-react/src/api/repl.ts` | TypeScript API client |
+
+### React API Client
+
+```typescript
+import { replApi } from './api/repl';
+
+// Create session
+const session = await replApi.createSession();
+
+// Send message (natural language)
+const response = await replApi.sendMessage(sessionId, "load the allianz book");
+
+// Handle clarification
+if (response.state.type === "Clarifying") {
+  const clarify = response.state.clarifying;
+  if (clarify.type === "VerbSelection") {
+    // Show verb options to user, then:
+    await replApi.selectVerb(sessionId, 0, "session.load-galaxy", "load the allianz book");
+  }
+}
+
+// Execute staged DSL
+await replApi.run(sessionId);
+
+// Commands
+await replApi.undo(sessionId);
+await replApi.clear(sessionId);
+```
+
+### Migration Path
+
+The new REPL API coexists with the existing `/api/session/*` endpoints:
+- **Legacy:** `/api/session/:id/chat` - existing chat endpoint (unchanged)
+- **New:** `/api/repl/session/:id/input` - unified REPL endpoint
+
+Migrate incrementally by switching frontend components to use `replApi` instead of `chatApi`.
+
+---
+
 ## Code Patterns
 
 ### Config Struct Pattern
@@ -4679,6 +4846,7 @@ When you see these in a task, read the corresponding annex first:
 | "lexicon", "verb lookup", "domain lookup", "LexiconService" | CLAUDE.md §Lexicon Service (072) |
 | "entity linking", "mention extraction", "entity resolution", "EntityLinkingService" | CLAUDE.md §Entity Linking Service (073) |
 | "lookup service", "verb-first", "dual search", "LookupService" | CLAUDE.md §Unified Lookup Service (074) |
+| "REPL redesign", "state machine", "command ledger", "ReplOrchestrator", "/api/repl" | CLAUDE.md §REPL Pipeline Redesign (077) |
 
 ---
 
