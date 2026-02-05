@@ -1,0 +1,1210 @@
+domains:
+  deal:
+    description: "Deal Record management - commercial origination hub for sales, contracting, and onboarding"
+
+    invocation_hints:
+      - "deal"
+      - "opportunity"
+      - "sales"
+      - "client onboarding"
+      - "rate card"
+      - "negotiation"
+
+    verbs:
+      # =========================================================================
+      # DEAL CRUD
+      # =========================================================================
+
+      create:
+        description: "Create a new deal record for a sales opportunity"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "create deal"
+          - "new deal"
+          - "create sales opportunity"
+          - "open new deal"
+          - "start deal"
+          - "create client deal"
+        args:
+          - name: deal-name
+            type: string
+            required: true
+            maps_to: deal_name
+            description: "Name of the deal"
+          - name: primary-client-group-id
+            type: uuid
+            required: true
+            maps_to: primary_client_group_id
+            description: "Client group ID (e.g., Allianz, BlackRock)"
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: deal-reference
+            type: string
+            required: false
+            maps_to: deal_reference
+            description: "Internal deal tracking reference"
+          - name: sales-owner
+            type: string
+            required: false
+            maps_to: sales_owner
+            description: "Lead sales contact"
+          - name: sales-team
+            type: string
+            required: false
+            maps_to: sales_team
+            description: "Sales team/desk"
+          - name: estimated-revenue
+            type: decimal
+            required: false
+            maps_to: estimated_revenue
+            description: "Estimated annual revenue"
+          - name: currency-code
+            type: string
+            required: false
+            maps_to: currency_code
+            default: "USD"
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: deal_id
+          capture: true
+
+      get:
+        description: "Retrieve deal record by ID"
+        behavior: crud
+        crud:
+          operation: select
+          table: deals
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "get deal"
+          - "show deal"
+          - "deal details"
+          - "view deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: record
+
+      list:
+        description: "List deals with optional filters"
+        behavior: crud
+        crud:
+          operation: select
+          table: v_deal_summary
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "list deals"
+          - "show deals"
+          - "all deals"
+          - "deals for client"
+          - "my deals"
+        args:
+          - name: client-group-id
+            type: uuid
+            required: false
+            maps_to: primary_client_group_id
+          - name: status
+            type: string
+            required: false
+            maps_to: deal_status
+            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
+          - name: sales-owner
+            type: string
+            required: false
+            maps_to: sales_owner
+        returns:
+          type: record_set
+
+      search:
+        description: "Search deals by name or reference"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "search deals"
+          - "find deal"
+          - "lookup deal"
+        args:
+          - name: query
+            type: string
+            required: true
+            description: "Search term for deal name or reference"
+        returns:
+          type: record_set
+
+      update:
+        description: "Update deal record fields"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "update deal"
+          - "modify deal"
+          - "edit deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: deal-name
+            type: string
+            required: false
+            maps_to: deal_name
+          - name: sales-owner
+            type: string
+            required: false
+            maps_to: sales_owner
+          - name: estimated-revenue
+            type: decimal
+            required: false
+            maps_to: estimated_revenue
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: affected
+
+      update-status:
+        description: "Transition deal status with lifecycle validation"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "update deal status"
+          - "change deal status"
+          - "move deal to"
+          - "advance deal"
+          - "progress deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: new-status
+            type: string
+            required: true
+            maps_to: deal_status
+            valid_values: [PROSPECT, QUALIFYING, NEGOTIATING, CONTRACTED, ONBOARDING, ACTIVE, WINDING_DOWN, OFFBOARDED, CANCELLED]
+        returns:
+          type: affected
+
+      cancel:
+        description: "Cancel a deal (soft delete - sets status to CANCELLED)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "cancel deal"
+          - "abort deal"
+          - "close deal as lost"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: reason
+            type: string
+            required: true
+            description: "Cancellation reason"
+        returns:
+          type: affected
+
+      # =========================================================================
+      # DEAL PARTICIPANTS
+      # =========================================================================
+
+      add-participant:
+        description: "Add a participating entity (regional LEI) to a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_participant
+        invocation_phrases:
+          - "add participant to deal"
+          - "add entity to deal"
+          - "add contracting party"
+          - "add deal participant"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: search_name
+              primary_key: entity_id
+          - name: participant-role
+            type: string
+            required: false
+            maps_to: participant_role
+            default: "CONTRACTING_PARTY"
+            valid_values: [CONTRACTING_PARTY, GUARANTOR, INTRODUCER, INVESTMENT_MANAGER, FUND_ADMIN]
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: "LEI of the participating entity"
+          - name: is-primary
+            type: boolean
+            required: false
+            maps_to: is_primary
+            default: false
+        returns:
+          type: affected
+
+      remove-participant:
+        description: "Remove a participant from a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_participant
+        invocation_phrases:
+          - "remove participant from deal"
+          - "remove deal participant"
+          - "delete participant"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: participant-role
+            type: string
+            required: false
+            maps_to: participant_role
+        returns:
+          type: affected
+
+      list-participants:
+        description: "List all participants in a deal"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_participants
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_participant
+        invocation_phrases:
+          - "list deal participants"
+          - "show deal participants"
+          - "who is in the deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # DEAL CONTRACTS
+      # =========================================================================
+
+      add-contract:
+        description: "Link a service contract to a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_contract
+        invocation_phrases:
+          - "add contract to deal"
+          - "link contract to deal"
+          - "attach contract"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: contract-id
+            type: uuid
+            required: true
+            maps_to: contract_id
+          - name: contract-role
+            type: string
+            required: false
+            maps_to: contract_role
+            default: "PRIMARY"
+            valid_values: [PRIMARY, ADDENDUM, SCHEDULE, SIDE_LETTER, NDA]
+          - name: sequence-order
+            type: integer
+            required: false
+            maps_to: sequence_order
+        returns:
+          type: affected
+
+      remove-contract:
+        description: "Unlink a contract from a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_contract
+        invocation_phrases:
+          - "remove contract from deal"
+          - "unlink contract"
+          - "detach contract"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: contract-id
+            type: uuid
+            required: true
+            maps_to: contract_id
+        returns:
+          type: affected
+
+      list-contracts:
+        description: "List all contracts linked to a deal"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_contracts
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_contract
+        invocation_phrases:
+          - "list deal contracts"
+          - "show contracts for deal"
+          - "deal agreements"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # RATE CARDS
+      # =========================================================================
+
+      create-rate-card:
+        description: "Create a negotiated rate card for a product within a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "create deal rate card"
+          - "new rate card for deal"
+          - "create pricing for deal"
+          - "add rate card to deal"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: contract-id
+            type: uuid
+            required: true
+            maps_to: contract_id
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+            lookup:
+              table: products
+              entity_type: product
+              schema: ob-poc
+              search_key: name
+              primary_key: product_id
+          - name: rate-card-name
+            type: string
+            required: false
+            maps_to: rate_card_name
+          - name: effective-from
+            type: date
+            required: true
+            maps_to: effective_from
+          - name: effective-to
+            type: date
+            required: false
+            maps_to: effective_to
+        returns:
+          type: uuid
+          name: rate_card_id
+          capture: true
+
+      add-rate-card-line:
+        description: "Add a fee line to a rate card"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rate_card_line
+        invocation_phrases:
+          - "add rate card line"
+          - "add fee line"
+          - "add pricing line"
+          - "add fee to rate card"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+          - name: fee-type
+            type: string
+            required: true
+            maps_to: fee_type
+            description: "Fee type (e.g., CUSTODY, FUND_ACCOUNTING, TA, FX, SETTLEMENT)"
+          - name: fee-subtype
+            type: string
+            required: false
+            maps_to: fee_subtype
+            default: "DEFAULT"
+          - name: pricing-model
+            type: string
+            required: true
+            maps_to: pricing_model
+            valid_values: [BPS, FLAT, PER_TRANSACTION, TIERED, SPREAD, MINIMUM_FEE]
+          - name: rate-value
+            type: decimal
+            required: false
+            maps_to: rate_value
+            description: "BPS or per-unit rate"
+          - name: minimum-fee
+            type: decimal
+            required: false
+            maps_to: minimum_fee
+          - name: maximum-fee
+            type: decimal
+            required: false
+            maps_to: maximum_fee
+          - name: currency-code
+            type: string
+            required: false
+            maps_to: currency_code
+            default: "USD"
+          - name: tier-brackets
+            type: json
+            required: false
+            maps_to: tier_brackets
+            description: "Tiered pricing brackets as JSON array"
+          - name: fee-basis
+            type: string
+            required: false
+            maps_to: fee_basis
+            valid_values: [AUM, NAV, TRADE_COUNT, POSITION_COUNT]
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+        returns:
+          type: uuid
+          name: line_id
+          capture: true
+
+      update-rate-card-line:
+        description: "Modify an existing rate card line"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rate_card_line
+        invocation_phrases:
+          - "update rate card line"
+          - "modify fee line"
+          - "change rate"
+        args:
+          - name: line-id
+            type: uuid
+            required: true
+            maps_to: line_id
+          - name: rate-value
+            type: decimal
+            required: false
+            maps_to: rate_value
+          - name: minimum-fee
+            type: decimal
+            required: false
+            maps_to: minimum_fee
+          - name: maximum-fee
+            type: decimal
+            required: false
+            maps_to: maximum_fee
+          - name: tier-brackets
+            type: json
+            required: false
+            maps_to: tier_brackets
+        returns:
+          type: affected
+
+      remove-rate-card-line:
+        description: "Remove a fee line from a rate card"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rate_card_line
+        invocation_phrases:
+          - "remove rate card line"
+          - "delete fee line"
+        args:
+          - name: line-id
+            type: uuid
+            required: true
+            maps_to: line_id
+        returns:
+          type: affected
+
+      list-rate-card-lines:
+        description: "List all fee lines for a rate card"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_rate_card_lines
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rate_card_line
+        invocation_phrases:
+          - "list rate card lines"
+          - "show fee lines"
+          - "rate card pricing"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # RATE CARD NEGOTIATION
+      # =========================================================================
+
+      propose-rate-card:
+        description: "Submit rate card for client review"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "propose rate card"
+          - "submit rate card"
+          - "send rate card to client"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+        returns:
+          type: affected
+
+      counter-rate-card:
+        description: "Client counter-offer - creates new version via clone"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "counter rate card"
+          - "client counter offer"
+          - "counter proposal"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+          - name: counter-lines
+            type: json
+            required: true
+            description: "Array of {line_id, proposed_rate, proposed_minimum, proposed_maximum}"
+        returns:
+          type: uuid
+          name: new_rate_card_id
+          capture: true
+
+      agree-rate-card:
+        description: "Finalise rate card - both parties agree. Lines become immutable."
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_rate_card
+        invocation_phrases:
+          - "agree rate card"
+          - "accept rate card"
+          - "finalize rate card"
+          - "approve pricing"
+        args:
+          - name: rate-card-id
+            type: uuid
+            required: true
+            maps_to: rate_card_id
+        returns:
+          type: affected
+
+      # =========================================================================
+      # SLAs
+      # =========================================================================
+
+      add-sla:
+        description: "Add a service level agreement to a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_sla
+        invocation_phrases:
+          - "add sla to deal"
+          - "create deal sla"
+          - "add service level agreement"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: contract-id
+            type: uuid
+            required: false
+            maps_to: contract_id
+          - name: product-id
+            type: uuid
+            required: false
+            maps_to: product_id
+          - name: service-id
+            type: uuid
+            required: false
+            maps_to: service_id
+          - name: sla-name
+            type: string
+            required: true
+            maps_to: sla_name
+          - name: sla-type
+            type: string
+            required: false
+            maps_to: sla_type
+            valid_values: [AVAILABILITY, TURNAROUND, ACCURACY, REPORTING]
+          - name: metric-name
+            type: string
+            required: true
+            maps_to: metric_name
+          - name: target-value
+            type: string
+            required: true
+            maps_to: target_value
+          - name: measurement-unit
+            type: string
+            required: false
+            maps_to: measurement_unit
+          - name: penalty-type
+            type: string
+            required: false
+            maps_to: penalty_type
+            valid_values: [FEE_REBATE, CREDIT, ESCALATION]
+          - name: penalty-value
+            type: decimal
+            required: false
+            maps_to: penalty_value
+          - name: effective-from
+            type: date
+            required: true
+            maps_to: effective_from
+        returns:
+          type: uuid
+          name: sla_id
+          capture: true
+
+      remove-sla:
+        description: "Remove an SLA from a deal"
+        behavior: crud
+        crud:
+          operation: delete
+          table: deal_slas
+          schema: ob-poc
+          key: sla_id
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_sla
+        invocation_phrases:
+          - "remove deal sla"
+          - "delete sla"
+        args:
+          - name: sla-id
+            type: uuid
+            required: true
+            maps_to: sla_id
+        returns:
+          type: affected
+
+      list-slas:
+        description: "List SLAs for a deal"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_slas
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_sla
+        invocation_phrases:
+          - "list deal slas"
+          - "show slas for deal"
+          - "deal service levels"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # DOCUMENTS
+      # =========================================================================
+
+      add-document:
+        description: "Link a document to a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_document
+        invocation_phrases:
+          - "add document to deal"
+          - "attach document"
+          - "link document"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: document-id
+            type: uuid
+            required: true
+            maps_to: document_id
+          - name: document-type
+            type: string
+            required: true
+            maps_to: document_type
+            valid_values: [CONTRACT, TERM_SHEET, SIDE_LETTER, NDA, RATE_SCHEDULE, SLA, PROPOSAL, RFP_RESPONSE, BOARD_APPROVAL, LEGAL_OPINION]
+          - name: document-status
+            type: string
+            required: false
+            maps_to: document_status
+            default: "DRAFT"
+            valid_values: [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
+        returns:
+          type: affected
+
+      update-document-status:
+        description: "Update document status (e.g. DRAFT → SIGNED → EXECUTED)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_document
+        invocation_phrases:
+          - "update deal document status"
+          - "mark document signed"
+          - "execute document"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: document-id
+            type: uuid
+            required: true
+            maps_to: document_id
+          - name: document-status
+            type: string
+            required: true
+            maps_to: document_status
+            valid_values: [DRAFT, UNDER_REVIEW, SIGNED, EXECUTED, SUPERSEDED, ARCHIVED]
+        returns:
+          type: affected
+
+      list-documents:
+        description: "List all documents linked to a deal"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_documents
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_document
+        invocation_phrases:
+          - "list deal documents"
+          - "show deal documents"
+          - "deal paperwork"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # UBO ASSESSMENTS
+      # =========================================================================
+
+      add-ubo-assessment:
+        description: "Link an entity's UBO assessment to a deal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_ubo_assessment
+        invocation_phrases:
+          - "add ubo assessment to deal"
+          - "link kyc assessment"
+          - "add deal ubo check"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: entity-id
+            type: uuid
+            required: true
+            maps_to: entity_id
+          - name: kyc-case-id
+            type: uuid
+            required: false
+            maps_to: kyc_case_id
+        returns:
+          type: uuid
+          name: assessment_id
+          capture: true
+
+      update-ubo-assessment:
+        description: "Update UBO assessment status and risk rating"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_ubo_assessment
+        invocation_phrases:
+          - "update ubo assessment"
+          - "set assessment status"
+          - "rate ubo risk"
+        args:
+          - name: assessment-id
+            type: uuid
+            required: true
+            maps_to: assessment_id
+          - name: assessment-status
+            type: string
+            required: false
+            maps_to: assessment_status
+            valid_values: [PENDING, IN_PROGRESS, COMPLETED, REQUIRES_EDD, BLOCKED]
+          - name: risk-rating
+            type: string
+            required: false
+            maps_to: risk_rating
+            valid_values: [LOW, MEDIUM, HIGH, PROHIBITED]
+        returns:
+          type: affected
+
+      # =========================================================================
+      # ONBOARDING HANDOFF
+      # =========================================================================
+
+      request-onboarding:
+        description: "Create onboarding request - handoff from Sales to Ops"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_onboarding_request
+        invocation_phrases:
+          - "request onboarding"
+          - "create onboarding request"
+          - "handoff to ops"
+          - "initiate onboarding"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: contract-id
+            type: uuid
+            required: true
+            maps_to: contract_id
+          - name: cbu-id
+            type: uuid
+            required: true
+            maps_to: cbu_id
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: product-id
+            type: uuid
+            required: true
+            maps_to: product_id
+            lookup:
+              table: products
+              entity_type: product
+              schema: ob-poc
+              search_key: name
+              primary_key: product_id
+          - name: requires-kyc
+            type: boolean
+            required: false
+            maps_to: requires_kyc
+            default: true
+          - name: target-live-date
+            type: date
+            required: false
+            maps_to: target_live_date
+          - name: requested-by
+            type: string
+            required: false
+            maps_to: requested_by
+          - name: notes
+            type: string
+            required: false
+            maps_to: notes
+        returns:
+          type: uuid
+          name: request_id
+          capture: true
+
+      request-onboarding-batch:
+        description: "Batch onboarding request - multiple CBUs to multiple products"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_onboarding_request
+        invocation_phrases:
+          - "batch onboarding request"
+          - "bulk onboard"
+          - "onboard multiple cbus"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: contract-id
+            type: uuid
+            required: true
+            maps_to: contract_id
+          - name: requests
+            type: json
+            required: true
+            description: "Array of {cbu-id, product-id, target-live-date}"
+          - name: requires-kyc
+            type: boolean
+            required: false
+            maps_to: requires_kyc
+            default: true
+          - name: requested-by
+            type: string
+            required: false
+            maps_to: requested_by
+        returns:
+          type: record_set
+
+      update-onboarding-status:
+        description: "Update onboarding request status"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_onboarding_request
+        invocation_phrases:
+          - "update onboarding status"
+          - "progress onboarding"
+          - "mark onboarding complete"
+        args:
+          - name: request-id
+            type: uuid
+            required: true
+            maps_to: request_id
+          - name: request-status
+            type: string
+            required: true
+            maps_to: request_status
+            valid_values: [REQUESTED, KYC_PENDING, KYC_CLEARED, IN_PROGRESS, COMPLETED, BLOCKED, CANCELLED]
+          - name: kyc-case-id
+            type: uuid
+            required: false
+            maps_to: kyc_case_id
+        returns:
+          type: affected
+
+      list-onboarding-requests:
+        description: "List onboarding requests for a deal"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_onboarding_requests
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_onboarding_request
+        invocation_phrases:
+          - "list onboarding requests"
+          - "show onboarding requests"
+          - "deal onboarding status"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: status
+            type: string
+            required: false
+            maps_to: request_status
+        returns:
+          type: record_set
+
+      # =========================================================================
+      # SUMMARY & REPORTING
+      # =========================================================================
+
+      summary:
+        description: "Full deal summary - all linked entities, status, progress"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal
+        invocation_phrases:
+          - "deal summary"
+          - "full deal details"
+          - "deal overview"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+        returns:
+          type: record
+
+      timeline:
+        description: "Deal event timeline for audit trail"
+        behavior: crud
+        crud:
+          operation: select
+          table: deal_events
+          schema: ob-poc
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: deal_event
+        invocation_phrases:
+          - "deal timeline"
+          - "deal history"
+          - "deal events"
+          - "deal audit trail"
+        args:
+          - name: deal-id
+            type: uuid
+            required: true
+            maps_to: deal_id
+          - name: event-type
+            type: string
+            required: false
+            maps_to: event_type
+          - name: from-date
+            type: timestamp
+            required: false
+            description: "Filter events from this date"
+          - name: to-date
+            type: timestamp
+            required: false
+            description: "Filter events to this date"
+        returns:
+          type: record_set

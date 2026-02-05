@@ -1,0 +1,45 @@
+%% Schema: kyc
+%% Entity naming: <schema>__<table>
+
+erDiagram
+  kyc__share_classes ||--o{ kyc__investor_role_profiles : FK
+  kyc__cases ||--o{ kyc__outstanding_requests : FK
+  kyc__entity_workstreams ||--o{ kyc__outstanding_requests : FK
+  kyc__cases ||--o{ kyc__approval_requests : FK
+  kyc__entity_workstreams ||--o{ kyc__approval_requests : FK
+  kyc__cases ||--o{ kyc__case_events : FK
+  kyc__entity_workstreams ||--o{ kyc__case_events : FK
+  kyc__dilution_instruments ||--o{ kyc__dilution_exercise_events : FK
+  kyc__holdings ||--o{ kyc__dilution_exercise_events : FK
+  kyc__share_classes ||--o{ kyc__dilution_instruments : FK
+  kyc__doc_requests ||--o{ kyc__doc_request_acceptable_types : FK
+  kyc__entity_workstreams ||--o{ kyc__doc_requests : FK
+  kyc__outstanding_requests ||--o{ kyc__entity_workstreams : FK
+  kyc__cases ||--o{ kyc__entity_workstreams : FK
+  kyc__entity_workstreams ||--o{ kyc__entity_workstreams : FK
+  kyc__share_classes ||--o{ kyc__holding_control_links : FK
+  kyc__investors ||--o{ kyc__holdings : FK
+  kyc__share_classes ||--o{ kyc__holdings : FK
+  kyc__investors ||--o{ kyc__investor_lifecycle_history : FK
+  kyc__share_classes ||--o{ kyc__issuance_events : FK
+  kyc__holdings ||--o{ kyc__movements : FK
+  kyc__ownership_reconciliation_runs ||--o{ kyc__ownership_reconciliation_findings : FK
+  kyc__share_classes ||--o{ kyc__ownership_snapshots : FK
+  kyc__ownership_snapshots ||--o{ kyc__ownership_snapshots : FK
+  kyc__cases ||--o{ kyc__red_flags : FK
+  kyc__entity_workstreams ||--o{ kyc__red_flags : FK
+  kyc__research_decisions ||--o{ kyc__research_actions : FK
+  kyc__research_actions ||--o{ kyc__research_anomalies : FK
+  kyc__research_actions ||--o{ kyc__research_corrections : FK
+  kyc__research_actions ||--o{ kyc__research_corrections : FK
+  kyc__research_decisions ||--o{ kyc__research_corrections : FK
+  kyc__cases ||--o{ kyc__rule_executions : FK
+  kyc__entity_workstreams ||--o{ kyc__rule_executions : FK
+  kyc__red_flags ||--o{ kyc__screenings : FK
+  kyc__entity_workstreams ||--o{ kyc__screenings : FK
+  kyc__instrument_identifier_schemes ||--o{ kyc__share_class_identifiers : FK
+  kyc__share_classes ||--o{ kyc__share_class_identifiers : FK
+  kyc__share_classes ||--o{ kyc__share_class_supply : FK
+  kyc__fund_compartments ||--o{ kyc__share_classes : FK
+  kyc__share_classes ||--o{ kyc__share_classes : FK
+  kyc__share_classes ||--o{ kyc__special_rights : FK

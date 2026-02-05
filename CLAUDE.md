@@ -1,11 +1,11 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-04
+> **Last reviewed:** 2026-02-05
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
-> **Verbs:** 537 canonical verbs (V2 schema), 10,160 intent patterns (DB-sourced)
-> **Migrations:** 73 schema migrations
+> **Verbs:** 581 canonical verbs (V2 schema), 12,442 intent patterns (DB-sourced)
+> **Migrations:** 74 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 10,160 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **V2 Schema Pipeline:** ✅ Complete - Canonical YAML → registry.json → server startup → embeddings
@@ -39,6 +39,7 @@
 > **Entity Linking Service (073):** ✅ Complete - In-memory entity resolution with mention extraction, token overlap matching
 > **Clarification UX Wiring (075):** ✅ Complete - Unified DecisionPacket system for verb/scope/group disambiguation with confirm tokens
 > **Inspector-First Visualization (076):** ✅ Complete - Deterministic tree/table Inspector UI, projection schema with $ref linking, 82 tests
+> **Deal Record & Fee Billing (067):** ✅ Complete - Commercial origination hub, rate card negotiation, closed-loop billing
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -1668,6 +1669,165 @@ UI keys are not the same as internal tokens - expansion MUST use `${arg.X.intern
 | `migrations/045_legal_contracts.sql` | Schema, views, seed data |
 | `rust/config/verbs/contract.yaml` | 14 contract verbs |
 | `rust/src/domain_ops/session_ops.rs` | `load-cluster` uses client_label |
+
+---
+
+## Deal Record & Fee Billing (067)
+
+> ✅ **IMPLEMENTED (2026-02-05)**: Deal record as commercial origination hub with rate card negotiation and closed-loop fee billing.
+
+**Problem Solved:** Sales, contracting, onboarding, servicing, and billing were disconnected silos. Deal Record is the hub entity that links them all in a closed commercial loop.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    DEAL RECORD - COMMERCIAL HUB                              │
+│                                                                              │
+│  Deal Record                                                                 │
+│       │                                                                       │
+│       ├─► Participants (sales owner, relationship manager, legal counsel)   │
+│       │                                                                       │
+│       ├─► Contracts (links to legal_contracts)                              │
+│       │                                                                       │
+│       ├─► Rate Cards (with negotiation workflow)                            │
+│       │       └─► Rate Card Lines (BPS, FLAT, TIERED, PER_TRANSACTION)     │
+│       │                                                                       │
+│       ├─► SLAs (service level commitments)                                  │
+│       │                                                                       │
+│       ├─► Documents (proposals, agreements)                                  │
+│       │                                                                       │
+│       ├─► UBO Assessments (links to KYC cases)                              │
+│       │                                                                       │
+│       └─► Onboarding Requests (handoff to CBU creation)                     │
+│                   │                                                          │
+│                   ▼                                                          │
+│           Fee Billing Profile                                                │
+│                   │                                                          │
+│                   ├─► Account Targets (which CBUs to bill)                  │
+│                   │                                                          │
+│                   └─► Billing Periods → Period Lines → Invoices             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Deal Status State Machine
+
+```
+PROSPECT → QUALIFYING → NEGOTIATING → CONTRACTED → ONBOARDING → ACTIVE → WINDING_DOWN → OFFBOARDED
+     ↓           ↓            ↓             ↓            ↓
+ CANCELLED   CANCELLED    CANCELLED    CANCELLED    CANCELLED
+```
+
+### Rate Card Status State Machine
+
+```
+DRAFT → PROPOSED → COUNTER_OFFERED ←→ REVISED → AGREED → SUPERSEDED
+   ↓        ↓            ↓               ↓
+CANCELLED REJECTED    REJECTED       REJECTED
+```
+
+### Pricing Models
+
+| Model | Description | Example |
+|-------|-------------|---------|
+| `BPS` | Basis points on AUM | 15 bps on $1B = $1.5M |
+| `FLAT` | Fixed fee | $50,000/year |
+| `TIERED` | Volume-based tiers | 20 bps ≤$100M, 15 bps >$100M |
+| `PER_TRANSACTION` | Per-trade fee | $5/trade |
+
+### Database Tables (14 new)
+
+| Table | Purpose |
+|-------|---------|
+| `deals` | Deal record hub entity |
+| `deal_participants` | Sales team members with roles |
+| `deal_contracts` | Links deals to legal contracts |
+| `deal_rate_cards` | Negotiable fee schedules |
+| `deal_rate_card_lines` | Individual fee line items |
+| `deal_slas` | Service level agreements |
+| `deal_documents` | Attached proposals/agreements |
+| `deal_ubo_assessments` | KYC case references |
+| `deal_onboarding_requests` | Handoff to CBU onboarding |
+| `deal_events` | Audit trail of all deal changes |
+| `fee_billing_profiles` | Billing configuration per deal |
+| `fee_billing_account_targets` | Which CBUs get billed |
+| `fee_billing_periods` | Monthly/quarterly billing cycles |
+| `fee_billing_period_lines` | Calculated fee amounts |
+
+### Key Verbs
+
+**Deal Verbs (30):**
+
+| Verb | Purpose |
+|------|---------|
+| `deal.create` | Create new deal record |
+| `deal.update-status` | Advance deal through pipeline |
+| `deal.add-participant` | Add sales team member |
+| `deal.link-contract` | Attach legal contract |
+| `deal.create-rate-card` | Start rate card negotiation |
+| `deal.add-rate-card-line` | Add fee line item |
+| `deal.propose-rate-card` | Submit for client review |
+| `deal.counter-offer` | Client counter-proposal |
+| `deal.agree-rate-card` | Finalize negotiation |
+| `deal.create-onboarding-request` | Handoff to CBU creation |
+| `deal.summary` | Get deal with all related data |
+
+**Billing Verbs (14):**
+
+| Verb | Purpose |
+|------|---------|
+| `billing.create-profile` | Create billing configuration |
+| `billing.add-account-target` | Add CBU to billing scope |
+| `billing.open-period` | Start billing cycle |
+| `billing.calculate-fees` | Run fee calculation |
+| `billing.close-period` | Finalize billing cycle |
+| `billing.revenue-summary` | Get revenue analytics |
+
+### DSL Examples
+
+```clojure
+;; Create deal and rate card
+(deal.create :deal-name "Allianz Custody 2024" 
+             :client-group-id <Allianz>
+             :sales-owner "john.smith@bny.com"
+             :as @deal)
+
+(deal.create-rate-card :deal-id @deal :version "1.0" :as @rate-card)
+
+(deal.add-rate-card-line :rate-card-id @rate-card
+                         :fee-type "CUSTODY"
+                         :pricing-model "BPS"
+                         :rate-value 15.0
+                         :currency-code "USD")
+
+(deal.propose-rate-card :rate-card-id @rate-card)
+
+;; After negotiation completes
+(deal.agree-rate-card :rate-card-id @rate-card)
+(deal.update-status :deal-id @deal :new-status "CONTRACTED")
+
+;; Create billing profile
+(billing.create-profile :deal-id @deal
+                        :billing-frequency "MONTHLY"
+                        :invoice-currency "USD"
+                        :as @profile)
+
+(billing.add-account-target :profile-id @profile :cbu-id @cbu)
+(billing.open-period :profile-id @profile
+                     :period-start "2024-01-01"
+                     :period-end "2024-01-31")
+```
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `migrations/067_deal_record_fee_billing.sql` | Schema (14 tables, 2 views) |
+| `rust/config/verbs/deal.yaml` | 30 deal verbs |
+| `rust/config/verbs/billing.yaml` | 14 billing verbs |
+| `rust/src/domain_ops/deal_ops.rs` | Deal custom operations |
+| `rust/src/domain_ops/billing_ops.rs` | Billing custom operations |
+| `docs/DEAL_RECORD_IMPLEMENTATION_PLAN.md` | Implementation details |
 
 ---
 
@@ -4645,3 +4805,5 @@ role:
 | `contract` | 14 | Legal contracts, rate cards, CBU subscriptions |
 | `document` | 7 | Document solicitation, verification, rejection |
 | `requirement` | 5 | Document requirements, waiver, status |
+| `deal` | 30 | Deal record lifecycle, rate card negotiation, onboarding handoff |
+| `billing` | 14 | Fee billing profiles, account targets, billing periods |

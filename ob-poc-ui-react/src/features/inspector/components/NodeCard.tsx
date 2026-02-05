@@ -12,24 +12,32 @@ import { RefLink } from "./RefLink";
 import { cn, getKindIcon, getEntityColor } from "../../../lib/utils";
 import * as LucideIcons from "lucide-react";
 
-/** Get icon component by name */
-function getIcon(name: string): React.ComponentType<LucideIcons.LucideProps> {
-  const iconMap: Record<
-    string,
-    React.ComponentType<LucideIcons.LucideProps>
-  > = {
-    "building-2": LucideIcons.Building2,
-    wallet: LucideIcons.Wallet,
-    user: LucideIcons.User,
-    building: LucideIcons.Building,
-    "file-text": LucideIcons.FileText,
-    coins: LucideIcons.Coins,
-    "git-branch": LucideIcons.GitBranch,
-    "line-chart": LucideIcons.LineChart,
-    "file-signature": LucideIcons.FileSignature,
-    circle: LucideIcons.Circle,
-  };
-  return iconMap[name] || LucideIcons.Circle;
+/** Icon map for kind icons */
+const iconMap: Record<string, React.ComponentType<LucideIcons.LucideProps>> = {
+  "building-2": LucideIcons.Building2,
+  wallet: LucideIcons.Wallet,
+  user: LucideIcons.User,
+  building: LucideIcons.Building,
+  "file-text": LucideIcons.FileText,
+  coins: LucideIcons.Coins,
+  "git-branch": LucideIcons.GitBranch,
+  "line-chart": LucideIcons.LineChart,
+  "file-signature": LucideIcons.FileSignature,
+  circle: LucideIcons.Circle,
+};
+
+/** Dynamic icon component that renders based on icon name */
+function DynamicIcon({
+  name,
+  size,
+  color,
+}: {
+  name: string;
+  size: number;
+  color: string;
+}) {
+  const Icon = iconMap[name] || LucideIcons.Circle;
+  return <Icon size={size} color={color} />;
 }
 
 /** Render a field value */
@@ -122,7 +130,6 @@ export function NodeCard({
   showChildren = false,
 }: NodeCardProps) {
   const iconName = getKindIcon(node.kind);
-  const Icon = getIcon(iconName);
   const color = getEntityColor(node.meta.entity_type || node.kind);
 
   return (
@@ -134,7 +141,7 @@ export function NodeCard({
     >
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-[var(--border-primary)] px-4 py-3">
-        <Icon size={20} color={color} />
+        <DynamicIcon name={iconName} size={20} color={color} />
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-[var(--text-primary)] truncate">
             {node.label}

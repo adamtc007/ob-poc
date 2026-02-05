@@ -32,24 +32,32 @@ function toTreeData(node: ProjectionNode): TreeNode {
   };
 }
 
-/** Get icon component by name */
-function getIcon(name: string): React.ComponentType<LucideIcons.LucideProps> {
-  const iconMap: Record<
-    string,
-    React.ComponentType<LucideIcons.LucideProps>
-  > = {
-    "building-2": LucideIcons.Building2,
-    wallet: LucideIcons.Wallet,
-    user: LucideIcons.User,
-    building: LucideIcons.Building,
-    "file-text": LucideIcons.FileText,
-    coins: LucideIcons.Coins,
-    "git-branch": LucideIcons.GitBranch,
-    "line-chart": LucideIcons.LineChart,
-    "file-signature": LucideIcons.FileSignature,
-    circle: LucideIcons.Circle,
-  };
-  return iconMap[name] || LucideIcons.Circle;
+/** Icon map for kind icons */
+const iconMap: Record<string, React.ComponentType<LucideIcons.LucideProps>> = {
+  "building-2": LucideIcons.Building2,
+  wallet: LucideIcons.Wallet,
+  user: LucideIcons.User,
+  building: LucideIcons.Building,
+  "file-text": LucideIcons.FileText,
+  coins: LucideIcons.Coins,
+  "git-branch": LucideIcons.GitBranch,
+  "line-chart": LucideIcons.LineChart,
+  "file-signature": LucideIcons.FileSignature,
+  circle: LucideIcons.Circle,
+};
+
+/** Dynamic icon component that renders based on icon name */
+function DynamicIcon({
+  name,
+  size,
+  color,
+}: {
+  name: string;
+  size: number;
+  color: string;
+}) {
+  const Icon = iconMap[name] || LucideIcons.Circle;
+  return <Icon size={size} color={color} />;
 }
 
 /** Individual tree node renderer */
@@ -62,7 +70,6 @@ function NodeRenderer({
   const isSelected = selectedNodeId === node.data.id;
 
   const iconName = getKindIcon(node.data.kind);
-  const Icon = getIcon(iconName);
   const color = getEntityColor(node.data.entityType || node.data.kind);
 
   const handleClick = () => {
@@ -104,7 +111,7 @@ function NodeRenderer({
       </span>
 
       {/* Kind icon */}
-      <Icon size={14} color={color} />
+      <DynamicIcon name={iconName} size={14} color={color} />
 
       {/* Label */}
       <span className="truncate">{node.data.name}</span>
