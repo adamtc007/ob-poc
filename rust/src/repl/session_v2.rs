@@ -201,6 +201,7 @@ fn default_pack() -> Arc<PackManifest> {
         section_layout: Vec::new(),
         definition_of_done: Vec::new(),
         progress_signals: Vec::new(),
+        handoff_target: None,
     })
 }
 

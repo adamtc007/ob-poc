@@ -10,16 +10,15 @@
 //! 3. DAG analysis determines execution order
 //! 4. Execution only happens on explicit user confirmation
 //!
-//! ## 2. REPL State Machine (New)
+//! ## 2. Pack-Guided Runbook REPL (V2, vnext-repl feature)
 //!
-//! Clean redesign with explicit state machine:
-//! 1. Command Ledger as single source of truth
-//! 2. All state derived from ledger entries
-//! 3. Pure IntentMatcher service (no side effects)
-//! 4. Clear state transitions (Idle → IntentMatching → Clarifying/DslReady → Executing)
-//!
-//! The new state machine (`orchestrator`, `intent_matcher`, `session`, `types`, `response`)
-//! will eventually replace the staged runbook subsystem.
+//! Clean redesign with explicit state machine, pack routing,
+//! proposal engine, and durable execution:
+//! - State machine in `orchestrator_v2`
+//! - Pack selection + verb filtering in `session_v2`
+//! - Intent matching via `intent_service` wrapping `IntentMatcher` trait
+//! - Proposal generation via `proposal_engine`
+//! - Runbook editing + execution via `runbook`
 
 // ============================================================================
 // Staged Runbook Subsystem (Legacy)
@@ -54,14 +53,18 @@ pub use repository::StagedRunbookRepository;
 pub use service::{PickError, PickResult, RunError, RunbookService, StageError, StageResult};
 
 // ============================================================================
-// REPL State Machine Subsystem (New)
+// Shared Intent Matching (used by V2)
 // ============================================================================
 
 pub mod intent_matcher;
-pub mod orchestrator;
-mod response;
-pub mod session;
 pub mod types;
+
+pub use intent_matcher::IntentMatcher;
+pub use types::{
+    ClientGroupOption, EntityCandidate, EntityMention, IntentMatchResult, IntentTierOption,
+    MatchContext, MatchDebugInfo, MatchOutcome, ScopeCandidate, ScopeContext, UnresolvedRef,
+    VerbCandidate,
+};
 
 // ============================================================================
 // REPL v2 — Pack-Guided Runbook Architecture (vnext-repl feature)
@@ -100,16 +103,3 @@ pub mod orchestrator_v2;
 #[cfg(feature = "vnext-repl")]
 #[cfg(feature = "database")]
 pub mod session_repository;
-
-// Re-export new state machine types
-pub use types::{
-    ClarifyingKind, ClarifyingState, ClientGroupOption, EntityCandidate, EntityMention,
-    EntryStatus, IntentMatchResult, IntentTierOption, LedgerEntry, LedgerExecutionResult,
-    MatchContext, MatchDebugInfo, MatchOutcome, ReplCommand, ReplState, ScopeCandidate,
-    ScopeContext, UnresolvedRef, UserInput, VerbCandidate,
-};
-
-pub use intent_matcher::{EntityLinkingService, HybridIntentMatcher, IntentMatcher, LlmClient};
-pub use orchestrator::{ClientGroupProvider, DslExecutor, ReplOrchestrator};
-pub use response::{ReplResponse, ReplResponseKind};
-pub use session::{ChatMessage, DerivedState, MessageRole, ReplSession};

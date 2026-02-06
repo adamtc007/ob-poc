@@ -26,15 +26,11 @@ use crate::state::AppState;
 use ob_poc::api::{
     control_routes, create_agent_router_with_semantic, create_attribute_router,
     create_cbu_session_router_with_pool, create_client_router, create_deal_router,
-    create_dsl_viewer_router, create_entity_router, create_graph_router, create_repl_router,
-    create_resolution_router, create_scoped_entity_router, create_session_graph_router,
-    create_session_store, create_taxonomy_router, create_trading_matrix_router,
-    create_universe_router, create_verb_discovery_router, service_resource_router, ReplRouteState,
+    create_dsl_viewer_router, create_entity_router, create_graph_router, create_resolution_router,
+    create_scoped_entity_router, create_session_graph_router, create_session_store,
+    create_taxonomy_router, create_trading_matrix_router, create_universe_router,
+    create_verb_discovery_router, service_resource_router,
 };
-
-// Import REPL orchestrator and related types
-use ob_poc::mcp::verb_search::HybridVerbSearcher;
-use ob_poc::repl::{HybridIntentMatcher, ReplOrchestrator};
 
 // Import gateway resolver for resolution routes
 use entity_gateway::proto::ob::gateway::v1::entity_gateway_client::EntityGatewayClient;
@@ -383,21 +379,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
-    // =========================================================================
-    // Build REPL Orchestrator (new state machine architecture)
-    // =========================================================================
-    // Create a stub verb searcher for now - will be replaced with full implementation
-    // once the orchestrator is integrated with the existing agent pipeline
-    let verb_searcher = Arc::new(HybridVerbSearcher::minimal());
-    let intent_matcher = Arc::new(HybridIntentMatcher::new(verb_searcher));
-    let repl_orchestrator = Arc::new(ReplOrchestrator::new(intent_matcher));
-
-    let repl_state = ReplRouteState {
-        orchestrator: repl_orchestrator,
-    };
-
-    tracing::info!("REPL Orchestrator initialized (stub mode - semantic search not yet wired)");
-
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
         // Try to find React dist relative to the crate
@@ -460,8 +441,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(api_router)
         // Voice matching routes (semantic ML + phonetic) - stateless router
         .merge(voice_router)
-        // REPL state machine routes (new architecture)
-        .nest("/api/repl", create_repl_router().with_state(repl_state))
         // Layers
         .layer(TraceLayer::new_for_http())
         .layer(cors);
@@ -506,12 +485,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  POST /api/cbu/:id/pipeline/full     - Run full pipeline");
     tracing::info!("  GET  /api/cbu/:id/readiness         - Service readiness");
     tracing::info!("  GET  /api/srdefs                    - SRDEF registry");
-    tracing::info!("");
-    tracing::info!("REPL State Machine API (NEW):");
-    tracing::info!("  POST /api/repl/session              - Create REPL session");
-    tracing::info!("  GET  /api/repl/session/:id          - Get session state");
-    tracing::info!("  POST /api/repl/session/:id/input    - Send input (unified endpoint)");
-    tracing::info!("  DELETE /api/repl/session/:id        - Delete session");
     tracing::info!("");
 
     let listener = match tokio::net::TcpListener::bind(addr).await {

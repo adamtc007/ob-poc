@@ -395,6 +395,13 @@ pub enum RunbookEvent {
         reason: Option<String>,
         timestamp: DateTime<Utc>,
     },
+    // Phase 6: Pack Handoff
+    HandoffReceived {
+        source_runbook_id: Uuid,
+        target_pack_id: String,
+        forwarded_context: HashMap<String, String>,
+        timestamp: DateTime<Utc>,
+    },
 }
 
 // ---------------------------------------------------------------------------

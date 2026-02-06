@@ -826,6 +826,7 @@ mod tests {
             section_layout: vec![],
             definition_of_done: vec![],
             progress_signals: vec![],
+            handoff_target: None,
         }
     }
 }

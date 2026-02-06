@@ -87,6 +87,10 @@ pub struct PackManifest {
     /// Observable signals for progress tracking.
     #[serde(default)]
     pub progress_signals: Vec<ProgressSignal>,
+
+    /// If set, auto-handoff to this pack after successful execution.
+    #[serde(default)]
+    pub handoff_target: Option<String>,
 }
 
 // ---------------------------------------------------------------------------

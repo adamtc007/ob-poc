@@ -38,6 +38,7 @@ use super::sentence_gen::SentenceGenerator;
 use super::session_v2::{ClientContext, MessageRole, ReplSessionV2};
 use super::types_v2::{ExecutionProgress, ReplCommandV2, ReplStateV2, UserInputV2};
 use super::verb_config_index::VerbConfigIndex;
+use crate::journey::handoff::PackHandoff;
 use crate::journey::playback::PackPlayback;
 use crate::journey::router::{PackRouteOutcome, PackRouter};
 use crate::journey::template::instantiate_template;
@@ -2437,6 +2438,13 @@ impl ReplOrchestratorV2 {
                 RunbookStatus::Ready // Allow retry
             });
 
+            // Check for pack handoff on successful completion.
+            if all_success {
+                if let Some(handoff_resp) = self.try_pack_handoff(session, &results) {
+                    return handoff_resp;
+                }
+            }
+
             session.set_state(ReplStateV2::RunbookEditing);
 
             // Best-effort persist on completion (non-critical).
@@ -2568,6 +2576,88 @@ impl ReplOrchestratorV2 {
                     );
                 }
             }
+        }
+    }
+
+    /// Check if the active pack has a handoff_target and, if so, transition
+    /// to the target pack. Returns `Some(response)` if handoff occurred,
+    /// `None` if no handoff is configured or the target pack is missing.
+    fn try_pack_handoff(
+        &self,
+        session: &mut ReplSessionV2,
+        _results: &[StepResult],
+    ) -> Option<ReplResponseV2> {
+        let handoff_target = session
+            .journey_context
+            .as_ref()
+            .and_then(|ctx| ctx.pack.handoff_target.as_ref())
+            .cloned()?;
+
+        // Build handoff context from completed entry outcomes.
+        let source_runbook_id = session.runbook.id;
+        let forwarded_outcomes: Vec<Uuid> = session
+            .runbook
+            .entries
+            .iter()
+            .filter(|e| e.status == EntryStatus::Completed)
+            .map(|e| e.id)
+            .collect();
+
+        let mut forwarded_context = HashMap::new();
+        if let Some(ref ctx) = session.client_context {
+            forwarded_context.insert(
+                "client_group_id".to_string(),
+                ctx.client_group_id.to_string(),
+            );
+        }
+        // Carry forward entry results as context (UUIDs of completed entries).
+        for (i, entry_id) in forwarded_outcomes.iter().enumerate() {
+            forwarded_context.insert(format!("outcome_{}", i), entry_id.to_string());
+        }
+
+        let handoff = PackHandoff {
+            source_runbook_id,
+            target_pack_id: handoff_target.clone(),
+            forwarded_context: forwarded_context.clone(),
+            forwarded_outcomes,
+        };
+
+        // Try to find the target pack in the router.
+        if let Some((manifest, hash)) = self.pack_router.get_pack(&handoff_target) {
+            let target_name = manifest.name.clone();
+            let target_id = manifest.id.clone();
+
+            // Activate target pack with handoff context.
+            session.activate_pack(manifest.clone(), hash.clone(), Some(handoff));
+
+            // Create a fresh runbook for the new pack.
+            session.runbook = super::runbook::Runbook::new(session.id);
+            session.runbook.pack_id = Some(target_id.clone());
+            session
+                .runbook
+                .audit
+                .push(super::runbook::RunbookEvent::HandoffReceived {
+                    source_runbook_id,
+                    target_pack_id: handoff_target.clone(),
+                    forwarded_context,
+                    timestamp: chrono::Utc::now(),
+                });
+
+            // Enter the target pack.
+            let resp = self.enter_pack(session, &target_id);
+            Some(ReplResponseV2 {
+                message: format!(
+                    "Execution complete. Handing off to: {}.\n\n{}",
+                    target_name, resp.message
+                ),
+                ..resp
+            })
+        } else {
+            tracing::warn!(
+                target_pack = %handoff_target,
+                "Handoff target pack not found, completing normally"
+            );
+            None
         }
     }
 
