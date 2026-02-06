@@ -192,6 +192,7 @@ database = ["dep:sqlx", "dep:bigdecimal", "dep:entity-gateway", "dep:pgvector"] 
 server = ["database", "mcp", "dep:axum", "dep:tower", "dep:tower-http"]  # REST API server with intent pipeline
 cli = ["dep:clap", "dep:colored", "dep:atty", "dep:rustyline"]  # CLI tool for DSL testing
 mcp = ["database"]  # MCP/intent pipeline for semantic verb search
+vnext-repl = ["database"]  # Pack-guided REPL v2 (Journey Packs, sentence templates, unified runbook)
 
 
 

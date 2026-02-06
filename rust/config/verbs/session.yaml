@@ -74,6 +74,12 @@ domains:
             type: string
             required: true
             description: ISO country code (LU, IE, DE, US, etc.)
+        sentences:
+          step:
+            - "Load all CBUs in {jurisdiction}"
+          clarify:
+            jurisdiction: "Which jurisdiction? (e.g., LU, IE, DE, US)"
+        confirm_policy: quick_confirm
         returns:
           type: record
           fields: [jurisdiction, count_added, total_loaded]
@@ -169,6 +175,12 @@ domains:
             description: Filter to specific jurisdiction (LU, DE, IE, etc.)
         validation:
           one_of_required: [client, apex-entity-id]
+        sentences:
+          step:
+            - "Load {client} book into session"
+          clarify:
+            client: "Which client book should be loaded?"
+        confirm_policy: quick_confirm
         returns:
           type: record
           fields: [apex_name, jurisdiction, count_added, total_loaded]

@@ -1,0 +1,149 @@
+# Book Setup Journey Pack
+# Configure a client book (set of CBUs) with jurisdiction-specific templates
+
+id: book-setup
+name: Book Setup
+version: "1.0"
+description: >
+  Set up a client book — a collection of CBUs under a single apex entity.
+  Supports Luxembourg SICAV and UK OEIC structures with jurisdiction-specific
+  templates for fund creation, product assignment, and custody configuration.
+
+invocation_phrases:
+  - "set up a book"
+  - "configure client book"
+  - "book setup"
+  - "create a fund book"
+  - "new book for client"
+  - "set up funds"
+
+required_context:
+  - client_group_id
+
+optional_context:
+  - default_cbu
+  - jurisdiction
+
+allowed_verbs:
+  - cbu.create
+  - cbu.assign-product
+  - cbu.assign-role
+  - session.load-galaxy
+  - trading-profile.create
+  - entity.create
+
+forbidden_verbs:
+  - cbu.delete
+  - session.clear
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 8
+
+required_questions:
+  - field: book_name
+    prompt: "What is the name of the client book? (e.g. Allianz Luxembourg)"
+    answer_kind: string
+
+  - field: jurisdiction
+    prompt: "Which jurisdiction? (LU for Luxembourg, UK for United Kingdom)"
+    answer_kind: string
+    default: "LU"
+
+  - field: fund_names
+    prompt: "List the fund names to create (comma-separated)"
+    answer_kind: list
+
+optional_questions:
+  - field: fund_type
+    prompt: "What type of fund structure? (e.g. SICAV, OEIC, UCITS)"
+    answer_kind: string
+    default: "SICAV"
+
+  - field: depositary
+    prompt: "Who is the depositary?"
+    answer_kind: entity_ref
+
+  - field: default_products
+    prompt: "Default products for all funds? (e.g. CUSTODY, FUND_ADMIN)"
+    answer_kind: list
+    default: ["CUSTODY"]
+
+stop_rules:
+  - "All funds created"
+  - "Products assigned to all funds"
+  - "Book loaded into session"
+
+templates:
+  - template_id: lux-sicav-book
+    when_to_use: "Luxembourg SICAV book with multiple sub-funds"
+    steps:
+      - verb: cbu.create
+        repeat_for: fund_names
+        args:
+          name: "{item}"
+          jurisdiction: "LU"
+          kind: "sicav"
+
+      - verb: cbu.assign-product
+        repeat_for: fund_names
+        args:
+          product: "CUSTODY"
+
+      - verb: cbu.assign-role
+        when: "depositary"
+        repeat_for: fund_names
+        args:
+          role: "depositary"
+          entity_ref: "{answers.depositary}"
+
+  - template_id: uk-oeic-book
+    when_to_use: "UK OEIC book with sub-funds"
+    steps:
+      - verb: cbu.create
+        repeat_for: fund_names
+        args:
+          name: "{item}"
+          jurisdiction: "UK"
+          kind: "oeic"
+
+      - verb: cbu.assign-product
+        repeat_for: fund_names
+        args:
+          product: "CUSTODY"
+
+      - verb: cbu.assign-role
+        when: "depositary"
+        repeat_for: fund_names
+        args:
+          role: "depositary"
+          entity_ref: "{answers.depositary}"
+
+pack_summary_template: >
+  Setting up {{answers.book_name}} book in {{answers.jurisdiction}}
+  with {{answers.fund_names.length}} funds.
+
+section_layout:
+  - title: "Fund Creation"
+    verb_prefixes:
+      - "cbu."
+  - title: "Custody & Products"
+    verb_prefixes:
+      - "trading-profile."
+  - title: "Roles"
+    verb_prefixes:
+      - "entity."
+
+definition_of_done:
+  - "All named funds created as CBUs"
+  - "Default products assigned to each fund"
+  - "Depositary role assigned if specified"
+  - "Book loaded into session scope"
+
+progress_signals:
+  - signal: funds_created
+    description: "All fund CBUs have been created"
+  - signal: products_assigned
+    description: "Products assigned to all funds"
+  - signal: book_loaded
+    description: "Book loaded into session for navigation"

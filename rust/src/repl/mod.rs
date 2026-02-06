@@ -63,6 +63,44 @@ mod response;
 pub mod session;
 pub mod types;
 
+// ============================================================================
+// REPL v2 — Pack-Guided Runbook Architecture (vnext-repl feature)
+// ============================================================================
+
+#[cfg(feature = "vnext-repl")]
+pub mod runbook;
+
+#[cfg(feature = "vnext-repl")]
+pub mod verb_config_index;
+
+#[cfg(feature = "vnext-repl")]
+pub mod executor_bridge;
+
+#[cfg(feature = "vnext-repl")]
+pub mod sentence_gen;
+
+#[cfg(feature = "vnext-repl")]
+pub mod types_v2;
+
+#[cfg(feature = "vnext-repl")]
+pub mod session_v2;
+
+#[cfg(feature = "vnext-repl")]
+pub mod response_v2;
+
+#[cfg(feature = "vnext-repl")]
+pub mod intent_service;
+
+#[cfg(feature = "vnext-repl")]
+pub mod proposal_engine;
+
+#[cfg(feature = "vnext-repl")]
+pub mod orchestrator_v2;
+
+#[cfg(feature = "vnext-repl")]
+#[cfg(feature = "database")]
+pub mod session_repository;
+
 // Re-export new state machine types
 pub use types::{
     ClarifyingKind, ClarifyingState, ClientGroupOption, EntityCandidate, EntityMention,

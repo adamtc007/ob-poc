@@ -132,6 +132,10 @@ pub mod service_resources;
 #[cfg(feature = "database")]
 pub mod repl;
 
+// Journey module - Pack-guided REPL v2 (Journey Packs, sentence templates, unified runbook)
+#[cfg(feature = "vnext-repl")]
+pub mod journey;
+
 // Document Bundles - Versioned document requirement sets for structure macros
 #[cfg(feature = "database")]
 pub mod document_bundles;

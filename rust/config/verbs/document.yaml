@@ -113,6 +113,16 @@ domains:
             type: string
             required: false
             description: Due date (YYYY-MM-DD)
+        sentences:
+          step:
+            - "Request {doc-types} from {subject-entity-id}"
+            - "Solicit documents from {subject-entity-id}"
+          summary:
+            - "solicited {doc-types}"
+          clarify:
+            subject-entity-id: "Which entity should provide the documents?"
+            doc-types: "Which document types are needed? (e.g., passport, proof of address)"
+          completed: "Document request sent to {subject-entity-id} for {doc-types}"
         returns:
           type: record
           fields:

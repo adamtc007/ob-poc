@@ -87,6 +87,14 @@ pub struct VerbConfig {
     /// Controls atomic vs best-effort execution and advisory locks.
     #[serde(default)]
     pub policy: Option<PolicyConfig>,
+    /// Sentence templates for human-readable playback (v2 REPL).
+    /// Used by the sentence generator to produce conversational step descriptions.
+    #[serde(default)]
+    pub sentences: Option<VerbSentences>,
+    /// Confirm policy for this verb (default: Always).
+    /// Controls whether the REPL requires explicit user confirmation before execution.
+    #[serde(default)]
+    pub confirm_policy: Option<ConfirmPolicyConfig>,
 }
 
 // =============================================================================
@@ -182,6 +190,68 @@ pub enum LockAccessConfig {
     /// Write lock - exclusive access (default)
     #[default]
     Write,
+}
+
+// =============================================================================
+// VERB SENTENCES (Human-Readable Playback)
+// =============================================================================
+
+/// Sentence templates for human-readable step playback in the v2 REPL.
+///
+/// Each field provides templates for different contexts:
+/// - `step`: Full sentence for runbook display ("Assign {product} to {cbu-name}")
+/// - `summary`: Short form for pack-level summaries ("assigned {product}")
+/// - `clarify`: Per-arg conversational prompts when args are missing
+/// - `completed`: Past-tense sentence after execution
+///
+/// Example YAML:
+/// ```yaml
+/// sentences:
+///   step:
+///     - "Create {name} structure in {jurisdiction}"
+///     - "Set up new structure {name}"
+///   summary:
+///     - "created {name}"
+///   clarify:
+///     name: "What should the structure be called?"
+///     jurisdiction: "Which jurisdiction? (e.g., LU, IE, UK)"
+///   completed: "{name} structure created in {jurisdiction}"
+/// ```
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct VerbSentences {
+    /// Step templates: "Assign {product} to {cbu-name}"
+    #[serde(default)]
+    pub step: Vec<String>,
+    /// Summary templates: "assigned {product}"
+    #[serde(default)]
+    pub summary: Vec<String>,
+    /// Clarification prompts per arg: {"product": "Which product?"}
+    #[serde(default)]
+    pub clarify: HashMap<String, String>,
+    /// Completed sentence: "{product} is now assigned to {cbu-name}"
+    #[serde(default)]
+    pub completed: Option<String>,
+}
+
+/// Confirm policy for a verb in the v2 REPL.
+///
+/// Controls whether the orchestrator requires explicit user confirmation
+/// before adding a step to the runbook or executing it.
+///
+/// Example YAML:
+/// ```yaml
+/// confirm_policy: quick_confirm
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConfirmPolicyConfig {
+    /// Always require explicit confirmation (default for data-modifying verbs).
+    #[default]
+    Always,
+    /// Auto-confirm (for navigation/read-only verbs like session.load-*).
+    QuickConfirm,
+    /// Defer to pack configuration.
+    PackConfigured,
 }
 
 // =============================================================================

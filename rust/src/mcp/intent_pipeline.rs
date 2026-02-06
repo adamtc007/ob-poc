@@ -2,6 +2,14 @@
 //!
 //! ALL user input flows through this pipeline. No exceptions.
 //!
+//! ## Deprecation Note (Phase 2)
+//!
+//! For the v2 REPL, use `IntentService::match_verb()` instead of
+//! `IntentPipeline::process()`. The IntentService provides a unified
+//! 5-phase pipeline with clarification checking via `sentences.clarify`
+//! templates. This module remains the entry point for the v1 agent
+//! pipeline (`/api/session/:id/chat`).
+//!
 //! ## Pipeline Flow
 //!
 //! ```text

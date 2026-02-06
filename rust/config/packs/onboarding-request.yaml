@@ -1,0 +1,151 @@
+# Onboarding Request Journey Pack
+# Full client onboarding workflow: scope → products → trading matrix → CBU creation
+
+id: onboarding-request
+name: Onboarding Request
+version: "1.0"
+description: >
+  Onboard a new client business unit with products, trading profile,
+  and custody accounts. Guides the user through scope selection,
+  product assignment, and trading matrix configuration.
+
+invocation_phrases:
+  - "onboard a new client"
+  - "onboarding request"
+  - "set up a new CBU"
+  - "create a new structure"
+  - "new client onboarding"
+  - "start onboarding"
+  - "onboard"
+
+required_context:
+  - client_group_id
+
+optional_context:
+  - default_cbu
+  - jurisdiction
+
+allowed_verbs:
+  - cbu.create
+  - cbu.assign-product
+  - cbu.assign-role
+  - trading-profile.create
+  - trading-profile.add-instrument
+  - entity.create
+  - contract.subscribe
+
+forbidden_verbs:
+  - cbu.delete
+  - entity.delete
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 5
+
+required_questions:
+  - field: cbu_name
+    prompt: "What should the new structure be called?"
+    answer_kind: string
+
+  - field: products
+    prompt: "Which products should be assigned? (e.g. CUSTODY, FUND_ADMIN, TRANSFER_AGENCY)"
+    answer_kind: list
+    options_source: product_catalog
+
+  - field: jurisdiction
+    prompt: "Which jurisdiction? (e.g. LU, IE, UK, DE)"
+    answer_kind: string
+    default: "LU"
+
+optional_questions:
+  - field: trading_instruments
+    prompt: "What instruments will be traded? (e.g. EQUITY, FIXED_INCOME, OTC_IRS)"
+    answer_kind: list
+    options_source: instrument_classes
+
+  - field: manco_entity
+    prompt: "Which management company oversees this structure?"
+    answer_kind: entity_ref
+    ask_when: "jurisdiction = LU"
+
+stop_rules:
+  - "All products assigned"
+  - "Trading profile created"
+  - "CBU entity roles assigned"
+
+templates:
+  - template_id: standard-onboarding
+    when_to_use: "Default onboarding with products and trading profile"
+    steps:
+      - verb: cbu.create
+        args:
+          name: "{answers.cbu_name}"
+          jurisdiction: "{answers.jurisdiction}"
+
+      - verb: cbu.assign-product
+        repeat_for: products
+        args:
+          product: "{item}"
+
+      - verb: trading-profile.create
+        args:
+          name: "{answers.cbu_name} Trading Profile"
+
+      - verb: trading-profile.add-instrument
+        repeat_for: trading_instruments
+        when: "trading_instruments"
+        args:
+          instrument_class: "{item}"
+
+  - template_id: lux-sicav-onboarding
+    when_to_use: "Luxembourg SICAV with management company"
+    steps:
+      - verb: cbu.create
+        args:
+          name: "{answers.cbu_name}"
+          jurisdiction: "LU"
+          kind: "sicav"
+
+      - verb: cbu.assign-product
+        repeat_for: products
+        args:
+          product: "{item}"
+
+      - verb: cbu.assign-role
+        when: "manco_entity"
+        args:
+          role: "management-company"
+          entity_ref: "{answers.manco_entity}"
+
+      - verb: trading-profile.create
+        args:
+          name: "{answers.cbu_name} Trading Profile"
+
+pack_summary_template: >
+  Onboarding {{answers.cbu_name}} in {{answers.jurisdiction}}
+  with {{answers.products.length}} products.
+
+section_layout:
+  - title: "Structure Creation"
+    verb_prefixes:
+      - "cbu."
+  - title: "Trading Configuration"
+    verb_prefixes:
+      - "trading-profile."
+  - title: "Roles & Relationships"
+    verb_prefixes:
+      - "entity."
+
+definition_of_done:
+  - "CBU created with correct jurisdiction"
+  - "All requested products assigned"
+  - "Trading profile created if instruments specified"
+  - "Entity roles assigned where applicable"
+
+progress_signals:
+  - signal: cbu_created
+    description: "CBU entity has been created"
+  - signal: products_assigned
+    description: "All products have been assigned to the CBU"
+  - signal: trading_profile_ready
+    description: "Trading profile is configured"

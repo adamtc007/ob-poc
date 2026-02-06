@@ -930,6 +930,8 @@ mod tests {
                 metadata: None,
                 invocation_phrases: vec![],
                 policy: None,
+                sentences: None,
+                confirm_policy: None,
             },
         );
 

@@ -93,6 +93,16 @@ domains:
               search_key: name
               primary_key: entity_id
               resolution_mode: entity
+        sentences:
+          step:
+            - "Create {name} structure in {jurisdiction}"
+            - "Set up new structure {name}"
+          summary:
+            - "created {name}"
+          clarify:
+            name: "What should the structure be called?"
+            jurisdiction: "Which jurisdiction? (e.g., LU, IE, UK)"
+          completed: "{name} structure created in {jurisdiction}"
         returns:
           type: record
           fields:
@@ -409,6 +419,14 @@ domains:
               entity_type: role
               code_column: name
               id_column: role_id
+        sentences:
+          step:
+            - "Assign {role} role to {entity-id} on {cbu-id}"
+          summary:
+            - "assigned {role} role"
+          clarify:
+            role: "Which role? (e.g., depositary, management company)"
+            entity-id: "Which party should receive this role?"
         returns:
           type: uuid
           name: cbu_entity_role_id

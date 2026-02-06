@@ -90,6 +90,9 @@ pub mod deal_routes;
 #[cfg(feature = "server")]
 pub mod repl_routes;
 
+#[cfg(feature = "vnext-repl")]
+pub mod repl_routes_v2;
+
 #[cfg(feature = "server")]
 pub use attribute_routes::create_attribute_router;
 
@@ -172,3 +175,6 @@ pub use deal_routes::{create_deal_router, create_deal_router_simple, DealState};
 
 #[cfg(feature = "server")]
 pub use repl_routes::{router as create_repl_router, ReplRouteState};
+
+#[cfg(feature = "vnext-repl")]
+pub use repl_routes_v2::{router as create_repl_v2_router, ReplV2RouteState};

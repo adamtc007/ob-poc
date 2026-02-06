@@ -7,6 +7,16 @@
 //! - Verb search (semantic + exact match)
 //! - Entity linking (mention extraction + resolution)
 //! - DSL generation (LLM-based arg extraction)
+//!
+//! ## Deprecation Note (Phase 2)
+//!
+//! Direct use of `IntentMatcher` by the orchestrator is deprecated in favor
+//! of `IntentService` (see `repl::intent_service`). `IntentService` wraps
+//! `IntentMatcher` internally and adds clarification checking via
+//! `sentences.clarify` templates and unified sentence generation.
+//!
+//! The `IntentMatcher` trait itself is NOT deprecated — it is still used
+//! internally by `IntentService`.
 
 use anyhow::Result;
 use async_trait::async_trait;

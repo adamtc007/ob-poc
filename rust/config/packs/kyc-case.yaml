@@ -1,0 +1,157 @@
+# KYC Case Journey Pack
+# Open, manage, and complete KYC cases with document solicitation
+
+id: kyc-case
+name: KYC Case
+version: "1.0"
+description: >
+  Open and manage a KYC case for a client entity. Guides through
+  UBO discovery, document solicitation, screening, and case approval.
+  Supports new cases and renewal reviews.
+
+invocation_phrases:
+  - "open a KYC case"
+  - "start KYC review"
+  - "KYC case"
+  - "new KYC"
+  - "KYC renewal"
+  - "run KYC"
+  - "compliance review"
+
+required_context:
+  - client_group_id
+
+optional_context:
+  - default_cbu
+  - target_entity
+
+allowed_verbs:
+  - kyc.create-case
+  - kyc.assign-reviewer
+  - kyc.submit-case
+  - kyc.approve-case
+  - ubo.discover
+  - document.solicit
+  - document.solicit-set
+  - screening.run
+
+forbidden_verbs:
+  - kyc.delete-case
+  - entity.delete
+
+risk_policy:
+  require_confirm_before_execute: true
+  max_steps_without_confirm: 3
+
+required_questions:
+  - field: entity_name
+    prompt: "Which entity is this KYC case for?"
+    answer_kind: entity_ref
+
+  - field: case_type
+    prompt: "Is this a new case or a renewal? (new / renewal)"
+    answer_kind: enum
+    options_source: case_types
+    default: "new"
+
+optional_questions:
+  - field: reviewer
+    prompt: "Who should review this case?"
+    answer_kind: entity_ref
+
+  - field: risk_rating
+    prompt: "Initial risk rating? (low / medium / high)"
+    answer_kind: enum
+    options_source: risk_ratings
+    default: "medium"
+
+  - field: document_types
+    prompt: "Which documents to solicit? (e.g. passport, proof_of_address, certificate_of_incorporation)"
+    answer_kind: list
+    default: ["passport", "proof_of_address"]
+
+stop_rules:
+  - "KYC case created"
+  - "UBO discovery complete"
+  - "Required documents solicited"
+  - "Screening run"
+
+templates:
+  - template_id: new-kyc-case
+    when_to_use: "New KYC case with UBO discovery and document solicitation"
+    steps:
+      - verb: kyc.create-case
+        args:
+          entity_ref: "{answers.entity_name}"
+          case_type: "new"
+          risk_rating: "{answers.risk_rating}"
+
+      - verb: ubo.discover
+        args:
+          entity_ref: "{answers.entity_name}"
+
+      - verb: document.solicit-set
+        args:
+          entity_ref: "{answers.entity_name}"
+          doc_types: "{answers.document_types}"
+
+      - verb: screening.run
+        args:
+          entity_ref: "{answers.entity_name}"
+
+      - verb: kyc.assign-reviewer
+        when: "reviewer"
+        args:
+          reviewer_ref: "{answers.reviewer}"
+
+  - template_id: renewal-kyc-case
+    when_to_use: "KYC renewal review for existing entity"
+    steps:
+      - verb: kyc.create-case
+        args:
+          entity_ref: "{answers.entity_name}"
+          case_type: "renewal"
+          risk_rating: "{answers.risk_rating}"
+
+      - verb: screening.run
+        args:
+          entity_ref: "{answers.entity_name}"
+
+      - verb: document.solicit-set
+        when: "document_types"
+        args:
+          entity_ref: "{answers.entity_name}"
+          doc_types: "{answers.document_types}"
+
+pack_summary_template: >
+  KYC {{answers.case_type}} case for {{answers.entity_name}},
+  risk rating: {{answers.risk_rating}}.
+
+section_layout:
+  - title: "Case Management"
+    verb_prefixes:
+      - "kyc."
+  - title: "Due Diligence"
+    verb_prefixes:
+      - "ubo."
+      - "screening."
+  - title: "Documentation"
+    verb_prefixes:
+      - "document."
+
+definition_of_done:
+  - "KYC case created with correct type"
+  - "UBO discovery completed (new cases)"
+  - "Required documents solicited"
+  - "Screening run against entity"
+  - "Reviewer assigned if specified"
+
+progress_signals:
+  - signal: case_opened
+    description: "KYC case has been created"
+  - signal: ubo_complete
+    description: "UBO discovery finished"
+  - signal: docs_solicited
+    description: "All required documents have been requested"
+  - signal: screening_complete
+    description: "Screening has been run"
