@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-> **Last reviewed:** 2026-02-05
+> **Last reviewed:** 2026-02-07
 > **Frontend:** React/TypeScript (`ob-poc-ui-react/`) - Chat UI with scope panel, Inspector
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
@@ -9,10 +9,11 @@
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
-> **Navigation:** ✅ Unified - All prompts go through IntentPipeline (view.*/session.* verbs)
+> **Navigation:** ✅ Unified - All prompts go through intent matching (view.*/session.* verbs)
 > **Multi-CBU Viewport:** ✅ Complete - Scope graph endpoint, execution refresh
-> **REPL Session/Phased Execution:** ✅ Complete - See `ai-thoughts/035-repl-session-implementation-plan.md`
-> **REPL Pipeline Redesign (077):** ✅ Complete - Explicit state machine, command ledger, unified `/api/repl/*` API
+> **REPL Session/Phased Execution:** ⚠️ Superseded by V2 REPL Architecture
+> **REPL Pipeline Redesign (077):** ⚠️ Superseded by V2 REPL Architecture — V1 types retained for reference
+> **V2 REPL Architecture (TODO-2):** ✅ Complete - Pack-scoped intent resolution, 7-state machine, ContextStack fold, preconditions engine, 320 tests
 > **Candle Semantic Pipeline:** ✅ Complete - DB source of truth, populate_embeddings binary
 > **Agent Pipeline:** ✅ Unified - One path, all input → LLM intent → DSL (no special cases)
 > **Solar Navigation (038):** ✅ Complete - ViewState, NavigationHistory, orbit navigation
@@ -359,6 +360,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | **Entity model & schema** | `docs/entity-model-ascii.md` | Full ERD, table relationships |
 | **DSL pipeline** | `docs/dsl-verb-flow.md` | Parser, compiler, executor, plugins |
 | **Research workflows** | `docs/research-agent-annex.md` | GLEIF, agent mode, invocation phrases |
+| **V2 REPL invariants** | `docs/INVARIANT-VERIFICATION.md` | P-1 through P-5, E-1 through E-8, enforcing code citations |
 
 ### AI-Thoughts (Design Decisions)
 
@@ -1252,9 +1254,7 @@ pub struct VerbDisambiguationState {
 | `rust/crates/ob-poc-types/src/lib.rs` | Type definitions |
 | `rust/src/api/agent_routes.rs` | `/select-verb`, `/abandon-disambiguation` endpoints |
 | `rust/src/api/agent_service.rs` | `handle_verb_selection()`, wires to ChatResponse |
-| `rust/crates/ob-poc-ui/src/state.rs` | `VerbDisambiguationState` |
-| `rust/crates/ob-poc-ui/src/panels/repl.rs` | `render_verb_disambiguation_card()` |
-| `rust/crates/ob-poc-ui/src/app.rs` | Action handling, timeout check |
+> **Note:** The egui UI for disambiguation (`ob-poc-ui`) has been removed. Disambiguation is now handled by the React frontend and V2 REPL API.
 
 **Learning Signal Generation:**
 
@@ -1415,9 +1415,8 @@ pub struct IntentTierSelection {
 | `rust/src/dsl_v2/intent_tiers.rs` | `IntentTierTaxonomy` loader and analysis |
 | `rust/src/api/agent_service.rs` | Integration in `process_chat()`, builds tier requests |
 | `rust/crates/ob-poc-types/src/lib.rs` | `IntentTierRequest`, `IntentTierOption` types |
-| `rust/crates/ob-poc-ui/src/state.rs` | `IntentTierState` UI state |
-| `rust/crates/ob-poc-ui/src/panels/repl.rs` | `render_intent_tier_card()` |
-| `rust/crates/ob-poc-ui/src/app.rs` | `select_intent_tier()`, `cancel_intent_tier()` |
+
+> **Note:** The egui UI for intent tiers (`ob-poc-ui`) has been removed. Intent tier selection is now handled by the React frontend and V2 REPL API.
 
 ### Decision Flow in agent_service.rs
 
@@ -3517,12 +3516,15 @@ Viewport updates with combined graph
 **Key files:**
 - `rust/src/api/graph_routes.rs` - `get_session_scope_graph()` endpoint
 - `rust/src/api/agent_routes.rs` - `exec_ctx.take_pending_cbu_session()` sync to `context.cbu_ids`
-- `rust/crates/ob-poc-ui/src/app.rs` - `fetch_scope_graph()` method
-- `rust/crates/ob-poc-ui/src/state.rs` - `pending_scope_graph`, `needs_scope_graph_refetch`
 
 ---
 
 ## REPL Session & Phased Execution
+
+> **V1 LEGACY (Superseded):** This section describes the V1 REPL phased execution model.
+> The active implementation is the **V2 REPL Architecture** (see below), which replaces
+> the state machine, session model, and execution pipeline described here.
+> V1 types are retained for reference but are not used in the V2 code path.
 
 > **Full design:** `ai-thoughts/034-repl-session-phased-execution.md`
 
@@ -3578,167 +3580,279 @@ Template batch operations can use `@session_cbus` as source to iterate over all 
 
 ## REPL Pipeline Redesign (077)
 
-> ✅ **IMPLEMENTED (2026-02-05)**: Complete architectural redesign with explicit state machine, command ledger, and unified input API.
+> **V1 LEGACY (Superseded):** The original 077 redesign introduced an explicit state machine
+> and command ledger. This has been **superseded by the V2 REPL Architecture** which implements
+> a 7-state machine with pack-scoped intent resolution, ContextStack fold, and preconditions engine.
 
-**Problem Solved:** The previous implementation had accumulated complexity:
-- 7 early-return branches in `process_chat()` (~2500 lines)
-- 4 overlapping pending states (verb_disambiguation, intent_tier, decision, resolution)
-- Duplicated state across UnifiedSession and SessionContext
-- No clear state machine - transitions were implicit
-- Session state not replayable from DSL history
+**V1 to V2 Migration:**
 
-### New Architecture
+| V1 Concept | V2 Replacement |
+|------------|----------------|
+| `ReplState` (5 states) | `ReplStateV2` in `orchestrator_v2.rs` (7 states) |
+| `LedgerEntry` | Runbook entries in `session_v2.rs` |
+| `UserInput` enum | `UserInputV2` in `types_v2.rs` |
+| `ClarifyingState` | Integrated into orchestrator state machine |
+| `ReplSession` with ledger | `ReplSessionV2` with runbook fold |
+| `ReplOrchestrator` | `ReplOrchestratorV2` with pack-scoped scoring |
+| `/api/repl/session/:id/input` | `/api/repl/v2/session/:id/input` (V2 routes) |
+| `HybridIntentMatcher` | `IntentService` + `search_with_context()` |
+
+See **V2 REPL Architecture** section below for the active implementation.
+
+---
+
+## V2 REPL Architecture — Pack-Scoped Intent Resolution
+
+> **Status:** ✅ Complete (2026-02-07) — Feature flag `vnext-repl` (enabled in web server)
+> **Tests:** 320 unit tests + 5 golden corpus tests
+> **Invariants:** P-1 through P-5, E-1 through E-8 — see `docs/INVARIANT-VERIFICATION.md`
+
+**Problem Solved:** V1 REPL had no concept of "what the user is trying to accomplish" — every turn was an independent verb search. V2 introduces **packs** (journey templates) that scope intent resolution, a **ContextStack** (pure fold from runbook), and a **preconditions engine** that filters verbs by eligibility.
+
+### 7-State Machine
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                    REPL STATE MACHINE                            │
-│                                                                  │
-│  ┌────────┐                                                     │
-│  │  IDLE  │ ◄─────────────────────────────────────────┐         │
-│  └───┬────┘                                           │         │
-│      │ user input                                     │         │
-│      ▼                                                │         │
-│  ┌────────────────┐                                   │         │
-│  │ INTENT_MATCHING│                                   │         │
-│  └───┬────────────┘                                   │         │
-│      │                                                │         │
-│      ├─► Matched (clear winner)      ──► DSL_READY ──┼─► IDLE  │
-│      │                                       │        │  (after │
-│      ├─► Ambiguous (verb options)    ──► CLARIFYING ─┘  exec)  │
-│      │                                       │                  │
-│      ├─► NeedsScopeSelection         ──► CLARIFYING            │
-│      │                                       │                  │
-│      ├─► NeedsEntityResolution       ──► CLARIFYING            │
-│      │                                       │                  │
-│      └─► NoMatch / Error             ──► IDLE (with error)     │
-└──────────────────────────────────────────────────────────────────┘
+┌────────────┐
+│  ScopeGate │ ◄── No client group in scope
+└─────┬──────┘
+      │ scope established
+      ▼
+┌────────────────┐
+│ JourneySelect  │ ◄── Multiple packs match
+└─────┬──────────┘
+      │ pack selected (or auto-selected)
+      ▼
+┌────────────┐     ┌────────────┐
+│   InPack   │ ──► │ Clarifying │ ──► (back to InPack after resolution)
+└─────┬──────┘     └────────────┘
+      │ all steps proposed
+      ▼
+┌────────────┐     ┌────────────┐
+│  Proposing │ ──► │RunbookEdit │ ──► (user edits steps)
+└─────┬──────┘     └────────────┘
+      │ user confirms
+      ▼
+┌────────────┐
+│ Executing  │ ──► Completed / Parked (human gate)
+└────────────┘
 ```
 
-### Key Principles
+**States:** `ScopeGate`, `JourneySelection`, `InPack`, `Clarifying`, `SentencePlayback`, `RunbookEditing`, `Executing`
 
-| Principle | Implementation |
-|-----------|----------------|
-| **Explicit State Machine** | `ReplState` enum with clear transitions in `ReplOrchestrator` |
-| **Single Source of Truth** | Command ledger (`Vec<LedgerEntry>`) is the authority |
-| **Pure Intent Matching** | `IntentMatcher` trait with no side effects |
-| **Replayable Sessions** | `recompute_derived()` rebuilds state from ledger |
-| **Unified Input API** | Single `/input` endpoint handles all interaction types |
+### ContextStack (7-Layer Fold from Runbook)
 
-### Core Types (`rust/src/repl/types.rs`)
+The ContextStack is a **pure fold** over executed runbook entries — never mutated directly. Only constructor: `ContextStack::from_runbook()`.
 
-```rust
-/// REPL state machine states
-pub enum ReplState {
-    Idle,
-    IntentMatching { started_at: DateTime<Utc> },
-    Clarifying(ClarifyingState),
-    DslReady { dsl: String, verb: String, can_auto_execute: bool },
-    Executing { dsl: String, started_at: DateTime<Utc> },
-}
+| Layer | Type | Purpose |
+|-------|------|---------|
+| `derived_scope` | `DerivedScope` | Session scope from executed entries (CBU IDs, client group) |
+| `pack_context` | `PackContext` | Active pack (staged preferred over executed) |
+| `template_hint` | `TemplateStepHint` | Next expected verb from pack template |
+| `focus` | `FocusContext` | Pronoun resolution ("it", "that entity") |
+| `recent` | `RecentContext` | Recent entity mentions for carry-forward |
+| `exclusion_set` | `ExclusionSet` | Rejected candidates with 3-turn decay |
+| `outcome_registry` | `OutcomeRegistry` | Execution results for `@N` outcome references |
 
-/// What we're waiting for user to clarify
-pub enum ClarifyingState {
-    VerbSelection { options, original_input, margin },
-    ScopeSelection { options, context },
-    EntityResolution { unresolved_refs, partial_dsl },
-    Confirmation { dsl, summary },
-    IntentTier { tier_number, options, prompt },
-    ClientGroupSelection { options, prompt },
-}
+Additional derived fields: `executed_verbs`, `staged_verbs`, `accumulated_answers` (Q&A from pack questions).
 
-/// Single entry in the command ledger
-pub struct LedgerEntry {
-    pub id: Uuid,
-    pub timestamp: DateTime<Utc>,
-    pub input: UserInput,
-    pub intent_result: Option<IntentMatchResult>,
-    pub dsl: Option<String>,
-    pub execution_result: Option<LedgerExecutionResult>,
-    pub status: EntryStatus,
-}
+**Key Invariant (P-3):** Session state is a runbook fold. No mutable `client_context` or `journey_context` — these are deprecated write-only persistence bridges.
 
-/// All user input types (unified)
-pub enum UserInput {
-    Message { content: String },
-    VerbSelection { option_index, selected_verb, original_input },
-    ScopeSelection { option_id, option_name },
-    EntitySelection { ref_id, entity_id, entity_name },
-    Confirmation { confirmed: bool },
-    IntentTierSelection { tier, selected_id },
-    ClientGroupSelection { group_id, group_name },
-    Command { command: ReplCommand },
-}
+### Pack System
+
+Packs are YAML journey templates that scope intent resolution to a workflow:
+
+| Pack | File | Purpose |
+|------|------|---------|
+| `session-bootstrap` | `config/packs/session-bootstrap.yaml` | Initial scope setup |
+| `book-setup` | `config/packs/book-setup.yaml` | Client book creation |
+| `onboarding-request` | `config/packs/onboarding-request.yaml` | Full client onboarding |
+| `kyc-case` | `config/packs/kyc-case.yaml` | KYC case management |
+
+**PackManifest** defines: `id`, `name`, `description`, `entry_conditions`, `questions` (with `options_source`), `template` (ordered steps), `risk_policy`, `handoff_target`.
+
+**PackRouter** selects pack: force-select > substring match > semantic match. Conversation-first design — question `options_source` values are suggestions, not gate constraints.
+
+### Scoring Pipeline
+
+```
+User input
+    │
+    ▼
+search_with_context(input, context_stack)     ← IntentService
+    │
+    ▼
+apply_pack_scoring(candidates, pack_context)  ← Pack verb boost/penalty
+    │
+    ▼
+apply_ambiguity_policy(candidates)            ← Margin-based disambiguation
+    │
+    ▼
+dual_decode(candidates, pack_context)         ← Joint pack+verb scoring
+    │
+    ▼
+VerbDecision: Clear | Ambiguous | NeedsContext | NoMatch
 ```
 
-### API Endpoints (`/api/repl/*`)
+**Scoring Constants:**
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `PACK_VERB_BOOST` | 0.10 | Verbs listed in active pack template |
+| `PACK_VERB_PENALTY` | 0.05 | Verbs outside active pack |
+| `TEMPLATE_STEP_BOOST` | 0.15 | Matching next expected template step |
+| `DOMAIN_AFFINITY_BOOST` | 0.03 | Domain matching from FocusMode |
+| `ABSOLUTE_FLOOR` | 0.55 | Minimum score cutoff |
+| `AMBIGUITY_MARGIN` | 0.05 | Gap required between top candidates |
+
+### Preconditions Engine
+
+Parsed from YAML verb `lifecycle` field. Formats: `requires_scope:cbu`, `requires_prior:cbu.create`, `forbids_prior:cbu.delete`.
+
+**EligibilityMode:**
+- `Executable` — verb can execute now (strict: all preconditions met)
+- `Plan` — verb can be planned for future execution (relaxed: scope only)
+
+`filter_by_preconditions()` removes ineligible verbs from candidates and generates **"why not" suggestions** explaining what's missing (e.g., "cbu.assign-role requires a CBU in scope — try cbu.create first").
+
+### FocusMode
+
+5 variants derived from active pack + recent verbs:
+
+| Variant | Trigger | Domain Affinity |
+|---------|---------|-----------------|
+| `KycCase` | kyc-case pack active | kyc.*, screening.* |
+| `Proofs` | Document collection phase | document.*, requirement.* |
+| `Trading` | Trading profile setup | trading-profile.*, custody.* |
+| `CbuManagement` | Book setup pack | cbu.*, session.* |
+| `General` | No pack or mixed activity | No boost |
+
+Provides a soft domain affinity boost (`DOMAIN_AFFINITY_BOOST = 0.03`), not a hard filter.
+
+### DecisionLog (Per-Turn Audit)
+
+Every turn produces a `DecisionLog` entry with:
+- Raw verb candidates (pre-scoring) with scores
+- Reranked candidates (post-scoring) with pack adjustments
+- `VerbDecision` (Clear/Ambiguous/NeedsContext/NoMatch)
+- Entity resolutions with method (deterministic vs LLM)
+- Arg extraction method
+- Context summary (pack, scope, focus mode)
+- Final DSL proposed
+- Privacy: `raw_input` redacted in operational mode (only `input_hash` kept)
+
+### Replay Tuner
+
+CLI tool for iterating on scoring constants against the golden corpus:
+
+```bash
+# Run corpus against current constants
+cargo x replay-tuner run
+
+# Sweep parameter space
+cargo x replay-tuner sweep
+
+# Compare two parameter sets
+cargo x replay-tuner compare --baseline defaults --candidate experimental
+
+# Generate report
+cargo x replay-tuner report
+```
+
+**Key file:** `rust/xtask/src/replay_tuner.rs`
+
+### Golden Corpus
+
+102 test entries across 8 YAML files in `rust/tests/golden_corpus/`:
+
+| File | Entries | Coverage |
+|------|---------|----------|
+| `seed.yaml` | 26 | Core verb matching |
+| `kyc.yaml` | 16 | KYC workflow |
+| `preconditions.yaml` | 15 | Precondition gates |
+| `edge_cases.yaml` | 13 | Edge cases |
+| `book_setup.yaml` | 11 | Book setup pack |
+| `bootstrap.yaml` | 7 | Bootstrap pack |
+| `pack_switching.yaml` | 7 | Pack transitions |
+| `error_recovery.yaml` | 7 | Error handling |
+
+CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
+
+### Invariant Verification
+
+13 invariants documented in `docs/INVARIANT-VERIFICATION.md`:
+
+**Pipeline (P-1 through P-5):**
+- P-1: ContextStack is a pure fold (no mutation)
+- P-2: Pack scoring is additive (never replaces base score)
+- P-3: Session state is runbook fold (no mutable context)
+- P-4: Preconditions never add candidates
+- P-5: ExclusionSet decays after 3 turns
+
+**Engine (E-1 through E-8):**
+- E-1: dual_decode handles cross-pack disambiguation
+- E-2: recover_from_rejection filters and re-scores
+- E-3: check_pack_handoff detects completion
+- E-4 through E-8: Template expansion, entity resolution, sentence generation, etc.
+
+### API Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `POST /api/repl/session` | Create new REPL session |
-| `GET /api/repl/session/:id` | Get full session state (for page reload recovery) |
-| `POST /api/repl/session/:id/input` | **Unified endpoint** - handles ALL user interactions |
-| `DELETE /api/repl/session/:id` | Delete session |
+| `POST /api/repl/v2/session` | Create V2 REPL session |
+| `GET /api/repl/v2/session/:id` | Get full session state |
+| `POST /api/repl/v2/session/:id/input` | Unified input (all `UserInputV2` types) |
+| `DELETE /api/repl/v2/session/:id` | Delete session |
+| `POST /api/repl/v2/signal` | External system completion signals |
 
-**Input Request Format:**
-```typescript
-type InputRequest =
-  | { type: "message"; content: string }
-  | { type: "verb_selection"; option_index: number; selected_verb: string; original_input: string }
-  | { type: "scope_selection"; option_id: string; option_name: string }
-  | { type: "entity_selection"; ref_id: string; entity_id: string; entity_name: string }
-  | { type: "confirmation"; confirmed: boolean }
-  | { type: "intent_tier_selection"; tier: number; selected_id: string }
-  | { type: "client_group_selection"; group_id: string; group_name: string }
-  | { type: "command"; command: "run" | "undo" | "redo" | "clear" | "cancel" };
-```
+**UserInputV2 types:** `Message`, `Confirm`, `Reject`, `Edit`, `Command`, `SelectPack`, `SelectVerb`, `SelectEntity`
 
-### Key Files
+**ReplResponseKindV2 types:** `ScopeRequired`, `JourneyOptions`, `Question`, `SentencePlayback`, `RunbookSummary`, `Clarification`, `Executed`, `Parked`, `StepProposals`, `Info`, `Prompt`, `Error`
+
+### Key Files (33 files)
 
 | File | Purpose |
 |------|---------|
-| `rust/src/repl/types.rs` | Core types: ReplState, LedgerEntry, UserInput, MatchContext |
-| `rust/src/repl/intent_matcher.rs` | IntentMatcher trait, HybridIntentMatcher implementation |
-| `rust/src/repl/orchestrator.rs` | ReplOrchestrator state machine (single `process()` entry point) |
-| `rust/src/repl/session.rs` | ReplSession with ledger and DerivedState |
-| `rust/src/repl/response.rs` | ReplResponse types for API |
-| `rust/src/api/repl_routes.rs` | HTTP endpoints with ReplRouteState |
-| `ob-poc-ui-react/src/api/repl.ts` | TypeScript API client |
-
-### React API Client
-
-```typescript
-import { replApi } from './api/repl';
-
-// Create session
-const session = await replApi.createSession();
-
-// Send message (natural language)
-const response = await replApi.sendMessage(sessionId, "load the allianz book");
-
-// Handle clarification
-if (response.state.type === "Clarifying") {
-  const clarify = response.state.clarifying;
-  if (clarify.type === "VerbSelection") {
-    // Show verb options to user, then:
-    await replApi.selectVerb(sessionId, 0, "session.load-galaxy", "load the allianz book");
-  }
-}
-
-// Execute staged DSL
-await replApi.run(sessionId);
-
-// Commands
-await replApi.undo(sessionId);
-await replApi.clear(sessionId);
-```
-
-### Migration Path
-
-The new REPL API coexists with the existing `/api/session/*` endpoints:
-- **Legacy:** `/api/session/:id/chat` - existing chat endpoint (unchanged)
-- **New:** `/api/repl/session/:id/input` - unified REPL endpoint
-
-Migrate incrementally by switching frontend components to use `replApi` instead of `chatApi`.
+| **State Machine & Session** | |
+| `rust/src/repl/orchestrator_v2.rs` | 7-state machine dispatcher (174K) |
+| `rust/src/repl/session_v2.rs` | `ReplSessionV2` with runbook (19K) |
+| `rust/src/repl/types_v2.rs` | `ReplStateV2`, `UserInputV2` types (11K) |
+| `rust/src/repl/response_v2.rs` | `ReplResponseV2` types (9K) |
+| **Intent & Scoring** | |
+| `rust/src/repl/intent_service.rs` | 5-phase verb matching pipeline (26K) |
+| `rust/src/repl/scoring.rs` | Pack scoring + ambiguity policy (29K) |
+| `rust/src/repl/preconditions.rs` | Precondition engine + "why not" (18K) |
+| `rust/src/repl/decision_log.rs` | Per-turn audit trail (32K) |
+| `rust/src/repl/verb_config_index.rs` | In-memory verb metadata (26K) |
+| **Context & Runbook** | |
+| `rust/src/repl/context_stack.rs` | 7-layer ContextStack fold (81K) |
+| `rust/src/repl/runbook.rs` | Runbook entries + execution (66K) |
+| `rust/src/repl/bootstrap.rs` | ScopeGate bootstrap logic (15K) |
+| **Proposal & Execution** | |
+| `rust/src/repl/proposal_engine.rs` | Deterministic step proposals (29K) |
+| `rust/src/repl/sentence_gen.rs` | Deterministic sentence templating (17K) |
+| `rust/src/repl/deterministic_extraction.rs` | Pattern-based arg extraction (30K) |
+| `rust/src/repl/executor_bridge.rs` | Bridge to DSL executor (5K) |
+| `rust/src/repl/entity_resolution.rs` | Entity resolution pipeline (17K) |
+| **Journey / Packs** | |
+| `rust/src/journey/pack.rs` | `PackManifest`, `PackTemplate` (19K) |
+| `rust/src/journey/router.rs` | `PackRouter` — pack selection (19K) |
+| `rust/src/journey/template.rs` | Template expansion + provenance (23K) |
+| `rust/src/journey/playback.rs` | Pack summary + chapter gen (10K) |
+| `rust/src/journey/handoff.rs` | Context forwarding between packs (2K) |
+| **API & Infrastructure** | |
+| `rust/src/api/repl_routes_v2.rs` | V2 HTTP endpoints |
+| `rust/src/repl/events.rs` | Event system (15K) |
+| `rust/src/repl/service.rs` | Service layer (32K) |
+| `rust/src/repl/session_repository.rs` | DB persistence (9K) |
+| **Config** | |
+| `rust/config/packs/session-bootstrap.yaml` | Bootstrap pack |
+| `rust/config/packs/book-setup.yaml` | Book setup pack |
+| `rust/config/packs/onboarding-request.yaml` | Onboarding pack |
+| `rust/config/packs/kyc-case.yaml` | KYC case pack |
+| **Test** | |
+| `rust/tests/golden_corpus/*.yaml` | 102 test entries (8 files) |
+| `rust/tests/golden_corpus_test.rs` | Corpus runner + CI gate |
+| `rust/xtask/src/replay_tuner.rs` | Replay tuner CLI |
 
 ---
 
@@ -3786,285 +3900,27 @@ No direct `sqlx::query` calls outside of service modules.
 
 ## ESPER Navigation Crates (065)
 
-> ✅ **IMPLEMENTED (2026-01-31)**: Rip-and-replace refactor of navigation system into 5 independent crates with 158 tests.
+> **DEPRECATED (2026-01-31):** The esper_* crates (`esper_snapshot`, `esper_core`, `esper_input`,
+> `esper_policy`, `esper_egui`) are retained in the repository for reference but are no longer
+> used by any active code path. All visualization is now handled by the React frontend
+> (`ob-poc-ui-react/`) with data served via REST API endpoints.
 
-The ESPER (Entity Spatial Exploration and Rendering) navigation system is split into 5 crates with strict dependency ordering:
+**Crates retained for reference:** `esper_snapshot`, `esper_core`, `esper_input`, `esper_policy`, `esper_egui`, `esper_compiler`
 
-```
-esper_snapshot (no deps)     ─┐
-                              ├─► esper_core ─┬─► esper_input ─┬─► esper_egui
-                              │               └─► esper_policy ─┘
-                              └─────────────────────────────────────────────┘
-```
-
-### Crate Overview
-
-| Crate | Tests | Purpose |
-|-------|-------|---------|
-| `esper_snapshot` | 29 | SoA data layout, bincode serialization, spatial grid |
-| `esper_core` | 39 | Verb enum, EffectSet bitflags, DroneState state machine |
-| `esper_input` | 23 | Unified input (keyboard/mouse/touch/gamepad → Verb) |
-| `esper_policy` | 41 | Permission bitflags, VerbPolicy, EntityPolicy, PolicyGuard |
-| `esper_egui` | 26 | egui rendering with camera animation, LOD, overlays |
-
-### Key Design Patterns
-
-**Structure-of-Arrays (SoA) Layout:**
-```rust
-// ChamberSnapshot stores entity data in parallel arrays for cache efficiency
-pub struct ChamberSnapshot {
-    pub entity_ids: Vec<u64>,    // Stable entity IDs
-    pub kind_ids: Vec<u16>,      // Entity type indices
-    pub x: Vec<f32>,             // X coordinates
-    pub y: Vec<f32>,             // Y coordinates
-    pub first_child: Vec<u32>,   // Tree navigation (NONE_IDX if leaf)
-    pub next_sibling: Vec<u32>,  // Sibling navigation
-    // ...
-}
-```
-
-**Sentinel Constants:**
-```rust
-pub const NONE_IDX: u32 = u32::MAX;  // No child/sibling
-pub const NONE_ID: u64 = 0;          // No entity
-```
-
-**Verb-Based Navigation:**
-All input (keyboard, mouse, touch, agent commands) translates to `Verb` enum before execution:
-```rust
-pub enum Verb {
-    PanBy { dx: f32, dy: f32 },
-    Zoom(f32),
-    Ascend, Descend, Next, Prev,
-    DiveInto(DoorId), PullBack, Surface,
-    Select(NodeIdx), Focus(EntityId),
-    // ...
-}
-```
-
-**EffectSet Output Protocol:**
-Verb execution returns a bitflag of effects for the renderer to handle:
-```rust
-bitflags! {
-    pub struct EffectSet: u32 {
-        const CAMERA_CHANGED = 0x0001;
-        const TAXONOMY_CHANGED = 0x0002;
-        const CHAMBER_CHANGED = 0x0004;
-        const CONTEXT_PUSHED = 0x0008;
-        // ...
-    }
-}
-```
-
-**DroneState (Navigation State Machine):**
-```rust
-pub struct DroneState {
-    pub mode: NavigationMode,        // Spatial vs Structural
-    pub current_chamber: ChamberId,  // Active chamber
-    pub context_stack: ContextStack, // For nested navigation
-    pub camera: CameraState,         // Position, zoom, animation
-    pub taxonomy: TaxonomyState,     // Selection, expansion, scroll
-    pub tick: u64,                   // Frame counter
-}
-```
-
-**Policy-Based Access Control:**
-```rust
-pub struct PolicyGuard {
-    policy: UserPolicy,
-}
-
-impl PolicyGuard {
-    pub fn pre_execute(&self, verb: &Verb) -> PolicyResult<()>;
-    pub fn post_execute(&self, effects: EffectSet) -> EffectSet;
-    pub fn filter_world(&self, world: &WorldSnapshot) -> FilteredWorld;
-}
-```
-
-**egui Compliance (Update vs Render):**
-```rust
-// Update phase: mutate state
-fn update(&mut self, dt: f32, drone: &mut DroneState, world: &WorldSnapshot) {
-    self.camera.tick(dt);           // Animation
-    let verbs = self.input.process(&input_state);  // Input → Verbs
-}
-
-// Render phase: read-only
-fn render(&self, ui: &mut Ui, drone: &DroneState, world: &WorldSnapshot) {
-    // Pure drawing, no mutation
-}
-```
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `rust/crates/esper_snapshot/src/chamber.rs` | ChamberSnapshot SoA structure |
-| `rust/crates/esper_snapshot/src/validate.rs` | Snapshot validation rules |
-| `rust/crates/esper_core/src/verb.rs` | Verb enum and DSL serialization |
-| `rust/crates/esper_core/src/state.rs` | DroneState and verb execution |
-| `rust/crates/esper_core/src/effect.rs` | EffectSet bitflags |
-| `rust/crates/esper_input/src/processor.rs` | InputProcessor (input → Verb) |
-| `rust/crates/esper_input/src/config.rs` | Rebindable key/mouse bindings |
-| `rust/crates/esper_policy/src/guard.rs` | PolicyGuard enforcement |
-| `rust/crates/esper_egui/src/renderer.rs` | Main EsperRenderer |
-| `rust/crates/esper_egui/src/camera.rs` | Camera animation with lerp |
+For historical implementation details, see git history or `ai-thoughts/065-esper-navigation.md`.
 
 ---
 
 ## Graph Configuration (Policy-Driven)
 
-> ✅ **IMPLEMENTED (2026-02-01)**: Centralized YAML config for graph visualization with hot-reload support.
+> **DEPRECATED (2026-02-01):** The graph configuration system (`config/graph_settings.yaml`)
+> was built for the esper_* visualization crates which are now deprecated. The configuration
+> file and `ob-poc-graph` crate still exist but are not used by the React frontend.
 
-The graph visualization system uses a centralized YAML configuration file for all tunables: LOD thresholds, layout dimensions, animation springs, viewport parameters, rendering options, and debug overlays. This enables tuning without code changes.
+**Key file retained:** `rust/config/graph_settings.yaml` — LOD, layout, animation, viewport config
+**Crate retained:** `rust/crates/ob-poc-graph/` — Graph data structures (still used for API responses)
 
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    GRAPH CONFIG PIPELINE                                     │
-│                                                                              │
-│  config/graph_settings.yaml                                                  │
-│         │                                                                    │
-│         ▼                                                                    │
-│  GraphConfig::load_default()                                                │
-│         │   - Searches: config/, ../config/, rust/config/                   │
-│         │   - Validates all fields                                          │
-│         │   - Computes policy_hash() for cache invalidation                 │
-│         │                                                                    │
-│         ▼                                                                    │
-│  global_config() → &'static GraphConfig                                     │
-│         │   - OnceLock singleton                                            │
-│         │   - Falls back to defaults if file missing                        │
-│         │                                                                    │
-│         ▼                                                                    │
-│  Module accessors (lod.rs, layout.rs, animation.rs, etc.)                   │
-│         │   - lod::density_base() → global_config().lod.density.base       │
-│         │   - layout::node_width() → global_config().layout.node.width     │
-│         │   - animation::SpringConfig::from_preset("camera")               │
-│         │                                                                    │
-│         ▼                                                                    │
-│  Rendering uses config values instead of hardcoded constants                │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Config Sections
-
-| Section | Purpose | Example Keys |
-|---------|---------|--------------|
-| `policy` | Version/variant tracking, cache invalidation | `version`, `name`, `variant` |
-| `lod` | Level of Detail thresholds and hysteresis | `tiers.icon.zoom_max`, `thresholds.compact`, `density.weight` |
-| `budgets` | Performance limits | `label_budget_count`, `shape_budget_ms_per_frame` |
-| `flyover` | Navigation phase settings | `dwell_ticks`, `phases.moving.selection_lod` |
-| `structural` | Taxonomy navigation density | `density_cutover.icon_only`, `max_labels_per_cluster` |
-| `camera` | Pan/zoom/snap settings | `pan_speed`, `zoom_speed`, `snap_epsilon` |
-| `focus` | Selection and neighbor priority | `selection_priority`, `neighbor_ring_size` |
-| `label_cache` | Text shaping cache | `max_entries`, `width_quantization` |
-| `spatial_index` | Spatial query optimization | `default_cell_size`, `chamber_overrides` |
-| `layout` | Node dimensions and spacing | `node.width`, `spacing.horizontal`, `tiers.cbu` |
-| `viewport` | Auto-fit and visibility limits | `fit_margin`, `max_visible_nodes` |
-| `animation` | Spring presets for motion | `springs.camera.stiffness`, `scale_pulse_peak` |
-| `rendering` | Edge and blur settings | `edges.bezier_segments`, `blur_opacity` |
-| `colors` | Risk, KYC, entity palette | `risk.high`, `kyc.complete`, `sun.glow` |
-| `debug` | Development overlay | `overlay.enabled`, `show_lod_counts` |
-| `clamps` | Safety limits | `max_nodes_visible`, `max_snapshot_bytes` |
-
-### Usage in Code
-
-**Getting config values:**
-```rust
-use ob_poc_graph::config::global_config;
-
-// Direct access
-let threshold = global_config().lod.thresholds.compact;
-let margin = global_config().viewport.fit_margin;
-
-// Module-level accessors (preferred)
-use ob_poc_graph::graph::layout::{node_width, h_spacing, tier_cbu};
-let width = node_width();  // from config
-let spacing = h_spacing(); // from config
-```
-
-**Spring presets:**
-```rust
-use ob_poc_graph::graph::animation::SpringConfig;
-
-// Config-driven (preferred)
-let camera_spring = SpringConfig::from_preset("camera");
-let gentle_spring = SpringConfig::from_preset("gentle");
-
-// Available presets: fast, medium, slow, bouncy, instant,
-// snappy, organic, gentle, camera, agent_ui, autopilot, pulse
-```
-
-**Policy hash for cache invalidation:**
-```rust
-let config = global_config();
-let hash = config.policy_hash();  // u64 hash of key config values
-
-// Use hash as part of cache key for WorldSnapshots
-let cache_key = format!("snapshot_{}_{}", session_id, hash);
-```
-
-### Validation Command
-
-```bash
-# Check config loads and validates
-cd rust && cargo x graph-config
-
-# Verbose output (shows all sections)
-cargo x graph-config -v
-```
-
-**Output:**
-```
-✓ Loaded graph config
-  Policy: default v1 (baseline)
-  Hash: 0x1a2b3c4d5e6f7890
-  LOD tiers: icon(<0.80) label(<1.50) extended(<3.00) full(<999.00)
-  Budgets: labels=250 full=20 shape=3.0ms/frame
-  Animation springs: 12 presets
-  ✓ Validation passed
-```
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `rust/config/graph_settings.yaml` | Master config file (~360 lines) |
-| `rust/crates/ob-poc-graph/src/config.rs` | GraphConfig types, validation, `global_config()` |
-| `rust/crates/ob-poc-graph/src/graph/lod.rs` | LOD accessors: `density_base()`, `compression_thresholds()` |
-| `rust/crates/ob-poc-graph/src/graph/layout.rs` | Layout accessors: `node_width()`, `tier_cbu()` |
-| `rust/crates/ob-poc-graph/src/graph/animation.rs` | `SpringConfig::from_preset()` |
-| `rust/crates/ob-poc-graph/src/graph/viewport_fit.rs` | Viewport accessors: `fit_margin()`, `max_visible_nodes()` |
-| `rust/crates/ob-poc-graph/src/graph/render.rs` | Render accessors: `corner_radius()`, `blur_opacity()` |
-| `rust/xtask/src/main.rs` | `graph-config` validation command |
-
-### Modifying Config
-
-1. Edit `rust/config/graph_settings.yaml`
-2. Run `cargo x graph-config` to validate
-3. Restart server (config loads once at startup via OnceLock)
-
-For hot-reload during development, the config file can be re-read by restarting the WASM app or server process.
-
-### Migration Pattern
-
-Legacy hardcoded constants are deprecated but retained for backwards compatibility:
-
-```rust
-// OLD (deprecated)
-const NODE_WIDTH: f32 = 160.0;
-let w = NODE_WIDTH;
-
-// NEW (config-driven)
-pub fn node_width() -> f32 {
-    global_config().layout.node.width
-}
-let w = node_width();
-```
-
-Deprecation warnings guide migration to config-driven accessors.
+For historical details, see git history.
 
 ---
 
@@ -4220,9 +4076,10 @@ rust/crates/inspector-projection/
 | `rust/crates/inspector-projection/src/node_id.rs` | NodeId with regex validation |
 | `rust/crates/inspector-projection/src/validate.rs` | Projection validation |
 | `rust/crates/inspector-projection/src/generator/cbu.rs` | CbuGenerator |
-| `rust/crates/ob-poc-ui/src/panels/inspector.rs` | egui Inspector panel |
 | `rust/src/api/graph_routes.rs` | `/api/cbu/:cbu_id/inspector` endpoint |
 | `rust/tests/fixtures/inspector/sample.yaml` | Test fixture with all node kinds |
+
+> **Note:** The egui Inspector panel (`ob-poc-ui`) has been removed. The projection crate (`inspector-projection`) remains active for API-driven inspection.
 
 ### Test Coverage
 
@@ -4230,115 +4087,6 @@ rust/crates/inspector-projection/
 - 32 integration tests in `rust/tests/`
 - 2 doc tests
 - Sample YAML fixture with comprehensive node coverage
-
----
-
-## Deal Record & Fee Billing (067)
-
-> ✅ **IMPLEMENTED (2026-02-05)**: Commercial origination hub with rate card negotiation, onboarding handoff, and closed-loop billing.
-
-The Deal domain provides end-to-end tracking of client relationships from first contact through billing, with full audit trail connecting negotiated rates to invoiced fees.
-
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  DEAL LIFECYCLE                                                              │
-│                                                                              │
-│  deals ─────────┬──→ client_group(id)           (primary client relationship)│
-│                 │                                                            │
-│                 ├── deal_participants ──→ entities (contracting parties)    │
-│                 ├── deal_contracts ──→ legal_contracts                      │
-│                 ├── deal_documents ──→ document_catalog                     │
-│                 ├── deal_rate_cards ──→ legal_contracts + products          │
-│                 │   └── deal_rate_card_lines (fee schedules)                │
-│                 ├── deal_slas ──→ contracts + products + services           │
-│                 ├── deal_ubo_assessments ──→ entities + kyc.cases           │
-│                 ├── deal_onboarding_requests ──→ cbus + products            │
-│                 └── deal_events (audit trail)                               │
-│                                                                              │
-│  BILLING CLOSED LOOP                                                         │
-│                                                                              │
-│  fee_billing_profiles ──→ legal_contracts + deal_rate_cards + cbus          │
-│      │                                                                       │
-│      ├── fee_billing_account_targets ──→ cbu_resource_instances             │
-│      │       └── rate_card_line_id (links to agreed rates)                  │
-│      │                                                                       │
-│      └── fee_billing_periods                                                 │
-│              └── fee_billing_period_lines ──→ targets + rate_card_lines     │
-│                      └── Same line ID from negotiation → invoice (audit)    │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Deal Status Lifecycle
-
-```
-PROSPECT → QUALIFYING → NEGOTIATING → CONTRACTED → ONBOARDING → ACTIVE → WINDING_DOWN → OFFBOARDED
-                                                                    ↓
-                                                              CANCELLED
-```
-
-### Key Tables (14 total)
-
-| Table | Purpose |
-|-------|---------|
-| `deals` | Master deal record with client_group linkage |
-| `deal_participants` | Contracting parties (entities) |
-| `deal_contracts` | Links to legal_contracts |
-| `deal_documents` | Deal-related documents |
-| `deal_rate_cards` | Pricing proposals (DRAFT→AGREED) |
-| `deal_rate_card_lines` | Fee schedules with pricing models |
-| `deal_slas` | Service level agreements |
-| `deal_ubo_assessments` | UBO/KYC assessments for participants |
-| `deal_onboarding_requests` | Handoff to onboarding (CBU creation) |
-| `deal_events` | Audit trail |
-| `fee_billing_profiles` | Billing configuration per CBU+product |
-| `fee_billing_account_targets` | Billable accounts |
-| `fee_billing_periods` | Billing cycles |
-| `fee_billing_period_lines` | Calculated fee lines |
-
-### Rate Card Pricing Models
-
-```sql
--- Supported fee_pricing_model values:
-'FLAT'    -- Fixed amount per period
-'BPS'     -- Basis points on AUM/volume (requires fee_rate_bps, fee_basis)
-'TIERED'  -- Tiered pricing (requires tier_brackets JSONB)
-'PER_TX'  -- Per transaction (requires per_tx_rate)
-```
-
-### Key Verbs
-
-| Verb | Purpose |
-|------|---------|
-| `deal.create` | Create deal for client_group |
-| `deal.add-participant` | Add contracting party |
-| `deal.create-rate-card` | Create pricing proposal |
-| `deal.add-rate-card-line` | Add fee schedule line |
-| `deal.agree-rate-card` | Lock rate card (immutable after) |
-| `deal.request-onboarding` | Trigger CBU onboarding |
-| `billing.create-profile` | Create billing config |
-| `billing.add-account-target` | Add billable account |
-| `billing.calculate-period` | Calculate fees for period |
-| `billing.approve-period` | Approve for invoicing |
-
-### Closed-Loop Audit Trail
-
-The same `rate_card_line_id` flows through:
-1. `deal_rate_card_lines.line_id` - Negotiated rate
-2. `fee_billing_account_targets.rate_card_line_id` - Applied rate
-3. `fee_billing_period_lines.rate_card_line_id` - Invoiced rate
-
-This proves the billed rate matches the contractually agreed rate.
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `migrations/067_deal_record_fee_billing.sql` | Schema (14 tables) |
-| `migrations/068_deal_billing_constraints.sql` | CHECK constraints, uuidv7() |
-| `rust/config/verbs/deal.yaml` | 35 deal verbs |
-| `rust/config/verbs/billing.yaml` | 17 billing verbs |
 
 ---
 
@@ -4749,12 +4497,17 @@ ob-poc/
 │   │   ├── ob-poc-graph/       # Graph data structures
 │   │   ├── ob-poc-web/         # Axum web server (serves React + API)
 │   │   ├── inspector-projection/ # Projection schema generation
-│   │   ├── esper_snapshot/     # SoA data layout (deprecated - for legacy)
-│   │   ├── esper_core/         # Navigation state (deprecated)
-│   │   ├── esper_input/        # Input handling (deprecated)
-│   │   ├── esper_policy/       # Access control (deprecated)
-│   │   └── esper_egui/         # egui rendering (deprecated)
+│   │   └── esper_*/            # DEPRECATED — 6 crates retained for reference
+│   ├── config/packs/           # 4 pack YAML manifests (V2 REPL journeys)
+│   ├── tests/golden_corpus/    # 102 test entries across 8 YAML files
 │   └── src/
+│       ├── repl/               # V2 REPL (vnext-repl feature flag)
+│       │   ├── orchestrator_v2.rs  # 7-state machine
+│       │   ├── context_stack.rs    # ContextStack fold
+│       │   ├── scoring.rs          # Pack scoring + ambiguity
+│       │   ├── preconditions.rs    # Precondition engine
+│       │   └── ...                 # 27 files total
+│       ├── journey/            # Pack system (router, manifests, handoff)
 │       ├── dsl_v2/             # DSL execution
 │       │   ├── custom_ops/     # Plugin handlers
 │       │   └── generic_executor.rs
@@ -4846,7 +4599,15 @@ When you see these in a task, read the corresponding annex first:
 | "lexicon", "verb lookup", "domain lookup", "LexiconService" | CLAUDE.md §Lexicon Service (072) |
 | "entity linking", "mention extraction", "entity resolution", "EntityLinkingService" | CLAUDE.md §Entity Linking Service (073) |
 | "lookup service", "verb-first", "dual search", "LookupService" | CLAUDE.md §Unified Lookup Service (074) |
-| "REPL redesign", "state machine", "command ledger", "ReplOrchestrator", "/api/repl" | CLAUDE.md §REPL Pipeline Redesign (077) |
+| "REPL redesign", "state machine", "V2 REPL", "ReplOrchestrator", "/api/repl" | CLAUDE.md §V2 REPL Architecture |
+| "context stack", "ContextStack", "runbook fold", "DerivedScope" | CLAUDE.md §V2 REPL Architecture |
+| "pack router", "PackManifest", "pack.select", "journey" | CLAUDE.md §V2 REPL Architecture |
+| "scoring", "pack scoring", "dual decode", "ambiguity policy" | CLAUDE.md §V2 REPL Architecture |
+| "preconditions", "EligibilityMode", "requires_scope" | CLAUDE.md §V2 REPL Architecture |
+| "decision log", "DecisionLog", "replay tuner", "golden corpus" | CLAUDE.md §V2 REPL Architecture |
+| "focus mode", "FocusMode", "domain affinity" | CLAUDE.md §V2 REPL Architecture |
+| "orchestrator v2", "ReplOrchestratorV2", "session v2" | CLAUDE.md §V2 REPL Architecture |
+| "invariant", "P-1", "P-2", "P-3", "P-4", "P-5" | `docs/INVARIANT-VERIFICATION.md` |
 
 ---
 
@@ -5078,6 +4839,14 @@ role:
 | `FeedbackLoop.generate_valid_dsl()` | MCP `dsl_generate` |
 | `VerbPhraseIndex` (YAML phrase matcher) | `VerbService` + pgvector semantic search |
 | Direct sqlx in `HybridVerbSearcher` | `VerbService` centralized DB access |
+| `ob-poc-ui` (egui crate) | React frontend (`ob-poc-ui-react/`) |
+| `esper_*` (6 navigation crates) | React frontend + REST API |
+| `orchestrator.rs` (V1 REPL) | `orchestrator_v2.rs` (7-state machine, vnext-repl) |
+| `session.rs` (V1 REPL) | `session_v2.rs` (runbook fold, vnext-repl) |
+| `ReplState` (V1 5-state) | `ReplStateV2` in orchestrator_v2.rs |
+| `ClientContext` / `JourneyContext` (mutable) | `ContextStack` (pure fold from runbook) |
+| `HybridVerbSearcher` (V1 agent chat) | `IntentService` + `search_with_context()` (V2 REPL) |
+| `IntentPipeline` (V1 agent chat) | `ReplOrchestratorV2.process()` (V2 REPL) |
 
 ---
 
@@ -5088,7 +4857,7 @@ role:
 | `cbu` | 25 | Client Business Unit lifecycle |
 | `entity` | 30 | Natural/legal person management |
 | `session` | 16 | Scope, navigation, history |
-| `view` | 15 | ESPER navigation, filters |
+| `view` | 15 | Navigation verbs (legacy ESPER, now via React) |
 | `trading-profile` | 30 | Trading matrix, CA policy |
 | `kyc` | 20 | KYC case management |
 | `investor` | 15 | Investor register, holdings |
