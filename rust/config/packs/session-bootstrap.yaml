@@ -1,0 +1,68 @@
+# Session Bootstrap Pack (Invariant I-7)
+#
+# Bootstrap is a pack — not a special state. The ScopeGate handler
+# delegates to this pack's routing logic. The only verb is
+# session.load-cluster, which resolves the client group and loads
+# CBUs into the session.
+
+id: session-bootstrap
+name: Session Bootstrap
+version: "1.0"
+description: >
+  Establish session scope by loading a client group into the working set.
+  This is the first pack activated in every session. It resolves the
+  client group name to a group ID and loads the associated CBUs.
+
+invocation_phrases:
+  - "load a client"
+  - "start a session"
+  - "set scope"
+  - "select client"
+
+required_context: []
+
+optional_context: []
+
+allowed_verbs:
+  - session.load-cluster
+  - session.load-galaxy
+  - session.load-cbu
+
+forbidden_verbs: []
+
+risk_policy:
+  require_confirm_before_execute: false
+  max_steps_without_confirm: 1
+
+required_questions:
+  - field: client_name
+    prompt: "Which client would you like to work with?"
+    answer_kind: string
+
+optional_questions: []
+
+stop_rules:
+  - "Client group resolved and CBUs loaded"
+
+templates:
+  - template_id: bootstrap-scope
+    when_to_use: "Standard session bootstrap"
+    steps:
+      - verb: session.load-cluster
+        args:
+          client: "{answers.client_name}"
+
+section_layout:
+  - title: "Session Scope"
+    verb_prefixes:
+      - "session."
+
+definition_of_done:
+  - "Client group resolved"
+  - "CBUs loaded into session"
+
+progress_signals:
+  - signal: scope_set
+    description: "Session scope has been established"
+
+handoff_target: null

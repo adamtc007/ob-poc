@@ -228,6 +228,12 @@ impl VerbConfigIndex {
             .map(|(fqn, e)| (fqn.clone(), e.description.clone()))
             .collect()
     }
+
+    /// Insert a test entry (for unit tests only).
+    #[cfg(test)]
+    pub fn insert_test_entry(&mut self, entry: VerbIndexEntry) {
+        self.entries.insert(entry.fqn.clone(), entry);
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,194 @@
+# Golden Corpus Seed — Pack-Scoped Verb Search
+#
+# Each entry defines an utterance, optional pack context, and expected verb.
+# Used by the tuning harness (Phase G) to measure accuracy and calibrate
+# scoring constants.
+#
+# Fields:
+#   utterance:     User input text
+#   expected_verb: Fully qualified verb (domain.action)
+#   pack:          Optional pack ID (null = no pack active)
+#   outcome:       "matched" | "ambiguous" | "no_match"
+#   notes:         Explanation of why this is the expected outcome
+#
+# Corpus seed: 25 examples covering bootstrap, KYC, book setup, and no-pack.
+
+---
+
+# ============================================================================
+# Bootstrap (session-bootstrap pack)
+# ============================================================================
+
+- utterance: "load the allianz book"
+  expected_verb: session.load-cluster
+  pack: session-bootstrap
+  outcome: matched
+  notes: "Core bootstrap verb — should match with high confidence in session-bootstrap pack"
+
+- utterance: "show me the aviva structures"
+  expected_verb: session.load-cluster
+  pack: session-bootstrap
+  outcome: matched
+  notes: "Natural language variant for load-cluster"
+
+- utterance: "load cbu for blackrock ireland"
+  expected_verb: session.load-cbu
+  pack: session-bootstrap
+  outcome: matched
+  notes: "Single CBU load variant"
+
+- utterance: "open the aberdeen lux book"
+  expected_verb: session.load-cluster
+  pack: session-bootstrap
+  outcome: matched
+  notes: "'open' as synonym for load"
+
+# ============================================================================
+# KYC Case (kyc-case pack)
+# ============================================================================
+
+- utterance: "add the Irish fund"
+  expected_verb: kyc.add-entity
+  pack: kyc-case
+  outcome: matched
+  notes: "Key accuracy test from research doc section 1 — 'add' in KYC pack = add entity to case"
+
+- utterance: "create a kyc case"
+  expected_verb: kyc.create-case
+  pack: kyc-case
+  outcome: matched
+  notes: "Direct KYC verb — should be strongly boosted in kyc-case pack"
+
+- utterance: "add State Street as transfer agent"
+  expected_verb: kyc.add-entity
+  pack: kyc-case
+  outcome: matched
+  notes: "Entity addition with role specification"
+
+- utterance: "who owns this company"
+  expected_verb: ubo.discover
+  pack: kyc-case
+  outcome: matched
+  notes: "UBO discovery — should match in KYC pack context"
+
+- utterance: "screen the directors"
+  expected_verb: kyc.screen-entity
+  pack: kyc-case
+  outcome: matched
+  notes: "Screening verb in KYC context"
+
+- utterance: "submit the case for review"
+  expected_verb: kyc.submit-case
+  pack: kyc-case
+  outcome: matched
+  notes: "Case lifecycle verb"
+
+- utterance: "add the Luxembourg SICAV"
+  expected_verb: kyc.add-entity
+  pack: kyc-case
+  outcome: matched
+  notes: "Entity addition with jurisdiction hint"
+
+- utterance: "remove Goldman from the case"
+  expected_verb: kyc.remove-entity
+  pack: kyc-case
+  outcome: matched
+  notes: "Entity removal from case"
+
+# ============================================================================
+# Book Setup (book-setup pack)
+# ============================================================================
+
+- utterance: "create a fund for allianz"
+  expected_verb: cbu.create
+  pack: book-setup
+  outcome: matched
+  notes: "CBU creation — should match in book-setup pack"
+
+- utterance: "set up the trading profile"
+  expected_verb: trading-profile.create
+  pack: book-setup
+  outcome: matched
+  notes: "Trading profile setup in book context"
+
+- utterance: "add custody product"
+  expected_verb: product.add
+  pack: book-setup
+  outcome: matched
+  notes: "Product addition in book setup"
+
+- utterance: "assign general partner role"
+  expected_verb: cbu-role.assign
+  pack: book-setup
+  outcome: matched
+  notes: "Role assignment in book setup context"
+
+- utterance: "add ISDA with Morgan Stanley"
+  expected_verb: isda.create
+  pack: book-setup
+  outcome: matched
+  notes: "ISDA creation with counterparty"
+
+# ============================================================================
+# No Pack (global context)
+# ============================================================================
+
+- utterance: "show all verbs"
+  expected_verb: agent.list-verbs
+  pack: null
+  outcome: matched
+  notes: "Meta command — no pack needed"
+
+- utterance: "undo"
+  expected_verb: session.undo
+  pack: null
+  outcome: matched
+  notes: "Session command — universal, no pack"
+
+- utterance: "what can I do"
+  expected_verb: agent.help
+  pack: null
+  outcome: matched
+  notes: "Help request — no pack"
+
+# ============================================================================
+# Cross-pack disambiguation (should be ambiguous without pack)
+# ============================================================================
+
+- utterance: "add the Irish fund"
+  expected_verb: null
+  pack: null
+  outcome: ambiguous
+  notes: "Without pack context, 'add' could be kyc.add-entity or cbu.create — should trigger disambiguation"
+
+- utterance: "create a new entity"
+  expected_verb: null
+  pack: null
+  outcome: ambiguous
+  notes: "Could be entity.create or kyc.add-entity without pack context"
+
+# ============================================================================
+# Pack switching
+# ============================================================================
+
+- utterance: "switch to KYC"
+  expected_verb: pack.select
+  pack: book-setup
+  outcome: matched
+  notes: "Explicit pack switch — should work from any pack"
+
+- utterance: "start a new case"
+  expected_verb: kyc.create-case
+  pack: null
+  outcome: matched
+  notes: "Strong enough signal to match even without pack"
+
+# ============================================================================
+# Edge cases
+# ============================================================================
+
+- utterance: "asdfghjkl"
+  expected_verb: null
+  pack: kyc-case
+  outcome: no_match
+  notes: "Garbage input — should not match anything"

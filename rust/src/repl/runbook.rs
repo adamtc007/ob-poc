@@ -427,6 +427,125 @@ pub struct ReadinessIssue {
 }
 
 // ---------------------------------------------------------------------------
+// PendingQuestion — derived from runbook, never stored
+// ---------------------------------------------------------------------------
+
+/// An entry with unresolved entity references that needs user input.
+///
+/// Derived on-demand via `Runbook::derive_pending_questions()`. NOT stored
+/// separately — the runbook entries are the single source of truth.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingQuestion {
+    pub entry_id: Uuid,
+    pub sequence: i32,
+    pub verb: String,
+    pub sentence: String,
+    pub unresolved_refs: Vec<UnresolvedRef>,
+    pub section: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// ProgressMetrics — derived from runbook, never stored
+// ---------------------------------------------------------------------------
+
+/// Snapshot of runbook progress for narration and UI display.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ProgressMetrics {
+    pub total: usize,
+    pub completed: usize,
+    pub confirmed: usize,
+    pub proposed: usize,
+    pub failed: usize,
+    pub parked: usize,
+    pub pending_resolution: usize,
+}
+
+// ---------------------------------------------------------------------------
+// FastCommand — power user commands detected before semantic search
+// ---------------------------------------------------------------------------
+
+/// Power user commands detected by prefix matching before semantic search.
+///
+/// These are zero-cost: parsed from the raw input string with no ML involved.
+/// If a fast command is detected, the orchestrator skips verb search entirely.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FastCommand {
+    /// "undo" — remove last entry from runbook.
+    Undo,
+    /// "redo" — restore last undone entry.
+    Redo,
+    /// "run" or "execute" or "go" — execute the runbook.
+    Run,
+    /// "run step N" — execute a specific step.
+    RunStep(i32),
+    /// "show runbook" or "show steps" — display current runbook.
+    ShowRunbook,
+    /// "drop step N" or "remove step N" — remove a step.
+    DropStep(i32),
+    /// "why" or "why this?" — explain last proposal.
+    Why,
+    /// "options" or "what can I do?" — show available verbs in pack.
+    Options,
+    /// "switch journey" or "switch pack" — go back to pack selection.
+    SwitchJourney,
+    /// "cancel" — cancel current clarification or proposal.
+    Cancel,
+    /// "status" or "progress" — show progress metrics.
+    Status,
+    /// "help" — show available commands.
+    Help,
+}
+
+impl FastCommand {
+    /// Try to parse a fast command from user input.
+    ///
+    /// Returns `None` if the input doesn't match any known command pattern.
+    /// Commands are case-insensitive and support common aliases.
+    pub fn parse(input: &str) -> Option<Self> {
+        let trimmed = input.trim().to_lowercase();
+
+        // Exact matches first.
+        match trimmed.as_str() {
+            "undo" => return Some(Self::Undo),
+            "redo" => return Some(Self::Redo),
+            "run" | "execute" | "go" | "commit" => return Some(Self::Run),
+            "show runbook" | "show steps" | "show plan" | "list steps" => {
+                return Some(Self::ShowRunbook)
+            }
+            "why" | "why this" | "why this?" | "explain" => return Some(Self::Why),
+            "options" | "what can i do" | "what can i do?" | "what now" | "what now?" => {
+                return Some(Self::Options)
+            }
+            "switch journey" | "switch pack" | "change journey" | "change pack" => {
+                return Some(Self::SwitchJourney)
+            }
+            "cancel" | "nevermind" | "never mind" => return Some(Self::Cancel),
+            "status" | "progress" | "where am i" | "where am i?" => return Some(Self::Status),
+            "help" | "?" => return Some(Self::Help),
+            _ => {}
+        }
+
+        // Prefix patterns: "run step N", "drop step N", "remove step N".
+        if let Some(rest) = trimmed.strip_prefix("run step ") {
+            if let Ok(n) = rest.trim().parse::<i32>() {
+                return Some(Self::RunStep(n));
+            }
+        }
+        if let Some(rest) = trimmed
+            .strip_prefix("drop step ")
+            .or_else(|| trimmed.strip_prefix("remove step "))
+            .or_else(|| trimmed.strip_prefix("delete step "))
+        {
+            if let Ok(n) = rest.trim().parse::<i32>() {
+                return Some(Self::DropStep(n));
+            }
+        }
+
+        None
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Runbook implementation
 // ---------------------------------------------------------------------------
 
@@ -581,6 +700,7 @@ impl Runbook {
 
     /// Update the sentence and DSL on an entry (after arg editing).
     /// Emits an `EntryArgChanged` audit event.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_entry_sentence(
         &mut self,
         entry_id: Uuid,
@@ -903,6 +1023,178 @@ impl Runbook {
                 }
             }
         }
+    }
+
+    // -- Phase E: pending questions, progress, fill --
+
+    /// Derive pending questions from unresolved args in staged entries.
+    ///
+    /// A "pending question" is an entry that is Proposed or Confirmed but
+    /// has unresolved entity refs or missing required args. This is NOT
+    /// stored separately — it's derived on demand from the runbook state.
+    ///
+    /// Returns entries in sequence order so the UI can show them as a queue.
+    pub fn derive_pending_questions(&self) -> Vec<PendingQuestion> {
+        self.entries
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e.status,
+                    EntryStatus::Proposed | EntryStatus::Confirmed | EntryStatus::Resolved
+                ) && !e.unresolved_refs.is_empty()
+            })
+            .map(|e| PendingQuestion {
+                entry_id: e.id,
+                sequence: e.sequence,
+                verb: e.verb.clone(),
+                sentence: e.sentence.clone(),
+                unresolved_refs: e.unresolved_refs.clone(),
+                section: e.labels.get("section").cloned(),
+            })
+            .collect()
+    }
+
+    /// Try to fill a pending question by resolving one of its entity refs.
+    ///
+    /// Returns `true` if the ref was found and resolved. The caller is
+    /// responsible for regenerating the sentence and DSL after resolution.
+    pub fn try_fill_pending(
+        &mut self,
+        entry_id: Uuid,
+        ref_id: &str,
+        resolved_id: Uuid,
+        resolved_name: &str,
+    ) -> bool {
+        let entry = match self.entries.iter_mut().find(|e| e.id == entry_id) {
+            Some(e) => e,
+            None => return false,
+        };
+
+        let ref_pos = entry
+            .unresolved_refs
+            .iter()
+            .position(|r| r.ref_id == ref_id);
+        let ref_pos = match ref_pos {
+            Some(p) => p,
+            None => return false,
+        };
+
+        let unresolved = entry.unresolved_refs.remove(ref_pos);
+
+        // Update the arg with the resolved UUID.
+        if let Some(search_column) = &unresolved.search_column {
+            entry
+                .args
+                .insert(search_column.clone(), resolved_id.to_string());
+        }
+        // Also store the display name for sentence regeneration.
+        entry
+            .args
+            .insert(format!("{}_display", ref_id), resolved_name.to_string());
+
+        // If all refs are now resolved, advance status to Resolved.
+        if entry.unresolved_refs.is_empty()
+            && matches!(entry.status, EntryStatus::Proposed | EntryStatus::Confirmed)
+        {
+            let old = entry.status;
+            entry.status = EntryStatus::Resolved;
+            self.audit.push(RunbookEvent::EntryStatusChanged {
+                entry_id,
+                from: old,
+                to: EntryStatus::Resolved,
+                timestamp: Utc::now(),
+            });
+        }
+
+        self.touch();
+        true
+    }
+
+    /// Compute progress metrics for the runbook.
+    pub fn progress(&self) -> ProgressMetrics {
+        let template_id = self.template_id.as_deref();
+
+        let template_entries: Vec<&RunbookEntry> = match template_id {
+            Some(tid) => self
+                .entries
+                .iter()
+                .filter(|e| {
+                    e.labels.get("template_id").map(|s| s.as_str()) == Some(tid)
+                        && e.status != EntryStatus::Disabled
+                })
+                .collect(),
+            None => self
+                .entries
+                .iter()
+                .filter(|e| e.status != EntryStatus::Disabled)
+                .collect(),
+        };
+
+        let total = template_entries.len();
+        let completed = template_entries
+            .iter()
+            .filter(|e| e.status == EntryStatus::Completed)
+            .count();
+        let confirmed = template_entries
+            .iter()
+            .filter(|e| matches!(e.status, EntryStatus::Confirmed | EntryStatus::Resolved))
+            .count();
+        let proposed = template_entries
+            .iter()
+            .filter(|e| e.status == EntryStatus::Proposed)
+            .count();
+        let failed = template_entries
+            .iter()
+            .filter(|e| e.status == EntryStatus::Failed)
+            .count();
+        let parked = template_entries
+            .iter()
+            .filter(|e| e.status == EntryStatus::Parked)
+            .count();
+        let pending_resolution = template_entries
+            .iter()
+            .filter(|e| !e.unresolved_refs.is_empty())
+            .count();
+
+        ProgressMetrics {
+            total,
+            completed,
+            confirmed,
+            proposed,
+            failed,
+            parked,
+            pending_resolution,
+        }
+    }
+
+    /// Generate a human-readable progress narration.
+    ///
+    /// Examples:
+    /// - "3 of 8 steps completed"
+    /// - "5 of 8 steps completed, 1 pending resolution"
+    /// - "All 8 steps completed"
+    pub fn narrate_progress(&self) -> String {
+        let m = self.progress();
+        if m.total == 0 {
+            return "No steps in runbook".to_string();
+        }
+        if m.completed == m.total {
+            return format!("All {} steps completed", m.total);
+        }
+        let mut parts = vec![format!("{} of {} steps completed", m.completed, m.total)];
+        if m.confirmed > 0 {
+            parts.push(format!("{} confirmed", m.confirmed));
+        }
+        if m.pending_resolution > 0 {
+            parts.push(format!("{} pending resolution", m.pending_resolution));
+        }
+        if m.failed > 0 {
+            parts.push(format!("{} failed", m.failed));
+        }
+        if m.parked > 0 {
+            parts.push(format!("{} parked", m.parked));
+        }
+        parts.join(", ")
     }
 
     // -- private helpers --
@@ -1490,5 +1782,262 @@ mod tests {
         let entry_id = Uuid::new_v4();
         let key = InvocationRecord::make_correlation_key(rb_id, entry_id);
         assert_eq!(key, format!("{}:{}", rb_id, entry_id));
+    }
+
+    // -- Phase E: Fast command tests --
+
+    #[test]
+    fn test_fast_command_parse_exact_matches() {
+        assert_eq!(FastCommand::parse("undo"), Some(FastCommand::Undo));
+        assert_eq!(FastCommand::parse("Undo"), Some(FastCommand::Undo));
+        assert_eq!(FastCommand::parse("redo"), Some(FastCommand::Redo));
+        assert_eq!(FastCommand::parse("run"), Some(FastCommand::Run));
+        assert_eq!(FastCommand::parse("execute"), Some(FastCommand::Run));
+        assert_eq!(FastCommand::parse("go"), Some(FastCommand::Run));
+        assert_eq!(FastCommand::parse("commit"), Some(FastCommand::Run));
+        assert_eq!(
+            FastCommand::parse("show runbook"),
+            Some(FastCommand::ShowRunbook)
+        );
+        assert_eq!(
+            FastCommand::parse("show steps"),
+            Some(FastCommand::ShowRunbook)
+        );
+        assert_eq!(
+            FastCommand::parse("show plan"),
+            Some(FastCommand::ShowRunbook)
+        );
+        assert_eq!(FastCommand::parse("why"), Some(FastCommand::Why));
+        assert_eq!(FastCommand::parse("why this?"), Some(FastCommand::Why));
+        assert_eq!(FastCommand::parse("explain"), Some(FastCommand::Why));
+        assert_eq!(FastCommand::parse("options"), Some(FastCommand::Options));
+        assert_eq!(
+            FastCommand::parse("what can I do?"),
+            Some(FastCommand::Options)
+        );
+        assert_eq!(
+            FastCommand::parse("switch journey"),
+            Some(FastCommand::SwitchJourney)
+        );
+        assert_eq!(FastCommand::parse("cancel"), Some(FastCommand::Cancel));
+        assert_eq!(FastCommand::parse("nevermind"), Some(FastCommand::Cancel));
+        assert_eq!(FastCommand::parse("status"), Some(FastCommand::Status));
+        assert_eq!(FastCommand::parse("progress"), Some(FastCommand::Status));
+        assert_eq!(FastCommand::parse("help"), Some(FastCommand::Help));
+        assert_eq!(FastCommand::parse("?"), Some(FastCommand::Help));
+    }
+
+    #[test]
+    fn test_fast_command_parse_step_commands() {
+        assert_eq!(
+            FastCommand::parse("run step 3"),
+            Some(FastCommand::RunStep(3))
+        );
+        assert_eq!(
+            FastCommand::parse("drop step 5"),
+            Some(FastCommand::DropStep(5))
+        );
+        assert_eq!(
+            FastCommand::parse("remove step 1"),
+            Some(FastCommand::DropStep(1))
+        );
+        assert_eq!(
+            FastCommand::parse("delete step 2"),
+            Some(FastCommand::DropStep(2))
+        );
+    }
+
+    #[test]
+    fn test_fast_command_parse_not_command() {
+        assert_eq!(FastCommand::parse("add the Irish fund"), None);
+        assert_eq!(FastCommand::parse("create a case for Allianz"), None);
+        assert_eq!(FastCommand::parse("run step"), None); // No number
+        assert_eq!(FastCommand::parse("run step abc"), None); // Not a number
+        assert_eq!(FastCommand::parse(""), None);
+    }
+
+    #[test]
+    fn test_fast_command_case_insensitive() {
+        assert_eq!(FastCommand::parse("UNDO"), Some(FastCommand::Undo));
+        assert_eq!(FastCommand::parse("Run"), Some(FastCommand::Run));
+        assert_eq!(
+            FastCommand::parse("SHOW RUNBOOK"),
+            Some(FastCommand::ShowRunbook)
+        );
+        assert_eq!(
+            FastCommand::parse("Drop Step 7"),
+            Some(FastCommand::DropStep(7))
+        );
+    }
+
+    // -- Phase E: Pending questions tests --
+
+    #[test]
+    fn test_derive_pending_questions_empty() {
+        let rb = Runbook::new(Uuid::new_v4());
+        assert!(rb.derive_pending_questions().is_empty());
+    }
+
+    #[test]
+    fn test_derive_pending_questions_with_unresolved() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut e = sample_entry("kyc.add-entity", "Add Allianz");
+        e.unresolved_refs.push(UnresolvedRef {
+            ref_id: "ref0".to_string(),
+            display_text: "Allianz".to_string(),
+            entity_type: Some("company".to_string()),
+            search_column: Some("entity-id".to_string()),
+        });
+        rb.add_entry(e);
+
+        let pending = rb.derive_pending_questions();
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].verb, "kyc.add-entity");
+        assert_eq!(pending[0].unresolved_refs.len(), 1);
+    }
+
+    #[test]
+    fn test_derive_pending_questions_skips_completed() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut e = sample_entry("kyc.add-entity", "Add Allianz");
+        e.status = EntryStatus::Completed;
+        e.unresolved_refs.push(UnresolvedRef {
+            ref_id: "ref0".to_string(),
+            display_text: "Allianz".to_string(),
+            entity_type: None,
+            search_column: None,
+        });
+        rb.add_entry(e);
+
+        assert!(rb.derive_pending_questions().is_empty());
+    }
+
+    #[test]
+    fn test_try_fill_pending_resolves_ref() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut e = sample_entry("kyc.add-entity", "Add Allianz");
+        e.unresolved_refs.push(UnresolvedRef {
+            ref_id: "ref0".to_string(),
+            display_text: "Allianz".to_string(),
+            entity_type: Some("company".to_string()),
+            search_column: Some("entity-id".to_string()),
+        });
+        let entry_id = rb.add_entry(e);
+
+        let resolved_id = Uuid::new_v4();
+        let filled = rb.try_fill_pending(entry_id, "ref0", resolved_id, "Allianz SE");
+        assert!(filled);
+
+        // Entry should now have zero unresolved refs.
+        let entry = rb.entry_by_id(entry_id).unwrap();
+        assert!(entry.unresolved_refs.is_empty());
+        assert_eq!(entry.status, EntryStatus::Resolved);
+        assert_eq!(
+            entry.args.get("entity-id").map(|s| s.as_str()),
+            Some(resolved_id.to_string().as_str())
+        );
+    }
+
+    #[test]
+    fn test_try_fill_pending_nonexistent_ref() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+        let e = sample_entry("kyc.add-entity", "Add Allianz");
+        let entry_id = rb.add_entry(e);
+
+        let filled = rb.try_fill_pending(entry_id, "nonexistent", Uuid::new_v4(), "X");
+        assert!(!filled);
+    }
+
+    // -- Phase E: Progress metrics tests --
+
+    #[test]
+    fn test_progress_empty_runbook() {
+        let rb = Runbook::new(Uuid::new_v4());
+        let m = rb.progress();
+        assert_eq!(m.total, 0);
+        assert_eq!(m.completed, 0);
+    }
+
+    #[test]
+    fn test_progress_mixed_statuses() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut e1 = sample_entry("a.b", "Step 1");
+        e1.status = EntryStatus::Completed;
+        rb.add_entry(e1);
+
+        let mut e2 = sample_entry("c.d", "Step 2");
+        e2.status = EntryStatus::Confirmed;
+        rb.add_entry(e2);
+
+        let e3 = sample_entry("e.f", "Step 3"); // Proposed
+        rb.add_entry(e3);
+
+        let mut e4 = sample_entry("g.h", "Step 4");
+        e4.status = EntryStatus::Failed;
+        rb.add_entry(e4);
+
+        let m = rb.progress();
+        assert_eq!(m.total, 4);
+        assert_eq!(m.completed, 1);
+        assert_eq!(m.confirmed, 1);
+        assert_eq!(m.proposed, 1);
+        assert_eq!(m.failed, 1);
+    }
+
+    #[test]
+    fn test_progress_skips_disabled() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut e1 = sample_entry("a.b", "Step 1");
+        e1.status = EntryStatus::Completed;
+        rb.add_entry(e1);
+
+        let mut e2 = sample_entry("c.d", "Step 2");
+        e2.status = EntryStatus::Disabled;
+        rb.add_entry(e2);
+
+        let m = rb.progress();
+        assert_eq!(m.total, 1); // Disabled excluded
+        assert_eq!(m.completed, 1);
+    }
+
+    #[test]
+    fn test_narrate_progress_all_complete() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut e1 = sample_entry("a.b", "Step 1");
+        e1.status = EntryStatus::Completed;
+        rb.add_entry(e1);
+
+        let mut e2 = sample_entry("c.d", "Step 2");
+        e2.status = EntryStatus::Completed;
+        rb.add_entry(e2);
+
+        assert_eq!(rb.narrate_progress(), "All 2 steps completed");
+    }
+
+    #[test]
+    fn test_narrate_progress_mixed() {
+        let mut rb = Runbook::new(Uuid::new_v4());
+
+        let mut e1 = sample_entry("a.b", "Step 1");
+        e1.status = EntryStatus::Completed;
+        rb.add_entry(e1);
+
+        let e2 = sample_entry("c.d", "Step 2"); // Proposed
+        rb.add_entry(e2);
+
+        let narration = rb.narrate_progress();
+        assert!(narration.contains("1 of 2 steps completed"));
+    }
+
+    #[test]
+    fn test_narrate_progress_empty() {
+        let rb = Runbook::new(Uuid::new_v4());
+        assert_eq!(rb.narrate_progress(), "No steps in runbook");
     }
 }

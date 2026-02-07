@@ -193,6 +193,7 @@ impl From<InputRequestV2> for UserInputV2 {
 pub struct CreateSessionResponseV2 {
     pub session_id: Uuid,
     pub state: ReplStateV2,
+    pub greeting: String,
 }
 
 /// Response for session state query.
@@ -250,6 +251,20 @@ async fn create_session_v2(
 ) -> Result<Json<CreateSessionResponseV2>, StatusCode> {
     let session_id = state.orchestrator.create_session().await;
 
+    let greeting = crate::repl::bootstrap::format_greeting();
+
+    // Push the greeting as an assistant message into session history.
+    {
+        let sessions = state.orchestrator.sessions_for_test();
+        let mut sessions_write = sessions.write().await;
+        if let Some(session) = sessions_write.get_mut(&session_id) {
+            session.push_message(
+                crate::repl::session_v2::MessageRole::Assistant,
+                greeting.clone(),
+            );
+        }
+    }
+
     let session = state
         .orchestrator
         .get_session(session_id)
@@ -259,6 +274,7 @@ async fn create_session_v2(
     Ok(Json(CreateSessionResponseV2 {
         session_id,
         state: session.state,
+        greeting,
     }))
 }
 

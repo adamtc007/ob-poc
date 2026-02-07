@@ -379,6 +379,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build voice matching router (semantic + phonetic)
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
+    // =========================================================================
+    // REPL V2 — Pack-Guided Runbook Pipeline
+    // =========================================================================
+    let repl_v2_router = {
+        use ob_poc::api::repl_routes_v2::{self, ReplV2RouteState};
+        use ob_poc::journey::router::PackRouter;
+        use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
+
+        // Load journey packs from config dir (if available), otherwise empty router.
+        let pack_router = {
+            let config_dir =
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
+            PackRouter::load(&config_dir).unwrap_or_else(|_| PackRouter::new(vec![]))
+        };
+        let executor = Arc::new(StubExecutor);
+
+        let orchestrator = ReplOrchestratorV2::new(pack_router, executor).with_pool(pool.clone());
+
+        let v2_state = ReplV2RouteState {
+            orchestrator: Arc::new(orchestrator),
+        };
+
+        tracing::info!("REPL V2 orchestrator initialized with bootstrap resolution");
+
+        repl_routes_v2::router().with_state(v2_state)
+    };
+
     // React dist directory - serve assets from React build
     let react_dist_dir = std::env::var("REACT_DIST_DIR").unwrap_or_else(|_| {
         // Try to find React dist relative to the crate
@@ -441,6 +468,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(api_router)
         // Voice matching routes (semantic ML + phonetic) - stateless router
         .merge(voice_router)
+        // REPL V2 — Pack-guided runbook pipeline with bootstrap resolution
+        .nest("/api/repl/v2", repl_v2_router)
         // Layers
         .layer(TraceLayer::new_for_http())
         .layer(cors);
@@ -470,6 +499,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("  /api/verbs/agent-context - Agent verb context");
     tracing::info!("  /api/voice/match      - Semantic voice matching");
     tracing::info!("  /api/voice/health     - Voice matcher health");
+    tracing::info!("  /api/repl/v2/session  - REPL V2 session management");
+    tracing::info!("  /api/repl/v2/session/:id/input - REPL V2 unified input");
     tracing::info!("  /api/universe         - Galaxy universe view");
     tracing::info!("  /api/cluster/:type/:id - Cluster detail view");
     tracing::info!("");

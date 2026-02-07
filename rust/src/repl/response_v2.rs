@@ -91,6 +91,12 @@ pub enum ReplResponseKindV2 {
         proposal_hash: String,
     },
 
+    /// Informational message (status, why, options) — no action required.
+    Info { detail: String },
+
+    /// Prompt for user input (e.g. after switching journey).
+    Prompt { text: String },
+
     /// Something went wrong.
     Error { error: String, recoverable: bool },
 }

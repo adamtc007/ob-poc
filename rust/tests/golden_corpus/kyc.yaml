@@ -1,0 +1,126 @@
+# Golden Corpus — KYC Domain (15 cases)
+#
+# Tests verb matching accuracy within the kyc-case pack.
+# Focus: entity management, case lifecycle, screening, UBO.
+
+---
+
+- id: kyc-001
+  category: kyc
+  input: "add the Irish fund to the case"
+  pack_id: kyc-case
+  expected_verb: kyc.add-entity
+  match_mode: exact
+  tags: [entity-add, jurisdiction]
+
+- id: kyc-002
+  category: kyc
+  input: "add BNY Mellon as depositary"
+  pack_id: kyc-case
+  expected_verb: kyc.add-entity
+  match_mode: exact
+  tags: [entity-add, role]
+
+- id: kyc-003
+  category: kyc
+  input: "open a new KYC case for the fund"
+  pack_id: kyc-case
+  expected_verb: kyc.create-case
+  match_mode: exact
+  tags: [case-lifecycle]
+
+- id: kyc-004
+  category: kyc
+  input: "check ownership of this entity"
+  pack_id: kyc-case
+  expected_verb: ubo.discover
+  match_mode: exact
+  tags: [ubo, pronoun]
+
+- id: kyc-005
+  category: kyc
+  input: "run a screening check"
+  pack_id: kyc-case
+  expected_verb: kyc.screen-entity
+  match_mode: exact
+  tags: [screening]
+
+- id: kyc-006
+  category: kyc
+  input: "approve the case"
+  pack_id: kyc-case
+  expected_verb: kyc.approve-case
+  match_mode: exact
+  tags: [case-lifecycle]
+
+- id: kyc-007
+  category: kyc
+  input: "reject the case with reason: incomplete documents"
+  pack_id: kyc-case
+  expected_verb: kyc.reject-case
+  match_mode: exact
+  tags: [case-lifecycle]
+
+- id: kyc-008
+  category: kyc
+  input: "who are the ultimate beneficial owners"
+  pack_id: kyc-case
+  expected_verb: ubo.discover
+  match_mode: exact
+  tags: [ubo, natural-language]
+
+- id: kyc-009
+  category: kyc
+  input: "remove the German entity from the case"
+  pack_id: kyc-case
+  expected_verb: kyc.remove-entity
+  match_mode: exact
+  tags: [entity-remove, jurisdiction]
+
+- id: kyc-010
+  category: kyc
+  input: "list all entities in this case"
+  pack_id: kyc-case
+  expected_verb: kyc.list-entities
+  match_mode: exact
+  tags: [list, case-context]
+
+- id: kyc-011
+  category: kyc
+  input: "add the management company"
+  pack_id: kyc-case
+  expected_verb: kyc.add-entity
+  match_mode: exact
+  tags: [entity-add, role-shorthand, pronoun]
+
+- id: kyc-012
+  category: kyc
+  input: "submit for review"
+  pack_id: kyc-case
+  expected_verb: kyc.submit-case
+  match_mode: exact
+  tags: [case-lifecycle]
+
+- id: kyc-013
+  category: kyc
+  input: "reopen the case"
+  pack_id: kyc-case
+  expected_verb: kyc.reopen-case
+  match_mode: exact
+  tags: [case-lifecycle]
+
+- id: kyc-014
+  category: kyc
+  input: "check if the TA has been screened"
+  pack_id: kyc-case
+  expected_verb: kyc.screen-entity
+  match_mode: top_three
+  tags: [screening, role-shorthand]
+
+- id: kyc-015
+  category: kyc
+  input: "discover the control chain for this company"
+  pack_id: kyc-case
+  expected_verb: ubo.discover
+  match_mode: exact
+  tags: [ubo, control-chain]

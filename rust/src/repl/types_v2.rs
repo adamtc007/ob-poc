@@ -21,7 +21,12 @@ use uuid::Uuid;
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum ReplStateV2 {
     /// Waiting for client/scope selection before any pack can start.
-    ScopeGate { pending_input: Option<String> },
+    ScopeGate {
+        pending_input: Option<String>,
+        /// Disambiguation candidates from a previous resolution attempt.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        candidates: Option<Vec<super::bootstrap::BootstrapCandidate>>,
+    },
 
     /// User has scope, now choosing a journey pack.
     JourneySelection {
@@ -311,6 +316,7 @@ mod tests {
         let states: Vec<ReplStateV2> = vec![
             ReplStateV2::ScopeGate {
                 pending_input: Some("allianz".to_string()),
+                candidates: None,
             },
             ReplStateV2::JourneySelection {
                 candidates: Some(vec![PackCandidate {

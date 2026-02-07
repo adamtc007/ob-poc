@@ -1,0 +1,77 @@
+# Pack Verbs — Journey pack lifecycle management
+#
+# These verbs record pack selection and Q&A answers on the runbook,
+# making pack context derivable from the runbook fold (Invariant I-1).
+
+domains:
+  pack:
+    description: |
+      Journey pack lifecycle. pack.select records which pack is active.
+      pack.answer records Q&A answers from pack questions.
+      Both produce runbook entries so session state can be reconstructed
+      from the runbook alone.
+
+    verbs:
+      select:
+        description: Select a journey pack for the current session
+        behavior: plugin
+        handler: PackSelectOp
+        invocation_phrases:
+          - "select pack"
+          - "use pack"
+          - "switch to pack"
+          - "start journey"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: pack
+          tags: [pack, select, journey]
+        args:
+          - name: pack-id
+            type: string
+            required: true
+            description: Pack identifier
+          - name: pack-version
+            type: string
+            required: false
+            description: Pack version (defaults to latest)
+          - name: manifest-hash
+            type: string
+            required: false
+            description: Canonical hash of the pack manifest
+          - name: handoff-from
+            type: string
+            required: false
+            description: Source pack ID if this is a handoff
+        returns:
+          type: record
+          fields: [pack_id, pack_name, pack_version]
+
+      answer:
+        description: Record an answer to a pack question
+        behavior: plugin
+        handler: PackAnswerOp
+        invocation_phrases:
+          - "answer question"
+          - "set answer"
+        metadata:
+          tier: intent
+          source_of_truth: session
+          noun: pack_answer
+          tags: [pack, answer, question]
+        args:
+          - name: field
+            type: string
+            required: true
+            description: Question field name
+          - name: value
+            type: string
+            required: true
+            description: Answer value
+          - name: pack-id
+            type: string
+            required: false
+            description: Pack this answer belongs to
+        returns:
+          type: record
+          fields: [field, value, accepted]

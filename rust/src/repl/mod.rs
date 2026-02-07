@@ -103,3 +103,21 @@ pub mod orchestrator_v2;
 #[cfg(feature = "vnext-repl")]
 #[cfg(feature = "database")]
 pub mod session_repository;
+
+#[cfg(feature = "vnext-repl")]
+pub mod bootstrap;
+
+#[cfg(feature = "vnext-repl")]
+pub mod context_stack;
+
+#[cfg(feature = "vnext-repl")]
+pub mod scoring;
+
+#[cfg(feature = "vnext-repl")]
+pub mod entity_resolution;
+
+#[cfg(feature = "vnext-repl")]
+pub mod deterministic_extraction;
+
+#[cfg(feature = "vnext-repl")]
+pub mod decision_log;

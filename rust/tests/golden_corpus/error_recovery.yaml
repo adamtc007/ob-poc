@@ -1,0 +1,54 @@
+# Golden Corpus — Error Recovery (6 cases)
+#
+# Tests verb matching for error recovery, rejection, undo, and corrections.
+# Focus: session commands, re-do after rejection, disambiguation recovery.
+
+---
+
+- id: err-001
+  category: error-recovery
+  input: "undo"
+  pack_id: kyc-case
+  expected_verb: session.undo
+  match_mode: exact
+  tags: [fast-command, universal]
+
+- id: err-002
+  category: error-recovery
+  input: "redo"
+  pack_id: kyc-case
+  expected_verb: session.redo
+  match_mode: exact
+  tags: [fast-command, universal]
+
+- id: err-003
+  category: error-recovery
+  input: "no, not that one"
+  pack_id: kyc-case
+  expected_verb: null
+  match_mode: match_or_ambiguous
+  tags: [rejection, exclusion]
+
+- id: err-004
+  category: error-recovery
+  input: "show me the runbook"
+  pack_id: kyc-case
+  expected_verb: runbook.show
+  match_mode: top_three
+  tags: [fast-command, runbook]
+
+- id: err-005
+  category: error-recovery
+  input: "clear everything and start over"
+  pack_id: kyc-case
+  expected_verb: session.clear
+  match_mode: exact
+  tags: [fast-command, destructive]
+
+- id: err-006
+  category: error-recovery
+  input: "drop the last step"
+  pack_id: kyc-case
+  expected_verb: runbook.remove
+  match_mode: top_three
+  tags: [fast-command, runbook-edit]

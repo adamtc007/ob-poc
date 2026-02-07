@@ -1,0 +1,86 @@
+# Golden Corpus — Book Setup Domain (10 cases)
+#
+# Tests verb matching accuracy within the book-setup pack.
+# Focus: CBU creation, product setup, role assignment, trading profiles.
+
+---
+
+- id: book-001
+  category: book-setup
+  input: "create a PE fund structure"
+  pack_id: book-setup
+  expected_verb: cbu.create
+  match_mode: exact
+  tags: [cbu-create, fund-type]
+
+- id: book-002
+  category: book-setup
+  input: "set up the trading mandate"
+  pack_id: book-setup
+  expected_verb: trading-profile.create
+  match_mode: exact
+  tags: [trading-profile, operator-vocab]
+
+- id: book-003
+  category: book-setup
+  input: "add equity product"
+  pack_id: book-setup
+  expected_verb: product.add
+  match_mode: exact
+  tags: [product]
+
+- id: book-004
+  category: book-setup
+  input: "assign the general partner role"
+  pack_id: book-setup
+  expected_verb: cbu-role.assign
+  match_mode: exact
+  tags: [role-assign]
+
+- id: book-005
+  category: book-setup
+  input: "set up ISDA agreement with Goldman Sachs"
+  pack_id: book-setup
+  expected_verb: isda.create
+  match_mode: exact
+  tags: [isda, entity-reference]
+
+- id: book-006
+  category: book-setup
+  input: "add fixed income and derivatives products"
+  pack_id: book-setup
+  expected_verb: product.add
+  match_mode: exact
+  tags: [product, multi-product]
+
+- id: book-007
+  category: book-setup
+  input: "list the current products"
+  pack_id: book-setup
+  expected_verb: product.list
+  match_mode: exact
+  tags: [product, list]
+
+- id: book-008
+  category: book-setup
+  input: "create a SICAV fund in Luxembourg"
+  pack_id: book-setup
+  expected_verb: cbu.create
+  match_mode: exact
+  tags: [cbu-create, jurisdiction, fund-type]
+
+- id: book-009
+  category: book-setup
+  input: "configure settlement instructions for USD"
+  pack_id: book-setup
+  expected_verb: ssi.create
+  match_mode: exact
+  tags: [ssi, settlement]
+
+- id: book-010
+  category: book-setup
+  input: "assign investment manager to the fund"
+  pack_id: book-setup
+  expected_verb: cbu-role.assign
+  match_mode: exact
+  tags: [role-assign, role-shorthand]

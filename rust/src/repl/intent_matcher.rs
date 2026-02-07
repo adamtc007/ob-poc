@@ -9,7 +9,13 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use super::types::{IntentMatchResult, MatchContext};
+use super::types::{IntentMatchResult, MatchContext, MatchOutcome};
+
+#[cfg(feature = "vnext-repl")]
+use super::context_stack::ContextStack;
+
+#[cfg(feature = "vnext-repl")]
+use super::scoring::{apply_ambiguity_policy, apply_pack_scoring, AmbiguityOutcome};
 
 /// Pure service for intent matching
 ///
@@ -30,6 +36,64 @@ pub trait IntentMatcher: Send + Sync {
         utterance: &str,
         context: &MatchContext,
     ) -> Result<IntentMatchResult>;
+
+    /// Pack-scoped intent matching with context-aware re-ranking.
+    ///
+    /// Steps:
+    /// 1. Delegate to `match_intent()` for raw semantic search
+    /// 2. Apply pack scoring (boost/penalty/forbidden)
+    /// 3. Apply ambiguity policy
+    /// 4. Return re-ranked result
+    ///
+    /// This is a default method — implementations that want custom
+    /// context-aware search can override it.
+    #[cfg(feature = "vnext-repl")]
+    async fn search_with_context(
+        &self,
+        utterance: &str,
+        context: &MatchContext,
+        stack: &ContextStack,
+    ) -> Result<IntentMatchResult> {
+        // Fast path: direct DSL input
+        if self.is_direct_dsl(utterance) {
+            return Ok(IntentMatchResult {
+                outcome: MatchOutcome::DirectDsl {
+                    source: utterance.to_string(),
+                },
+                verb_candidates: vec![],
+                entity_mentions: vec![],
+                scope_candidates: None,
+                generated_dsl: Some(utterance.to_string()),
+                unresolved_refs: vec![],
+                debug: None,
+            });
+        }
+
+        // Step 1: Raw semantic search
+        let mut result = self.match_intent(utterance, context).await?;
+
+        // Step 2: Apply pack scoring to candidates
+        apply_pack_scoring(&mut result.verb_candidates, stack);
+
+        // Step 3: Apply ambiguity policy and update outcome
+        let outcome = apply_ambiguity_policy(&result.verb_candidates);
+        result.outcome = match outcome {
+            AmbiguityOutcome::NoMatch => MatchOutcome::NoMatch {
+                reason: "No verb matched after pack scoring".to_string(),
+            },
+            AmbiguityOutcome::Confident { verb, score } => MatchOutcome::Matched {
+                verb,
+                confidence: score,
+            },
+            AmbiguityOutcome::Ambiguous { margin, .. } => MatchOutcome::Ambiguous { margin },
+            AmbiguityOutcome::Proposed { verb, score } => MatchOutcome::Matched {
+                verb,
+                confidence: score,
+            },
+        };
+
+        Ok(result)
+    }
 
     /// Check if a query looks like direct DSL input
     fn is_direct_dsl(&self, input: &str) -> bool {

@@ -19,6 +19,7 @@ mod gleif_import;
 mod gleif_load;
 mod gleif_test;
 mod lexicon;
+mod replay_tuner;
 mod seed_allianz;
 mod ubo_test;
 mod verbs;
@@ -524,6 +525,15 @@ enum Command {
         #[arg(long, short = 'n')]
         dry_run: bool,
     },
+
+    /// Replay-tuner — Offline replay of decision logs with scoring constant sweeps
+    ///
+    /// Loads golden corpus YAML and/or session decision logs, then replays them
+    /// with different scoring configurations to find optimal constants.
+    ReplayTuner {
+        #[command(subcommand)]
+        action: ReplayTunerAction,
+    },
 }
 
 #[derive(Subcommand)]
@@ -690,6 +700,91 @@ enum LexiconAction {
         /// Number of iterations
         #[arg(long, short = 'n', default_value = "10000")]
         iterations: usize,
+    },
+}
+
+#[derive(Subcommand)]
+enum ReplayTunerAction {
+    /// Run golden corpus with current scoring constants
+    ///
+    /// Loads test cases from golden_corpus/ directory and evaluates them
+    /// against the current scoring constants. Reports accuracy by category.
+    Run {
+        /// Path to golden corpus directory (default: tests/golden_corpus/)
+        #[arg(long, short = 'c')]
+        corpus: Option<std::path::PathBuf>,
+
+        /// Path to a session decision log JSON file (optional)
+        #[arg(long, short = 'l')]
+        session_log: Option<std::path::PathBuf>,
+
+        /// Show per-test detail
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Sweep a scoring parameter across a range
+    ///
+    /// Varies one scoring constant from min to max in steps,
+    /// running the full golden corpus at each point. Identifies
+    /// the optimal value for that parameter.
+    Sweep {
+        /// Scoring parameter to sweep
+        /// Valid: pack_verb_boost, pack_verb_penalty, template_step_boost,
+        /// domain_affinity_boost, absolute_floor, threshold, margin, strong_threshold
+        #[arg(long, short = 'p')]
+        param: String,
+
+        /// Minimum value for sweep
+        #[arg(long, default_value = "0.0")]
+        min: f32,
+
+        /// Maximum value for sweep
+        #[arg(long, default_value = "0.30")]
+        max: f32,
+
+        /// Step size for sweep
+        #[arg(long, default_value = "0.05")]
+        step: f32,
+
+        /// Path to golden corpus directory
+        #[arg(long, short = 'c')]
+        corpus: Option<std::path::PathBuf>,
+
+        /// Path to a session decision log JSON file
+        #[arg(long, short = 'l')]
+        session_log: Option<std::path::PathBuf>,
+
+        /// Write sweep results as JSON to this file
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+    },
+
+    /// Compare two report JSON files (baseline vs candidate)
+    ///
+    /// Shows accuracy delta, category breakdown, regressions, and improvements.
+    Compare {
+        /// Baseline report JSON file
+        #[arg(long, short = 'b')]
+        baseline: std::path::PathBuf,
+
+        /// Candidate report JSON file
+        #[arg(long, short = 'k')]
+        candidate: std::path::PathBuf,
+    },
+
+    /// Generate report from a session decision log
+    ///
+    /// Shows turn-by-turn breakdown of verb matching, entity resolution,
+    /// and extraction methods from a recorded session.
+    Report {
+        /// Session decision log JSON file
+        #[arg(long, short = 'l')]
+        session_log: std::path::PathBuf,
+
+        /// Show per-turn detail
+        #[arg(long, short = 'v')]
+        verbose: bool,
     },
 }
 
@@ -926,6 +1021,38 @@ fn main() -> Result<()> {
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(run_aviva_deal_harness(verbose, dry_run))
         }
+        Command::ReplayTuner { action } => match action {
+            ReplayTunerAction::Run {
+                corpus,
+                session_log,
+                verbose,
+            } => replay_tuner::run(corpus.as_deref(), session_log.as_deref(), verbose),
+            ReplayTunerAction::Sweep {
+                param,
+                min,
+                max,
+                step,
+                corpus,
+                session_log,
+                output,
+            } => replay_tuner::sweep(
+                corpus.as_deref(),
+                session_log.as_deref(),
+                &param,
+                min,
+                max,
+                step,
+                output.as_deref(),
+            ),
+            ReplayTunerAction::Compare {
+                baseline,
+                candidate,
+            } => replay_tuner::compare(&baseline, &candidate),
+            ReplayTunerAction::Report {
+                session_log,
+                verbose,
+            } => replay_tuner::report(&session_log, verbose),
+        },
     }
 }
 

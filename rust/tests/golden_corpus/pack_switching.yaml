@@ -1,0 +1,54 @@
+# Golden Corpus — Pack Switching (6 cases)
+#
+# Tests verb matching for pack navigation and switching.
+# Focus: explicit pack selection, cross-pack transitions.
+
+---
+
+- id: switch-001
+  category: pack-switching
+  input: "switch to KYC"
+  pack_id: book-setup
+  expected_verb: pack.select
+  match_mode: exact
+  tags: [pack-select, explicit]
+
+- id: switch-002
+  category: pack-switching
+  input: "go to book setup"
+  pack_id: kyc-case
+  expected_verb: pack.select
+  match_mode: exact
+  tags: [pack-select, natural-language]
+
+- id: switch-003
+  category: pack-switching
+  input: "I want to set up a new case"
+  pack_id: book-setup
+  expected_verb: kyc.create-case
+  match_mode: top_three
+  tags: [cross-pack, implicit-switch]
+
+- id: switch-004
+  category: pack-switching
+  input: "start onboarding a new fund"
+  pack_id: kyc-case
+  expected_verb: cbu.create
+  match_mode: top_three
+  tags: [cross-pack, implicit-switch]
+
+- id: switch-005
+  category: pack-switching
+  input: "change journey to KYC case"
+  pack_id: book-setup
+  expected_verb: pack.select
+  match_mode: exact
+  tags: [pack-select, synonym]
+
+- id: switch-006
+  category: pack-switching
+  input: "select the book setup pack"
+  pack_id: null
+  expected_verb: pack.select
+  match_mode: exact
+  tags: [pack-select, no-pack]

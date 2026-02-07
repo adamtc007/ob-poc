@@ -1,0 +1,114 @@
+# Golden Corpus — Edge Cases (12 cases)
+#
+# Tests boundary conditions: garbage input, multi-intent, pronouns,
+# canonicalization, cross-pack ambiguity, minimal input.
+
+---
+
+# --- Garbage / No-Match ---
+
+- id: edge-001
+  category: edge-cases
+  input: "asdfghjkl"
+  pack_id: kyc-case
+  expected_verb: null
+  match_mode: exact
+  tags: [garbage, no-match]
+
+- id: edge-002
+  category: edge-cases
+  input: ""
+  pack_id: kyc-case
+  expected_verb: null
+  match_mode: exact
+  tags: [empty-input, no-match]
+
+- id: edge-003
+  category: edge-cases
+  input: "the"
+  pack_id: kyc-case
+  expected_verb: null
+  match_mode: exact
+  tags: [minimal-input, no-match]
+
+# --- Multi-Intent ---
+
+- id: edge-004
+  category: edge-cases
+  input: "yes, and add State Street as TA"
+  pack_id: kyc-case
+  expected_verb: kyc.add-entity
+  match_mode: exact
+  tags: [multi-intent, confirmation-plus-action]
+
+- id: edge-005
+  category: edge-cases
+  input: "ok, also create a new fund"
+  pack_id: book-setup
+  expected_verb: cbu.create
+  match_mode: exact
+  tags: [multi-intent, confirmation-plus-action]
+
+# --- Pronoun Resolution ---
+
+- id: edge-006
+  category: edge-cases
+  input: "add it to the case"
+  pack_id: kyc-case
+  expected_verb: kyc.add-entity
+  match_mode: exact
+  tags: [pronoun, focus-dependent]
+
+- id: edge-007
+  category: edge-cases
+  input: "screen the manco"
+  pack_id: kyc-case
+  expected_verb: kyc.screen-entity
+  match_mode: exact
+  tags: [role-shorthand, pronoun]
+
+# --- Canonicalization ---
+
+- id: edge-008
+  category: edge-cases
+  input: "add the Lux fund"
+  pack_id: kyc-case
+  expected_verb: kyc.add-entity
+  match_mode: exact
+  tags: [canonicalization, jurisdiction-shorthand]
+
+- id: edge-009
+  category: edge-cases
+  input: "create entity for the GmbH"
+  pack_id: book-setup
+  expected_verb: entity.create
+  match_mode: top_three
+  tags: [canonicalization, legal-form]
+
+# --- Cross-Pack Ambiguity ---
+
+- id: edge-010
+  category: edge-cases
+  input: "add the Irish fund"
+  pack_id: null
+  expected_verb: null
+  match_mode: match_or_ambiguous
+  tags: [cross-pack, no-pack-ambiguity]
+
+- id: edge-011
+  category: edge-cases
+  input: "create a new entity"
+  pack_id: null
+  expected_verb: null
+  match_mode: match_or_ambiguous
+  tags: [cross-pack, no-pack-ambiguity]
+
+# --- Template Step Boost ---
+
+- id: edge-012
+  category: edge-cases
+  input: "add the entity"
+  pack_id: kyc-case
+  expected_verb: kyc.add-entity
+  match_mode: exact
+  tags: [template-step, minimal-input, pack-boost]

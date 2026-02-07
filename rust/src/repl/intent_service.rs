@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
+use super::context_stack::ContextStack;
 use super::intent_matcher::IntentMatcher;
 use super::runbook::ConfirmPolicy;
 use super::sentence_gen::SentenceGenerator;
@@ -138,6 +139,61 @@ impl IntentService {
             MatchOutcome::NeedsScopeSelection => VerbMatchOutcome::NeedsScopeSelection,
             MatchOutcome::NeedsEntityResolution => VerbMatchOutcome::NeedsEntityResolution,
             // Intent tier, client group, etc. — pass through as Other
+            _ => VerbMatchOutcome::Other(Box::new(result)),
+        };
+
+        Ok(outcome)
+    }
+
+    /// Phase 2b: Context-aware verb matching with pack scoring.
+    ///
+    /// Uses `search_with_context()` on the IntentMatcher trait which:
+    /// 1. Runs raw semantic search via `match_intent()`
+    /// 2. Applies pack scoring (boost in-pack, penalise out-of-pack, zero forbidden)
+    /// 3. Applies ambiguity policy (Invariant I-5)
+    ///
+    /// This is the primary verb matching path when a ContextStack is available.
+    /// Falls back to `match_verb()` semantics when no pack is active.
+    pub async fn match_verb_with_context(
+        &self,
+        input: &str,
+        ctx: &MatchContext,
+        stack: &ContextStack,
+    ) -> Result<VerbMatchOutcome> {
+        let result = self
+            .intent_matcher
+            .search_with_context(input, ctx, stack)
+            .await?;
+
+        let outcome = match &result.outcome {
+            MatchOutcome::Matched { verb, confidence } => VerbMatchOutcome::Matched {
+                verb: verb.clone(),
+                confidence: *confidence,
+                generated_dsl: result.generated_dsl.clone(),
+            },
+            MatchOutcome::Ambiguous { margin } => {
+                let candidates = result
+                    .verb_candidates
+                    .iter()
+                    .map(|vc| VerbMatchCandidate {
+                        verb_fqn: vc.verb_fqn.clone(),
+                        description: vc.description.clone(),
+                        score: vc.score,
+                    })
+                    .collect();
+                VerbMatchOutcome::Ambiguous {
+                    candidates,
+                    margin: *margin,
+                }
+            }
+            MatchOutcome::NoMatch { reason } => VerbMatchOutcome::NoMatch {
+                reason: reason.clone(),
+            },
+            MatchOutcome::DirectDsl { source } => VerbMatchOutcome::DirectDsl {
+                source: source.clone(),
+            },
+            MatchOutcome::NeedsScopeSelection => VerbMatchOutcome::NeedsScopeSelection,
+            MatchOutcome::NeedsEntityResolution => VerbMatchOutcome::NeedsEntityResolution,
             _ => VerbMatchOutcome::Other(Box::new(result)),
         };
 

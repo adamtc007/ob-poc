@@ -11,8 +11,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::decision_log::SessionDecisionLog;
 use super::proposal_engine::ProposalSet;
-use super::runbook::{ArgExtractionAudit, Runbook};
+use super::runbook::{ArgExtractionAudit, Runbook, SlotSource};
 use super::types_v2::ReplStateV2;
 use crate::journey::handoff::PackHandoff;
 use crate::journey::pack::PackManifest;
@@ -22,22 +23,46 @@ use crate::journey::pack::PackManifest;
 // ---------------------------------------------------------------------------
 
 /// A v2 REPL session — the single source of truth for a user's work.
+///
+/// Session state is derived from the runbook via `ContextStack::from_runbook()`.
+/// The `staged_pack` field holds the active pack manifest for the current turn;
+/// everything else (scope, answers, progress) is a left fold over executed
+/// runbook entries.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplSessionV2 {
     pub id: Uuid,
     pub state: ReplStateV2,
+    /// Deprecated — use `ContextStack::derived_scope` from runbook fold.
+    /// Retained for serialization compatibility during migration.
     pub client_context: Option<ClientContext>,
+    /// Deprecated — use `staged_pack` + `ContextStack` from runbook fold.
+    /// Retained for serialization compatibility during migration.
     pub journey_context: Option<JourneyContext>,
+    /// The active pack manifest (not serialized — reloaded from pack files).
+    /// This is the staged pack that ContextStack reads. It replaces the
+    /// `journey_context.pack` field for all read-side access.
+    #[serde(skip)]
+    pub staged_pack: Option<Arc<PackManifest>>,
+    /// Hash of the staged pack manifest (for rehydration).
+    #[serde(skip)]
+    pub staged_pack_hash: Option<String>,
     pub runbook: Runbook,
     pub messages: Vec<ChatMessage>,
     /// Transient: audit from the most recent IntentMatcher result.
     /// Set when a verb is matched, consumed when the entry is confirmed.
     #[serde(skip)]
     pub pending_arg_audit: Option<ArgExtractionAudit>,
+    /// Transient: slot provenance from deterministic extraction (Phase F).
+    /// Set when deterministic extraction succeeds, consumed when the entry is confirmed.
+    #[serde(skip)]
+    pub pending_slot_provenance: Option<HashMap<String, SlotSource>>,
     /// Transient: last proposal set from the proposal engine.
     /// Set when proposals are generated, consumed when user selects one.
     #[serde(skip)]
     pub last_proposal_set: Option<ProposalSet>,
+    /// Phase G: Accumulated decision logs for replay and tuning.
+    #[serde(skip)]
+    pub decision_log: SessionDecisionLog,
     pub created_at: DateTime<Utc>,
     pub last_active_at: DateTime<Utc>,
 }
@@ -51,13 +76,18 @@ impl ReplSessionV2 {
             id,
             state: ReplStateV2::ScopeGate {
                 pending_input: None,
+                candidates: None,
             },
             client_context: None,
             journey_context: None,
+            staged_pack: None,
+            staged_pack_hash: None,
             runbook: Runbook::new(id),
             messages: Vec::new(),
             pending_arg_audit: None,
+            pending_slot_provenance: None,
             last_proposal_set: None,
+            decision_log: SessionDecisionLog::new(id),
             created_at: now,
             last_active_at: now,
         }
@@ -88,6 +118,9 @@ impl ReplSessionV2 {
     }
 
     /// Activate a journey pack.
+    ///
+    /// Sets both the new `staged_pack` field (for ContextStack reads)
+    /// and the legacy `journey_context` (for migration compatibility).
     pub fn activate_pack(
         &mut self,
         pack: Arc<PackManifest>,
@@ -98,6 +131,11 @@ impl ReplSessionV2 {
         self.runbook.pack_version = Some(pack.version.clone());
         self.runbook.pack_manifest_hash = Some(manifest_hash.clone());
 
+        // New: set staged_pack for ContextStack reads.
+        self.staged_pack = Some(pack.clone());
+        self.staged_pack_hash = Some(manifest_hash.clone());
+
+        // Legacy: kept for serialization compatibility.
         self.journey_context = Some(JourneyContext {
             pack,
             pack_manifest_hash: manifest_hash,
@@ -118,15 +156,57 @@ impl ReplSessionV2 {
         self.last_active_at = Utc::now();
     }
 
+    /// Clear the staged pack (e.g., when switching journeys).
+    pub fn clear_staged_pack(&mut self) {
+        self.staged_pack = None;
+        self.staged_pack_hash = None;
+        self.journey_context = None;
+        self.last_active_at = Utc::now();
+    }
+
+    /// Build a ContextStack from the current session state.
+    ///
+    /// This is the primary way to access derived session state.
+    /// Call this once per turn and read from the result.
+    pub fn build_context_stack(
+        &self,
+        pack_router: Option<&crate::journey::router::PackRouter>,
+    ) -> super::context_stack::ContextStack {
+        let turn = self.messages.len() as u32;
+        super::context_stack::ContextStack::from_runbook_with_router(
+            &self.runbook,
+            self.staged_pack.clone(),
+            turn,
+            pack_router,
+        )
+    }
+
+    /// Whether a journey pack is currently active.
+    pub fn has_active_pack(&self) -> bool {
+        self.staged_pack.is_some() || self.journey_context.is_some()
+    }
+
+    /// Get the active pack ID (from staged_pack or journey_context).
+    pub fn active_pack_id(&self) -> Option<String> {
+        self.staged_pack
+            .as_ref()
+            .map(|p| p.id.clone())
+            .or_else(|| self.journey_context.as_ref().map(|c| c.pack.id.clone()))
+    }
+
     /// Rehydrate transient fields after loading from database.
     ///
     /// - Restores the Arc<PackManifest> from the pack router using the stored hash.
+    /// - Restores staged_pack from the journey_context (migration bridge).
     /// - Rebuilds the invocation index on the runbook.
     pub fn rehydrate(&mut self, pack_router: &crate::journey::router::PackRouter) {
         // Restore the pack Arc from the router using stored manifest hash.
         if let Some(ref mut jctx) = self.journey_context {
             if let Some((manifest, _)) = pack_router.get_pack_by_hash(&jctx.pack_manifest_hash) {
                 jctx.pack = manifest.clone();
+                // Also restore staged_pack for ContextStack reads.
+                self.staged_pack = Some(manifest.clone());
+                self.staged_pack_hash = Some(jctx.pack_manifest_hash.clone());
             }
         }
         // Rebuild invocation index (lost during serialization due to #[serde(skip)]).

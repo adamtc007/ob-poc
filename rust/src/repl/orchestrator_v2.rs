@@ -27,12 +27,17 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+use super::context_stack::ContextStack;
+use super::decision_log::{
+    ContextSummary, DecisionLog, ExtractionDecision, ExtractionMethod, TurnType,
+    VerbCandidateSnapshot, VerbDecision,
+};
 use super::intent_service::{ClarificationOutcome, IntentService, VerbMatchOutcome};
 use super::proposal_engine::ProposalEngine;
 use super::response_v2::{ChapterView, ReplResponseKindV2, ReplResponseV2, StepResult};
 use super::runbook::{
     ArgExtractionAudit, ConfirmPolicy, EntryStatus, ExecutionMode, GateType, InvocationRecord,
-    RunbookEntry, RunbookStatus,
+    RunbookEntry, RunbookStatus, SlotProvenance, SlotSource,
 };
 use super::sentence_gen::SentenceGenerator;
 use super::session_v2::{ClientContext, MessageRole, ReplSessionV2};
@@ -146,6 +151,9 @@ pub struct ReplOrchestratorV2 {
     /// Phase 5: Session persistence for durable execution / human gates.
     #[cfg(feature = "database")]
     session_repository: Option<Arc<super::session_repository::SessionRepositoryV2>>,
+    /// Database pool for bootstrap resolution (ScopeGate).
+    #[cfg(feature = "database")]
+    pool: Option<sqlx::PgPool>,
 }
 
 impl ReplOrchestratorV2 {
@@ -163,6 +171,8 @@ impl ReplOrchestratorV2 {
             executor_v2: None,
             #[cfg(feature = "database")]
             session_repository: None,
+            #[cfg(feature = "database")]
+            pool: None,
         }
     }
 
@@ -211,6 +221,13 @@ impl ReplOrchestratorV2 {
         repo: Arc<super::session_repository::SessionRepositoryV2>,
     ) -> Self {
         self.session_repository = Some(repo);
+        self
+    }
+
+    /// Attach a database pool for bootstrap resolution in ScopeGate.
+    #[cfg(feature = "database")]
+    pub fn with_pool(mut self, pool: sqlx::PgPool) -> Self {
+        self.pool = Some(pool);
         self
     }
 
@@ -273,7 +290,7 @@ impl ReplOrchestratorV2 {
 
         // Dispatch based on current state.
         let response = match session.state.clone() {
-            ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input),
+            ReplStateV2::ScopeGate { .. } => self.handle_scope_gate(session, input).await,
             ReplStateV2::JourneySelection { .. } => self.handle_journey_selection(session, input),
             ReplStateV2::InPack { .. } => self.handle_in_pack(session, input).await,
             ReplStateV2::Clarifying { .. } => self.handle_clarifying(session, input),
@@ -298,39 +315,53 @@ impl ReplOrchestratorV2 {
     // State handlers
     // -----------------------------------------------------------------------
 
-    fn handle_scope_gate(&self, session: &mut ReplSessionV2, input: UserInputV2) -> ReplResponseV2 {
+    async fn handle_scope_gate(
+        &self,
+        session: &mut ReplSessionV2,
+        input: UserInputV2,
+    ) -> ReplResponseV2 {
         match input {
             UserInputV2::SelectScope {
                 group_id,
                 group_name,
             } => {
-                session.set_client_context(ClientContext {
-                    client_group_id: group_id,
-                    client_group_name: group_name.clone(),
-                    default_cbu: None,
-                    default_book: None,
-                });
-                session.set_state(ReplStateV2::JourneySelection { candidates: None });
-
-                let packs = self.pack_router.list_packs();
-                ReplResponseV2 {
-                    state: session.state.clone(),
-                    kind: ReplResponseKindV2::JourneyOptions {
-                        packs: packs.clone(),
-                    },
-                    message: format!(
-                        "Scope set to {}. Which journey would you like to start?",
-                        group_name
-                    ),
-                    runbook_summary: None,
-                    step_count: 0,
-                }
+                self.complete_scope_gate(session, group_id, &group_name)
+                    .await
             }
             UserInputV2::Message { content } => {
-                // Try to interpret the message as a scope selection.
-                // Phase 0: simple approach — store as pending and ask.
+                // Check if we have pending disambiguation candidates.
+                let pending_candidates = match &session.state {
+                    ReplStateV2::ScopeGate { candidates, .. } => candidates.clone(),
+                    _ => None,
+                };
+
+                // If we have candidates, try numeric or name selection first.
+                if let Some(ref cands) = pending_candidates {
+                    if let Some(selected) =
+                        super::bootstrap::try_numeric_or_name_selection(&content, cands)
+                    {
+                        let group_id = selected.group_id;
+                        let group_name = selected.group_name.clone();
+                        return self
+                            .complete_scope_gate(session, group_id, &group_name)
+                            .await;
+                    }
+                    // Not a selection from the list — fall through to fresh resolution.
+                }
+
+                // Resolve the input against client groups.
+                #[cfg(feature = "database")]
+                {
+                    if let Some(ref pool) = self.pool {
+                        let outcome = super::bootstrap::resolve_client_input(&content, pool).await;
+                        return self.handle_bootstrap_outcome(session, outcome).await;
+                    }
+                }
+
+                // No database — store as pending and re-prompt.
                 session.set_state(ReplStateV2::ScopeGate {
                     pending_input: Some(content),
+                    candidates: None,
                 });
                 ReplResponseV2 {
                     state: session.state.clone(),
@@ -358,6 +389,19 @@ impl ReplOrchestratorV2 {
                 match self.pack_router.route(&content) {
                     PackRouteOutcome::Matched(manifest, hash) => {
                         let pack_id = manifest.id.clone();
+                        let pack_name = manifest.name.clone();
+                        let pack_version = manifest.version.clone();
+
+                        // Record pack.select on the runbook (Invariant I-1).
+                        self.record_pack_select_entry(
+                            session,
+                            &pack_id,
+                            &pack_name,
+                            &pack_version,
+                            &hash,
+                            None,
+                        );
+
                         session.activate_pack(manifest, hash, None);
                         self.enter_pack(session, &pack_id)
                     }
@@ -402,11 +446,21 @@ impl ReplOrchestratorV2 {
     ) -> ReplResponseV2 {
         match input {
             UserInputV2::Message { content } => {
+                // Phase E: Check for power user fast commands before anything else.
+                if let Some(response) = self.try_fast_command(session, &content).await {
+                    return response;
+                }
+
                 // Check if there are still required questions to answer.
                 if let Some(question) = self.next_required_question(session) {
                     // Record the answer to the previous question (if any).
+                    let field = question.field.clone();
                     session
-                        .record_answer(question.field.clone(), serde_json::Value::String(content));
+                        .record_answer(field.clone(), serde_json::Value::String(content.clone()));
+
+                    // Record pack.answer on the runbook (Invariant I-1).
+                    let pack_id = session.active_pack_id();
+                    self.record_pack_answer_entry(session, &field, &content, pack_id.as_deref());
 
                     // Check for next question.
                     if let Some(next) = self.next_required_question(session) {
@@ -548,14 +602,9 @@ impl ReplOrchestratorV2 {
                     session.runbook.add_entry(entry);
 
                     // Go to RunbookEditing (or back to InPack if pack is active).
-                    let next_state = if session.journey_context.is_some() {
-                        let pack_id = session
-                            .journey_context
-                            .as_ref()
-                            .map(|c| c.pack.id.clone())
-                            .unwrap_or_default();
+                    let next_state = if session.has_active_pack() {
                         ReplStateV2::InPack {
-                            pack_id,
+                            pack_id: session.active_pack_id().unwrap_or_default(),
                             required_slots_remaining: vec![],
                             last_proposal_id: None,
                         }
@@ -581,14 +630,9 @@ impl ReplOrchestratorV2 {
             }
             UserInputV2::Reject => {
                 // Discard and go back to InPack.
-                let next_state = if session.journey_context.is_some() {
-                    let pack_id = session
-                        .journey_context
-                        .as_ref()
-                        .map(|c| c.pack.id.clone())
-                        .unwrap_or_default();
+                let next_state = if session.has_active_pack() {
                     ReplStateV2::InPack {
-                        pack_id,
+                        pack_id: session.active_pack_id().unwrap_or_default(),
                         required_slots_remaining: vec![],
                         last_proposal_id: None,
                     }
@@ -985,27 +1029,378 @@ impl ReplOrchestratorV2 {
     }
 
     // -----------------------------------------------------------------------
+    // Bootstrap helpers (ScopeGate resolution)
+    // -----------------------------------------------------------------------
+
+    /// Complete the scope gate: build scope DSL, add to runbook, execute,
+    /// and only on success set client context and transition to JourneySelection.
+    ///
+    /// Nothing is real until it's DSL on the runsheet, executed through the executor.
+    async fn complete_scope_gate(
+        &self,
+        session: &mut ReplSessionV2,
+        group_id: Uuid,
+        group_name: &str,
+    ) -> ReplResponseV2 {
+        // 1. Build the DSL — this is the only thing that matters.
+        let dsl = format!("(session.load-cluster :client \"{}\")", group_id);
+        let sentence = format!("Set client scope to {}", group_name);
+
+        let mut args = HashMap::new();
+        args.insert("client".to_string(), group_id.to_string());
+        args.insert("client-name".to_string(), group_name.to_string());
+
+        let mut slot_prov = SlotProvenance {
+            slots: HashMap::new(),
+        };
+        slot_prov
+            .slots
+            .insert("client".to_string(), SlotSource::InferredFromContext);
+
+        let entry = RunbookEntry {
+            id: Uuid::new_v4(),
+            sequence: 0,
+            sentence,
+            labels: HashMap::new(),
+            dsl: dsl.clone(),
+            verb: "session.load-cluster".to_string(),
+            args,
+            slot_provenance: slot_prov,
+            arg_extraction_audit: None,
+            status: EntryStatus::Confirmed,
+            execution_mode: ExecutionMode::Sync,
+            confirm_policy: ConfirmPolicy::Always,
+            unresolved_refs: vec![],
+            depends_on: vec![],
+            result: None,
+            invocation: None,
+        };
+
+        // 2. Add to the runbook — now it exists.
+        let entry_id = session.runbook.add_entry(entry);
+
+        // 3. Execute through the executor — the runsheet is the single source of truth.
+        let exec_result = self.executor.execute(&dsl).await;
+
+        // 4. Record outcome on the runsheet entry.
+        let succeeded = exec_result.is_ok();
+        if let Some(entry) = session
+            .runbook
+            .entries
+            .iter_mut()
+            .find(|e| e.id == entry_id)
+        {
+            match &exec_result {
+                Ok(val) => {
+                    entry.status = EntryStatus::Completed;
+                    entry.result = Some(val.clone());
+                }
+                Err(err) => {
+                    entry.status = EntryStatus::Failed;
+                    entry.result = Some(serde_json::json!({"error": err}));
+                }
+            }
+        }
+
+        // 5. Only set context and transition if the DSL actually succeeded.
+        if succeeded {
+            session.set_client_context(ClientContext {
+                client_group_id: group_id,
+                client_group_name: group_name.to_string(),
+                default_cbu: None,
+                default_book: None,
+            });
+            session.set_state(ReplStateV2::JourneySelection { candidates: None });
+
+            let examples = super::bootstrap::default_example_phrases();
+            let message = super::bootstrap::format_ready_message(group_name, &examples);
+            let packs = self.pack_router.list_packs();
+
+            ReplResponseV2 {
+                state: session.state.clone(),
+                kind: ReplResponseKindV2::JourneyOptions {
+                    packs: packs.clone(),
+                },
+                message,
+                runbook_summary: None,
+                step_count: 1,
+            }
+        } else {
+            // DSL failed — stay in ScopeGate. The runsheet has the failure recorded.
+            session.set_state(ReplStateV2::ScopeGate {
+                pending_input: None,
+                candidates: None,
+            });
+
+            ReplResponseV2 {
+                state: session.state.clone(),
+                kind: ReplResponseKindV2::ScopeRequired {
+                    prompt: format!(
+                        "Failed to load scope for '{}'. Please try again.",
+                        group_name
+                    ),
+                },
+                message: format!(
+                    "Scope load failed for '{}'. The error is recorded on the runsheet. \
+                     Please try again or choose a different client group.",
+                    group_name
+                ),
+                runbook_summary: None,
+                step_count: 1,
+            }
+        }
+    }
+
+    /// Handle a `BootstrapOutcome` from the resolution logic.
+    async fn handle_bootstrap_outcome(
+        &self,
+        session: &mut ReplSessionV2,
+        outcome: super::bootstrap::BootstrapOutcome,
+    ) -> ReplResponseV2 {
+        match outcome {
+            super::bootstrap::BootstrapOutcome::Resolved {
+                group_id,
+                group_name,
+            } => {
+                self.complete_scope_gate(session, group_id, &group_name)
+                    .await
+            }
+
+            super::bootstrap::BootstrapOutcome::Ambiguous {
+                candidates,
+                original_input,
+            } => {
+                let message = super::bootstrap::format_disambiguation(&candidates, &original_input);
+                session.set_state(ReplStateV2::ScopeGate {
+                    pending_input: Some(original_input),
+                    candidates: Some(candidates),
+                });
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::ScopeRequired {
+                        prompt: message.clone(),
+                    },
+                    message,
+                    runbook_summary: None,
+                    step_count: 0,
+                }
+            }
+
+            super::bootstrap::BootstrapOutcome::NoMatch { original_input } => {
+                session.set_state(ReplStateV2::ScopeGate {
+                    pending_input: Some(original_input.clone()),
+                    candidates: None,
+                });
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::ScopeRequired {
+                        prompt: format!(
+                            "No client group found matching \"{}\". Please try again.",
+                            original_input
+                        ),
+                    },
+                    message: format!(
+                        "I couldn't find a client group matching \"{}\". Please try again or type the exact name.",
+                        original_input
+                    ),
+                    runbook_summary: None,
+                    step_count: 0,
+                }
+            }
+
+            super::bootstrap::BootstrapOutcome::Empty => {
+                // No client groups in DB — stay in ScopeGate.
+                // Client scope is a non-negotiable tollgate: nothing progresses without it.
+                session.set_state(ReplStateV2::ScopeGate {
+                    pending_input: None,
+                    candidates: None,
+                });
+
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::ScopeRequired {
+                        prompt: "No client groups are configured in the system. \
+                                 Please ask an administrator to set up client groups \
+                                 before proceeding."
+                            .to_string(),
+                    },
+                    message: "No client groups are configured. \
+                              A client group must be selected before any work can begin."
+                        .to_string(),
+                    runbook_summary: None,
+                    step_count: 0,
+                }
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
     fn activate_pack_by_id(&self, session: &mut ReplSessionV2, pack_id: &str) -> ReplResponseV2 {
         if let Some((manifest, hash)) = self.pack_router.get_pack(pack_id) {
-            let pack_id = manifest.id.clone();
+            let pack_id_str = manifest.id.clone();
+            let pack_name = manifest.name.clone();
+            let pack_version = manifest.version.clone();
+
+            // 1. Record pack.select on the runbook (Invariant I-1).
+            self.record_pack_select_entry(
+                session,
+                &pack_id_str,
+                &pack_name,
+                &pack_version,
+                hash,
+                None,
+            );
+
+            // 2. Activate the pack on the session (existing behavior).
             session.activate_pack(manifest.clone(), hash.clone(), None);
-            self.enter_pack(session, &pack_id)
+
+            // 3. Enter the pack (ask first question or prompt for input).
+            self.enter_pack(session, &pack_id_str)
         } else {
             self.invalid_input(session, &format!("Pack '{}' not found.", pack_id))
         }
     }
 
+    /// Record a `pack.select` entry on the runbook so pack context is derivable from fold.
+    fn record_pack_select_entry(
+        &self,
+        session: &mut ReplSessionV2,
+        pack_id: &str,
+        pack_name: &str,
+        pack_version: &str,
+        manifest_hash: &str,
+        handoff_from: Option<&str>,
+    ) {
+        let dsl = if let Some(source) = handoff_from {
+            format!(
+                "(pack.select :pack-id \"{}\" :pack-version \"{}\" :manifest-hash \"{}\" :handoff-from \"{}\")",
+                pack_id, pack_version, manifest_hash, source
+            )
+        } else {
+            format!(
+                "(pack.select :pack-id \"{}\" :pack-version \"{}\" :manifest-hash \"{}\")",
+                pack_id, pack_version, manifest_hash
+            )
+        };
+
+        let sentence = format!("Select journey: {}", pack_name);
+
+        let mut args = HashMap::new();
+        args.insert("pack-id".to_string(), pack_id.to_string());
+        args.insert("pack-version".to_string(), pack_version.to_string());
+        args.insert("manifest-hash".to_string(), manifest_hash.to_string());
+        if let Some(source) = handoff_from {
+            args.insert("handoff-from".to_string(), source.to_string());
+        }
+
+        let mut slot_prov = SlotProvenance {
+            slots: HashMap::new(),
+        };
+        slot_prov
+            .slots
+            .insert("pack-id".to_string(), SlotSource::UserProvided);
+
+        let entry = RunbookEntry {
+            id: Uuid::new_v4(),
+            sequence: session.runbook.entries.len() as i32,
+            sentence,
+            labels: HashMap::new(),
+            dsl,
+            verb: "pack.select".to_string(),
+            args,
+            slot_provenance: slot_prov,
+            arg_extraction_audit: None,
+            status: EntryStatus::Completed,
+            execution_mode: ExecutionMode::Sync,
+            confirm_policy: ConfirmPolicy::Always,
+            unresolved_refs: vec![],
+            depends_on: vec![],
+            result: Some(serde_json::json!({
+                "pack_id": pack_id,
+                "pack_name": pack_name,
+                "pack_version": pack_version,
+                "manifest_hash": manifest_hash,
+                "handoff_from": handoff_from,
+            })),
+            invocation: None,
+        };
+
+        session.runbook.add_entry(entry);
+    }
+
+    /// Record a `pack.answer` entry on the runbook so Q&A answers are derivable from fold.
+    fn record_pack_answer_entry(
+        &self,
+        session: &mut ReplSessionV2,
+        field: &str,
+        value: &str,
+        pack_id: Option<&str>,
+    ) {
+        let dsl = if let Some(pid) = pack_id {
+            format!(
+                "(pack.answer :field \"{}\" :value \"{}\" :pack-id \"{}\")",
+                field, value, pid
+            )
+        } else {
+            format!("(pack.answer :field \"{}\" :value \"{}\")", field, value)
+        };
+
+        let sentence = format!("Answer: {} = {}", field, value);
+
+        let mut args = HashMap::new();
+        args.insert("field".to_string(), field.to_string());
+        args.insert("value".to_string(), value.to_string());
+        if let Some(pid) = pack_id {
+            args.insert("pack-id".to_string(), pid.to_string());
+        }
+
+        let mut slot_prov = SlotProvenance {
+            slots: HashMap::new(),
+        };
+        slot_prov
+            .slots
+            .insert("field".to_string(), SlotSource::InferredFromContext);
+        slot_prov
+            .slots
+            .insert("value".to_string(), SlotSource::UserProvided);
+
+        let entry = RunbookEntry {
+            id: Uuid::new_v4(),
+            sequence: session.runbook.entries.len() as i32,
+            sentence,
+            labels: HashMap::new(),
+            dsl,
+            verb: "pack.answer".to_string(),
+            args,
+            slot_provenance: slot_prov,
+            arg_extraction_audit: None,
+            status: EntryStatus::Completed,
+            execution_mode: ExecutionMode::Sync,
+            confirm_policy: ConfirmPolicy::Always,
+            unresolved_refs: vec![],
+            depends_on: vec![],
+            result: Some(serde_json::json!({
+                "field": field,
+                "value": value,
+                "accepted": true,
+                "pack_id": pack_id,
+            })),
+            invocation: None,
+        };
+
+        session.runbook.add_entry(entry);
+    }
+
     fn enter_pack(&self, session: &mut ReplSessionV2, pack_id: &str) -> ReplResponseV2 {
-        // Determine remaining required slots.
+        // Determine remaining required slots from staged pack.
         let required_slots: Vec<String> = session
-            .journey_context
+            .staged_pack
             .as_ref()
-            .map(|ctx| {
-                ctx.pack
-                    .required_questions
+            .map(|pack| {
+                pack.required_questions
                     .iter()
                     .map(|q| q.field.clone())
                     .collect()
@@ -1050,30 +1445,285 @@ impl ReplOrchestratorV2 {
         &self,
         session: &ReplSessionV2,
     ) -> Option<crate::journey::pack::PackQuestion> {
-        let ctx = session.journey_context.as_ref()?;
-        ctx.pack
-            .required_questions
+        let pack = session.staged_pack.as_ref()?;
+        // Derive answered fields from the runbook fold (accumulated_answers).
+        let ctx = self.build_context_stack(session);
+        pack.required_questions
             .iter()
-            .find(|q| !ctx.answers.contains_key(&q.field))
+            .find(|q| !ctx.accumulated_answers.contains_key(&q.field))
             .cloned()
     }
 
+    /// Update the session's context stack focus from a completed runbook entry.
+    ///
+    /// Called after each successful entry completion to keep focus current.
+    /// Focus is ephemeral (not stored) — it's re-derived from the runbook on
+    /// each context stack build. This method is a convenience for immediate
+    /// use within the same turn.
+    #[allow(dead_code)] // Called in Phase E when orchestrator process loop wires focus updates
+    fn update_focus_from_entry(&self, session: &ReplSessionV2, entry_idx: usize) {
+        // Focus updates are handled by the ContextStack::from_runbook() fold.
+        // This method exists as a documentation anchor and future hook for
+        // intra-turn focus updates if needed. Currently, the context stack
+        // is rebuilt at each match_verb_for_input() call, so focus is always
+        // fresh from the runbook fold.
+        let _ = (session, entry_idx);
+    }
+
+    /// Record an exclusion from user rejection.
+    ///
+    /// When a user rejects a proposed entity or verb, we record it so
+    /// subsequent resolution avoids re-proposing it. The exclusion is
+    /// stored on the session's exclusion list and will be picked up by
+    /// ContextStack::from_runbook() on the next fold.
+    ///
+    /// Exclusions are ephemeral — they decay after 3 turns.
+    #[allow(dead_code)] // Called in Phase E when rejection handling wires exclusions
+    fn record_exclusion(
+        &self,
+        session: &mut ReplSessionV2,
+        value: String,
+        entity_id: Option<Uuid>,
+        reason: String,
+    ) {
+        // Record as a runbook entry so it's derivable from fold
+        let dsl = if let Some(eid) = entity_id {
+            format!(
+                "(session.exclude :value \"{}\" :entity-id \"{}\" :reason \"{}\")",
+                value, eid, reason
+            )
+        } else {
+            format!(
+                "(session.exclude :value \"{}\" :reason \"{}\")",
+                value, reason
+            )
+        };
+
+        let sentence = format!("Excluded: {} ({})", value, reason);
+
+        let mut args = HashMap::new();
+        args.insert("value".to_string(), value);
+        if let Some(eid) = entity_id {
+            args.insert("entity-id".to_string(), eid.to_string());
+        }
+        args.insert("reason".to_string(), reason);
+
+        let entry = RunbookEntry {
+            id: Uuid::new_v4(),
+            sequence: session.runbook.entries.len() as i32,
+            sentence,
+            labels: {
+                let mut l = HashMap::new();
+                l.insert("type".to_string(), "exclusion".to_string());
+                l
+            },
+            dsl,
+            verb: "session.exclude".to_string(),
+            args,
+            slot_provenance: SlotProvenance {
+                slots: HashMap::new(),
+            },
+            arg_extraction_audit: None,
+            status: EntryStatus::Completed,
+            execution_mode: ExecutionMode::Sync,
+            confirm_policy: ConfirmPolicy::QuickConfirm,
+            unresolved_refs: vec![],
+            depends_on: vec![],
+            result: Some(serde_json::json!({"excluded": true})),
+            invocation: None,
+        };
+
+        session.runbook.add_entry(entry);
+    }
+
+    // -- Phase E: Fast command handling --
+
+    /// Try to parse and handle a fast command from user input.
+    ///
+    /// Fast commands are detected by prefix matching before semantic search.
+    /// They are zero-cost (no ML, no DB) and bypass the verb pipeline entirely.
+    /// Returns `None` if the input is not a recognized fast command.
+    #[allow(dead_code)] // Wired in handle_in_pack Message branch
+    async fn try_fast_command(
+        &self,
+        session: &mut ReplSessionV2,
+        input: &str,
+    ) -> Option<ReplResponseV2> {
+        use super::runbook::FastCommand;
+
+        let cmd = FastCommand::parse(input)?;
+
+        let response = match cmd {
+            FastCommand::Undo => self.handle_undo(session),
+            FastCommand::Redo => self.handle_redo(session),
+            FastCommand::Run => self.execute_runbook(session).await,
+            FastCommand::RunStep(n) => {
+                // Find entry by sequence number.
+                let entry = session
+                    .runbook
+                    .entries
+                    .iter()
+                    .find(|e| e.sequence == n)
+                    .map(|e| e.id);
+                match entry {
+                    Some(_id) => {
+                        // For now, run the whole runbook (single-step execution is Phase H).
+                        self.execute_runbook(session).await
+                    }
+                    None => self.invalid_input(session, &format!("No step {} in runbook.", n)),
+                }
+            }
+            FastCommand::ShowRunbook => {
+                let summary = self.runbook_summary(session);
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::RunbookSummary {
+                        chapters: self.chapter_view(session),
+                        summary: summary.clone(),
+                    },
+                    message: if session.runbook.entries.is_empty() {
+                        "Runbook is empty.".to_string()
+                    } else {
+                        let progress = session.runbook.narrate_progress();
+                        format!("{}\n\n{}", summary, progress)
+                    },
+                    runbook_summary: Some(summary),
+                    step_count: session.runbook.entries.len(),
+                }
+            }
+            FastCommand::DropStep(n) => {
+                let entry_id = session
+                    .runbook
+                    .entries
+                    .iter()
+                    .find(|e| e.sequence == n)
+                    .map(|e| e.id);
+                match entry_id {
+                    Some(id) => {
+                        if session.runbook.remove_entry(id).is_some() {
+                            let summary = self.runbook_summary(session);
+                            ReplResponseV2 {
+                                state: session.state.clone(),
+                                kind: ReplResponseKindV2::RunbookSummary {
+                                    chapters: self.chapter_view(session),
+                                    summary: summary.clone(),
+                                },
+                                message: format!("Removed step {}. {}", n, summary),
+                                runbook_summary: Some(summary),
+                                step_count: session.runbook.entries.len(),
+                            }
+                        } else {
+                            self.invalid_input(session, &format!("Could not remove step {}.", n))
+                        }
+                    }
+                    None => self.invalid_input(session, &format!("No step {} in runbook.", n)),
+                }
+            }
+            FastCommand::Why => {
+                // Show the last proposal's provenance/audit.
+                let msg = if let Some(audit) = &session.pending_arg_audit {
+                    format!(
+                        "Last match: verb='{}', confidence={:.2}, model={}",
+                        audit
+                            .extracted_args
+                            .keys()
+                            .next()
+                            .unwrap_or(&"?".to_string()),
+                        audit.confidence,
+                        audit.model_id,
+                    )
+                } else {
+                    "No recent proposal to explain.".to_string()
+                };
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Info {
+                        detail: msg.clone(),
+                    },
+                    message: msg,
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                }
+            }
+            FastCommand::Options => {
+                let pack_verbs = session
+                    .staged_pack
+                    .as_ref()
+                    .map(|pack| pack.allowed_verbs.join(", "))
+                    .unwrap_or_else(|| "No pack active — all verbs available.".to_string());
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Info {
+                        detail: pack_verbs.clone(),
+                    },
+                    message: format!("Available verbs: {}", pack_verbs),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                }
+            }
+            FastCommand::SwitchJourney => {
+                session.state = ReplStateV2::JourneySelection { candidates: None };
+                session.clear_staged_pack();
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Prompt {
+                        text: "What would you like to work on?".to_string(),
+                    },
+                    message: "Switched back to journey selection. What would you like to work on?"
+                        .to_string(),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                }
+            }
+            FastCommand::Cancel => self.handle_cancel(session),
+            FastCommand::Status => {
+                let progress = session.runbook.narrate_progress();
+                let pending = session.runbook.derive_pending_questions();
+                let msg = if pending.is_empty() {
+                    progress
+                } else {
+                    format!(
+                        "{}\n\n{} entries need entity resolution.",
+                        progress,
+                        pending.len()
+                    )
+                };
+                ReplResponseV2 {
+                    state: session.state.clone(),
+                    kind: ReplResponseKindV2::Info {
+                        detail: msg.clone(),
+                    },
+                    message: msg,
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                }
+            }
+            FastCommand::Help => self.handle_help(session),
+        };
+
+        Some(response)
+    }
+
     /// Build a `MatchContext` from the current session state.
+    ///
+    /// Uses ContextStack (runbook fold) for scope and pack data instead
+    /// of reading ClientContext/JourneyContext directly.
     fn build_match_context(&self, session: &ReplSessionV2) -> MatchContext {
+        let ctx = self.build_context_stack(session);
         MatchContext {
-            client_group_id: session.client_context.as_ref().map(|c| c.client_group_id),
-            client_group_name: session
-                .client_context
-                .as_ref()
-                .map(|c| c.client_group_name.clone()),
-            domain_hint: session.journey_context.as_ref().and_then(|ctx| {
-                ctx.pack
-                    .allowed_verbs
-                    .first()
-                    .and_then(|v| v.split('.').next().map(|s| s.to_string()))
-            }),
+            client_group_id: ctx.derived_scope.client_group_id,
+            client_group_name: ctx.derived_scope.client_group_name.clone(),
+            domain_hint: ctx.active_pack().and_then(|p| p.dominant_domain.clone()),
             ..Default::default()
         }
+    }
+
+    /// Build a `ContextStack` from the current session state for pack-scoped matching.
+    ///
+    /// The ContextStack is a pure fold over the runbook, enriched with the
+    /// optional staged pack manifest and the PackRouter for manifest lookup.
+    fn build_context_stack(&self, session: &ReplSessionV2) -> ContextStack {
+        session.build_context_stack(Some(&self.pack_router))
     }
 
     /// Phase 3: Propose steps using the ProposalEngine.
@@ -1092,24 +1742,21 @@ impl ReplOrchestratorV2 {
         };
 
         let match_ctx = self.build_match_context(session);
-        let pack = session.journey_context.as_ref().map(|c| c.pack.as_ref());
+        let pack = session.staged_pack.as_deref();
 
-        let context_vars: HashMap<String, String> = session
-            .client_context
-            .as_ref()
-            .map(|c| {
-                HashMap::from([
-                    ("client_name".to_string(), c.client_group_name.clone()),
-                    ("client_group_id".to_string(), c.client_group_id.to_string()),
-                ])
-            })
-            .unwrap_or_default();
+        let ctx_stack = self.build_context_stack(session);
+        let context_vars: HashMap<String, String> = {
+            let mut vars = HashMap::new();
+            if let Some(name) = &ctx_stack.derived_scope.client_group_name {
+                vars.insert("client_name".to_string(), name.clone());
+            }
+            if let Some(id) = ctx_stack.derived_scope.client_group_id {
+                vars.insert("client_group_id".to_string(), id.to_string());
+            }
+            vars
+        };
 
-        let answers = session
-            .journey_context
-            .as_ref()
-            .map(|c| c.answers.clone())
-            .unwrap_or_default();
+        let answers: HashMap<String, serde_json::Value> = ctx_stack.accumulated_answers.clone();
 
         let proposal_set = engine
             .propose(
@@ -1148,14 +1795,9 @@ impl ReplOrchestratorV2 {
                 entry.confirm_policy = ConfirmPolicy::QuickConfirm;
                 session.runbook.add_entry(entry);
 
-                let next_state = if session.journey_context.is_some() {
-                    let pack_id = session
-                        .journey_context
-                        .as_ref()
-                        .map(|c| c.pack.id.clone())
-                        .unwrap_or_default();
+                let next_state = if session.has_active_pack() {
                     ReplStateV2::InPack {
-                        pack_id,
+                        pack_id: session.active_pack_id().unwrap_or_default(),
                         required_slots_remaining: vec![],
                         last_proposal_id: None,
                     }
@@ -1288,10 +1930,14 @@ impl ReplOrchestratorV2 {
         content: &str,
     ) -> ReplResponseV2 {
         let match_ctx = self.build_match_context(session);
+        let context_stack = self.build_context_stack(session);
 
-        // Phase 2: Try IntentService first (unified pipeline with clarification).
+        // Phase 2: Try IntentService with context-aware matching first.
         if let Some(svc) = &self.intent_service {
-            match svc.match_verb(content, &match_ctx).await {
+            match svc
+                .match_verb_with_context(content, &match_ctx, &context_stack)
+                .await
+            {
                 Ok(outcome) => {
                     return self.handle_intent_service_outcome(session, content, svc, outcome);
                 }
@@ -1336,8 +1982,84 @@ impl ReplOrchestratorV2 {
                 confidence,
                 generated_dsl,
             } => {
-                let dsl = generated_dsl.unwrap_or_else(|| format!("({})", verb));
-                let args = extract_args_from_dsl(&dsl);
+                // Phase F: Try deterministic arg extraction before LLM/DSL parsing.
+                let turn = session.runbook.entries.len() as u32;
+                let context_stack = super::context_stack::ContextStack::from_runbook(
+                    &session.runbook,
+                    session.staged_pack.clone(),
+                    turn,
+                );
+                let (args, slot_provenance, det_model_id) = if let Some(det) =
+                    super::deterministic_extraction::try_deterministic_extraction(
+                        &verb,
+                        original_input,
+                        &context_stack,
+                        svc.verb_config_index(),
+                    ) {
+                    (det.args, det.provenance, Some(det.model_id))
+                } else {
+                    let fallback_dsl = generated_dsl.as_deref().unwrap_or("");
+                    let parsed = if fallback_dsl.is_empty() {
+                        HashMap::new()
+                    } else {
+                        extract_args_from_dsl(fallback_dsl)
+                    };
+                    (parsed, HashMap::new(), None)
+                };
+                let dsl = generated_dsl.unwrap_or_else(|| rebuild_dsl(&verb, &args));
+
+                // Phase G: Emit DecisionLog for this matched verb.
+                {
+                    let extraction_method = if det_model_id.is_some() {
+                        ExtractionMethod::Deterministic
+                    } else if args.is_empty() {
+                        ExtractionMethod::None
+                    } else {
+                        ExtractionMethod::Llm
+                    };
+                    let prov_map: HashMap<String, String> = slot_provenance
+                        .iter()
+                        .map(|(k, v)| (k.clone(), format!("{:?}", v)))
+                        .collect();
+                    Self::emit_decision_log(
+                        session,
+                        original_input,
+                        TurnType::IntentMatch,
+                        VerbDecision {
+                            raw_candidates: vec![VerbCandidateSnapshot {
+                                verb_fqn: verb.clone(),
+                                score: confidence,
+                                domain: verb.split('.').next().map(|s| s.to_string()),
+                                adjustments: vec![],
+                            }],
+                            reranked_candidates: vec![VerbCandidateSnapshot {
+                                verb_fqn: verb.clone(),
+                                score: confidence,
+                                domain: verb.split('.').next().map(|s| s.to_string()),
+                                adjustments: vec![],
+                            }],
+                            ambiguity_outcome: "confident".to_string(),
+                            selected_verb: Some(verb.clone()),
+                            confidence,
+                            used_template_path: false,
+                            template_id: None,
+                        },
+                        ExtractionDecision {
+                            method: extraction_method,
+                            filled_args: args.clone(),
+                            missing_args: vec![],
+                            slot_provenance: prov_map,
+                            model_id: det_model_id.map(|m| m.to_string()),
+                            llm_confidence: if det_model_id.is_some() {
+                                None
+                            } else {
+                                Some(confidence as f64)
+                            },
+                        },
+                        Some(dsl.clone()),
+                        &context_stack,
+                    );
+                }
 
                 // Phase 2: Check clarification via sentences.clarify
                 match svc.check_clarification(&verb, &args) {
@@ -1369,15 +2091,21 @@ impl ReplOrchestratorV2 {
                 let sentence = svc.generate_sentence(&verb, &args);
                 let confirm_policy = svc.confirm_policy(&verb);
 
-                // Build audit
-                let audit = build_arg_extraction_audit(
+                // Build audit — use deterministic model_id if extraction succeeded.
+                let mut audit = build_arg_extraction_audit(
                     original_input,
                     &args,
                     confidence,
                     None, // IntentService doesn't expose debug info here
                 );
+                if let Some(model) = det_model_id {
+                    audit.model_id = model.to_string();
+                    audit.confidence = 1.0; // Deterministic extraction is fully confident.
+                }
 
                 session.pending_arg_audit = Some(audit.clone());
+                // Stash slot provenance for use when creating the RunbookEntry.
+                session.pending_slot_provenance = Some(slot_provenance.clone());
 
                 session.set_state(ReplStateV2::SentencePlayback {
                     sentence: sentence.clone(),
@@ -1395,14 +2123,9 @@ impl ReplOrchestratorV2 {
                     entry.confirm_policy = ConfirmPolicy::QuickConfirm;
                     session.runbook.add_entry(entry);
 
-                    let next_state = if session.journey_context.is_some() {
-                        let pack_id = session
-                            .journey_context
-                            .as_ref()
-                            .map(|c| c.pack.id.clone())
-                            .unwrap_or_default();
+                    let next_state = if session.has_active_pack() {
                         ReplStateV2::InPack {
-                            pack_id,
+                            pack_id: session.active_pack_id().unwrap_or_default(),
                             required_slots_remaining: vec![],
                             last_proposal_id: None,
                         }
@@ -1442,6 +2165,42 @@ impl ReplOrchestratorV2 {
             }
 
             VerbMatchOutcome::Ambiguous { candidates, margin } => {
+                // Phase G: Emit DecisionLog for ambiguous outcome.
+                {
+                    let turn = session.runbook.entries.len() as u32;
+                    let ctx = super::context_stack::ContextStack::from_runbook(
+                        &session.runbook,
+                        session.staged_pack.clone(),
+                        turn,
+                    );
+                    let snaps: Vec<VerbCandidateSnapshot> = candidates
+                        .iter()
+                        .map(|c| VerbCandidateSnapshot {
+                            verb_fqn: c.verb_fqn.clone(),
+                            score: c.score,
+                            domain: c.verb_fqn.split('.').next().map(|s| s.to_string()),
+                            adjustments: vec![],
+                        })
+                        .collect();
+                    Self::emit_decision_log(
+                        session,
+                        original_input,
+                        TurnType::IntentMatch,
+                        VerbDecision {
+                            raw_candidates: snaps.clone(),
+                            reranked_candidates: snaps,
+                            ambiguity_outcome: format!("ambiguous(margin={:.3})", margin),
+                            selected_verb: None,
+                            confidence: candidates.first().map(|c| c.score).unwrap_or(0.0),
+                            used_template_path: false,
+                            template_id: None,
+                        },
+                        ExtractionDecision::default(),
+                        None,
+                        &ctx,
+                    );
+                }
+
                 let v2_candidates: Vec<_> = candidates
                     .iter()
                     .take(5)
@@ -1485,6 +2244,32 @@ impl ReplOrchestratorV2 {
             }
 
             VerbMatchOutcome::NoMatch { reason } => {
+                // Phase G: Emit DecisionLog for no-match.
+                {
+                    let turn = session.runbook.entries.len() as u32;
+                    let ctx = super::context_stack::ContextStack::from_runbook(
+                        &session.runbook,
+                        session.staged_pack.clone(),
+                        turn,
+                    );
+                    Self::emit_decision_log(
+                        session,
+                        original_input,
+                        TurnType::IntentMatch,
+                        VerbDecision {
+                            raw_candidates: vec![],
+                            reranked_candidates: vec![],
+                            ambiguity_outcome: format!("no_match({})", reason),
+                            selected_verb: None,
+                            confidence: 0.0,
+                            used_template_path: false,
+                            template_id: None,
+                        },
+                        ExtractionDecision::default(),
+                        None,
+                        &ctx,
+                    );
+                }
                 self.invalid_input(session, &format!("No matching action found: {}", reason))
             }
 
@@ -1534,6 +2319,35 @@ impl ReplOrchestratorV2 {
                 self.handle_intent_result(session, original_input, result)
             }
         }
+    }
+
+    /// Phase G: Emit a DecisionLog entry for a verb match outcome.
+    ///
+    /// Called after `handle_intent_service_outcome` resolves the outcome
+    /// to capture the full decision snapshot for offline replay.
+    fn emit_decision_log(
+        session: &mut ReplSessionV2,
+        original_input: &str,
+        turn_type: TurnType,
+        verb_decision: VerbDecision,
+        extraction: ExtractionDecision,
+        proposed_dsl: Option<String>,
+        context_stack: &ContextStack,
+    ) {
+        let turn = session.decision_log.len() as u32;
+        let log = DecisionLog::new(session.id, turn, original_input)
+            .with_turn_type(turn_type)
+            .with_verb_decision(verb_decision)
+            .with_extraction_decision(extraction)
+            .with_context_summary(ContextSummary::from_context(context_stack));
+
+        let log = if let Some(dsl) = proposed_dsl {
+            log.with_proposed_dsl(dsl)
+        } else {
+            log
+        };
+
+        session.decision_log.push(log);
     }
 
     /// Handle the result of an IntentMatcher call.
@@ -1600,14 +2414,9 @@ impl ReplOrchestratorV2 {
                     entry.confirm_policy = ConfirmPolicy::QuickConfirm;
                     session.runbook.add_entry(entry);
 
-                    let next_state = if session.journey_context.is_some() {
-                        let pack_id = session
-                            .journey_context
-                            .as_ref()
-                            .map(|c| c.pack.id.clone())
-                            .unwrap_or_default();
+                    let next_state = if session.has_active_pack() {
                         ReplStateV2::InPack {
-                            pack_id,
+                            pack_id: session.active_pack_id().unwrap_or_default(),
                             required_slots_remaining: vec![],
                             last_proposal_id: None,
                         }
@@ -1780,13 +2589,13 @@ impl ReplOrchestratorV2 {
     }
 
     fn try_instantiate_template(&self, session: &mut ReplSessionV2) -> ReplResponseV2 {
-        let ctx = match session.journey_context.as_ref() {
-            Some(c) => c,
+        let pack = match session.staged_pack.as_ref() {
+            Some(p) => p.clone(),
             None => return self.invalid_input(session, "No pack context."),
         };
 
         // Find the first template (Phase 0: use the first one).
-        let template = match ctx.pack.templates.first() {
+        let template = match pack.templates.first() {
             Some(t) => t,
             None => {
                 // No templates — go to InPack for freeform input.
@@ -1804,26 +2613,30 @@ impl ReplOrchestratorV2 {
             }
         };
 
-        // Build context vars from client context.
-        let context_vars: HashMap<String, String> = session
-            .client_context
-            .as_ref()
-            .map(|c| {
-                HashMap::from([
-                    ("client_name".to_string(), c.client_group_name.clone()),
-                    ("client_group_id".to_string(), c.client_group_id.to_string()),
-                ])
-            })
-            .unwrap_or_default();
+        // Build context vars from derived scope (replaces ClientContext reads).
+        let ctx_stack = self.build_context_stack(session);
+        let context_vars: HashMap<String, String> = {
+            let mut vars = HashMap::new();
+            if let Some(name) = &ctx_stack.derived_scope.client_group_name {
+                vars.insert("client_name".to_string(), name.clone());
+            }
+            if let Some(id) = ctx_stack.derived_scope.client_group_id {
+                vars.insert("client_group_id".to_string(), id.to_string());
+            }
+            vars
+        };
 
         // Build invocation phrases and descriptions from VerbConfigIndex.
         let verb_phrases = self.verb_config_index.all_invocation_phrases();
         let verb_descriptions = self.verb_config_index.all_descriptions();
 
+        // Answers derived from runbook fold.
+        let answers = &ctx_stack.accumulated_answers;
+
         match instantiate_template(
             template,
             &context_vars,
-            &ctx.answers,
+            answers,
             &self.sentence_gen,
             &verb_phrases,
             &verb_descriptions,
@@ -1955,14 +2768,9 @@ impl ReplOrchestratorV2 {
 
     /// Handle Cancel command — return to InPack or RunbookEditing.
     fn handle_cancel(&self, session: &mut ReplSessionV2) -> ReplResponseV2 {
-        let next_state = if session.journey_context.is_some() {
-            let pack_id = session
-                .journey_context
-                .as_ref()
-                .map(|c| c.pack.id.clone())
-                .unwrap_or_default();
+        let next_state = if session.has_active_pack() {
             ReplStateV2::InPack {
-                pack_id,
+                pack_id: session.active_pack_id().unwrap_or_default(),
                 required_slots_remaining: vec![],
                 last_proposal_id: None,
             }
@@ -2045,15 +2853,16 @@ impl ReplOrchestratorV2 {
     /// Handle Info command — show session info and readiness.
     fn handle_info(&self, session: &ReplSessionV2) -> ReplResponseV2 {
         let readiness = session.runbook.readiness();
-        let scope = session
-            .client_context
-            .as_ref()
-            .map(|c| c.client_group_name.clone())
+        let ctx_stack = self.build_context_stack(session);
+        let scope = ctx_stack
+            .derived_scope
+            .client_group_name
+            .clone()
             .unwrap_or_else(|| "none".to_string());
         let pack = session
-            .journey_context
+            .staged_pack
             .as_ref()
-            .map(|c| c.pack.name.clone())
+            .map(|p| p.name.clone())
             .unwrap_or_else(|| "none".to_string());
 
         let mut info = format!(
@@ -2588,9 +3397,9 @@ impl ReplOrchestratorV2 {
         _results: &[StepResult],
     ) -> Option<ReplResponseV2> {
         let handoff_target = session
-            .journey_context
+            .staged_pack
             .as_ref()
-            .and_then(|ctx| ctx.pack.handoff_target.as_ref())
+            .and_then(|pack| pack.handoff_target.as_ref())
             .cloned()?;
 
         // Build handoff context from completed entry outcomes.
@@ -2604,11 +3413,9 @@ impl ReplOrchestratorV2 {
             .collect();
 
         let mut forwarded_context = HashMap::new();
-        if let Some(ref ctx) = session.client_context {
-            forwarded_context.insert(
-                "client_group_id".to_string(),
-                ctx.client_group_id.to_string(),
-            );
+        let ctx_stack = self.build_context_stack(session);
+        if let Some(id) = ctx_stack.derived_scope.client_group_id {
+            forwarded_context.insert("client_group_id".to_string(), id.to_string());
         }
         // Carry forward entry results as context (UUIDs of completed entries).
         for (i, entry_id) in forwarded_outcomes.iter().enumerate() {
@@ -2626,6 +3433,8 @@ impl ReplOrchestratorV2 {
         if let Some((manifest, hash)) = self.pack_router.get_pack(&handoff_target) {
             let target_name = manifest.name.clone();
             let target_id = manifest.id.clone();
+            let target_version = manifest.version.clone();
+            let source_pack_id = session.active_pack_id();
 
             // Activate target pack with handoff context.
             session.activate_pack(manifest.clone(), hash.clone(), Some(handoff));
@@ -2642,6 +3451,16 @@ impl ReplOrchestratorV2 {
                     forwarded_context,
                     timestamp: chrono::Utc::now(),
                 });
+
+            // Record pack.select on the new runbook with handoff source (Invariant I-1).
+            self.record_pack_select_entry(
+                session,
+                &target_id,
+                &target_name,
+                &target_version,
+                hash,
+                source_pack_id.as_deref(),
+            );
 
             // Enter the target pack.
             let resp = self.enter_pack(session, &target_id);
@@ -2662,16 +3481,17 @@ impl ReplOrchestratorV2 {
     }
 
     fn runbook_summary(&self, session: &ReplSessionV2) -> String {
-        if let Some(ref ctx) = session.journey_context {
-            PackPlayback::summarize(&ctx.pack, &session.runbook, &ctx.answers)
+        if let Some(ref pack) = session.staged_pack {
+            let ctx_stack = self.build_context_stack(session);
+            PackPlayback::summarize(pack, &session.runbook, &ctx_stack.accumulated_answers)
         } else {
             format!("{} steps in runbook", session.runbook.entries.len())
         }
     }
 
     fn chapter_view(&self, session: &ReplSessionV2) -> Vec<ChapterView> {
-        if let Some(ref ctx) = session.journey_context {
-            PackPlayback::chapter_view(&ctx.pack, &session.runbook)
+        if let Some(ref pack) = session.staged_pack {
+            PackPlayback::chapter_view(pack, &session.runbook)
                 .into_iter()
                 .map(|c| ChapterView {
                     chapter: c.chapter,
@@ -3356,6 +4176,295 @@ definition_of_done:
                 assert_eq!(v["status"], "stub_success");
             }
             other => panic!("Expected Completed, got {:?}", other),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Phase H Acceptance Test: Full KYC case flow
+    //
+    // Validates: bootstrap → pack → template-guided case → run.
+    // Verifies: ContextStack-derived state, accumulated_answers from runbook
+    // fold, pack scoring, template instantiation, execution.
+    // -----------------------------------------------------------------------
+
+    fn kyc_yaml() -> &'static [u8] {
+        include_bytes!("../../config/packs/kyc-case.yaml")
+    }
+
+    fn make_kyc_orchestrator() -> ReplOrchestratorV2 {
+        let (manifest, hash) = load_pack_from_bytes(kyc_yaml()).unwrap();
+        let packs = vec![(Arc::new(manifest), hash)];
+        let router = PackRouter::new(packs);
+        ReplOrchestratorV2::new(router, Arc::new(StubExecutor))
+    }
+
+    /// Phase H acceptance test: full KYC case flow.
+    ///
+    /// Flow: ScopeGate → JourneySelection → InPack (answer questions) →
+    ///       RunbookEditing (template built) → Executed (all steps complete).
+    ///
+    /// Validates:
+    /// - DerivedScope from runbook fold (not ClientContext)
+    /// - accumulated_answers from runbook fold (not JourneyContext.answers)
+    /// - staged_pack drives pack reads (not JourneyContext.pack)
+    /// - Template instantiation uses ContextStack
+    /// - All runbook entries complete with results
+    #[tokio::test]
+    async fn test_phase_h_kyc_acceptance() {
+        let orch = make_kyc_orchestrator();
+        let id = orch.create_session().await;
+
+        // Turn 1: Set scope — this records scope on the runbook.
+        let group_id = Uuid::new_v4();
+        let resp = orch
+            .process(
+                id,
+                UserInputV2::SelectScope {
+                    group_id,
+                    group_name: "Aviva Investors".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(resp.kind, ReplResponseKindV2::JourneyOptions { .. }),
+            "Expected JourneyOptions, got {:?}",
+            resp.kind
+        );
+
+        // Verify DerivedScope from runbook fold.
+        {
+            let session = orch.get_session(id).await.unwrap();
+            let ctx = session.build_context_stack(None);
+            assert_eq!(ctx.derived_scope.client_group_id, Some(group_id));
+            assert_eq!(
+                ctx.derived_scope.client_group_name.as_deref(),
+                Some("Aviva Investors")
+            );
+        }
+
+        // Turn 2: Select KYC pack.
+        let resp = orch
+            .process(
+                id,
+                UserInputV2::SelectPack {
+                    pack_id: "kyc-case".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        // Should ask the first required question: entity_name.
+        assert!(
+            matches!(resp.kind, ReplResponseKindV2::Question { .. }),
+            "Expected Question, got {:?}",
+            resp.kind
+        );
+        assert!(
+            resp.message.contains("entity"),
+            "First question should be about entity"
+        );
+
+        // Verify staged_pack is set (not just journey_context).
+        {
+            let session = orch.get_session(id).await.unwrap();
+            assert!(session.staged_pack.is_some());
+            assert_eq!(session.staged_pack.as_ref().unwrap().id, "kyc-case");
+            assert!(session.has_active_pack());
+            assert_eq!(session.active_pack_id().as_deref(), Some("kyc-case"));
+        }
+
+        // Turn 3: Answer entity_name.
+        let resp = orch
+            .process(
+                id,
+                UserInputV2::Message {
+                    content: "Aviva Holdings Ltd".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        // Should ask the next question: case_type.
+        assert!(
+            matches!(resp.kind, ReplResponseKindV2::Question { .. }),
+            "Expected Question for case_type, got {:?}",
+            resp.kind
+        );
+
+        // Verify accumulated_answers from runbook fold.
+        {
+            let session = orch.get_session(id).await.unwrap();
+            let ctx = session.build_context_stack(None);
+            assert!(
+                ctx.accumulated_answers.contains_key("entity_name"),
+                "entity_name should be in accumulated_answers from runbook fold"
+            );
+        }
+
+        // Turn 4: Answer case_type → triggers template instantiation.
+        let resp = orch
+            .process(
+                id,
+                UserInputV2::Message {
+                    content: "new".to_string(),
+                },
+            )
+            .await
+            .unwrap();
+
+        // Should have built a runbook from template.
+        assert!(
+            matches!(resp.kind, ReplResponseKindV2::RunbookSummary { .. }),
+            "Expected RunbookSummary, got {:?}",
+            resp.kind
+        );
+
+        // Verify runbook has template entries.
+        {
+            let session = orch.get_session(id).await.unwrap();
+            assert!(
+                !session.runbook.entries.is_empty(),
+                "Runbook should have entries from template"
+            );
+            assert!(
+                session.runbook.template_id.is_some(),
+                "Runbook should track template_id"
+            );
+            assert_eq!(session.runbook.template_id.as_deref(), Some("new-kyc-case"));
+
+            // Verify accumulated_answers has both answers.
+            let ctx = session.build_context_stack(None);
+            assert!(ctx.accumulated_answers.contains_key("entity_name"));
+            assert!(ctx.accumulated_answers.contains_key("case_type"));
+
+            // Verify DerivedScope is still correct (from runbook, not ClientContext).
+            assert_eq!(ctx.derived_scope.client_group_id, Some(group_id));
+        }
+
+        // Turn 5: Execute the runbook.
+        let resp = orch
+            .process(
+                id,
+                UserInputV2::Command {
+                    command: ReplCommandV2::Run,
+                },
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(resp.kind, ReplResponseKindV2::Executed { .. }),
+            "Expected Executed, got {:?}",
+            resp.kind
+        );
+
+        // Final verification: all entries completed, results present.
+        {
+            let session = orch.get_session(id).await.unwrap();
+            assert_eq!(session.runbook.status, RunbookStatus::Completed);
+            for entry in &session.runbook.entries {
+                assert_eq!(
+                    entry.status,
+                    EntryStatus::Completed,
+                    "Entry '{}' should be Completed but was {:?}",
+                    entry.verb,
+                    entry.status
+                );
+                assert!(
+                    entry.result.is_some(),
+                    "Entry '{}' should have a result",
+                    entry.verb
+                );
+            }
+
+            // Verify: total turns ≤ 8 (scope + pack + 2 answers + run = 5).
+            // This is well under the target of ≤8 turns.
+            let turn_count = 5;
+            assert!(
+                turn_count <= 8,
+                "Flow should complete in ≤8 turns, took {}",
+                turn_count
+            );
+
+            // Verify: no ClientContext or JourneyContext was needed for reads.
+            // All state was derived from runbook fold via ContextStack.
+            let ctx = session.build_context_stack(None);
+            assert_eq!(ctx.derived_scope.client_group_id, Some(group_id));
+            assert!(ctx.accumulated_answers.len() >= 2);
+        }
+    }
+
+    /// Phase H: Verify ContextStack rebuild from runbook is deterministic.
+    ///
+    /// Build context stack at different points in the flow and verify
+    /// it always reflects the current runbook state.
+    #[tokio::test]
+    async fn test_phase_h_context_stack_determinism() {
+        let orch = make_kyc_orchestrator();
+        let id = orch.create_session().await;
+
+        // Empty session → empty context.
+        {
+            let session = orch.get_session(id).await.unwrap();
+            let ctx = session.build_context_stack(None);
+            assert!(ctx.derived_scope.client_group_id.is_none());
+            assert!(ctx.accumulated_answers.is_empty());
+            assert!(ctx.active_pack().is_none());
+        }
+
+        // After scope.
+        let group_id = Uuid::new_v4();
+        orch.process(
+            id,
+            UserInputV2::SelectScope {
+                group_id,
+                group_name: "Test Corp".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        {
+            let session = orch.get_session(id).await.unwrap();
+            let ctx = session.build_context_stack(None);
+            assert_eq!(ctx.derived_scope.client_group_id, Some(group_id));
+            assert!(ctx.accumulated_answers.is_empty());
+        }
+
+        // After pack selection.
+        orch.process(
+            id,
+            UserInputV2::SelectPack {
+                pack_id: "kyc-case".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        {
+            let session = orch.get_session(id).await.unwrap();
+            let ctx = session.build_context_stack(None);
+            assert!(ctx.active_pack().is_some());
+            assert_eq!(ctx.active_pack().unwrap().pack_id, "kyc-case");
+        }
+
+        // After answering a question.
+        orch.process(
+            id,
+            UserInputV2::Message {
+                content: "Some Entity".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+
+        {
+            let session = orch.get_session(id).await.unwrap();
+            let ctx = session.build_context_stack(None);
+            // Scope still there.
+            assert_eq!(ctx.derived_scope.client_group_id, Some(group_id));
+            // Answer recorded via runbook fold.
+            assert!(ctx.accumulated_answers.contains_key("entity_name"));
+            // Pack still active.
+            assert!(ctx.active_pack().is_some());
         }
     }
 

@@ -1,0 +1,54 @@
+# Golden Corpus — Bootstrap Domain (6 cases)
+#
+# Tests verb matching during initial session scope selection.
+# Focus: client group loading, jurisdiction filtering, CBU loading.
+
+---
+
+- id: boot-001
+  category: bootstrap
+  input: "load the allianz book"
+  pack_id: session-bootstrap
+  expected_verb: session.load-cluster
+  match_mode: exact
+  tags: [load-cluster, client-name]
+
+- id: boot-002
+  category: bootstrap
+  input: "show me the aviva structures"
+  pack_id: session-bootstrap
+  expected_verb: session.load-cluster
+  match_mode: exact
+  tags: [load-cluster, natural-language]
+
+- id: boot-003
+  category: bootstrap
+  input: "load CBU for blackrock ireland"
+  pack_id: session-bootstrap
+  expected_verb: session.load-cbu
+  match_mode: exact
+  tags: [load-cbu, jurisdiction]
+
+- id: boot-004
+  category: bootstrap
+  input: "open the aberdeen luxembourg book"
+  pack_id: session-bootstrap
+  expected_verb: session.load-cluster
+  match_mode: exact
+  tags: [load-cluster, synonym]
+
+- id: boot-005
+  category: bootstrap
+  input: "load all luxembourg funds"
+  pack_id: session-bootstrap
+  expected_verb: session.load-jurisdiction
+  match_mode: exact
+  tags: [load-jurisdiction, jurisdiction]
+
+- id: boot-006
+  category: bootstrap
+  input: "show me everything for aviva investors"
+  pack_id: session-bootstrap
+  expected_verb: session.load-cluster
+  match_mode: exact
+  tags: [load-cluster, natural-language]

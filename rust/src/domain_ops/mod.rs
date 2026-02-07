@@ -50,6 +50,7 @@ mod observation_ops;
 mod onboarding;
 mod outreach_ops;
 mod ownership_ops;
+mod pack_ops;
 mod partnership_ops;
 mod refdata_loader;
 mod regulatory_ops;
@@ -176,6 +177,7 @@ pub use observation_ops::{
     DocumentExtractObservationsOp, ObservationFromDocumentOp, ObservationGetCurrentOp,
     ObservationReconcileOp, ObservationVerifyAllegationsOp,
 };
+pub use pack_ops::{PackAnswerOp, PackAnswerResult, PackSelectOp, PackSelectResult};
 #[cfg(feature = "database")]
 pub use requirement_ops::{RequirementCreateSetOp, RequirementUnsatisfiedOp};
 pub use resource_ops::{
@@ -947,5 +949,8 @@ mod tests {
         assert!(registry.has("runbook", "preview"));
         assert!(registry.has("runbook", "remove"));
         assert!(registry.has("runbook", "abort"));
+        // Pack operations (Journey Pack lifecycle)
+        assert!(registry.has("pack", "select"));
+        assert!(registry.has("pack", "answer"));
     }
 }
