@@ -677,6 +677,8 @@ domains:
           entity_arg: cbu-id
           requires_states:
             - VALIDATION_PENDING
+          precondition_checks:
+            - "requires_scope:cbu"
         args:
           - name: cbu-id
             type: uuid

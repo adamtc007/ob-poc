@@ -65,6 +65,8 @@ domains:
           name: jurisdiction_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "reviewed:none"
           writes_tables:
             - custody.tax_jurisdictions
 
@@ -187,6 +189,8 @@ domains:
           name: treaty_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_prior:tax-config.define-jurisdiction"
           writes_tables:
             - custody.tax_treaty_rates
           reads_tables:
@@ -326,6 +330,8 @@ domains:
           name: status_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_tax_status
           reads_tables:
@@ -450,6 +456,8 @@ domains:
           name: config_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_tax_reclaim_config
           reads_tables:
@@ -511,6 +519,8 @@ domains:
         returns:
           type: affected
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_tax_reclaim_config
 
@@ -614,6 +624,8 @@ domains:
           name: reporting_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_tax_reporting
           reads_tables:

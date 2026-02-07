@@ -60,6 +60,8 @@ domains:
           name: gateway_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "reviewed:none"
           writes_tables:
             - custody.trade_gateways
 
@@ -193,6 +195,8 @@ domains:
           name: connectivity_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_gateway_connectivity
           reads_tables:
@@ -222,6 +226,8 @@ domains:
         returns:
           type: affected
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_gateway_connectivity
 
@@ -252,6 +258,8 @@ domains:
         returns:
           type: affected
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_gateway_connectivity
 
@@ -381,6 +389,8 @@ domains:
           name: routing_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_gateway_routing
           reads_tables:
@@ -513,6 +523,8 @@ domains:
           name: fallback_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_gateway_fallbacks
           reads_tables:

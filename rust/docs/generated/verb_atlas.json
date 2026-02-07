@@ -2,10 +2,18 @@
   "collisions": [
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "link controller",
+      "normalized_phrase": "add ownership",
       "verbs": [
-        "control.add",
-        "ubo.add-control"
+        "client-group.add-relationship",
+        "ubo.add-ownership"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "show all cbus",
+      "verbs": [
+        "cbu.list",
+        "session.load-cluster"
       ]
     },
     {
@@ -18,82 +26,10 @@
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "list subsidiaries",
+      "normalized_phrase": "add control",
       "verbs": [
-        "control.list-controlled",
-        "ubo.list-owned"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "add isda",
-      "verbs": [
-        "isda.create",
-        "trading-profile.add-isda-config"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "pick",
-      "verbs": [
-        "agent.select",
-        "runbook.pick"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "link to umbrella",
-      "verbs": [
-        "fund-vehicle.upsert",
-        "fund.add-to-umbrella"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "trace ownership",
-      "verbs": [
-        "bods.discover-ubos",
-        "gleif.trace-ownership"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "verify ownership",
-      "verbs": [
-        "client-group.verify-ownership",
-        "ownership.reconcile"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "create fund compartment",
-      "verbs": [
-        "fund-compartment.upsert",
-        "fund.create-subfund"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "who controls this",
-      "verbs": [
-        "control.list-controllers",
-        "ownership.who-controls"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "show sub funds",
-      "verbs": [
-        "fund-compartment.list-by-umbrella",
-        "fund-vehicle.list-by-umbrella"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "create isda",
-      "verbs": [
-        "isda.create",
-        "trading-profile.add-isda-config"
+        "control.add",
+        "ubo.add-control"
       ]
     },
     {
@@ -106,26 +42,10 @@
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "end control",
+      "normalized_phrase": "show deal",
       "verbs": [
-        "control.end",
-        "ubo.end-control"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "ensure share class",
-      "verbs": [
-        "fund.ensure-share-class",
-        "share-class.ensure"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "add voting control",
-      "verbs": [
-        "control.add",
-        "ubo.add-control"
+        "deal.get",
+        "session.load-deal"
       ]
     },
     {
@@ -146,46 +66,6 @@
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "show cbu",
-      "verbs": [
-        "cbu.show",
-        "session.load-system"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "reject",
-      "verbs": [
-        "agent.reject",
-        "research.workflow.reject-decision"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "create share class",
-      "verbs": [
-        "fund.create-share-class",
-        "share-class.create"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "add compartment to umbrella",
-      "verbs": [
-        "fund-compartment.upsert",
-        "fund.create-subfund"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "show rate cards",
-      "verbs": [
-        "contract.list-rate-cards",
-        "deal.list-rate-cards"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
       "normalized_phrase": "add document requirements",
       "verbs": [
         "docs-bundle.apply",
@@ -194,66 +74,18 @@
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "list sub funds",
+      "normalized_phrase": "new share class",
       "verbs": [
-        "fund-vehicle.list-by-umbrella",
-        "fund.list-subfunds"
+        "fund.create-share-class",
+        "share-class.create"
       ]
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "delete cbu role",
+      "normalized_phrase": "list subsidiaries",
       "verbs": [
-        "cbu.remove-role",
-        "cbu.role.remove"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "remove cbu",
-      "verbs": [
-        "cbu.delete",
-        "session.unload-system"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "create control link",
-      "verbs": [
-        "control.add",
-        "ubo.add-control"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "add ownership",
-      "verbs": [
-        "client-group.add-relationship",
-        "ubo.add-ownership"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "show all cbus",
-      "verbs": [
-        "cbu.list",
-        "session.load-cluster"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "show deal",
-      "verbs": [
-        "deal.get",
-        "session.load-deal"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "add control",
-      "verbs": [
-        "control.add",
-        "ubo.add-control"
+        "control.list-controlled",
+        "ubo.list-owned"
       ]
     },
     {
@@ -266,26 +98,18 @@
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "trace ownership chain",
+      "normalized_phrase": "create fund compartment",
       "verbs": [
-        "economic-exposure.compute",
-        "ownership.trace-chain"
+        "fund-compartment.upsert",
+        "fund.create-subfund"
       ]
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "control relationship ended",
+      "normalized_phrase": "verify ownership",
       "verbs": [
-        "control.end",
-        "ubo.end-control"
-      ]
-    },
-    {
-      "collision_type": "EXACT",
-      "normalized_phrase": "add controller",
-      "verbs": [
-        "control.add",
-        "ubo.add-control"
+        "client-group.verify-ownership",
+        "ownership.reconcile"
       ]
     },
     {
@@ -298,6 +122,118 @@
     },
     {
       "collision_type": "EXACT",
+      "normalized_phrase": "end control",
+      "verbs": [
+        "control.end",
+        "ubo.end-control"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "link to umbrella",
+      "verbs": [
+        "fund-vehicle.upsert",
+        "fund.add-to-umbrella"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "ensure share class",
+      "verbs": [
+        "fund.ensure-share-class",
+        "share-class.ensure"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "add controller",
+      "verbs": [
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "remove cbu",
+      "verbs": [
+        "cbu.delete",
+        "session.unload-system"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "add voting control",
+      "verbs": [
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "pick",
+      "verbs": [
+        "agent.select",
+        "runbook.pick"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "control relationship ended",
+      "verbs": [
+        "control.end",
+        "ubo.end-control"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "add compartment to umbrella",
+      "verbs": [
+        "fund-compartment.upsert",
+        "fund.create-subfund"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "show sub funds",
+      "verbs": [
+        "fund-compartment.list-by-umbrella",
+        "fund-vehicle.list-by-umbrella"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "add isda",
+      "verbs": [
+        "isda.create",
+        "trading-profile.add-isda-config"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "reject",
+      "verbs": [
+        "agent.reject",
+        "research.workflow.reject-decision"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "list sub funds",
+      "verbs": [
+        "fund-vehicle.list-by-umbrella",
+        "fund.list-subfunds"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "who controls this",
+      "verbs": [
+        "control.list-controllers",
+        "ownership.who-controls"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
       "normalized_phrase": "abort",
       "verbs": [
         "agent.stop",
@@ -306,10 +242,18 @@
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "who are the ubos",
+      "normalized_phrase": "link controller",
       "verbs": [
-        "bods.discover-ubos",
-        "ubo.list-ubos"
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "delete cbu role",
+      "verbs": [
+        "cbu.remove-role",
+        "cbu.role.remove"
       ]
     },
     {
@@ -322,10 +266,66 @@
     },
     {
       "collision_type": "EXACT",
-      "normalized_phrase": "new share class",
+      "normalized_phrase": "create share class",
       "verbs": [
         "fund.create-share-class",
         "share-class.create"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "create isda",
+      "verbs": [
+        "isda.create",
+        "trading-profile.add-isda-config"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "trace ownership",
+      "verbs": [
+        "bods.discover-ubos",
+        "gleif.trace-ownership"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "show rate cards",
+      "verbs": [
+        "contract.list-rate-cards",
+        "deal.list-rate-cards"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "who are the ubos",
+      "verbs": [
+        "bods.discover-ubos",
+        "ubo.list-ubos"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "trace ownership chain",
+      "verbs": [
+        "economic-exposure.compute",
+        "ownership.trace-chain"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "create control link",
+      "verbs": [
+        "control.add",
+        "ubo.add-control"
+      ]
+    },
+    {
+      "collision_type": "EXACT",
+      "normalized_phrase": "show cbu",
+      "verbs": [
+        "cbu.show",
+        "session.load-system"
       ]
     },
     {
@@ -1210,7 +1210,13 @@
     },
     {
       "code": "COLLISION",
-      "message": "Exact phrase collision on \"link controller\" — shared with: ubo.add-control (cross-domain, scope-separated)",
+      "message": "Exact phrase collision on \"add control\" — shared with: ubo.add-control (cross-domain, scope-separated)",
+      "severity": "WARN",
+      "verb_fqn": "control.add"
+    },
+    {
+      "code": "COLLISION",
+      "message": "Exact phrase collision on \"add controller\" — shared with: ubo.add-control (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "control.add"
     },
@@ -1222,19 +1228,13 @@
     },
     {
       "code": "COLLISION",
+      "message": "Exact phrase collision on \"link controller\" — shared with: ubo.add-control (cross-domain, scope-separated)",
+      "severity": "WARN",
+      "verb_fqn": "control.add"
+    },
+    {
+      "code": "COLLISION",
       "message": "Exact phrase collision on \"create control link\" — shared with: ubo.add-control (cross-domain, scope-separated)",
-      "severity": "WARN",
-      "verb_fqn": "control.add"
-    },
-    {
-      "code": "COLLISION",
-      "message": "Exact phrase collision on \"add control\" — shared with: ubo.add-control (cross-domain, scope-separated)",
-      "severity": "WARN",
-      "verb_fqn": "control.add"
-    },
-    {
-      "code": "COLLISION",
-      "message": "Exact phrase collision on \"add controller\" — shared with: ubo.add-control (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "control.add"
     },
@@ -1264,6 +1264,12 @@
     },
     {
       "code": "COLLISION",
+      "message": "Exact phrase collision on \"terminate control\" — shared with: ubo.end-control (cross-domain, scope-separated)",
+      "severity": "WARN",
+      "verb_fqn": "control.end"
+    },
+    {
+      "code": "COLLISION",
       "message": "Exact phrase collision on \"end control\" — shared with: ubo.end-control (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "control.end"
@@ -1271,12 +1277,6 @@
     {
       "code": "COLLISION",
       "message": "Exact phrase collision on \"control relationship ended\" — shared with: ubo.end-control (cross-domain, scope-separated)",
-      "severity": "WARN",
-      "verb_fqn": "control.end"
-    },
-    {
-      "code": "COLLISION",
-      "message": "Exact phrase collision on \"terminate control\" — shared with: ubo.end-control (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "control.end"
     },
@@ -2008,13 +2008,13 @@
     },
     {
       "code": "COLLISION",
-      "message": "Exact phrase collision on \"create share class\" — shared with: share-class.create, share-class.create (cross-domain, scope-separated)",
+      "message": "Exact phrase collision on \"new share class\" — shared with: share-class.create, share-class.create (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "fund.create-share-class"
     },
     {
       "code": "COLLISION",
-      "message": "Exact phrase collision on \"new share class\" — shared with: share-class.create, share-class.create (cross-domain, scope-separated)",
+      "message": "Exact phrase collision on \"create share class\" — shared with: share-class.create, share-class.create (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "fund.create-share-class"
     },
@@ -3586,13 +3586,13 @@
     },
     {
       "code": "COLLISION",
-      "message": "Exact phrase collision on \"create share class\" — shared with: fund.create-share-class (cross-domain, scope-separated)",
+      "message": "Exact phrase collision on \"new share class\" — shared with: fund.create-share-class (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "share-class.create"
     },
     {
       "code": "COLLISION",
-      "message": "Exact phrase collision on \"new share class\" — shared with: fund.create-share-class (cross-domain, scope-separated)",
+      "message": "Exact phrase collision on \"create share class\" — shared with: fund.create-share-class (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "share-class.create"
     },
@@ -4216,7 +4216,13 @@
     },
     {
       "code": "COLLISION",
-      "message": "Exact phrase collision on \"link controller\" — shared with: control.add (cross-domain, scope-separated)",
+      "message": "Exact phrase collision on \"add control\" — shared with: control.add (cross-domain, scope-separated)",
+      "severity": "WARN",
+      "verb_fqn": "ubo.add-control"
+    },
+    {
+      "code": "COLLISION",
+      "message": "Exact phrase collision on \"add controller\" — shared with: control.add (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "ubo.add-control"
     },
@@ -4228,19 +4234,13 @@
     },
     {
       "code": "COLLISION",
+      "message": "Exact phrase collision on \"link controller\" — shared with: control.add (cross-domain, scope-separated)",
+      "severity": "WARN",
+      "verb_fqn": "ubo.add-control"
+    },
+    {
+      "code": "COLLISION",
       "message": "Exact phrase collision on \"create control link\" — shared with: control.add (cross-domain, scope-separated)",
-      "severity": "WARN",
-      "verb_fqn": "ubo.add-control"
-    },
-    {
-      "code": "COLLISION",
-      "message": "Exact phrase collision on \"add control\" — shared with: control.add (cross-domain, scope-separated)",
-      "severity": "WARN",
-      "verb_fqn": "ubo.add-control"
-    },
-    {
-      "code": "COLLISION",
-      "message": "Exact phrase collision on \"add controller\" — shared with: control.add (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "ubo.add-control"
     },
@@ -4300,6 +4300,12 @@
     },
     {
       "code": "COLLISION",
+      "message": "Exact phrase collision on \"terminate control\" — shared with: control.end (cross-domain, scope-separated)",
+      "severity": "WARN",
+      "verb_fqn": "ubo.end-control"
+    },
+    {
+      "code": "COLLISION",
       "message": "Exact phrase collision on \"end control\" — shared with: control.end (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "ubo.end-control"
@@ -4307,12 +4313,6 @@
     {
       "code": "COLLISION",
       "message": "Exact phrase collision on \"control relationship ended\" — shared with: control.end (cross-domain, scope-separated)",
-      "severity": "WARN",
-      "verb_fqn": "ubo.end-control"
-    },
-    {
-      "code": "COLLISION",
-      "message": "Exact phrase collision on \"terminate control\" — shared with: control.end (cross-domain, scope-separated)",
       "severity": "WARN",
       "verb_fqn": "ubo.end-control"
     },
@@ -4596,85 +4596,7 @@
       "code": "MISSING_PRECONDITIONS",
       "message": "Intent verb with lifecycle block but no precondition_checks",
       "severity": "INFO",
-      "verb_fqn": "cbu.decide"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "pricing-config.set-fallback-chain"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "pricing-config.set-nav-threshold"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "pricing-config.set-stale-policy"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "pricing-config.set-valuation-schedule"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "settlement-chain.add-hop"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "settlement-chain.create-chain"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "settlement-chain.deactivate-chain"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "settlement-chain.deactivate-cross-border"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
       "verb_fqn": "settlement-chain.define-location"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "settlement-chain.remove-hop"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "settlement-chain.set-cross-border"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "settlement-chain.set-location-preference"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "tax-config.deactivate-reclaim"
     },
     {
       "code": "MISSING_PRECONDITIONS",
@@ -4686,64 +4608,10 @@
       "code": "MISSING_PRECONDITIONS",
       "message": "Intent verb with lifecycle block but no precondition_checks",
       "severity": "INFO",
-      "verb_fqn": "tax-config.set-reclaim-config"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "tax-config.set-reporting"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "tax-config.set-tax-status"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "tax-config.set-treaty-rate"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "trade-gateway.activate-gateway"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "trade-gateway.add-routing-rule"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
       "verb_fqn": "trade-gateway.define-gateway"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "trade-gateway.enable-gateway"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "trade-gateway.set-fallback"
-    },
-    {
-      "code": "MISSING_PRECONDITIONS",
-      "message": "Intent verb with lifecycle block but no precondition_checks",
-      "severity": "INFO",
-      "verb_fqn": "trade-gateway.suspend-gateway"
     }
   ],
-  "generated_at": "2026-02-07T17:54:08.333720+00:00",
+  "generated_at": "2026-02-07T18:12:59.047564+00:00",
   "phrase_count": 4856,
   "rows": [
     {
@@ -8120,7 +7988,7 @@
       "fqn": "cbu.decide",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -20428,7 +20296,7 @@
       "fqn": "pricing-config.set-fallback-chain",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -20451,7 +20319,7 @@
       "fqn": "pricing-config.set-nav-threshold",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -20474,7 +20342,7 @@
       "fqn": "pricing-config.set-stale-policy",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -20497,7 +20365,7 @@
       "fqn": "pricing-config.set-valuation-schedule",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -24408,7 +24276,7 @@
       "fqn": "settlement-chain.add-hop",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -24438,7 +24306,7 @@
       "fqn": "settlement-chain.create-chain",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -24468,7 +24336,7 @@
       "fqn": "settlement-chain.deactivate-chain",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -24497,7 +24365,7 @@
       "fqn": "settlement-chain.deactivate-cross-border",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -24700,7 +24568,7 @@
       "fqn": "settlement-chain.remove-hop",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -24728,7 +24596,7 @@
       "fqn": "settlement-chain.set-cross-border",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -24757,7 +24625,7 @@
       "fqn": "settlement-chain.set-location-preference",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -25638,7 +25506,7 @@
       "fqn": "tax-config.deactivate-reclaim",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -25799,7 +25667,7 @@
       "fqn": "tax-config.set-reclaim-config",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -25822,7 +25690,7 @@
       "fqn": "tax-config.set-reporting",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -25845,7 +25713,7 @@
       "fqn": "tax-config.set-tax-status",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -25868,7 +25736,7 @@
       "fqn": "tax-config.set-treaty-rate",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -26681,7 +26549,7 @@
       "fqn": "trade-gateway.activate-gateway",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -26704,7 +26572,7 @@
       "fqn": "trade-gateway.add-routing-rule",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -26750,7 +26618,7 @@
       "fqn": "trade-gateway.enable-gateway",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -26911,7 +26779,7 @@
       "fqn": "trade-gateway.set-fallback",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],
@@ -26934,7 +26802,7 @@
       "fqn": "trade-gateway.suspend-gateway",
       "handler_exists": true,
       "has_lifecycle": true,
-      "has_preconditions": false,
+      "has_preconditions": true,
       "in_lexicon": false,
       "internal": false,
       "pack_forbidden": [],

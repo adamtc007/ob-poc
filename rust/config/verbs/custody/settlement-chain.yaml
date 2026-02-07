@@ -69,6 +69,8 @@ domains:
           name: location_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "reviewed:none"
           writes_tables:
             - custody.settlement_locations
 
@@ -196,6 +198,8 @@ domains:
           name: chain_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_settlement_chains
 
@@ -272,6 +276,8 @@ domains:
         returns:
           type: affected
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_settlement_chains
 
@@ -363,6 +369,9 @@ domains:
           name: hop_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
+            - "requires_prior:settlement-chain.create-chain"
           writes_tables:
             - custody.settlement_chain_hops
           reads_tables:
@@ -426,6 +435,9 @@ domains:
         returns:
           type: affected
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
+            - "requires_prior:settlement-chain.create-chain"
           writes_tables:
             - custody.settlement_chain_hops
 
@@ -513,6 +525,8 @@ domains:
           name: preference_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_settlement_location_preferences
           reads_tables:
@@ -657,6 +671,8 @@ domains:
           name: config_id
           capture: true
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_cross_border_config
           reads_tables:
@@ -730,5 +746,7 @@ domains:
         returns:
           type: affected
         lifecycle:
+          precondition_checks:
+            - "requires_scope:cbu"
           writes_tables:
             - custody.cbu_cross_border_config

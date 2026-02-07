@@ -9,7 +9,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use super::types::{IntentMatchResult, MatchContext, MatchOutcome};
+#[cfg(feature = "vnext-repl")]
+use super::types::MatchOutcome;
+use super::types::{IntentMatchResult, MatchContext};
 
 #[cfg(feature = "vnext-repl")]
 use super::context_stack::ContextStack;
