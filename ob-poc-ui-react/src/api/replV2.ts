@@ -175,7 +175,8 @@ export type InputRequestV2 =
 /** Response for session creation */
 export interface CreateSessionResponseV2 {
   session_id: string;
-  state: ReplStateV2;
+  /** Full initial response with ScopeRequired kind for client group selector. */
+  response: ReplResponseV2;
 }
 
 /** Response for session state query */

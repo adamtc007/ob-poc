@@ -192,8 +192,8 @@ impl From<InputRequestV2> for UserInputV2 {
 #[derive(Debug, Serialize)]
 pub struct CreateSessionResponseV2 {
     pub session_id: Uuid,
-    pub state: ReplStateV2,
-    pub greeting: String,
+    /// Full initial response including state + kind (ScopeRequired).
+    pub response: ReplResponseV2,
 }
 
 /// Response for session state query.
@@ -271,10 +271,21 @@ async fn create_session_v2(
         .await
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    // Build a full ReplResponseV2 with ScopeRequired kind so the
+    // frontend can render the client group selector immediately.
+    let response = ReplResponseV2 {
+        state: session.state,
+        kind: crate::repl::response_v2::ReplResponseKindV2::ScopeRequired {
+            prompt: greeting.clone(),
+        },
+        message: greeting,
+        runbook_summary: None,
+        step_count: 0,
+    };
+
     Ok(Json(CreateSessionResponseV2 {
         session_id,
-        state: session.state,
-        greeting,
+        response,
     }))
 }
 
