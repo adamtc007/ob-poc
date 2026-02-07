@@ -1365,7 +1365,7 @@ domains:
           - "give profile approval"
           - "approve activation"
           - "authorize trading setup"
-          - "activate trading profile"
+          - "approve trading profile activation"
         behavior: plugin
         handler: approve_trading_profile
         metadata:

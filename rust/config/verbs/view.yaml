@@ -398,7 +398,7 @@ domains:
           - "expand and zoom"
           - "zoom closer"
           - "magnify this area"
-          - "show more detail"
+          - "zoom in for detail"
           - "get closer view"
         behavior: plugin
         plugin:
@@ -425,7 +425,7 @@ domains:
           - "zoom out"
           - "zoom back out"
           - "see bigger picture"
-          - "go back up"
+          - "widen the view"
           - "expand view outward"
           - "zoom to parent"
           - "pull back view"

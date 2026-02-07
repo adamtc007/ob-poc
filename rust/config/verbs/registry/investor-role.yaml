@@ -88,9 +88,6 @@ domains:
           - "set unitholder type"
           - "configure look-through policy"
           - "set UBO eligibility"
-          - "mark as nominee"
-          - "mark as FoF"
-          - "mark as end investor"
         behavior: plugin
         plugin_handler: investor_role_set
         args:

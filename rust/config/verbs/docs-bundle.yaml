@@ -90,7 +90,7 @@ domains:
         behavior: plugin
         invocation_phrases:
           - list applied bundles
-          - show document bundles
+          - show applied document bundles
           - what bundles are applied
           - get cbu bundles
         metadata:
@@ -126,7 +126,7 @@ domains:
         behavior: plugin
         invocation_phrases:
           - list available bundles
-          - show document bundles
+          - show available document bundles
           - what bundles exist
           - list docs bundles
         metadata:

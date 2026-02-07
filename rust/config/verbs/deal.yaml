@@ -882,31 +882,6 @@ domains:
         returns:
           type: affected
 
-      supersede-rate-card:
-        description: "Replace an AGREED rate card with a new one (atomic supersession)"
-        behavior: plugin
-        metadata:
-          tier: intent
-          source_of_truth: operational
-          scope: global
-          noun: deal_rate_card
-        invocation_phrases:
-          - "supersede rate card"
-          - "replace rate card"
-          - "new rate card version"
-          - "update agreed rates"
-        args:
-          - name: old-rate-card-id
-            type: uuid
-            required: true
-            description: "The currently AGREED rate card to supersede"
-          - name: new-rate-card-id
-            type: uuid
-            required: true
-            description: "The new rate card (must be DRAFT/PROPOSED/COUNTER_PROPOSED)"
-        returns:
-          type: affected
-
       list-rate-cards:
         description: "List all rate cards for a deal with status"
         behavior: crud

@@ -4,11 +4,13 @@
 
 use anyhow::{Context, Result};
 use sqlx::PgPool;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::fmt::Write;
 use std::path::PathBuf;
 
-use dsl_core::config::types::{SourceOfTruth, VerbScope, VerbTier};
+use dsl_core::config::types::{SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
 use dsl_core::config::ConfigLoader;
+use ob_poc::domain_ops::CustomOperationRegistry;
 use ob_poc::dsl_v2::RuntimeVerbRegistry;
 use ob_poc::session::verb_contract::VerbDiagnostics;
 use ob_poc::session::verb_sync::VerbSyncService;
@@ -877,4 +879,940 @@ fn update_claude_md_stats(verb_count: usize, file_count: usize) -> Result<()> {
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Verb Atlas
+// ---------------------------------------------------------------------------
+
+/// Severity for atlas findings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[serde(rename_all = "UPPERCASE")]
+enum Severity {
+    Error,
+    Warn,
+    Info,
+}
+
+impl std::fmt::Display for Severity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Severity::Error => write!(f, "ERROR"),
+            Severity::Warn => write!(f, "WARN"),
+            Severity::Info => write!(f, "INFO"),
+        }
+    }
+}
+
+/// A single finding from the atlas lint pass.
+#[derive(Debug, Clone, serde::Serialize)]
+struct Finding {
+    code: String,
+    severity: Severity,
+    verb_fqn: String,
+    message: String,
+}
+
+/// One row in the atlas table — one per verb FQN.
+#[derive(Debug, Clone, serde::Serialize)]
+struct AtlasRow {
+    fqn: String,
+    domain: String,
+    action: String,
+    tier: Option<String>,
+    source_of_truth: Option<String>,
+    scope: Option<String>,
+    behavior: String,
+    description: String,
+    phrase_count: usize,
+    phrases: Vec<String>,
+    pack_membership: Vec<String>,
+    pack_forbidden: Vec<String>,
+    handler_exists: bool,
+    in_lexicon: bool,
+    has_preconditions: bool,
+    has_lifecycle: bool,
+    internal: bool,
+    dangerous: bool,
+    status: String,
+}
+
+/// Collision between two or more verbs sharing the same normalised phrase.
+#[derive(Debug, Clone, serde::Serialize)]
+struct PhraseCollision {
+    normalized_phrase: String,
+    verbs: Vec<String>,
+    collision_type: String, // "EXACT" or "NEAR"
+}
+
+/// Normalize a phrase for collision detection: lowercase, trim, collapse whitespace, strip punctuation.
+fn normalize_phrase(phrase: &str) -> String {
+    let lower = phrase.to_lowercase();
+    let cleaned: String = lower
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c.is_whitespace() {
+                c
+            } else {
+                ' '
+            }
+        })
+        .collect();
+    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// Truncate a string to at most `max_chars` characters (Unicode-safe), appending "..." if truncated.
+fn truncate_utf8(s: &str, max_chars: usize) -> String {
+    let char_count = s.chars().count();
+    if char_count <= max_chars {
+        s.to_string()
+    } else {
+        let truncated: String = s.chars().take(max_chars.saturating_sub(3)).collect();
+        format!("{}...", truncated)
+    }
+}
+
+/// Jaccard similarity between two token sets.
+fn jaccard_similarity(a: &HashSet<&str>, b: &HashSet<&str>) -> f64 {
+    if a.is_empty() && b.is_empty() {
+        return 0.0;
+    }
+    let intersection = a.intersection(b).count();
+    let union = a.union(b).count();
+    if union == 0 {
+        return 0.0;
+    }
+    intersection as f64 / union as f64
+}
+
+/// Load pack manifests from YAML files.
+fn load_packs(config_dir: &std::path::Path) -> Result<Vec<PackInfo>> {
+    let packs_dir = config_dir.join("packs");
+    if !packs_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut packs = Vec::new();
+    for entry in std::fs::read_dir(&packs_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path
+            .extension()
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false)
+        {
+            let content = std::fs::read_to_string(&path)
+                .with_context(|| format!("Failed to read pack: {}", path.display()))?;
+            let pack: PackInfo = serde_yaml::from_str(&content)
+                .with_context(|| format!("Failed to parse pack: {}", path.display()))?;
+            packs.push(pack);
+        }
+    }
+    Ok(packs)
+}
+
+/// Minimal pack info for atlas (avoids pulling in full PackManifest).
+#[derive(Debug, Clone, serde::Deserialize)]
+struct PackInfo {
+    id: String,
+    #[serde(default)]
+    allowed_verbs: Vec<String>,
+    #[serde(default)]
+    forbidden_verbs: Vec<String>,
+}
+
+/// Load verb concepts from the lexicon YAML.
+fn load_verb_concepts(config_dir: &std::path::Path) -> Result<HashSet<String>> {
+    let path = config_dir.join("lexicon/verb_concepts.yaml");
+    if !path.exists() {
+        return Ok(HashSet::new());
+    }
+    let content = std::fs::read_to_string(&path)?;
+    let map: BTreeMap<String, serde_yaml::Value> = serde_yaml::from_str(&content)?;
+    Ok(map.keys().cloned().collect())
+}
+
+/// Control-plane verb prefixes that should not appear in business pack allowed_verbs.
+const CONTROL_PREFIXES: &[&str] = &["session.", "runbook.", "agent.", "view.", "nav."];
+
+/// Generate the verb atlas.
+pub fn verbs_atlas(output_dir: Option<PathBuf>, lint_only: bool, verbose: bool) -> Result<()> {
+    println!("===========================================");
+    println!("  Verb Atlas Generator");
+    println!("===========================================\n");
+
+    // -----------------------------------------------------------------------
+    // 1. Load all verb data
+    // -----------------------------------------------------------------------
+    println!("Loading verb definitions from YAML...");
+    let loader = ConfigLoader::from_env();
+    let verbs_config = loader.load_verbs().context("Failed to load verb config")?;
+
+    // Resolve config directory for packs / lexicon
+    let config_dir = resolve_config_dir();
+
+    // Load packs
+    println!("Loading pack manifests...");
+    let packs = load_packs(&config_dir)?;
+    println!("  Found {} pack(s)", packs.len());
+
+    // Load lexicon verb concepts
+    println!("Loading verb concepts lexicon...");
+    let lexicon_verbs = load_verb_concepts(&config_dir)?;
+    println!("  Found {} concept entries", lexicon_verbs.len());
+
+    // Build handler registry (inventory-based)
+    println!("Building handler registry...");
+    let custom_ops = CustomOperationRegistry::new();
+    let handler_list: HashSet<String> = custom_ops
+        .list()
+        .iter()
+        .map(|(domain, verb, _)| format!("{}.{}", domain, verb))
+        .collect();
+    println!("  Found {} registered handlers", handler_list.len());
+
+    // Build pack membership indices
+    let mut pack_allowed: HashMap<String, Vec<String>> = HashMap::new(); // verb_fqn → pack_ids
+    let mut pack_forbidden: HashMap<String, Vec<String>> = HashMap::new();
+    for pack in &packs {
+        for verb in &pack.allowed_verbs {
+            pack_allowed
+                .entry(verb.clone())
+                .or_default()
+                .push(pack.id.clone());
+        }
+        for verb in &pack.forbidden_verbs {
+            pack_forbidden
+                .entry(verb.clone())
+                .or_default()
+                .push(pack.id.clone());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 2. Build atlas rows
+    // -----------------------------------------------------------------------
+    println!("\nBuilding atlas rows...");
+    let mut rows: Vec<AtlasRow> = Vec::new();
+    let mut all_findings: Vec<Finding> = Vec::new();
+    let mut all_collisions: Vec<PhraseCollision> = Vec::new();
+
+    // Phrase → list of verb FQNs (for collision detection)
+    let mut phrase_to_verbs: HashMap<String, Vec<String>> = HashMap::new();
+
+    for (domain_name, domain_config) in &verbs_config.domains {
+        for (verb_name, verb_config) in &domain_config.verbs {
+            let fqn = format!("{}.{}", domain_name, verb_name);
+
+            let (
+                tier_str,
+                source_str,
+                scope_str,
+                internal,
+                dangerous,
+                status_str,
+                has_preconditions,
+                has_lifecycle,
+            ) = if let Some(ref meta) = verb_config.metadata {
+                (
+                    meta.tier
+                        .as_ref()
+                        .map(|t| format!("{:?}", t).to_lowercase()),
+                    meta.source_of_truth
+                        .as_ref()
+                        .map(|s| format!("{:?}", s).to_lowercase()),
+                    meta.scope
+                        .as_ref()
+                        .map(|s| format!("{:?}", s).to_lowercase()),
+                    meta.internal,
+                    meta.dangerous,
+                    format!("{:?}", meta.status).to_lowercase(),
+                    !verb_config
+                        .lifecycle
+                        .as_ref()
+                        .map(|l| l.precondition_checks.is_empty())
+                        .unwrap_or(true),
+                    verb_config.lifecycle.is_some(),
+                )
+            } else {
+                (
+                    None,
+                    None,
+                    None,
+                    false,
+                    false,
+                    "active".to_string(),
+                    false,
+                    false,
+                )
+            };
+
+            let behavior_str = match verb_config.behavior {
+                VerbBehavior::Crud => "crud",
+                VerbBehavior::Plugin => "plugin",
+                VerbBehavior::GraphQuery => "graph_query",
+            }
+            .to_string();
+
+            let handler_exists = match verb_config.behavior {
+                VerbBehavior::Plugin => handler_list.contains(&fqn),
+                _ => true, // CRUD and GraphQuery don't need custom handlers
+            };
+
+            // Index phrases for collision detection
+            for phrase in &verb_config.invocation_phrases {
+                let norm = normalize_phrase(phrase);
+                if !norm.is_empty() {
+                    phrase_to_verbs.entry(norm).or_default().push(fqn.clone());
+                }
+            }
+
+            let row = AtlasRow {
+                fqn: fqn.clone(),
+                domain: domain_name.clone(),
+                action: verb_name.clone(),
+                tier: tier_str,
+                source_of_truth: source_str,
+                scope: scope_str,
+                behavior: behavior_str,
+                description: verb_config.description.clone(),
+                phrase_count: verb_config.invocation_phrases.len(),
+                phrases: verb_config.invocation_phrases.clone(),
+                pack_membership: pack_allowed.get(&fqn).cloned().unwrap_or_default(),
+                pack_forbidden: pack_forbidden.get(&fqn).cloned().unwrap_or_default(),
+                handler_exists,
+                in_lexicon: lexicon_verbs.contains(&fqn),
+                has_preconditions,
+                has_lifecycle,
+                internal,
+                dangerous,
+                status: status_str,
+            };
+            rows.push(row);
+        }
+    }
+
+    rows.sort_by(|a, b| a.fqn.cmp(&b.fqn));
+    println!("  Built {} atlas rows", rows.len());
+
+    // -----------------------------------------------------------------------
+    // 3. Collision detection
+    // -----------------------------------------------------------------------
+    println!("Running collision detection...");
+
+    // Build verb→domain lookup for collision severity
+    let verb_domain: HashMap<&str, &str> = rows
+        .iter()
+        .map(|r| (r.fqn.as_str(), r.domain.as_str()))
+        .collect();
+
+    // 3a. Exact collisions: same normalized phrase → multiple verbs
+    // Same-domain collisions are ERROR (must fix), cross-domain collisions are WARN
+    // (acceptable — pack/scope scoring separates them).
+    for (norm_phrase, verbs) in &phrase_to_verbs {
+        // Deduplicate verb FQNs (same verb can register the same phrase multiple times)
+        let unique_verbs: BTreeSet<_> = verbs.iter().collect();
+        if unique_verbs.len() > 1 {
+            // Determine if all colliding verbs are in the same domain
+            let domains: BTreeSet<_> = unique_verbs
+                .iter()
+                .filter_map(|v| verb_domain.get(v.as_str()).copied())
+                .collect();
+            let same_domain = domains.len() == 1;
+
+            all_collisions.push(PhraseCollision {
+                normalized_phrase: norm_phrase.clone(),
+                verbs: unique_verbs.into_iter().cloned().collect(),
+                collision_type: "EXACT".to_string(),
+            });
+
+            for verb_fqn in verbs.iter().collect::<BTreeSet<_>>() {
+                all_findings.push(Finding {
+                    code: "COLLISION".to_string(),
+                    severity: if same_domain {
+                        Severity::Error
+                    } else {
+                        Severity::Warn
+                    },
+                    verb_fqn: verb_fqn.clone(),
+                    message: format!(
+                        "Exact phrase collision on \"{}\" — shared with: {}{}",
+                        norm_phrase,
+                        verbs
+                            .iter()
+                            .filter(|v| v.as_str() != verb_fqn.as_str())
+                            .map(|v| v.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        if same_domain {
+                            ""
+                        } else {
+                            " (cross-domain, scope-separated)"
+                        }
+                    ),
+                });
+            }
+        }
+    }
+
+    // 3b. Near-collisions: Jaccard > 0.80 between verbs in same domain or pack
+    {
+        // Build per-verb normalized phrase token sets (owned strings for lifetime safety)
+        let verb_phrase_sets: BTreeMap<String, Vec<(String, HashSet<String>)>> = rows
+            .iter()
+            .map(|r| {
+                let sets: Vec<(String, HashSet<String>)> = r
+                    .phrases
+                    .iter()
+                    .map(|p| {
+                        let norm = normalize_phrase(p);
+                        let tokens: HashSet<String> =
+                            norm.split_whitespace().map(String::from).collect();
+                        (norm, tokens)
+                    })
+                    .collect();
+                (r.fqn.clone(), sets)
+            })
+            .collect();
+
+        // Group verbs by domain
+        let mut domain_groups: HashMap<String, Vec<String>> = HashMap::new();
+        for row in &rows {
+            domain_groups
+                .entry(row.domain.clone())
+                .or_default()
+                .push(row.fqn.clone());
+        }
+
+        let mut near_collision_set: HashSet<(String, String)> = HashSet::new();
+
+        for verbs_in_group in domain_groups.values() {
+            for i in 0..verbs_in_group.len() {
+                for j in (i + 1)..verbs_in_group.len() {
+                    let v1 = &verbs_in_group[i];
+                    let v2 = &verbs_in_group[j];
+                    let sets1 = verb_phrase_sets.get(v1);
+                    let sets2 = verb_phrase_sets.get(v2);
+
+                    if let (Some(s1), Some(s2)) = (sets1, sets2) {
+                        for (norm1, tokens1) in s1 {
+                            for (norm2, tokens2) in s2 {
+                                if norm1 == norm2 {
+                                    continue; // Already caught as exact collision
+                                }
+                                let t1_ref: HashSet<&str> =
+                                    tokens1.iter().map(|s| s.as_str()).collect();
+                                let t2_ref: HashSet<&str> =
+                                    tokens2.iter().map(|s| s.as_str()).collect();
+                                let sim = jaccard_similarity(&t1_ref, &t2_ref);
+                                if sim > 0.80 {
+                                    let key = if v1 < v2 {
+                                        (v1.clone(), v2.clone())
+                                    } else {
+                                        (v2.clone(), v1.clone())
+                                    };
+                                    if near_collision_set.insert(key.clone()) {
+                                        all_collisions.push(PhraseCollision {
+                                            normalized_phrase: format!(
+                                                "\"{}\" ↔ \"{}\" (Jaccard={:.2})",
+                                                norm1, norm2, sim
+                                            ),
+                                            verbs: vec![v1.clone(), v2.clone()],
+                                            collision_type: "NEAR".to_string(),
+                                        });
+                                        all_findings.push(Finding {
+                                            code: "NEAR_COLLISION".to_string(),
+                                            severity: Severity::Warn,
+                                            verb_fqn: v1.clone(),
+                                            message: format!(
+                                                "Near-collision with {} — \"{}\" ↔ \"{}\" (Jaccard={:.2})",
+                                                v2, norm1, norm2, sim
+                                            ),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    println!(
+        "  Found {} exact collisions, {} near-collisions",
+        all_collisions
+            .iter()
+            .filter(|c| c.collision_type == "EXACT")
+            .count(),
+        all_collisions
+            .iter()
+            .filter(|c| c.collision_type == "NEAR")
+            .count(),
+    );
+
+    // -----------------------------------------------------------------------
+    // 4. Lint checks
+    // -----------------------------------------------------------------------
+    println!("Running lint checks...");
+
+    for row in &rows {
+        // GHOST_VERB: tier=intent + 0 phrases + not internal
+        if row.tier.as_deref() == Some("intent") && row.phrase_count == 0 && !row.internal {
+            all_findings.push(Finding {
+                code: "GHOST_VERB".to_string(),
+                severity: Severity::Error,
+                verb_fqn: row.fqn.clone(),
+                message: "Intent verb with 0 invocation phrases — invisible to semantic search"
+                    .to_string(),
+            });
+        }
+
+        // MISSING_TIER: no tier at all
+        if row.tier.is_none() {
+            all_findings.push(Finding {
+                code: "MISSING_TIER".to_string(),
+                severity: Severity::Error,
+                verb_fqn: row.fqn.clone(),
+                message: "No metadata.tier set".to_string(),
+            });
+        }
+
+        // CONTROL_IN_PACK: control-plane verb in a business pack's allowed_verbs
+        // Exclude session.load-* (scoping verbs legitimately used in business packs)
+        // and packs whose id starts with "session" (dedicated session packs).
+        if !row.pack_membership.is_empty() {
+            let is_control = CONTROL_PREFIXES.iter().any(|p| row.fqn.starts_with(p));
+            let is_scoping_verb = row.fqn.starts_with("session.load-");
+            let only_session_packs = row.pack_membership.iter().all(|p| p.starts_with("session"));
+            if is_control && !is_scoping_verb && !only_session_packs {
+                all_findings.push(Finding {
+                    code: "CONTROL_IN_PACK".to_string(),
+                    severity: Severity::Error,
+                    verb_fqn: row.fqn.clone(),
+                    message: format!(
+                        "Control-plane verb in business pack allowed_verbs: [{}]",
+                        row.pack_membership.join(", ")
+                    ),
+                });
+            }
+        }
+
+        // NO_HANDLER: plugin behavior but no handler found
+        if row.behavior == "plugin" && !row.handler_exists {
+            all_findings.push(Finding {
+                code: "NO_HANDLER".to_string(),
+                severity: Severity::Error,
+                verb_fqn: row.fqn.clone(),
+                message: "Plugin verb with no registered CustomOperation handler".to_string(),
+            });
+        }
+
+        // MISSING_CONCEPT: intent verb not in verb_concepts lexicon
+        if row.tier.as_deref() == Some("intent") && !row.in_lexicon && !row.internal {
+            all_findings.push(Finding {
+                code: "MISSING_CONCEPT".to_string(),
+                severity: Severity::Warn,
+                verb_fqn: row.fqn.clone(),
+                message: "Intent verb not in verb_concepts.yaml lexicon".to_string(),
+            });
+        }
+
+        // DEAD_VERB: no handler + no pack membership + status active + not internal
+        if !row.handler_exists
+            && row.pack_membership.is_empty()
+            && row.status == "active"
+            && !row.internal
+            && row.behavior == "plugin"
+        {
+            all_findings.push(Finding {
+                code: "DEAD_VERB".to_string(),
+                severity: Severity::Warn,
+                verb_fqn: row.fqn.clone(),
+                message: "No handler, no pack membership — delete candidate".to_string(),
+            });
+        }
+
+        // MISSING_PRECONDITIONS: intent verb with lifecycle but no precondition_checks
+        if row.tier.as_deref() == Some("intent")
+            && row.has_lifecycle
+            && !row.has_preconditions
+            && !row.internal
+        {
+            all_findings.push(Finding {
+                code: "MISSING_PRECONDITIONS".to_string(),
+                severity: Severity::Info,
+                verb_fqn: row.fqn.clone(),
+                message: "Intent verb with lifecycle block but no precondition_checks".to_string(),
+            });
+        }
+    }
+
+    // ORPHAN_CONCEPT: lexicon entry maps to nonexistent verb
+    let all_fqns: HashSet<String> = rows.iter().map(|r| r.fqn.clone()).collect();
+    for concept_fqn in &lexicon_verbs {
+        if !all_fqns.contains(concept_fqn) {
+            all_findings.push(Finding {
+                code: "ORPHAN_CONCEPT".to_string(),
+                severity: Severity::Warn,
+                verb_fqn: concept_fqn.clone(),
+                message: "Lexicon verb_concepts entry maps to nonexistent verb".to_string(),
+            });
+        }
+    }
+
+    // Sort findings by severity (errors first), then by verb_fqn
+    all_findings.sort_by(|a, b| {
+        a.severity
+            .cmp(&b.severity)
+            .then(a.verb_fqn.cmp(&b.verb_fqn))
+    });
+
+    let error_count = all_findings
+        .iter()
+        .filter(|f| f.severity == Severity::Error)
+        .count();
+    let warn_count = all_findings
+        .iter()
+        .filter(|f| f.severity == Severity::Warn)
+        .count();
+    let info_count = all_findings
+        .iter()
+        .filter(|f| f.severity == Severity::Info)
+        .count();
+
+    println!(
+        "  {} ERRORs, {} WARNs, {} INFOs",
+        error_count, warn_count, info_count
+    );
+
+    // -----------------------------------------------------------------------
+    // 5. Print summary
+    // -----------------------------------------------------------------------
+    println!("\n===========================================");
+    println!("  Atlas Summary");
+    println!("===========================================");
+    println!("  Total verbs:          {}", rows.len());
+    println!(
+        "  Total phrases:        {}",
+        rows.iter().map(|r| r.phrase_count).sum::<usize>()
+    );
+    println!(
+        "  Verbs with phrases:   {}",
+        rows.iter().filter(|r| r.phrase_count > 0).count()
+    );
+    println!(
+        "  Verbs without phrases:{}",
+        rows.iter().filter(|r| r.phrase_count == 0).count()
+    );
+    println!(
+        "  Plugin verbs:         {}",
+        rows.iter().filter(|r| r.behavior == "plugin").count()
+    );
+    println!(
+        "  CRUD verbs:           {}",
+        rows.iter().filter(|r| r.behavior == "crud").count()
+    );
+    println!(
+        "  Pack-assigned verbs:  {}",
+        rows.iter()
+            .filter(|r| !r.pack_membership.is_empty())
+            .count()
+    );
+    println!(
+        "  In lexicon:           {}",
+        rows.iter().filter(|r| r.in_lexicon).count()
+    );
+    println!(
+        "  Exact collisions:     {}",
+        all_collisions
+            .iter()
+            .filter(|c| c.collision_type == "EXACT")
+            .count()
+    );
+    println!(
+        "  Near-collisions:      {}",
+        all_collisions
+            .iter()
+            .filter(|c| c.collision_type == "NEAR")
+            .count()
+    );
+    println!("  Findings — ERRORs:    {}", error_count);
+    println!("  Findings — WARNs:     {}", warn_count);
+    println!("  Findings — INFOs:     {}", info_count);
+
+    // If lint-only, exit with non-zero on errors
+    if lint_only {
+        if error_count > 0 {
+            println!("\n  FAILED: {} errors found", error_count);
+            // Print errors only
+            for f in &all_findings {
+                if f.severity == Severity::Error {
+                    println!(
+                        "  {} [{}] {}: {}",
+                        f.severity, f.code, f.verb_fqn, f.message
+                    );
+                }
+            }
+            std::process::exit(1);
+        } else {
+            println!("\n  PASSED: 0 errors");
+            return Ok(());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. Write output files
+    // -----------------------------------------------------------------------
+    let out_dir = output_dir.unwrap_or_else(|| PathBuf::from("docs/generated"));
+    std::fs::create_dir_all(&out_dir)
+        .with_context(|| format!("Failed to create output dir: {}", out_dir.display()))?;
+
+    // 6a. verb_atlas.json
+    let json_path = out_dir.join("verb_atlas.json");
+    let json_output = serde_json::json!({
+        "generated_at": chrono::Utc::now().to_rfc3339(),
+        "verb_count": rows.len(),
+        "phrase_count": rows.iter().map(|r| r.phrase_count).sum::<usize>(),
+        "rows": rows,
+        "findings": all_findings,
+        "collisions": all_collisions,
+    });
+    std::fs::write(&json_path, serde_json::to_string_pretty(&json_output)?)
+        .context("Failed to write verb_atlas.json")?;
+    println!("\n  Written: {}", json_path.display());
+
+    // 6b. verb_atlas.md
+    let md_path = out_dir.join("verb_atlas.md");
+    let atlas_md = generate_atlas_md(&rows);
+    std::fs::write(&md_path, &atlas_md).context("Failed to write verb_atlas.md")?;
+    println!("  Written: {}", md_path.display());
+
+    // 6c. verb_findings.md
+    let findings_path = out_dir.join("verb_findings.md");
+    let findings_md = generate_findings_md(&all_findings, error_count, warn_count, info_count);
+    std::fs::write(&findings_path, &findings_md).context("Failed to write verb_findings.md")?;
+    println!("  Written: {}", findings_path.display());
+
+    // 6d. verb_phrase_collisions.md
+    let collisions_path = out_dir.join("verb_phrase_collisions.md");
+    let collisions_md = generate_collisions_md(&all_collisions);
+    std::fs::write(&collisions_path, &collisions_md)
+        .context("Failed to write verb_phrase_collisions.md")?;
+    println!("  Written: {}", collisions_path.display());
+
+    if verbose {
+        println!("\n--- Findings Detail ---\n");
+        for f in &all_findings {
+            println!(
+                "  {} [{}] {}: {}",
+                f.severity, f.code, f.verb_fqn, f.message
+            );
+        }
+    }
+
+    if error_count > 0 {
+        println!(
+            "\n  {} errors need attention (see verb_findings.md)",
+            error_count
+        );
+    }
+
+    Ok(())
+}
+
+/// Resolve the config directory for packs and lexicon.
+fn resolve_config_dir() -> PathBuf {
+    // Try DSL_CONFIG_DIR first
+    if let Ok(dir) = std::env::var("DSL_CONFIG_DIR") {
+        return PathBuf::from(dir);
+    }
+
+    // Try common locations
+    for candidate in &["config", "../config", "rust/config"] {
+        let path = PathBuf::from(candidate);
+        if path.join("verbs").exists() {
+            return path;
+        }
+    }
+
+    // Fallback: use CARGO_MANIFEST_DIR to find rust/config
+    if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+        let path = PathBuf::from(manifest_dir);
+        // xtask is in rust/xtask, so config is at rust/config
+        let config_path = path.parent().unwrap_or(&path).join("config");
+        if config_path.join("verbs").exists() {
+            return config_path;
+        }
+    }
+
+    PathBuf::from("config")
+}
+
+fn generate_atlas_md(rows: &[AtlasRow]) -> String {
+    let mut md = String::new();
+    let now = chrono::Utc::now();
+
+    writeln!(md, "# Verb Atlas\n").unwrap();
+    writeln!(md, "> Auto-generated by `cargo x verbs atlas`").unwrap();
+    writeln!(md, "> Generated: {}", now.format("%Y-%m-%d %H:%M UTC")).unwrap();
+    writeln!(md, "> Verb count: {}\n", rows.len()).unwrap();
+
+    // Summary by domain
+    let mut domain_counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for row in rows {
+        *domain_counts.entry(&row.domain).or_insert(0) += 1;
+    }
+    writeln!(md, "## Domain Summary\n").unwrap();
+    writeln!(md, "| Domain | Count |").unwrap();
+    writeln!(md, "|--------|-------|").unwrap();
+    for (domain, count) in &domain_counts {
+        writeln!(md, "| {} | {} |", domain, count).unwrap();
+    }
+
+    // Full table
+    writeln!(md, "\n## Full Verb Table\n").unwrap();
+    writeln!(
+        md,
+        "| FQN | Tier | Behavior | Phrases | Packs | Handler | Lexicon | Description |"
+    )
+    .unwrap();
+    writeln!(
+        md,
+        "|-----|------|----------|---------|-------|---------|---------|-------------|"
+    )
+    .unwrap();
+
+    for row in rows {
+        let tier = row.tier.as_deref().unwrap_or("-");
+        let packs = if row.pack_membership.is_empty() {
+            "-".to_string()
+        } else {
+            row.pack_membership.join(", ")
+        };
+        let handler = if row.behavior == "plugin" {
+            if row.handler_exists {
+                "yes"
+            } else {
+                "**NO**"
+            }
+        } else {
+            "n/a"
+        };
+        let lexicon = if row.in_lexicon { "yes" } else { "-" };
+        let desc = row.description.replace('|', "\\|");
+        let desc_short = truncate_utf8(&desc, 50);
+
+        writeln!(
+            md,
+            "| {} | {} | {} | {} | {} | {} | {} | {} |",
+            row.fqn, tier, row.behavior, row.phrase_count, packs, handler, lexicon, desc_short
+        )
+        .unwrap();
+    }
+
+    md
+}
+
+fn generate_findings_md(
+    findings: &[Finding],
+    error_count: usize,
+    warn_count: usize,
+    info_count: usize,
+) -> String {
+    let mut md = String::new();
+    let now = chrono::Utc::now();
+
+    writeln!(md, "# Verb Atlas Findings\n").unwrap();
+    writeln!(md, "> Auto-generated by `cargo x verbs atlas`").unwrap();
+    writeln!(md, "> Generated: {}", now.format("%Y-%m-%d %H:%M UTC")).unwrap();
+    writeln!(
+        md,
+        "> {} ERRORs, {} WARNs, {} INFOs\n",
+        error_count, warn_count, info_count
+    )
+    .unwrap();
+
+    if findings.is_empty() {
+        writeln!(md, "No findings. All verbs are clean.").unwrap();
+        return md;
+    }
+
+    // Group findings by code
+    let mut by_code: BTreeMap<&str, Vec<&Finding>> = BTreeMap::new();
+    for f in findings {
+        by_code.entry(&f.code).or_default().push(f);
+    }
+
+    for (code, items) in &by_code {
+        let severity = items[0].severity;
+        writeln!(md, "## {} — {} ({} items)\n", code, severity, items.len()).unwrap();
+
+        writeln!(md, "| Verb | Message |").unwrap();
+        writeln!(md, "|------|---------|").unwrap();
+        for f in items {
+            writeln!(md, "| {} | {} |", f.verb_fqn, f.message.replace('|', "\\|")).unwrap();
+        }
+        writeln!(md).unwrap();
+    }
+
+    md
+}
+
+fn generate_collisions_md(collisions: &[PhraseCollision]) -> String {
+    let mut md = String::new();
+    let now = chrono::Utc::now();
+
+    writeln!(md, "# Verb Phrase Collisions\n").unwrap();
+    writeln!(md, "> Auto-generated by `cargo x verbs atlas`").unwrap();
+    writeln!(md, "> Generated: {}\n", now.format("%Y-%m-%d %H:%M UTC")).unwrap();
+
+    let exact: Vec<_> = collisions
+        .iter()
+        .filter(|c| c.collision_type == "EXACT")
+        .collect();
+    let near: Vec<_> = collisions
+        .iter()
+        .filter(|c| c.collision_type == "NEAR")
+        .collect();
+
+    writeln!(md, "## Summary\n").unwrap();
+    writeln!(md, "- Exact collisions: {}", exact.len()).unwrap();
+    writeln!(md, "- Near-collisions: {}\n", near.len()).unwrap();
+
+    if !exact.is_empty() {
+        writeln!(md, "## Exact Collisions\n").unwrap();
+        writeln!(
+            md,
+            "Two or more verbs share the exact same normalized phrase.\n"
+        )
+        .unwrap();
+        writeln!(md, "| Phrase | Verbs |").unwrap();
+        writeln!(md, "|--------|-------|").unwrap();
+        for c in &exact {
+            writeln!(md, "| {} | {} |", c.normalized_phrase, c.verbs.join(", ")).unwrap();
+        }
+        writeln!(md).unwrap();
+    }
+
+    if !near.is_empty() {
+        writeln!(md, "## Near-Collisions (Jaccard > 0.80)\n").unwrap();
+        writeln!(
+            md,
+            "Verb pairs within the same domain with highly similar phrases.\n"
+        )
+        .unwrap();
+        writeln!(md, "| Comparison | Verbs |").unwrap();
+        writeln!(md, "|------------|-------|").unwrap();
+        for c in &near {
+            writeln!(md, "| {} | {} |", c.normalized_phrase, c.verbs.join(", ")).unwrap();
+        }
+        writeln!(md).unwrap();
+    }
+
+    if collisions.is_empty() {
+        writeln!(md, "No phrase collisions detected.").unwrap();
+    }
+
+    md
 }

@@ -51,7 +51,7 @@ cbu.list:
   target_types: []
   crud_type: read
 
-cbu.get:
+cbu.read:
   pref_label: "get cbu"
   alt_labels:
     - "show cbu"
@@ -98,7 +98,7 @@ session.load-galaxy:
   target_types: []
   crud_type: null
 
-session.load-cbu:
+session.load-system:
   pref_label: "load cbu"
   alt_labels:
     - "focus cbu"
@@ -155,7 +155,7 @@ session.redo:
   crud_type: null
 
 # Entity Domain - Natural/legal person management
-entity.create:
+entity.create-proper-person:
   pref_label: "create entity"
   alt_labels:
     - "new entity"
@@ -187,7 +187,7 @@ entity.list:
   target_types: []
   crud_type: read
 
-entity.get:
+entity.read:
   pref_label: "get entity"
   alt_labels:
     - "show entity"
@@ -201,7 +201,7 @@ entity.get:
   crud_type: read
 
 # UBO Domain - Ultimate Beneficial Ownership
-ubo.discover:
+ubo.list-ubos:
   pref_label: "discover ubo"
   alt_labels:
     - "find ubo"
@@ -233,7 +233,7 @@ ubo.trace-chains:
   crud_type: read
 
 # KYC Domain - Know Your Customer
-kyc.open-case:
+kyc-case.create:
   pref_label: "open kyc case"
   alt_labels:
     - "create kyc case"
@@ -249,7 +249,7 @@ kyc.open-case:
   produces_type: kyc_case
   crud_type: create
 
-kyc.list-cases:
+kyc-case.list-by-cbu:
   pref_label: "list kyc cases"
   alt_labels:
     - "show kyc cases"
@@ -263,7 +263,7 @@ kyc.list-cases:
   crud_type: read
 
 # Trading Profile Domain
-trading-profile.create:
+trading-profile.create-draft:
   pref_label: "create trading profile"
   alt_labels:
     - "new trading profile"
@@ -279,7 +279,7 @@ trading-profile.create:
   produces_type: trading_profile
   crud_type: create
 
-trading-profile.list:
+trading-profile.list-versions:
   pref_label: "list trading profiles"
   alt_labels:
     - "show trading profiles"
@@ -293,7 +293,7 @@ trading-profile.list:
   crud_type: read
 
 # CBU Role Domain
-cbu-role.assign:
+cbu.role.assign:
   pref_label: "assign role"
   alt_labels:
     - "add role"
@@ -308,7 +308,7 @@ cbu-role.assign:
   target_types: [cbu, entity]
   crud_type: create
 
-cbu-role.list:
+cbu.role.list:
   pref_label: "list roles"
   alt_labels:
     - "show roles"
@@ -323,7 +323,7 @@ cbu-role.list:
   crud_type: read
 
 # GLEIF Domain - LEI lookups
-gleif.lookup:
+gleif.lookup-by-isin:
   pref_label: "gleif lookup"
   alt_labels:
     - "lei lookup"
@@ -396,32 +396,3 @@ view.cbu:
   domain: view
   target_types: [cbu]
   crud_type: null
-
-# Scope Domain - Entity scope management
-scope.commit:
-  pref_label: "commit scope"
-  alt_labels:
-    - "create scope"
-    - "define scope"
-    - "set scope"
-  invocation_phrases:
-    - "create a scope for irish funds"
-    - "define the scope"
-    - "commit this scope"
-  domain: scope
-  target_types: []
-  produces_type: entity_scope
-  crud_type: create
-
-scope.narrow:
-  pref_label: "narrow scope"
-  alt_labels:
-    - "filter scope"
-    - "refine scope"
-  invocation_phrases:
-    - "narrow the scope"
-    - "filter to legal entities only"
-  domain: scope
-  target_types: [entity_scope]
-  produces_type: entity_scope
-  crud_type: update

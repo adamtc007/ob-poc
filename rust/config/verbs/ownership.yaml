@@ -68,6 +68,11 @@ domains:
 
       snapshot.list:
         description: List ownership snapshots for an issuer
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: plugin
         plugin:
           handler: OwnershipSnapshotListOp
@@ -116,6 +121,11 @@ domains:
 
       snapshot.get:
         description: Get a specific ownership snapshot
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: select
@@ -238,6 +248,11 @@ domains:
 
       right.add-to-class:
         description: Add a special right attached to a share class
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: insert
@@ -333,6 +348,11 @@ domains:
 
       right.add-to-holder:
         description: Add a special right attached to a specific holder (side letter)
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: insert
@@ -444,6 +464,11 @@ domains:
 
       right.end:
         description: End a special right (set effective_to date)
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: update
@@ -464,6 +489,11 @@ domains:
 
       right.list-for-issuer:
         description: List all special rights for an issuer
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: list_by_fk
@@ -488,6 +518,11 @@ domains:
 
       right.list-for-holder:
         description: List all special rights held by an entity
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: list_by_fk
@@ -587,6 +622,11 @@ domains:
 
       reconcile.findings:
         description: List findings from a reconciliation run
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: plugin
         plugin:
           handler: OwnershipReconcileFindingsOp
@@ -628,6 +668,11 @@ domains:
 
       reconcile.resolve-finding:
         description: Resolve a reconciliation finding
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: update
@@ -664,6 +709,11 @@ domains:
 
       reconcile.list-runs:
         description: List reconciliation runs for an issuer
+        metadata:
+          tier: intent
+          source_of_truth: entity
+          scope: cbu
+          noun: ownership
         behavior: crud
         crud:
           operation: list_by_fk

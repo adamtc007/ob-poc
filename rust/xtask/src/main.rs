@@ -656,6 +656,34 @@ enum VerbsAction {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
+
+    /// Generate comprehensive verb atlas with findings
+    ///
+    /// Produces a full report of every verb in the system including:
+    /// - Metadata (tier, domain, scope, invocation phrases)
+    /// - Pack membership (which packs include/forbid each verb)
+    /// - Handler existence (plugin verbs with registered CustomOps)
+    /// - Collision detection (exact phrase collisions, near-collisions)
+    /// - Lint findings (ghost verbs, missing tier, control verbs in packs, etc.)
+    ///
+    /// Outputs:
+    /// - docs/generated/verb_atlas.md (full table)
+    /// - docs/generated/verb_atlas.json (machine-readable)
+    /// - docs/generated/verb_findings.md (findings by severity)
+    /// - docs/generated/verb_phrase_collisions.md (collision report)
+    Atlas {
+        /// Output directory (default: docs/generated/)
+        #[arg(long, short = 'o')]
+        output: Option<std::path::PathBuf>,
+
+        /// Only run lint checks and exit with non-zero on errors (CI mode)
+        #[arg(long)]
+        lint_only: bool,
+
+        /// Show verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -932,6 +960,11 @@ fn main() -> Result<()> {
                     errors_only,
                     verbose,
                 } => lint_macros(errors_only, verbose),
+                VerbsAction::Atlas {
+                    output,
+                    lint_only,
+                    verbose,
+                } => verbs::verbs_atlas(output, lint_only, verbose),
             }
         }
         Command::Lexicon { action } => match action {
@@ -1512,6 +1545,9 @@ fn pre_commit(sh: &Shell) -> Result<()> {
 
     println!("\n=== Unit Tests ===");
     cmd!(sh, "cargo test --lib --features database").run()?;
+
+    println!("\n=== Verb Atlas Lint ===");
+    verbs::verbs_atlas(None, true, false)?;
 
     println!("\nPre-commit checks passed!");
     Ok(())

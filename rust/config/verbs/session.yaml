@@ -195,7 +195,7 @@ domains:
           - "load cbu into session"
           - "open cbu"
           - "load fund"
-          - "switch to"
+          - "switch to cbu"
           - "show cbu"
           - "add cbu to session"
         metadata:
@@ -228,11 +228,11 @@ domains:
         behavior: plugin
         handler: SessionFilterJurisdictionOp
         invocation_phrases:
-          - "filter to"
+          - "filter to jurisdiction"
           - "narrow to"
           - "just the"
           - "only"
-          - "switch to"
+          - "filter by jurisdiction"
           - "now use"
         metadata:
           tier: intent
@@ -381,12 +381,11 @@ domains:
         behavior: plugin
         handler: SessionSetClientOp
         invocation_phrases:
-          - "work on"
-          - "switch to"
+          - "set client context"
           - "I'm working with"
           - "client is"
           - "set client to"
-          - "working on"
+          - "my client is"
         metadata:
           tier: intent
           source_of_truth: session

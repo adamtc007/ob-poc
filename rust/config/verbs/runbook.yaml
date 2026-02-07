@@ -236,7 +236,7 @@ domains:
         invocation_phrases:
           - "abort"
           - "cancel"
-          - "clear runbook"
+          - "clear all staged commands"
           - "start over"
           - "discard"
           - "abort runbook"

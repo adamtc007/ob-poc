@@ -26,10 +26,13 @@ pub fn verb_synonyms() -> HashMap<&'static str, Vec<&'static str>> {
     let mut synonyms = HashMap::new();
 
     // CRUD operations
+    // Note: list and read/get are deliberately differentiated to avoid collisions.
+    // - list → "list all", "show all", "display", "enumerate" (plural/collection)
+    // - read/get → "get details", "fetch", "retrieve", "view" (singular/detail)
     synonyms.insert("create", vec!["add", "new", "make", "register"]);
-    synonyms.insert("list", vec!["show", "get all", "display", "enumerate"]);
+    synonyms.insert("list", vec!["show all", "list all", "display", "enumerate"]);
     synonyms.insert("get", vec!["show", "fetch", "retrieve", "read"]);
-    synonyms.insert("read", vec!["get", "fetch", "show", "view"]);
+    synonyms.insert("read", vec!["get", "fetch", "view", "retrieve"]);
     synonyms.insert("update", vec!["edit", "modify", "change", "set"]);
     synonyms.insert("delete", vec!["remove", "drop", "terminate"]);
     synonyms.insert("remove", vec!["delete", "drop", "clear"]);
@@ -41,8 +44,10 @@ pub fn verb_synonyms() -> HashMap<&'static str, Vec<&'static str>> {
     synonyms.insert("validate", vec!["verify", "check", "confirm"]);
 
     // Navigation
-    synonyms.insert("drill", vec!["dive", "expand", "zoom in", "enter"]);
-    synonyms.insert("surface", vec!["back", "up", "zoom out", "parent"]);
+    // "zoom in" removed — collides with view.zoom-in; "enter" removed — collides with view.book
+    synonyms.insert("drill", vec!["dive", "expand", "go into", "dig into"]);
+    // "zoom out" removed — collides with view.zoom-out in same domain
+    synonyms.insert("surface", vec!["back", "up", "parent", "ascend"]);
     synonyms.insert("load", vec!["open", "switch", "select"]);
     synonyms.insert("unload", vec!["close", "remove", "clear"]);
 
@@ -71,7 +76,8 @@ pub fn verb_synonyms() -> HashMap<&'static str, Vec<&'static str>> {
 
     // Deal/Billing specific
     synonyms.insert("record", vec!["log", "capture", "enter"]);
-    synonyms.insert("book", vec!["record", "register", "enter"]);
+    // "enter" removed — collides with drill synonyms in view domain
+    synonyms.insert("book", vec!["record", "register", "log"]);
     synonyms.insert("generate", vec!["create", "produce", "build"]);
     synonyms.insert("invoice", vec!["bill", "charge"]);
     synonyms.insert("reconcile", vec!["match", "balance", "verify"]);
@@ -105,18 +111,23 @@ pub fn domain_nouns() -> HashMap<&'static str, Vec<&'static str>> {
 
     // Session/Navigation
     nouns.insert("session", vec!["session", "scope", "workspace"]);
-    nouns.insert("view", vec!["view", "display", "visualization"]);
-    nouns.insert("graph", vec!["graph", "visualization", "diagram"]);
+    // "display"/"visualization" removed — collides with graph domain and view sub-verbs
+    nouns.insert("view", vec!["view", "viewport"]);
+    // "visualization" removed — collides with view domain
+    nouns.insert("graph", vec!["graph", "diagram"]);
 
     // Trading/Settlement
     nouns.insert("trading-profile", vec!["trading profile", "profile"]);
     nouns.insert("custody", vec!["custody", "safekeeping", "account"]);
-    nouns.insert("isda", vec!["isda", "agreement", "contract"]);
+    // "agreement"/"contract" removed — collides with contract domain
+    nouns.insert("isda", vec!["isda", "isda agreement", "isda contract"]);
     nouns.insert("ssi", vec!["ssi", "settlement instruction"]);
 
     // Products/Services
-    nouns.insert("product", vec!["product", "service", "offering"]);
-    nouns.insert("contract", vec!["contract", "agreement", "legal document"]);
+    // "service" removed — collides with service domain
+    nouns.insert("product", vec!["product", "offering"]);
+    // "agreement" removed — collides with isda domain
+    nouns.insert("contract", vec!["contract", "legal contract"]);
     nouns.insert("service-resource", vec!["service resource", "resource"]);
     nouns.insert("service-intent", vec!["service intent", "intent"]);
 
@@ -131,7 +142,8 @@ pub fn domain_nouns() -> HashMap<&'static str, Vec<&'static str>> {
     // Reference data
     nouns.insert("jurisdiction", vec!["jurisdiction", "country"]);
     nouns.insert("currency", vec!["currency", "money"]);
-    nouns.insert("role", vec!["role", "position"]);
+    // "position" removed — collides with holding domain
+    nouns.insert("role", vec!["role", "entity role"]);
 
     // Workflow
     nouns.insert("runbook", vec!["runbook", "command", "staged command"]);
@@ -140,7 +152,8 @@ pub fn domain_nouns() -> HashMap<&'static str, Vec<&'static str>> {
 
     // Investor
     nouns.insert("investor", vec!["investor", "shareholder"]);
-    nouns.insert("holding", vec!["holding", "position"]);
+    // "position" removed — collides with role domain
+    nouns.insert("holding", vec!["holding", "investment holding"]);
     nouns.insert("share-class", vec!["share class", "class"]);
 
     // Deal/Billing (067)
@@ -172,7 +185,7 @@ pub fn domain_nouns() -> HashMap<&'static str, Vec<&'static str>> {
 ///
 /// # Returns
 ///
-/// A vector of unique phrases, limited to 15 entries.
+/// A vector of unique phrases, limited to 20 entries.
 ///
 /// # Example
 ///
@@ -210,10 +223,10 @@ pub fn generate_phrases(domain: &str, action: &str, existing: &[String]) -> Vec<
         }
     }
 
-    // Dedupe and limit
-    phrases.sort();
-    phrases.dedup();
-    phrases.truncate(15);
+    // Dedupe (preserving generation order — primary action+domain first) and limit
+    let mut seen = std::collections::HashSet::new();
+    phrases.retain(|p| seen.insert(p.clone()));
+    phrases.truncate(20);
 
     phrases
 }
@@ -248,10 +261,12 @@ mod tests {
 
         // Core phrase should always be present
         assert!(phrases.contains(&"list billing".to_string()));
+        // list synonyms should use "show all"/"list all" (not bare "show")
+        assert!(phrases.contains(&"show all billing".to_string()));
         // Should have multiple phrases generated
         assert!(phrases.len() >= 5);
-        // Should be limited to max 15
-        assert!(phrases.len() <= 15);
+        // Should be limited to max 20
+        assert!(phrases.len() <= 20);
     }
 
     #[test]
