@@ -281,6 +281,7 @@ mod tests {
                 consumes: vec![],
                 lifecycle: None,
                 graph_query: None,
+                durable: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Upsert,
                     table: Some("cbus".to_string()),
@@ -380,6 +381,7 @@ mod tests {
                 consumes: vec![],
                 lifecycle: None,
                 graph_query: None,
+                durable: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::RoleLink,
                     table: None,

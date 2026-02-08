@@ -242,6 +242,7 @@ pub fn lint_verb_with_config(
             .unwrap_or(false),
         VerbBehavior::Plugin => metadata.writes_operational,
         VerbBehavior::GraphQuery => false,
+        VerbBehavior::Durable => metadata.writes_operational,
     };
 
     // =========================================================================
@@ -711,6 +712,7 @@ mod tests {
             }),
             handler: None,
             graph_query: None,
+            durable: None,
             args: vec![],
             returns: None,
             produces: None,
@@ -756,6 +758,7 @@ mod tests {
             }),
             handler: None,
             graph_query: None,
+            durable: None,
             args: vec![],
             returns: None,
             produces: None,
@@ -776,6 +779,7 @@ mod tests {
             crud: None,
             handler: Some("test_handler".to_string()),
             graph_query: None,
+            durable: None,
             args: vec![],
             returns: None,
             produces: None,

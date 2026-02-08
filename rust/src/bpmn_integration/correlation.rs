@@ -30,8 +30,9 @@ impl CorrelationStore {
             r#"
             INSERT INTO "ob-poc".bpmn_correlations
                 (correlation_id, process_instance_id, session_id, runbook_id,
-                 entry_id, process_key, domain_payload_hash, status, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                 entry_id, process_key, domain_payload_hash, status, created_at,
+                 domain_correlation_key)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
             record.correlation_id,
             record.process_instance_id,
@@ -42,6 +43,7 @@ impl CorrelationStore {
             record.domain_payload_hash,
             record.status.as_str(),
             record.created_at,
+            record.domain_correlation_key.as_deref(),
         )
         .execute(&self.pool)
         .await
@@ -62,7 +64,7 @@ impl CorrelationStore {
             r#"
             SELECT correlation_id, process_instance_id, session_id, runbook_id,
                    entry_id, process_key, domain_payload_hash, status,
-                   created_at, completed_at
+                   created_at, completed_at, domain_correlation_key
             FROM "ob-poc".bpmn_correlations
             WHERE process_instance_id = $1
             "#,
@@ -83,6 +85,7 @@ impl CorrelationStore {
             status: CorrelationStatus::parse(&r.status).unwrap_or(CorrelationStatus::Active),
             created_at: r.created_at,
             completed_at: r.completed_at,
+            domain_correlation_key: r.domain_correlation_key,
         }))
     }
 
@@ -99,7 +102,7 @@ impl CorrelationStore {
             r#"
             SELECT correlation_id, process_instance_id, session_id, runbook_id,
                    entry_id, process_key, domain_payload_hash, status,
-                   created_at, completed_at
+                   created_at, completed_at, domain_correlation_key
             FROM "ob-poc".bpmn_correlations
             WHERE session_id = $1 AND entry_id = $2
             "#,
@@ -121,6 +124,7 @@ impl CorrelationStore {
             status: CorrelationStatus::parse(&r.status).unwrap_or(CorrelationStatus::Active),
             created_at: r.created_at,
             completed_at: r.completed_at,
+            domain_correlation_key: r.domain_correlation_key,
         }))
     }
 
@@ -161,7 +165,7 @@ impl CorrelationStore {
             r#"
             SELECT correlation_id, process_instance_id, session_id, runbook_id,
                    entry_id, process_key, domain_payload_hash, status,
-                   created_at, completed_at
+                   created_at, completed_at, domain_correlation_key
             FROM "ob-poc".bpmn_correlations
             WHERE status = 'active'
             ORDER BY created_at ASC
@@ -184,7 +188,52 @@ impl CorrelationStore {
                 status: CorrelationStatus::parse(&r.status).unwrap_or(CorrelationStatus::Active),
                 created_at: r.created_at,
                 completed_at: r.completed_at,
+                domain_correlation_key: r.domain_correlation_key,
             })
             .collect())
+    }
+
+    /// Find an active correlation by process_key and domain correlation key.
+    ///
+    /// Used by lifecycle signal verbs (request.remind, request.cancel, etc.)
+    /// to discover if a domain entity (e.g., a KYC case) has an active BPMN
+    /// process instance. If found, signals can be routed through the BPMN
+    /// engine alongside legacy DB updates.
+    pub async fn find_active_by_domain_key(
+        &self,
+        process_key: &str,
+        domain_correlation_key: &str,
+    ) -> Result<Option<CorrelationRecord>> {
+        let row = sqlx::query!(
+            r#"
+            SELECT correlation_id, process_instance_id, session_id, runbook_id,
+                   entry_id, process_key, domain_payload_hash, status,
+                   created_at, completed_at, domain_correlation_key
+            FROM "ob-poc".bpmn_correlations
+            WHERE process_key = $1
+              AND domain_correlation_key = $2
+              AND status = 'active'
+            LIMIT 1
+            "#,
+            process_key,
+            domain_correlation_key,
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to query bpmn_correlation by domain_key")?;
+
+        Ok(row.map(|r| CorrelationRecord {
+            correlation_id: r.correlation_id,
+            process_instance_id: r.process_instance_id,
+            session_id: r.session_id,
+            runbook_id: r.runbook_id,
+            entry_id: r.entry_id,
+            process_key: r.process_key,
+            domain_payload_hash: r.domain_payload_hash,
+            status: CorrelationStatus::parse(&r.status).unwrap_or(CorrelationStatus::Active),
+            created_at: r.created_at,
+            completed_at: r.completed_at,
+            domain_correlation_key: r.domain_correlation_key,
+        }))
     }
 }

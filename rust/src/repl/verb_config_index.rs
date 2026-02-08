@@ -503,6 +503,7 @@ mod tests {
             crud: None,
             handler: None,
             graph_query: None,
+            durable: None,
             args: vec![],
             returns: None,
             produces: None,

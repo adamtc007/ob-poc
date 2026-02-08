@@ -393,6 +393,12 @@ impl VerbSyncService {
                 "type": "graph_query",
                 "operation": format!("{:?}", gq.operation),
             }),
+            RuntimeBehavior::Durable(d) => serde_json::json!({
+                "type": "durable",
+                "runtime": format!("{:?}", d.runtime),
+                "process_key": d.process_key,
+                "correlation_field": d.correlation_field,
+            }),
         };
 
         let args_json: Vec<serde_json::Value> = verb
@@ -584,6 +590,16 @@ impl VerbSyncService {
             RuntimeBehavior::GraphQuery(_) => {
                 // Graph queries are generally valid if they compile
             }
+            RuntimeBehavior::Durable(d) => {
+                if d.process_key.is_empty() {
+                    diagnostics.add_error_with_path(
+                        codes::PLUGIN_EMPTY_HANDLER,
+                        "Durable behavior missing process_key",
+                        Some("behavior.durable"),
+                        None,
+                    );
+                }
+            }
         }
     }
 
@@ -605,6 +621,7 @@ impl VerbSyncService {
             RuntimeBehavior::Crud(_) => "crud",
             RuntimeBehavior::Plugin(_) => "plugin",
             RuntimeBehavior::GraphQuery(_) => "graph_query",
+            RuntimeBehavior::Durable(_) => "durable",
         };
 
         // Extract produces info
@@ -725,6 +742,7 @@ impl VerbSyncService {
             RuntimeBehavior::Crud(c) => format!("crud:{:?}", c.operation),
             RuntimeBehavior::Plugin(h) => format!("plugin:{}", h),
             RuntimeBehavior::GraphQuery(g) => format!("graph_query:{:?}", g.operation),
+            RuntimeBehavior::Durable(d) => format!("durable:{}", d.process_key),
         };
         hasher.update(behavior_str.as_bytes());
 

@@ -799,6 +799,7 @@ async fn b3_13_signal_resume_parked_entry() {
         status: CorrelationStatus::Active,
         created_at: chrono::Utc::now(),
         completed_at: None,
+        domain_correlation_key: None,
     };
     correlation_store
         .insert(&record)

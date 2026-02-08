@@ -36,6 +36,8 @@ pub enum VerbBehavior {
     Composite,
     /// Graph query operation (GraphQueryExecutor)
     GraphQuery,
+    /// Durable execution via external workflow engine (e.g., BPMN-Lite)
+    Durable,
 }
 
 /// Argument definition for unified verbs
@@ -154,6 +156,7 @@ impl UnifiedVerbRegistry {
                 RuntimeBehavior::Crud(_) => (VerbBehavior::Crud, None),
                 RuntimeBehavior::Plugin(handler) => (VerbBehavior::CustomOp, Some(handler.clone())),
                 RuntimeBehavior::GraphQuery(_) => (VerbBehavior::GraphQuery, None),
+                RuntimeBehavior::Durable(_) => (VerbBehavior::Durable, None),
             };
 
             let unified = UnifiedVerbDef {

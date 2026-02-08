@@ -11,6 +11,7 @@ use xshell::{cmd, Shell};
 
 mod allianz_harness;
 mod aviva_deal_harness;
+mod bpmn_lite;
 mod deal_harness;
 mod entity;
 mod fund_programme;
@@ -534,6 +535,65 @@ enum Command {
         #[command(subcommand)]
         action: ReplayTunerAction,
     },
+
+    /// BPMN-Lite service commands (build, test, clippy, docker, deploy)
+    ///
+    /// Manages the standalone bpmn-lite orchestration service at bpmn-lite/.
+    BpmnLite {
+        #[command(subcommand)]
+        action: BpmnLiteAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum BpmnLiteAction {
+    /// Build the bpmn-lite workspace
+    Build {
+        /// Build in release mode
+        #[arg(long)]
+        release: bool,
+    },
+
+    /// Run all bpmn-lite tests
+    Test {
+        /// Filter test name
+        #[arg(long, short = 'f')]
+        filter: Option<String>,
+    },
+
+    /// Run clippy on bpmn-lite workspace
+    Clippy,
+
+    /// Start the bpmn-lite gRPC server (native, release build, background)
+    Start {
+        /// Port to listen on
+        #[arg(long, short = 'p', default_value = "50051")]
+        port: u16,
+    },
+
+    /// Stop the bpmn-lite gRPC server
+    Stop {
+        /// Port the server is listening on
+        #[arg(long, short = 'p', default_value = "50051")]
+        port: u16,
+    },
+
+    /// Show bpmn-lite service status (native and Docker)
+    Status {
+        /// Port to check
+        #[arg(long, short = 'p', default_value = "50051")]
+        port: u16,
+    },
+
+    /// Build Docker image for bpmn-lite
+    DockerBuild,
+
+    /// Build and deploy bpmn-lite via docker compose
+    Deploy {
+        /// Skip Docker image rebuild (use existing image)
+        #[arg(long)]
+        skip_build: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -648,6 +708,24 @@ enum VerbsAction {
     /// - Operator types only (structure_ref, party_ref, etc.)
     /// - Enum args must use ${arg.X.internal} in expansion
     LintMacros {
+        /// Show only errors, not warnings
+        #[arg(long)]
+        errors_only: bool,
+
+        /// Show verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
+
+    /// Lint durable verb YAML definitions
+    ///
+    /// Validates verbs with `behavior: durable` have correct config:
+    /// - process_key is non-empty
+    /// - correlation_field references a verb arg
+    /// - timeout is valid ISO 8601 duration (if present)
+    /// - task_bindings values reference known verbs
+    /// - runtime is a valid variant
+    LintDurable {
         /// Show only errors, not warnings
         #[arg(long)]
         errors_only: bool,
@@ -960,6 +1038,10 @@ fn main() -> Result<()> {
                     errors_only,
                     verbose,
                 } => lint_macros(errors_only, verbose),
+                VerbsAction::LintDurable {
+                    errors_only,
+                    verbose,
+                } => verbs::verbs_lint_durable(errors_only, verbose),
                 VerbsAction::Atlas {
                     output,
                     lint_only,
@@ -1085,6 +1167,16 @@ fn main() -> Result<()> {
                 session_log,
                 verbose,
             } => replay_tuner::report(&session_log, verbose),
+        },
+        Command::BpmnLite { action } => match action {
+            BpmnLiteAction::Build { release } => bpmn_lite::build(&sh, release),
+            BpmnLiteAction::Test { filter } => bpmn_lite::test(&sh, filter.as_deref()),
+            BpmnLiteAction::Clippy => bpmn_lite::clippy(&sh),
+            BpmnLiteAction::Start { port } => bpmn_lite::start(&sh, port),
+            BpmnLiteAction::Stop { port } => bpmn_lite::stop(&sh, port),
+            BpmnLiteAction::Status { port } => bpmn_lite::status(&sh, port),
+            BpmnLiteAction::DockerBuild => bpmn_lite::docker_build(&sh),
+            BpmnLiteAction::Deploy { skip_build } => bpmn_lite::deploy(&sh, !skip_build),
         },
     }
 }

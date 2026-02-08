@@ -3,7 +3,7 @@
 //! These structs map directly to the YAML configuration files.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 // =============================================================================
 // TOP-LEVEL CONFIG
@@ -62,6 +62,10 @@ pub struct VerbConfig {
     pub handler: Option<String>,
     #[serde(default)]
     pub graph_query: Option<GraphQueryConfig>,
+    /// Configuration for durable (workflow-engine-backed) execution.
+    /// Required when `behavior: durable`.
+    #[serde(default)]
+    pub durable: Option<DurableConfig>,
     #[serde(default)]
     pub args: Vec<ArgConfig>,
     #[serde(default)]
@@ -517,6 +521,9 @@ pub enum VerbBehavior {
     Plugin,
     /// Graph query operations - visualization, traversal, path-finding
     GraphQuery,
+    /// Durable execution — routed through an external workflow engine (e.g., BPMN-Lite).
+    /// The verb parks a token, receives a correlation key, and resumes on external signal.
+    Durable,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -647,6 +654,54 @@ pub enum GraphQueryOperation {
     Ancestors,
     /// Find all descendants of a node (BFS downward)
     Descendants,
+}
+
+// =============================================================================
+// DURABLE (WORKFLOW-ENGINE) CONFIG
+// =============================================================================
+
+/// Configuration for durable verb execution — routed through an external
+/// workflow engine (currently BPMN-Lite).
+///
+/// Example YAML:
+/// ```yaml
+/// kyc.open-case:
+///   behavior: durable
+///   durable:
+///     runtime: bpmn-lite
+///     process_key: kyc-open-case
+///     correlation_field: case_id
+///     timeout: P14D
+///     task_bindings:
+///       send_request_notification: notification.send-document-request
+///       validate_uploaded_document: document.validate
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DurableConfig {
+    /// Which workflow runtime to use.
+    pub runtime: DurableRuntime,
+    /// The process definition key in the workflow engine (e.g., "kyc-open-case").
+    pub process_key: String,
+    /// The verb argument whose value becomes the correlation key for signal routing.
+    pub correlation_field: String,
+    /// Map of BPMN service-task name → ob-poc verb FQN.
+    /// When the engine activates a service task, the job worker invokes the mapped verb.
+    #[serde(default)]
+    pub task_bindings: BTreeMap<String, String>,
+    /// Maximum duration before the workflow engine escalates (ISO 8601 duration, e.g., "P14D").
+    #[serde(default)]
+    pub timeout: Option<String>,
+    /// Escalation action when timeout expires (e.g., verb FQN or policy name).
+    #[serde(default)]
+    pub escalation: Option<String>,
+}
+
+/// Supported durable workflow runtimes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DurableRuntime {
+    /// bpmn-lite gRPC workflow engine
+    BpmnLite,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -1913,5 +1968,105 @@ args: []
 "#;
         let config: VerbConfig = serde_yaml::from_str(yaml).unwrap();
         assert!(config.policy.is_none());
+    }
+
+    // =========================================================================
+    // Durable behavior tests (B4)
+    // =========================================================================
+
+    #[test]
+    fn test_durable_behavior_serde() {
+        let yaml = "durable";
+        let behavior: VerbBehavior = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(behavior, VerbBehavior::Durable);
+    }
+
+    #[test]
+    fn test_durable_runtime_serde() {
+        let yaml = "bpmn-lite";
+        let runtime: DurableRuntime = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(runtime, DurableRuntime::BpmnLite);
+
+        // Round-trip
+        let json = serde_json::to_string(&runtime).unwrap();
+        assert_eq!(json, r#""bpmn-lite""#);
+    }
+
+    #[test]
+    fn test_durable_config_full_roundtrip() {
+        let yaml = r#"
+runtime: bpmn-lite
+process_key: kyc-open-case
+correlation_field: case_id
+timeout: P90D
+escalation: kyc.escalate-case
+task_bindings:
+  create_case_record: kyc-case.create
+  request_documents: document.solicit-set
+"#;
+        let config: DurableConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.runtime, DurableRuntime::BpmnLite);
+        assert_eq!(config.process_key, "kyc-open-case");
+        assert_eq!(config.correlation_field, "case_id");
+        assert_eq!(config.timeout.as_deref(), Some("P90D"));
+        assert_eq!(config.escalation.as_deref(), Some("kyc.escalate-case"));
+        assert_eq!(config.task_bindings.len(), 2);
+        assert_eq!(
+            config.task_bindings.get("create_case_record").unwrap(),
+            "kyc-case.create"
+        );
+    }
+
+    #[test]
+    fn test_durable_config_minimal() {
+        let yaml = r#"
+runtime: bpmn-lite
+process_key: simple-process
+correlation_field: entity_id
+"#;
+        let config: DurableConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.process_key, "simple-process");
+        assert!(config.timeout.is_none());
+        assert!(config.escalation.is_none());
+        assert!(config.task_bindings.is_empty());
+    }
+
+    #[test]
+    fn test_durable_verb_config_roundtrip() {
+        let yaml = r#"
+description: "Open a KYC case via BPMN workflow"
+behavior: durable
+durable:
+  runtime: bpmn-lite
+  process_key: kyc-open-case
+  correlation_field: case_id
+  timeout: P90D
+  task_bindings:
+    create_case: kyc-case.create
+args:
+  - name: cbu-id
+    type: uuid
+    required: true
+  - name: case-type
+    type: string
+    required: false
+    default: NEW_CLIENT
+returns:
+  type: uuid
+  name: case_id
+  capture: true
+"#;
+        let config: VerbConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.behavior, VerbBehavior::Durable);
+        assert!(config.durable.is_some());
+        let durable = config.durable.unwrap();
+        assert_eq!(durable.runtime, DurableRuntime::BpmnLite);
+        assert_eq!(durable.process_key, "kyc-open-case");
+        assert_eq!(durable.correlation_field, "case_id");
+        assert_eq!(durable.timeout.as_deref(), Some("P90D"));
+        assert_eq!(durable.task_bindings.len(), 1);
+        assert_eq!(config.args.len(), 2);
+        assert!(config.returns.is_some());
+        assert_eq!(config.returns.unwrap().name.as_deref(), Some("case_id"));
     }
 }

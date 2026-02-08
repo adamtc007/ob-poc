@@ -115,6 +115,63 @@ impl WorkflowConfigIndex {
     pub fn workflow_count(&self) -> usize {
         self.by_verb.len()
     }
+
+    /// Register a durable verb from its YAML `DurableConfig`.
+    ///
+    /// This bridges verb YAML declarations (`behavior: durable`) to the BPMN
+    /// routing layer so verbs don't need to appear in both `workflows.yaml`
+    /// and the verb YAML.  Existing entries (from `workflows.yaml`) take
+    /// precedence — this method is a no-op if the verb is already registered.
+    pub fn register_from_durable_config(
+        &mut self,
+        verb_fqn: &str,
+        durable: &dsl_core::DurableConfig,
+    ) {
+        if self.by_verb.contains_key(verb_fqn) {
+            tracing::debug!(
+                "WorkflowConfigIndex: verb {} already registered, skipping durable auto-register",
+                verb_fqn
+            );
+            return;
+        }
+
+        let task_bindings: Vec<TaskBinding> = durable
+            .task_bindings
+            .iter()
+            .map(|(task_type, target_verb)| TaskBinding {
+                task_type: task_type.clone(),
+                verb_fqn: target_verb.clone(),
+                timeout_ms: None,
+                max_retries: 3,
+            })
+            .collect();
+
+        // Collect task types for ActivateJobs
+        for tb in &task_bindings {
+            self.by_task_type
+                .insert(tb.task_type.clone(), (verb_fqn.to_string(), tb.clone()));
+            if !self.all_task_types.contains(&tb.task_type) {
+                self.all_task_types.push(tb.task_type.clone());
+            }
+        }
+
+        let binding = WorkflowBinding {
+            verb_fqn: verb_fqn.to_string(),
+            route: ExecutionRoute::Orchestrated,
+            process_key: Some(durable.process_key.clone()),
+            task_bindings,
+        };
+
+        tracing::info!(
+            "WorkflowConfigIndex: auto-registered durable verb {} → process_key={}",
+            verb_fqn,
+            durable.process_key
+        );
+        self.by_verb.insert(verb_fqn.to_string(), binding);
+
+        self.all_task_types.sort();
+        self.all_task_types.dedup();
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -224,5 +281,93 @@ mod tests {
         let parsed: WorkflowConfig = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(parsed.workflows.len(), 2);
         assert_eq!(parsed.workflows[0].verb_fqn, "kyc.open-case");
+    }
+
+    // =========================================================================
+    // Auto-registration from DurableConfig (B4.4)
+    // =========================================================================
+
+    #[test]
+    fn test_register_from_durable_config() {
+        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use std::collections::BTreeMap;
+
+        let mut index = WorkflowConfigIndex::from_config(&WorkflowConfig { workflows: vec![] });
+
+        // Verify verb is unknown before registration
+        assert_eq!(
+            index.route_for_verb("document.request"),
+            ExecutionRoute::Direct
+        );
+
+        let mut task_bindings = BTreeMap::new();
+        task_bindings.insert(
+            "send_notification".to_string(),
+            "notification.send".to_string(),
+        );
+        task_bindings.insert("validate_doc".to_string(), "document.validate".to_string());
+
+        let durable = DurableConfig {
+            runtime: DurableRuntime::BpmnLite,
+            process_key: "doc-request-workflow".to_string(),
+            correlation_field: "case_id".to_string(),
+            task_bindings,
+            timeout: Some("P14D".to_string()),
+            escalation: None,
+        };
+
+        index.register_from_durable_config("document.request", &durable);
+
+        // Now verb should be orchestrated
+        assert_eq!(
+            index.route_for_verb("document.request"),
+            ExecutionRoute::Orchestrated
+        );
+
+        // Task bindings should be discoverable
+        let (wf_fqn, tb) = index
+            .binding_for_task_type("send_notification")
+            .expect("should find task binding");
+        assert_eq!(wf_fqn, "document.request");
+        assert_eq!(tb.verb_fqn, "notification.send");
+
+        let (wf_fqn2, tb2) = index
+            .binding_for_task_type("validate_doc")
+            .expect("should find second task binding");
+        assert_eq!(wf_fqn2, "document.request");
+        assert_eq!(tb2.verb_fqn, "document.validate");
+    }
+
+    #[test]
+    fn test_register_from_durable_config_does_not_overwrite() {
+        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use std::collections::BTreeMap;
+
+        // Pre-register kyc.open-case via workflows.yaml
+        let mut index = WorkflowConfigIndex::from_config(&sample_config());
+
+        // Verify existing binding
+        let (_, tb) = index
+            .binding_for_task_type("create_case_record")
+            .expect("should find existing task binding");
+        assert_eq!(tb.verb_fqn, "kyc.create-case");
+
+        // Attempt to register same verb with different config
+        let durable = DurableConfig {
+            runtime: DurableRuntime::BpmnLite,
+            process_key: "different-process".to_string(),
+            correlation_field: "case_id".to_string(),
+            task_bindings: BTreeMap::new(),
+            timeout: None,
+            escalation: None,
+        };
+
+        index.register_from_durable_config("kyc.open-case", &durable);
+
+        // Original binding should be preserved (not overwritten)
+        let (_, tb_after) = index
+            .binding_for_task_type("create_case_record")
+            .expect("original task binding should still exist");
+        assert_eq!(tb_after.verb_fqn, "kyc.create-case");
     }
 }

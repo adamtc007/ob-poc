@@ -297,6 +297,13 @@ impl GenericCrudExecutor {
                     verb.verb
                 ));
             }
+            RuntimeBehavior::Durable(_) => {
+                return Err(anyhow!(
+                    "Verb {}.{} is durable, use WorkflowDispatcher",
+                    verb.domain,
+                    verb.verb
+                ));
+            }
         };
 
         tracing::debug!(

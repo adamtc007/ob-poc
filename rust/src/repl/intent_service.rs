@@ -488,6 +488,7 @@ mod tests {
                 crud: None,
                 handler: None,
                 graph_query: None,
+                durable: None,
                 returns: None,
                 produces: None,
                 consumes: vec![],

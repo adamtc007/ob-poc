@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write;
 use std::path::PathBuf;
 
-use dsl_core::config::types::{SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
+use dsl_core::config::types::{DurableConfig, SourceOfTruth, VerbBehavior, VerbScope, VerbTier};
 use dsl_core::config::ConfigLoader;
 use ob_poc::domain_ops::CustomOperationRegistry;
 use ob_poc::dsl_v2::RuntimeVerbRegistry;
@@ -1151,12 +1151,13 @@ pub fn verbs_atlas(output_dir: Option<PathBuf>, lint_only: bool, verbose: bool) 
                 VerbBehavior::Crud => "crud",
                 VerbBehavior::Plugin => "plugin",
                 VerbBehavior::GraphQuery => "graph_query",
+                VerbBehavior::Durable => "durable",
             }
             .to_string();
 
             let handler_exists = match verb_config.behavior {
                 VerbBehavior::Plugin => handler_list.contains(&fqn),
-                _ => true, // CRUD and GraphQuery don't need custom handlers
+                _ => true, // CRUD, GraphQuery, and Durable don't need custom handlers
             };
 
             // Index phrases for collision detection
@@ -1815,4 +1816,283 @@ fn generate_collisions_md(collisions: &[PhraseCollision]) -> String {
     }
 
     md
+}
+
+// =============================================================================
+// Durable verb YAML lint
+// =============================================================================
+
+/// Diagnostic finding from durable verb lint.
+struct DurableFinding {
+    verb_fqn: String,
+    code: &'static str,
+    severity: DurableSeverity,
+    message: String,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DurableSeverity {
+    Error,
+    Warning,
+}
+
+impl std::fmt::Display for DurableSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Error => write!(f, "ERROR"),
+            Self::Warning => write!(f, "WARN "),
+        }
+    }
+}
+
+/// Lint all verbs with `behavior: durable` for correct configuration.
+pub fn verbs_lint_durable(errors_only: bool, verbose: bool) -> Result<()> {
+    println!("===========================================");
+    println!("  Durable Verb Lint");
+    println!("===========================================\n");
+
+    let loader = ConfigLoader::from_env();
+    let verbs_config = loader.load_verbs().context("Failed to load verb config")?;
+
+    // Collect all verb FQNs for task_bindings cross-reference
+    let all_verb_fqns: HashSet<String> = verbs_config
+        .domains
+        .iter()
+        .flat_map(|(domain, dc)| {
+            dc.verbs
+                .keys()
+                .map(move |verb| format!("{}.{}", domain, verb))
+        })
+        .collect();
+
+    let mut findings: Vec<DurableFinding> = Vec::new();
+    let mut durable_count = 0u32;
+
+    for (domain, domain_config) in &verbs_config.domains {
+        for (verb_name, verb_config) in &domain_config.verbs {
+            if verb_config.behavior != VerbBehavior::Durable {
+                continue;
+            }
+            durable_count += 1;
+            let fqn = format!("{}.{}", domain, verb_name);
+
+            // DUR001: behavior: durable requires a durable: block
+            let Some(ref durable) = verb_config.durable else {
+                findings.push(DurableFinding {
+                    verb_fqn: fqn,
+                    code: "DUR001",
+                    severity: DurableSeverity::Error,
+                    message: "behavior: durable requires a sibling `durable:` config block"
+                        .to_string(),
+                });
+                continue;
+            };
+
+            lint_durable_config(&fqn, durable, verb_config, &all_verb_fqns, &mut findings);
+        }
+    }
+
+    // Print results
+    let error_count = findings
+        .iter()
+        .filter(|f| f.severity == DurableSeverity::Error)
+        .count();
+    let warning_count = findings
+        .iter()
+        .filter(|f| f.severity == DurableSeverity::Warning)
+        .count();
+
+    println!("Scanned {} durable verb(s)\n", durable_count);
+
+    if findings.is_empty() {
+        println!("  No issues found.");
+    } else {
+        for f in &findings {
+            if errors_only && f.severity != DurableSeverity::Error {
+                continue;
+            }
+            println!(
+                "  {} [{}] {}: {}",
+                f.severity, f.code, f.verb_fqn, f.message
+            );
+        }
+    }
+
+    println!();
+    println!("===========================================");
+    println!("  Summary");
+    println!("===========================================");
+    println!("  Durable verbs:  {}", durable_count);
+    println!("  Errors:         {}", error_count);
+    println!("  Warnings:       {}", warning_count);
+
+    if verbose {
+        println!(
+            "\n  All verb FQNs checked for task_bindings: {}",
+            all_verb_fqns.len()
+        );
+    }
+
+    if error_count > 0 {
+        anyhow::bail!("{} durable lint error(s) found", error_count);
+    }
+
+    Ok(())
+}
+
+fn lint_durable_config(
+    fqn: &str,
+    durable: &DurableConfig,
+    verb_config: &dsl_core::config::types::VerbConfig,
+    all_verb_fqns: &HashSet<String>,
+    findings: &mut Vec<DurableFinding>,
+) {
+    // DUR002: process_key must be non-empty
+    if durable.process_key.trim().is_empty() {
+        findings.push(DurableFinding {
+            verb_fqn: fqn.to_string(),
+            code: "DUR002",
+            severity: DurableSeverity::Error,
+            message: "durable.process_key must be non-empty".to_string(),
+        });
+    }
+
+    // DUR003: correlation_field must reference a verb arg or the returns.name
+    let arg_names: HashSet<&str> = verb_config.args.iter().map(|a| a.name.as_str()).collect();
+    let returns_name = verb_config.returns.as_ref().and_then(|r| r.name.as_deref());
+    let corr = &durable.correlation_field;
+    let hyphenated = corr.replace('_', "-");
+    let matches_arg = arg_names.contains(corr.as_str()) || arg_names.contains(hyphenated.as_str());
+    let matches_return = returns_name
+        .map(|rn| rn == corr.as_str() || rn == hyphenated.as_str())
+        .unwrap_or(false);
+    if !matches_arg && !matches_return {
+        findings.push(DurableFinding {
+            verb_fqn: fqn.to_string(),
+            code: "DUR003",
+            severity: DurableSeverity::Error,
+            message: format!(
+                "durable.correlation_field '{}' does not match any verb arg or returns.name (args: {:?}, returns.name: {:?})",
+                durable.correlation_field,
+                arg_names.iter().collect::<Vec<_>>(),
+                returns_name,
+            ),
+        });
+    }
+
+    // DUR004: task_bindings values should reference known verbs
+    for (task_name, verb_ref) in &durable.task_bindings {
+        // Convert kebab-case verb reference to dot notation for lookup
+        // e.g., "kyc-case.create" is already in dot notation
+        if !all_verb_fqns.contains(verb_ref) {
+            findings.push(DurableFinding {
+                verb_fqn: fqn.to_string(),
+                code: "DUR004",
+                severity: DurableSeverity::Warning,
+                message: format!(
+                    "durable.task_bindings['{}'] references unknown verb '{}'",
+                    task_name, verb_ref
+                ),
+            });
+        }
+    }
+
+    // DUR005: timeout must be valid ISO 8601 duration (if present)
+    if let Some(ref timeout) = durable.timeout {
+        if !is_valid_iso8601_duration(timeout) {
+            findings.push(DurableFinding {
+                verb_fqn: fqn.to_string(),
+                code: "DUR005",
+                severity: DurableSeverity::Error,
+                message: format!(
+                    "durable.timeout '{}' is not a valid ISO 8601 duration (expected P[n]Y[n]M[n]DT[n]H[n]M[n]S)",
+                    timeout
+                ),
+            });
+        }
+    }
+
+    // DUR006: escalation verb should reference a known verb (if present)
+    if let Some(ref escalation) = durable.escalation {
+        if !all_verb_fqns.contains(escalation) && !escalation.starts_with("policy:") {
+            findings.push(DurableFinding {
+                verb_fqn: fqn.to_string(),
+                code: "DUR006",
+                severity: DurableSeverity::Warning,
+                message: format!(
+                    "durable.escalation '{}' is not a known verb or policy:* reference",
+                    escalation
+                ),
+            });
+        }
+    }
+
+    // DUR007: empty task_bindings is suspicious for orchestrated verbs
+    if durable.task_bindings.is_empty() {
+        findings.push(DurableFinding {
+            verb_fqn: fqn.to_string(),
+            code: "DUR007",
+            severity: DurableSeverity::Warning,
+            message: "durable.task_bindings is empty — orchestrated verbs typically bind service tasks to sub-verbs".to_string(),
+        });
+    }
+}
+
+/// Basic ISO 8601 duration validation.
+/// Accepts patterns like P14D, P90D, P1Y, P1Y6M, PT2H30M, P1DT12H, etc.
+fn is_valid_iso8601_duration(s: &str) -> bool {
+    if !s.starts_with('P') || s.len() < 2 {
+        return false;
+    }
+
+    let rest = &s[1..];
+
+    // Split on T for date/time parts
+    let (date_part, time_part) = if let Some(pos) = rest.find('T') {
+        (&rest[..pos], Some(&rest[pos + 1..]))
+    } else {
+        (rest, None)
+    };
+
+    // Validate date part: sequence of digits followed by Y, M, W, or D
+    if !date_part.is_empty() && !validate_duration_components(date_part, &['Y', 'M', 'W', 'D']) {
+        return false;
+    }
+
+    // Validate time part: sequence of digits followed by H, M, or S
+    if let Some(tp) = time_part {
+        if tp.is_empty() || !validate_duration_components(tp, &['H', 'M', 'S']) {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Validate a duration string as a sequence of number+designator pairs.
+fn validate_duration_components(s: &str, valid_designators: &[char]) -> bool {
+    let mut chars = s.chars().peekable();
+    let mut found_any = false;
+
+    while chars.peek().is_some() {
+        // Expect one or more digits
+        let mut has_digits = false;
+        while chars.peek().map_or(false, |c| c.is_ascii_digit()) {
+            chars.next();
+            has_digits = true;
+        }
+        if !has_digits {
+            return false;
+        }
+
+        // Expect a designator character
+        match chars.next() {
+            Some(c) if valid_designators.contains(&c) => {
+                found_any = true;
+            }
+            _ => return false,
+        }
+    }
+
+    found_any
 }

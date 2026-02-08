@@ -77,6 +77,11 @@ pub struct CorrelationRecord {
     pub created_at: DateTime<Utc>,
     /// When the correlation was completed/failed/cancelled.
     pub completed_at: Option<DateTime<Utc>>,
+    /// Domain-level correlation key (e.g., case_id as string).
+    /// Extracted from the DurableConfig.correlation_field at dispatch time.
+    /// Enables lifecycle signal verbs to discover active BPMN processes
+    /// for a given domain entity.
+    pub domain_correlation_key: Option<String>,
 }
 
 /// Status of a BPMN correlation record.

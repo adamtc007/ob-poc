@@ -1,0 +1,83 @@
+# KYC orchestrated verbs — durable workflows backed by BPMN-Lite.
+#
+# These are composite KYC operations that drive multi-step BPMN processes.
+# Each verb parks a token via WorkflowDispatcher and resumes on external signal.
+#
+# The underlying service tasks (kyc-case.create, document.solicit-set, etc.)
+# remain as standalone verbs with their own behavior (crud/plugin).
+
+domains:
+  kyc:
+    description: "Orchestrated KYC workflows backed by BPMN-Lite"
+
+    verbs:
+      open-case:
+        description: >
+          Open a full KYC case for a CBU. This is a durable workflow that
+          orchestrates case creation, document solicitation, and decision
+          recording via a BPMN process. The verb parks and resumes on
+          external completion signals.
+        behavior: durable
+        durable:
+          runtime: bpmn-lite
+          process_key: kyc-open-case
+          correlation_field: case_id
+          timeout: P90D
+          task_bindings:
+            create_case_record: kyc-case.create
+            request_documents: document.solicit-set
+            record_decision: kyc.record-decision
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: kyc_case
+        lifecycle:
+          requires_scope: cbu
+        invocation_phrases:
+          - "open kyc case"
+          - "start kyc process"
+          - "begin kyc for"
+          - "open a case"
+          - "initiate kyc"
+          - "run kyc workflow"
+          - "start onboarding case"
+        args:
+          - name: cbu-id
+            type: uuid
+            required: true
+            description: "CBU to open the KYC case for"
+            lookup:
+              table: cbus
+              entity_type: cbu
+              schema: ob-poc
+              search_key: name
+              primary_key: cbu_id
+          - name: case-type
+            type: string
+            required: false
+            default: NEW_CLIENT
+            valid_values:
+              - NEW_CLIENT
+              - PERIODIC_REVIEW
+              - EVENT_DRIVEN
+              - REMEDIATION
+          - name: assigned-analyst-id
+            type: uuid
+            required: false
+            description: "Analyst to assign the case to"
+            lookup:
+              table: entities
+              entity_type: entity
+              schema: ob-poc
+              search_key: name
+              primary_key: entity_id
+          - name: notes
+            type: string
+            required: false
+            description: "Additional notes for the case"
+        returns:
+          type: uuid
+          name: case_id
+          capture: true
+          description: "The created KYC case ID (available after BPMN process completes create_case_record task)"

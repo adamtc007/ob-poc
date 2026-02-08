@@ -1190,6 +1190,18 @@ impl DslExecutor {
                 vc.verb
             ));
         }
+
+        // Durable verbs require the V2 REPL / WorkflowDispatcher infrastructure
+        if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
+            return Err(anyhow!(
+                "Durable verb {}.{} (process_key={}) requires V2 REPL with WorkflowDispatcher. \
+                 Use /api/repl/v2/ endpoints instead.",
+                vc.domain,
+                vc.verb,
+                d.process_key
+            ));
+        }
+
         tracing::debug!("execute_verb: routing to GENERIC executor");
 
         // Convert VerbCall arguments to JSON for generic executor
@@ -1466,6 +1478,17 @@ impl DslExecutor {
                 "Plugin {}.{} has no handler implementation",
                 vc.domain,
                 vc.verb
+            ));
+        }
+
+        // Durable verbs cannot participate in transactional batches
+        if let RuntimeBehavior::Durable(d) = &runtime_verb.behavior {
+            return Err(anyhow!(
+                "Durable verb {}.{} (process_key={}) cannot execute in a transaction. \
+                 Durable verbs require the V2 REPL with WorkflowDispatcher.",
+                vc.domain,
+                vc.verb,
+                d.process_key
             ));
         }
 

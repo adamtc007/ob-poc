@@ -12,7 +12,7 @@ domains:
         description: "Compile BPMN XML to bytecode via bpmn-lite"
         behavior: plugin
         metadata:
-          tier: operational
+          tier: composite
           source_of_truth: external
         invocation_phrases:
           - "compile bpmn model"
@@ -31,7 +31,7 @@ domains:
         description: "Start a BPMN process instance"
         behavior: plugin
         metadata:
-          tier: operational
+          tier: composite
           source_of_truth: external
         invocation_phrases:
           - "start bpmn process"
@@ -54,7 +54,7 @@ domains:
         description: "Send a signal to a running BPMN process instance"
         behavior: plugin
         metadata:
-          tier: operational
+          tier: composite
           source_of_truth: external
         invocation_phrases:
           - "signal bpmn process"
@@ -80,7 +80,7 @@ domains:
         description: "Cancel a running BPMN process instance"
         behavior: plugin
         metadata:
-          tier: operational
+          tier: composite
           source_of_truth: external
         invocation_phrases:
           - "cancel bpmn process"
@@ -102,7 +102,7 @@ domains:
         description: "Inspect a running BPMN process instance"
         behavior: plugin
         metadata:
-          tier: operational
+          tier: composite
           source_of_truth: external
         invocation_phrases:
           - "inspect bpmn process"

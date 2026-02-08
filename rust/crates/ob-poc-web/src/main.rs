@@ -595,7 +595,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let config_path = std::path::Path::new(&config_dir).join("workflows.yaml");
 
                 match WorkflowConfigIndex::load_from_file(&config_path) {
-                    Ok(config_index) => {
+                    Ok(mut config_index) => {
+                        // Auto-register durable verbs from verb YAML into
+                        // the workflow config index. This bridges `behavior: durable`
+                        // declarations to the BPMN routing layer without duplicating
+                        // config in workflows.yaml.
+                        {
+                            use ob_poc::dsl_v2::config::types::DurableConfig;
+                            use ob_poc::dsl_v2::runtime_registry::{
+                                runtime_registry, RuntimeBehavior,
+                            };
+                            let reg = runtime_registry();
+                            let mut registered = 0usize;
+                            for verb in reg.all_verbs() {
+                                if let RuntimeBehavior::Durable(d) = &verb.behavior {
+                                    let durable_config = DurableConfig {
+                                        runtime: d.runtime,
+                                        process_key: d.process_key.clone(),
+                                        correlation_field: d.correlation_field.clone(),
+                                        task_bindings: d.task_bindings.clone(),
+                                        timeout: d.timeout.clone(),
+                                        escalation: d.escalation.clone(),
+                                    };
+                                    config_index.register_from_durable_config(
+                                        &verb.full_name,
+                                        &durable_config,
+                                    );
+                                    registered += 1;
+                                }
+                            }
+                            if registered > 0 {
+                                tracing::info!(
+                                    "Auto-registered {} durable verbs in WorkflowConfigIndex",
+                                    registered
+                                );
+                            }
+                        }
+
                         let config_index = Arc::new(config_index);
 
                         // 4. Spawn JobWorker as background task

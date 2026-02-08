@@ -156,6 +156,7 @@ impl WorkflowDispatcher {
             status: CorrelationStatus::Active,
             created_at: chrono::Utc::now(),
             completed_at: None,
+            domain_correlation_key: None, // TODO: extract from DurableConfig.correlation_field when available
         };
 
         if let Err(e) = self.correlations.insert(&record).await {

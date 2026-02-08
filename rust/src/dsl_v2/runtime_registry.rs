@@ -111,6 +111,8 @@ pub enum RuntimeBehavior {
     Plugin(String),
     /// Graph query operation
     GraphQuery(Box<RuntimeGraphQueryConfig>),
+    /// Durable execution via external workflow engine (e.g., BPMN-Lite)
+    Durable(Box<RuntimeDurableConfig>),
 }
 
 #[derive(Debug, Clone)]
@@ -164,7 +166,25 @@ pub struct RuntimeGraphQueryConfig {
     pub default_view_mode: Option<String>,
 }
 
-use super::config::types::GraphQueryOperation;
+/// Runtime configuration for durable (workflow-engine-backed) verb execution.
+/// Built from `DurableConfig` in verb YAML.
+#[derive(Debug, Clone)]
+pub struct RuntimeDurableConfig {
+    /// Which workflow runtime to use
+    pub runtime: DurableRuntime,
+    /// The process definition key in the workflow engine (e.g., "kyc-open-case")
+    pub process_key: String,
+    /// The verb argument whose value becomes the correlation key for signal routing
+    pub correlation_field: String,
+    /// Map of BPMN service-task name → ob-poc verb FQN
+    pub task_bindings: std::collections::BTreeMap<String, String>,
+    /// Maximum duration before escalation (ISO 8601 duration)
+    pub timeout: Option<String>,
+    /// Escalation action when timeout expires
+    pub escalation: Option<String>,
+}
+
+use super::config::types::{DurableRuntime, GraphQueryOperation};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeArg {
@@ -459,6 +479,24 @@ impl RuntimeVerbRegistry {
                     max_depth: graph_query.map(|g| g.max_depth).unwrap_or(10),
                     default_view_mode: graph_query.and_then(|g| g.default_view_mode.clone()),
                 }))
+            }
+            (VerbBehavior::Durable, _, _) => {
+                if let Some(durable) = &config.durable {
+                    RuntimeBehavior::Durable(Box::new(RuntimeDurableConfig {
+                        runtime: durable.runtime,
+                        process_key: durable.process_key.clone(),
+                        correlation_field: durable.correlation_field.clone(),
+                        task_bindings: durable.task_bindings.clone(),
+                        timeout: durable.timeout.clone(),
+                        escalation: durable.escalation.clone(),
+                    }))
+                } else {
+                    warn!(
+                        "Durable verb {}.{} missing durable config, defaulting to plugin",
+                        domain, verb
+                    );
+                    RuntimeBehavior::Plugin(verb.replace('-', "_"))
+                }
             }
             _ => {
                 warn!(
@@ -881,6 +919,7 @@ mod tests {
                 consumes: vec![],
                 lifecycle: None,
                 graph_query: None,
+                durable: None,
                 handler: None,
                 crud: Some(CrudConfig {
                     operation: CrudOperation::Insert,
@@ -1049,6 +1088,112 @@ mod tests {
             for t in registry.list_templates() {
                 println!("  - {} ({})", t.template, t.metadata.summary);
             }
+        }
+    }
+
+    // =========================================================================
+    // Durable behavior mapping (B4.2)
+    // =========================================================================
+
+    #[test]
+    fn test_durable_verb_maps_to_runtime_durable() {
+        use dsl_core::config::types::{DurableConfig, DurableRuntime};
+        use std::collections::BTreeMap;
+
+        let mut domains = HashMap::new();
+        let mut kyc_verbs = HashMap::new();
+
+        let mut task_bindings = BTreeMap::new();
+        task_bindings.insert(
+            "create_case_record".to_string(),
+            "kyc-case.create".to_string(),
+        );
+
+        kyc_verbs.insert(
+            "open-case".to_string(),
+            VerbConfig {
+                description: "Open KYC case via BPMN".to_string(),
+                behavior: VerbBehavior::Durable,
+                produces: None,
+                consumes: vec![],
+                lifecycle: None,
+                graph_query: None,
+                durable: Some(DurableConfig {
+                    runtime: DurableRuntime::BpmnLite,
+                    process_key: "kyc-open-case".to_string(),
+                    correlation_field: "case_id".to_string(),
+                    task_bindings,
+                    timeout: Some("P90D".to_string()),
+                    escalation: None,
+                }),
+                handler: None,
+                crud: None,
+                args: vec![ArgConfig {
+                    name: "cbu-id".to_string(),
+                    arg_type: ArgType::Uuid,
+                    required: true,
+                    maps_to: None,
+                    lookup: None,
+                    valid_values: None,
+                    default: None,
+                    description: None,
+                    validation: None,
+                    fuzzy_check: None,
+                    slot_type: None,
+                    preferred_roles: vec![],
+                }],
+                returns: Some(ReturnsConfig {
+                    return_type: ReturnTypeConfig::Uuid,
+                    name: Some("case_id".to_string()),
+                    capture: Some(true),
+                }),
+                metadata: None,
+                invocation_phrases: vec![],
+                policy: None,
+                sentences: None,
+                confirm_policy: None,
+            },
+        );
+
+        domains.insert(
+            "kyc".to_string(),
+            DomainConfig {
+                description: "KYC operations".to_string(),
+                verbs: kyc_verbs,
+                dynamic_verbs: vec![],
+                invocation_hints: vec![],
+            },
+        );
+
+        let config = VerbsConfig {
+            version: "1.0".to_string(),
+            domains,
+        };
+
+        let registry = RuntimeVerbRegistry::from_config(&config);
+
+        // Verify verb exists
+        assert!(registry.contains("kyc", "open-case"));
+
+        let verb = registry.get("kyc", "open-case").unwrap();
+        assert_eq!(verb.full_name, "kyc.open-case");
+
+        // Verify behavior is Durable
+        match &verb.behavior {
+            RuntimeBehavior::Durable(durable_cfg) => {
+                assert_eq!(durable_cfg.process_key, "kyc-open-case");
+                assert_eq!(durable_cfg.correlation_field, "case_id");
+                assert_eq!(durable_cfg.timeout.as_deref(), Some("P90D"));
+                assert_eq!(durable_cfg.task_bindings.len(), 1);
+                assert_eq!(
+                    durable_cfg.task_bindings.get("create_case_record").unwrap(),
+                    "kyc-case.create"
+                );
+            }
+            other => panic!(
+                "Expected RuntimeBehavior::Durable, got {:?}",
+                std::mem::discriminant(other)
+            ),
         }
     }
 }
