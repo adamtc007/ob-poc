@@ -124,7 +124,7 @@ impl JobWorker {
     }
 
     /// Execute a single poll cycle. Returns the number of jobs processed.
-    async fn poll_and_execute(&self) -> anyhow::Result<usize> {
+    pub async fn poll_and_execute(&self) -> anyhow::Result<usize> {
         let task_types = self.config.all_task_types();
         if task_types.is_empty() {
             return Ok(0);

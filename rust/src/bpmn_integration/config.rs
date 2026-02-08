@@ -32,6 +32,9 @@ pub struct WorkflowConfigIndex {
     by_task_type: HashMap<String, (String, TaskBinding)>,
     /// All task types collected from orchestrated workflows (for ActivateJobs).
     all_task_types: Vec<String>,
+    /// process_key → compiled bytecode version (32 bytes).
+    /// Populated via `register_bytecode()` after compiling BPMN models.
+    bytecode_registry: HashMap<String, Vec<u8>>,
 }
 
 impl WorkflowConfigIndex {
@@ -60,6 +63,7 @@ impl WorkflowConfigIndex {
             by_verb,
             by_task_type,
             all_task_types,
+            bytecode_registry: HashMap::new(),
         }
     }
 
@@ -114,6 +118,24 @@ impl WorkflowConfigIndex {
     /// Number of registered workflows.
     pub fn workflow_count(&self) -> usize {
         self.by_verb.len()
+    }
+
+    /// Register the compiled bytecode version for a process key.
+    ///
+    /// Called after compiling a BPMN model so the dispatcher can pass the
+    /// correct bytecode_version to `start_process`.
+    pub fn register_bytecode(&mut self, process_key: &str, bytecode_version: Vec<u8>) {
+        self.bytecode_registry
+            .insert(process_key.to_string(), bytecode_version);
+    }
+
+    /// Look up the bytecode version for a process key.
+    ///
+    /// Returns `None` if the model hasn't been compiled/registered yet.
+    pub fn bytecode_for_process(&self, process_key: &str) -> Option<&[u8]> {
+        self.bytecode_registry
+            .get(process_key)
+            .map(|v| v.as_slice())
     }
 
     /// Register a durable verb from its YAML `DurableConfig`.

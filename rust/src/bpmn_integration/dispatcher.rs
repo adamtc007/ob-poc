@@ -112,10 +112,12 @@ impl WorkflowDispatcher {
         let payload_value = serde_json::Value::String(dsl.to_string());
         let (canonical_json, hash) = canonical_json_with_hash(&payload_value);
 
-        // 2. We need bytecode — for now, use an empty placeholder.
-        //    In production, the bytecode would be pre-compiled and cached.
-        //    The bpmn-lite service looks up bytecode by process_key.
-        let bytecode_version = Vec::new();
+        // 2. Look up pre-compiled bytecode version from the config registry.
+        let bytecode_version = self
+            .config
+            .bytecode_for_process(&process_key)
+            .map(|b| b.to_vec())
+            .unwrap_or_default();
 
         let correlation_id = Uuid::new_v4();
         let correlation_key = format!("{}:{}:{}", runbook_id, entry_id, correlation_id);
