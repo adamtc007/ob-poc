@@ -132,6 +132,10 @@ pub mod service_resources;
 #[cfg(feature = "database")]
 pub mod repl;
 
+// BPMN-Lite integration - gRPC client, workflow dispatch, job worker, event bridge
+#[cfg(feature = "database")]
+pub mod bpmn_integration;
+
 // Journey module - Pack-guided REPL v2 (Journey Packs, sentence templates, unified runbook)
 #[cfg(feature = "vnext-repl")]
 pub mod journey;

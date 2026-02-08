@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  KYC Open Case — BPMN model for integration testing.
+
+  Flow:
+    Start
+      → create_case_record   (ServiceTask)
+      → request_documents    (ServiceTask)
+      → WAIT_MSG(docs_received)
+      → reviewer_decision    (UserTask / human gate)
+      → record_decision      (ServiceTask)
+      → End
+
+  Task types map to ob-poc verbs via config/workflows.yaml:
+    create_case_record  → kyc-case.create
+    request_documents   → document.solicit-set
+    record_decision     → kyc-case.update-status
+-->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0">
+  <bpmn:process id="kyc_open_case" isExecutable="true">
+
+    <!-- ===== Nodes ===== -->
+    <bpmn:startEvent id="start" />
+
+    <bpmn:serviceTask id="create_case" name="Create Case Record">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="create_case_record" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="request_docs" name="Request Documents">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="request_documents" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:intermediateCatchEvent id="wait_docs" name="docs_received">
+      <bpmn:messageEventDefinition messageRef="msg_docs_received" />
+      <bpmn:extensionElements>
+        <zeebe:subscription correlationKey="=case_id" />
+      </bpmn:extensionElements>
+    </bpmn:intermediateCatchEvent>
+
+    <bpmn:userTask id="reviewer_decision" name="Reviewer Decision">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="reviewer_decision" />
+        <zeebe:subscription correlationKey="=case_id" />
+      </bpmn:extensionElements>
+    </bpmn:userTask>
+
+    <bpmn:serviceTask id="record_decision" name="Record Decision">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="record_decision" />
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="end" />
+
+    <!-- ===== Flows ===== -->
+    <bpmn:sequenceFlow id="f1" sourceRef="start"             targetRef="create_case" />
+    <bpmn:sequenceFlow id="f2" sourceRef="create_case"       targetRef="request_docs" />
+    <bpmn:sequenceFlow id="f3" sourceRef="request_docs"      targetRef="wait_docs" />
+    <bpmn:sequenceFlow id="f4" sourceRef="wait_docs"         targetRef="reviewer_decision" />
+    <bpmn:sequenceFlow id="f5" sourceRef="reviewer_decision" targetRef="record_decision" />
+    <bpmn:sequenceFlow id="f6" sourceRef="record_decision"   targetRef="end" />
+
+  </bpmn:process>
+</bpmn:definitions>

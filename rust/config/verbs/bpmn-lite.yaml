@@ -1,0 +1,118 @@
+# BPMN-Lite control verbs — direct gRPC operations for workflow management.
+#
+# These verbs allow operators to compile BPMN models, start/signal/cancel
+# process instances, and inspect running workflows via the bpmn-lite service.
+
+domains:
+  bpmn:
+    description: "BPMN workflow orchestration control operations"
+
+    verbs:
+      compile:
+        description: "Compile BPMN XML to bytecode via bpmn-lite"
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+        invocation_phrases:
+          - "compile bpmn model"
+          - "compile workflow"
+          - "build bpmn bytecode"
+        args:
+          - name: bpmn-xml
+            type: string
+            required: true
+            description: "BPMN XML source to compile"
+        returns:
+          type: record
+          description: "Compilation result with bytecode version and diagnostics"
+
+      start:
+        description: "Start a BPMN process instance"
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+        invocation_phrases:
+          - "start bpmn process"
+          - "start workflow instance"
+          - "launch workflow"
+        args:
+          - name: process-key
+            type: string
+            required: true
+            description: "BPMN process key (matches compiled model)"
+          - name: payload
+            type: string
+            required: false
+            description: "Domain payload as JSON string"
+        returns:
+          type: uuid
+          description: "Process instance ID"
+
+      signal:
+        description: "Send a signal to a running BPMN process instance"
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+        invocation_phrases:
+          - "signal bpmn process"
+          - "send workflow signal"
+          - "resume workflow"
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            description: "Process instance ID to signal"
+          - name: message-name
+            type: string
+            required: true
+            description: "Signal message name"
+          - name: payload
+            type: string
+            required: false
+            description: "Signal payload as bytes"
+        returns:
+          type: void
+
+      cancel:
+        description: "Cancel a running BPMN process instance"
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+        invocation_phrases:
+          - "cancel bpmn process"
+          - "cancel workflow"
+          - "abort workflow"
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            description: "Process instance ID to cancel"
+          - name: reason
+            type: string
+            required: false
+            description: "Cancellation reason"
+        returns:
+          type: void
+
+      inspect:
+        description: "Inspect a running BPMN process instance"
+        behavior: plugin
+        metadata:
+          tier: operational
+          source_of_truth: external
+        invocation_phrases:
+          - "inspect bpmn process"
+          - "inspect workflow"
+          - "show workflow status"
+        args:
+          - name: instance-id
+            type: uuid
+            required: true
+            description: "Process instance ID to inspect"
+        returns:
+          type: record
+          description: "Process state, fibers, and wait conditions"

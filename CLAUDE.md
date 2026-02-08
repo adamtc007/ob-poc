@@ -42,6 +42,8 @@
 > **Clarification UX Wiring (075):** ✅ Complete - Unified DecisionPacket system for verb/scope/group disambiguation with confirm tokens
 > **Inspector-First Visualization (076):** ✅ Complete - Deterministic tree/table Inspector UI, projection schema with $ref linking, 82 tests
 > **Deal Record & Fee Billing (067):** ✅ Complete - Commercial origination hub, rate card negotiation, closed-loop billing
+> **BPMN-Lite Runtime (Phase A):** ✅ Complete - Standalone durable orchestration service, 16-opcode VM, gRPC API (verified over the wire), 37 tests + gRPC smoke test
+> **BPMN-Lite Integration (Phase B):** ✅ Complete - ob-poc ↔ bpmn-lite wiring: WorkflowDispatcher, JobWorker, EventBridge, correlation stores, 41 unit tests + 13 integration tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -67,6 +69,17 @@ DATABASE_URL="postgresql:///data_designer" cargo run -p ob-poc-web
 
 # React development (hot reload)
 cd ob-poc-ui-react && npm run dev  # Runs on port 5173, proxies API to :3000
+
+# BPMN-Lite service (standalone workspace at bpmn-lite/)
+cargo x bpmn-lite build            # Build bpmn-lite workspace
+cargo x bpmn-lite build --release  # Release build
+cargo x bpmn-lite test             # Run all 37 tests (+ 1 ignored gRPC smoke test)
+cargo x bpmn-lite clippy           # Lint
+cargo x bpmn-lite start            # Build release + start native (port 50051)
+cargo x bpmn-lite stop             # Stop native server
+cargo x bpmn-lite status           # Show native + Docker status
+cargo x bpmn-lite docker-build     # Build Docker image
+cargo x bpmn-lite deploy           # Docker build + compose up
 ```
 
 ---
@@ -1844,6 +1857,145 @@ The harness creates:
 - 2 Contracts (Core Services + Ancillary Services)
 - 9 Products with rate cards
 - Fee lines with BPS, FLAT, PER_TRANSACTION pricing
+
+---
+
+## BPMN-Lite Integration (Phase B)
+
+> ✅ **IMPLEMENTED (2026-02-08)**: ob-poc ↔ bpmn-lite gRPC wiring with WorkflowDispatcher, JobWorker, EventBridge, correlation stores.
+
+**Problem Solved:** Verbs that represent long-running processes (days/weeks — document solicitation, KYC reviews, approvals) were fire-and-forget. Phase B wires ob-poc to the standalone bpmn-lite gRPC service so orchestrated verbs park the REPL runbook and resume on external signals.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  BPMN-LITE INTEGRATION PIPELINE                                             │
+│                                                                              │
+│  REPL V2 Orchestrator                                                        │
+│       │                                                                       │
+│       ▼                                                                       │
+│  WorkflowDispatcher (implements DslExecutorV2)                              │
+│       │                                                                       │
+│       ├─► Direct verb → inner executor → DslExecutionOutcome::Completed     │
+│       │                                                                       │
+│       └─► Orchestrated verb:                                                │
+│               1. canonical_json_with_hash(payload)                          │
+│               2. gRPC StartProcess → process_instance_id                    │
+│               3. CorrelationStore.insert() (session ↔ process link)         │
+│               4. ParkedTokenStore.insert() (waiting entry)                  │
+│               5. → DslExecutionOutcome::Parked                              │
+│                                                                              │
+│  JobWorker (background task, long-poll loop)                                │
+│       │   1. ActivateJobs via gRPC (30s timeout)                            │
+│       │   2. Dedupe via JobFrameStore                                       │
+│       │   3. Execute ob-poc verb for each job                               │
+│       │   4. CompleteJob / FailJob via gRPC                                 │
+│       │                                                                      │
+│  EventBridge (per-process subscription)                                     │
+│       │   1. SubscribeEvents via gRPC (streaming)                           │
+│       │   2. Translate lifecycle events → OutcomeEvent                      │
+│       │   3. Update CorrelationStore / ParkedTokenStore                     │
+│       │   4. On ProcessCompleted → POST /api/repl/v2/signal (resume)       │
+│                                                                              │
+│  Signal Endpoint: POST /api/repl/v2/signal                                  │
+│       │   1. Lookup parked entry by correlation_key                         │
+│       │   2. runbook.resume_entry() → EntryStatus::Completed               │
+│       │   3. Continue execution from next entry                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Module Structure
+
+```
+rust/src/bpmn_integration/
+├── mod.rs              # Module root, re-exports
+├── types.rs            # CorrelationRecord, JobFrame, ParkedToken, OutcomeEvent,
+│                       # WorkflowBinding, TaskBinding, ExecutionRoute
+├── canonical.rs        # canonical_json_with_hash(), sha256_bytes()
+├── client.rs           # BpmnLiteConnection — typed gRPC client wrapper
+├── config.rs           # WorkflowConfigIndex — verb→route mapping from YAML
+├── correlation.rs      # CorrelationStore — session ↔ process instance links
+├── job_frames.rs       # JobFrameStore — dedupe for at-least-once delivery
+├── parked_tokens.rs    # ParkedTokenStore — waiting REPL entries
+├── dispatcher.rs       # WorkflowDispatcher — DslExecutorV2 impl, routes Direct/Orchestrated
+├── worker.rs           # JobWorker — long-poll job activation + verb execution
+└── event_bridge.rs     # EventBridge — lifecycle event subscription + translation
+```
+
+### Key Types
+
+| Type | Purpose |
+|------|---------|
+| `ExecutionRoute` | `Direct` (standard executor) or `Orchestrated` (BPMN-Lite) |
+| `WorkflowBinding` | Maps verb FQN → route + process_key + task_bindings |
+| `TaskBinding` | Maps BPMN task_type → ob-poc verb FQN + timeout + retries |
+| `CorrelationRecord` | Links process_instance_id ↔ session/runbook/entry with payload hash |
+| `JobFrame` | Tracks job activation for dedupe (job_key, status, attempts) |
+| `ParkedToken` | Waiting REPL entry with correlation_key for O(1) signal routing |
+| `OutcomeEvent` | Translated BPMN events: StepCompleted, StepFailed, ProcessCompleted, ProcessCancelled, IncidentCreated |
+| `BpmnLiteConnection` | Typed gRPC client (connect_lazy, 8 RPC methods) |
+| `WorkflowConfigIndex` | In-memory verb→route index loaded from `config/workflows.yaml` |
+
+### Control Verbs
+
+| Verb | Purpose |
+|------|---------|
+| `bpmn.compile` | Compile BPMN XML → bytecode via gRPC |
+| `bpmn.start` | Start a process instance |
+| `bpmn.signal` | Send signal to waiting process |
+| `bpmn.cancel` | Cancel running process |
+| `bpmn.inspect` | Inspect process state (fiber positions, waits) |
+
+### Server Wiring
+
+BPMN integration is **conditionally enabled** on the `BPMN_LITE_GRPC_URL` environment variable in `ob-poc-web/src/main.rs`:
+
+```bash
+# Enable BPMN-Lite integration
+BPMN_LITE_GRPC_URL=http://localhost:50052 cargo run -p ob-poc-web
+
+# Without env var — integration disabled, all verbs execute directly
+cargo run -p ob-poc-web
+```
+
+On startup (when enabled):
+1. Create `BpmnLiteConnection` (lazy — no network call until first RPC)
+2. Create stores (`CorrelationStore`, `JobFrameStore`, `ParkedTokenStore`)
+3. Load `WorkflowConfigIndex` from `config/workflows.yaml`
+4. Spawn `JobWorker` as background task
+5. Log "BPMN-Lite integration initialized"
+
+### Database Tables (migration 073)
+
+| Table | Purpose |
+|-------|---------|
+| `bpmn_correlations` | PK `correlation_id`, UNIQUE on `process_instance_id` |
+| `bpmn_job_frames` | PK `job_key`, indexed on `status WHERE active` |
+| `bpmn_parked_tokens` | PK `token_id`, UNIQUE on `correlation_key` |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `rust/src/bpmn_integration/dispatcher.rs` | `WorkflowDispatcher` — routes verbs, implements `DslExecutorV2` |
+| `rust/src/bpmn_integration/worker.rs` | `JobWorker` — background job activation loop |
+| `rust/src/bpmn_integration/event_bridge.rs` | `EventBridge` — lifecycle event translation |
+| `rust/src/bpmn_integration/client.rs` | `BpmnLiteConnection` — typed gRPC wrapper |
+| `rust/src/bpmn_integration/config.rs` | `WorkflowConfigIndex` — verb routing config |
+| `rust/src/domain_ops/bpmn_lite_ops.rs` | 5 control verb CustomOps |
+| `rust/config/workflows.yaml` | Verb → route mappings |
+| `rust/config/verbs/bpmn-lite.yaml` | Control verb definitions |
+| `rust/proto/bpmn_lite/v1/bpmn_lite.proto` | gRPC service definition (8 RPCs) |
+| `migrations/073_bpmn_integration.sql` | 3 tables: correlations, job_frames, parked_tokens |
+| `rust/tests/bpmn_integration_test.rs` | 13 integration tests (all `#[ignore]`) |
+| `rust/tests/models/kyc-open-case.bpmn` | Test BPMN model (7-node KYC workflow) |
+
+### Environment Variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `BPMN_LITE_GRPC_URL` | (none — disabled) | gRPC endpoint for bpmn-lite service |
 
 ---
 
@@ -3856,6 +4008,273 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 
 ---
 
+## BPMN-Lite Durable Orchestration Service
+
+> ✅ **IMPLEMENTED (2026-02-08)**: Standalone Rust service for durable workflow orchestration. BPMN XML → Verified IR → Bytecode → Fiber VM. 37 tests + gRPC smoke test (full lifecycle verified over the wire against native and Docker).
+
+**Problem Solved:** ob-poc has a DSL + verb runtime for deterministic, short-running work and a runbook/REPL model for auditable execution. It lacks **durable orchestration** — the ability to park a workflow for days/weeks (waiting for documents, human approvals, timers) and resume deterministically. BPMN-Lite fills this gap as a standalone gRPC service.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    BPMN-LITE SERVICE                                          │
+│                                                                              │
+│  BPMN XML (.bpmn)                                                           │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Parser (quick-xml) → IRGraph (petgraph)                                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Verifier (structural checks: single start, reachable, paired gateways)     │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Lowering → Bytecode (Vec<Instr>, 16-opcode ISA)                           │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Fiber VM (tick-based executor)                                             │
+│         │   - ExecNative parks fiber + enqueues job                         │
+│         │   - CompleteJob resumes fiber with payload                        │
+│         │   - Fork/Join for parallel paths                                  │
+│         │   - WaitFor/WaitUntil/WaitMsg for timers/messages                │
+│         │                                                                    │
+│         ▼                                                                    │
+│  BpmnLiteEngine (facade wrapping compiler + VM + store)                     │
+│         │                                                                    │
+│         ▼                                                                    │
+│  gRPC Server (tonic 0.12) — 9 RPCs                                         │
+│         │                                                                    │
+│         ▼                                                                    │
+│  ob-poc (future Phase B) connects as job worker via gRPC                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Constraints
+
+- **Standalone workspace** — `bpmn-lite/` at repo root, NOT inside `rust/` or as an ob-poc crate
+- **gRPC is the only boundary** — no shared crates beyond protobuf-generated types
+- **Hollow orchestration** — BPMN-Lite orchestrates control flow; all domain work happens in ob-poc verb handlers via the job worker protocol
+- **Two-namespace payload** — `domain_payload` (opaque canonical JSON + SHA-256 hash) never parsed by VM; `orch_flags` (flat primitives) for branching only
+- **MemoryStore for POC** — Postgres ProcessStore deferred to post-POC
+
+### 16-Opcode ISA
+
+| Group | Instructions | Behavior |
+|-------|-------------|----------|
+| Control flow | `Jump`, `BrIf`, `BrIfNot` | Manipulate pc; BrIf/BrIfNot pop stack |
+| Stack ops | `PushBool`, `PushI64`, `Pop` | Push/pop on fiber.stack |
+| Flags | `LoadFlag`, `StoreFlag` | Read/write instance.flags; StoreFlag emits FlagSet event |
+| Work | `ExecNative` | Park fiber + enqueue job (key v0.9 change) |
+| Concurrency | `Fork`, `Join` | Fork spawns child fibers; Join increments barrier + parks |
+| Waits | `WaitFor`, `WaitUntil`, `WaitMsg` | Park fiber in appropriate WaitState |
+| Lifecycle | `End`, `Fail` | End removes fiber (last-fiber-ends-process); Fail creates incident |
+
+### ExecNative (Job Worker Protocol)
+
+1. Derive deterministic `job_key` from `(instance_id, service_task_id, pc)`
+2. Check dedupe cache → if hit, apply cached completion, advance pc
+3. If miss: emit `JobActivated` event, enqueue `JobActivation`, park fiber in `WaitState::Job`
+4. Fiber does NOT advance pc — resumes when `CompleteJob` arrives
+5. `CompleteJob` validates `domain_payload_hash`, merges `orch_flags`, advances pc
+
+### gRPC API (9 RPCs)
+
+| RPC | Purpose |
+|-----|---------|
+| `Compile` | BPMN XML → verified bytecode, returns `bytecode_version` hash |
+| `StartProcess` | Create process instance from compiled program |
+| `Signal` | Send named message to waiting process (correlation) |
+| `Cancel` | Cancel all fibers, mark process Cancelled |
+| `Inspect` | Snapshot of process state (fibers, waits, flags) |
+| `ActivateJobs` | Server-streaming: dequeue jobs for worker (long-poll with timeout) |
+| `CompleteJob` | Worker returns result (payload + hash + flags) |
+| `FailJob` | Worker reports failure (creates incident) |
+| `SubscribeEvents` | Server-streaming: real-time RuntimeEvent stream |
+
+### Workspace Structure
+
+```
+bpmn-lite/                          # Standalone workspace (repo root sibling to rust/)
+├── Cargo.toml                      # Workspace manifest
+├── rust-toolchain.toml             # Pinned to 1.91 (matches ob-poc)
+├── Dockerfile                      # Multi-stage (rust:1.84-bookworm → debian:bookworm-slim)
+├── .dockerignore
+├── .gitignore
+├── bpmn-lite-core/
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── lib.rs                  # Module exports
+│   │   ├── types.rs                # Value, Instr, Fiber, ProcessInstance, Job*, CompiledProgram
+│   │   ├── events.rs               # RuntimeEvent enum (15 variants)
+│   │   ├── store.rs                # ProcessStore trait (28 async methods)
+│   │   ├── store_memory.rs         # MemoryStore (RwLock<HashMap> implementation)
+│   │   ├── vm.rs                   # tick_fiber() executor + CompleteJob/FailJob handlers
+│   │   ├── engine.rs               # BpmnLiteEngine facade
+│   │   └── compiler/
+│   │       ├── mod.rs
+│   │       ├── ir.rs               # IRGraph, IRNode, IREdge (petgraph)
+│   │       ├── verifier.rs         # Structural verification (7 checks)
+│   │       ├── lowering.rs         # IR → bytecode with debug_map
+│   │       └── parser.rs           # BPMN XML → IR (quick-xml)
+│   └── tests/
+│       └── fixtures/
+│           └── kyc-open-case.bpmn  # Test fixture: KYC workflow
+├── bpmn-lite-server/
+│   ├── Cargo.toml
+│   ├── build.rs                    # tonic-build for proto compilation
+│   ├── proto/
+│   │   └── bpmn_lite/v1/
+│   │       └── bpmn_lite.proto     # Full proto definition (9 RPCs)
+│   ├── src/
+│   │   ├── lib.rs                  # Re-exports grpc::proto for integration tests
+│   │   ├── main.rs                 # gRPC server startup on 0.0.0.0:50051
+│   │   └── grpc.rs                 # Handler implementations delegating to Engine
+│   └── tests/
+│       └── integration.rs          # 6 integration tests + 1 gRPC smoke test (#[ignore])
+```
+
+### Core Types
+
+| Type | Description |
+|------|-------------|
+| `Value` | Stack value: `Bool(bool)`, `I64(i64)`, `Str(u32)`, `Ref(u32)` |
+| `Instr` | 16-opcode enum |
+| `Fiber` | fiber_id, pc, stack, regs[8], wait state |
+| `ProcessInstance` | instance_id, bytecode, domain_payload, hash, flags, state |
+| `WaitState` | Running, Timer, Msg, Job{job_key}, Join, Incident |
+| `CompiledProgram` | bytecode_version (SHA-256), program, debug_map, join_plan, wait_plan |
+| `RuntimeEvent` | 15 variants: InstanceStarted, FiberSpawned, JobActivated, JobCompleted, etc. |
+| `ProcessStore` | Trait with 28 async methods (instances, fibers, joins, dedupe, jobs, programs, events) |
+
+### Engine: `tick_instance` vs `run_instance`
+
+The `BpmnLiteEngine` has two methods for advancing fibers:
+
+| Method | Dequeues Jobs? | Used By |
+|--------|---------------|---------|
+| `tick_instance()` | No — leaves jobs in queue | gRPC handlers (`start_process`, `complete_job`, `signal`) |
+| `run_instance()` | Yes — calls `tick_instance()` then dequeues | In-process tests and convenience callers |
+
+gRPC handlers use `tick_instance` so that jobs remain in the store queue for the `ActivateJobs` RPC to deliver to external workers. The `complete_job` gRPC handler also calls `tick_instance` after resuming the fiber, so it can advance to the next instruction (End, or another ExecNative).
+
+### Running the Service
+
+```bash
+# Native (via xtask, from rust/ directory)
+cargo x bpmn-lite start            # Release build + start background (port 50051)
+cargo x bpmn-lite start -p 50055   # Custom port
+cargo x bpmn-lite status           # Show native + Docker status
+cargo x bpmn-lite stop             # Stop native server
+
+# Build and run directly (foreground)
+cd bpmn-lite && cargo run -p bpmn-lite-server
+# Server starts on [::]:50051
+
+# Build/test only
+cargo x bpmn-lite build            # Debug build
+cargo x bpmn-lite build --release  # Release build
+cargo x bpmn-lite test             # Run all 37 tests (+ 1 ignored gRPC smoke)
+cargo x bpmn-lite clippy           # Lint
+
+# Docker
+cargo x bpmn-lite docker-build     # Build image
+cargo x bpmn-lite deploy           # Docker build + compose up (port 50053)
+
+# Docker directly
+docker build -t bpmn-lite ./bpmn-lite
+docker run -p 50051:50051 bpmn-lite
+
+# Docker Compose (port 50053 on host → 50051 in container)
+docker compose up bpmn-lite
+```
+
+### Test Coverage (37 default + 1 ignored smoke test)
+
+| Phase | Tests | Coverage |
+|-------|-------|----------|
+| A2: MemoryStore | 7 | Instance/fiber/join/dedupe/job queue/event log/payload history |
+| A3: VM | 7 | Linear flow, flag round-trip, dedupe, hash validation, events, FlagSet |
+| A4: Compiler | 7 | IR lowering, XOR/parallel gateways, verifier rejects, end-to-end |
+| A5: Parser | 4 | Minimal BPMN, task_type extraction, unsupported elements, full pipeline |
+| A5: Full pipeline | 2 | kyc-open-case.bpmn end-to-end, fixture parsing |
+| A6: Engine | 4 | Engine lifecycle, compile, start+tick, complete_job |
+| A6: Integration | 6 | Full lifecycle, two-task, cancel, fail, compile error, hash integrity |
+| A6: gRPC smoke | 1 (`#[ignore]`) | Over-the-wire: Compile → Start → Inspect → ActivateJobs → CompleteJob → Inspect(COMPLETED) → SubscribeEvents |
+
+The gRPC smoke test requires a running server. Run with:
+```bash
+# Against native server (port 50051)
+cargo x bpmn-lite start
+cd bpmn-lite && BPMN_LITE_URL=http://127.0.0.1:50051 cargo test --test integration test_grpc_smoke -- --ignored
+
+# Against Docker container (port 50053)
+cargo x bpmn-lite deploy
+cd bpmn-lite && BPMN_LITE_URL=http://127.0.0.1:50053 cargo test --test integration test_grpc_smoke -- --ignored
+```
+
+### Dependencies
+
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| `tonic` | 0.12 | gRPC server |
+| `prost` | 0.13 | Protobuf codegen |
+| `petgraph` | 0.6 | IR graph representation |
+| `quick-xml` | 0.36 | BPMN XML parser |
+| `tokio` | 1 | Async runtime |
+| `uuid` | 1 (v7) | Instance/fiber IDs |
+| `sha2` | 0.10 | Payload hash, bytecode version |
+| `serde`/`serde_json` | 1 | Serialization |
+| `tracing` | 0.1 | Structured logging |
+
+### Docker Compose
+
+```yaml
+# In docker-compose.yml at repo root
+bpmn-lite:
+  build:
+    context: ./bpmn-lite
+    dockerfile: Dockerfile
+  container_name: bpmn-lite
+  ports:
+    - "50053:50051"  # gRPC (50051 inside container, 50053 on host)
+  environment:
+    RUST_LOG: info
+```
+
+### Phase B (Future — ob-poc Integration)
+
+Phase B connects ob-poc to the BPMN-Lite service via gRPC job worker protocol:
+
+| Component | Purpose |
+|-----------|---------|
+| Job Worker | ob-poc polls `ActivateJobs`, executes DSL verbs, calls `CompleteJob` |
+| Correlation Store | Maps BPMN message events to ob-poc entity events |
+| Event Bridge | Streams `RuntimeEvent` to ob-poc for audit/UI |
+| WorkflowDispatcher | ob-poc DSL verb `workflow.start` triggers `StartProcess` |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `bpmn-lite/bpmn-lite-core/src/types.rs` | All core types (Value, Instr, Fiber, etc.) |
+| `bpmn-lite/bpmn-lite-core/src/events.rs` | RuntimeEvent enum (15 variants) |
+| `bpmn-lite/bpmn-lite-core/src/store.rs` | ProcessStore trait (28 methods) |
+| `bpmn-lite/bpmn-lite-core/src/store_memory.rs` | MemoryStore implementation |
+| `bpmn-lite/bpmn-lite-core/src/vm.rs` | VM tick executor |
+| `bpmn-lite/bpmn-lite-core/src/engine.rs` | BpmnLiteEngine facade |
+| `bpmn-lite/bpmn-lite-core/src/compiler/parser.rs` | BPMN XML → IR |
+| `bpmn-lite/bpmn-lite-core/src/compiler/ir.rs` | IRGraph (petgraph) |
+| `bpmn-lite/bpmn-lite-core/src/compiler/verifier.rs` | Structural verification |
+| `bpmn-lite/bpmn-lite-core/src/compiler/lowering.rs` | IR → bytecode |
+| `bpmn-lite/bpmn-lite-server/src/lib.rs` | Library re-export of proto module |
+| `bpmn-lite/bpmn-lite-server/src/grpc.rs` | gRPC handler implementations |
+| `bpmn-lite/bpmn-lite-server/src/main.rs` | Server startup |
+| `bpmn-lite/bpmn-lite-server/proto/bpmn_lite/v1/bpmn_lite.proto` | Proto definition |
+| `bpmn-lite/bpmn-lite-server/tests/integration.rs` | 6 integration tests + 1 gRPC smoke test |
+| `rust/xtask/src/bpmn_lite.rs` | xtask build/test/deploy commands |
+
+---
+
 ## Code Patterns
 
 ### Config Struct Pattern
@@ -4480,6 +4899,9 @@ If `entity_linker` is not configured (no snapshot), `get_lookup_service()` retur
 
 ```
 ob-poc/
+├── bpmn-lite/                  # Standalone BPMN orchestration service (NOT inside rust/)
+│   ├── bpmn-lite-core/         # Core types, compiler, VM, store
+│   └── bpmn-lite-server/       # gRPC server (tonic), proto definitions
 ├── ob-poc-ui-react/            # React/TypeScript frontend (PRIMARY UI)
 │   ├── src/
 │   │   ├── api/                # API client modules
@@ -4608,6 +5030,8 @@ When you see these in a task, read the corresponding annex first:
 | "focus mode", "FocusMode", "domain affinity" | CLAUDE.md §V2 REPL Architecture |
 | "orchestrator v2", "ReplOrchestratorV2", "session v2" | CLAUDE.md §V2 REPL Architecture |
 | "invariant", "P-1", "P-2", "P-3", "P-4", "P-5" | `docs/INVARIANT-VERIFICATION.md` |
+| "BPMN", "bpmn-lite", "orchestration", "fiber VM", "durable workflow" | CLAUDE.md §BPMN-Lite Durable Orchestration Service |
+| "WorkflowDispatcher", "JobWorker", "EventBridge", "correlation", "parked token", "bpmn_integration" | CLAUDE.md §BPMN-Lite Integration (Phase B) |
 
 ---
 

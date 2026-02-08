@@ -49,8 +49,9 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "postgres", "uuid"
 bigdecimal = { version = "0.4", features = ["serde"], optional = true }
 pgvector = { version = "0.4", features = ["sqlx"], optional = true }
 
-# gRPC client for EntityGateway
+# gRPC client for EntityGateway + BPMN-Lite
 tonic = "0.12"
+prost = "0.13"
 
 
 
@@ -117,6 +118,9 @@ smallvec = { version = "1.11", features = ["serde"] }
 
 # Testing
 [dev-dependencies]
+
+[build-dependencies]
+tonic-build = "0.12"
 
 # Build compute-heavy crates in release mode even during debug builds
 # This dramatically speeds up Candle embeddings (from 20+ min to ~10s)

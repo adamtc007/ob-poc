@@ -567,6 +567,89 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Background learning task spawned");
 
+    // =========================================================================
+    // BPMN-Lite Integration (optional — gated on BPMN_LITE_GRPC_URL env var)
+    // =========================================================================
+    if let Ok(bpmn_url) = std::env::var("BPMN_LITE_GRPC_URL") {
+        use ob_poc::bpmn_integration::{
+            client::BpmnLiteConnection, config::WorkflowConfigIndex, correlation::CorrelationStore,
+            job_frames::JobFrameStore, parked_tokens::ParkedTokenStore, worker::JobWorker,
+        };
+        use ob_poc::repl::orchestrator_v2::StubExecutor;
+
+        tracing::info!("BPMN-Lite integration enabled at {}", bpmn_url);
+
+        // 1. Create gRPC client (lazy — no network call until first RPC)
+        match BpmnLiteConnection::connect_lazy(&bpmn_url) {
+            Ok(client) => {
+                // 2. Create stores
+                let correlation_store = CorrelationStore::new(pool.clone());
+                let job_frame_store = JobFrameStore::new(pool.clone());
+                let parked_token_store = ParkedTokenStore::new(pool.clone());
+
+                // 3. Load workflow config
+                let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| {
+                    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+                    format!("{}/../../config", manifest_dir)
+                });
+                let config_path = std::path::Path::new(&config_dir).join("workflows.yaml");
+
+                match WorkflowConfigIndex::load_from_file(&config_path) {
+                    Ok(config_index) => {
+                        let config_index = Arc::new(config_index);
+
+                        // 4. Spawn JobWorker as background task
+                        //    Uses StubExecutor for now — will be replaced with
+                        //    RealDslExecutor in B3 end-to-end integration.
+                        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+                        let worker_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2> =
+                            Arc::new(StubExecutor);
+                        let worker = JobWorker::new(
+                            format!("ob-poc-worker-{}", std::process::id()),
+                            client,
+                            config_index.clone(),
+                            job_frame_store,
+                            worker_executor,
+                        );
+
+                        tokio::spawn(async move {
+                            worker.run(shutdown_rx).await;
+                        });
+
+                        // Keep shutdown_tx alive for graceful shutdown
+                        // (dropped when server exits, signaling worker to stop)
+                        std::mem::forget(shutdown_tx);
+
+                        tracing::info!(
+                            "BPMN-Lite integration initialized: client={}, task_types={:?}",
+                            bpmn_url,
+                            config_index.all_task_types()
+                        );
+
+                        // Note: WorkflowDispatcher wiring into REPL V2 orchestrator
+                        // and EventBridge per-instance subscriptions are deferred to
+                        // B3 integration tests where the full end-to-end flow is validated.
+                        let _ = (correlation_store, parked_token_store);
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to load workflow config from {}: {}",
+                            config_path.display(),
+                            e
+                        );
+                        tracing::warn!("BPMN-Lite JobWorker not started");
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to create BPMN-Lite client: {}", e);
+                tracing::warn!("BPMN-Lite integration disabled");
+            }
+        }
+    } else {
+        tracing::debug!("BPMN-Lite integration disabled (BPMN_LITE_GRPC_URL not set)");
+    }
+
     if let Err(e) = axum::serve(listener, app).await {
         tracing::error!("Server error: {}", e);
         return Err(format!("Server error: {}", e).into());

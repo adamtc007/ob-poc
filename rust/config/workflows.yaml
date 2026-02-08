@@ -1,0 +1,32 @@
+# Workflow routing configuration for BPMN-Lite integration.
+#
+# Verbs listed here with route: orchestrated will be dispatched through
+# the bpmn-lite gRPC service. All other verbs default to route: direct.
+#
+# Each orchestrated workflow requires:
+#   - process_key: BPMN process key (matches compiled model)
+#   - task_bindings: maps BPMN service task types to ob-poc verbs
+#
+# Task bindings tell the JobWorker which ob-poc verb to execute when
+# bpmn-lite activates a job for that task type.
+
+workflows:
+  # KYC Open Case — first orchestrated workflow
+  - verb_fqn: kyc.open-case
+    route: orchestrated
+    process_key: kyc-open-case
+    task_bindings:
+      - task_type: create_case_record
+        verb_fqn: kyc.create-case
+        timeout_ms: 30000
+        max_retries: 3
+
+      - task_type: request_documents
+        verb_fqn: document.solicit-set
+        timeout_ms: 60000
+        max_retries: 3
+
+      - task_type: record_decision
+        verb_fqn: kyc.record-decision
+        timeout_ms: 30000
+        max_retries: 3

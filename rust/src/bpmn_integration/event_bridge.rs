@@ -1,0 +1,325 @@
+//! EventBridge — subscribes to bpmn-lite lifecycle events and translates them
+//! into store updates + REPL signal forwarding.
+//!
+//! ## Event Mapping
+//!
+//! | BPMN event_type    | OutcomeEvent variant | Store action                          |
+//! |--------------------|----------------------|---------------------------------------|
+//! | `JobCompleted`     | `StepCompleted`      | (informational only)                  |
+//! | `Completed`        | `ProcessCompleted`   | Correlation → Completed, resolve all  |
+//! | `Cancelled`        | `ProcessCancelled`   | Correlation → Cancelled, resolve all  |
+//! | `IncidentCreated`  | `IncidentCreated`    | Correlation → Failed                  |
+//! | Other              | (ignored)            | —                                     |
+
+use anyhow::{Context, Result};
+use tokio::sync::mpsc;
+use uuid::Uuid;
+
+use super::client::{lifecycle_event_from_proto, BpmnLifecycleEvent, BpmnLiteConnection};
+use super::correlation::CorrelationStore;
+use super::parked_tokens::ParkedTokenStore;
+use super::types::{CorrelationStatus, OutcomeEvent};
+
+// ---------------------------------------------------------------------------
+// EventBridge
+// ---------------------------------------------------------------------------
+
+/// Subscribes to lifecycle events for a process instance and translates them
+/// into store updates + outcome events.
+pub struct EventBridge {
+    bpmn_client: BpmnLiteConnection,
+    correlations: CorrelationStore,
+    parked_tokens: ParkedTokenStore,
+}
+
+impl EventBridge {
+    pub fn new(
+        bpmn_client: BpmnLiteConnection,
+        correlations: CorrelationStore,
+        parked_tokens: ParkedTokenStore,
+    ) -> Self {
+        Self {
+            bpmn_client,
+            correlations,
+            parked_tokens,
+        }
+    }
+
+    /// Subscribe to events for a process instance and forward outcomes.
+    ///
+    /// Runs until the stream ends or an error occurs. Each translated event
+    /// is sent via the `outcome_tx` channel for the REPL signal handler.
+    pub async fn subscribe_instance(
+        &self,
+        process_instance_id: Uuid,
+        outcome_tx: mpsc::Sender<OutcomeEvent>,
+    ) -> Result<()> {
+        let mut stream = self
+            .bpmn_client
+            .subscribe_events(process_instance_id)
+            .await
+            .context("Failed to subscribe to events")?;
+
+        tracing::info!(
+            process_instance_id = %process_instance_id,
+            "EventBridge subscribed to lifecycle events"
+        );
+
+        while let Some(proto_event) = stream.message().await.context("Event stream error")? {
+            let event = lifecycle_event_from_proto(proto_event);
+
+            if let Some(outcome) = Self::translate_event(&event) {
+                // Update stores based on the event.
+                self.handle_outcome(process_instance_id, &outcome).await;
+
+                // Forward to REPL signal handler.
+                if outcome_tx.send(outcome).await.is_err() {
+                    tracing::warn!(
+                        process_instance_id = %process_instance_id,
+                        "Outcome channel closed, stopping event bridge"
+                    );
+                    break;
+                }
+            }
+        }
+
+        tracing::info!(
+            process_instance_id = %process_instance_id,
+            "EventBridge stream ended"
+        );
+
+        Ok(())
+    }
+
+    /// Translate a BPMN lifecycle event to an OutcomeEvent.
+    ///
+    /// Returns `None` for unrecognized or informational event types.
+    pub fn translate_event(event: &BpmnLifecycleEvent) -> Option<OutcomeEvent> {
+        let process_instance_id = Uuid::parse_str(&event.process_instance_id).unwrap_or_default();
+
+        // Try to extract structured fields from payload_json.
+        let payload: serde_json::Value =
+            serde_json::from_str(&event.payload_json).unwrap_or_default();
+
+        match event.event_type.as_str() {
+            "JobCompleted" => Some(OutcomeEvent::StepCompleted {
+                process_instance_id,
+                job_key: payload
+                    .get("job_key")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                task_type: payload
+                    .get("task_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                result: payload.get("result").cloned().unwrap_or_default(),
+            }),
+            "JobFailed" => Some(OutcomeEvent::StepFailed {
+                process_instance_id,
+                job_key: payload
+                    .get("job_key")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                task_type: payload
+                    .get("task_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                error: payload
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&event.payload_json)
+                    .to_string(),
+            }),
+            "Completed" => Some(OutcomeEvent::ProcessCompleted {
+                process_instance_id,
+            }),
+            "Cancelled" => Some(OutcomeEvent::ProcessCancelled {
+                process_instance_id,
+                reason: payload
+                    .get("reason")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("cancelled")
+                    .to_string(),
+            }),
+            "IncidentCreated" => Some(OutcomeEvent::IncidentCreated {
+                process_instance_id,
+                service_task_id: payload
+                    .get("service_task_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                error: payload
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or(&event.payload_json)
+                    .to_string(),
+            }),
+            _ => {
+                tracing::trace!(
+                    event_type = event.event_type,
+                    "Ignoring unrecognized event type"
+                );
+                None
+            }
+        }
+    }
+
+    /// Handle store updates triggered by an outcome event.
+    async fn handle_outcome(&self, process_instance_id: Uuid, outcome: &OutcomeEvent) {
+        match outcome {
+            OutcomeEvent::ProcessCompleted { .. } => {
+                // Correlation → Completed, resolve all parked tokens.
+                self.update_correlation(process_instance_id, CorrelationStatus::Completed)
+                    .await;
+                self.resolve_all_tokens(process_instance_id).await;
+            }
+            OutcomeEvent::ProcessCancelled { .. } => {
+                // Correlation → Cancelled, resolve all parked tokens.
+                self.update_correlation(process_instance_id, CorrelationStatus::Cancelled)
+                    .await;
+                self.resolve_all_tokens(process_instance_id).await;
+            }
+            OutcomeEvent::IncidentCreated { .. } => {
+                // Correlation → Failed (tokens remain waiting for manual resolution).
+                self.update_correlation(process_instance_id, CorrelationStatus::Failed)
+                    .await;
+            }
+            OutcomeEvent::StepCompleted { .. } | OutcomeEvent::StepFailed { .. } => {
+                // Informational — no store updates needed.
+            }
+        }
+    }
+
+    /// Update the correlation status for a process instance.
+    async fn update_correlation(&self, process_instance_id: Uuid, new_status: CorrelationStatus) {
+        match self
+            .correlations
+            .find_by_process_instance(process_instance_id)
+            .await
+        {
+            Ok(Some(record)) => {
+                if let Err(e) = self
+                    .correlations
+                    .update_status(record.correlation_id, new_status)
+                    .await
+                {
+                    tracing::error!(
+                        process_instance_id = %process_instance_id,
+                        error = %e,
+                        "Failed to update correlation status"
+                    );
+                }
+            }
+            Ok(None) => {
+                tracing::warn!(
+                    process_instance_id = %process_instance_id,
+                    "No correlation found for process instance"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    process_instance_id = %process_instance_id,
+                    error = %e,
+                    "Failed to look up correlation"
+                );
+            }
+        }
+    }
+
+    /// Resolve all parked tokens for a process instance.
+    async fn resolve_all_tokens(&self, process_instance_id: Uuid) {
+        match self
+            .parked_tokens
+            .resolve_all_for_instance(process_instance_id)
+            .await
+        {
+            Ok(count) => {
+                tracing::info!(
+                    process_instance_id = %process_instance_id,
+                    resolved_count = count,
+                    "Resolved parked tokens"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    process_instance_id = %process_instance_id,
+                    error = %e,
+                    "Failed to resolve parked tokens"
+                );
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_event(event_type: &str) -> BpmnLifecycleEvent {
+        BpmnLifecycleEvent {
+            sequence: 1,
+            event_type: event_type.to_string(),
+            process_instance_id: Uuid::new_v4().to_string(),
+            payload_json: "{}".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_translate_job_completed() {
+        let event = make_event("JobCompleted");
+        let outcome = EventBridge::translate_event(&event);
+        assert!(matches!(outcome, Some(OutcomeEvent::StepCompleted { .. })));
+    }
+
+    #[test]
+    fn test_translate_job_failed() {
+        let event = make_event("JobFailed");
+        let outcome = EventBridge::translate_event(&event);
+        assert!(matches!(outcome, Some(OutcomeEvent::StepFailed { .. })));
+    }
+
+    #[test]
+    fn test_translate_completed() {
+        let event = make_event("Completed");
+        let outcome = EventBridge::translate_event(&event);
+        assert!(matches!(
+            outcome,
+            Some(OutcomeEvent::ProcessCompleted { .. })
+        ));
+    }
+
+    #[test]
+    fn test_translate_cancelled() {
+        let event = make_event("Cancelled");
+        let outcome = EventBridge::translate_event(&event);
+        assert!(matches!(
+            outcome,
+            Some(OutcomeEvent::ProcessCancelled { .. })
+        ));
+    }
+
+    #[test]
+    fn test_translate_incident_created() {
+        let event = make_event("IncidentCreated");
+        let outcome = EventBridge::translate_event(&event);
+        assert!(matches!(
+            outcome,
+            Some(OutcomeEvent::IncidentCreated { .. })
+        ));
+    }
+
+    #[test]
+    fn test_translate_unknown_returns_none() {
+        let event = make_event("SomethingElse");
+        let outcome = EventBridge::translate_event(&event);
+        assert!(outcome.is_none());
+    }
+}

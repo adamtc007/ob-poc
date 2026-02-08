@@ -25,6 +25,8 @@ pub mod batch_control_ops;
 mod billing_ops;
 mod board_ops;
 mod bods_ops;
+mod booking_principal_ops;
+mod bpmn_lite_ops;
 mod capital_ops;
 mod cbu_ops;
 mod cbu_role_ops;
@@ -58,6 +60,7 @@ mod request_ops;
 mod requirement_ops;
 mod research_workflow_ops;
 mod resource_ops;
+pub mod rule_evaluator;
 mod runbook_ops;
 
 mod screening_ops;
@@ -952,5 +955,36 @@ mod tests {
         // Pack operations (Journey Pack lifecycle)
         assert!(registry.has("pack", "select"));
         assert!(registry.has("pack", "answer"));
+        // Booking principal operations
+        assert!(registry.has("legal-entity", "create"));
+        assert!(registry.has("legal-entity", "update"));
+        assert!(registry.has("legal-entity", "list"));
+        assert!(registry.has("booking-location", "create"));
+        assert!(registry.has("booking-location", "update"));
+        assert!(registry.has("booking-location", "list"));
+        assert!(registry.has("booking-principal", "create"));
+        assert!(registry.has("booking-principal", "update"));
+        assert!(registry.has("booking-principal", "retire"));
+        assert!(registry.has("booking-principal", "evaluate"));
+        assert!(registry.has("booking-principal", "select"));
+        assert!(registry.has("booking-principal", "explain"));
+        assert!(registry.has("booking-principal", "coverage-matrix"));
+        assert!(registry.has("booking-principal", "gap-report"));
+        assert!(registry.has("booking-principal", "impact-analysis"));
+        assert!(registry.has("client-principal-relationship", "record"));
+        assert!(registry.has("client-principal-relationship", "terminate"));
+        assert!(registry.has("client-principal-relationship", "list"));
+        assert!(registry.has("client-principal-relationship", "cross-sell-check"));
+        assert!(registry.has("service-availability", "set"));
+        assert!(registry.has("service-availability", "list"));
+        assert!(registry.has("service-availability", "list-by-principal"));
+        assert!(registry.has("ruleset", "create"));
+        assert!(registry.has("ruleset", "publish"));
+        assert!(registry.has("ruleset", "retire"));
+        assert!(registry.has("rule", "add"));
+        assert!(registry.has("rule", "update"));
+        assert!(registry.has("rule", "disable"));
+        assert!(registry.has("contract-pack", "create"));
+        assert!(registry.has("contract-pack", "add-template"));
     }
 }
