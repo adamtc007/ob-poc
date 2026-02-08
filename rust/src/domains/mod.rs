@@ -175,33 +175,6 @@ impl Default for DomainRegistry {
     }
 }
 
-/// Extract domain from verb (e.g., "kyc.collect" -> "kyc")
-pub fn extract_domain_from_verb(verb: &str) -> Option<&str> {
-    verb.split('.').next()
-}
-
-/// Check if a verb belongs to a specific domain
-pub fn verb_belongs_to_domain(verb: &str, domain: &str) -> bool {
-    verb.starts_with(&format!("{}.", domain))
-}
-
-/// Get all supported verbs across all domains
-pub fn get_all_supported_verbs() -> Vec<String> {
-    let registry = DomainRegistry::new();
-    let mut all_verbs = Vec::new();
-
-    for domain_name in registry.get_all_domains() {
-        if let Some(handler) = registry.get_handler(&domain_name) {
-            for verb in handler.supported_verbs() {
-                all_verbs.push(format!("{}.{}", domain_name, verb));
-            }
-        }
-    }
-
-    all_verbs.sort();
-    all_verbs
-}
-
 /// Stub domain handler for testing and compilation
 pub struct StubDomainHandler {
     domain: String,
@@ -292,23 +265,5 @@ mod tests {
         assert!(domains.contains(&"onboarding".to_string()));
         assert!(domains.contains(&"ubo".to_string()));
         assert!(domains.contains(&"isda".to_string()));
-    }
-
-    #[test]
-    fn test_verb_domain_extraction() {
-        assert_eq!(extract_domain_from_verb("kyc.collect"), Some("kyc"));
-        assert_eq!(extract_domain_from_verb("ubo.analyze"), Some("ubo"));
-        assert_eq!(
-            extract_domain_from_verb("isda.establish_master"),
-            Some("isda")
-        );
-        assert_eq!(extract_domain_from_verb("invalid"), Some("invalid"));
-    }
-
-    #[test]
-    fn test_verb_belongs_to_domain() {
-        assert!(verb_belongs_to_domain("kyc.collect", "kyc"));
-        assert!(verb_belongs_to_domain("ubo.calculate", "ubo"));
-        assert!(!verb_belongs_to_domain("kyc.collect", "ubo"));
     }
 }

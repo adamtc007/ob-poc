@@ -145,7 +145,13 @@ impl MockIntentMatcher {
                     verb: verb.to_string(),
                     confidence,
                 },
-                verb_candidates: vec![],
+                verb_candidates: vec![ob_poc::repl::types::VerbCandidate {
+                    verb_fqn: verb.to_string(),
+                    description: format!("Description for {}", verb),
+                    score: confidence,
+                    example: None,
+                    domain: Some(verb.split('.').next().unwrap_or("").to_string()),
+                }],
                 entity_mentions: vec![],
                 scope_candidates: None,
                 generated_dsl: dsl.map(|s| s.to_string()),
@@ -313,10 +319,15 @@ async fn setup_with_one_entry(orch: &ReplOrchestratorV2) -> (Uuid, Uuid) {
         std::mem::discriminant(&resp.kind)
     );
 
-    // Get the entry ID
+    // Get the entry ID (find the user entry, not infrastructure)
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries.len(), 1);
-    let entry_id = session.runbook.entries[0].id;
+    let entry_id = session
+        .runbook
+        .entries
+        .iter()
+        .rfind(|e| e.verb == "cbu.create")
+        .expect("Expected a cbu.create entry in runbook")
+        .id;
 
     (session_id, entry_id)
 }
@@ -351,10 +362,19 @@ async fn setup_with_n_entries(orch: &ReplOrchestratorV2, n: usize) -> (Uuid, Vec
     }
 
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries.len(), n);
+    // Collect only user entries (not infra entries like scope/pack)
     for entry in &session.runbook.entries {
-        entry_ids.push(entry.id);
+        if entry.verb != "session.load-cluster" && entry.verb != "pack.select" {
+            entry_ids.push(entry.id);
+        }
     }
+    assert_eq!(
+        entry_ids.len(),
+        n,
+        "Expected {} user entries, found {}",
+        n,
+        entry_ids.len()
+    );
 
     (session_id, entry_ids)
 }
@@ -366,6 +386,27 @@ fn sample_entry(verb: &str, sentence: &str) -> RunbookEntry {
         sentence.to_string(),
         format!("({} :placeholder true)", verb),
     )
+}
+
+/// Check if a verb is an infrastructure verb (not a user-initiated entry).
+fn is_infra_verb(verb: &str) -> bool {
+    matches!(verb, "session.load-cluster" | "pack.select" | "pack.answer")
+}
+
+/// Get user entries (non-infrastructure) from the runbook.
+fn user_entries(entries: &[RunbookEntry]) -> Vec<&RunbookEntry> {
+    entries.iter().filter(|e| !is_infra_verb(&e.verb)).collect()
+}
+
+/// Get the index of the Nth user entry in the full entries vec.
+fn user_entry_index(entries: &[RunbookEntry], user_index: usize) -> usize {
+    entries
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| !is_infra_verb(&e.verb))
+        .nth(user_index)
+        .map(|(i, _)| i)
+        .unwrap_or_else(|| panic!("No user entry at index {}", user_index))
 }
 
 // ===========================================================================
@@ -674,8 +715,9 @@ async fn test_durable_entry_parks_on_parked_outcome() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::Durable;
-        session.runbook.entries[0].dsl = "(doc.solicit :park :entity-id \"test\")".to_string();
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::Durable;
+        session.runbook.entries[idx].dsl = "(doc.solicit :park :entity-id \"test\")".to_string();
     }
 
     // Run
@@ -734,7 +776,8 @@ async fn test_human_gate_parks_before_execution() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     // Run
@@ -793,7 +836,8 @@ async fn test_mixed_mode_stops_at_gate() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[1].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 1);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     // Run
@@ -840,8 +884,9 @@ async fn test_mixed_mode_stops_at_gate() {
     assert!(matches!(session.state, ReplStateV2::Executing { .. }));
 
     // Entry 1 completed, Entry 2 parked
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Parked);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Completed);
+    assert_eq!(ue[1].status, EntryStatus::Parked);
 }
 
 // ===========================================================================
@@ -862,8 +907,9 @@ async fn test_entries_before_park_complete_normally() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[1].execution_mode = ExecutionMode::Durable;
-        session.runbook.entries[1].dsl = "(doc.solicit :park)".to_string();
+        let idx = user_entry_index(&session.runbook.entries, 1);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::Durable;
+        session.runbook.entries[idx].dsl = "(doc.solicit :park)".to_string();
     }
 
     // Run
@@ -879,11 +925,12 @@ async fn test_entries_before_park_complete_normally() {
     let session = orch.get_session(session_id).await.unwrap();
 
     // Entry 1 completed normally
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Completed);
-    assert!(session.runbook.entries[0].result.is_some());
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Completed);
+    assert!(ue[0].result.is_some());
 
     // Entry 2 parked
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Parked);
+    assert_eq!(ue[1].status, EntryStatus::Parked);
 }
 
 // ===========================================================================
@@ -904,8 +951,9 @@ async fn test_entries_after_park_remain_confirmed() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::Durable;
-        session.runbook.entries[0].dsl = "(doc.solicit :park)".to_string();
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::Durable;
+        session.runbook.entries[idx].dsl = "(doc.solicit :park)".to_string();
         // Entry 2 stays Sync (default)
     }
 
@@ -922,10 +970,11 @@ async fn test_entries_after_park_remain_confirmed() {
     let session = orch.get_session(session_id).await.unwrap();
 
     // Entry 1 parked
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Parked);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Parked);
 
     // Entry 2 still Confirmed (not executed yet because we stopped at park)
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Confirmed);
+    assert_eq!(ue[1].status, EntryStatus::Confirmed);
 }
 
 // ===========================================================================
@@ -946,7 +995,8 @@ async fn test_rejects_random_input_when_parked() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     orch.process(
@@ -1004,7 +1054,8 @@ async fn test_status_check_returns_parked_info() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     orch.process(
@@ -1063,7 +1114,8 @@ async fn test_approve_human_gate_executes_and_continues() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     orch.process(
@@ -1120,7 +1172,8 @@ async fn test_reject_human_gate_marks_failed() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     orch.process(
@@ -1190,7 +1243,8 @@ async fn test_cancel_aborts_all_parked() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     orch.process(
@@ -1251,7 +1305,8 @@ async fn test_approve_then_continue_executes_remaining() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[1].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 1);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     // Run -> Entry 1 completes, Entry 2 parks
@@ -1266,9 +1321,10 @@ async fn test_approve_then_continue_executes_remaining() {
 
     // Verify: Entry 1 completed, Entry 2 parked, Entry 3 still Confirmed
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Parked);
-    assert_eq!(session.runbook.entries[2].status, EntryStatus::Confirmed);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Completed);
+    assert_eq!(ue[1].status, EntryStatus::Parked);
+    assert_eq!(ue[2].status, EntryStatus::Confirmed);
 
     // Approve Entry 2
     orch.process(
@@ -1283,9 +1339,10 @@ async fn test_approve_then_continue_executes_remaining() {
 
     // After approval, all entries should be completed
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[2].status, EntryStatus::Completed);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Completed);
+    assert_eq!(ue[1].status, EntryStatus::Completed);
+    assert_eq!(ue[2].status, EntryStatus::Completed);
 
     // Session should be back to RunbookEditing
     assert!(matches!(session.state, ReplStateV2::RunbookEditing));
@@ -1309,8 +1366,9 @@ async fn test_durable_park_then_signal_resumes() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::Durable;
-        session.runbook.entries[0].dsl = "(doc.solicit :park)".to_string();
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::Durable;
+        session.runbook.entries[idx].dsl = "(doc.solicit :park)".to_string();
     }
 
     // Run -> parks
@@ -1391,8 +1449,9 @@ async fn test_signal_continues_remaining_entries() {
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::Durable;
-        session.runbook.entries[0].dsl = "(doc.solicit :park)".to_string();
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::Durable;
+        session.runbook.entries[idx].dsl = "(doc.solicit :park)".to_string();
         // Entry 2 stays Sync
     }
 
@@ -1408,18 +1467,15 @@ async fn test_signal_continues_remaining_entries() {
 
     // Verify
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Parked);
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Confirmed);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Parked);
+    assert_eq!(ue[1].status, EntryStatus::Confirmed);
 
     // Resume Entry 1
     let correlation_key = {
         let session = orch.get_session(session_id).await.unwrap();
-        session.runbook.entries[0]
-            .invocation
-            .as_ref()
-            .unwrap()
-            .correlation_key
-            .clone()
+        let ue = user_entries(&session.runbook.entries);
+        ue[0].invocation.as_ref().unwrap().correlation_key.clone()
     };
 
     {
@@ -1442,8 +1498,9 @@ async fn test_signal_continues_remaining_entries() {
 
     // Both entries should be completed
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Completed);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Completed);
+    assert_eq!(ue[1].status, EntryStatus::Completed);
     assert!(matches!(session.state, ReplStateV2::RunbookEditing));
 }
 
@@ -1621,15 +1678,17 @@ async fn test_golden_loop_with_durable() {
 
     let entry_id = {
         let session = orch.get_session(session_id).await.unwrap();
-        session.runbook.entries[0].id
+        let ue = user_entries(&session.runbook.entries);
+        ue[0].id
     };
 
     // 3. Set to Durable with :park marker
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::Durable;
-        session.runbook.entries[0].dsl = "(doc.solicit :park :entity-id \"test\")".to_string();
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::Durable;
+        session.runbook.entries[idx].dsl = "(doc.solicit :park :entity-id \"test\")".to_string();
     }
 
     // 4. Run -> parks
@@ -1745,14 +1804,16 @@ async fn test_golden_loop_with_human_gate() {
 
     let entry_id = {
         let session = orch.get_session(session_id).await.unwrap();
-        session.runbook.entries[0].id
+        let ue = user_entries(&session.runbook.entries);
+        ue[0].id
     };
 
     // 3. Set to HumanGate
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
-        session.runbook.entries[0].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 0);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
     }
 
     // 4. Run -> parks (DSL not executed)
@@ -1843,18 +1904,22 @@ async fn test_golden_loop_mixed_modes() {
             .unwrap();
     }
 
-    let entry_ids: Vec<Uuid> = {
+    let user_entry_ids: Vec<Uuid> = {
         let session = orch.get_session(session_id).await.unwrap();
-        session.runbook.entries.iter().map(|e| e.id).collect()
+        user_entries(&session.runbook.entries)
+            .iter()
+            .map(|e| e.id)
+            .collect()
     };
-    assert_eq!(entry_ids.len(), 3);
+    assert_eq!(user_entry_ids.len(), 3);
 
     // 3. Set execution modes: Entry 1 Sync, Entry 2 HumanGate, Entry 3 Sync
     {
         let mut sessions = orch.sessions_for_test().write().await;
         let session = sessions.get_mut(&session_id).unwrap();
         // Entry 0 stays Sync (default)
-        session.runbook.entries[1].execution_mode = ExecutionMode::HumanGate;
+        let idx = user_entry_index(&session.runbook.entries, 1);
+        session.runbook.entries[idx].execution_mode = ExecutionMode::HumanGate;
         // Entry 2 stays Sync (default)
     }
 
@@ -1870,16 +1935,17 @@ async fn test_golden_loop_mixed_modes() {
 
     // 5. Verify intermediate state
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Parked);
-    assert_eq!(session.runbook.entries[2].status, EntryStatus::Confirmed);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Completed);
+    assert_eq!(ue[1].status, EntryStatus::Parked);
+    assert_eq!(ue[2].status, EntryStatus::Confirmed);
     assert!(matches!(session.state, ReplStateV2::Executing { .. }));
 
     // 6. Approve Entry 2 -> Entry 2 executes, Entry 3 executes
     orch.process(
         session_id,
         UserInputV2::Approve {
-            entry_id: entry_ids[1],
+            entry_id: user_entry_ids[1],
             approved_by: Some("admin".to_string()),
         },
     )
@@ -1888,9 +1954,10 @@ async fn test_golden_loop_mixed_modes() {
 
     // 7. Verify all completed
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries[0].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[1].status, EntryStatus::Completed);
-    assert_eq!(session.runbook.entries[2].status, EntryStatus::Completed);
+    let ue = user_entries(&session.runbook.entries);
+    assert_eq!(ue[0].status, EntryStatus::Completed);
+    assert_eq!(ue[1].status, EntryStatus::Completed);
+    assert_eq!(ue[2].status, EntryStatus::Completed);
 
     // 8. Session back to RunbookEditing
     assert!(matches!(session.state, ReplStateV2::RunbookEditing));

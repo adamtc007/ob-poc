@@ -414,8 +414,8 @@ impl<'a> Parser<'a> {
     }
 }
 
-/// Convenience function
-#[allow(dead_code)]
+/// Convenience function (used in tests)
+#[cfg(test)]
 pub fn parse(input: &str, registry: &VerbRegistry) -> ParseResult {
     Parser::parse(input, registry)
 }

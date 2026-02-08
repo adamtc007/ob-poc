@@ -43,16 +43,6 @@ pub trait PrimitiveRegistry {
     }
 }
 
-/// Empty registry for when no cross-registry validation is needed
-#[allow(dead_code)]
-pub struct EmptyRegistry;
-
-impl PrimitiveRegistry for EmptyRegistry {
-    fn has_verb(&self, _verb_fqn: &str) -> bool {
-        true // Accept all verbs when no registry is provided
-    }
-}
-
 /// Lint a macro YAML file and return diagnostics
 ///
 /// # Arguments

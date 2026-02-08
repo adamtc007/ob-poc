@@ -9,8 +9,8 @@
 //! 1. **Template fast-path**: Score pack templates against user input using
 //!    word-overlap scoring. Qualifying templates are expanded via
 //!    `instantiate_template()` and wrapped as proposals.
-//! 2. **Verb matching fallback**: Delegates to `IntentService.match_verb()`
-//!    and converts results into ranked proposals.
+//! 2. **Verb matching fallback**: Delegates to `IntentService.match_verb_with_context()`
+//!    with pack-scoped scoring (P-2 invariant) and converts results into ranked proposals.
 //! 3. **Pack constraint filtering**: Respects `allowed_verbs` / `forbidden_verbs`.
 //! 4. **Deterministic**: Same inputs always produce the same `ProposalSet`.
 
@@ -21,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::context_stack::ContextStack;
 use super::intent_service::{IntentService, VerbMatchOutcome};
 use super::runbook::{ConfirmPolicy, Runbook};
 use super::sentence_gen::SentenceGenerator;
@@ -139,12 +140,14 @@ impl ProposalEngine {
     ///
     /// Never executes — only proposes edits. Deterministic: same inputs
     /// always produce the same `ProposalSet`.
+    #[allow(clippy::too_many_arguments)]
     pub async fn propose(
         &self,
         input: &str,
         pack: Option<&PackManifest>,
         _runbook: &Runbook,
         match_ctx: &MatchContext,
+        context_stack: &ContextStack,
         context_vars: &HashMap<String, String>,
         answers: &HashMap<String, serde_json::Value>,
     ) -> ProposalSet {
@@ -166,8 +169,10 @@ impl ProposalEngine {
             }
         }
 
-        // 3. Verb matching (fallback).
-        let verb_proposals = self.verb_match_proposals(trimmed, match_ctx).await;
+        // 3. Verb matching with pack-scoped scoring (P-2 invariant).
+        let verb_proposals = self
+            .verb_match_proposals(trimmed, match_ctx, context_stack)
+            .await;
         proposals.extend(verb_proposals);
 
         // 4. Pack constraint filtering.
@@ -337,8 +342,13 @@ impl ProposalEngine {
         &self,
         input: &str,
         match_ctx: &MatchContext,
+        context_stack: &ContextStack,
     ) -> Vec<StepProposal> {
-        let outcome = match self.intent_service.match_verb(input, match_ctx).await {
+        let outcome = match self
+            .intent_service
+            .match_verb_with_context(input, match_ctx, context_stack)
+            .await
+        {
             Ok(o) => o,
             Err(_) => return Vec::new(),
         };

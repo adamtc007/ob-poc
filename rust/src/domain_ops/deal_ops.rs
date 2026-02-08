@@ -39,32 +39,6 @@ pub struct DealStatusUpdateResult {
     pub new_status: String,
 }
 
-// These structs are defined for future use when returning structured results
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RateCardCreateResult {
-    pub rate_card_id: Uuid,
-    pub deal_id: Uuid,
-    pub status: String,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RateCardLineResult {
-    pub line_id: Uuid,
-    pub rate_card_id: Uuid,
-    pub fee_type: String,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OnboardingRequestResult {
-    pub request_id: Uuid,
-    pub deal_id: Uuid,
-    pub cbu_id: Uuid,
-    pub request_status: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BatchOnboardingResult {
     pub request_ids: Vec<Uuid>,
@@ -92,23 +66,6 @@ fn is_valid_deal_status_transition(from: &str, to: &str) -> bool {
             | ("ONBOARDING", "CANCELLED")
             | ("ACTIVE", "WINDING_DOWN")
             | ("WINDING_DOWN", "OFFBOARDED")
-    )
-}
-
-/// Valid rate card status transitions
-#[allow(dead_code)]
-fn is_valid_rate_card_status_transition(from: &str, to: &str) -> bool {
-    matches!(
-        (from, to),
-        ("DRAFT", "PROPOSED")
-            | ("DRAFT", "CANCELLED")
-            | ("PROPOSED", "COUNTER_OFFERED")
-            | ("PROPOSED", "AGREED")
-            | ("PROPOSED", "CANCELLED")
-            | ("COUNTER_OFFERED", "PROPOSED")
-            | ("COUNTER_OFFERED", "AGREED")
-            | ("COUNTER_OFFERED", "CANCELLED")
-            | ("AGREED", "SUPERSEDED")
     )
 }
 

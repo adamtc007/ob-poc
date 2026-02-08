@@ -70,16 +70,6 @@ use sqlx::PgPool;
 // RESULT TYPES
 // =============================================================================
 
-#[allow(dead_code)] // Future use for membership operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EntityMembershipResult {
-    pub id: Uuid,
-    pub group_id: Uuid,
-    pub entity_id: Uuid,
-    pub entity_name: String,
-    pub membership_type: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityMembershipListItem {
     pub entity_id: Uuid,

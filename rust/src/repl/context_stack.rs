@@ -68,6 +68,12 @@ pub struct ContextStack {
     /// Accumulated Q&A answers from pack questions.
     pub accumulated_answers: HashMap<String, serde_json::Value>,
 
+    /// Verbs that have been executed (Completed) in the runbook.
+    pub executed_verbs: HashSet<String>,
+
+    /// Verbs that are staged (Proposed/Confirmed/Resolved) but not yet executed.
+    pub staged_verbs: HashSet<String>,
+
     /// Current turn number (for exclusion decay).
     pub turn: u32,
 }
@@ -110,6 +116,9 @@ impl ContextStack {
         let mut exclusions = derive_exclusions(runbook, turn);
         exclusions.prune(turn);
 
+        let executed_verbs = derive_executed_verbs(runbook);
+        let staged_verbs = derive_staged_verbs(runbook);
+
         Self {
             derived_scope,
             pack_staged,
@@ -120,6 +129,8 @@ impl ContextStack {
             exclusions,
             outcomes,
             accumulated_answers,
+            executed_verbs,
+            staged_verbs,
             turn,
         }
     }
@@ -719,6 +730,77 @@ fn derive_focus(runbook: &Runbook) -> FocusContext {
 }
 
 // ---------------------------------------------------------------------------
+// FocusMode — domain gating for soft scoring boost
+// ---------------------------------------------------------------------------
+
+/// Focus mode derived from the active pack and recent verbs.
+///
+/// Used for a soft domain-affinity boost: verbs matching the focus mode's
+/// domain get a small positive adjustment in the scoring pipeline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FocusMode {
+    /// KYC / case management focus.
+    KycCase,
+    /// Document / proof collection.
+    Proofs,
+    /// Trading profile / mandate management.
+    Trading,
+    /// CBU / structure management.
+    CbuManagement,
+    /// General — no specific domain focus.
+    General,
+}
+
+impl FocusMode {
+    /// The primary domain associated with this focus mode.
+    pub fn domain(&self) -> Option<&'static str> {
+        match self {
+            FocusMode::KycCase => Some("kyc"),
+            FocusMode::Proofs => Some("document"),
+            FocusMode::Trading => Some("trading-profile"),
+            FocusMode::CbuManagement => Some("cbu"),
+            FocusMode::General => None,
+        }
+    }
+}
+
+/// Derive focus mode from the context stack.
+///
+/// Priority:
+/// 1. Active pack's dominant domain (strongest signal)
+/// 2. Domain of the most recent executed verb (weaker signal)
+/// 3. General (no focus)
+pub fn derive_focus_mode(context: &ContextStack) -> FocusMode {
+    // 1. Active pack dominant domain
+    if let Some(pack) = context.active_pack() {
+        if let Some(ref domain) = pack.dominant_domain {
+            return match domain.as_str() {
+                "kyc" | "kyc-case" => FocusMode::KycCase,
+                "document" | "requirement" => FocusMode::Proofs,
+                "trading-profile" | "custody" => FocusMode::Trading,
+                "cbu" | "entity" => FocusMode::CbuManagement,
+                _ => FocusMode::General,
+            };
+        }
+    }
+
+    // 2. Most recent executed verb's domain
+    for verb in &context.executed_verbs {
+        if let Some(domain) = verb.split('.').next() {
+            return match domain {
+                "kyc" => FocusMode::KycCase,
+                "document" | "requirement" => FocusMode::Proofs,
+                "trading-profile" | "custody" => FocusMode::Trading,
+                "cbu" | "entity" => FocusMode::CbuManagement,
+                _ => continue,
+            };
+        }
+    }
+
+    FocusMode::General
+}
+
+// ---------------------------------------------------------------------------
 // RecentContext — last N mentions
 // ---------------------------------------------------------------------------
 
@@ -955,9 +1037,42 @@ fn derive_answers(runbook: &Runbook) -> HashMap<String, serde_json::Value> {
 }
 
 // ---------------------------------------------------------------------------
+// Executed / Staged Verb Sets — for precondition evaluation
+// ---------------------------------------------------------------------------
+
+/// Collect FQNs of verbs that have been executed (Completed) in the runbook.
+fn derive_executed_verbs(runbook: &Runbook) -> HashSet<String> {
+    runbook
+        .entries
+        .iter()
+        .filter(|e| e.status == EntryStatus::Completed)
+        .map(|e| e.verb.clone())
+        .collect()
+}
+
+/// Collect FQNs of verbs that are staged but not yet executed.
+///
+/// Staged means Proposed, Confirmed, or Resolved — visible in Plan mode
+/// but not yet facts in Executable mode.
+fn derive_staged_verbs(runbook: &Runbook) -> HashSet<String> {
+    runbook
+        .entries
+        .iter()
+        .filter(|e| {
+            matches!(
+                e.status,
+                EntryStatus::Proposed | EntryStatus::Confirmed | EntryStatus::Resolved
+            )
+        })
+        .map(|e| e.verb.clone())
+        .collect()
+}
+
+// ---------------------------------------------------------------------------
 // Pack Handoff — suggest next pack when current is complete
 // ---------------------------------------------------------------------------
 
+#[cfg(test)]
 /// A suggestion to hand off to a different pack after the current one completes.
 #[derive(Debug, Clone)]
 pub struct PackHandoffSuggestion {
@@ -990,6 +1105,7 @@ impl ContextStack {
     /// 2. All template entries are Completed (no Proposed/Confirmed/Resolved remain)
     ///
     /// Returns a handoff suggestion with outcome refs from the completed pack.
+    #[cfg(test)]
     pub fn check_pack_handoff(&self, runbook: &Runbook) -> Option<PackHandoffSuggestion> {
         let pack = self.active_pack()?;
 
@@ -1057,6 +1173,7 @@ impl ContextStack {
     }
 }
 
+#[cfg(test)]
 /// Derive handoff target from runbook metadata.
 ///
 /// Looks for a `pack.select` entry that stored a `handoff-target` arg,

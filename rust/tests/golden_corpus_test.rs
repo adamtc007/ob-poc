@@ -22,6 +22,7 @@ use serde::Deserialize;
 struct SeedEntry {
     utterance: String,
     expected_verb: Option<String>,
+    #[allow(dead_code)]
     pack: Option<String>,
     outcome: String,
     #[allow(dead_code)]
@@ -34,6 +35,7 @@ struct CorpusEntry {
     id: String,
     category: String,
     input: String,
+    #[allow(dead_code)]
     pack_id: Option<String>,
     expected_verb: Option<String>,
     match_mode: String,
@@ -196,8 +198,8 @@ fn test_no_duplicate_ids() {
 #[test]
 fn test_corpus_total_at_least_50() {
     let dir = corpus_dir();
-    let all_files = [
-        "seed.yaml",
+    let seed_files = ["seed.yaml", "preconditions.yaml"];
+    let expanded_files = [
         "kyc.yaml",
         "book_setup.yaml",
         "bootstrap.yaml",
@@ -208,20 +210,24 @@ fn test_corpus_total_at_least_50() {
 
     let mut total = 0;
 
-    for filename in &all_files {
+    for filename in &seed_files {
         let path = dir.join(filename);
         if !path.exists() {
             continue;
         }
         let content = std::fs::read_to_string(&path).unwrap();
+        let entries: Vec<SeedEntry> = serde_yaml::from_str(&content).unwrap();
+        total += entries.len();
+    }
 
-        if filename == &"seed.yaml" {
-            let entries: Vec<SeedEntry> = serde_yaml::from_str(&content).unwrap();
-            total += entries.len();
-        } else {
-            let entries: Vec<CorpusEntry> = serde_yaml::from_str(&content).unwrap();
-            total += entries.len();
+    for filename in &expanded_files {
+        let path = dir.join(filename);
+        if !path.exists() {
+            continue;
         }
+        let content = std::fs::read_to_string(&path).unwrap();
+        let entries: Vec<CorpusEntry> = serde_yaml::from_str(&content).unwrap();
+        total += entries.len();
     }
 
     assert!(

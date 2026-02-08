@@ -365,12 +365,6 @@ pub fn parser(name: impl Into<String>) -> ParserCombinator {
     ParserCombinator::new(name)
 }
 
-/// Create a terminal parser (for leaf nodes)
-#[allow(dead_code)]
-pub fn terminal_parser(name: impl Into<String>) -> ParserCombinator {
-    ParserCombinator::new(name).terminal()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

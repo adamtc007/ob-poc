@@ -136,7 +136,6 @@ struct LayoutNode {
 #[derive(Debug, Clone)]
 struct LayoutEdge {
     /// Index in original edges array
-    #[allow(dead_code)]
     index: usize,
     /// Source node index
     from_idx: usize,

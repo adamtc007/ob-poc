@@ -223,7 +223,6 @@ pub enum Status {
 
 impl Status {
     /// Parse status from string (case-insensitive)
-    #[allow(dead_code)]
     pub fn parse(s: &str) -> Option<Self> {
         match s.to_uppercase().as_str() {
             "RED" => Some(Status::Red),

@@ -13,7 +13,16 @@ use uuid::Uuid;
 // Intent Matching Types
 // ============================================================================
 
-/// Context for intent matching (immutable, passed in)
+/// Lightweight adapter DTO derived from [`ContextStack`].
+///
+/// `ContextStack` is the canonical context object (invariant P-1).
+/// `MatchContext` exists solely for the [`IntentMatcher`] trait contract,
+/// which requires a small, serializable subset of context for semantic
+/// search and scoring.  The orchestrator builds `MatchContext` from
+/// `ContextStack` via `build_match_context()` — never the reverse.
+///
+/// [`ContextStack`]: super::context_stack::ContextStack
+/// [`IntentMatcher`]: super::intent_matcher::IntentMatcher
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MatchContext {
     /// Current client group (if set)
@@ -83,36 +92,6 @@ pub struct IntentMatchResult {
     /// Debug information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub debug: Option<MatchDebugInfo>,
-}
-
-impl IntentMatchResult {
-    /// Create a "no match" result
-    pub fn no_match(reason: impl Into<String>) -> Self {
-        Self {
-            outcome: MatchOutcome::NoMatch {
-                reason: reason.into(),
-            },
-            verb_candidates: vec![],
-            entity_mentions: vec![],
-            scope_candidates: None,
-            generated_dsl: None,
-            unresolved_refs: vec![],
-            debug: None,
-        }
-    }
-
-    /// Create a "needs client group" result
-    pub fn needs_client_group(options: Vec<ClientGroupOption>) -> Self {
-        Self {
-            outcome: MatchOutcome::NeedsClientGroup { options },
-            verb_candidates: vec![],
-            entity_mentions: vec![],
-            scope_candidates: None,
-            generated_dsl: None,
-            unresolved_refs: vec![],
-            debug: None,
-        }
-    }
 }
 
 /// Match outcome

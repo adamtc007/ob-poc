@@ -25,24 +25,6 @@ use sqlx::PgPool;
 // Result Types
 // =============================================================================
 
-// These structs are defined for future use when returning structured results
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BillingProfileCreateResult {
-    pub profile_id: Uuid,
-    pub deal_id: Uuid,
-    pub status: String,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BillingPeriodCreateResult {
-    pub period_id: Uuid,
-    pub profile_id: Uuid,
-    pub period_start: String,
-    pub period_end: String,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BillingCalculationResult {
     pub period_id: Uuid,

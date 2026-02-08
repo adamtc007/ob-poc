@@ -147,11 +147,6 @@ fn build_segments(
                     });
                 }
             }
-            RegionKind::Comment { ref content } => {
-                segments.push(DslDisplaySegment::Comment {
-                    content: content.clone(),
-                });
-            }
         }
 
         pos = region.end;
@@ -227,11 +222,6 @@ enum RegionKind {
         value: String,
         resolved_key: Option<String>,
         arg_name: String,
-    },
-    // Comment variant reserved for future use when AST includes comment spans
-    #[allow(dead_code)]
-    Comment {
-        content: String,
     },
 }
 

@@ -366,15 +366,14 @@ impl AgentLearningInspector {
         let id = sqlx::query_scalar!(
             r#"
             INSERT INTO agent.events (
-                session_id, event_type, user_message, parsed_intents, selected_verb,
+                event_type, user_message, parsed_intents, selected_verb,
                 generated_dsl, was_corrected, corrected_dsl, correction_type,
                 entities_resolved, resolution_failures, execution_success,
                 error_message, duration_ms
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id
             "#,
-            event.session_id,
             event_type,
             user_message,
             parsed_intents,
@@ -453,7 +452,6 @@ impl AgentLearningInspector {
             .into_iter()
             .map(|r| CorrectionEvent {
                 id: r.id,
-                session_id: r.session_id,
                 user_message: r.user_message,
                 generated_dsl: r.generated_dsl,
                 corrected_dsl: r.corrected_dsl,
@@ -888,8 +886,7 @@ impl AgentLearningInspector {
 /// Internal: correction event from DB.
 struct CorrectionEvent {
     id: i64,
-    #[allow(dead_code)]
-    session_id: Option<Uuid>,
+
     user_message: Option<String>,
     generated_dsl: Option<String>,
     corrected_dsl: Option<String>,

@@ -70,17 +70,6 @@ impl VerbSearcherFactory {
 
         searcher
     }
-
-    /// Build a minimal `HybridVerbSearcher` for testing or fallback scenarios.
-    ///
-    /// Only the database channel is enabled. Useful for:
-    /// - Unit tests that don't need full semantic search
-    /// - Fallback when embedder/learned_data unavailable
-    #[allow(dead_code)]
-    pub fn build_minimal(pool: &PgPool) -> HybridVerbSearcher {
-        let verb_service = Arc::new(VerbService::new(pool.clone()));
-        HybridVerbSearcher::new(verb_service, None)
-    }
 }
 
 #[cfg(test)]
@@ -101,10 +90,6 @@ mod tests {
             _macro_registry: Arc<OperatorMacroRegistry>,
             _lexicon: Option<SharedLexicon>,
         ) -> HybridVerbSearcher {
-            unimplemented!("type check only")
-        }
-
-        fn _check_minimal_signature(_pool: &PgPool) -> HybridVerbSearcher {
             unimplemented!("type check only")
         }
     }

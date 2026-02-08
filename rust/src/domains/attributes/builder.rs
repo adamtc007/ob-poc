@@ -110,32 +110,3 @@ impl DslValue {
         }
     }
 }
-
-/// Helper function to create a DSL builder for entity operations
-pub fn entity_set_attribute<T: AttributeType>(
-    entity_id: impl Into<String>,
-    value: T::Value,
-) -> DslBuilder
-where
-    T::Value: std::fmt::Display,
-{
-    DslBuilder::new("entity.set-attribute")
-        .with_string("entity-id", entity_id)
-        .with_attribute::<T>("attribute")
-        .with_string("value", value.to_string())
-}
-
-/// Helper function to create a DSL builder for validation operations
-pub fn validate_attribute<T: AttributeType>(
-    entity_id: impl Into<String>,
-    value: T::Value,
-) -> DslBuilder
-where
-    T::Value: std::fmt::Display,
-{
-    DslBuilder::new("validation.validate-attribute")
-        .with_string("entity-id", entity_id)
-        .with_attribute::<T>("attribute")
-        .with_string("value", value.to_string())
-}
-

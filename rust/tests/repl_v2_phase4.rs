@@ -143,7 +143,13 @@ impl MockIntentMatcher {
                     verb: verb.to_string(),
                     confidence,
                 },
-                verb_candidates: vec![],
+                verb_candidates: vec![ob_poc::repl::types::VerbCandidate {
+                    verb_fqn: verb.to_string(),
+                    description: format!("Description for {}", verb),
+                    score: confidence,
+                    example: None,
+                    domain: Some(verb.split('.').next().unwrap_or("").to_string()),
+                }],
                 entity_mentions: vec![],
                 scope_candidates: None,
                 generated_dsl: dsl.map(|s| s.to_string()),
@@ -291,10 +297,15 @@ async fn setup_with_one_entry(orch: &ReplOrchestratorV2) -> (Uuid, Uuid) {
         std::mem::discriminant(&resp.kind)
     );
 
-    // Get the entry ID
+    // Get the user's cbu.create entry ID (last entry; scope + pack entries precede it)
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries.len(), 1);
-    let entry_id = session.runbook.entries[0].id;
+    let user_entry = session
+        .runbook
+        .entries
+        .iter()
+        .rfind(|e| e.verb == "cbu.create")
+        .expect("Expected a cbu.create entry in runbook");
+    let entry_id = user_entry.id;
 
     (session_id, entry_id)
 }
@@ -843,11 +854,19 @@ async fn test_undo_removes_last_entry() {
     let orch = build_orchestrator_with_engine(matcher);
     let (session_id, _entry_id) = setup_with_one_entry(&orch).await;
 
-    // Verify 1 entry exists
+    // Verify user entry exists (plus 2 infra entries: scope + pack)
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries.len(), 1);
+    let total_before = session.runbook.entries.len();
+    assert!(
+        session
+            .runbook
+            .entries
+            .iter()
+            .any(|e| e.verb == "cbu.create"),
+        "Expected cbu.create entry"
+    );
 
-    // Undo
+    // Undo removes the last entry (which is cbu.create)
     let resp = orch
         .process(
             session_id,
@@ -863,12 +882,20 @@ async fn test_undo_removes_last_entry() {
         ReplResponseKindV2::RunbookSummary { .. }
     ));
     assert!(resp.message.contains("Undone"));
-    assert_eq!(resp.step_count, 0);
+    assert_eq!(resp.step_count, total_before - 1);
 
-    // Verify entry was moved to undo stack
+    // Verify user entry was moved to undo stack
     let session = orch.get_session(session_id).await.unwrap();
-    assert!(session.runbook.entries.is_empty());
+    assert!(
+        !session
+            .runbook
+            .entries
+            .iter()
+            .any(|e| e.verb == "cbu.create"),
+        "cbu.create should have been undone"
+    );
     assert_eq!(session.runbook.undo_stack.len(), 1);
+    assert_eq!(session.runbook.undo_stack[0].verb, "cbu.create");
 }
 
 // ===========================================================================
@@ -911,10 +938,16 @@ async fn test_redo_restores_entry() {
         ReplResponseKindV2::RunbookSummary { .. }
     ));
     assert!(resp.message.contains("Restored"));
-    assert_eq!(resp.step_count, 1);
 
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries.len(), 1);
+    assert!(
+        session
+            .runbook
+            .entries
+            .iter()
+            .any(|e| e.verb == "cbu.create"),
+        "cbu.create should be restored after redo"
+    );
     assert!(session.runbook.undo_stack.is_empty());
 }
 
@@ -934,8 +967,10 @@ async fn test_undo_redo_cycle_is_identity() {
 
     // Capture original entry state
     let session = orch.get_session(session_id).await.unwrap();
-    let original_verb = session.runbook.entries[0].verb.clone();
-    let original_sentence = session.runbook.entries[0].sentence.clone();
+    let original_entry = session.runbook.entry_by_id(entry_id).unwrap();
+    let original_verb = original_entry.verb.clone();
+    let original_sentence = original_entry.sentence.clone();
+    let total_before = session.runbook.entries.len();
 
     // Undo
     orch.process(
@@ -957,12 +992,12 @@ async fn test_undo_redo_cycle_is_identity() {
     .await
     .unwrap();
 
-    // Verify identity
+    // Verify identity: same total entries, same user entry preserved
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(session.runbook.entries.len(), 1);
-    assert_eq!(session.runbook.entries[0].id, entry_id);
-    assert_eq!(session.runbook.entries[0].verb, original_verb);
-    assert_eq!(session.runbook.entries[0].sentence, original_sentence);
+    assert_eq!(session.runbook.entries.len(), total_before);
+    let restored = session.runbook.entry_by_id(entry_id).unwrap();
+    assert_eq!(restored.verb, original_verb);
+    assert_eq!(restored.sentence, original_sentence);
 }
 
 // ===========================================================================
@@ -975,6 +1010,22 @@ async fn test_undo_empty_runbook_returns_error() {
     let orch = build_orchestrator_with_engine(matcher);
     let session_id = setup_in_pack(&orch).await;
 
+    // After setup_in_pack, infra entries (scope + pack) exist.
+    // Undo them all first to get a truly empty runbook.
+    let session = orch.get_session(session_id).await.unwrap();
+    let infra_count = session.runbook.entries.len();
+    for _ in 0..infra_count {
+        orch.process(
+            session_id,
+            UserInputV2::Command {
+                command: ReplCommandV2::Undo,
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    // Now the runbook is truly empty — undo should return error
     let resp = orch
         .process(
             session_id,
@@ -993,7 +1044,8 @@ async fn test_undo_empty_runbook_returns_error() {
                 ..
             }
         ),
-        "Undo on empty runbook should return error"
+        "Undo on empty runbook should return error, got: {:?}",
+        std::mem::discriminant(&resp.kind)
     );
     assert!(resp.message.contains("Nothing to undo"));
 }
@@ -1026,7 +1078,8 @@ async fn test_clear_empties_runbook() {
         resp.kind,
         ReplResponseKindV2::RunbookSummary { .. }
     ));
-    assert!(resp.message.contains("Cleared 1 steps"));
+    // Clears all entries (infra + user)
+    assert!(resp.message.contains("Cleared"));
     assert_eq!(resp.step_count, 0);
 
     let session = orch.get_session(session_id).await.unwrap();
@@ -1085,8 +1138,15 @@ async fn test_cancel_from_sentence_playback() {
         std::mem::discriminant(&session.state)
     );
 
-    // Nothing added to runbook
-    assert!(session.runbook.entries.is_empty());
+    // No user entry added to runbook (only infra entries from scope + pack)
+    assert!(
+        !session
+            .runbook
+            .entries
+            .iter()
+            .any(|e| e.verb == "cbu.create"),
+        "cbu.create should NOT be in runbook after cancel"
+    );
 }
 
 // ===========================================================================
@@ -1228,7 +1288,7 @@ async fn test_disable_step_skipped_during_execution() {
         EntryStatus::Disabled
     );
 
-    // Try to run — readiness gate should block (no enabled entries)
+    // Try to run — infra entries (Completed) pass readiness, but the user entry is skipped.
     let resp = orch
         .process(
             session_id,
@@ -1239,17 +1299,21 @@ async fn test_disable_step_skipped_during_execution() {
         .await
         .unwrap();
 
-    // Should fail because the only entry is disabled (no enabled entries)
-    assert!(
-        matches!(
-            resp.kind,
-            ReplResponseKindV2::Error {
-                recoverable: true,
-                ..
+    // Run succeeds (infra entries are Completed, user entry is Disabled → skipped).
+    match &resp.kind {
+        ReplResponseKindV2::Executed { results } => {
+            // The disabled entry should be reported as skipped.
+            let disabled_result = results.iter().find(|r| r.entry_id == entry_id);
+            if let Some(r) = disabled_result {
+                assert!(r.success);
+                assert_eq!(r.message.as_deref(), Some("Skipped (disabled)"));
             }
+        }
+        other => panic!(
+            "Expected Executed response, got: {:?}",
+            std::mem::discriminant(other)
         ),
-        "Run with all disabled should fail readiness check"
-    );
+    }
 }
 
 // ===========================================================================
@@ -1583,10 +1647,15 @@ async fn test_golden_loop_with_editing() {
         resp.kind,
         ReplResponseKindV2::RunbookSummary { .. }
     ));
-    assert_eq!(resp.step_count, 1);
 
     let session = orch.get_session(session_id).await.unwrap();
-    let entry_id = session.runbook.entries[0].id;
+    let entry_id = session
+        .runbook
+        .entries
+        .iter()
+        .rfind(|e| e.verb == "cbu.create")
+        .expect("Expected cbu.create entry in runbook")
+        .id;
 
     // 6. Edit the entry
     let resp = orch

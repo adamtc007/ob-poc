@@ -26,6 +26,7 @@ impl SessionRepositoryV2 {
     /// `version` is the last known version — if a concurrent writer has
     /// incremented it, this call will fail (returns 0 rows affected).
     /// Returns the new version on success.
+    #[allow(deprecated)] // Reads deprecated fields for DB persistence (migration compat)
     pub async fn save_session(&self, session: &ReplSessionV2, version: i64) -> Result<i64> {
         let state =
             serde_json::to_value(&session.state).context("Failed to serialize session state")?;
@@ -92,6 +93,7 @@ impl SessionRepositoryV2 {
     }
 
     /// Load a session by ID. Returns (session, version) or None.
+    #[allow(deprecated)] // Constructs ReplSessionV2 with deprecated fields from DB
     pub async fn load_session(&self, session_id: Uuid) -> Result<Option<(ReplSessionV2, i64)>> {
         let row = sqlx::query!(
             r#"

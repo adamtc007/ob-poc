@@ -377,7 +377,6 @@ impl<'a> AttributeRollupEngine<'a> {
                     .and_then(|v| serde_json::from_value(v).ok())
                     .unwrap_or_else(|| vec!["manual".to_string()]),
                 constraints: r.constraints,
-                condition: r.condition_expression,
             })
             .collect())
     }
@@ -389,6 +388,7 @@ struct SrdefAttrRequirementRow {
     requirement_type: Option<String>,
     source_policy: Option<JsonValue>,
     constraints: Option<JsonValue>,
+    #[allow(dead_code)] // Populated by sqlx FromRow
     condition_expression: Option<String>,
 }
 
@@ -398,8 +398,6 @@ struct SrdefAttrRequirement {
     requirement: String,
     source_policy: Vec<String>,
     constraints: Option<JsonValue>,
-    #[allow(dead_code)]
-    condition: Option<String>,
 }
 
 /// Information about a rolled-up attribute

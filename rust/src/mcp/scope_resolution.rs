@@ -176,9 +176,9 @@ impl ScopeContext {
 // =============================================================================
 
 /// Scope resolver - detects and resolves client group context
-#[allow(dead_code)] // Fields used for future semantic resolution tuning
 pub struct ScopeResolver {
     /// Threshold for exact match (alias_norm = query)
+    #[allow(dead_code)]
     exact_threshold: f64,
     /// Threshold for fuzzy match
     fuzzy_threshold: f64,

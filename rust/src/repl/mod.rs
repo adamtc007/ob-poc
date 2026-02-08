@@ -113,7 +113,7 @@ pub mod context_stack;
 #[cfg(feature = "vnext-repl")]
 pub mod scoring;
 
-#[cfg(feature = "vnext-repl")]
+#[cfg(all(feature = "vnext-repl", test))]
 pub mod entity_resolution;
 
 #[cfg(feature = "vnext-repl")]
@@ -121,3 +121,6 @@ pub mod deterministic_extraction;
 
 #[cfg(feature = "vnext-repl")]
 pub mod decision_log;
+
+#[cfg(feature = "vnext-repl")]
+pub mod preconditions;

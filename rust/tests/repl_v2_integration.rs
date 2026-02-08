@@ -573,10 +573,9 @@ async fn test_scenario_d_onboard_allianz_lux() {
     );
 
     let session = orch.get_session(session_id).await.unwrap();
-    assert!(session.journey_context.is_some());
     assert_eq!(
-        session.journey_context.as_ref().unwrap().pack.id,
-        "onboarding-request"
+        session.active_pack_id().as_deref(),
+        Some("onboarding-request")
     );
 
     // Answer questions → build runbook → execute.

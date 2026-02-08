@@ -342,7 +342,6 @@ pub mod db {
     pub struct AsyncEntityArgResolver<'a> {
         pool: &'a PgPool,
         resolver: EntityArgResolver,
-        #[allow(dead_code)]
         embedder: Option<&'a SharedEmbedder>,
     }
 

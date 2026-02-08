@@ -595,9 +595,10 @@ async fn test_force_select_onboarding() {
 
     // Verify the pack is active.
     let session = orch.get_session(session_id).await.unwrap();
-    assert!(session.journey_context.is_some());
-    let ctx = session.journey_context.as_ref().unwrap();
-    assert_eq!(ctx.pack.id, "onboarding-request");
+    assert_eq!(
+        session.active_pack_id().as_deref(),
+        Some("onboarding-request")
+    );
 }
 
 #[tokio::test]
@@ -629,10 +630,7 @@ async fn test_force_select_book_setup() {
 
     assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(
-        session.journey_context.as_ref().unwrap().pack.id,
-        "book-setup"
-    );
+    assert_eq!(session.active_pack_id().as_deref(), Some("book-setup"));
 }
 
 #[tokio::test]
@@ -664,10 +662,7 @@ async fn test_force_select_kyc_case() {
 
     assert!(matches!(resp.kind, ReplResponseKindV2::Question { .. }));
     let session = orch.get_session(session_id).await.unwrap();
-    assert_eq!(
-        session.journey_context.as_ref().unwrap().pack.id,
-        "kyc-case"
-    );
+    assert_eq!(session.active_pack_id().as_deref(), Some("kyc-case"));
 }
 
 // ===========================================================================

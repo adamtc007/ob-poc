@@ -124,60 +124,6 @@ pub trait ExtractionService: Send + Sync {
     }
 }
 
-/// Mock extraction service for testing
-pub struct MockExtractionService {
-    mock_data: std::collections::HashMap<(Uuid, Uuid), serde_json::Value>,
-}
-
-impl MockExtractionService {
-    pub fn new() -> Self {
-        Self {
-            mock_data: std::collections::HashMap::new(),
-        }
-    }
-
-    pub fn with_mock_data(
-        mut self,
-        #[allow(dead_code)] doc_id: Uuid,
-        attr_id: Uuid,
-        value: serde_json::Value,
-    ) -> Self {
-        self.mock_data.insert((doc_id, attr_id), value);
-        self
-    }
-}
-
-impl Default for MockExtractionService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[async_trait]
-impl ExtractionService for MockExtractionService {
-    async fn extract(
-        &self,
-        doc_id: &Uuid,
-        attribute_id: &Uuid,
-    ) -> ExtractionResult<serde_json::Value> {
-        self.mock_data
-            .get(&(*doc_id, *attribute_id))
-            .cloned()
-            .ok_or_else(|| ExtractionError::ExtractionFailed {
-                method: "mock".to_string(),
-                reason: "No mock data configured".to_string(),
-            })
-    }
-
-    fn method_name(&self) -> &'static str {
-        "mock"
-    }
-
-    async fn can_extract(&self, _doc_id: &Uuid) -> ExtractionResult<bool> {
-        Ok(true)
-    }
-}
-
 /// OCR-based extraction service
 pub struct OcrExtractionService {
     pool: PgPool,

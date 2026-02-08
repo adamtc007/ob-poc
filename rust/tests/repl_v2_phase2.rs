@@ -92,7 +92,13 @@ impl MockIntentMatcher {
                     verb: verb.to_string(),
                     confidence,
                 },
-                verb_candidates: vec![],
+                verb_candidates: vec![ob_poc::repl::types::VerbCandidate {
+                    verb_fqn: verb.to_string(),
+                    description: format!("Description for {}", verb),
+                    score: confidence,
+                    example: None,
+                    domain: Some(verb.split('.').next().unwrap_or("").to_string()),
+                }],
                 entity_mentions: vec![],
                 scope_candidates: None,
                 generated_dsl: dsl.map(|s| s.to_string()),
@@ -430,8 +436,8 @@ async fn test_orchestrator_with_intent_service() {
     // For this test, we just verify the orchestrator builds and processes without error.
     let session = orch.get_session(session_id).await.unwrap();
     assert!(
-        session.journey_context.is_some(),
-        "Should have journey context after pack selection"
+        session.active_pack_id().is_some(),
+        "Should have active pack after pack selection"
     );
 }
 

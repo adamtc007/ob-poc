@@ -24,7 +24,7 @@ pub use resolver::{AttributeResolver, ResolutionError, ResolutionResult};
 pub use execution_context::{ExecutionContext, ValueSource};
 
 // Re-export builder
-pub use builder::{entity_set_attribute, validate_attribute, DslBuilder, DslValue};
+pub use builder::{DslBuilder, DslValue};
 
 // Re-export all KYC attributes
 pub use kyc::*;

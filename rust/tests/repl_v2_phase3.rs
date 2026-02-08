@@ -28,6 +28,7 @@ use uuid::Uuid;
 use dsl_core::config::types::VerbsConfig;
 use ob_poc::journey::pack::{load_pack_from_bytes, PackManifest};
 use ob_poc::journey::router::PackRouter;
+use ob_poc::repl::context_stack::ContextStack;
 use ob_poc::repl::intent_matcher::IntentMatcher;
 use ob_poc::repl::intent_service::IntentService;
 use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
@@ -128,7 +129,13 @@ impl MockIntentMatcher {
                     verb: verb.to_string(),
                     confidence,
                 },
-                verb_candidates: vec![],
+                verb_candidates: vec![ob_poc::repl::types::VerbCandidate {
+                    verb_fqn: verb.to_string(),
+                    description: format!("Description for {}", verb),
+                    score: confidence,
+                    example: None,
+                    domain: Some(verb.split('.').next().unwrap_or("").to_string()),
+                }],
                 entity_mentions: vec![],
                 scope_candidates: None,
                 generated_dsl: dsl.map(|s| s.to_string()),
@@ -187,6 +194,11 @@ impl IntentMatcher for MockIntentMatcher {
     ) -> anyhow::Result<IntentMatchResult> {
         Ok(self.result.clone())
     }
+}
+
+/// Build an empty ContextStack for tests (from a fresh runbook).
+fn empty_context_stack(runbook: &ob_poc::repl::runbook::Runbook) -> ContextStack {
+    ContextStack::from_runbook(runbook, None, 0)
 }
 
 /// Build a ProposalEngine with a mock intent matcher.
@@ -284,6 +296,7 @@ async fn test_direct_dsl_produces_single_proposal() {
             None,
             &runbook,
             &match_ctx,
+            &empty_context_stack(&runbook),
             &HashMap::new(),
             &HashMap::new(),
         )
@@ -326,6 +339,7 @@ async fn test_template_scoring_word_overlap() {
             Some(pack.as_ref()),
             &runbook,
             &match_ctx,
+            &empty_context_stack(&runbook),
             &context_vars,
             &answers,
         )
@@ -373,6 +387,7 @@ async fn test_template_fast_path_flag() {
             Some(pack.as_ref()),
             &runbook,
             &match_ctx,
+            &empty_context_stack(&runbook),
             &context_vars,
             &answers,
         )
@@ -406,6 +421,7 @@ async fn test_verb_match_fallback_no_pack() {
             None, // No pack
             &runbook,
             &match_ctx,
+            &empty_context_stack(&runbook),
             &HashMap::new(),
             &HashMap::new(),
         )
@@ -446,6 +462,7 @@ async fn test_ambiguous_produces_multiple_proposals() {
             None,
             &runbook,
             &match_ctx,
+            &empty_context_stack(&runbook),
             &HashMap::new(),
             &HashMap::new(),
         )
@@ -543,6 +560,7 @@ async fn test_missing_required_args_counted() {
             None,
             &runbook,
             &match_ctx,
+            &empty_context_stack(&runbook),
             &HashMap::new(),
             &HashMap::new(),
         )
@@ -572,12 +590,15 @@ async fn test_proposal_hash_determinism() {
     let runbook = ob_poc::repl::runbook::Runbook::new(Uuid::new_v4());
     let match_ctx = MatchContext::default();
 
+    let ctx = empty_context_stack(&runbook);
+
     let result1 = engine
         .propose(
             "create a cbu",
             None,
             &runbook,
             &match_ctx,
+            &ctx,
             &HashMap::new(),
             &HashMap::new(),
         )
@@ -589,6 +610,7 @@ async fn test_proposal_hash_determinism() {
             None,
             &runbook,
             &match_ctx,
+            &ctx,
             &HashMap::new(),
             &HashMap::new(),
         )
@@ -636,6 +658,7 @@ async fn test_empty_input_returns_empty() {
             None,
             &runbook,
             &match_ctx,
+            &empty_context_stack(&runbook),
             &HashMap::new(),
             &HashMap::new(),
         )

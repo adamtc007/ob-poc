@@ -200,6 +200,7 @@ impl SentenceGenerator {
     /// - 1 item  → "A"
     /// - 2 items → "A and B"
     /// - 3+ items → "A, B, and C"
+    #[allow(dead_code)] // Used by integration tests (rust/tests/repl_v2_golden_loop.rs)
     pub fn format_list(values: &[String]) -> String {
         match values.len() {
             0 => String::new(),

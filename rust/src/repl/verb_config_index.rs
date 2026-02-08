@@ -51,6 +51,8 @@ pub struct VerbIndexEntry {
     pub args: Vec<ArgSummary>,
     /// Confirm policy for this verb.
     pub confirm_policy: ConfirmPolicy,
+    /// Precondition checks from lifecycle config (e.g., `["requires_scope:cbu"]`).
+    pub precondition_checks: Vec<String>,
 }
 
 /// Compact argument summary for display and validation.
@@ -125,6 +127,13 @@ impl VerbConfigIndex {
                     })
                     .collect();
 
+                // Precondition checks from lifecycle config
+                let precondition_checks = verb_config
+                    .lifecycle
+                    .as_ref()
+                    .map(|lc| lc.precondition_checks.clone())
+                    .unwrap_or_default();
+
                 entries.insert(
                     fqn.clone(),
                     VerbIndexEntry {
@@ -135,6 +144,7 @@ impl VerbConfigIndex {
                         sentences: yaml_sentences,
                         args,
                         confirm_policy: policy,
+                        precondition_checks,
                     },
                 );
             }
@@ -160,6 +170,11 @@ impl VerbConfigIndex {
     /// Iterate over all verbs.
     pub fn all_verbs(&self) -> impl Iterator<Item = &VerbIndexEntry> {
         self.entries.values()
+    }
+
+    /// Iterate over all verbs with their FQN keys.
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &VerbIndexEntry)> {
+        self.entries.iter()
     }
 
     /// Number of indexed verbs.

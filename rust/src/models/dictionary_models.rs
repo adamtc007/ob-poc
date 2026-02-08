@@ -192,38 +192,6 @@ pub struct DictionaryAttributeWithMetadata {
     pub validation_rules: Option<serde_json::Value>,
 }
 
-/// Batch operation request for attributes
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AttributeBatchRequest {
-    pub operation_type: AttributeOperationType,
-    pub attributes: Vec<NewDictionaryAttribute>,
-    pub transaction_id: Option<Uuid>,
-}
-
-/// Batch operation result for attributes
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AttributeBatchResult {
-    pub transaction_id: Uuid,
-    pub total_requested: i32,
-    pub successful: i32,
-    pub failed: i32,
-    pub results: Vec<AttributeBatchItemResult>,
-    pub execution_time_ms: i64,
-}
-
-/// Individual batch item result
-#[allow(dead_code)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AttributeBatchItemResult {
-    pub index: i32,
-    pub success: bool,
-    pub attribute_id: Option<Uuid>,
-    pub error_message: Option<String>,
-    pub generated_dsl: Option<String>,
-}
-
 /// Statistics for dictionary usage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DictionaryStatistics {

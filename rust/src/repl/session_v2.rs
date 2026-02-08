@@ -32,11 +32,17 @@ use crate::journey::pack::PackManifest;
 pub struct ReplSessionV2 {
     pub id: Uuid,
     pub state: ReplStateV2,
-    /// Deprecated — use `ContextStack::derived_scope` from runbook fold.
+    /// Deprecated — use `ContextStack::derived_scope` from runbook fold (P-3).
     /// Retained for serialization compatibility during migration.
+    /// No V2 code should READ from this field — it is written only for
+    /// persistence backward compatibility.
+    #[deprecated(note = "Use ContextStack::derived_scope from runbook fold (P-3)")]
     pub client_context: Option<ClientContext>,
-    /// Deprecated — use `staged_pack` + `ContextStack` from runbook fold.
+    /// Deprecated — use `staged_pack` + `ContextStack` from runbook fold (P-3).
     /// Retained for serialization compatibility during migration.
+    /// No V2 code should READ from this field — it is written only for
+    /// persistence backward compatibility.
+    #[deprecated(note = "Use staged_pack + ContextStack from runbook fold (P-3)")]
     pub journey_context: Option<JourneyContext>,
     /// The active pack manifest (not serialized — reloaded from pack files).
     /// This is the staged pack that ContextStack reads. It replaces the
@@ -69,6 +75,7 @@ pub struct ReplSessionV2 {
 
 impl ReplSessionV2 {
     /// Create a new session starting in `ScopeGate`.
+    #[allow(deprecated)] // Initialises deprecated fields to None for serde compat
     pub fn new() -> Self {
         let id = Uuid::new_v4();
         let now = Utc::now();
@@ -111,6 +118,10 @@ impl ReplSessionV2 {
     }
 
     /// Set the client context (scope).
+    ///
+    /// Writes to both `runbook.client_group_id` (canonical) and the
+    /// deprecated `client_context` field (serialization compat only).
+    #[allow(deprecated)] // Bridge: writes deprecated field for persistence compat
     pub fn set_client_context(&mut self, ctx: ClientContext) {
         self.runbook.client_group_id = Some(ctx.client_group_id);
         self.client_context = Some(ctx);
@@ -121,6 +132,7 @@ impl ReplSessionV2 {
     ///
     /// Sets both the new `staged_pack` field (for ContextStack reads)
     /// and the legacy `journey_context` (for migration compatibility).
+    #[allow(deprecated)] // Bridge: writes deprecated journey_context for persistence compat
     pub fn activate_pack(
         &mut self,
         pack: Arc<PackManifest>,
@@ -149,6 +161,11 @@ impl ReplSessionV2 {
     }
 
     /// Record an answer to a pack question.
+    ///
+    /// Writes to deprecated `journey_context.answers` for persistence compat.
+    /// The canonical source is `ContextStack::accumulated_answers` derived
+    /// from the runbook fold via `derive_answers()`.
+    #[allow(deprecated)] // Bridge: writes deprecated field for persistence compat
     pub fn record_answer(&mut self, field: String, value: serde_json::Value) {
         if let Some(ref mut ctx) = self.journey_context {
             ctx.answers.insert(field, value);
@@ -157,6 +174,7 @@ impl ReplSessionV2 {
     }
 
     /// Clear the staged pack (e.g., when switching journeys).
+    #[allow(deprecated)] // Bridge: clears deprecated journey_context for persistence compat
     pub fn clear_staged_pack(&mut self) {
         self.staged_pack = None;
         self.staged_pack_hash = None;
@@ -182,11 +200,13 @@ impl ReplSessionV2 {
     }
 
     /// Whether a journey pack is currently active.
+    #[allow(deprecated)] // Fallback reads deprecated journey_context for migration compat
     pub fn has_active_pack(&self) -> bool {
         self.staged_pack.is_some() || self.journey_context.is_some()
     }
 
     /// Get the active pack ID (from staged_pack or journey_context).
+    #[allow(deprecated)] // Fallback reads deprecated journey_context for migration compat
     pub fn active_pack_id(&self) -> Option<String> {
         self.staged_pack
             .as_ref()
@@ -199,6 +219,7 @@ impl ReplSessionV2 {
     /// - Restores the Arc<PackManifest> from the pack router using the stored hash.
     /// - Restores staged_pack from the journey_context (migration bridge).
     /// - Rebuilds the invocation index on the runbook.
+    #[allow(deprecated)] // Reads deprecated journey_context for migration rehydration
     pub fn rehydrate(&mut self, pack_router: &crate::journey::router::PackRouter) {
         // Restore the pack Arc from the router using stored manifest hash.
         if let Some(ref mut jctx) = self.journey_context {
@@ -327,6 +348,7 @@ pub enum MessageRole {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(deprecated)] // Tests exercise deprecated fields for migration coverage
 mod tests {
     use super::*;
 

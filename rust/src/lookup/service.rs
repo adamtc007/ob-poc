@@ -3,7 +3,7 @@
 //! Combines verb discovery and entity resolution in a single pass,
 //! using verb schema to constrain entity kinds.
 
-use crate::entity_linking::{EntityLinkingService, EntityResolution, StubEntityLinkingService};
+use crate::entity_linking::{EntityLinkingService, EntityResolution};
 use crate::lexicon::LexiconService;
 use crate::mcp::verb_search::{HybridVerbSearcher, VerbSearchResult};
 use serde::{Deserialize, Serialize};
@@ -235,8 +235,10 @@ impl LookupService {
     }
 }
 
-/// Create a stub lookup service for testing/graceful degradation
+#[cfg(test)]
+/// Create a stub lookup service for testing
 pub fn stub_lookup_service() -> LookupService {
+    use crate::entity_linking::StubEntityLinkingService;
     LookupService::new(Arc::new(StubEntityLinkingService))
 }
 

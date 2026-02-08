@@ -614,9 +614,6 @@ struct RequiredBinding {
     subtype: Option<String>,
     /// Which statement requires this binding
     required_by_stmt: usize,
-    /// Which argument references this binding
-    #[allow(dead_code)]
-    arg_name: String,
 }
 
 /// Get the entity type that a verb produces
@@ -664,7 +661,7 @@ fn collect_symbol_refs_with_type(
     entity_type: &str,
     subtype: Option<&str>,
     stmt_idx: usize,
-    arg_name: &str,
+    _arg_name: &str,
     out: &mut Vec<RequiredBinding>,
 ) {
     match node {
@@ -676,13 +673,12 @@ fn collect_symbol_refs_with_type(
                     entity_type: entity_type.to_string(),
                     subtype: subtype.map(String::from),
                     required_by_stmt: stmt_idx,
-                    arg_name: arg_name.to_string(),
                 });
             }
         }
         AstNode::List { items, .. } => {
             for item in items {
-                collect_symbol_refs_with_type(item, entity_type, subtype, stmt_idx, arg_name, out);
+                collect_symbol_refs_with_type(item, entity_type, subtype, stmt_idx, _arg_name, out);
             }
         }
         _ => {}
@@ -707,7 +703,6 @@ fn collect_untyped_symbol_refs(
                     entity_type,
                     subtype: None,
                     required_by_stmt: stmt_idx,
-                    arg_name: arg_name.to_string(),
                 });
             }
         }

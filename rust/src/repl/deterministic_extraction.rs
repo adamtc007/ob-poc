@@ -22,6 +22,7 @@
 
 use std::collections::HashMap;
 
+#[cfg(test)]
 use serde::{Deserialize, Serialize};
 
 use super::context_stack::ContextStack;
@@ -72,6 +73,7 @@ impl ExtractionResult {
 // Closed-World Prompt
 // ============================================================================
 
+#[cfg(test)]
 /// Structured context for constraining LLM fallback prompts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClosedWorldPrompt {
@@ -93,6 +95,7 @@ pub struct ClosedWorldPrompt {
     pub missing_args: Vec<String>,
 }
 
+#[cfg(test)]
 /// An entity in the closed-world candidate list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClosedWorldEntity {
@@ -105,6 +108,7 @@ pub struct ClosedWorldEntity {
 // Multi-Intent Detection
 // ============================================================================
 
+#[cfg(test)]
 /// A detected split in user input.
 #[derive(Debug, Clone)]
 pub struct IntentSplit {
@@ -222,6 +226,7 @@ pub fn try_deterministic_extraction(
 // Closed-World Prompt Builder
 // ============================================================================
 
+#[cfg(test)]
 /// Build a closed-world candidate list for constraining LLM fallback.
 ///
 /// The LLM MUST pick from this list — never invent entity IDs.
@@ -288,6 +293,7 @@ pub fn build_closed_world_prompt(
     }
 }
 
+#[cfg(test)]
 impl ClosedWorldPrompt {
     /// Render as a text block for embedding in an LLM system prompt.
     pub fn render(&self) -> String {
@@ -334,6 +340,7 @@ impl ClosedWorldPrompt {
 // Multi-Intent Detection
 // ============================================================================
 
+#[cfg(test)]
 /// Conjunction patterns that indicate multi-intent input.
 const CONJUNCTIONS: &[&str] = &[
     " and also ",
@@ -348,6 +355,7 @@ const CONJUNCTIONS: &[&str] = &[
     " then ",
 ];
 
+#[cfg(test)]
 /// Detect if user input contains multiple intents joined by conjunctions.
 ///
 /// Returns `Some(IntentSplit)` if a conjunction is found AND the leading
@@ -402,6 +410,7 @@ pub fn detect_multi_intent(input: &str) -> Option<IntentSplit> {
 // Pack-Enriched Prompt
 // ============================================================================
 
+#[cfg(test)]
 /// Build a pack-enriched system prompt section for LLM arg extraction.
 ///
 /// Provides the LLM with structured context so it can extract args
@@ -561,6 +570,8 @@ mod tests {
             exclusions: ExclusionSet::default(),
             outcomes: OutcomeRegistry::default(),
             accumulated_answers: HashMap::new(),
+            executed_verbs: HashSet::new(),
+            staged_verbs: HashSet::new(),
             turn: 0,
         }
     }
@@ -598,6 +609,7 @@ mod tests {
                 },
             ],
             confirm_policy: super::super::runbook::ConfirmPolicy::Always,
+            precondition_checks: vec![],
         });
         index.insert_test_entry(VerbIndexEntry {
             fqn: "kyc.add-entity".to_string(),
@@ -620,6 +632,7 @@ mod tests {
                 },
             ],
             confirm_policy: super::super::runbook::ConfirmPolicy::Always,
+            precondition_checks: vec![],
         });
         index.insert_test_entry(VerbIndexEntry {
             fqn: "session.info".to_string(),
@@ -629,6 +642,7 @@ mod tests {
             sentences: None,
             args: vec![],
             confirm_policy: super::super::runbook::ConfirmPolicy::QuickConfirm,
+            precondition_checks: vec![],
         });
         index
     }

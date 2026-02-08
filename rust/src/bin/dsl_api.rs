@@ -738,55 +738,8 @@ async fn get_lookup_values(
         .unwrap_or_default()
 }
 
-/// Query database for fuzzy matches using pg_trgm (for large datasets)
-/// Returns top matches with similarity scores
-#[allow(dead_code)]
-async fn get_fuzzy_matches_from_db(
-    pool: &PgPool,
-    schema: &str,
-    table: &str,
-    code_column: &str,
-    target: &str,
-    limit: i32,
-) -> Vec<(String, f32)> {
-    // Use pg_trgm similarity function for DB-side fuzzy matching
-    // This is efficient for large datasets (1000+ rows)
-    let sql = format!(
-        r#"SELECT "{}", similarity("{}", $1) as score
-           FROM "{}"."{}"
-           WHERE "{}" % $1
-           ORDER BY score DESC
-           LIMIT $2"#,
-        code_column, code_column, schema, table, code_column
-    );
-
-    let results: Vec<(String, f32)> = sqlx::query_as(&sql)
-        .bind(target)
-        .bind(limit)
-        .fetch_all(pool)
-        .await
-        .unwrap_or_default();
-
-    results
-}
-
 /// Minimum similarity threshold for suggestions (0.0 - 1.0)
 const SIMILARITY_THRESHOLD: f64 = 0.6;
-
-/// Maximum candidates for in-memory fuzzy matching
-/// For larger sets, we use DB-side trigram matching instead
-#[allow(dead_code)]
-const MAX_FUZZY_CANDIDATES: usize = 500;
-
-/// Find the closest matching string using Jaro-Winkler similarity
-#[allow(dead_code)]
-fn find_closest_match(target: &str, candidates: &[&str]) -> Option<String> {
-    find_closest_with_score(
-        target,
-        &candidates.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
-    )
-    .map(|(s, _)| s)
-}
 
 /// Find closest match with confidence score (0.0 - 1.0) using Jaro-Winkler
 /// Returns None if no candidate meets the similarity threshold
@@ -811,33 +764,6 @@ fn find_closest_with_score(target: &str, candidates: &[String]) -> Option<(Strin
     scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
     scored.first().map(|(s, score)| (s.clone(), *score as f32))
-}
-
-/// Get top N suggestions with scores, filtered by threshold
-#[allow(dead_code)]
-fn get_ranked_suggestions(target: &str, candidates: &[String], top_n: usize) -> Vec<(String, f32)> {
-    if candidates.is_empty() {
-        return vec![];
-    }
-
-    let target_lower = target.to_lowercase();
-
-    let mut scored: Vec<(String, f64)> = candidates
-        .iter()
-        .map(|candidate| {
-            let score = strsim::jaro_winkler(&target_lower, &candidate.to_lowercase());
-            (candidate.clone(), score)
-        })
-        .filter(|(_, score)| *score >= SIMILARITY_THRESHOLD)
-        .collect();
-
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-    scored
-        .into_iter()
-        .take(top_n)
-        .map(|(s, score)| (s, score as f32))
-        .collect()
 }
 
 // ============================================================================

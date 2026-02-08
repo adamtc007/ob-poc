@@ -113,7 +113,6 @@ use crate::dsl_v2::gateway_resolver::{gateway_addr, GatewayRefResolver};
 use crate::dsl_v2::ref_resolver::ResolveResult;
 use crate::dsl_v2::semantic_validator::SemanticValidator;
 use crate::dsl_v2::validation::{RefType, Severity, ValidationContext, ValidationRequest};
-use crate::dsl_v2::verb_registry::registry;
 use crate::dsl_v2::{enrich_program, parse_program, runtime_registry, Statement};
 use crate::graph::GraphScope;
 use crate::macros::OperatorMacroRegistry;
@@ -164,6 +163,7 @@ pub enum LookupResolution {
 /// Parameters that should be resolved as codes (not raw strings) via EntityGateway.
 /// These are reference data lookups where user input needs fuzzy matching to canonical codes.
 /// UUID-based entity lookups (CBU, Entity, Document) are handled separately.
+#[allow(dead_code)] // V1 agent pipeline — used by entity resolution in process_chat
 const CODE_PARAMS: &[(&str, RefType)] = &[
     // Core reference codes
     ("product", RefType::Product),
@@ -183,6 +183,7 @@ const CODE_PARAMS: &[(&str, RefType)] = &[
 ];
 
 /// Convert IntentArgValue to ParamValue for VerbIntent construction
+#[allow(dead_code)] // V1 agent pipeline — used by build_intent
 fn intent_arg_to_param_value(value: &IntentArgValue) -> ParamValue {
     match value {
         IntentArgValue::String(s) => ParamValue::String(s.clone()),
@@ -470,7 +471,6 @@ pub struct AgentService {
     entity_linker: Option<Arc<dyn crate::entity_linking::EntityLinkingService>>,
 }
 
-#[allow(dead_code)]
 impl AgentService {
     /// Create agent service with pool and embedder
     ///
@@ -673,6 +673,7 @@ impl AgentService {
     /// This is Enhancement #1: Query EntityGateway upfront and inject available
     /// entities into the LLM prompt. The LLM can then only reference entities
     /// that actually exist, eliminating "entity not found" retries.
+    #[allow(dead_code)] // V1 agent pipeline — used by LLM prompt enrichment path
     async fn pre_resolve_entities(&self) -> PreResolvedContext {
         let mut context = PreResolvedContext::default();
 
@@ -733,6 +734,7 @@ impl AgentService {
     }
 
     /// Format pre-resolved entities for injection into LLM prompt
+    #[allow(dead_code)] // V1 agent pipeline
     fn format_pre_resolved_context(&self, ctx: &PreResolvedContext) -> String {
         let mut sections = Vec::new();
 
@@ -801,6 +803,7 @@ impl AgentService {
     /// - What stages are complete, in progress, or blocked
     /// - What entities are missing
     /// - What the next actionable steps are
+    #[allow(dead_code)] // V1 agent pipeline
     async fn derive_semantic_context(&self, active_cbu_id: Uuid) -> Option<String> {
         let pool = &self.pool;
 
@@ -837,6 +840,7 @@ impl AgentService {
     /// - Current position in the taxonomy (breadcrumb trail)
     /// - Available navigation actions (drill down, zoom out)
     /// - Visible entities at this level
+    #[allow(dead_code)] // V1 agent pipeline
     fn derive_taxonomy_context(&self, session: &UnifiedSession) -> Option<String> {
         let stack = &session.context.taxonomy_stack;
 
@@ -911,6 +915,7 @@ Breadcrumb: {}
     ///
     /// This implements the "Domain Coherence" principle: requests appear as child
     /// nodes of workstreams in `awaiting` arrays, not as a separate list.
+    #[allow(dead_code)] // V1 agent pipeline
     async fn derive_kyc_case_context(&self, kyc_case_id: Uuid) -> Option<String> {
         let pool = &self.pool;
 
@@ -2260,6 +2265,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         }
     }
 
+    #[allow(dead_code)] // V1 agent pipeline
     fn ok_response(&self, dsl: String) -> AgentChatResponse {
         AgentChatResponse {
             message: dsl.clone(),
@@ -2502,6 +2508,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     }
 
     /// Build VerbIntent from pipeline result
+    #[allow(dead_code)] // V1 agent pipeline
     fn build_intent(&self, result: &crate::mcp::intent_pipeline::PipelineResult) -> VerbIntent {
         let params = result
             .intent
@@ -2519,6 +2526,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     }
 
     /// Run semantic validation on DSL
+    #[allow(dead_code)] // V1 agent pipeline
     async fn run_semantic_validation(
         &self,
         pool: &PgPool,
@@ -2568,6 +2576,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     }
 
     /// Handle disambiguation response from user
+    #[allow(dead_code)] // V1 agent pipeline
     async fn handle_disambiguation_response(
         &self,
         session: &mut UnifiedSession,
@@ -2683,6 +2692,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     /// They bypass the LLM entirely because they're instant control commands.
     ///
     /// Returns Some(response) if the message is a REPL command, None otherwise.
+    #[allow(dead_code)] // V1 agent pipeline
     fn handle_repl_command(
         &self,
         message: &str,
@@ -2787,6 +2797,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     /// - inject_resolved_ids() → resolution modifies intents in place
     ///
     /// One method. One Gateway connection. One pattern.
+    #[allow(dead_code)] // V1 agent pipeline
     async fn resolve_all(&self, mut intents: Vec<VerbIntent>) -> UnifiedResolution {
         let mut resolver = match GatewayRefResolver::connect(&self.config.gateway_addr).await {
             Ok(r) => r,
@@ -2988,6 +2999,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
     /// Resolve only code values (products, roles, jurisdictions, etc.) in intents.
     /// Used after disambiguation when entities are already resolved.
+    #[allow(dead_code)] // V1 agent pipeline
     async fn resolve_codes_only(
         &self,
         intents: &mut [VerbIntent],
@@ -3077,6 +3089,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
 
     /// Build final response with DSL
     /// Takes both execution DSL (with UUIDs for DB) and user DSL (with display names for chat)
+    #[allow(dead_code)] // V1 agent pipeline
     async fn build_response(
         &self,
         session: &mut UnifiedSession,
@@ -3221,152 +3234,6 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
     // ========================================================================
     // Public Entity Resolution API
     // ========================================================================
-    // These methods expose EntityGateway functionality directly for UI components
-    // that need entity search/autocomplete without going through the LLM.
-
-    /// Search for entities by type and query string
-    ///
-    /// This is a direct passthrough to EntityGateway for UI autocomplete.
-    /// Returns up to `limit` matches with fuzzy search.
-    ///
-    /// For client_group type, uses PgClientGroupResolver with semantic search.
-    pub async fn search_entities(
-        &self,
-        entity_type: &str,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<EntityMatchOption>, String> {
-        self.search_entities_in_scope(entity_type, query, limit, None)
-            .await
-    }
-
-    /// Search for entities within a client group scope
-    ///
-    /// When `client_group_id` is provided, results are filtered to entities
-    /// that belong to that client group. This prevents cross-client entity
-    /// leakage and improves disambiguation accuracy.
-    pub async fn search_entities_in_scope(
-        &self,
-        entity_type: &str,
-        query: &str,
-        limit: usize,
-        client_group_id: Option<Uuid>,
-    ) -> Result<Vec<EntityMatchOption>, String> {
-        // Special handling for client_group - uses PgClientGroupResolver
-        if entity_type == "client_group" || entity_type == "client" {
-            return self.search_client_groups(query, limit).await;
-        }
-
-        // If we have a client_group_id, use the scoped search function
-        if let Some(group_id) = client_group_id {
-            return self
-                .search_entities_by_client_group(entity_type, query, limit, group_id)
-                .await;
-        }
-
-        // No scope - fall through to global search
-        let ref_type = match entity_type {
-            "cbu" => RefType::Cbu,
-            "entity" | "person" | "company" => RefType::Entity,
-            "product" => RefType::Product,
-            "role" => RefType::Role,
-            "jurisdiction" => RefType::Jurisdiction,
-            "currency" => RefType::Currency,
-            _ => RefType::Entity,
-        };
-
-        let mut resolver = GatewayRefResolver::connect(&self.config.gateway_addr)
-            .await
-            .map_err(|e| format!("Gateway connection failed: {}", e))?;
-
-        let matches = resolver
-            .search_fuzzy(ref_type, query, limit)
-            .await
-            .map_err(|e| format!("Search failed: {}", e))?;
-
-        Ok(matches
-            .into_iter()
-            .filter_map(|m| {
-                Uuid::parse_str(&m.value).ok().map(|id| EntityMatchOption {
-                    entity_id: id,
-                    name: m.display,
-                    entity_type: entity_type.to_string(),
-                    jurisdiction: None,
-                    context: None,
-                    score: Some(m.score),
-                })
-            })
-            .collect())
-    }
-
-    /// Search for entities within a specific client group
-    ///
-    /// Uses typed search dispatch: CBU slots search CBUs, entity slots search entities.
-    /// This is THE core fix for "Allianz means different things depending on context".
-    async fn search_entities_by_client_group(
-        &self,
-        entity_type: &str,
-        query: &str,
-        limit: usize,
-        client_group_id: Uuid,
-    ) -> Result<Vec<EntityMatchOption>, String> {
-        use crate::mcp::scope_resolution::{search_in_scope, ScopeContext};
-
-        // Build scope context with the client group
-        let scope = ScopeContext::new().with_client_group(client_group_id, String::new());
-
-        // TYPE-DISPATCHED SEARCH: The key fix
-        // When entity_type is "cbu", we search CBUs, not entities
-        let matches = search_in_scope(&self.pool, &scope, entity_type, query, limit)
-            .await
-            .map_err(|e| format!("Scoped search failed: {}", e))?;
-
-        // Map to EntityMatchOption with typed metadata
-        Ok(matches
-            .into_iter()
-            .map(|m| EntityMatchOption {
-                entity_id: m.id,
-                name: m.name,
-                entity_type: m.result_type, // Preserve actual type from search
-                jurisdiction: None,
-                context: Some(format!("{} ({})", m.display_kind, m.match_type)),
-                score: Some(m.confidence as f32),
-            })
-            .collect())
-    }
-
-    /// Search client groups using PgClientGroupResolver with semantic search
-    async fn search_client_groups(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<EntityMatchOption>, String> {
-        use ob_semantic_matcher::client_group_resolver::ClientGroupAliasResolver;
-
-        let adapter = ClientGroupEmbedderAdapter(self.embedder.clone());
-        let resolver = ob_semantic_matcher::client_group_resolver::PgClientGroupResolver::new(
-            self.pool.clone(),
-            Arc::new(adapter),
-            "BAAI/bge-small-en-v1.5".to_string(),
-        );
-
-        let matches = resolver
-            .search_aliases(query, limit)
-            .await
-            .map_err(|e| format!("Client group search failed: {}", e))?;
-
-        Ok(matches
-            .into_iter()
-            .map(|m| EntityMatchOption {
-                entity_id: m.group_id,
-                name: m.canonical_name,
-                entity_type: "client_group".to_string(),
-                jurisdiction: None,
-                context: Some(format!("Matched: {}", m.matched_alias)),
-                score: Some(m.similarity_score),
-            })
-            .collect())
-    }
 
     /// Resolve a single entity by exact name match
     ///
@@ -3449,40 +3316,4 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
             Err(e) => Err(format!("Client group resolution failed: {}", e)),
         }
     }
-
-    /// Get all available DSL verbs (for UI verb picker / autocomplete)
-    pub fn get_available_verbs(&self) -> Vec<VerbInfo> {
-        let reg = registry();
-        reg.all_verbs()
-            .map(|v| VerbInfo {
-                domain: v.domain.clone(),
-                verb: v.verb.clone(),
-                full_name: format!("{}.{}", v.domain, v.verb),
-                description: v.description.clone(),
-                required_args: v
-                    .args
-                    .iter()
-                    .filter(|a| a.required)
-                    .map(|a| a.name.clone())
-                    .collect(),
-                optional_args: v
-                    .args
-                    .iter()
-                    .filter(|a| !a.required)
-                    .map(|a| a.name.clone())
-                    .collect(),
-            })
-            .collect()
-    }
-}
-
-/// Information about a DSL verb (for UI display)
-#[derive(Debug, Clone, Serialize)]
-pub struct VerbInfo {
-    pub domain: String,
-    pub verb: String,
-    pub full_name: String,
-    pub description: String,
-    pub required_args: Vec<String>,
-    pub optional_args: Vec<String>,
 }

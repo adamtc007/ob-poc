@@ -172,27 +172,6 @@ pub enum InputQuality {
     Nonsense,
 }
 
-/// Classify input quality based on verb search results
-pub fn classify_input(candidates: &[VerbSearchResult], threshold: f32) -> InputQuality {
-    match candidates.first() {
-        None => InputQuality::Nonsense,
-        Some(top) if top.score < 0.30 => InputQuality::Nonsense,
-        Some(top) if top.score < threshold => InputQuality::TooVague {
-            best_guess: Some(top.verb.clone()),
-        },
-        Some(top) => {
-            if let Some(runner_up) = candidates.get(1) {
-                if runner_up.score >= threshold && (top.score - runner_up.score) < 0.05 {
-                    return InputQuality::Ambiguous {
-                        candidates: candidates.iter().take(2).cloned().collect(),
-                    };
-                }
-            }
-            InputQuality::Clear
-        }
-    }
-}
-
 /// Confidence tiers for UI treatment
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum ConfidenceTier {

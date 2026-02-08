@@ -21,12 +21,8 @@ pub use ob_templates::{
 };
 
 // Keep harness module in main crate (has heavy dsl_v2 dependencies)
+#[cfg(test)]
 pub mod harness;
-
-pub use harness::{
-    get_sample_params, run_harness_from_registry, run_harness_no_db, HarnessResult,
-    TemplateTestResult,
-};
 
 // Extension trait for ExpansionContext integration with main crate session types
 mod context_ext;

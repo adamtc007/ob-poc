@@ -3603,25 +3603,6 @@ impl GenericCrudExecutor {
         Ok(row)
     }
 
-    /// Execute query returning multiple rows within a transaction
-    #[allow(dead_code)]
-    async fn execute_many_with_bindings_in_tx(
-        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-        sql: &str,
-        values: &[SqlValue],
-    ) -> Result<Vec<PgRow>> {
-        tracing::trace!(sql = %sql, bind_count = values.len(), "executing SQL in tx (multi row)");
-        tracing::trace!(bindings = ?values, "SQL bind values");
-
-        let mut query = sqlx::query(sql);
-        for val in values {
-            query = Self::bind_sql_value(query, val);
-        }
-        let rows = query.fetch_all(&mut **tx).await?;
-        tracing::trace!(row_count = rows.len(), "SQL returned rows");
-        Ok(rows)
-    }
-
     /// Execute non-query within a transaction (INSERT/UPDATE/DELETE without RETURNING)
     async fn execute_non_query_in_tx(
         tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
@@ -3742,93 +3723,6 @@ impl GenericCrudExecutor {
                 schema,
                 lookup.table,
             )),
-        }
-    }
-
-    /// Get suggestions for failed lookup using EntityGateway fuzzy search
-    #[allow(dead_code)]
-    async fn get_lookup_suggestions_gateway(
-        &self,
-        entity_type: &str,
-        attempted_value: &str,
-    ) -> Result<Vec<String>> {
-        let mut guard = self.get_gateway_client().await?;
-        if let Some(client) = guard.as_mut() {
-            let request = SearchRequest {
-                nickname: entity_type.to_uppercase(),
-                values: vec![attempted_value.to_string()],
-                search_key: None,
-                mode: SearchMode::Fuzzy as i32,
-                limit: Some(5),
-                discriminators: std::collections::HashMap::new(),
-                tenant_id: None,
-                cbu_id: None,
-            };
-
-            if let Ok(response) = client.search(request).await {
-                let suggestions: Vec<String> = response
-                    .into_inner()
-                    .matches
-                    .into_iter()
-                    .map(|m| m.display)
-                    .collect();
-                return Ok(suggestions);
-            }
-        }
-        Ok(vec![])
-    }
-
-    /// Fallback: Get suggestions using SQL (when EntityGateway unavailable)
-    #[allow(dead_code)]
-    async fn get_lookup_suggestions_sql(
-        &self,
-        schema: &str,
-        table: &str,
-        code_column: &str,
-        attempted_value: &str,
-    ) -> Result<Vec<String>> {
-        let sql = format!(
-            r#"SELECT "{}" FROM "{}"."{}"
-               WHERE "{}" IS NOT NULL
-               ORDER BY levenshtein(LOWER("{}"), LOWER($1)) ASC
-               LIMIT 5"#,
-            code_column, schema, table, code_column, code_column
-        );
-
-        let rows = sqlx::query(&sql)
-            .bind(attempted_value)
-            .fetch_all(&self.pool)
-            .await;
-
-        match rows {
-            Ok(rows) => {
-                let suggestions: Vec<String> = rows
-                    .iter()
-                    .filter_map(|r| r.try_get::<String, _>(code_column).ok())
-                    .collect();
-                Ok(suggestions)
-            }
-            Err(_) => {
-                // Levenshtein not available, fall back to simple ILIKE prefix match
-                let fallback_sql = format!(
-                    r#"SELECT "{}" FROM "{}"."{}"
-                       WHERE LOWER("{}") LIKE LOWER($1)
-                       LIMIT 10"#,
-                    code_column, schema, table, code_column
-                );
-
-                let prefix = format!("{}%", &attempted_value.chars().take(2).collect::<String>());
-                let rows = sqlx::query(&fallback_sql)
-                    .bind(&prefix)
-                    .fetch_all(&self.pool)
-                    .await?;
-
-                let suggestions: Vec<String> = rows
-                    .iter()
-                    .filter_map(|r| r.try_get::<String, _>(code_column).ok())
-                    .collect();
-                Ok(suggestions)
-            }
         }
     }
 

@@ -85,6 +85,16 @@ pub fn apply_pack_scoring(candidates: &mut Vec<VerbCandidate>, context: &Context
                     }
                 }
             }
+        } else {
+            // No pack active — apply focus-mode domain boost from recent verbs.
+            let focus_mode = super::context_stack::derive_focus_mode(context);
+            if let Some(focus_domain) = focus_mode.domain() {
+                if let Some(verb_domain) = c.verb_fqn.split('.').next() {
+                    if verb_domain == focus_domain {
+                        c.score += DOMAIN_AFFINITY_BOOST;
+                    }
+                }
+            }
         }
 
         // Exclusion filtering
@@ -188,6 +198,7 @@ pub fn apply_ambiguity_policy(candidates: &[VerbCandidate]) -> AmbiguityOutcome 
 // Dual Decode — Joint pack+verb scoring (Phase H)
 // ---------------------------------------------------------------------------
 
+#[cfg(test)]
 /// Result of dual decode: a verb match paired with its pack context.
 #[derive(Debug, Clone)]
 pub struct DualDecodeResult {
@@ -203,6 +214,7 @@ pub struct DualDecodeResult {
     pub scored_candidates: Vec<VerbCandidate>,
 }
 
+#[cfg(test)]
 /// Joint pack+verb scoring.
 ///
 /// Unlike sequential (pick pack → match verb), this cross-references ALL
@@ -318,6 +330,7 @@ pub fn dual_decode(
     }
 }
 
+#[cfg(test)]
 /// Apply pack scoring with an explicit pack (for cross-pack evaluation).
 fn apply_pack_scoring_with_pack(
     candidates: &mut Vec<VerbCandidate>,
@@ -370,6 +383,7 @@ fn apply_pack_scoring_with_pack(
 // Error Recovery — Rejection → exclusion → re-resolve (Phase H)
 // ---------------------------------------------------------------------------
 
+#[cfg(test)]
 /// After a user rejects a verb or entity, re-score with the rejection excluded.
 ///
 /// Returns a new set of candidates without the rejected item, re-sorted.

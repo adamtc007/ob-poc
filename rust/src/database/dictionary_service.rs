@@ -31,20 +31,6 @@ impl DictionaryDatabaseService {
         &self.pool
     }
 
-    /// Create a mock dictionary database service for testing
-    pub fn new_mock() -> Self {
-        // This creates a mock service that will fail on actual database operations
-        // but is useful for type checking and basic initialization
-
-        let mock_url = "postgresql://mock:mock@localhost/mock";
-        let pool = sqlx::postgres::PgPoolOptions::new()
-            .max_connections(1)
-            .connect_lazy(mock_url)
-            .expect("Mock pool creation failed");
-
-        Self { pool }
-    }
-
     /// Create a new dictionary attribute
     pub async fn create_attribute(
         &self,

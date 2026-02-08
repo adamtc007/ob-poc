@@ -102,10 +102,15 @@ impl IntentService {
         }
     }
 
-    /// Phase 2: Verb matching (delegates to IntentMatcher).
+    /// Phase 2: Verb matching (delegates to IntentMatcher) — **WITHOUT pack scoring**.
     ///
     /// Maps the full `IntentMatchResult` to a simplified `VerbMatchOutcome`
     /// that the orchestrator can pattern-match on.
+    ///
+    /// **Deprecated:** Use [`match_verb_with_context`] instead, which applies
+    /// pack-scoped scoring (invariant P-2). This method calls `match_intent()`
+    /// directly and bypasses pack boost/penalty/forbidden filtering.
+    #[deprecated(note = "Use match_verb_with_context for pack-scoped scoring (P-2)")]
     pub async fn match_verb(&self, input: &str, ctx: &MatchContext) -> Result<VerbMatchOutcome> {
         let result = self.intent_matcher.match_intent(input, ctx).await?;
 
@@ -160,10 +165,67 @@ impl IntentService {
         ctx: &MatchContext,
         stack: &ContextStack,
     ) -> Result<VerbMatchOutcome> {
-        let result = self
+        let mut result = self
             .intent_matcher
             .search_with_context(input, ctx, stack)
             .await?;
+
+        // Step 3.5: Apply precondition filter — remove verbs whose
+        // preconditions are not met, then re-evaluate the outcome.
+        let filter_stats = super::preconditions::filter_by_preconditions(
+            &mut result.verb_candidates,
+            &self.verb_config_index,
+            stack,
+            super::preconditions::EligibilityMode::Executable,
+        );
+        if filter_stats.before_count != filter_stats.after_count {
+            tracing::debug!(
+                "Precondition filter: {} → {} candidates (removed {})",
+                filter_stats.before_count,
+                filter_stats.after_count,
+                filter_stats.removed.len(),
+            );
+            // Re-evaluate ambiguity policy after filtering.
+            let new_outcome = super::scoring::apply_ambiguity_policy(&result.verb_candidates);
+            result.outcome = match new_outcome {
+                super::scoring::AmbiguityOutcome::NoMatch => {
+                    // Provide "why not" suggestion from the best removed candidate.
+                    let suggestion = filter_stats
+                        .removed
+                        .first()
+                        .and_then(|r| {
+                            r.unmet_reasons.first().and_then(|u| {
+                                u.suggested_verb
+                                    .as_ref()
+                                    .map(|sv| format!("Try '{}' first ({})", sv, u.explanation))
+                            })
+                        })
+                        .unwrap_or_default();
+                    MatchOutcome::NoMatch {
+                        reason: if suggestion.is_empty() {
+                            "No verb matched after precondition filter".to_string()
+                        } else {
+                            suggestion
+                        },
+                    }
+                }
+                super::scoring::AmbiguityOutcome::Confident { verb, score } => {
+                    MatchOutcome::Matched {
+                        verb,
+                        confidence: score,
+                    }
+                }
+                super::scoring::AmbiguityOutcome::Ambiguous { margin, .. } => {
+                    MatchOutcome::Ambiguous { margin }
+                }
+                super::scoring::AmbiguityOutcome::Proposed { verb, score } => {
+                    MatchOutcome::Matched {
+                        verb,
+                        confidence: score,
+                    }
+                }
+            };
+        }
 
         let outcome = match &result.outcome {
             MatchOutcome::Matched { verb, confidence } => VerbMatchOutcome::Matched {
@@ -287,8 +349,9 @@ impl IntentService {
 // ============================================================================
 
 #[cfg(test)]
+#[allow(deprecated)] // Tests exercise deprecated match_verb() for coverage
 mod tests {
-    use super::super::types::{EntityMention, VerbCandidate};
+    use super::super::types::VerbCandidate;
     use super::*;
     use async_trait::async_trait;
     use dsl_core::config::types::{ArgConfig, ArgType};

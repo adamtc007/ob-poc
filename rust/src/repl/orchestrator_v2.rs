@@ -112,6 +112,7 @@ impl<T: DslExecutor> DslExecutorV2 for T {
     }
 }
 
+#[allow(dead_code)] // Used by integration tests (rust/tests/repl_v2_phase*.rs)
 /// Test executor that parks entries whose DSL contains ":park" or ":durable" markers.
 pub struct ParkableStubExecutor;
 
@@ -1454,88 +1455,6 @@ impl ReplOrchestratorV2 {
             .cloned()
     }
 
-    /// Update the session's context stack focus from a completed runbook entry.
-    ///
-    /// Called after each successful entry completion to keep focus current.
-    /// Focus is ephemeral (not stored) — it's re-derived from the runbook on
-    /// each context stack build. This method is a convenience for immediate
-    /// use within the same turn.
-    #[allow(dead_code)] // Called in Phase E when orchestrator process loop wires focus updates
-    fn update_focus_from_entry(&self, session: &ReplSessionV2, entry_idx: usize) {
-        // Focus updates are handled by the ContextStack::from_runbook() fold.
-        // This method exists as a documentation anchor and future hook for
-        // intra-turn focus updates if needed. Currently, the context stack
-        // is rebuilt at each match_verb_for_input() call, so focus is always
-        // fresh from the runbook fold.
-        let _ = (session, entry_idx);
-    }
-
-    /// Record an exclusion from user rejection.
-    ///
-    /// When a user rejects a proposed entity or verb, we record it so
-    /// subsequent resolution avoids re-proposing it. The exclusion is
-    /// stored on the session's exclusion list and will be picked up by
-    /// ContextStack::from_runbook() on the next fold.
-    ///
-    /// Exclusions are ephemeral — they decay after 3 turns.
-    #[allow(dead_code)] // Called in Phase E when rejection handling wires exclusions
-    fn record_exclusion(
-        &self,
-        session: &mut ReplSessionV2,
-        value: String,
-        entity_id: Option<Uuid>,
-        reason: String,
-    ) {
-        // Record as a runbook entry so it's derivable from fold
-        let dsl = if let Some(eid) = entity_id {
-            format!(
-                "(session.exclude :value \"{}\" :entity-id \"{}\" :reason \"{}\")",
-                value, eid, reason
-            )
-        } else {
-            format!(
-                "(session.exclude :value \"{}\" :reason \"{}\")",
-                value, reason
-            )
-        };
-
-        let sentence = format!("Excluded: {} ({})", value, reason);
-
-        let mut args = HashMap::new();
-        args.insert("value".to_string(), value);
-        if let Some(eid) = entity_id {
-            args.insert("entity-id".to_string(), eid.to_string());
-        }
-        args.insert("reason".to_string(), reason);
-
-        let entry = RunbookEntry {
-            id: Uuid::new_v4(),
-            sequence: session.runbook.entries.len() as i32,
-            sentence,
-            labels: {
-                let mut l = HashMap::new();
-                l.insert("type".to_string(), "exclusion".to_string());
-                l
-            },
-            dsl,
-            verb: "session.exclude".to_string(),
-            args,
-            slot_provenance: SlotProvenance {
-                slots: HashMap::new(),
-            },
-            arg_extraction_audit: None,
-            status: EntryStatus::Completed,
-            execution_mode: ExecutionMode::Sync,
-            confirm_policy: ConfirmPolicy::QuickConfirm,
-            unresolved_refs: vec![],
-            depends_on: vec![],
-            result: Some(serde_json::json!({"excluded": true})),
-            invocation: None,
-        };
-
-        session.runbook.add_entry(entry);
-    }
-
     // -- Phase E: Fast command handling --
 
     /// Try to parse and handle a fast command from user input.
@@ -1543,7 +1462,6 @@ impl ReplOrchestratorV2 {
     /// Fast commands are detected by prefix matching before semantic search.
     /// They are zero-cost (no ML, no DB) and bypass the verb pipeline entirely.
     /// Returns `None` if the input is not a recognized fast command.
-    #[allow(dead_code)] // Wired in handle_in_pack Message branch
     async fn try_fast_command(
         &self,
         session: &mut ReplSessionV2,
@@ -1764,6 +1682,7 @@ impl ReplOrchestratorV2 {
                 pack,
                 &session.runbook,
                 &match_ctx,
+                &ctx_stack,
                 &context_vars,
                 &answers,
             )
@@ -1947,10 +1866,52 @@ impl ReplOrchestratorV2 {
             }
         }
 
-        // Phase 1: Try raw IntentMatcher if available.
+        // Phase 1: Try raw IntentMatcher with pack-scoped scoring (P-2 invariant).
+        //
+        // Uses `search_with_context()` (NOT `match_intent()`) to ensure pack
+        // scoring is always applied. The IntentMatcher trait provides
+        // `search_with_context()` as a default method that wraps `match_intent()`
+        // with pack boost/penalty/forbidden filtering.
         if let Some(matcher) = &self.intent_matcher {
-            match matcher.match_intent(content, &match_ctx).await {
-                Ok(result) => {
+            match matcher
+                .search_with_context(content, &match_ctx, &context_stack)
+                .await
+            {
+                Ok(mut result) => {
+                    // Apply precondition filter (P-D invariant).
+                    let _filter_stats = super::preconditions::filter_by_preconditions(
+                        &mut result.verb_candidates,
+                        &self.verb_config_index,
+                        &context_stack,
+                        super::preconditions::EligibilityMode::Executable,
+                    );
+                    if _filter_stats.before_count != _filter_stats.after_count {
+                        // Re-evaluate outcome after filtering.
+                        let new_outcome =
+                            super::scoring::apply_ambiguity_policy(&result.verb_candidates);
+                        result.outcome = match new_outcome {
+                            super::scoring::AmbiguityOutcome::NoMatch => {
+                                super::types::MatchOutcome::NoMatch {
+                                    reason: "No verb matched after precondition filter".to_string(),
+                                }
+                            }
+                            super::scoring::AmbiguityOutcome::Confident { verb, score } => {
+                                super::types::MatchOutcome::Matched {
+                                    verb,
+                                    confidence: score,
+                                }
+                            }
+                            super::scoring::AmbiguityOutcome::Ambiguous { margin, .. } => {
+                                super::types::MatchOutcome::Ambiguous { margin }
+                            }
+                            super::scoring::AmbiguityOutcome::Proposed { verb, score } => {
+                                super::types::MatchOutcome::Matched {
+                                    verb,
+                                    confidence: score,
+                                }
+                            }
+                        };
+                    }
                     return self.handle_intent_result(session, content, result);
                 }
                 Err(e) => {
@@ -2043,6 +2004,7 @@ impl ReplOrchestratorV2 {
                             confidence,
                             used_template_path: false,
                             template_id: None,
+                            precondition_filter: None,
                         },
                         ExtractionDecision {
                             method: extraction_method,
@@ -2194,6 +2156,7 @@ impl ReplOrchestratorV2 {
                             confidence: candidates.first().map(|c| c.score).unwrap_or(0.0),
                             used_template_path: false,
                             template_id: None,
+                            precondition_filter: None,
                         },
                         ExtractionDecision::default(),
                         None,
@@ -2264,6 +2227,7 @@ impl ReplOrchestratorV2 {
                             confidence: 0.0,
                             used_template_path: false,
                             template_id: None,
+                            precondition_filter: None,
                         },
                         ExtractionDecision::default(),
                         None,

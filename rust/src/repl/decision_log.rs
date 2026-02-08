@@ -191,6 +191,29 @@ pub struct VerbDecision {
 
     /// Template ID if template path was used.
     pub template_id: Option<String>,
+
+    /// Precondition filter stats (if filter was applied).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub precondition_filter: Option<PreconditionFilterLog>,
+}
+
+/// Log entry for precondition filtering.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreconditionFilterLog {
+    /// Candidates before filtering.
+    pub before_count: usize,
+    /// Candidates after filtering.
+    pub after_count: usize,
+    /// Verbs removed with reasons.
+    pub removed: Vec<PreconditionRemovedVerb>,
+}
+
+/// A verb removed by precondition filter.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreconditionRemovedVerb {
+    pub verb_fqn: String,
+    pub reasons: Vec<String>,
+    pub suggested_verb: Option<String>,
 }
 
 /// Snapshot of a verb candidate at a point in the pipeline.
@@ -213,6 +236,7 @@ impl Default for VerbDecision {
             confidence: 0.0,
             used_template_path: false,
             template_id: None,
+            precondition_filter: None,
         }
     }
 }
@@ -774,6 +798,7 @@ mod tests {
                 confidence: 0.92,
                 used_template_path: false,
                 template_id: None,
+                precondition_filter: None,
             })
             .with_proposed_dsl("(kyc.add-entity :entity-name \"Irish Fund\")".to_string());
 
