@@ -127,6 +127,26 @@ impl JobFrameStore {
         Ok(result.rows_affected() > 0)
     }
 
+    /// Mark a job as dead-lettered (exceeded max retries).
+    ///
+    /// Sets status to 'dead_lettered' and records the completion timestamp.
+    /// Returns true if the row was updated.
+    pub async fn mark_dead_lettered(&self, job_key: &str) -> Result<bool> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".bpmn_job_frames
+            SET status = 'dead_lettered', completed_at = now()
+            WHERE job_key = $1 AND status IN ('active', 'failed')
+            "#,
+            job_key,
+        )
+        .execute(&self.pool)
+        .await
+        .context("Failed to mark bpmn_job_frame as dead_lettered")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
     /// List all active job frames for a process instance.
     ///
     /// Used for monitoring and cleanup.

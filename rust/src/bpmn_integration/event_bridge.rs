@@ -47,12 +47,124 @@ impl EventBridge {
 
     /// Subscribe to events for a process instance and forward outcomes.
     ///
-    /// Runs until the stream ends or an error occurs. Each translated event
-    /// is sent via the `outcome_tx` channel for the REPL signal handler.
+    /// Runs until a terminal event is received or the channel is closed.
+    /// If the gRPC stream drops before a terminal event, the bridge
+    /// reconnects automatically with exponential backoff, filtering out
+    /// already-seen events by sequence number.
     pub async fn subscribe_instance(
         &self,
         process_instance_id: Uuid,
         outcome_tx: mpsc::Sender<OutcomeEvent>,
+    ) -> Result<()> {
+        /// Maximum number of reconnect attempts before giving up.
+        const MAX_RECONNECT_ATTEMPTS: u32 = 10;
+        /// Initial backoff duration (doubles on each retry).
+        const INITIAL_BACKOFF_MS: u64 = 250;
+        /// Maximum backoff cap.
+        const MAX_BACKOFF_MS: u64 = 30_000;
+
+        let mut last_seen_seq: u64 = 0;
+        let mut reconnect_attempts: u32 = 0;
+        let mut saw_terminal = false;
+
+        loop {
+            match self
+                .run_event_stream(
+                    process_instance_id,
+                    &outcome_tx,
+                    &mut last_seen_seq,
+                    &mut saw_terminal,
+                )
+                .await
+            {
+                Ok(()) => {
+                    // Stream ended cleanly.
+                    if saw_terminal {
+                        tracing::info!(
+                            process_instance_id = %process_instance_id,
+                            last_seen_seq,
+                            "EventBridge stream ended after terminal event"
+                        );
+                        return Ok(());
+                    }
+
+                    // Stream ended without terminal event — channel closed
+                    // or receiver dropped.
+                    if outcome_tx.is_closed() {
+                        tracing::warn!(
+                            process_instance_id = %process_instance_id,
+                            "Outcome channel closed, stopping event bridge"
+                        );
+                        return Ok(());
+                    }
+
+                    // Stream ended prematurely — reconnect.
+                    reconnect_attempts += 1;
+                    if reconnect_attempts > MAX_RECONNECT_ATTEMPTS {
+                        tracing::error!(
+                            process_instance_id = %process_instance_id,
+                            reconnect_attempts,
+                            "EventBridge exceeded max reconnect attempts"
+                        );
+                        return Err(anyhow::anyhow!(
+                            "EventBridge exceeded {} reconnect attempts",
+                            MAX_RECONNECT_ATTEMPTS
+                        ));
+                    }
+
+                    let backoff = std::cmp::min(
+                        INITIAL_BACKOFF_MS * 2u64.pow(reconnect_attempts - 1),
+                        MAX_BACKOFF_MS,
+                    );
+                    tracing::warn!(
+                        process_instance_id = %process_instance_id,
+                        reconnect_attempts,
+                        last_seen_seq,
+                        backoff_ms = backoff,
+                        "EventBridge stream ended prematurely, reconnecting"
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_millis(backoff)).await;
+                }
+                Err(e) => {
+                    // Stream error — reconnect with backoff.
+                    reconnect_attempts += 1;
+                    if reconnect_attempts > MAX_RECONNECT_ATTEMPTS {
+                        tracing::error!(
+                            process_instance_id = %process_instance_id,
+                            reconnect_attempts,
+                            error = %e,
+                            "EventBridge exceeded max reconnect attempts after error"
+                        );
+                        return Err(e);
+                    }
+
+                    let backoff = std::cmp::min(
+                        INITIAL_BACKOFF_MS * 2u64.pow(reconnect_attempts - 1),
+                        MAX_BACKOFF_MS,
+                    );
+                    tracing::warn!(
+                        process_instance_id = %process_instance_id,
+                        reconnect_attempts,
+                        last_seen_seq,
+                        backoff_ms = backoff,
+                        error = %e,
+                        "EventBridge stream error, reconnecting"
+                    );
+                    tokio::time::sleep(tokio::time::Duration::from_millis(backoff)).await;
+                }
+            }
+        }
+    }
+
+    /// Run a single event stream session, updating `last_seen_seq` as events
+    /// are received. Returns `Ok(())` when the stream ends (either cleanly or
+    /// prematurely). Sets `saw_terminal` to `true` if a terminal event arrives.
+    async fn run_event_stream(
+        &self,
+        process_instance_id: Uuid,
+        outcome_tx: &mpsc::Sender<OutcomeEvent>,
+        last_seen_seq: &mut u64,
+        saw_terminal: &mut bool,
     ) -> Result<()> {
         let mut stream = self
             .bpmn_client
@@ -62,13 +174,34 @@ impl EventBridge {
 
         tracing::info!(
             process_instance_id = %process_instance_id,
+            from_seq = *last_seen_seq,
             "EventBridge subscribed to lifecycle events"
         );
 
         while let Some(proto_event) = stream.message().await.context("Event stream error")? {
             let event = lifecycle_event_from_proto(proto_event);
 
+            // Skip events we've already seen (from previous stream session).
+            if event.sequence < *last_seen_seq {
+                continue;
+            }
+
+            // Track the highest sequence seen.
+            if event.sequence >= *last_seen_seq {
+                *last_seen_seq = event.sequence + 1;
+            }
+
             if let Some(outcome) = Self::translate_event(&event) {
+                // Check if this is a terminal event.
+                if matches!(
+                    outcome,
+                    OutcomeEvent::ProcessCompleted { .. }
+                        | OutcomeEvent::ProcessCancelled { .. }
+                        | OutcomeEvent::IncidentCreated { .. }
+                ) {
+                    *saw_terminal = true;
+                }
+
                 // Update stores based on the event.
                 self.handle_outcome(process_instance_id, &outcome).await;
 
@@ -78,15 +211,10 @@ impl EventBridge {
                         process_instance_id = %process_instance_id,
                         "Outcome channel closed, stopping event bridge"
                     );
-                    break;
+                    return Ok(());
                 }
             }
         }
-
-        tracing::info!(
-            process_instance_id = %process_instance_id,
-            "EventBridge stream ended"
-        );
 
         Ok(())
     }

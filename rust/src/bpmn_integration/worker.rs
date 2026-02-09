@@ -172,7 +172,7 @@ impl JobWorker {
                 tracing::debug!(job_key, task_type, "Job activated (new)");
             }
             Ok(false) => {
-                // Already seen — check if completed.
+                // Already seen — check if completed or dead-lettered.
                 if let Ok(Some(existing)) = self.job_frames.find_by_job_key(job_key).await {
                     if existing.status == JobFrameStatus::Completed {
                         tracing::info!(
@@ -180,6 +180,10 @@ impl JobWorker {
                             task_type,
                             "Job already completed (dedupe), skipping"
                         );
+                        return;
+                    }
+                    if existing.status == JobFrameStatus::DeadLettered {
+                        tracing::info!(job_key, task_type, "Job already dead-lettered, skipping");
                         return;
                     }
                 }
@@ -245,8 +249,42 @@ impl JobWorker {
                 // 5b. Failure — fail the job via gRPC.
                 self.fail_job_rpc(job_key, "VERB_EXECUTION_ERROR", &err)
                     .await;
-                let _ = self.job_frames.mark_failed(job_key).await;
-                tracing::warn!(job_key, verb_fqn, error = %err, "Job failed");
+
+                // Check if this job has exceeded the maximum retry count.
+                // If so, promote to dead-letter queue instead of just marking failed.
+                let max_retries = task_binding.max_retries;
+                let attempts = self
+                    .job_frames
+                    .find_by_job_key(job_key)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|f| f.attempts)
+                    .unwrap_or(1);
+
+                if attempts as u32 >= max_retries {
+                    let _ = self.job_frames.mark_dead_lettered(job_key).await;
+                    tracing::error!(
+                        job_key,
+                        verb_fqn,
+                        attempts,
+                        max_retries,
+                        error = %err,
+                        "Job exceeded max retries, promoted to dead-letter queue"
+                    );
+                } else {
+                    let _ = self.job_frames.mark_failed(job_key).await;
+                    tracing::warn!(
+                        job_key,
+                        verb_fqn,
+                        attempts,
+                        max_retries,
+                        error = %err,
+                        "Job failed (attempt {}/{})",
+                        attempts,
+                        max_retries
+                    );
+                }
             }
             crate::repl::orchestrator_v2::DslExecutionOutcome::Parked { .. } => {
                 // 5c. Parked — should not happen for job verbs (they're direct).

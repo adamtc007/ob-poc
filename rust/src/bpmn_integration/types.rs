@@ -149,6 +149,8 @@ pub enum JobFrameStatus {
     Active,
     Completed,
     Failed,
+    /// Promoted to dead-letter queue after exceeding max retries.
+    DeadLettered,
 }
 
 impl JobFrameStatus {
@@ -157,6 +159,7 @@ impl JobFrameStatus {
             Self::Active => "active",
             Self::Completed => "completed",
             Self::Failed => "failed",
+            Self::DeadLettered => "dead_lettered",
         }
     }
 
@@ -165,6 +168,7 @@ impl JobFrameStatus {
             "active" => Some(Self::Active),
             "completed" => Some(Self::Completed),
             "failed" => Some(Self::Failed),
+            "dead_lettered" => Some(Self::DeadLettered),
             _ => None,
         }
     }
@@ -305,6 +309,7 @@ mod tests {
             JobFrameStatus::Active,
             JobFrameStatus::Completed,
             JobFrameStatus::Failed,
+            JobFrameStatus::DeadLettered,
         ] {
             let s = status.as_str();
             let parsed = JobFrameStatus::parse(s).unwrap();
