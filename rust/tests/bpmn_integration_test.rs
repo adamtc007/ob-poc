@@ -24,6 +24,7 @@ use ob_poc::bpmn_integration::{
     correlation::CorrelationStore,
     job_frames::JobFrameStore,
     parked_tokens::ParkedTokenStore,
+    pending_dispatches::PendingDispatchStore,
     types::{CorrelationRecord, CorrelationStatus, ExecutionRoute, ParkedToken, ParkedTokenStatus},
 };
 
@@ -753,6 +754,7 @@ async fn b3_12_dispatcher_direct_routing() {
         client,
         correlation_store,
         parked_token_store,
+        PendingDispatchStore::new(pool.clone()),
     );
 
     // Direct verb should delegate to inner executor (StubExecutor returns Completed).

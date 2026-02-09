@@ -380,12 +380,159 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let voice_router = routes::voice::create_voice_router(pool.clone());
 
     // =========================================================================
+    // BPMN-Lite Integration (before REPL V2 — determines executor)
+    // =========================================================================
+    let bpmn_executor_v2: Option<Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>> = {
+        use ob_poc::bpmn_integration::{
+            client::BpmnLiteConnection, config::WorkflowConfigIndex, correlation::CorrelationStore,
+            dispatcher::WorkflowDispatcher, job_frames::JobFrameStore,
+            parked_tokens::ParkedTokenStore, pending_dispatch_worker::PendingDispatchWorker,
+            pending_dispatches::PendingDispatchStore, worker::JobWorker,
+        };
+        use ob_poc::repl::executor_bridge::RealDslExecutor;
+
+        match std::env::var("BPMN_LITE_GRPC_URL") {
+            Ok(bpmn_url) => {
+                tracing::info!("BPMN-Lite integration enabled at {}", bpmn_url);
+
+                match BpmnLiteConnection::connect_lazy(&bpmn_url) {
+                    Ok(client) => {
+                        // Load workflow config
+                        let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| {
+                            let manifest_dir = env!("CARGO_MANIFEST_DIR");
+                            format!("{}/../../config", manifest_dir)
+                        });
+                        let config_path = std::path::Path::new(&config_dir).join("workflows.yaml");
+
+                        match WorkflowConfigIndex::load_from_file(&config_path) {
+                            Ok(mut config_index) => {
+                                // Auto-register durable verbs from verb YAML
+                                {
+                                    use ob_poc::dsl_v2::config::types::DurableConfig;
+                                    use ob_poc::dsl_v2::runtime_registry::{
+                                        runtime_registry, RuntimeBehavior,
+                                    };
+                                    let reg = runtime_registry();
+                                    let mut registered = 0usize;
+                                    for verb in reg.all_verbs() {
+                                        if let RuntimeBehavior::Durable(d) = &verb.behavior {
+                                            let durable_config = DurableConfig {
+                                                runtime: d.runtime,
+                                                process_key: d.process_key.clone(),
+                                                correlation_field: d.correlation_field.clone(),
+                                                task_bindings: d.task_bindings.clone(),
+                                                timeout: d.timeout.clone(),
+                                                escalation: d.escalation.clone(),
+                                            };
+                                            config_index.register_from_durable_config(
+                                                &verb.full_name,
+                                                &durable_config,
+                                            );
+                                            registered += 1;
+                                        }
+                                    }
+                                    if registered > 0 {
+                                        tracing::info!(
+                                            "Auto-registered {} durable verbs in WorkflowConfigIndex",
+                                            registered
+                                        );
+                                    }
+                                }
+
+                                let config_index = Arc::new(config_index);
+
+                                // Inner executor for direct verb execution
+                                let inner: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2> =
+                                    Arc::new(RealDslExecutor::new(pool.clone()));
+
+                                // WorkflowDispatcher — routes Direct vs Orchestrated.
+                                // Each store wraps a PgPool (cheap Arc clone), so we
+                                // create separate instances per consumer.
+                                let dispatcher = WorkflowDispatcher::new(
+                                    inner,
+                                    config_index.clone(),
+                                    client.clone(),
+                                    CorrelationStore::new(pool.clone()),
+                                    ParkedTokenStore::new(pool.clone()),
+                                    PendingDispatchStore::new(pool.clone()),
+                                )
+                                .with_pool(pool.clone());
+
+                                // Spawn JobWorker (long-poll job activation loop)
+                                let (job_shutdown_tx, job_shutdown_rx) =
+                                    tokio::sync::watch::channel(false);
+                                let worker_executor: Arc<
+                                    dyn ob_poc::repl::orchestrator_v2::DslExecutorV2,
+                                > = Arc::new(RealDslExecutor::new(pool.clone()));
+                                let job_worker = JobWorker::new(
+                                    format!("ob-poc-worker-{}", std::process::id()),
+                                    client.clone(),
+                                    config_index.clone(),
+                                    JobFrameStore::new(pool.clone()),
+                                    worker_executor,
+                                );
+                                tokio::spawn(async move {
+                                    job_worker.run(job_shutdown_rx).await;
+                                });
+                                std::mem::forget(job_shutdown_tx);
+
+                                // Spawn PendingDispatchWorker (retry queued dispatches)
+                                let (pending_shutdown_tx, pending_shutdown_rx) =
+                                    tokio::sync::watch::channel(false);
+                                let pending_worker = PendingDispatchWorker::new(
+                                    client.clone(),
+                                    PendingDispatchStore::new(pool.clone()),
+                                    CorrelationStore::new(pool.clone()),
+                                    config_index.clone(),
+                                );
+                                tokio::spawn(async move {
+                                    pending_worker.run(pending_shutdown_rx).await;
+                                });
+                                std::mem::forget(pending_shutdown_tx);
+
+                                tracing::info!(
+                                    "BPMN-Lite integration initialized: client={}, task_types={:?}",
+                                    bpmn_url,
+                                    config_index.all_task_types()
+                                );
+
+                                Some(Arc::new(dispatcher)
+                                    as Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2>)
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to load workflow config from {}: {}",
+                                    config_path.display(),
+                                    e
+                                );
+                                tracing::warn!(
+                                    "BPMN-Lite disabled — WorkflowDispatcher not available"
+                                );
+                                None
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to create BPMN-Lite client: {}", e);
+                        tracing::warn!("BPMN-Lite integration disabled");
+                        None
+                    }
+                }
+            }
+            Err(_) => {
+                tracing::debug!("BPMN-Lite integration disabled (BPMN_LITE_GRPC_URL not set)");
+                None
+            }
+        }
+    };
+
+    // =========================================================================
     // REPL V2 — Pack-Guided Runbook Pipeline
     // =========================================================================
     let repl_v2_router = {
         use ob_poc::api::repl_routes_v2::{self, ReplV2RouteState};
         use ob_poc::journey::router::PackRouter;
-        use ob_poc::repl::orchestrator_v2::{ReplOrchestratorV2, StubExecutor};
+        use ob_poc::repl::orchestrator_v2::ReplOrchestratorV2;
 
         // Load journey packs from config dir (if available), otherwise empty router.
         let pack_router = {
@@ -393,9 +540,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../config/packs");
             PackRouter::load(&config_dir).unwrap_or_else(|_| PackRouter::new(vec![]))
         };
-        let executor = Arc::new(StubExecutor);
 
-        let orchestrator = ReplOrchestratorV2::new(pack_router, executor).with_pool(pool.clone());
+        // Legacy DslExecutor for the constructor (fallback path — never parks)
+        use ob_poc::repl::executor_bridge::RealDslExecutor;
+        let legacy_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutor> =
+            Arc::new(RealDslExecutor::new(pool.clone()));
+
+        let mut orchestrator =
+            ReplOrchestratorV2::new(pack_router, legacy_executor).with_pool(pool.clone());
+
+        // Wire the V2 executor that supports parking (WorkflowDispatcher or RealDslExecutor)
+        if let Some(ref bpmn_exec) = bpmn_executor_v2 {
+            orchestrator = orchestrator.with_executor_v2(bpmn_exec.clone());
+            tracing::info!("REPL V2 executor: WorkflowDispatcher (BPMN-routed)");
+        } else {
+            // No BPMN — wire RealDslExecutor directly (it auto-impls DslExecutorV2
+            // via the blanket impl, so execute_v2 maps to Completed/Failed, never Parked)
+            orchestrator =
+                orchestrator.with_executor_v2(Arc::new(RealDslExecutor::new(pool.clone())));
+            tracing::info!("REPL V2 executor: RealDslExecutor (direct, no BPMN)");
+        }
 
         let v2_state = ReplV2RouteState {
             orchestrator: Arc::new(orchestrator),
@@ -566,125 +730,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     tracing::info!("Background learning task spawned");
-
-    // =========================================================================
-    // BPMN-Lite Integration (optional — gated on BPMN_LITE_GRPC_URL env var)
-    // =========================================================================
-    if let Ok(bpmn_url) = std::env::var("BPMN_LITE_GRPC_URL") {
-        use ob_poc::bpmn_integration::{
-            client::BpmnLiteConnection, config::WorkflowConfigIndex, correlation::CorrelationStore,
-            job_frames::JobFrameStore, parked_tokens::ParkedTokenStore, worker::JobWorker,
-        };
-        use ob_poc::repl::orchestrator_v2::StubExecutor;
-
-        tracing::info!("BPMN-Lite integration enabled at {}", bpmn_url);
-
-        // 1. Create gRPC client (lazy — no network call until first RPC)
-        match BpmnLiteConnection::connect_lazy(&bpmn_url) {
-            Ok(client) => {
-                // 2. Create stores
-                let correlation_store = CorrelationStore::new(pool.clone());
-                let job_frame_store = JobFrameStore::new(pool.clone());
-                let parked_token_store = ParkedTokenStore::new(pool.clone());
-
-                // 3. Load workflow config
-                let config_dir = std::env::var("DSL_CONFIG_DIR").unwrap_or_else(|_| {
-                    let manifest_dir = env!("CARGO_MANIFEST_DIR");
-                    format!("{}/../../config", manifest_dir)
-                });
-                let config_path = std::path::Path::new(&config_dir).join("workflows.yaml");
-
-                match WorkflowConfigIndex::load_from_file(&config_path) {
-                    Ok(mut config_index) => {
-                        // Auto-register durable verbs from verb YAML into
-                        // the workflow config index. This bridges `behavior: durable`
-                        // declarations to the BPMN routing layer without duplicating
-                        // config in workflows.yaml.
-                        {
-                            use ob_poc::dsl_v2::config::types::DurableConfig;
-                            use ob_poc::dsl_v2::runtime_registry::{
-                                runtime_registry, RuntimeBehavior,
-                            };
-                            let reg = runtime_registry();
-                            let mut registered = 0usize;
-                            for verb in reg.all_verbs() {
-                                if let RuntimeBehavior::Durable(d) = &verb.behavior {
-                                    let durable_config = DurableConfig {
-                                        runtime: d.runtime,
-                                        process_key: d.process_key.clone(),
-                                        correlation_field: d.correlation_field.clone(),
-                                        task_bindings: d.task_bindings.clone(),
-                                        timeout: d.timeout.clone(),
-                                        escalation: d.escalation.clone(),
-                                    };
-                                    config_index.register_from_durable_config(
-                                        &verb.full_name,
-                                        &durable_config,
-                                    );
-                                    registered += 1;
-                                }
-                            }
-                            if registered > 0 {
-                                tracing::info!(
-                                    "Auto-registered {} durable verbs in WorkflowConfigIndex",
-                                    registered
-                                );
-                            }
-                        }
-
-                        let config_index = Arc::new(config_index);
-
-                        // 4. Spawn JobWorker as background task
-                        //    Uses StubExecutor for now — will be replaced with
-                        //    RealDslExecutor in B3 end-to-end integration.
-                        let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
-                        let worker_executor: Arc<dyn ob_poc::repl::orchestrator_v2::DslExecutorV2> =
-                            Arc::new(StubExecutor);
-                        let worker = JobWorker::new(
-                            format!("ob-poc-worker-{}", std::process::id()),
-                            client,
-                            config_index.clone(),
-                            job_frame_store,
-                            worker_executor,
-                        );
-
-                        tokio::spawn(async move {
-                            worker.run(shutdown_rx).await;
-                        });
-
-                        // Keep shutdown_tx alive for graceful shutdown
-                        // (dropped when server exits, signaling worker to stop)
-                        std::mem::forget(shutdown_tx);
-
-                        tracing::info!(
-                            "BPMN-Lite integration initialized: client={}, task_types={:?}",
-                            bpmn_url,
-                            config_index.all_task_types()
-                        );
-
-                        // Note: WorkflowDispatcher wiring into REPL V2 orchestrator
-                        // and EventBridge per-instance subscriptions are deferred to
-                        // B3 integration tests where the full end-to-end flow is validated.
-                        let _ = (correlation_store, parked_token_store);
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            "Failed to load workflow config from {}: {}",
-                            config_path.display(),
-                            e
-                        );
-                        tracing::warn!("BPMN-Lite JobWorker not started");
-                    }
-                }
-            }
-            Err(e) => {
-                tracing::warn!("Failed to create BPMN-Lite client: {}", e);
-                tracing::warn!("BPMN-Lite integration disabled");
-            }
-        }
-    } else {
-        tracing::debug!("BPMN-Lite integration disabled (BPMN_LITE_GRPC_URL not set)");
-    }
 
     if let Err(e) = axum::serve(listener, app).await {
         tracing::error!("Server error: {}", e);

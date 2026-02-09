@@ -5,7 +5,7 @@
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
-> **Migrations:** 71 schema migrations
+> **Migrations:** 72 schema migrations
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
@@ -43,7 +43,7 @@
 > **Inspector-First Visualization (076):** ✅ Complete - Deterministic tree/table Inspector UI, projection schema with $ref linking, 82 tests
 > **Deal Record & Fee Billing (067):** ✅ Complete - Commercial origination hub, rate card negotiation, closed-loop billing
 > **BPMN-Lite Runtime (Phase A):** ✅ Complete - Standalone durable orchestration service, 16-opcode VM, gRPC API (verified over the wire), 37 tests + gRPC smoke test
-> **BPMN-Lite Integration (Phase B):** ✅ Complete - ob-poc ↔ bpmn-lite wiring: WorkflowDispatcher, JobWorker, EventBridge, correlation stores, 41 unit tests + 13 integration tests
+> **BPMN-Lite Integration (Phase B):** ✅ Complete - ob-poc ↔ bpmn-lite wiring: WorkflowDispatcher (queue-based resilience), JobWorker, EventBridge, SignalRelay, PendingDispatchWorker, correlation stores, 41 unit tests + 13 integration tests + 15 E2E choreography tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -1862,9 +1862,9 @@ The harness creates:
 
 ## BPMN-Lite Integration (Phase B)
 
-> ✅ **IMPLEMENTED (2026-02-08)**: ob-poc ↔ bpmn-lite gRPC wiring with WorkflowDispatcher, JobWorker, EventBridge, correlation stores.
+> ✅ **IMPLEMENTED (2026-02-09)**: ob-poc ↔ bpmn-lite gRPC wiring with WorkflowDispatcher (queue-based resilience), JobWorker, EventBridge, SignalRelay, PendingDispatchWorker, correlation stores, 15 E2E choreography tests.
 
-**Problem Solved:** Verbs that represent long-running processes (days/weeks — document solicitation, KYC reviews, approvals) were fire-and-forget. Phase B wires ob-poc to the standalone bpmn-lite gRPC service so orchestrated verbs park the REPL runbook and resume on external signals.
+**Problem Solved:** Verbs that represent long-running processes (days/weeks — document solicitation, KYC reviews, approvals) were fire-and-forget. Phase B wires ob-poc to the standalone bpmn-lite gRPC service so orchestrated verbs park the REPL runbook and resume on external signals. When the BPMN service is temporarily unavailable, dispatch requests are queued locally and retried automatically.
 
 ### Architecture
 
@@ -1881,11 +1881,21 @@ The harness creates:
 │       │                                                                       │
 │       └─► Orchestrated verb:                                                │
 │               1. canonical_json_with_hash(payload)                          │
-│               2. gRPC StartProcess → process_instance_id                    │
-│               3. CorrelationStore.insert() (session ↔ process link)         │
-│               4. ParkedTokenStore.insert() (waiting entry)                  │
-│               5. → DslExecutionOutcome::Parked                              │
+│               2. Generate correlation_id + correlation_key (stable)         │
+│               3. Try gRPC StartProcess → process_instance_id               │
+│                  ├─ OK → process_instance_id = real PID                     │
+│                  └─ ERR → queue to bpmn_pending_dispatches                  │
+│                           process_instance_id = dispatch_id (placeholder)   │
+│               4. CorrelationStore.insert() (session ↔ process link)         │
+│               5. ParkedTokenStore.insert() (waiting entry)                  │
+│               6. → DslExecutionOutcome::Parked (always, even if queued)    │
 │                                                                              │
+│  PendingDispatchWorker (background retry, 10s poll loop)                    │
+│       │   1. claim_pending(5, backoff) — FOR UPDATE SKIP LOCKED             │
+│       │   2. Retry StartProcess with same correlation_id (idempotent)      │
+│       │   3. On success: patch correlation.process_instance_id              │
+│       │   4. On failure: record_failure (max 50 → failed_permanent)        │
+│       │                                                                      │
 │  JobWorker (background task, long-poll loop)                                │
 │       │   1. ActivateJobs via gRPC (30s timeout)                            │
 │       │   2. Dedupe via JobFrameStore                                       │
@@ -1893,15 +1903,16 @@ The harness creates:
 │       │   4. CompleteJob / FailJob via gRPC                                 │
 │       │                                                                      │
 │  EventBridge (per-process subscription)                                     │
-│       │   1. SubscribeEvents via gRPC (streaming)                           │
+│       │   1. SubscribeEvents via gRPC (tailing stream)                      │
 │       │   2. Translate lifecycle events → OutcomeEvent                      │
 │       │   3. Update CorrelationStore / ParkedTokenStore                     │
-│       │   4. On ProcessCompleted → POST /api/repl/v2/signal (resume)       │
+│       │   4. Forward OutcomeEvent to SignalRelay via channel                │
 │                                                                              │
-│  Signal Endpoint: POST /api/repl/v2/signal                                  │
-│       │   1. Lookup parked entry by correlation_key                         │
-│       │   2. runbook.resume_entry() → EntryStatus::Completed               │
-│       │   3. Continue execution from next entry                             │
+│  SignalRelay (decoupled orchestrator bridge)                                │
+│       │   1. Consume OutcomeEvent from EventBridge channel                  │
+│       │   2. Look up CorrelationRecord → correlation_key                    │
+│       │   3. Call orchestrator.signal_completion()                          │
+│       │   4. Runbook entry transitions Parked → Completed/Failed           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1909,18 +1920,21 @@ The harness creates:
 
 ```
 rust/src/bpmn_integration/
-├── mod.rs              # Module root, re-exports
-├── types.rs            # CorrelationRecord, JobFrame, ParkedToken, OutcomeEvent,
-│                       # WorkflowBinding, TaskBinding, ExecutionRoute
-├── canonical.rs        # canonical_json_with_hash(), sha256_bytes()
-├── client.rs           # BpmnLiteConnection — typed gRPC client wrapper
-├── config.rs           # WorkflowConfigIndex — verb→route mapping from YAML
-├── correlation.rs      # CorrelationStore — session ↔ process instance links
-├── job_frames.rs       # JobFrameStore — dedupe for at-least-once delivery
-├── parked_tokens.rs    # ParkedTokenStore — waiting REPL entries
-├── dispatcher.rs       # WorkflowDispatcher — DslExecutorV2 impl, routes Direct/Orchestrated
-├── worker.rs           # JobWorker — long-poll job activation + verb execution
-└── event_bridge.rs     # EventBridge — lifecycle event subscription + translation
+├── mod.rs                      # Module root, re-exports
+├── types.rs                    # CorrelationRecord, JobFrame, ParkedToken, PendingDispatch,
+│                               # OutcomeEvent, WorkflowBinding, TaskBinding, ExecutionRoute
+├── canonical.rs                # canonical_json_with_hash(), sha256_bytes()
+├── client.rs                   # BpmnLiteConnection — typed gRPC client wrapper
+├── config.rs                   # WorkflowConfigIndex — verb→route mapping from YAML
+├── correlation.rs              # CorrelationStore — session ↔ process instance links
+├── job_frames.rs               # JobFrameStore — dedupe for at-least-once delivery
+├── parked_tokens.rs            # ParkedTokenStore — waiting REPL entries
+├── pending_dispatches.rs       # PendingDispatchStore — durable queue for BPMN resilience
+├── pending_dispatch_worker.rs  # PendingDispatchWorker — background retry (10s poll)
+├── dispatcher.rs               # WorkflowDispatcher — DslExecutorV2 impl, routes Direct/Orchestrated
+├── worker.rs                   # JobWorker — long-poll job activation + verb execution
+├── event_bridge.rs             # EventBridge — lifecycle event subscription + translation
+└── signal_relay.rs             # SignalRelay — bounces OutcomeEvents to orchestrator
 ```
 
 ### Key Types
@@ -1933,9 +1947,13 @@ rust/src/bpmn_integration/
 | `CorrelationRecord` | Links process_instance_id ↔ session/runbook/entry with payload hash |
 | `JobFrame` | Tracks job activation for dedupe (job_key, status, attempts) |
 | `ParkedToken` | Waiting REPL entry with correlation_key for O(1) signal routing |
+| `PendingDispatch` | Queued BPMN dispatch request with correlation_id, payload_hash, retry state |
+| `PendingDispatchStatus` | `Pending` → `Dispatched` or `FailedPermanent` (after max retries) |
 | `OutcomeEvent` | Translated BPMN events: StepCompleted, StepFailed, ProcessCompleted, ProcessCancelled, IncidentCreated |
 | `BpmnLiteConnection` | Typed gRPC client (connect_lazy, 8 RPC methods) |
 | `WorkflowConfigIndex` | In-memory verb→route index loaded from `config/workflows.yaml` |
+| `SignalRelay` | Consumes EventBridge outcomes, relays to orchestrator for runbook resume |
+| `PendingDispatchWorker` | Background retry worker — 10s poll, claims pending dispatches, retries gRPC |
 
 ### Control Verbs
 
@@ -1949,46 +1967,60 @@ rust/src/bpmn_integration/
 
 ### Server Wiring
 
-BPMN integration is **conditionally enabled** on the `BPMN_LITE_GRPC_URL` environment variable in `ob-poc-web/src/main.rs`:
+BPMN integration is **conditionally enabled** on the `BPMN_LITE_GRPC_URL` environment variable in `ob-poc-web/src/main.rs`. The BPMN init block runs **before** the REPL V2 router so the `WorkflowDispatcher` can be wired as the V2 executor.
 
 ```bash
-# Enable BPMN-Lite integration
+# Enable BPMN-Lite integration (WorkflowDispatcher routes orchestrated verbs)
 BPMN_LITE_GRPC_URL=http://localhost:50052 cargo run -p ob-poc-web
 
-# Without env var — integration disabled, all verbs execute directly
+# Without env var — RealDslExecutor used directly, no parking, no BPMN
 cargo run -p ob-poc-web
 ```
 
-On startup (when enabled):
+**Startup sequence (when BPMN enabled):**
 1. Create `BpmnLiteConnection` (lazy — no network call until first RPC)
-2. Create stores (`CorrelationStore`, `JobFrameStore`, `ParkedTokenStore`)
-3. Load `WorkflowConfigIndex` from `config/workflows.yaml`
-4. Spawn `JobWorker` as background task
-5. Log "BPMN-Lite integration initialized"
+2. Load `WorkflowConfigIndex` from `config/workflows.yaml`
+3. Auto-register `behavior: durable` verbs into WorkflowConfigIndex
+4. Create `WorkflowDispatcher` wrapping `RealDslExecutor` + all stores
+5. Spawn `JobWorker` (long-poll job activation)
+6. Spawn `PendingDispatchWorker` (retry queued dispatches)
+7. Wire `WorkflowDispatcher` as REPL V2 `executor_v2`
+8. Log "REPL V2 executor: WorkflowDispatcher (BPMN-routed)"
 
-### Database Tables (migration 073)
+**Startup sequence (without BPMN):**
+1. Wire `RealDslExecutor` as REPL V2 `executor_v2`
+2. Log "REPL V2 executor: RealDslExecutor (direct, no BPMN)"
 
-| Table | Purpose |
-|-------|---------|
-| `bpmn_correlations` | PK `correlation_id`, UNIQUE on `process_instance_id` |
-| `bpmn_job_frames` | PK `job_key`, indexed on `status WHERE active` |
-| `bpmn_parked_tokens` | PK `token_id`, UNIQUE on `correlation_key` |
+### Database Tables (migrations 073, 076)
+
+| Table | Migration | Purpose |
+|-------|-----------|---------|
+| `bpmn_correlations` | 073 | PK `correlation_id`, UNIQUE on `process_instance_id` |
+| `bpmn_job_frames` | 073 | PK `job_key`, indexed on `status WHERE active` |
+| `bpmn_parked_tokens` | 073 | PK `token_id`, UNIQUE on `correlation_key` |
+| `bpmn_pending_dispatches` | 076 | PK `dispatch_id`, UNIQUE on `payload_hash WHERE pending` (idempotency), indexed on `(status, last_attempted_at) WHERE pending` |
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `rust/src/bpmn_integration/dispatcher.rs` | `WorkflowDispatcher` — routes verbs, implements `DslExecutorV2` |
+| `rust/src/bpmn_integration/dispatcher.rs` | `WorkflowDispatcher` — routes verbs, queues on gRPC failure |
+| `rust/src/bpmn_integration/pending_dispatches.rs` | `PendingDispatchStore` — durable queue (insert, claim, mark, fail) |
+| `rust/src/bpmn_integration/pending_dispatch_worker.rs` | `PendingDispatchWorker` — background retry (10s poll, max 50 attempts) |
 | `rust/src/bpmn_integration/worker.rs` | `JobWorker` — background job activation loop |
 | `rust/src/bpmn_integration/event_bridge.rs` | `EventBridge` — lifecycle event translation |
+| `rust/src/bpmn_integration/signal_relay.rs` | `SignalRelay` — orchestrator bridge |
 | `rust/src/bpmn_integration/client.rs` | `BpmnLiteConnection` — typed gRPC wrapper |
 | `rust/src/bpmn_integration/config.rs` | `WorkflowConfigIndex` — verb routing config |
 | `rust/src/domain_ops/bpmn_lite_ops.rs` | 5 control verb CustomOps |
 | `rust/config/workflows.yaml` | Verb → route mappings |
 | `rust/config/verbs/bpmn-lite.yaml` | Control verb definitions |
 | `rust/proto/bpmn_lite/v1/bpmn_lite.proto` | gRPC service definition (8 RPCs) |
+| `rust/crates/ob-poc-web/src/main.rs` | BPMN init before REPL V2, wires WorkflowDispatcher + workers |
 | `migrations/073_bpmn_integration.sql` | 3 tables: correlations, job_frames, parked_tokens |
+| `migrations/076_bpmn_pending_dispatches.sql` | Pending dispatch queue table with idempotency index |
 | `rust/tests/bpmn_integration_test.rs` | 13 integration tests (all `#[ignore]`) |
+| `rust/tests/bpmn_e2e_harness_test.rs` | 15 E2E choreography tests (all `#[ignore]`) |
 | `rust/tests/models/kyc-open-case.bpmn` | Test BPMN model (7-node KYC workflow) |
 
 ### Environment Variables
@@ -1996,6 +2028,41 @@ On startup (when enabled):
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `BPMN_LITE_GRPC_URL` | (none — disabled) | gRPC endpoint for bpmn-lite service |
+
+### Queue-Based Resilience (Pending Dispatch)
+
+When the bpmn-lite gRPC service is temporarily unavailable, the `WorkflowDispatcher` queues the dispatch request locally in `bpmn_pending_dispatches` and still returns `Parked` to the REPL. The `PendingDispatchWorker` retries queued dispatches every 10 seconds until the service recovers.
+
+**Idempotency chain:**
+
+```
+Verb dispatch → canonical_json_with_hash(payload) → (json, hash)
+  ├─ gRPC OK → correlation(correlation_id, real_pid) + parked_token → Parked
+  └─ gRPC ERR → pending_dispatch(dispatch_id, correlation_id, hash)
+               + correlation(correlation_id, placeholder_pid) + parked_token → Parked
+                    ↓
+               PendingDispatchWorker retries with same correlation_id
+                    ↓
+               start_process(correlation_id) — bpmn-lite is idempotent on correlation_id
+                    ↓
+               On success: update correlation.process_instance_id, mark dispatched
+```
+
+**Key guarantees:**
+- `correlation_id` generated once at dispatch time, stable across retries
+- `payload_hash` UNIQUE index prevents duplicate pending entries
+- `FOR UPDATE SKIP LOCKED` prevents concurrent workers claiming the same row
+- Max 50 attempts (~8 minutes at 10s intervals) before `failed_permanent`
+- Only fails immediately if BOTH gRPC AND queue insert fail (true infra failure)
+
+**PendingDispatchStore methods:**
+
+| Method | Purpose |
+|--------|---------|
+| `insert()` | Queue dispatch (ON CONFLICT DO NOTHING for idempotency) |
+| `claim_pending()` | Pop pending rows with backoff (FOR UPDATE SKIP LOCKED) |
+| `mark_dispatched()` | Transition to dispatched state with timestamp |
+| `record_failure()` | Increment attempts, promote to failed_permanent after max |
 
 ---
 
@@ -4089,7 +4156,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 | `ActivateJobs` | Server-streaming: dequeue jobs for worker (long-poll with timeout) |
 | `CompleteJob` | Worker returns result (payload + hash + flags) |
 | `FailJob` | Worker reports failure (creates incident) |
-| `SubscribeEvents` | Server-streaming: real-time RuntimeEvent stream |
+| `SubscribeEvents` | Server-streaming: tailing event log (polls until terminal event) |
 
 ### Workspace Structure
 
@@ -5032,6 +5099,7 @@ When you see these in a task, read the corresponding annex first:
 | "invariant", "P-1", "P-2", "P-3", "P-4", "P-5" | `docs/INVARIANT-VERIFICATION.md` |
 | "BPMN", "bpmn-lite", "orchestration", "fiber VM", "durable workflow" | CLAUDE.md §BPMN-Lite Durable Orchestration Service |
 | "WorkflowDispatcher", "JobWorker", "EventBridge", "correlation", "parked token", "bpmn_integration" | CLAUDE.md §BPMN-Lite Integration (Phase B) |
+| "PendingDispatch", "pending dispatch", "queue resilience", "dispatch worker", "retry worker" | CLAUDE.md §BPMN-Lite Integration (Phase B) §Queue-Based Resilience |
 
 ---
 

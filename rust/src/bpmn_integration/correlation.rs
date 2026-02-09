@@ -193,6 +193,33 @@ impl CorrelationStore {
             .collect())
     }
 
+    /// Update the process_instance_id on a correlation record.
+    ///
+    /// Used by the `PendingDispatchWorker` after a queued dispatch succeeds:
+    /// the correlation was initially created with a placeholder
+    /// (dispatch_id), and the worker patches it with the real
+    /// process_instance_id returned by bpmn-lite's StartProcess.
+    pub async fn update_process_instance_id(
+        &self,
+        correlation_id: Uuid,
+        process_instance_id: Uuid,
+    ) -> Result<bool> {
+        let result = sqlx::query!(
+            r#"
+            UPDATE "ob-poc".bpmn_correlations
+            SET process_instance_id = $2
+            WHERE correlation_id = $1
+            "#,
+            correlation_id,
+            process_instance_id,
+        )
+        .execute(&self.pool)
+        .await
+        .context("Failed to update process_instance_id on bpmn_correlation")?;
+
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Find an active correlation by process_key and domain correlation key.
     ///
     /// Used by lifecycle signal verbs (request.remind, request.cancel, etc.)

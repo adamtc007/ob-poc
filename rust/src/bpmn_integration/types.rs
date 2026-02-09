@@ -31,6 +31,11 @@ pub struct WorkflowBinding {
     pub process_key: Option<String>,
     /// Task type → ob-poc verb mappings for this workflow.
     pub task_bindings: Vec<TaskBinding>,
+    /// Domain correlation field name (e.g., "case_id").
+    /// Extracted from `DurableConfig.correlation_field` at registration time.
+    /// Used by the dispatcher to populate `CorrelationRecord.domain_correlation_key`.
+    #[serde(default)]
+    pub correlation_field: Option<String>,
 }
 
 /// Maps a BPMN service task type to an ob-poc verb.
@@ -235,6 +240,85 @@ impl ParkedTokenStatus {
     }
 }
 
+// ─── Pending Dispatch ────────────────────────────────────────────────────────
+
+/// A queued BPMN dispatch request awaiting service availability.
+///
+/// When `WorkflowDispatcher::execute_orchestrated()` cannot reach the
+/// bpmn-lite gRPC service, it persists the request here. The
+/// `PendingDispatchWorker` background task retries periodically until
+/// the service recovers or `max_attempts` is exceeded.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingDispatch {
+    /// Primary key.
+    pub dispatch_id: Uuid,
+    /// SHA-256 of canonical domain payload — idempotency key.
+    pub payload_hash: Vec<u8>,
+    /// Fully-qualified verb name (e.g., "document.solicit").
+    pub verb_fqn: String,
+    /// BPMN process key from WorkflowBinding.
+    pub process_key: String,
+    /// Compiled bytecode version (may be empty).
+    pub bytecode_version: Vec<u8>,
+    /// Canonical JSON domain payload for StartProcess.
+    pub domain_payload: String,
+    /// Original DSL string (audit trail).
+    pub dsl_source: String,
+    /// Runbook entry ID that triggered the dispatch.
+    pub entry_id: Uuid,
+    /// Runbook ID.
+    pub runbook_id: Uuid,
+    /// Pre-generated correlation ID (stable across retries).
+    pub correlation_id: Uuid,
+    /// Pre-generated correlation key for ParkedToken.
+    pub correlation_key: String,
+    /// Domain-level correlation key (e.g., case_id).
+    pub domain_correlation_key: Option<String>,
+    /// Current dispatch status.
+    pub status: PendingDispatchStatus,
+    /// Number of retry attempts so far.
+    pub attempts: i32,
+    /// Last error message from a failed attempt.
+    pub last_error: Option<String>,
+    /// When this dispatch was queued.
+    pub created_at: DateTime<Utc>,
+    /// When the last attempt was made.
+    pub last_attempted_at: Option<DateTime<Utc>>,
+    /// When the dispatch succeeded.
+    pub dispatched_at: Option<DateTime<Utc>>,
+}
+
+/// Status of a pending dispatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingDispatchStatus {
+    /// Awaiting retry.
+    Pending,
+    /// Successfully dispatched to bpmn-lite.
+    Dispatched,
+    /// Exceeded max retry attempts.
+    FailedPermanent,
+}
+
+impl PendingDispatchStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Dispatched => "dispatched",
+            Self::FailedPermanent => "failed_permanent",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "pending" => Some(Self::Pending),
+            "dispatched" => Some(Self::Dispatched),
+            "failed_permanent" => Some(Self::FailedPermanent),
+            _ => None,
+        }
+    }
+}
+
 // ─── Outcome Events ──────────────────────────────────────────────────────────
 
 /// Events translated from BPMN lifecycle events into ob-poc terms.
@@ -358,5 +442,18 @@ mod tests {
         let binding: TaskBinding = serde_json::from_str(json).unwrap();
         assert_eq!(binding.max_retries, 3);
         assert!(binding.timeout_ms.is_none());
+    }
+
+    #[test]
+    fn test_pending_dispatch_status_roundtrip() {
+        for status in [
+            PendingDispatchStatus::Pending,
+            PendingDispatchStatus::Dispatched,
+            PendingDispatchStatus::FailedPermanent,
+        ] {
+            let s = status.as_str();
+            let parsed = PendingDispatchStatus::parse(s).unwrap();
+            assert_eq!(parsed, status);
+        }
     }
 }

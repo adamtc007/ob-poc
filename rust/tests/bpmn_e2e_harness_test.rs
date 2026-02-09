@@ -38,6 +38,7 @@ use ob_poc::bpmn_integration::{
     event_bridge::EventBridge,
     job_frames::JobFrameStore,
     parked_tokens::ParkedTokenStore,
+    pending_dispatches::PendingDispatchStore,
     types::{
         CorrelationStatus, ExecutionRoute, OutcomeEvent, ParkedTokenStatus, TaskBinding,
         WorkflowBinding,
@@ -176,6 +177,7 @@ impl BpmnTestRig {
             self.client.clone(),
             CorrelationStore::new(self.pool.clone()),
             ParkedTokenStore::new(self.pool.clone()),
+            PendingDispatchStore::new(self.pool.clone()),
         )
     }
 
@@ -262,12 +264,14 @@ fn build_kyc_config() -> WorkflowConfigIndex {
                         max_retries: 3,
                     },
                 ],
+                correlation_field: Some("case_id".to_string()),
             },
             WorkflowBinding {
                 verb_fqn: "session.info".to_string(),
                 route: ExecutionRoute::Direct,
                 process_key: None,
                 task_bindings: vec![],
+                correlation_field: None,
             },
         ],
     };
@@ -1600,6 +1604,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
                     max_retries: 1,
                 },
             ],
+            correlation_field: Some("case_id".to_string()),
         }],
     };
 
@@ -1616,6 +1621,7 @@ async fn e2e_13_dead_letter_queue_promotion() {
         rig.client.clone(),
         CorrelationStore::new(rig.pool.clone()),
         ParkedTokenStore::new(rig.pool.clone()),
+        PendingDispatchStore::new(rig.pool.clone()),
     );
     let worker = JobWorker::new(
         "dlq-test-worker".to_string(),
