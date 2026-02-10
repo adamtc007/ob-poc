@@ -42,7 +42,12 @@
 > **Clarification UX Wiring (075):** ✅ Complete - Unified DecisionPacket system for verb/scope/group disambiguation with confirm tokens
 > **Inspector-First Visualization (076):** ✅ Complete - Deterministic tree/table Inspector UI, projection schema with $ref linking, 82 tests
 > **Deal Record & Fee Billing (067):** ✅ Complete - Commercial origination hub, rate card negotiation, closed-loop billing
-> **BPMN-Lite Runtime (Phase A):** ✅ Complete - Standalone durable orchestration service, 16-opcode VM, gRPC API (verified over the wire), 37 tests + gRPC smoke test
+> **BPMN-Lite Runtime (Phase A):** ✅ Complete - Standalone durable orchestration service, 23-opcode VM, gRPC API (verified over the wire), 71 core tests + gRPC smoke test
+> **BPMN-Lite Phase 2 (Race/Boundary):** ✅ Complete - Race semantics (Msg vs Timer arms), boundary timer events, interrupting + non-interrupting fire modes
+> **BPMN-Lite Phase 2A (Non-Interrupting + Cycles):** ✅ Complete - Non-interrupting boundary spawns child fiber (main stays in Race), ISO 8601 timer cycles (R<n>/PT<dur>), cycle exhaustion revert
+> **BPMN-Lite Phase 3 (Cancel/Ghost):** ✅ Complete - Ghost signal protection, WaitCancelled/SignalIgnored events, job purge on cancel, completion ownership in engine
+> **BPMN-Lite Phase 5 (Terminate/Error/Loops):** ✅ Complete - EndTerminate (kill all sibling fibers), error boundary routing (BusinessRejection → catch path), bounded retry loops (IncCounter/BrCounterLt)
+> **BPMN-Lite Phase 5A (Inclusive Gateway):** ✅ Complete - OR-gateway ForkInclusive (condition_flag evaluation, dynamic branch count), JoinDynamic (join_expected set at fork time)
 > **BPMN-Lite Integration (Phase B):** ✅ Complete - ob-poc ↔ bpmn-lite wiring: WorkflowDispatcher (queue-based resilience), JobWorker, EventBridge, SignalRelay, PendingDispatchWorker, correlation stores, 41 unit tests + 13 integration tests + 15 E2E choreography tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
@@ -73,7 +78,7 @@ cd ob-poc-ui-react && npm run dev  # Runs on port 5173, proxies API to :3000
 # BPMN-Lite service (standalone workspace at bpmn-lite/)
 cargo x bpmn-lite build            # Build bpmn-lite workspace
 cargo x bpmn-lite build --release  # Release build
-cargo x bpmn-lite test             # Run all 37 tests (+ 1 ignored gRPC smoke test)
+cargo x bpmn-lite test             # Run all 71 tests (+ 1 ignored gRPC smoke test)
 cargo x bpmn-lite clippy           # Lint
 cargo x bpmn-lite start            # Build release + start native (port 50051)
 cargo x bpmn-lite stop             # Stop native server
@@ -4077,7 +4082,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 
 ## BPMN-Lite Durable Orchestration Service
 
-> ✅ **IMPLEMENTED (2026-02-08)**: Standalone Rust service for durable workflow orchestration. BPMN XML → Verified IR → Bytecode → Fiber VM. 37 tests + gRPC smoke test (full lifecycle verified over the wire against native and Docker).
+> ✅ **IMPLEMENTED (2026-02-10)**: Standalone Rust service for durable workflow orchestration. BPMN XML → Verified IR → Bytecode → Fiber VM. 71 core tests + 6 integration tests + gRPC smoke test. Includes race semantics (Phase 2), non-interrupting boundary events + timer cycles (Phase 2A), cancel/ghost signal protection (Phase 3), terminate end events + error boundary routing + bounded loops (Phase 5), and inclusive (OR) gateways (Phase 5A).
 
 **Problem Solved:** ob-poc has a DSL + verb runtime for deterministic, short-running work and a runbook/REPL model for auditable execution. It lacks **durable orchestration** — the ability to park a workflow for days/weeks (waiting for documents, human approvals, timers) and resume deterministically. BPMN-Lite fills this gap as a standalone gRPC service.
 
@@ -4096,7 +4101,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 │  Verifier (structural checks: single start, reachable, paired gateways)     │
 │         │                                                                    │
 │         ▼                                                                    │
-│  Lowering → Bytecode (Vec<Instr>, 16-opcode ISA)                           │
+│  Lowering → Bytecode (Vec<Instr>, 23-opcode ISA)                           │
 │         │                                                                    │
 │         ▼                                                                    │
 │  Fiber VM (tick-based executor)                                             │
@@ -4104,6 +4109,14 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 │         │   - CompleteJob resumes fiber with payload                        │
 │         │   - Fork/Join for parallel paths                                  │
 │         │   - WaitFor/WaitUntil/WaitMsg for timers/messages                │
+│         │   - Race semantics (Msg vs Timer arms, boundary events)          │
+│         │   - Non-interrupting fire (spawns child fiber, main stays)       │
+│         │   - Timer cycles (R<n>/PT<dur>, exhaustion revert)               │
+│         │   - Cancel/ghost signal protection (3 guards)                    │
+│         │   - Terminate end events (kill all sibling fibers)               │
+│         │   - Error boundary routing (BusinessRejection → catch path)      │
+│         │   - Bounded retry loops (IncCounter/BrCounterLt)                 │
+│         │   - Inclusive (OR) gateway (ForkInclusive/JoinDynamic)            │
 │         │                                                                    │
 │         ▼                                                                    │
 │  BpmnLiteEngine (facade wrapping compiler + VM + store)                     │
@@ -4112,7 +4125,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 │  gRPC Server (tonic 0.12) — 9 RPCs                                         │
 │         │                                                                    │
 │         ▼                                                                    │
-│  ob-poc (future Phase B) connects as job worker via gRPC                    │
+│  ob-poc connects as job worker via gRPC (Phase B — complete)               │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -4124,7 +4137,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 - **Two-namespace payload** — `domain_payload` (opaque canonical JSON + SHA-256 hash) never parsed by VM; `orch_flags` (flat primitives) for branching only
 - **MemoryStore for POC** — Postgres ProcessStore deferred to post-POC
 
-### 16-Opcode ISA
+### 23-Opcode ISA
 
 | Group | Instructions | Behavior |
 |-------|-------------|----------|
@@ -4134,7 +4147,10 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 | Work | `ExecNative` | Park fiber + enqueue job (key v0.9 change) |
 | Concurrency | `Fork`, `Join` | Fork spawns child fibers; Join increments barrier + parks |
 | Waits | `WaitFor`, `WaitUntil`, `WaitMsg` | Park fiber in appropriate WaitState |
-| Lifecycle | `End`, `Fail` | End removes fiber (last-fiber-ends-process); Fail creates incident |
+| Race | `WaitAny`, `CancelWait` | WaitAny races N arms (timer/msg/internal); CancelWait cleans up losers |
+| Bounded loops | `IncCounter`, `BrCounterLt` | IncCounter increments loop counter; BrCounterLt branches if counter < limit |
+| Inclusive gateway | `ForkInclusive`, `JoinDynamic` | ForkInclusive evaluates condition_flags, spawns fibers for truthy branches; JoinDynamic waits for dynamic count |
+| Lifecycle | `End`, `EndTerminate`, `Fail` | End removes fiber; EndTerminate kills all sibling fibers + ends process; Fail creates incident |
 
 ### ExecNative (Job Worker Protocol)
 
@@ -4172,8 +4188,8 @@ bpmn-lite/                          # Standalone workspace (repo root sibling to
 │   ├── src/
 │   │   ├── lib.rs                  # Module exports
 │   │   ├── types.rs                # Value, Instr, Fiber, ProcessInstance, Job*, CompiledProgram
-│   │   ├── events.rs               # RuntimeEvent enum (15 variants)
-│   │   ├── store.rs                # ProcessStore trait (28 async methods)
+│   │   ├── events.rs               # RuntimeEvent enum (28 variants)
+│   │   ├── store.rs                # ProcessStore trait (29 async methods)
 │   │   ├── store_memory.rs         # MemoryStore (RwLock<HashMap> implementation)
 │   │   ├── vm.rs                   # tick_fiber() executor + CompleteJob/FailJob handlers
 │   │   ├── engine.rs               # BpmnLiteEngine facade
@@ -4205,13 +4221,17 @@ bpmn-lite/                          # Standalone workspace (repo root sibling to
 | Type | Description |
 |------|-------------|
 | `Value` | Stack value: `Bool(bool)`, `I64(i64)`, `Str(u32)`, `Ref(u32)` |
-| `Instr` | 16-opcode enum |
+| `Instr` | 23-opcode enum |
 | `Fiber` | fiber_id, pc, stack, regs[8], wait state |
 | `ProcessInstance` | instance_id, bytecode, domain_payload, hash, flags, state |
-| `WaitState` | Running, Timer, Msg, Job{job_key}, Join, Incident |
-| `CompiledProgram` | bytecode_version (SHA-256), program, debug_map, join_plan, wait_plan |
-| `RuntimeEvent` | 15 variants: InstanceStarted, FiberSpawned, JobActivated, JobCompleted, etc. |
-| `ProcessStore` | Trait with 28 async methods (instances, fibers, joins, dedupe, jobs, programs, events) |
+| `WaitState` | Running, Timer, Msg, Job{job_key}, Join, Race{race_id, timer, cycle}, Incident |
+| `CycleSpec` | Timer cycle config: `interval_ms`, `max_fires` |
+| `WaitArm` | Race arm: `Timer{deadline, resume_at, interrupting, cycle}` or `Msg{name, corr_key, resume_at}` |
+| `RacePlanEntry` | Race plan arm with `boundary_element_id` for BPMN element tracing |
+| `InclusiveBranch` | OR-gateway branch: `condition_flag` (Option<FlagKey>) + `target` (Addr) |
+| `CompiledProgram` | bytecode_version (SHA-256), program, debug_map, join_plan, wait_plan, race_plan |
+| `RuntimeEvent` | 28 variants: InstanceStarted, FiberSpawned, JobActivated, JobCompleted, RaceRegistered, RaceWon, BoundaryFired, TimerCycleIteration, TimerCycleExhausted, WaitCancelled, SignalIgnored, Terminated, ErrorRouted, CounterIncremented, InclusiveForkTaken, etc. |
+| `ProcessStore` | Trait with 29 async methods (instances, fibers, joins, dedupe, jobs, programs, events, cancel) |
 
 ### Engine: `tick_instance` vs `run_instance`
 
@@ -4240,7 +4260,7 @@ cd bpmn-lite && cargo run -p bpmn-lite-server
 # Build/test only
 cargo x bpmn-lite build            # Debug build
 cargo x bpmn-lite build --release  # Release build
-cargo x bpmn-lite test             # Run all 37 tests (+ 1 ignored gRPC smoke)
+cargo x bpmn-lite test             # Run all 71 tests (+ 1 ignored gRPC smoke)
 cargo x bpmn-lite clippy           # Lint
 
 # Docker
@@ -4255,18 +4275,26 @@ docker run -p 50051:50051 bpmn-lite
 docker compose up bpmn-lite
 ```
 
-### Test Coverage (37 default + 1 ignored smoke test)
+### Test Coverage (71 core + 6 integration + 1 ignored smoke test)
 
 | Phase | Tests | Coverage |
 |-------|-------|----------|
 | A2: MemoryStore | 7 | Instance/fiber/join/dedupe/job queue/event log/payload history |
-| A3: VM | 7 | Linear flow, flag round-trip, dedupe, hash validation, events, FlagSet |
+| A3: VM (core) | 7 | Linear flow, flag round-trip, dedupe, hash validation, events, FlagSet |
+| A3: VM (race) | 4 | Race msg wins, timer wins, replay after race, duplicate signal noop |
+| A3: VM (boundary) | 3 | Job completes before timer, timer fires before job, verifier rejects invalid |
 | A4: Compiler | 7 | IR lowering, XOR/parallel gateways, verifier rejects, end-to-end |
-| A5: Parser | 4 | Minimal BPMN, task_type extraction, unsupported elements, full pipeline |
+| A5: Parser | 6 | Minimal BPMN, task_type extraction, unsupported elements, full pipeline, boundary timer parse+lower, ISO cycle parse |
 | A5: Full pipeline | 2 | kyc-open-case.bpmn end-to-end, fixture parsing |
-| A6: Engine | 4 | Engine lifecycle, compile, start+tick, complete_job |
-| A6: Integration | 6 | Full lifecycle, two-task, cancel, fail, compile error, hash integrity |
-| A6: gRPC smoke | 1 (`#[ignore]`) | Over-the-wire: Compile → Start → Inspect → ActivateJobs → CompleteJob → Inspect(COMPLETED) → SubscribeEvents |
+| A6: Engine | 1 | Engine full lifecycle |
+| Phase 2A: Non-interrupting | 5 | Spawns child fiber, cycle fires multiple, cycle exhaustion revert, job completes before timer, verifier rejects cycle+interrupting |
+| Phase 3: Cancel | 5 | Complete-after-cancel, signal-after-complete, signal-no-match, duplicate-complete, job-purge-on-cancel |
+| Phase 5.1: Terminate | 4 | EndTerminate kills siblings, terminate after parallel fork, terminate in sequential flow, Terminated event emitted |
+| Phase 5.2: Error routing | 5 | BusinessRejection routes to error boundary, unmatched error creates incident, error routing with orch_flags, error after parallel fork, nested error boundaries |
+| Phase 5.3: Bounded loops | 5 | Counter increment + branch, loop exits at limit, counter reset across epochs, loop with service task, counter events emitted |
+| Phase 5A: Inclusive gateway | 6 | All branches taken, subset branches (condition_flag), single branch, default-only, dynamic join count, InclusiveForkTaken event |
+| Integration | 6 | Full lifecycle, two-task, cancel, fail, compile error, hash integrity |
+| gRPC smoke | 1 (`#[ignore]`) | Over-the-wire: Compile → Start → Inspect → ActivateJobs → CompleteJob → Inspect(COMPLETED) → SubscribeEvents |
 
 The gRPC smoke test requires a running server. Run with:
 ```bash
@@ -4308,37 +4336,245 @@ bpmn-lite:
     RUST_LOG: info
 ```
 
-### Phase B (Future — ob-poc Integration)
+### Race Semantics (Phase 2)
 
-Phase B connects ob-poc to the BPMN-Lite service via gRPC job worker protocol:
+Race semantics model BPMN constructs where multiple events compete (e.g., service task completion vs boundary timer). The first arm to fire wins.
 
-| Component | Purpose |
-|-----------|---------|
-| Job Worker | ob-poc polls `ActivateJobs`, executes DSL verbs, calls `CompleteJob` |
-| Correlation Store | Maps BPMN message events to ob-poc entity events |
-| Event Bridge | Streams `RuntimeEvent` to ob-poc for audit/UI |
-| WorkflowDispatcher | ob-poc DSL verb `workflow.start` triggers `StartProcess` |
+**WaitState::Race fields:**
+
+| Field | Type | Purpose |
+|-------|------|---------|
+| `race_id` | `RaceId` | Links to `race_plan` in CompiledProgram |
+| `timer_deadline_ms` | `Option<u64>` | Absolute deadline for timer arm |
+| `job_key` | `Option<String>` | Preserved from Job state during boundary promotion |
+| `interrupting` | `bool` | If true, timer resolves race; if false, spawns child fiber |
+| `timer_arm_index` | `Option<usize>` | Computed index into race_plan arms (not hardcoded) |
+| `cycle_remaining` | `Option<u32>` | Remaining cycle fires (None = no cycle) |
+| `cycle_fired_count` | `u32` | How many times timer has fired (for event numbering) |
+
+**Engine promotion:** When a fiber is in `WaitState::Job` and the compiled program has a `race_plan` entry for that pc, the engine promotes it to `WaitState::Race` — preserving the job_key and adding the timer deadline.
+
+### Non-Interrupting Boundary Events + Timer Cycles (Phase 2A)
+
+**Non-interrupting fire** (5 non-negotiable constraints):
+1. Does NOT resolve the race — spawns a child fiber at the escalation path, main fiber stays in Race
+2. `timer_arm_index` computed from arms vec, never hardcoded
+3. `cycle_fired_count` used for iteration numbering in events
+4. Real BPMN element IDs emitted from `RacePlanEntry.boundary_element_id`
+5. No `spawned_fibers` stored in `WaitState::Race`
+
+**Timer cycles** use ISO 8601 `R<n>/PT<duration>` format:
+- `R3/PT1H` = fire 3 times, 1 hour apart
+- After each fire: spawn child fiber, decrement `cycle_remaining`, increment `cycle_fired_count`
+- On exhaustion: emit `TimerCycleExhausted`, revert fiber from Race back to plain `WaitState::Job`
+
+**New events:** `BoundaryFired`, `TimerCycleIteration`, `TimerCycleExhausted`
+
+**Verifier rule:** Cycle timers MUST be non-interrupting (`cancelActivity="false"`). Cycle + interrupting = compile error.
+
+### Cancel & Ghost Signal Protection (Phase 3)
+
+Three guards in `engine.complete_job()` prevent ghost signals:
+
+| Guard | Condition | Response |
+|-------|-----------|----------|
+| Instance not Running | `state != Running` | Emit `SignalIgnored`, return Ok |
+| Fiber not found | No fiber for job_key | Emit `SignalIgnored`, return Ok |
+| Fiber not waiting | `wait_state` mismatch | Emit `SignalIgnored`, return Ok |
+
+**Cancel improvements:**
+- `cancel()` now emits `WaitCancelled` for each active fiber before termination
+- `cancel_jobs_for_instance()` purges pending jobs from the queue
+- `signal()` checks instance state before matching, emits `SignalIgnored` on no-match
+
+**New events:** `WaitCancelled`, `SignalIgnored`
+
+### Terminate End Events (Phase 5.1)
+
+`EndTerminate` immediately kills all sibling fibers in the same process instance. Unlike `End` (which removes only the executing fiber and lets others continue), `EndTerminate` is a hard stop.
+
+**VM behavior:**
+1. Fiber executes `EndTerminate` → returns `TickOutcome::Terminated` (does NOT delete fibers itself)
+2. Engine receives `Terminated` outcome → deletes ALL fibers, sets instance state to `Completed`
+3. Emits `RuntimeEvent::Terminated { at, fiber_id }` identifying which fiber triggered termination
+
+**Use case:** BPMN terminate end events (e.g., "critical failure — abort entire process regardless of parallel branches").
+
+### Error Boundary Routing (Phase 5.2)
+
+Error boundary events catch `BusinessRejection` failures from service tasks and route to escalation/recovery paths instead of creating incidents.
+
+**ErrorClass taxonomy:**
+
+| Class | Behavior |
+|-------|----------|
+| `Transient` | Always creates incident (infra/network errors) |
+| `ContractViolation` | Always creates incident (programmer error) |
+| `BusinessRejection { rejection_code }` | Checks `error_route_map` for matching catch boundary |
+
+**Routing logic in `engine.fail_job()`:**
+1. Only `BusinessRejection` errors check routes — `Transient` and `ContractViolation` always create incidents
+2. `error_route_map` maps `service_task_pc → Vec<ErrorRoute>` (compiled from BPMN `boundaryEvent` with `errorEventDefinition`)
+3. Routes match by `error_code`: specific code match first, then catch-all (`error_code: None`)
+4. On match: fiber jumps to `resume_at`, emits `ErrorRouted { job_key, error_code, boundary_id, resume_at }`
+5. On no match: falls through to incident creation (existing behavior)
+
+**Key types:**
+```rust
+pub struct ErrorRoute {
+    pub error_code: Option<String>,    // None = catch-all
+    pub resume_at: Addr,               // Escalation path entry point
+    pub boundary_element_id: String,   // BPMN element ID for tracing
+}
+```
+
+### Bounded Retry Loops (Phase 5.3)
+
+Two new opcodes enable bounded loops without risk of infinite cycling:
+
+| Opcode | Behavior |
+|--------|----------|
+| `IncCounter { counter_id }` | Increments `instance.counters[counter_id]`, emits `CounterIncremented` |
+| `BrCounterLt { counter_id, limit, target }` | If `counter < limit`, jump to `target`; else fall through |
+
+**Use case:** Retry patterns — "retry up to 3 times, then escalate":
+```
+IncCounter(0)          ; bump retry count
+BrCounterLt(0, 3, L1) ; if retries < 3, go to L1 (retry)
+Jump(L2)               ; else go to L2 (escalation)
+```
+
+**Counters:**
+- Stored in `ProcessInstance.counters: BTreeMap<u32, u32>`
+- Epoch-tracked via `loop_epoch` for counter reset across loop iterations
+- `CounterIncremented { counter_id, new_value, loop_epoch }` event emitted on each increment
+
+### Inclusive (OR) Gateway (Phase 5A)
+
+Inclusive gateways evaluate condition flags at fork time and spawn fibers only for branches whose conditions are truthy. The join count is dynamic — set at fork time based on how many branches were actually taken.
+
+**Two opcodes:**
+
+| Opcode | Behavior |
+|--------|----------|
+| `ForkInclusive { branches, join_id, default_target }` | Evaluates each `InclusiveBranch.condition_flag` against `instance.flags`. Spawns fibers for truthy branches. Sets `instance.join_expected[join_id]` to actual count. If no conditions match and `default_target` is set, spawns single fiber there. |
+| `JoinDynamic { id, next }` | Same barrier semantics as `Join`, but reads expected count from `instance.join_expected[id]` instead of compile-time constant |
+
+**InclusiveBranch:**
+```rust
+pub struct InclusiveBranch {
+    pub condition_flag: Option<FlagKey>,  // None = unconditional (always taken)
+    pub target: Addr,                     // Fiber spawn target
+}
+```
+
+**Semantics:**
+- `condition_flag: None` → always taken (unconditional branch)
+- `condition_flag: Some(key)` → taken if `instance.flags[key]` is truthy (`Bool(true)` or `I64(n)` where n != 0)
+- At least one branch must be taken (enforced at runtime — if zero match and no default, returns error)
+- `InclusiveForkTaken { gateway_id, branches_taken, join_id, expected }` event emitted
+
+**New events:** `Terminated`, `ErrorRouted`, `CounterIncremented`, `InclusiveForkTaken`
 
 ### Key Files
 
 | File | Purpose |
 |------|---------|
-| `bpmn-lite/bpmn-lite-core/src/types.rs` | All core types (Value, Instr, Fiber, etc.) |
-| `bpmn-lite/bpmn-lite-core/src/events.rs` | RuntimeEvent enum (15 variants) |
-| `bpmn-lite/bpmn-lite-core/src/store.rs` | ProcessStore trait (28 methods) |
+| `bpmn-lite/bpmn-lite-core/src/types.rs` | All core types (Value, Instr, Fiber, CycleSpec, WaitArm, RacePlanEntry, InclusiveBranch, ErrorRoute, ErrorClass) |
+| `bpmn-lite/bpmn-lite-core/src/events.rs` | RuntimeEvent enum (28 variants) |
+| `bpmn-lite/bpmn-lite-core/src/store.rs` | ProcessStore trait (29 methods) |
 | `bpmn-lite/bpmn-lite-core/src/store_memory.rs` | MemoryStore implementation |
-| `bpmn-lite/bpmn-lite-core/src/vm.rs` | VM tick executor |
-| `bpmn-lite/bpmn-lite-core/src/engine.rs` | BpmnLiteEngine facade |
-| `bpmn-lite/bpmn-lite-core/src/compiler/parser.rs` | BPMN XML → IR |
-| `bpmn-lite/bpmn-lite-core/src/compiler/ir.rs` | IRGraph (petgraph) |
-| `bpmn-lite/bpmn-lite-core/src/compiler/verifier.rs` | Structural verification |
-| `bpmn-lite/bpmn-lite-core/src/compiler/lowering.rs` | IR → bytecode |
+| `bpmn-lite/bpmn-lite-core/src/vm.rs` | VM tick executor + race/boundary/terminate/inclusive tests |
+| `bpmn-lite/bpmn-lite-core/src/engine.rs` | BpmnLiteEngine facade + cancel/ghost guards + NI fire + error routing + terminate |
+| `bpmn-lite/bpmn-lite-core/src/compiler/parser.rs` | BPMN XML → IR (timeCycle, cancelActivity, errorEventDefinition, inclusiveGateway) |
+| `bpmn-lite/bpmn-lite-core/src/compiler/ir.rs` | IRGraph, TimerSpec (Duration/Date/Cycle) |
+| `bpmn-lite/bpmn-lite-core/src/compiler/verifier.rs` | Structural verification (cycle+interrupting rule) |
+| `bpmn-lite/bpmn-lite-core/src/compiler/lowering.rs` | IR → bytecode (race_plan, error_route_map, inclusive branches) |
 | `bpmn-lite/bpmn-lite-server/src/lib.rs` | Library re-export of proto module |
 | `bpmn-lite/bpmn-lite-server/src/grpc.rs` | gRPC handler implementations |
 | `bpmn-lite/bpmn-lite-server/src/main.rs` | Server startup |
 | `bpmn-lite/bpmn-lite-server/proto/bpmn_lite/v1/bpmn_lite.proto` | Proto definition |
 | `bpmn-lite/bpmn-lite-server/tests/integration.rs` | 6 integration tests + 1 gRPC smoke test |
 | `rust/xtask/src/bpmn_lite.rs` | xtask build/test/deploy commands |
+
+### Fiber-Based Execution Model — Design Rationale
+
+**Problem:** We need a workflow runtime that supports long-running orchestration (minutes to weeks), pause/resume on timers/messages/human gates, deterministic replay, exactly-once domain effects over at-least-once delivery, and strict separation of orchestration from business logic.
+
+**Why not interpreter-style BPMN execution?** A "DI/Spring" instinct is to load BPMN XML into a runtime interpreter and execute it. That fails because: interpreter state is opaque and hard to persist/replay deterministically; "magic" pushes failures to runtime and makes incident resolution non-reproducible; data mapping engines (FEEL/JUEL) encourage domain logic in the workflow engine; exactly-once semantics become hard to guarantee.
+
+**Chosen approach:** BPMN-Lite **compiles** BPMN into compact bytecode, then executes it using **fibers**.
+
+**What is a Fiber:** A fiber is the smallest unit of execution — a user-space "token + instruction pointer":
+- **Serializable** — can be persisted to storage and resumed later
+- **Explicit** — not hidden in a framework runtime
+- **Controlled** — our scheduler decides step budgets, no hidden preemption
+- **Deterministic** — same inputs produce same execution trace
+
+```rust
+struct Fiber {
+    fiber_id: Uuid,
+    pc: Addr,                    // Program counter into bytecode
+    stack: Vec<Value>,           // Small values for branching
+    regs: [Option<Value>; 8],    // Fixed locals
+    wait_state: WaitState,       // Running | Job | Timer | Msg | Join | Race | Incident
+}
+```
+
+**Yield points are explicit and finite.** A fiber may only stop at:
+- `EXEC_NATIVE` → parks as `WaitState::Job` (waiting for ob-poc verb worker)
+- `WAIT_*` (timer/message/human) → parks in appropriate wait state
+- `JOIN` → parks at parallel join barrier
+- `END` / `FAIL` → terminates fiber
+
+**Why fibers instead of goroutines/threads:**
+- **Massive concurrency** — thousands of tokens without OS threads
+- **Deterministic scheduling** — no hidden preemption
+- **Durable persistence** — serialize fiber state, restart safely
+- **Exact invariants** — "no fiber → no mutation" guardrails
+- **Replayability** — event log + fiber snapshots restore exact state
+
+Goroutines/threads are great for in-memory concurrency but cannot reliably persist a goroutine's stack/PC and replay it deterministically.
+
+**Two-stack separation (process vs data):**
+
+| Stack | Owned By | Contents |
+|-------|----------|----------|
+| **Process / control-flow** | BPMN-Lite | Bytecode, fibers, joins, waits, races, event log |
+| **Domain / business data** | ob-poc | `domain_payload` (opaque canonical JSON + SHA-256 hash) |
+
+The engine **never interprets** `domain_payload`. Only ob-poc verbs mutate it. The engine branches only on `orch_flags` (flat primitives). This prevents "engine creep" into business logic.
+
+**How work happens (EXEC_NATIVE → Job):**
+1. Service task compiles to `EXEC_NATIVE` → creates `JobActivation` (job_key, task_type, domain_payload + hash, orch_flags)
+2. ob-poc worker processes the job by running a verb
+3. Worker returns `JobCompletion` (same job_key, updated payload + hash, updated orch_flags)
+4. Idempotency: completion deduped by `job_key` — retries and duplicates are safe
+
+**Durability invariants (non-negotiable):**
+- A completion/signal must never mutate state unless there is a live fiber waiting for it
+- Every irreversible decision is recorded in the event log (gateway branches, wait registrations, race winners, join releases, flag writes)
+- PITR/replay must not re-execute verbs — it replays decisions and consults dedupe history
+
+**Alternatives considered and rejected:**
+
+| Alternative | Why Rejected |
+|-------------|-------------|
+| Interpreter-style BPMN | Opaque runtime state, hard PITR, encourages domain logic in engine |
+| Full Camunda-like engine | Heavy platform surface area, data semantics not solved, "engine becomes system" |
+| Thread-per-instance | Too heavy, not scalable, hard to persist |
+
+**Where to look in the code:**
+
+| File | What to Read |
+|------|-------------|
+| `bpmn-lite-core/src/types.rs` | `Fiber`, `WaitState`, `Instr`, `Value` — the core data model |
+| `bpmn-lite-core/src/vm.rs` | `tick_fiber()` — the bytecode interpreter loop |
+| `bpmn-lite-core/src/engine.rs` | `BpmnLiteEngine` — facade orchestrating compiler + VM + store |
+| `bpmn-lite-core/src/store.rs` | `ProcessStore` trait — the persistence contract |
+| `bpmn-lite-core/src/events.rs` | `RuntimeEvent` — the audit event log |
+| `rust/src/bpmn_integration/dispatcher.rs` | `WorkflowDispatcher` — ob-poc side, routes verbs to BPMN-Lite |
+| `rust/src/bpmn_integration/worker.rs` | `JobWorker` — ob-poc side, processes jobs from BPMN-Lite |
 
 ---
 
@@ -5098,8 +5334,15 @@ When you see these in a task, read the corresponding annex first:
 | "orchestrator v2", "ReplOrchestratorV2", "session v2" | CLAUDE.md §V2 REPL Architecture |
 | "invariant", "P-1", "P-2", "P-3", "P-4", "P-5" | `docs/INVARIANT-VERIFICATION.md` |
 | "BPMN", "bpmn-lite", "orchestration", "fiber VM", "durable workflow" | CLAUDE.md §BPMN-Lite Durable Orchestration Service |
+| "race", "WaitState::Race", "boundary timer", "race_plan", "RacePlanEntry" | CLAUDE.md §BPMN-Lite §Race Semantics (Phase 2) |
+| "non-interrupting", "timer cycle", "CycleSpec", "timeCycle", "BoundaryFired", "cycle exhaustion" | CLAUDE.md §BPMN-Lite §Non-Interrupting Boundary Events (Phase 2A) |
+| "ghost signal", "SignalIgnored", "WaitCancelled", "cancel_jobs", "complete_job guard" | CLAUDE.md §BPMN-Lite §Cancel & Ghost Signal Protection (Phase 3) |
+| "fiber", "fiber-based execution", "two-stack separation", "EXEC_NATIVE", "durable fiber" | CLAUDE.md §Fiber-Based Execution Model |
 | "WorkflowDispatcher", "JobWorker", "EventBridge", "correlation", "parked token", "bpmn_integration" | CLAUDE.md §BPMN-Lite Integration (Phase B) |
 | "PendingDispatch", "pending dispatch", "queue resilience", "dispatch worker", "retry worker" | CLAUDE.md §BPMN-Lite Integration (Phase B) §Queue-Based Resilience |
+| "EndTerminate", "terminate end", "error boundary", "ErrorRoute", "error_route_map", "BusinessRejection" | CLAUDE.md §BPMN-Lite §Terminate End Events / Error Boundary Routing (Phase 5) |
+| "IncCounter", "BrCounterLt", "bounded loop", "retry loop", "counter" | CLAUDE.md §BPMN-Lite §Bounded Retry Loops (Phase 5.3) |
+| "ForkInclusive", "JoinDynamic", "inclusive gateway", "OR gateway", "InclusiveBranch", "condition_flag" | CLAUDE.md §BPMN-Lite §Inclusive (OR) Gateway (Phase 5A) |
 
 ---
 
