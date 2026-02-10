@@ -6,8 +6,22 @@
 #[cfg(feature = "server")]
 pub mod attribute_routes;
 
+pub mod booking_principal_types;
+
+#[cfg(feature = "server")]
+pub mod agent_types;
+
+#[cfg(feature = "server")]
+pub mod agent_dsl_routes;
+
+#[cfg(feature = "server")]
+pub mod agent_learning_routes;
+
 #[cfg(feature = "server")]
 pub mod agent_routes;
+
+#[cfg(feature = "server")]
+pub mod agent_state;
 
 #[cfg(feature = "server")]
 pub mod intent;
@@ -97,7 +111,7 @@ pub use attribute_routes::create_attribute_router;
 pub use entity_routes::{create_entity_router, create_scoped_entity_router};
 
 #[cfg(feature = "server")]
-pub use agent_routes::create_agent_router_with_semantic;
+pub use agent_state::{create_agent_router_with_semantic, AgentState};
 
 #[cfg(feature = "server")]
 pub use dsl_viewer_routes::create_dsl_viewer_router;

@@ -30,8 +30,12 @@
 //! - `research.rs` - Research macro handlers
 //! - `runbook.rs` - Staged runbook execution handlers
 
+mod batch_tools;
 mod core;
+mod learning_tools;
+mod navigation_tools;
 pub mod runbook;
+mod session_tools;
 
 // Re-export the main ToolHandlers struct
 pub use core::ToolHandlers;

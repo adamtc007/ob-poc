@@ -1853,7 +1853,7 @@ Use `(kyc-case.state :case-id @case)` to get full state with embedded awaiting r
         // Record learning signal (gold-standard training data)
         // Convert candidates to verb strings for the recording function
         let candidate_verbs: Vec<String> = all_candidates.iter().map(|c| c.verb.clone()).collect();
-        if let Err(e) = crate::api::agent_routes::record_verb_selection_signal(
+        if let Err(e) = crate::api::agent_learning_routes::record_verb_selection_signal(
             &self.pool,
             original_input,
             selected_verb,
