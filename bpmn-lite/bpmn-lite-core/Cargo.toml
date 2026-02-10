@@ -1,0 +1,26 @@
+[package]
+name = "bpmn-lite-core"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+postgres = ["dep:sqlx", "dep:chrono"]
+
+[dependencies]
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+sha2 = { workspace = true }
+petgraph = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+quick-xml = "0.36"
+sqlx = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

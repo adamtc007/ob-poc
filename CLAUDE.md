@@ -49,6 +49,7 @@
 > **BPMN-Lite Phase 5 (Terminate/Error/Loops):** ✅ Complete - EndTerminate (kill all sibling fibers), error boundary routing (BusinessRejection → catch path), bounded retry loops (IncCounter/BrCounterLt)
 > **BPMN-Lite Phase 5A (Inclusive Gateway):** ✅ Complete - OR-gateway ForkInclusive (condition_flag evaluation, dynamic branch count), JoinDynamic (join_expected set at fork time)
 > **BPMN-Lite Integration (Phase B):** ✅ Complete - ob-poc ↔ bpmn-lite wiring: WorkflowDispatcher (queue-based resilience), JobWorker, EventBridge, SignalRelay, PendingDispatchWorker, correlation stores, 41 unit tests + 13 integration tests + 15 E2E choreography tests
+> **BPMN-Lite Phase 4 (PostgresProcessStore):** ✅ Complete - Feature-gated (`postgres`) PostgreSQL-backed ProcessStore, 12 migrations, 29 async methods, `--database-url` CLI arg with MemoryStore fallback, 15 integration tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -80,7 +81,8 @@ cargo x bpmn-lite build            # Build bpmn-lite workspace
 cargo x bpmn-lite build --release  # Release build
 cargo x bpmn-lite test             # Run all 71 tests (+ 1 ignored gRPC smoke test)
 cargo x bpmn-lite clippy           # Lint
-cargo x bpmn-lite start            # Build release + start native (port 50051)
+cargo x bpmn-lite start            # Build release + start native (port 50051, MemoryStore)
+cargo x bpmn-lite start --database-url postgresql:///data_designer  # Start with PostgresProcessStore
 cargo x bpmn-lite stop             # Stop native server
 cargo x bpmn-lite status           # Show native + Docker status
 cargo x bpmn-lite docker-build     # Build Docker image
@@ -4135,7 +4137,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 - **gRPC is the only boundary** — no shared crates beyond protobuf-generated types
 - **Hollow orchestration** — BPMN-Lite orchestrates control flow; all domain work happens in ob-poc verb handlers via the job worker protocol
 - **Two-namespace payload** — `domain_payload` (opaque canonical JSON + SHA-256 hash) never parsed by VM; `orch_flags` (flat primitives) for branching only
-- **MemoryStore for POC** — Postgres ProcessStore deferred to post-POC
+- **Dual store** — `MemoryStore` (default, no deps) or `PostgresProcessStore` (feature-gated `postgres`, `--database-url` CLI arg / `DATABASE_URL` env var)
 
 ### 23-Opcode ISA
 
@@ -4185,12 +4187,14 @@ bpmn-lite/                          # Standalone workspace (repo root sibling to
 ├── .gitignore
 ├── bpmn-lite-core/
 │   ├── Cargo.toml
+│   ├── migrations/                 # 12 SQL files (001-012), run by sqlx::migrate!()
 │   ├── src/
 │   │   ├── lib.rs                  # Module exports
 │   │   ├── types.rs                # Value, Instr, Fiber, ProcessInstance, Job*, CompiledProgram
 │   │   ├── events.rs               # RuntimeEvent enum (28 variants)
 │   │   ├── store.rs                # ProcessStore trait (29 async methods)
 │   │   ├── store_memory.rs         # MemoryStore (RwLock<HashMap> implementation)
+│   │   ├── store_postgres.rs       # PostgresProcessStore (#[cfg(feature = "postgres")])
 │   │   ├── vm.rs                   # tick_fiber() executor + CompleteJob/FailJob handlers
 │   │   ├── engine.rs               # BpmnLiteEngine facade
 │   │   └── compiler/
@@ -4210,7 +4214,7 @@ bpmn-lite/                          # Standalone workspace (repo root sibling to
 │   │       └── bpmn_lite.proto     # Full proto definition (9 RPCs)
 │   ├── src/
 │   │   ├── lib.rs                  # Re-exports grpc::proto for integration tests
-│   │   ├── main.rs                 # gRPC server startup on 0.0.0.0:50051
+│   │   ├── main.rs                 # gRPC server startup, conditional store (--database-url)
 │   │   └── grpc.rs                 # Handler implementations delegating to Engine
 │   └── tests/
 │       └── integration.rs          # 6 integration tests + 1 gRPC smoke test (#[ignore])
@@ -4253,15 +4257,22 @@ cargo x bpmn-lite start -p 50055   # Custom port
 cargo x bpmn-lite status           # Show native + Docker status
 cargo x bpmn-lite stop             # Stop native server
 
-# Build and run directly (foreground)
+# Build and run directly (foreground, MemoryStore)
 cd bpmn-lite && cargo run -p bpmn-lite-server
 # Server starts on [::]:50051
+
+# Build and run with PostgresProcessStore (migrations auto-applied)
+cd bpmn-lite && cargo run -p bpmn-lite-server --features postgres -- --database-url postgresql:///data_designer
 
 # Build/test only
 cargo x bpmn-lite build            # Debug build
 cargo x bpmn-lite build --release  # Release build
 cargo x bpmn-lite test             # Run all 71 tests (+ 1 ignored gRPC smoke)
 cargo x bpmn-lite clippy           # Lint
+
+# Postgres integration tests (15 tests, require running Postgres)
+cd bpmn-lite && DATABASE_URL="postgresql:///data_designer" \
+  cargo test --features postgres -p bpmn-lite-core -- --ignored
 
 # Docker
 cargo x bpmn-lite docker-build     # Build image
@@ -4275,7 +4286,7 @@ docker run -p 50051:50051 bpmn-lite
 docker compose up bpmn-lite
 ```
 
-### Test Coverage (71 core + 6 integration + 1 ignored smoke test)
+### Test Coverage (71 core + 6 integration + 15 postgres + 1 ignored smoke test)
 
 | Phase | Tests | Coverage |
 |-------|-------|----------|
@@ -4294,6 +4305,7 @@ docker compose up bpmn-lite
 | Phase 5.3: Bounded loops | 5 | Counter increment + branch, loop exits at limit, counter reset across epochs, loop with service task, counter events emitted |
 | Phase 5A: Inclusive gateway | 6 | All branches taken, subset branches (condition_flag), single branch, default-only, dynamic join count, InclusiveForkTaken event |
 | Integration | 6 | Full lifecycle, two-task, cancel, fail, compile error, hash integrity |
+| Phase 4: PostgresProcessStore | 15 (`#[ignore]`) | Instance/fiber/join/dedupe/job/event/payload/program/dead-letter/incident round-trips, instance updates, teardown, concurrent dequeue, engine smoke, cancel_jobs_for_instance |
 | gRPC smoke | 1 (`#[ignore]`) | Over-the-wire: Compile → Start → Inspect → ActivateJobs → CompleteJob → Inspect(COMPLETED) → SubscribeEvents |
 
 The gRPC smoke test requires a running server. Run with:
@@ -4320,6 +4332,8 @@ cd bpmn-lite && BPMN_LITE_URL=http://127.0.0.1:50053 cargo test --test integrati
 | `sha2` | 0.10 | Payload hash, bytecode version |
 | `serde`/`serde_json` | 1 | Serialization |
 | `tracing` | 0.1 | Structured logging |
+| `sqlx` | 0.8 | PostgreSQL async driver (optional, `postgres` feature) |
+| `chrono` | 0.4 | Timestamp conversion (optional, `postgres` feature) |
 
 ### Docker Compose
 
@@ -4328,12 +4342,15 @@ cd bpmn-lite && BPMN_LITE_URL=http://127.0.0.1:50053 cargo test --test integrati
 bpmn-lite:
   build:
     context: ./bpmn-lite
-    dockerfile: Dockerfile
+    dockerfile: Dockerfile    # Builds with --features postgres
   container_name: bpmn-lite
   ports:
     - "50053:50051"  # gRPC (50051 inside container, 50053 on host)
   environment:
     RUST_LOG: info
+    DATABASE_URL: postgresql://localhost@host.docker.internal:5432/data_designer
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 ```
 
 ### Race Semantics (Phase 2)
@@ -4476,6 +4493,43 @@ pub struct InclusiveBranch {
 
 **New events:** `Terminated`, `ErrorRouted`, `CounterIncremented`, `InclusiveForkTaken`
 
+### PostgresProcessStore (Phase 4)
+
+> ✅ **IMPLEMENTED (2026-02-10)**: Feature-gated PostgreSQL-backed ProcessStore so workflows survive restarts.
+
+**Feature gate:** All Postgres code behind `#[cfg(feature = "postgres")]`. Never import sqlx in non-gated code.
+
+**Non-negotiable constraints:**
+- **Runtime queries only** — `sqlx::query()` / `sqlx::query_as()`, NOT `sqlx::query!()` macro
+- **Single SQL round-trip per trait method** — no method issues more than one query
+- **BYTEA for `[u8; 32]`** — bind as `&hash[..]`, load as `Vec<u8>` → `.try_into::<[u8; 32]>()?`
+- **JSONB for compound fields** — flags, counters, join_expected, state, wait_state, stack, regs, orch_flags, error_class, completion, event
+- **`FOR UPDATE SKIP LOCKED`** for `dequeue_jobs` — CTE pattern for concurrent safety
+- **Fiber regs padding** — deserialize JSONB as `Vec<Value>`, pad to 8 with `Value::Bool(false)` if short
+
+**12 migrations** (`bpmn-lite-core/migrations/001-012`):
+`process_instances`, `fibers`, `join_barriers`, `dedupe_cache`, `job_queue`, `compiled_programs`, `dead_letter_queue`, `event_sequences`, `event_log`, `payload_history`, `incidents`, `updated_at_trigger`
+
+**29 trait methods by group:**
+
+| Group | Methods | SQL Pattern |
+|-------|---------|-------------|
+| Instance (5) | save/load/update_state/update_flags/update_payload | Upsert, SELECT, UPDATE |
+| Fibers (5) | save/load/load_all/delete/delete_all | Upsert, SELECT, DELETE |
+| Joins (3) | arrive/reset/delete_all | Upsert+increment, reset, DELETE |
+| Dedupe (2) | get/put | SELECT, Upsert |
+| Jobs (4) | enqueue/dequeue/ack/cancel_for_instance | INSERT, CTE+SKIP LOCKED, DELETE, DELETE RETURNING |
+| Programs (2) | store/load | INSERT ON CONFLICT DO NOTHING, SELECT |
+| Dead-letter (2) | put/take | Upsert with computed expires_at, DELETE WHERE expires_at > now() |
+| Events (2) | append/read | Atomic CTE (seq alloc + insert), SELECT WHERE seq >= |
+| Payload history (2) | save/load | INSERT ON CONFLICT DO NOTHING, SELECT |
+| Incidents (2) | save/load | INSERT, SELECT ORDER BY created_at |
+
+**Server wiring:** `--database-url <url>` CLI arg or `DATABASE_URL` env var. Without either, falls back to MemoryStore. Migrations auto-applied on startup via `sqlx::migrate!()`.
+
+**15 integration tests** (all `#[ignore]`, require running Postgres):
+T-PG-1 through T-PG-15 covering instance/fiber/join/dedupe/job/event/payload/program/dead-letter/incident round-trips, instance updates, teardown, concurrent dequeue, full engine smoke, and cancel_jobs_for_instance.
+
 ### Key Files
 
 | File | Purpose |
@@ -4484,6 +4538,8 @@ pub struct InclusiveBranch {
 | `bpmn-lite/bpmn-lite-core/src/events.rs` | RuntimeEvent enum (28 variants) |
 | `bpmn-lite/bpmn-lite-core/src/store.rs` | ProcessStore trait (29 methods) |
 | `bpmn-lite/bpmn-lite-core/src/store_memory.rs` | MemoryStore implementation |
+| `bpmn-lite/bpmn-lite-core/src/store_postgres.rs` | PostgresProcessStore (`#[cfg(feature = "postgres")]`, 29 methods, 15 tests) |
+| `bpmn-lite/bpmn-lite-core/migrations/` | 12 SQL migrations (tables, indexes, updated_at trigger) |
 | `bpmn-lite/bpmn-lite-core/src/vm.rs` | VM tick executor + race/boundary/terminate/inclusive tests |
 | `bpmn-lite/bpmn-lite-core/src/engine.rs` | BpmnLiteEngine facade + cancel/ghost guards + NI fire + error routing + terminate |
 | `bpmn-lite/bpmn-lite-core/src/compiler/parser.rs` | BPMN XML → IR (timeCycle, cancelActivity, errorEventDefinition, inclusiveGateway) |
@@ -5343,6 +5399,7 @@ When you see these in a task, read the corresponding annex first:
 | "EndTerminate", "terminate end", "error boundary", "ErrorRoute", "error_route_map", "BusinessRejection" | CLAUDE.md §BPMN-Lite §Terminate End Events / Error Boundary Routing (Phase 5) |
 | "IncCounter", "BrCounterLt", "bounded loop", "retry loop", "counter" | CLAUDE.md §BPMN-Lite §Bounded Retry Loops (Phase 5.3) |
 | "ForkInclusive", "JoinDynamic", "inclusive gateway", "OR gateway", "InclusiveBranch", "condition_flag" | CLAUDE.md §BPMN-Lite §Inclusive (OR) Gateway (Phase 5A) |
+| "PostgresProcessStore", "store_postgres", "postgres feature", "database-url", "bpmn migrations" | CLAUDE.md §BPMN-Lite Phase 4 (PostgresProcessStore) |
 
 ---
 

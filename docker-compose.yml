@@ -36,5 +36,19 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
+  bpmn-lite:
+    build:
+      context: ./bpmn-lite
+      dockerfile: Dockerfile
+    container_name: bpmn-lite
+    ports:
+      - "50053:50051" # gRPC (50051 inside container, 50053 on host)
+    environment:
+      RUST_LOG: info
+      DATABASE_URL: postgresql://localhost@host.docker.internal:5432/data_designer
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
 # volumes:
 #   postgres_data:
