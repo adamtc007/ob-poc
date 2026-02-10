@@ -1,3 +1,4 @@
+pub mod authoring;
 pub mod compiler;
 pub mod engine;
 pub mod events;

@@ -1,3 +1,4 @@
+use crate::authoring;
 use crate::compiler::{lowering, parser, verifier};
 use crate::events::RuntimeEvent;
 use crate::store::ProcessStore;
@@ -76,6 +77,84 @@ impl BpmnLiteEngine {
             task_types,
             diagnostics: vec![],
         })
+    }
+
+    /// Compile a WorkflowGraphDto → verified IR → bytecode, store the program.
+    /// Same post-parse pipeline as `compile()`.
+    pub async fn compile_from_dto(
+        &self,
+        dto: &authoring::dto::WorkflowGraphDto,
+    ) -> Result<CompileResult> {
+        let errors = authoring::validate::validate_dto(dto);
+        if !errors.is_empty() {
+            let msgs: Vec<String> = errors
+                .iter()
+                .map(|e| format!("[{}] {}", e.rule, e.message))
+                .collect();
+            return Err(anyhow!("DTO validation failed: {}", msgs.join("; ")));
+        }
+
+        let ir = authoring::dto_to_ir::dto_to_ir(dto)?;
+
+        let verify_errors = verifier::verify(&ir);
+        if !verify_errors.is_empty() {
+            let msgs: Vec<String> = verify_errors.iter().map(|e| e.message.clone()).collect();
+            return Err(anyhow!("Verification failed:\n{}", msgs.join("\n")));
+        }
+
+        let program = lowering::lower(&ir)?;
+
+        let bytecode_errors = verifier::verify_bytecode(&program);
+        if !bytecode_errors.is_empty() {
+            let msgs: Vec<String> = bytecode_errors.iter().map(|e| e.message.clone()).collect();
+            return Err(anyhow!(
+                "Bytecode verification failed:\n{}",
+                msgs.join("\n")
+            ));
+        }
+
+        let bytecode_version = program.bytecode_version;
+        let task_types = program.task_manifest.clone();
+
+        self.store.store_program(bytecode_version, &program).await?;
+
+        Ok(CompileResult {
+            bytecode_version,
+            task_types,
+            diagnostics: vec![],
+        })
+    }
+
+    /// Parse YAML → DTO → compile via `compile_from_dto()`.
+    pub async fn compile_from_yaml(&self, yaml_str: &str) -> Result<CompileResult> {
+        let dto = authoring::yaml::parse_workflow_yaml(yaml_str)?;
+        self.compile_from_dto(&dto).await
+    }
+
+    /// Compile and publish a workflow from YAML in a single atomic step.
+    ///
+    /// Runs the full publish pipeline (parse → validate → lint → compile → hash),
+    /// then persists: (a) compiled program to ProcessStore, (b) template to TemplateStore.
+    ///
+    /// If (b) fails, no Draft row is left behind — the template was never written.
+    /// Program writes are idempotent (keyed by bytecode hash), so retry is safe.
+    pub async fn compile_and_publish(
+        &self,
+        yaml_str: &str,
+        options: authoring::publish::PublishOptions,
+        template_store: &dyn authoring::registry::TemplateStore,
+    ) -> Result<authoring::publish::PublishResult> {
+        let result = authoring::publish::publish_workflow(yaml_str, options)?;
+
+        // Persist compiled program (idempotent — keyed by bytecode hash)
+        self.store
+            .store_program(result.program.bytecode_version, &result.program)
+            .await?;
+
+        // Persist template (Published state — no intermediate Draft)
+        template_store.save(&result.template).await?;
+
+        Ok(result)
     }
 
     /// Start a new process instance.
@@ -3432,5 +3511,474 @@ mod tests {
             .iter()
             .any(|i| matches!(i, Instr::JoinDynamic { .. }));
         assert!(has_join_dynamic, "Should contain JoinDynamic instruction");
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Authoring Phase A: YAML → DTO → IR → Bytecode → Execute
+    // ═══════════════════════════════════════════════════════════
+
+    /// T-AUTH-1: Basic sequence: start → task_a → task_b → end.
+    /// YAML compile + execute to Completed.
+    #[tokio::test]
+    async fn t_auth_1_basic_sequence_yaml() {
+        let yaml = r#"
+id: basic-seq
+nodes:
+  - kind: Start
+    id: start
+  - kind: ServiceTask
+    id: task_a
+    task_type: do_a
+  - kind: ServiceTask
+    id: task_b
+    task_type: do_b
+  - kind: End
+    id: end
+edges:
+  - from: start
+    to: task_a
+  - from: task_a
+    to: task_b
+  - from: task_b
+    to: end
+"#;
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let engine = BpmnLiteEngine::new(store.clone());
+
+        // Compile from YAML
+        let cr = engine.compile_from_yaml(yaml).await.unwrap();
+        assert!(cr.task_types.contains(&"do_a".to_string()));
+        assert!(cr.task_types.contains(&"do_b".to_string()));
+
+        // Start instance
+        let payload = r#"{"test":"auth1"}"#;
+        let hash = compute_hash(payload);
+        let iid = engine
+            .start(
+                "basic-seq",
+                cr.bytecode_version,
+                payload,
+                hash,
+                "corr-auth1",
+            )
+            .await
+            .unwrap();
+
+        // Tick → task_a job
+        let jobs = engine.run_instance(iid).await.unwrap();
+        let extra = engine
+            .activate_jobs(&["do_a".to_string()], 10)
+            .await
+            .unwrap();
+        let all_jobs: Vec<_> = jobs.into_iter().chain(extra).collect();
+        assert!(!all_jobs.is_empty(), "Should have do_a job");
+
+        // Complete task_a
+        engine
+            .complete_job(
+                &all_jobs[0].job_key,
+                r#"{"a":"done"}"#,
+                hash,
+                BTreeMap::new(),
+            )
+            .await
+            .unwrap();
+
+        // Tick → task_b job
+        engine.tick_instance(iid).await.unwrap();
+        let jobs_b = engine
+            .activate_jobs(&["do_b".to_string()], 10)
+            .await
+            .unwrap();
+        assert!(!jobs_b.is_empty(), "Should have do_b job");
+
+        // Complete task_b — hash must match instance's current domain_payload
+        // (updated to task_a's completion payload after first complete_job)
+        let hash_b = compute_hash(r#"{"a":"done"}"#);
+        engine
+            .complete_job(
+                &jobs_b[0].job_key,
+                r#"{"b":"done"}"#,
+                hash_b,
+                BTreeMap::new(),
+            )
+            .await
+            .unwrap();
+
+        // Tick → Completed
+        engine.tick_instance(iid).await.unwrap();
+        let inspection = engine.inspect(iid).await.unwrap();
+        assert!(
+            matches!(inspection.state, ProcessState::Completed { .. }),
+            "Expected Completed, got {:?}",
+            inspection.state
+        );
+    }
+
+    /// T-AUTH-2: Inclusive gateway round-trip from YAML.
+    /// Unconditional + 2 conditional branches, set 1 flag true → 2 branches taken.
+    #[tokio::test]
+    async fn t_auth_2_inclusive_gateway_yaml() {
+        use crate::authoring::dto::*;
+        use crate::compiler::ir::GatewayDirection;
+
+        let dto = WorkflowGraphDto {
+            id: "inclusive-test".to_string(),
+            meta: None,
+            nodes: vec![
+                NodeDto::Start {
+                    id: "start".to_string(),
+                },
+                NodeDto::InclusiveGateway {
+                    id: "ig_fork".to_string(),
+                    direction: GatewayDirection::Diverging,
+                    join: Some("ig_join".to_string()),
+                },
+                NodeDto::ServiceTask {
+                    id: "always".to_string(),
+                    task_type: "always_task".to_string(),
+                    bpmn_id: None,
+                },
+                NodeDto::ServiceTask {
+                    id: "branch_a".to_string(),
+                    task_type: "branch_a_task".to_string(),
+                    bpmn_id: None,
+                },
+                NodeDto::ServiceTask {
+                    id: "branch_b".to_string(),
+                    task_type: "branch_b_task".to_string(),
+                    bpmn_id: None,
+                },
+                NodeDto::InclusiveGateway {
+                    id: "ig_join".to_string(),
+                    direction: GatewayDirection::Converging,
+                    join: None,
+                },
+                NodeDto::End {
+                    id: "end".to_string(),
+                    terminate: false,
+                },
+            ],
+            edges: vec![
+                EdgeDto {
+                    from: "start".to_string(),
+                    to: "ig_fork".to_string(),
+                    condition: None,
+                    is_default: false,
+                    on_error: None,
+                },
+                // Unconditional branch (always taken)
+                EdgeDto {
+                    from: "ig_fork".to_string(),
+                    to: "always".to_string(),
+                    condition: None,
+                    is_default: false,
+                    on_error: None,
+                },
+                // Conditional: flag_a == true
+                EdgeDto {
+                    from: "ig_fork".to_string(),
+                    to: "branch_a".to_string(),
+                    condition: Some(FlagCondition {
+                        flag: "flag_a".to_string(),
+                        op: FlagOp::Eq,
+                        value: FlagValue::Bool(true),
+                    }),
+                    is_default: false,
+                    on_error: None,
+                },
+                // Conditional: flag_b == true
+                EdgeDto {
+                    from: "ig_fork".to_string(),
+                    to: "branch_b".to_string(),
+                    condition: Some(FlagCondition {
+                        flag: "flag_b".to_string(),
+                        op: FlagOp::Eq,
+                        value: FlagValue::Bool(true),
+                    }),
+                    is_default: false,
+                    on_error: None,
+                },
+                EdgeDto {
+                    from: "always".to_string(),
+                    to: "ig_join".to_string(),
+                    condition: None,
+                    is_default: false,
+                    on_error: None,
+                },
+                EdgeDto {
+                    from: "branch_a".to_string(),
+                    to: "ig_join".to_string(),
+                    condition: None,
+                    is_default: false,
+                    on_error: None,
+                },
+                EdgeDto {
+                    from: "branch_b".to_string(),
+                    to: "ig_join".to_string(),
+                    condition: None,
+                    is_default: false,
+                    on_error: None,
+                },
+                EdgeDto {
+                    from: "ig_join".to_string(),
+                    to: "end".to_string(),
+                    condition: None,
+                    is_default: false,
+                    on_error: None,
+                },
+            ],
+        };
+
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let engine = BpmnLiteEngine::new(store.clone());
+
+        let cr = engine.compile_from_dto(&dto).await.unwrap();
+
+        // Start with flag_a=true, flag_b=false
+        let payload = r#"{"test":"ig"}"#;
+        let hash = compute_hash(payload);
+        let iid = engine
+            .start(
+                "inclusive-test",
+                cr.bytecode_version,
+                payload,
+                hash,
+                "corr-ig",
+            )
+            .await
+            .unwrap();
+
+        // Flag names are interned as sequential u32 keys during lowering.
+        // flag_a is first interned → key 0, flag_b → key 1.
+        // Set flag key 0 (flag_a) = true before tick
+        {
+            let mut inst = store.load_instance(iid).await.unwrap().unwrap();
+            inst.flags.insert(0, Value::Bool(true));
+            // flag_b (key 1) not set = defaults to false
+            store.save_instance(&inst).await.unwrap();
+        }
+
+        // Tick — ForkInclusive should spawn 2 fibers (unconditional + flag_a)
+        engine.tick_instance(iid).await.unwrap();
+
+        let inspection = engine.inspect(iid).await.unwrap();
+        assert_eq!(inspection.state, ProcessState::Running);
+        // Should have at least 2 fibers for the 2 branches
+        assert!(
+            inspection.fibers.len() >= 2,
+            "Expected >=2 fibers for inclusive fork, got {}",
+            inspection.fibers.len()
+        );
+    }
+
+    /// T-AUTH-3: RaceWait deferred to Phase B.
+    #[tokio::test]
+    #[ignore = "RaceWait not supported in Phase A — deferred to Phase B"]
+    async fn t_auth_3_race_wait() {
+        // Placeholder — RaceWait DTO nodes are rejected by dto_to_ir in Phase A
+    }
+
+    /// T-AUTH-4: Error routing from YAML — ServiceTask with on_error edge.
+    /// Fail job → routes to escalation.
+    #[tokio::test]
+    async fn t_auth_4_error_routing_yaml() {
+        let yaml = r#"
+id: error-route
+nodes:
+  - kind: Start
+    id: start
+  - kind: ServiceTask
+    id: risky_task
+    task_type: risky_work
+  - kind: ServiceTask
+    id: escalation
+    task_type: handle_escalation
+  - kind: End
+    id: end_normal
+  - kind: End
+    id: end_error
+edges:
+  - from: start
+    to: risky_task
+  - from: risky_task
+    to: end_normal
+  - from: risky_task
+    to: escalation
+    on_error:
+      error_code: BIZ_FAIL
+      retries: 0
+  - from: escalation
+    to: end_error
+"#;
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let engine = BpmnLiteEngine::new(store.clone());
+
+        let cr = engine.compile_from_yaml(yaml).await.unwrap();
+
+        let payload = r#"{"test":"err"}"#;
+        let hash = compute_hash(payload);
+        let iid = engine
+            .start(
+                "error-route",
+                cr.bytecode_version,
+                payload,
+                hash,
+                "corr-err",
+            )
+            .await
+            .unwrap();
+
+        // Tick → risky_task job
+        let jobs = engine.run_instance(iid).await.unwrap();
+        let extra = engine
+            .activate_jobs(&["risky_work".to_string()], 10)
+            .await
+            .unwrap();
+        let all_jobs: Vec<_> = jobs.into_iter().chain(extra).collect();
+        assert!(!all_jobs.is_empty());
+
+        // Fail with matching error code
+        engine
+            .fail_job(
+                &all_jobs[0].job_key,
+                ErrorClass::BusinessRejection {
+                    rejection_code: "BIZ_FAIL".to_string(),
+                },
+                "Business failure",
+            )
+            .await
+            .unwrap();
+
+        // Verify error was routed (not incident)
+        let events = store.read_events(iid, 0).await.unwrap();
+        let has_routed = events.iter().any(|(_, e)| {
+            matches!(e, RuntimeEvent::ErrorRouted { error_code, .. } if error_code == "BIZ_FAIL")
+        });
+        assert!(has_routed, "Should route error to escalation handler");
+
+        // Instance should still be Running (not Failed)
+        let inst = store.load_instance(iid).await.unwrap().unwrap();
+        assert!(
+            matches!(inst.state, ProcessState::Running),
+            "Instance should be Running after error routing, got {:?}",
+            inst.state
+        );
+
+        // Tick to advance to escalation handler
+        engine.tick_instance(iid).await.unwrap();
+        let esc_jobs = engine
+            .activate_jobs(&["handle_escalation".to_string()], 10)
+            .await
+            .unwrap();
+        assert!(
+            !esc_jobs.is_empty(),
+            "Should have handle_escalation job after error routing"
+        );
+    }
+
+    /// T-AUTH-5: XOR with is_default=true edge. Condition false → default path.
+    #[tokio::test]
+    async fn t_auth_5_xor_default_yaml() {
+        let yaml = r#"
+id: xor-default
+nodes:
+  - kind: Start
+    id: start
+  - kind: ExclusiveGateway
+    id: decision
+  - kind: ServiceTask
+    id: approved_path
+    task_type: do_approved
+  - kind: ServiceTask
+    id: fallback_path
+    task_type: do_fallback
+  - kind: End
+    id: end
+edges:
+  - from: start
+    to: decision
+  - from: decision
+    to: approved_path
+    condition:
+      flag: approved
+      op: "=="
+      value: true
+  - from: decision
+    to: fallback_path
+    is_default: true
+  - from: approved_path
+    to: end
+  - from: fallback_path
+    to: end
+"#;
+        let store: Arc<dyn ProcessStore> = Arc::new(MemoryStore::new());
+        let engine = BpmnLiteEngine::new(store.clone());
+
+        let cr = engine.compile_from_yaml(yaml).await.unwrap();
+
+        let payload = r#"{"test":"xor"}"#;
+        let hash = compute_hash(payload);
+        let iid = engine
+            .start(
+                "xor-default",
+                cr.bytecode_version,
+                payload,
+                hash,
+                "corr-xor",
+            )
+            .await
+            .unwrap();
+
+        // Do NOT set "approved" flag → condition is false → default path
+        // Tick to advance through XOR
+        engine.tick_instance(iid).await.unwrap();
+
+        // Should get do_fallback job (not do_approved)
+        let jobs_fallback = engine
+            .activate_jobs(&["do_fallback".to_string()], 10)
+            .await
+            .unwrap();
+        let jobs_approved = engine
+            .activate_jobs(&["do_approved".to_string()], 10)
+            .await
+            .unwrap();
+
+        assert!(
+            !jobs_fallback.is_empty(),
+            "Default path (do_fallback) should be taken"
+        );
+        assert!(
+            jobs_approved.is_empty(),
+            "Conditional path (do_approved) should NOT be taken"
+        );
+
+        // Complete fallback → end
+        engine
+            .complete_job(
+                &jobs_fallback[0].job_key,
+                r#"{"r":"fb"}"#,
+                hash,
+                BTreeMap::new(),
+            )
+            .await
+            .unwrap();
+        engine.tick_instance(iid).await.unwrap();
+
+        let inspection = engine.inspect(iid).await.unwrap();
+        assert!(
+            matches!(inspection.state, ProcessState::Completed { .. }),
+            "Expected Completed, got {:?}",
+            inspection.state
+        );
+    }
+
+    /// T-AUTH-6: Boundary timer from YAML DTO.
+    #[tokio::test]
+    #[ignore = "BoundaryTimer time simulation requires deadline manipulation — covered by BPMN XML tests"]
+    async fn t_auth_6_boundary_timer_yaml() {
+        // BoundaryTimer from DTO compiles correctly (verified in dto_to_ir tests).
+        // Runtime behavior (timer firing, race resolution) is covered by
+        // the existing BPMN XML boundary timer tests (T-NI-*).
     }
 }

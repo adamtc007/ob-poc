@@ -42,7 +42,7 @@
 > **Clarification UX Wiring (075):** ✅ Complete - Unified DecisionPacket system for verb/scope/group disambiguation with confirm tokens
 > **Inspector-First Visualization (076):** ✅ Complete - Deterministic tree/table Inspector UI, projection schema with $ref linking, 82 tests
 > **Deal Record & Fee Billing (067):** ✅ Complete - Commercial origination hub, rate card negotiation, closed-loop billing
-> **BPMN-Lite Runtime (Phase A):** ✅ Complete - Standalone durable orchestration service, 23-opcode VM, gRPC API (verified over the wire), 71 core tests + gRPC smoke test
+> **BPMN-Lite Runtime (Phase A):** ✅ Complete - Standalone durable orchestration service, 23-opcode VM, gRPC API (verified over the wire), 123 core tests + gRPC smoke test
 > **BPMN-Lite Phase 2 (Race/Boundary):** ✅ Complete - Race semantics (Msg vs Timer arms), boundary timer events, interrupting + non-interrupting fire modes
 > **BPMN-Lite Phase 2A (Non-Interrupting + Cycles):** ✅ Complete - Non-interrupting boundary spawns child fiber (main stays in Race), ISO 8601 timer cycles (R<n>/PT<dur>), cycle exhaustion revert
 > **BPMN-Lite Phase 3 (Cancel/Ghost):** ✅ Complete - Ghost signal protection, WaitCancelled/SignalIgnored events, job purge on cancel, completion ownership in engine
@@ -50,6 +50,7 @@
 > **BPMN-Lite Phase 5A (Inclusive Gateway):** ✅ Complete - OR-gateway ForkInclusive (condition_flag evaluation, dynamic branch count), JoinDynamic (join_expected set at fork time)
 > **BPMN-Lite Integration (Phase B):** ✅ Complete - ob-poc ↔ bpmn-lite wiring: WorkflowDispatcher (queue-based resilience), JobWorker, EventBridge, SignalRelay, PendingDispatchWorker, correlation stores, 41 unit tests + 13 integration tests + 15 E2E choreography tests
 > **BPMN-Lite Phase 4 (PostgresProcessStore):** ✅ Complete - Feature-gated (`postgres`) PostgreSQL-backed ProcessStore, 12 migrations, 29 async methods, `--database-url` CLI arg with MemoryStore fallback, 15 integration tests
+> **BPMN-Lite Authoring (Phases B-D):** ✅ Complete - Verb contracts + lint rules (5 rules), BPMN 2.0 XML export + IR↔DTO round-trip, template registry + atomic publish pipeline, PostgresTemplateStore, 123 core tests + 6 integration tests
 
 This is the root project guide for Claude Code. Domain-specific details are in annexes.
 
@@ -4084,7 +4085,7 @@ CI gate: `test_corpus_total_at_least_50` ensures corpus doesn't regress.
 
 ## BPMN-Lite Durable Orchestration Service
 
-> ✅ **IMPLEMENTED (2026-02-10)**: Standalone Rust service for durable workflow orchestration. BPMN XML → Verified IR → Bytecode → Fiber VM. 71 core tests + 6 integration tests + gRPC smoke test. Includes race semantics (Phase 2), non-interrupting boundary events + timer cycles (Phase 2A), cancel/ghost signal protection (Phase 3), terminate end events + error boundary routing + bounded loops (Phase 5), and inclusive (OR) gateways (Phase 5A).
+> ✅ **IMPLEMENTED (2026-02-10)**: Standalone Rust service for durable workflow orchestration. BPMN XML → Verified IR → Bytecode → Fiber VM. 123 core tests + 6 integration tests + gRPC smoke test. Includes race semantics (Phase 2), non-interrupting boundary events + timer cycles (Phase 2A), cancel/ghost signal protection (Phase 3), terminate end events + error boundary routing + bounded loops (Phase 5), inclusive (OR) gateways (Phase 5A), and authoring pipeline with verb contracts, BPMN XML export, and template publish lifecycle (Phases B-D).
 
 **Problem Solved:** ob-poc has a DSL + verb runtime for deterministic, short-running work and a runbook/REPL model for auditable execution. It lacks **durable orchestration** — the ability to park a workflow for days/weeks (waiting for documents, human approvals, timers) and resume deterministically. BPMN-Lite fills this gap as a standalone gRPC service.
 
@@ -4530,6 +4531,123 @@ pub struct InclusiveBranch {
 **15 integration tests** (all `#[ignore]`, require running Postgres):
 T-PG-1 through T-PG-15 covering instance/fiber/join/dedupe/job/event/payload/program/dead-letter/incident round-trips, instance updates, teardown, concurrent dequeue, full engine smoke, and cancel_jobs_for_instance.
 
+### Authoring Pipeline (Phases B-D)
+
+> ✅ **IMPLEMENTED (2026-02-10)**: Verb contracts + static lint rules, BPMN 2.0 XML export with round-trip verification, template registry with atomic publish lifecycle. 30 authoring tests (10 per phase).
+
+The authoring pipeline extends the core compiler with workflow design-time tooling: static analysis against verb contracts, BPMN XML round-trip export/import, and a publish lifecycle with versioned templates.
+
+**Pipeline:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  AUTHORING PIPELINE                                                          │
+│                                                                              │
+│  YAML Workflow Definition                                                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  parse_workflow_yaml() → WorkflowGraphDto (12 NodeDto variants)             │
+│         │                                                                    │
+│         ▼                                                                    │
+│  validate_dto() → reject if structural errors (15 validation rules)         │
+│         │                                                                    │
+│         ▼                                                                    │
+│  lint_contracts() → 5 lint rules (L1-L5) against VerbContract registry      │
+│         │   L1: Flag provenance (backward BFS)                              │
+│         │   L2: Error code validity                                         │
+│         │   L3: Correlation provenance                                      │
+│         │   L4: Missing contract warning                                    │
+│         │   L5: Unused writes warning                                       │
+│         │                                                                    │
+│         ▼                                                                    │
+│  dto_to_ir() → IRGraph (petgraph)                                           │
+│         │                                                                    │
+│         ▼                                                                    │
+│  verify() + lower() → CompiledProgram (bytecode)                            │
+│         │                                                                    │
+│         ▼                                                                    │
+│  compute_bytecode_hash() → SHA-256 of instruction stream                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Optional: dto_to_bpmn_xml() → BPMN 2.0 XML (Zeebe-compatible)             │
+│         │                                                                    │
+│         ▼                                                                    │
+│  Build WorkflowTemplate (state=Published, all artifacts)                    │
+│         │                                                                    │
+│         ▼                                                                    │
+│  compile_and_publish() → ProcessStore + TemplateStore persistence           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Verb Contracts (`contracts.rs`):**
+
+| Type | Purpose |
+|------|---------|
+| `VerbContract` | Declares what a verb reads, writes, may raise, and produces |
+| `CorrelationContract` | Declares a correlation key a verb produces |
+| `ContractRegistry` | Registry of contracts + known workflow inputs (YAML-parseable) |
+
+**Lint Rules (`lints.rs`):**
+
+| Rule | Level | Description |
+|------|-------|-------------|
+| L1 | Error/Warning | Flag provenance — every flag condition must be written upstream (backward BFS); Warning if in `known_workflow_inputs` |
+| L2 | Error | Error code validity — `on_error.error_code` must be in task's `may_raise_errors` (`"*"` catch-all satisfies) |
+| L3 | Warning | Correlation provenance — MessageWait/HumanWait `corr_key_source` should match upstream `produces_correlation` |
+| L4 | Warning | Missing contract — ServiceTask without registered contract |
+| L5 | Warning | Unused writes — verb declares `writes_flags` but no edge condition references it |
+
+**BPMN 2.0 XML Export (`export_bpmn.rs`):**
+
+- Maps all 12 NodeDto variants to BPMN elements (startEvent, endEvent, serviceTask, exclusiveGateway, parallelGateway, inclusiveGateway, intermediateCatchEvent, eventBasedGateway, boundaryEvent)
+- Deterministic `bpmn_id` generation: `sanitize_ncname(node_id) + "_" + sha256(node_id)[..4].hex()`
+- Conditions exported as FEEL expressions: `= {flag} {op} {value}`
+- Timer ms → ISO 8601 duration conversion
+- DI layout: topological left-to-right (X = topo_rank * 200, Y = rank_index * 100)
+- XOR default: set from `is_default=true` edge only (never from edge ordering)
+
+**IR-to-DTO Reverse Mapping (`ir_to_dto.rs`):**
+
+- Enables round-trip verification: DTO → IR → DTO → compare structure
+- Maps all IRNode variants back to NodeDto
+- Detects XOR default edges (unconditional from XOR with other conditional edges → `is_default=true`)
+
+**Template Registry (`registry.rs`):**
+
+| Type | Purpose |
+|------|---------|
+| `TemplateState` | `Draft`, `Published`, `Retired` — valid transitions: Draft→Published, Published→Retired |
+| `SourceFormat` | `Yaml`, `BpmnImport`, `Agent` |
+| `WorkflowTemplate` | Versioned publish artifact (dto_snapshot, task_manifest, bytecode_version, bpmn_xml, etc.) |
+| `TemplateStore` | Async trait: save, load, list, set_state, load_latest_published |
+| `MemoryTemplateStore` | In-memory implementation with immutability guards |
+
+**Atomic Publish (`publish.rs`):**
+
+- `publish_workflow(yaml_str, options) → PublishResult` — 10-step sync pipeline, no intermediate Draft artifact
+- Rejects on validation errors, lint Error-level diagnostics, or verification failures
+- `PublishResult` contains: `WorkflowTemplate` + `CompiledProgram` + `Vec<LintDiagnostic>`
+- `compute_bytecode_hash()`: SHA-256 of debug-formatted instruction stream (excludes debug_map for stability)
+
+**Engine Integration:**
+
+- `BpmnLiteEngine::compile_and_publish()` — orchestrates publish pipeline + ProcessStore + TemplateStore persistence
+- Program writes are idempotent (keyed by bytecode hash) — retry-safe
+
+**PostgresTemplateStore (`store_postgres_templates.rs`):**
+
+- Feature-gated behind `#[cfg(feature = "postgres")]`
+- Migration `013_create_workflow_templates.sql`: table + published lookup index + immutability trigger
+- Immutability trigger: published content cannot change (only state→retired); retired cannot revert
+
+**Test Coverage (30 authoring tests):**
+
+| Phase | Tests | Coverage |
+|-------|-------|----------|
+| B: Contracts + Lints | 10 (T-LINT-1..10) | Flag provenance, error codes, correlation, missing contracts, unused writes, race arm BFS, clean workflow |
+| C: Export + IR-to-DTO | 10 (T-EXP-1..10) | Basic export, XOR default, timer ISO, FEEL conditions, deterministic IDs, boundary export, round-trip, linear IR, XOR conditions, boundary error |
+| D: Registry + Publish | 10 (T-PUB-1..10) | Save/load round-trip, state transitions, published immutability, list filters, latest published, minimal publish, lint blocks, deterministic bytecode, artifact set, Postgres (ignored) |
+
 ### Key Files
 
 | File | Purpose |
@@ -4539,13 +4657,20 @@ T-PG-1 through T-PG-15 covering instance/fiber/join/dedupe/job/event/payload/pro
 | `bpmn-lite/bpmn-lite-core/src/store.rs` | ProcessStore trait (29 methods) |
 | `bpmn-lite/bpmn-lite-core/src/store_memory.rs` | MemoryStore implementation |
 | `bpmn-lite/bpmn-lite-core/src/store_postgres.rs` | PostgresProcessStore (`#[cfg(feature = "postgres")]`, 29 methods, 15 tests) |
-| `bpmn-lite/bpmn-lite-core/migrations/` | 12 SQL migrations (tables, indexes, updated_at trigger) |
+| `bpmn-lite/bpmn-lite-core/migrations/` | 13 SQL migrations (tables, indexes, triggers, workflow_templates) |
 | `bpmn-lite/bpmn-lite-core/src/vm.rs` | VM tick executor + race/boundary/terminate/inclusive tests |
-| `bpmn-lite/bpmn-lite-core/src/engine.rs` | BpmnLiteEngine facade + cancel/ghost guards + NI fire + error routing + terminate |
+| `bpmn-lite/bpmn-lite-core/src/engine.rs` | BpmnLiteEngine facade + compile_and_publish() |
 | `bpmn-lite/bpmn-lite-core/src/compiler/parser.rs` | BPMN XML → IR (timeCycle, cancelActivity, errorEventDefinition, inclusiveGateway) |
 | `bpmn-lite/bpmn-lite-core/src/compiler/ir.rs` | IRGraph, TimerSpec (Duration/Date/Cycle) |
 | `bpmn-lite/bpmn-lite-core/src/compiler/verifier.rs` | Structural verification (cycle+interrupting rule) |
 | `bpmn-lite/bpmn-lite-core/src/compiler/lowering.rs` | IR → bytecode (race_plan, error_route_map, inclusive branches) |
+| `bpmn-lite/bpmn-lite-core/src/authoring/contracts.rs` | VerbContract, ContractRegistry, YAML parsing |
+| `bpmn-lite/bpmn-lite-core/src/authoring/lints.rs` | 5 lint rules (L1-L5), lint_contracts() entry point |
+| `bpmn-lite/bpmn-lite-core/src/authoring/export_bpmn.rs` | DTO → BPMN 2.0 XML (Zeebe-compatible) |
+| `bpmn-lite/bpmn-lite-core/src/authoring/ir_to_dto.rs` | IR → DTO reverse mapping for round-trip |
+| `bpmn-lite/bpmn-lite-core/src/authoring/registry.rs` | WorkflowTemplate, TemplateStore trait, MemoryTemplateStore |
+| `bpmn-lite/bpmn-lite-core/src/authoring/publish.rs` | Atomic 10-step publish pipeline |
+| `bpmn-lite/bpmn-lite-core/src/authoring/store_postgres_templates.rs` | PostgresTemplateStore (feature-gated) |
 | `bpmn-lite/bpmn-lite-server/src/lib.rs` | Library re-export of proto module |
 | `bpmn-lite/bpmn-lite-server/src/grpc.rs` | gRPC handler implementations |
 | `bpmn-lite/bpmn-lite-server/src/main.rs` | Server startup |
@@ -5259,7 +5384,10 @@ If `entity_linker` is not configured (no snapshot), `get_lookup_service()` retur
 ```
 ob-poc/
 ├── bpmn-lite/                  # Standalone BPMN orchestration service (NOT inside rust/)
-│   ├── bpmn-lite-core/         # Core types, compiler, VM, store
+│   ├── bpmn-lite-core/         # Core types, compiler, VM, store, authoring pipeline
+│   │   ├── src/authoring/      # Contracts, lints, BPMN export, publish lifecycle
+│   │   ├── src/compiler/       # Parser, IR, verifier, lowering
+│   │   └── migrations/         # 13 SQL migrations (ProcessStore + templates)
 │   └── bpmn-lite-server/       # gRPC server (tonic), proto definitions
 ├── ob-poc-ui-react/            # React/TypeScript frontend (PRIMARY UI)
 │   ├── src/
@@ -5400,6 +5528,9 @@ When you see these in a task, read the corresponding annex first:
 | "IncCounter", "BrCounterLt", "bounded loop", "retry loop", "counter" | CLAUDE.md §BPMN-Lite §Bounded Retry Loops (Phase 5.3) |
 | "ForkInclusive", "JoinDynamic", "inclusive gateway", "OR gateway", "InclusiveBranch", "condition_flag" | CLAUDE.md §BPMN-Lite §Inclusive (OR) Gateway (Phase 5A) |
 | "PostgresProcessStore", "store_postgres", "postgres feature", "database-url", "bpmn migrations" | CLAUDE.md §BPMN-Lite Phase 4 (PostgresProcessStore) |
+| "authoring", "VerbContract", "ContractRegistry", "lint_contracts", "LintDiagnostic" | CLAUDE.md §BPMN-Lite §Authoring Pipeline (Phases B-D) |
+| "export_bpmn", "dto_to_bpmn_xml", "BPMN XML export", "ir_to_dto", "round-trip" | CLAUDE.md §BPMN-Lite §Authoring Pipeline (Phases B-D) |
+| "TemplateStore", "WorkflowTemplate", "publish_workflow", "compile_and_publish", "TemplateState" | CLAUDE.md §BPMN-Lite §Authoring Pipeline (Phases B-D) |
 
 ---
 
