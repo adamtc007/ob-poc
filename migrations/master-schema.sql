@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 9ZfUvfexehZZnJKfQc5NI3HTMlvNkHnOTa3I8UfiRLqh4bdd15ZKCsZjig8KTEQ
+\restrict xirczpZsDCSmNV8dTirwV3roHzpR4tubsfr2SN1ykdMmO7VAPPI3SHCu8yNuTFE
 
 -- Dumped from database version 18.1 (Homebrew)
 -- Dumped by pg_dump version 18.1 (Homebrew)
@@ -136,6 +136,20 @@ CREATE SCHEMA sessions;
 --
 
 CREATE SCHEMA teams;
+
+
+--
+-- Name: btree_gist; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION btree_gist; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION btree_gist IS 'support for indexing common datatypes in GiST';
 
 
 --
@@ -3866,6 +3880,32 @@ $$;
 --
 
 COMMENT ON FUNCTION "ob-poc".check_cbu_role_requirements(p_cbu_id uuid) IS 'Checks if all role requirements are satisfied for a CBU (e.g., feeder needs master).';
+
+
+--
+-- Name: check_ruleset_overlap(); Type: FUNCTION; Schema: ob-poc; Owner: -
+--
+
+CREATE FUNCTION "ob-poc".check_ruleset_overlap() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM "ob-poc".ruleset
+    WHERE owner_type = NEW.owner_type
+      AND owner_id IS NOT DISTINCT FROM NEW.owner_id
+      AND ruleset_boundary = NEW.ruleset_boundary
+      AND status = 'active'
+      AND ruleset_id != NEW.ruleset_id
+      AND tstzrange(effective_from, effective_to) &&
+          tstzrange(NEW.effective_from, NEW.effective_to)
+  ) THEN
+    RAISE EXCEPTION 'Overlapping active ruleset for (%, %, %)',
+      NEW.owner_type, NEW.owner_id, NEW.ruleset_boundary;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
 
 --
@@ -12131,6 +12171,140 @@ COMMENT ON COLUMN "ob-poc".bods_person_statements.birth_date_precision IS 'Preci
 
 
 --
+-- Name: booking_location; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".booking_location (
+    booking_location_id uuid DEFAULT uuidv7() NOT NULL,
+    country_code text NOT NULL,
+    region_code text,
+    regulatory_regime_tags text[] DEFAULT '{}'::text[],
+    jurisdiction_code character varying(10),
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE booking_location; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".booking_location IS 'Jurisdictional perimeter in which activity is booked/regulated. References master_jurisdictions.';
+
+
+--
+-- Name: booking_principal; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".booking_principal (
+    booking_principal_id uuid DEFAULT uuidv7() NOT NULL,
+    legal_entity_id uuid NOT NULL,
+    booking_location_id uuid,
+    principal_code text NOT NULL,
+    book_code text,
+    status text DEFAULT 'active'::text NOT NULL,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    effective_to timestamp with time zone,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT booking_principal_check CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
+    CONSTRAINT booking_principal_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])))
+);
+
+
+--
+-- Name: TABLE booking_principal; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".booking_principal IS 'Contracting + booking authority envelope: LegalEntity + optional BookingLocation. First-class policy anchor.';
+
+
+--
+-- Name: bpmn_correlations; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bpmn_correlations (
+    correlation_id uuid NOT NULL,
+    process_instance_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    runbook_id uuid NOT NULL,
+    entry_id uuid NOT NULL,
+    process_key text NOT NULL,
+    domain_payload_hash bytea NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    domain_correlation_key text,
+    CONSTRAINT bpmn_correlations_status_check CHECK ((status = ANY (ARRAY['active'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: bpmn_job_frames; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bpmn_job_frames (
+    job_key text NOT NULL,
+    process_instance_id uuid NOT NULL,
+    task_type text NOT NULL,
+    worker_id text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    activated_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    attempts integer DEFAULT 0 NOT NULL,
+    CONSTRAINT bpmn_job_frames_status_check CHECK ((status = ANY (ARRAY['active'::text, 'completed'::text, 'failed'::text, 'dead_lettered'::text])))
+);
+
+
+--
+-- Name: bpmn_parked_tokens; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bpmn_parked_tokens (
+    token_id uuid NOT NULL,
+    correlation_key text NOT NULL,
+    session_id uuid NOT NULL,
+    entry_id uuid NOT NULL,
+    process_instance_id uuid NOT NULL,
+    expected_signal text NOT NULL,
+    status text DEFAULT 'waiting'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    resolved_at timestamp with time zone,
+    result_payload jsonb,
+    CONSTRAINT bpmn_parked_tokens_status_check CHECK ((status = ANY (ARRAY['waiting'::text, 'resolved'::text, 'timed_out'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: bpmn_pending_dispatches; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".bpmn_pending_dispatches (
+    dispatch_id uuid NOT NULL,
+    payload_hash bytea NOT NULL,
+    verb_fqn text NOT NULL,
+    process_key text NOT NULL,
+    bytecode_version bytea DEFAULT '\x'::bytea NOT NULL,
+    domain_payload text NOT NULL,
+    dsl_source text NOT NULL,
+    entry_id uuid NOT NULL,
+    runbook_id uuid NOT NULL,
+    correlation_id uuid NOT NULL,
+    correlation_key text NOT NULL,
+    domain_correlation_key text,
+    status text DEFAULT 'pending'::text NOT NULL,
+    attempts integer DEFAULT 0 NOT NULL,
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_attempted_at timestamp with time zone,
+    dispatched_at timestamp with time zone,
+    CONSTRAINT bpmn_pending_dispatches_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'dispatched'::text, 'failed_permanent'::text])))
+);
+
+
+--
 -- Name: case_evaluation_snapshots; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -12984,6 +13158,25 @@ COMMENT ON TABLE "ob-poc".client_allegations IS 'Client allegations - the unveri
 
 
 --
+-- Name: client_classification; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_classification (
+    client_classification_id uuid DEFAULT uuidv7() NOT NULL,
+    client_profile_id uuid NOT NULL,
+    classification_scheme text NOT NULL,
+    classification_value text NOT NULL,
+    jurisdiction_scope text,
+    effective_from timestamp with time zone,
+    effective_to timestamp with time zone,
+    source text,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT client_classification_check CHECK (((effective_to IS NULL) OR (effective_to > effective_from)))
+);
+
+
+--
 -- Name: client_group; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -13319,6 +13512,59 @@ COMMENT ON COLUMN "ob-poc".client_group_relationship_sources.is_canonical IS 'An
 
 
 --
+-- Name: client_principal_relationship; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_principal_relationship (
+    client_principal_relationship_id uuid DEFAULT uuidv7() CONSTRAINT client_principal_relationsh_client_principal_relations_not_null NOT NULL,
+    client_group_id uuid NOT NULL,
+    booking_principal_id uuid NOT NULL,
+    product_offering_id uuid NOT NULL,
+    relationship_status text DEFAULT 'active'::text NOT NULL,
+    contract_ref text,
+    onboarded_at timestamp with time zone,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    effective_to timestamp with time zone,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT client_principal_relationship_check CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
+    CONSTRAINT client_principal_relationship_relationship_status_check CHECK ((relationship_status = ANY (ARRAY['active'::text, 'pending'::text, 'terminated'::text])))
+);
+
+
+--
+-- Name: TABLE client_principal_relationship; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_principal_relationship IS 'Active client-principal-offering relationships. Partial unique index enforces one active per triple.';
+
+
+--
+-- Name: client_profile; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".client_profile (
+    client_profile_id uuid DEFAULT uuidv7() NOT NULL,
+    client_group_id uuid NOT NULL,
+    as_of timestamp with time zone DEFAULT now() NOT NULL,
+    segment text NOT NULL,
+    domicile_country text NOT NULL,
+    entity_types text[] DEFAULT '{}'::text[],
+    risk_flags jsonb DEFAULT '{}'::jsonb,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE client_profile; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".client_profile IS 'Point-in-time evaluation snapshot of client facts. Immutable once created.';
+
+
+--
 -- Name: client_types; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -13329,6 +13575,24 @@ CREATE TABLE "ob-poc".client_types (
     is_active boolean DEFAULT true,
     display_order integer DEFAULT 0,
     CONSTRAINT client_type_code_uppercase CHECK (((code)::text = upper((code)::text)))
+);
+
+
+--
+-- Name: contract_pack; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".contract_pack (
+    contract_pack_id uuid DEFAULT uuidv7() NOT NULL,
+    code text NOT NULL,
+    name text NOT NULL,
+    description text,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    effective_to timestamp with time zone,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT contract_pack_check CHECK (((effective_to IS NULL) OR (effective_to > effective_from)))
 );
 
 
@@ -13344,6 +13608,21 @@ CREATE TABLE "ob-poc".contract_products (
     termination_date date,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: contract_template; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".contract_template (
+    contract_template_id uuid DEFAULT uuidv7() NOT NULL,
+    contract_pack_id uuid NOT NULL,
+    template_type text NOT NULL,
+    template_ref text,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -14645,6 +14924,34 @@ COMMENT ON COLUMN "ob-poc".edge_types.bundle_group IS 'Edges in same bundle grou
 
 
 --
+-- Name: eligibility_evaluation; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".eligibility_evaluation (
+    eligibility_evaluation_id uuid DEFAULT uuidv7() NOT NULL,
+    client_profile_id uuid NOT NULL,
+    client_group_id uuid NOT NULL,
+    product_offering_ids uuid[] NOT NULL,
+    requested_at timestamp with time zone DEFAULT now() NOT NULL,
+    requested_by text NOT NULL,
+    policy_snapshot jsonb NOT NULL,
+    evaluation_context jsonb,
+    result jsonb NOT NULL,
+    explain jsonb NOT NULL,
+    selected_principal_id uuid,
+    selected_at timestamp with time zone,
+    runbook_entry_id uuid
+);
+
+
+--
+-- Name: TABLE eligibility_evaluation; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".eligibility_evaluation IS 'Immutable evaluation audit record. Policy pin is automatic — this record IS the pin.';
+
+
+--
 -- Name: entity_addresses; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -15871,6 +16178,31 @@ CREATE TABLE "ob-poc".legal_contracts (
 
 
 --
+-- Name: legal_entity; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".legal_entity (
+    legal_entity_id uuid DEFAULT uuidv7() NOT NULL,
+    lei text,
+    name text NOT NULL,
+    incorporation_jurisdiction text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    entity_id uuid,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT legal_entity_status_check CHECK ((status = ANY (ARRAY['active'::text, 'inactive'::text])))
+);
+
+
+--
+-- Name: TABLE legal_entity; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".legal_entity IS 'BNY legal entities that can sign contracts. Curated reference set, not the general entity universe.';
+
+
+--
 -- Name: lifecycle_resource_capabilities; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16161,7 +16493,10 @@ CREATE TABLE "ob-poc".products (
     metadata jsonb,
     kyc_risk_rating character varying(20),
     kyc_context character varying(50),
-    requires_kyc boolean DEFAULT true
+    requires_kyc boolean DEFAULT true,
+    product_family text,
+    effective_from timestamp with time zone DEFAULT now(),
+    effective_to timestamp with time zone
 );
 
 
@@ -16635,6 +16970,72 @@ COMMENT ON TABLE "ob-poc".roles IS 'Master role taxonomy with visualization meta
 
 
 --
+-- Name: rule; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".rule (
+    rule_id uuid DEFAULT uuidv7() NOT NULL,
+    ruleset_id uuid NOT NULL,
+    name text NOT NULL,
+    kind text NOT NULL,
+    when_expr jsonb NOT NULL,
+    then_effect jsonb NOT NULL,
+    explain text,
+    priority integer DEFAULT 100 NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT rule_kind_check CHECK ((kind = ANY (ARRAY['deny'::text, 'require_gate'::text, 'allow'::text, 'constrain_principal'::text, 'select_contract'::text])))
+);
+
+
+--
+-- Name: rule_field_dictionary; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".rule_field_dictionary (
+    field_key text NOT NULL,
+    field_type text NOT NULL,
+    description text,
+    source_table text,
+    added_in_version integer DEFAULT 1 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT rule_field_dictionary_field_type_check CHECK ((field_type = ANY (ARRAY['string'::text, 'string_array'::text, 'boolean'::text, 'number'::text, 'date'::text])))
+);
+
+
+--
+-- Name: TABLE rule_field_dictionary; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".rule_field_dictionary IS 'Closed-world field dictionary for rule expression validation. Unknown fields fail at publish, not at eval.';
+
+
+--
+-- Name: ruleset; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".ruleset (
+    ruleset_id uuid DEFAULT uuidv7() NOT NULL,
+    owner_type text NOT NULL,
+    owner_id uuid,
+    name text NOT NULL,
+    ruleset_boundary text NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    effective_to timestamp with time zone,
+    status text DEFAULT 'draft'::text NOT NULL,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ruleset_check CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
+    CONSTRAINT ruleset_owner_type_check CHECK ((owner_type = ANY (ARRAY['principal'::text, 'offering'::text, 'global'::text]))),
+    CONSTRAINT ruleset_ruleset_boundary_check CHECK ((ruleset_boundary = ANY (ARRAY['regulatory'::text, 'commercial'::text, 'operational'::text]))),
+    CONSTRAINT ruleset_status_check CHECK ((status = ANY (ARRAY['draft'::text, 'active'::text, 'retired'::text])))
+);
+
+
+--
 -- Name: screening_lists; Type: TABLE; Schema: ob-poc; Owner: -
 --
 
@@ -16689,6 +17090,41 @@ CREATE TABLE "ob-poc".semantic_match_cache (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     last_accessed_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: service_availability; Type: TABLE; Schema: ob-poc; Owner: -
+--
+
+CREATE TABLE "ob-poc".service_availability (
+    service_availability_id uuid DEFAULT uuidv7() NOT NULL,
+    booking_principal_id uuid NOT NULL,
+    service_id uuid NOT NULL,
+    regulatory_status text DEFAULT 'permitted'::text NOT NULL,
+    regulatory_constraints jsonb DEFAULT '{}'::jsonb,
+    commercial_status text DEFAULT 'offered'::text NOT NULL,
+    commercial_constraints jsonb DEFAULT '{}'::jsonb,
+    operational_status text DEFAULT 'supported'::text NOT NULL,
+    delivery_model text,
+    operational_constraints jsonb DEFAULT '{}'::jsonb,
+    effective_from timestamp with time zone DEFAULT now() NOT NULL,
+    effective_to timestamp with time zone,
+    metadata jsonb DEFAULT '{}'::jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT service_availability_check CHECK (((effective_to IS NULL) OR (effective_to > effective_from))),
+    CONSTRAINT service_availability_commercial_status_check CHECK ((commercial_status = ANY (ARRAY['offered'::text, 'conditional'::text, 'not_offered'::text]))),
+    CONSTRAINT service_availability_delivery_model_check CHECK ((delivery_model = ANY (ARRAY['direct'::text, 'sub_custodian'::text, 'partner'::text, 'internal_network'::text]))),
+    CONSTRAINT service_availability_operational_status_check CHECK ((operational_status = ANY (ARRAY['supported'::text, 'limited'::text, 'not_supported'::text]))),
+    CONSTRAINT service_availability_regulatory_status_check CHECK ((regulatory_status = ANY (ARRAY['permitted'::text, 'restricted'::text, 'prohibited'::text])))
+);
+
+
+--
+-- Name: TABLE service_availability; Type: COMMENT; Schema: ob-poc; Owner: -
+--
+
+COMMENT ON TABLE "ob-poc".service_availability IS 'Three-lane availability: regulatory/commercial/operational per booking_principal x service. Temporal exclusion enforced.';
 
 
 --
@@ -16917,7 +17353,8 @@ CREATE TABLE "ob-poc".services (
     service_code character varying(50),
     service_category character varying(100),
     sla_definition jsonb,
-    is_active boolean DEFAULT true
+    is_active boolean DEFAULT true,
+    lifecycle_tags text[] DEFAULT '{}'::text[]
 );
 
 
@@ -18932,6 +19369,24 @@ COMMENT ON VIEW "ob-poc".v_client_group_entity_search IS 'Denormalized view for 
 
 
 --
+-- Name: v_commercial_gaps; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_commercial_gaps AS
+ SELECT p.product_code AS offering_code,
+    bl.country_code AS jurisdiction,
+    bp.principal_code,
+    'commercial'::text AS gap_type,
+    'Permitted but not commercially offered'::text AS detail
+   FROM (((("ob-poc".products p
+     JOIN "ob-poc".product_services ps ON ((ps.product_id = p.product_id)))
+     JOIN "ob-poc".service_availability sa ON ((sa.service_id = ps.service_id)))
+     JOIN "ob-poc".booking_principal bp ON ((bp.booking_principal_id = sa.booking_principal_id)))
+     JOIN "ob-poc".booking_location bl ON ((bl.booking_location_id = bp.booking_location_id)))
+  WHERE ((p.is_active = true) AND (bp.status = 'active'::text) AND (sa.regulatory_status = 'permitted'::text) AND (sa.commercial_status = ANY (ARRAY['not_offered'::text, 'conditional'::text])) AND ((now() >= sa.effective_from) AND (now() <= COALESCE(sa.effective_to, 'infinity'::timestamp with time zone))));
+
+
+--
 -- Name: v_contract_summary; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -19237,6 +19692,20 @@ COMMENT ON VIEW "ob-poc".v_manco_group_summary IS 'Summary of governance control
 
 
 --
+-- Name: v_offerings_without_rules; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_offerings_without_rules AS
+ SELECT product_id,
+    product_code,
+    name
+   FROM "ob-poc".products p
+  WHERE ((is_active = true) AND (NOT (EXISTS ( SELECT 1
+           FROM "ob-poc".ruleset rs
+          WHERE ((rs.owner_type = 'offering'::text) AND (rs.owner_id = p.product_id) AND (rs.status = 'active'::text) AND ((now() >= rs.effective_from) AND (now() <= COALESCE(rs.effective_to, 'infinity'::timestamp with time zone))))))));
+
+
+--
 -- Name: v_open_discrepancies; Type: VIEW; Schema: ob-poc; Owner: -
 --
 
@@ -19279,6 +19748,25 @@ CREATE VIEW "ob-poc".v_open_discrepancies AS
             WHEN 'LOW'::text THEN 4
             ELSE 5
         END, od.detected_at;
+
+
+--
+-- Name: v_operational_gaps; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_operational_gaps AS
+ SELECT p.product_code AS offering_code,
+    bl.country_code AS jurisdiction,
+    bp.principal_code,
+    'operational'::text AS gap_type,
+    ('Offered but operationally '::text || sa.operational_status) AS detail,
+    sa.delivery_model
+   FROM (((("ob-poc".products p
+     JOIN "ob-poc".product_services ps ON ((ps.product_id = p.product_id)))
+     JOIN "ob-poc".service_availability sa ON ((sa.service_id = ps.service_id)))
+     JOIN "ob-poc".booking_principal bp ON ((bp.booking_principal_id = sa.booking_principal_id)))
+     JOIN "ob-poc".booking_location bl ON ((bl.booking_location_id = bp.booking_location_id)))
+  WHERE ((p.is_active = true) AND (bp.status = 'active'::text) AND (sa.regulatory_status = 'permitted'::text) AND (sa.commercial_status = ANY (ARRAY['offered'::text, 'conditional'::text])) AND (sa.operational_status = ANY (ARRAY['not_supported'::text, 'limited'::text])) AND ((now() >= sa.effective_from) AND (now() <= COALESCE(sa.effective_to, 'infinity'::timestamp with time zone))));
 
 
 --
@@ -19376,6 +19864,24 @@ CREATE VIEW "ob-poc".v_rate_card_history AS
 --
 
 COMMENT ON VIEW "ob-poc".v_rate_card_history IS 'Full rate card history with supersession chain';
+
+
+--
+-- Name: v_regulatory_gaps; Type: VIEW; Schema: ob-poc; Owner: -
+--
+
+CREATE VIEW "ob-poc".v_regulatory_gaps AS
+ SELECT p.product_code AS offering_code,
+    bl.country_code AS jurisdiction,
+    'regulatory'::text AS gap_type,
+    'No principal permitted in this jurisdiction'::text AS detail
+   FROM ("ob-poc".products p
+     CROSS JOIN "ob-poc".booking_location bl)
+  WHERE ((p.is_active = true) AND (NOT (EXISTS ( SELECT 1
+           FROM (("ob-poc".booking_principal bp
+             JOIN "ob-poc".service_availability sa ON ((sa.booking_principal_id = bp.booking_principal_id)))
+             JOIN "ob-poc".product_services ps ON (((ps.service_id = sa.service_id) AND (ps.product_id = p.product_id))))
+          WHERE ((bp.booking_location_id = bl.booking_location_id) AND (bp.status = 'active'::text) AND (sa.regulatory_status = 'permitted'::text) AND ((now() >= sa.effective_from) AND (now() <= COALESCE(sa.effective_to, 'infinity'::timestamp with time zone))))))));
 
 
 --
@@ -21795,6 +22301,70 @@ ALTER TABLE ONLY "ob-poc".bods_person_statements
 
 
 --
+-- Name: booking_location booking_location_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".booking_location
+    ADD CONSTRAINT booking_location_pkey PRIMARY KEY (booking_location_id);
+
+
+--
+-- Name: booking_principal booking_principal_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".booking_principal
+    ADD CONSTRAINT booking_principal_pkey PRIMARY KEY (booking_principal_id);
+
+
+--
+-- Name: booking_principal booking_principal_principal_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".booking_principal
+    ADD CONSTRAINT booking_principal_principal_code_key UNIQUE (principal_code);
+
+
+--
+-- Name: bpmn_correlations bpmn_correlations_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bpmn_correlations
+    ADD CONSTRAINT bpmn_correlations_pkey PRIMARY KEY (correlation_id);
+
+
+--
+-- Name: bpmn_job_frames bpmn_job_frames_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bpmn_job_frames
+    ADD CONSTRAINT bpmn_job_frames_pkey PRIMARY KEY (job_key);
+
+
+--
+-- Name: bpmn_parked_tokens bpmn_parked_tokens_correlation_key_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bpmn_parked_tokens
+    ADD CONSTRAINT bpmn_parked_tokens_correlation_key_key UNIQUE (correlation_key);
+
+
+--
+-- Name: bpmn_parked_tokens bpmn_parked_tokens_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bpmn_parked_tokens
+    ADD CONSTRAINT bpmn_parked_tokens_pkey PRIMARY KEY (token_id);
+
+
+--
+-- Name: bpmn_pending_dispatches bpmn_pending_dispatches_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".bpmn_pending_dispatches
+    ADD CONSTRAINT bpmn_pending_dispatches_pkey PRIMARY KEY (dispatch_id);
+
+
+--
 -- Name: case_evaluation_snapshots case_evaluation_snapshots_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22083,6 +22653,22 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
+-- Name: client_classification client_classification_client_profile_id_classification_sche_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_classification
+    ADD CONSTRAINT client_classification_client_profile_id_classification_sche_key UNIQUE (client_profile_id, classification_scheme, jurisdiction_scope);
+
+
+--
+-- Name: client_classification client_classification_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_classification
+    ADD CONSTRAINT client_classification_pkey PRIMARY KEY (client_classification_id);
+
+
+--
 -- Name: client_group_alias_embedding client_group_alias_embedding_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22195,6 +22781,22 @@ ALTER TABLE ONLY "ob-poc".client_group
 
 
 --
+-- Name: client_principal_relationship client_principal_relationship_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_principal_relationship
+    ADD CONSTRAINT client_principal_relationship_pkey PRIMARY KEY (client_principal_relationship_id);
+
+
+--
+-- Name: client_profile client_profile_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_profile
+    ADD CONSTRAINT client_profile_pkey PRIMARY KEY (client_profile_id);
+
+
+--
 -- Name: client_types client_types_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -22203,11 +22805,35 @@ ALTER TABLE ONLY "ob-poc".client_types
 
 
 --
+-- Name: contract_pack contract_pack_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".contract_pack
+    ADD CONSTRAINT contract_pack_code_key UNIQUE (code);
+
+
+--
+-- Name: contract_pack contract_pack_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".contract_pack
+    ADD CONSTRAINT contract_pack_pkey PRIMARY KEY (contract_pack_id);
+
+
+--
 -- Name: contract_products contract_products_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".contract_products
     ADD CONSTRAINT contract_products_pkey PRIMARY KEY (contract_id, product_code);
+
+
+--
+-- Name: contract_template contract_template_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".contract_template
+    ADD CONSTRAINT contract_template_pkey PRIMARY KEY (contract_template_id);
 
 
 --
@@ -22608,6 +23234,14 @@ ALTER TABLE ONLY "ob-poc".dsl_workflow_phases
 
 ALTER TABLE ONLY "ob-poc".edge_types
     ADD CONSTRAINT edge_types_pkey PRIMARY KEY (edge_type_code);
+
+
+--
+-- Name: eligibility_evaluation eligibility_evaluation_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".eligibility_evaluation
+    ADD CONSTRAINT eligibility_evaluation_pkey PRIMARY KEY (eligibility_evaluation_id);
 
 
 --
@@ -23083,6 +23717,22 @@ ALTER TABLE ONLY "ob-poc".legal_contracts
 
 
 --
+-- Name: legal_entity legal_entity_lei_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".legal_entity
+    ADD CONSTRAINT legal_entity_lei_key UNIQUE (lei);
+
+
+--
+-- Name: legal_entity legal_entity_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".legal_entity
+    ADD CONSTRAINT legal_entity_pkey PRIMARY KEY (legal_entity_id);
+
+
+--
 -- Name: lifecycle_resource_capabilities lifecycle_resource_capabilities_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23395,6 +24045,30 @@ ALTER TABLE ONLY "ob-poc".roles
 
 
 --
+-- Name: rule_field_dictionary rule_field_dictionary_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".rule_field_dictionary
+    ADD CONSTRAINT rule_field_dictionary_pkey PRIMARY KEY (field_key);
+
+
+--
+-- Name: rule rule_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".rule
+    ADD CONSTRAINT rule_pkey PRIMARY KEY (rule_id);
+
+
+--
+-- Name: ruleset ruleset_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".ruleset
+    ADD CONSTRAINT ruleset_pkey PRIMARY KEY (ruleset_id);
+
+
+--
 -- Name: screening_lists screening_lists_list_code_key; Type: CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -23440,6 +24114,22 @@ ALTER TABLE ONLY "ob-poc".semantic_match_cache
 
 ALTER TABLE ONLY "ob-poc".semantic_match_cache
     ADD CONSTRAINT semantic_match_cache_transcript_normalized_key UNIQUE (transcript_normalized);
+
+
+--
+-- Name: service_availability service_availability_booking_principal_id_service_id_tstzr_excl; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_availability
+    ADD CONSTRAINT service_availability_booking_principal_id_service_id_tstzr_excl EXCLUDE USING gist (booking_principal_id WITH =, service_id WITH =, tstzrange(effective_from, effective_to) WITH &&);
+
+
+--
+-- Name: service_availability service_availability_pkey; Type: CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_availability
+    ADD CONSTRAINT service_availability_pkey PRIMARY KEY (service_availability_id);
 
 
 --
@@ -25584,6 +26274,83 @@ CREATE INDEX idx_bods_person_name ON "ob-poc".bods_person_statements USING gin (
 
 
 --
+-- Name: idx_bpmn_corr_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_corr_active ON "ob-poc".bpmn_correlations USING btree (status) WHERE (status = 'active'::text);
+
+
+--
+-- Name: idx_bpmn_corr_domain_key; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_corr_domain_key ON "ob-poc".bpmn_correlations USING btree (process_key, domain_correlation_key) WHERE ((status = 'active'::text) AND (domain_correlation_key IS NOT NULL));
+
+
+--
+-- Name: idx_bpmn_corr_process_instance; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_bpmn_corr_process_instance ON "ob-poc".bpmn_correlations USING btree (process_instance_id);
+
+
+--
+-- Name: idx_bpmn_corr_session_entry; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_corr_session_entry ON "ob-poc".bpmn_correlations USING btree (session_id, entry_id);
+
+
+--
+-- Name: idx_bpmn_job_frames_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_job_frames_active ON "ob-poc".bpmn_job_frames USING btree (status) WHERE (status = 'active'::text);
+
+
+--
+-- Name: idx_bpmn_job_frames_instance; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_job_frames_instance ON "ob-poc".bpmn_job_frames USING btree (process_instance_id);
+
+
+--
+-- Name: idx_bpmn_parked_tokens_process; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_parked_tokens_process ON "ob-poc".bpmn_parked_tokens USING btree (process_instance_id);
+
+
+--
+-- Name: idx_bpmn_parked_tokens_session; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_parked_tokens_session ON "ob-poc".bpmn_parked_tokens USING btree (session_id) WHERE (status = 'waiting'::text);
+
+
+--
+-- Name: idx_bpmn_parked_tokens_waiting; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_parked_tokens_waiting ON "ob-poc".bpmn_parked_tokens USING btree (correlation_key) WHERE (status = 'waiting'::text);
+
+
+--
+-- Name: idx_bpmn_pending_dispatches_hash; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_bpmn_pending_dispatches_hash ON "ob-poc".bpmn_pending_dispatches USING btree (payload_hash) WHERE (status = 'pending'::text);
+
+
+--
+-- Name: idx_bpmn_pending_dispatches_pending; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_bpmn_pending_dispatches_pending ON "ob-poc".bpmn_pending_dispatches USING btree (status, last_attempted_at) WHERE (status = 'pending'::text);
+
+
+--
 -- Name: idx_case_eval_snapshots_case_id; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -26225,6 +26992,27 @@ CREATE INDEX idx_control_edges_type ON "ob-poc".control_edges USING btree (edge_
 --
 
 CREATE UNIQUE INDEX idx_control_edges_unique_active ON "ob-poc".control_edges USING btree (from_entity_id, to_entity_id, edge_type) WHERE (end_date IS NULL);
+
+
+--
+-- Name: idx_cpr_client_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cpr_client_status ON "ob-poc".client_principal_relationship USING btree (client_group_id, relationship_status);
+
+
+--
+-- Name: idx_cpr_principal_status; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_cpr_principal_status ON "ob-poc".client_principal_relationship USING btree (booking_principal_id, relationship_status);
+
+
+--
+-- Name: idx_cpr_unique_active; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_cpr_unique_active ON "ob-poc".client_principal_relationship USING btree (client_group_id, booking_principal_id, product_offering_id) WHERE (relationship_status = 'active'::text);
 
 
 --
@@ -27257,6 +28045,20 @@ CREATE INDEX idx_entity_ubos_person ON "ob-poc".entity_ubos USING btree (person_
 
 
 --
+-- Name: idx_eval_client; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_eval_client ON "ob-poc".eligibility_evaluation USING btree (client_group_id, requested_at DESC);
+
+
+--
+-- Name: idx_eval_runbook; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_eval_runbook ON "ob-poc".eligibility_evaluation USING btree (runbook_entry_id) WHERE (runbook_entry_id IS NOT NULL);
+
+
+--
 -- Name: idx_expansion_reports_batch_policy; Type: INDEX; Schema: ob-poc; Owner: -
 --
 
@@ -28157,6 +28959,13 @@ CREATE INDEX idx_ria_instance ON "ob-poc".resource_instance_attributes USING btr
 --
 
 CREATE INDEX idx_roles_name ON "ob-poc".roles USING btree (name);
+
+
+--
+-- Name: idx_rule_ruleset; Type: INDEX; Schema: ob-poc; Owner: -
+--
+
+CREATE INDEX idx_rule_ruleset ON "ob-poc".rule USING btree (ruleset_id);
 
 
 --
@@ -29443,6 +30252,13 @@ CREATE TRIGGER trg_provisioning_events_immutable BEFORE DELETE OR UPDATE ON "ob-
 --
 
 CREATE TRIGGER trg_provisioning_requests_status BEFORE UPDATE ON "ob-poc".provisioning_requests FOR EACH ROW EXECUTE FUNCTION "ob-poc".track_provisioning_status_change();
+
+
+--
+-- Name: ruleset trg_ruleset_no_overlap; Type: TRIGGER; Schema: ob-poc; Owner: -
+--
+
+CREATE TRIGGER trg_ruleset_no_overlap BEFORE INSERT OR UPDATE ON "ob-poc".ruleset FOR EACH ROW WHEN ((new.status = 'active'::text)) EXECUTE FUNCTION "ob-poc".check_ruleset_overlap();
 
 
 --
@@ -30890,6 +31706,30 @@ ALTER TABLE ONLY "ob-poc".board_control_evidence
 
 
 --
+-- Name: booking_location booking_location_jurisdiction_code_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".booking_location
+    ADD CONSTRAINT booking_location_jurisdiction_code_fkey FOREIGN KEY (jurisdiction_code) REFERENCES "ob-poc".master_jurisdictions(jurisdiction_code);
+
+
+--
+-- Name: booking_principal booking_principal_booking_location_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".booking_principal
+    ADD CONSTRAINT booking_principal_booking_location_id_fkey FOREIGN KEY (booking_location_id) REFERENCES "ob-poc".booking_location(booking_location_id);
+
+
+--
+-- Name: booking_principal booking_principal_legal_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".booking_principal
+    ADD CONSTRAINT booking_principal_legal_entity_id_fkey FOREIGN KEY (legal_entity_id) REFERENCES "ob-poc".legal_entity(legal_entity_id);
+
+
+--
 -- Name: case_evaluation_snapshots case_evaluation_snapshots_case_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -31370,6 +32210,14 @@ ALTER TABLE ONLY "ob-poc".client_allegations
 
 
 --
+-- Name: client_classification client_classification_client_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_classification
+    ADD CONSTRAINT client_classification_client_profile_id_fkey FOREIGN KEY (client_profile_id) REFERENCES "ob-poc".client_profile(client_profile_id);
+
+
+--
 -- Name: client_group_alias_embedding client_group_alias_embedding_alias_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -31522,11 +32370,35 @@ ALTER TABLE ONLY "ob-poc".client_group_relationship_sources
 
 
 --
+-- Name: client_principal_relationship client_principal_relationship_booking_principal_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_principal_relationship
+    ADD CONSTRAINT client_principal_relationship_booking_principal_id_fkey FOREIGN KEY (booking_principal_id) REFERENCES "ob-poc".booking_principal(booking_principal_id);
+
+
+--
+-- Name: client_principal_relationship client_principal_relationship_product_offering_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".client_principal_relationship
+    ADD CONSTRAINT client_principal_relationship_product_offering_id_fkey FOREIGN KEY (product_offering_id) REFERENCES "ob-poc".products(product_id);
+
+
+--
 -- Name: contract_products contract_products_contract_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".contract_products
     ADD CONSTRAINT contract_products_contract_id_fkey FOREIGN KEY (contract_id) REFERENCES "ob-poc".legal_contracts(contract_id) ON DELETE CASCADE;
+
+
+--
+-- Name: contract_template contract_template_contract_pack_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".contract_template
+    ADD CONSTRAINT contract_template_contract_pack_id_fkey FOREIGN KEY (contract_pack_id) REFERENCES "ob-poc".contract_pack(contract_pack_id);
 
 
 --
@@ -31919,6 +32791,14 @@ ALTER TABLE ONLY "ob-poc".dsl_sessions
 
 ALTER TABLE ONLY "ob-poc".dsl_snapshots
     ADD CONSTRAINT dsl_snapshots_session_id_fkey FOREIGN KEY (session_id) REFERENCES "ob-poc".dsl_sessions(session_id) ON DELETE CASCADE;
+
+
+--
+-- Name: eligibility_evaluation eligibility_evaluation_client_profile_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".eligibility_evaluation
+    ADD CONSTRAINT eligibility_evaluation_client_profile_id_fkey FOREIGN KEY (client_profile_id) REFERENCES "ob-poc".client_profile(client_profile_id);
 
 
 --
@@ -32466,6 +33346,14 @@ ALTER TABLE ONLY "ob-poc".kyc_service_agreements
 
 
 --
+-- Name: legal_entity legal_entity_entity_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".legal_entity
+    ADD CONSTRAINT legal_entity_entity_id_fkey FOREIGN KEY (entity_id) REFERENCES "ob-poc".entities(entity_id);
+
+
+--
 -- Name: lifecycle_resource_capabilities lifecycle_resource_capabilities_lifecycle_fk; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
@@ -32714,11 +33602,35 @@ ALTER TABLE ONLY "ob-poc".resource_instance_dependencies
 
 
 --
+-- Name: rule rule_ruleset_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".rule
+    ADD CONSTRAINT rule_ruleset_id_fkey FOREIGN KEY (ruleset_id) REFERENCES "ob-poc".ruleset(ruleset_id);
+
+
+--
 -- Name: screening_requirements screening_requirements_risk_band_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
 --
 
 ALTER TABLE ONLY "ob-poc".screening_requirements
     ADD CONSTRAINT screening_requirements_risk_band_fkey FOREIGN KEY (risk_band) REFERENCES "ob-poc".risk_bands(band_code);
+
+
+--
+-- Name: service_availability service_availability_booking_principal_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_availability
+    ADD CONSTRAINT service_availability_booking_principal_id_fkey FOREIGN KEY (booking_principal_id) REFERENCES "ob-poc".booking_principal(booking_principal_id);
+
+
+--
+-- Name: service_availability service_availability_service_id_fkey; Type: FK CONSTRAINT; Schema: ob-poc; Owner: -
+--
+
+ALTER TABLE ONLY "ob-poc".service_availability
+    ADD CONSTRAINT service_availability_service_id_fkey FOREIGN KEY (service_id) REFERENCES "ob-poc".services(service_id);
 
 
 --
@@ -33229,5 +34141,5 @@ ALTER TABLE ONLY teams.teams
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 9ZfUvfexehZZnJKfQc5NI3HTMlvNkHnOTa3I8UfiRLqh4bdd15ZKCsZjig8KTEQ
+\unrestrict xirczpZsDCSmNV8dTirwV3roHzpR4tubsfr2SN1ykdMmO7VAPPI3SHCu8yNuTFE
 
