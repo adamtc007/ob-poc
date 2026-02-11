@@ -588,7 +588,7 @@ CBU onboarding requires a contract+product subscription. No contract = no onboar
 ```mermaid
 erDiagram
     legal_contracts ||--o{ contract_products : "contract_id"
-    contract_products ||--o{ cbu_subscriptions : "contract_id, product_code"
+    contract_products ||--o{ cbu_subscriptions : "contract_id+product_code"
     cbu_subscriptions }o--|| cbus : "cbu_id"
     contract_products }o--o| rate_cards : "rate_card_id"
 
@@ -602,15 +602,15 @@ erDiagram
     }
 
     contract_products {
-        uuid contract_id PK_FK
+        uuid contract_id PK
         varchar product_code PK
         uuid rate_card_id FK
     }
 
     cbu_subscriptions {
-        uuid cbu_id PK_FK
-        uuid contract_id PK_FK
-        varchar product_code PK_FK
+        uuid cbu_id PK
+        uuid contract_id PK
+        varchar product_code PK
         varchar status
     }
 
