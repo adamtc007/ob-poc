@@ -19,6 +19,9 @@ pub struct ProductRow {
     pub min_asset_requirement: Option<rust_decimal::Decimal>,
     pub is_active: Option<bool>,
     pub metadata: Option<JsonValue>,
+    pub product_family: Option<String>,
+    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_to: Option<DateTime<Utc>>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -60,12 +63,12 @@ impl ProductService {
     }
 
     pub async fn get_product_by_id(&self, product_id: Uuid) -> Result<Option<ProductRow>> {
-        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, created_at, updated_at FROM "ob-poc".products WHERE product_id = $1"#)
+        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, product_family, effective_from, effective_to, created_at, updated_at FROM "ob-poc".products WHERE product_id = $1"#)
             .bind(product_id).fetch_optional(&self.pool).await.context("Failed to get Product by ID")
     }
 
     pub async fn get_product_by_name(&self, name: &str) -> Result<Option<ProductRow>> {
-        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, created_at, updated_at FROM "ob-poc".products WHERE name = $1"#)
+        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, product_family, effective_from, effective_to, created_at, updated_at FROM "ob-poc".products WHERE name = $1"#)
             .bind(name).fetch_optional(&self.pool).await.context("Failed to get Product by name")
     }
 
@@ -74,7 +77,7 @@ impl ProductService {
         limit: Option<i32>,
         offset: Option<i32>,
     ) -> Result<Vec<ProductRow>> {
-        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, created_at, updated_at FROM "ob-poc".products ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
+        sqlx::query_as::<_, ProductRow>(r#"SELECT product_id, name, description, product_code, product_category, regulatory_framework, min_asset_requirement, is_active, metadata, product_family, effective_from, effective_to, created_at, updated_at FROM "ob-poc".products ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
             .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Products")
     }
 

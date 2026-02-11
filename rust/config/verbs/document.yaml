@@ -14,8 +14,17 @@ domains:
       # Document Solicitation (outbound tasks)
       # ========================================================================
       solicit:
-        description: Solicit a single document from an entity (creates pending task)
-        behavior: plugin
+        description: Solicit a single document from an entity and track through to fulfillment
+        behavior: durable
+        durable:
+          runtime: bpmn-lite
+          process_key: kyc-document-request
+          correlation_field: workflow-instance-id
+          task_bindings:
+            send_request_notification: notification.send-document-request
+            validate_uploaded_document: document.verify
+            update_requirement_status: requirement.create
+          timeout: P14D
         invocation_phrases:
           - request document
           - solicit document
@@ -27,7 +36,9 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: document_request
-          tags: [workflow, outbound, write]
+          tags: [workflow, outbound, write, durable]
+        lifecycle:
+          requires_scope: cbu
         args:
           - name: subject-entity-id
             type: uuid
@@ -69,6 +80,16 @@ domains:
             valid_values:
               - received
               - verified
+        sentences:
+          step:
+            - "Request {doc-type} from {subject-entity-id}"
+            - "Solicit {doc-type} document"
+          summary:
+            - "solicited {doc-type}"
+          clarify:
+            subject-entity-id: "Which entity should provide the document?"
+            doc-type: "What type of document is needed? (e.g., passport, proof of address)"
+          completed: "Document request sent to {subject-entity-id} for {doc-type}"
         returns:
           type: record
           fields:
@@ -76,8 +97,17 @@ domains:
             requirement_id: uuid
 
       solicit-set:
-        description: Solicit multiple documents from an entity (creates single multi-result task)
-        behavior: plugin
+        description: Solicit multiple documents from an entity and track through to fulfillment
+        behavior: durable
+        durable:
+          runtime: bpmn-lite
+          process_key: kyc-document-request-set
+          correlation_field: workflow-instance-id
+          task_bindings:
+            send_request_notification: notification.send-document-request
+            validate_uploaded_document: document.verify
+            update_requirement_status: requirement.create-set
+          timeout: P14D
         invocation_phrases:
           - request documents
           - solicit document set
@@ -89,7 +119,9 @@ domains:
           source_of_truth: operational
           scope: cbu
           noun: document_request_set
-          tags: [workflow, outbound, write, batch]
+          tags: [workflow, outbound, write, batch, durable]
+        lifecycle:
+          requires_scope: cbu
         args:
           - name: subject-entity-id
             type: uuid

@@ -5,7 +5,8 @@
 > **Backend:** Rust/Axum (`rust/crates/ob-poc-web/`) - Serves React + REST API
 > **Crates:** 18 active Rust crates (esper_* crates deprecated after React migration)
 > **Verbs:** 1,083 canonical verbs, 14,593 intent patterns (DB-sourced)
-> **Migrations:** 72 schema migrations
+> **Migrations:** 77 schema migrations (+ 072b seed)
+> **Schema Overview:** `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` — living doc, 14 sections, ~150 tables, 10 mermaid ER diagrams
 > **Embeddings:** Candle local (384-dim, BGE-small-en-v1.5) - 14,593 patterns vectorized
 > **React Migration (077):** ✅ Complete - egui/WASM replaced with React/TypeScript, 3-panel chat layout
 > **Verb Phrase Generation:** ✅ Complete - V1 YAML auto-generates phrases on load (no V2 registry)
@@ -88,6 +89,10 @@ cargo x bpmn-lite stop             # Stop native server
 cargo x bpmn-lite status           # Show native + Docker status
 cargo x bpmn-lite docker-build     # Build Docker image
 cargo x bpmn-lite deploy           # Docker build + compose up
+
+# Schema overview (living doc with mermaid ER diagrams)
+# Regenerate PDF after schema changes:
+npx md-to-pdf migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md
 ```
 
 ---
@@ -379,6 +384,7 @@ These are **UI zoom levels using CBU and group structures**, not session scope c
 | **Verb authoring** | `docs/verb-definition-spec.md` | YAML structure, valid values, common errors |
 | **React frontend** | CLAUDE.md §React Frontend | Chat UI, scope panel, API endpoints |
 | **Entity model & schema** | `docs/entity-model-ascii.md` | Full ERD, table relationships |
+| **Schema overview (living doc)** | `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` | ob-poc schema: 14 domain sections, ~150 tables, 10 mermaid ER diagrams, DSL verb domain cross-ref |
 | **DSL pipeline** | `docs/dsl-verb-flow.md` | Parser, compiler, executor, plugins |
 | **Research workflows** | `docs/research-agent-annex.md` | GLEIF, agent mode, invocation phrases |
 | **V2 REPL invariants** | `docs/INVARIANT-VERIFICATION.md` | P-1 through P-5, E-1 through E-8, enforcing code citations |
@@ -5493,6 +5499,7 @@ When you see these in a task, read the corresponding annex first:
 | "add verb", "create verb", "verb YAML" | `docs/verb-definition-spec.md` |
 | "React", "frontend", "chat UI", "scope panel" | CLAUDE.md §React Frontend |
 | "entity model", "CBU", "UBO", "holdings" | `docs/strategy-patterns.md` §1 |
+| "schema overview", "table structure", "ER diagram", "mermaid", "ob-poc schema" | `migrations/OB_POC_SCHEMA_ENTITY_OVERVIEW.md` |
 | "agent", "MCP", "verb_search" | `docs/agent-architecture.md` |
 | "session", "scope", "navigation" | `docs/session-visualization-architecture.md` |
 | "ESPER", "drill", "trace", "xray" | `docs/session-visualization-architecture.md` |
@@ -5792,3 +5799,12 @@ role:
 | `requirement` | 5 | Document requirements, waiver, status |
 | `deal` | 30 | Deal record lifecycle, rate card negotiation, onboarding handoff |
 | `billing` | 14 | Fee billing profiles, account targets, billing periods |
+| `legal-entity` | 3 | Legal entity CRUD (booking principal layer) |
+| `booking-location` | 3 | Booking location CRUD |
+| `booking-principal` | 6 | Principal lifecycle, evaluation, selection |
+| `service-availability` | 3 | Three-lane service availability |
+| `client-principal-relationship` | 3 | Client ↔ principal relationships |
+| `ruleset` | 3 | Eligibility ruleset lifecycle (draft → publish → retire) |
+| `rule` | 3 | Individual eligibility rules within rulesets |
+| `rule-field` | 2 | Closed-world field dictionary for rule validation |
+| `contract-pack` | 3 | Contract template packs |

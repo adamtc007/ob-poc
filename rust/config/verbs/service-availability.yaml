@@ -1,0 +1,101 @@
+domains:
+  service-availability:
+    description: "Three-lane service availability — regulatory, commercial, and operational status per booking principal × service"
+
+    invocation_hints:
+      - "service availability"
+      - "availability"
+      - "three lane"
+      - "delivery capability"
+
+    verbs:
+      set:
+        description: "Set three-lane service availability for a booking principal × service combination"
+        behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:booking-principal.create"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: service_availability
+        invocation_phrases:
+          - "set service availability"
+          - "configure availability"
+          - "set delivery capability"
+          - "update service availability"
+        args:
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+          - name: service-id
+            type: uuid
+            required: true
+            maps_to: service_id
+          - name: regulatory-status
+            type: string
+            required: true
+            maps_to: regulatory_status
+            description: "permitted, prohibited, restricted, or pending"
+          - name: commercial-status
+            type: string
+            required: true
+            maps_to: commercial_status
+            description: "offered, not_offered, or planned"
+          - name: operational-status
+            type: string
+            required: true
+            maps_to: operational_status
+            description: "deliverable, not_deliverable, or building"
+          - name: delivery-model
+            type: string
+            required: false
+            maps_to: delivery_model
+            description: "in_house, outsourced, or hybrid"
+        returns:
+          type: record
+          name: service_availability
+
+      list:
+        description: "List active service availability for a booking principal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: service_availability
+        invocation_phrases:
+          - "list service availability"
+          - "show availability"
+          - "what services are available"
+        args:
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+        returns:
+          type: record_set
+          name: availability_records
+
+      list-by-principal:
+        description: "List service availability grouped by principal"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: service_availability
+        invocation_phrases:
+          - "availability by principal"
+          - "principal service availability"
+          - "what can this principal deliver"
+        args:
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+        returns:
+          type: record_set
+          name: availability_records

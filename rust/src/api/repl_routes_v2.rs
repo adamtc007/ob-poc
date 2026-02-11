@@ -356,90 +356,24 @@ async fn signal_v2(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    // Find the session that owns this correlation key by scanning all sessions.
-    let sessions = state.orchestrator.sessions_for_test().read().await;
-    let mut found_session_id = None;
-    let mut found_entry_id = None;
-
-    for (sid, session) in sessions.iter() {
-        if let Some(entry_id) = session.runbook.invocation_index.get(&req.correlation_key) {
-            found_session_id = Some(*sid);
-            found_entry_id = Some(*entry_id);
-            break;
-        }
-    }
-    drop(sessions);
-
-    let session_id = found_session_id.ok_or(StatusCode::NOT_FOUND)?;
-    let entry_id = found_entry_id.ok_or(StatusCode::NOT_FOUND)?;
-
-    // Determine the result payload to pass to resume_entry.
-    let signal_result = match req.status.as_str() {
-        "completed" => req.result.clone(),
-        "failed" => Some(serde_json::json!({
-            "error": req.error.clone().unwrap_or_default()
-        })),
-        _ => unreachable!(), // validated above
-    };
-
-    // Resume the parked entry in the runbook.
+    // Delegate to orchestrator.signal_completion() — shared logic with SignalRelay.
+    match state
+        .orchestrator
+        .signal_completion(&req.correlation_key, &req.status, req.result, req.error)
+        .await
     {
-        let mut sessions = state.orchestrator.sessions_for_test().write().await;
-        let session = sessions.get_mut(&session_id).ok_or(StatusCode::NOT_FOUND)?;
-
-        let resumed = session
-            .runbook
-            .resume_entry(&req.correlation_key, signal_result);
-
-        if resumed.is_none() {
-            // Idempotent: already resumed.
-            return Ok(Json(serde_json::json!({
-                "status": "already_resumed",
-                "session_id": session_id
-            })));
+        Ok(Some(response)) => Ok(Json(
+            serde_json::to_value(response)
+                .unwrap_or_else(|_| serde_json::json!({"status": "signalled"})),
+        )),
+        Ok(None) => {
+            // No session found or already resumed — idempotent.
+            Err(StatusCode::NOT_FOUND)
         }
-
-        // If the signal indicates failure, mark the entry as Failed and
-        // transition to RunbookEditing so the user can fix or retry.
-        if req.status == "failed" {
-            if let Some(entry) = session
-                .runbook
-                .entries
-                .iter_mut()
-                .find(|e| e.id == entry_id)
-            {
-                entry.status = crate::repl::runbook::EntryStatus::Failed;
-            }
-            session
-                .runbook
-                .set_status(crate::repl::runbook::RunbookStatus::Ready);
-            session.set_state(crate::repl::types_v2::ReplStateV2::RunbookEditing);
-
-            return Ok(Json(serde_json::json!({
-                "status": "failed",
-                "session_id": session_id,
-                "entry_id": entry_id,
-                "error": req.error.unwrap_or_else(|| "External task failed".into())
-            })));
-        }
-    }
-
-    // For "completed" signals, continue execution from the next entry
-    // by sending a Resume command through the orchestrator.
-    let input = UserInputV2::Command {
-        command: ReplCommandV2::Resume(entry_id),
-    };
-    match state.orchestrator.process(session_id, input).await {
-        Ok(response) => Ok(Json(serde_json::to_value(response).unwrap_or_else(|_| {
-            serde_json::json!({
-                "status": "completed",
-                "session_id": session_id
-            })
-        }))),
         Err(e) => {
             tracing::error!(
-                "REPL V2 signal processing error for session {}: {}",
-                session_id,
+                "REPL V2 signal processing error for key={}: {}",
+                req.correlation_key,
                 e
             );
             Err(StatusCode::INTERNAL_SERVER_ERROR)

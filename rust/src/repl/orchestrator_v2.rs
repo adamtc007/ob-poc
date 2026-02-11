@@ -273,6 +273,103 @@ impl ReplOrchestratorV2 {
         &self.sessions
     }
 
+    /// Signal that an external task completed (or failed) for a parked entry.
+    ///
+    /// Finds the session owning `correlation_key` via the runbook invocation
+    /// index, resumes the entry, and either continues execution (on success)
+    /// or transitions to `RunbookEditing` (on failure).
+    ///
+    /// Returns `Ok(Some(response))` when a session was found and resumed,
+    /// `Ok(None)` when no session owns the key or the entry was already resumed.
+    pub async fn signal_completion(
+        &self,
+        correlation_key: &str,
+        status: &str,
+        result: Option<serde_json::Value>,
+        error: Option<String>,
+    ) -> Result<Option<ReplResponseV2>, anyhow::Error> {
+        use anyhow::Context as _;
+
+        // 1. Find the session that owns this correlation key.
+        let (session_id, entry_id) = {
+            let sessions = self.sessions.read().await;
+            let mut found = None;
+            for (sid, session) in sessions.iter() {
+                if let Some(eid) = session.runbook.invocation_index.get(correlation_key) {
+                    found = Some((*sid, *eid));
+                    break;
+                }
+            }
+            match found {
+                Some(pair) => pair,
+                None => return Ok(None),
+            }
+        };
+
+        // 2. Build the result payload.
+        let signal_result = match status {
+            "completed" => result,
+            "failed" => Some(serde_json::json!({
+                "error": error.clone().unwrap_or_default()
+            })),
+            other => anyhow::bail!("Invalid signal status: {}", other),
+        };
+
+        // 3. Resume the parked entry in the runbook.
+        {
+            let mut sessions = self.sessions.write().await;
+            let session = sessions
+                .get_mut(&session_id)
+                .context("Session disappeared between read and write")?;
+
+            let resumed = session.runbook.resume_entry(correlation_key, signal_result);
+
+            if resumed.is_none() {
+                // Idempotent: already resumed.
+                return Ok(None);
+            }
+
+            // If the signal indicates failure, mark entry Failed and transition
+            // to RunbookEditing so the user can fix or retry.
+            if status == "failed" {
+                if let Some(entry) = session
+                    .runbook
+                    .entries
+                    .iter_mut()
+                    .find(|e| e.id == entry_id)
+                {
+                    entry.status = EntryStatus::Failed;
+                }
+                session.runbook.set_status(RunbookStatus::Ready);
+                session.set_state(ReplStateV2::RunbookEditing);
+
+                let response = ReplResponseV2 {
+                    state: ReplStateV2::RunbookEditing,
+                    kind: ReplResponseKindV2::Error {
+                        error: error.unwrap_or_else(|| "External task failed".into()),
+                        recoverable: true,
+                    },
+                    message: "External task failed. Edit the runbook or retry.".into(),
+                    runbook_summary: None,
+                    step_count: session.runbook.entries.len(),
+                };
+                return Ok(Some(response));
+            }
+        }
+
+        // 4. For "completed" signals, continue execution via the state machine.
+        let input = UserInputV2::Command {
+            command: ReplCommandV2::Resume(entry_id),
+        };
+        match self.process(session_id, input).await {
+            Ok(response) => Ok(Some(response)),
+            Err(e) => Err(anyhow::anyhow!(
+                "Failed to continue execution after signal: {}",
+                e
+            )),
+        }
+    }
+
     /// Process user input and return a response.
     pub async fn process(
         &self,

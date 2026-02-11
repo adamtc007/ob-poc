@@ -1641,6 +1641,30 @@ async fn try_unblock_workstream(workstream_id: Uuid, pool: &PgPool) -> Result<bo
     Ok(false)
 }
 
+/// Lazy BPMN gRPC client — created once from `BPMN_LITE_GRPC_URL` env var.
+/// Returns `None` when the env var is not set (BPMN integration disabled).
+#[cfg(feature = "database")]
+fn bpmn_client() -> Option<&'static crate::bpmn_integration::client::BpmnLiteConnection> {
+    use std::sync::OnceLock;
+    static CLIENT: OnceLock<Option<crate::bpmn_integration::client::BpmnLiteConnection>> =
+        OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            if std::env::var("BPMN_LITE_GRPC_URL").is_err() {
+                tracing::debug!("BPMN_LITE_GRPC_URL not set — signal routing disabled");
+                return None;
+            }
+            match crate::bpmn_integration::client::BpmnLiteConnection::from_env() {
+                Ok(conn) => Some(conn),
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to create BPMN client for signal routing");
+                    None
+                }
+            }
+        })
+        .as_ref()
+}
+
 /// Best-effort BPMN signal routing for lifecycle request operations.
 ///
 /// When a request is reminded/cancelled/escalated/extended, check if the
@@ -1688,18 +1712,45 @@ async fn try_send_bpmn_signal(
         }
     };
 
-    // Attempt gRPC signal — best-effort, don't fail the main operation.
-    // The BpmnLiteConnection is not available here directly since the request
-    // ops don't hold a reference to it. For now, log the intent. The actual
-    // gRPC call will be wired when the server exposes the BPMN client to ops.
-    tracing::info!(
-        case_id = %case_id,
-        process_instance_id = %correlation.process_instance_id,
-        signal = signal_name,
-        "BPMN signal routed for lifecycle event on active correlation"
-    );
+    // Send gRPC signal to BPMN-Lite — best-effort, never fails the main operation.
+    if let Some(client) = bpmn_client() {
+        let payload_bytes = serde_json::to_vec(payload).unwrap_or_default();
+        match client
+            .signal(
+                correlation.process_instance_id,
+                signal_name,
+                Some(&payload_bytes),
+            )
+            .await
+        {
+            Ok(()) => {
+                tracing::info!(
+                    case_id = %case_id,
+                    process_instance_id = %correlation.process_instance_id,
+                    signal = signal_name,
+                    "BPMN signal sent for lifecycle event"
+                );
+            }
+            Err(e) => {
+                tracing::warn!(
+                    case_id = %case_id,
+                    process_instance_id = %correlation.process_instance_id,
+                    signal = signal_name,
+                    error = %e,
+                    "BPMN signal failed (non-blocking)"
+                );
+            }
+        }
+    } else {
+        tracing::debug!(
+            case_id = %case_id,
+            process_instance_id = %correlation.process_instance_id,
+            signal = signal_name,
+            "BPMN client not available, skipping signal"
+        );
+    }
 
-    // Record the signal intent in the communication_log for audit
+    // Record the signal in the communication_log for audit regardless of send result
     let signal_log = serde_json::json!({
         "timestamp": chrono::Utc::now(),
         "type": "BPMN_SIGNAL",

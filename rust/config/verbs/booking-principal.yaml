@@ -1,0 +1,275 @@
+domains:
+  booking-principal:
+    description: "Booking principal selection — determines which BNY legal entity + booking location can contract, book, and service a client offering"
+
+    invocation_hints:
+      - "booking principal"
+      - "principal"
+      - "eligibility"
+      - "booking entity"
+      - "who books"
+
+    verbs:
+      create:
+        description: "Create a new booking principal (legal entity + booking location envelope)"
+        behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:legal-entity.create"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking_principal
+        invocation_phrases:
+          - "create booking principal"
+          - "new booking principal"
+          - "add booking principal"
+          - "register booking principal"
+        args:
+          - name: legal-entity-id
+            type: uuid
+            required: true
+            maps_to: legal_entity_id
+            description: "BNY legal entity for this principal"
+          - name: booking-location-id
+            type: uuid
+            required: false
+            maps_to: booking_location_id
+            description: "Booking location (jurisdictional perimeter)"
+          - name: principal-code
+            type: string
+            required: true
+            maps_to: principal_code
+            description: "Unique code for this principal (e.g., BNYM-LU)"
+          - name: book-code
+            type: string
+            required: false
+            maps_to: book_code
+            description: "Booking ledger code"
+        returns:
+          type: record
+          name: booking_principal
+
+      update:
+        description: "Update a booking principal's fields"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking_principal
+        invocation_phrases:
+          - "update booking principal"
+          - "modify booking principal"
+          - "edit booking principal"
+        args:
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+            description: "ID of the principal to update"
+          - name: book-code
+            type: string
+            required: false
+            maps_to: book_code
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: uuid
+          name: booking_principal_id
+
+      retire:
+        description: "Retire a booking principal (checks active relationships first)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking_principal
+        invocation_phrases:
+          - "retire booking principal"
+          - "deactivate booking principal"
+          - "wind down principal"
+        args:
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+          - name: force
+            type: boolean
+            required: false
+            maps_to: force
+            description: "Override active relationship check"
+        returns:
+          type: record
+          name: retire_result
+
+      evaluate:
+        description: "Run full eligibility evaluation — snapshot client profile, gather rules, merge by boundary, check delivery, pin audit record"
+        behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_scope:client_group"
+        metadata:
+          tier: composite
+          source_of_truth: operational
+          scope: global
+          noun: eligibility_evaluation
+        invocation_phrases:
+          - "evaluate booking principal"
+          - "check eligibility"
+          - "who can book this"
+          - "find eligible principals"
+          - "run principal evaluation"
+          - "booking eligibility check"
+        args:
+          - name: client-group-id
+            type: uuid
+            required: true
+            maps_to: client_group_id
+            description: "Client group to evaluate"
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: segment
+            type: string
+            required: true
+            maps_to: segment
+            description: "Client segment (pension, sovereign, hedge_fund, etc.)"
+          - name: domicile-country
+            type: string
+            required: true
+            maps_to: domicile_country
+            description: "Client domicile country code"
+          - name: entity-types
+            type: string_list
+            required: false
+            maps_to: entity_types
+            description: "Entity type classifications"
+          - name: offering-ids
+            type: uuid_list
+            required: false
+            maps_to: offering_ids
+            description: "Product offering IDs to evaluate against"
+          - name: requested-by
+            type: string
+            required: false
+            maps_to: requested_by
+            default: "system"
+        returns:
+          type: record
+          name: evaluation_result
+
+      select:
+        description: "Record selection of a principal from an evaluation"
+        behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:booking-principal.evaluate"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: principal_selection
+        invocation_phrases:
+          - "select booking principal"
+          - "choose principal"
+          - "pick booking entity"
+        args:
+          - name: evaluation-id
+            type: uuid
+            required: true
+            maps_to: evaluation_id
+            description: "Evaluation to record selection on"
+          - name: principal-id
+            type: uuid
+            required: true
+            maps_to: principal_id
+            description: "Selected principal"
+        returns:
+          type: record
+          name: selection_result
+
+      explain:
+        description: "Retrieve full explain payload and audit trail for an evaluation"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: evaluation_explain
+        invocation_phrases:
+          - "explain evaluation"
+          - "show evaluation details"
+          - "why was this principal selected"
+          - "evaluation audit trail"
+        args:
+          - name: evaluation-id
+            type: uuid
+            required: true
+            maps_to: evaluation_id
+        returns:
+          type: record
+          name: evaluation
+
+      coverage-matrix:
+        description: "Generate coverage matrix showing principal × jurisdiction × service availability"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: coverage_matrix
+        invocation_phrases:
+          - "coverage matrix"
+          - "show coverage"
+          - "principal coverage"
+          - "booking coverage matrix"
+        returns:
+          type: record_set
+          name: coverage_entries
+
+      gap-report:
+        description: "Generate gap report across regulatory, commercial, and operational boundaries"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: gap_report
+        invocation_phrases:
+          - "gap report"
+          - "coverage gaps"
+          - "what gaps exist"
+          - "show booking gaps"
+        returns:
+          type: record_set
+          name: gaps
+
+      impact-analysis:
+        description: "Analyse impact of retiring a booking principal on active client relationships"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: impact_analysis
+        invocation_phrases:
+          - "impact analysis"
+          - "retirement impact"
+          - "what happens if we retire this principal"
+          - "principal retirement impact"
+        args:
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+        returns:
+          type: record_set
+          name: impact_entries

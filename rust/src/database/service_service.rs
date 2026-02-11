@@ -17,6 +17,7 @@ pub struct ServiceRow {
     pub service_category: Option<String>,
     pub sla_definition: Option<JsonValue>,
     pub is_active: Option<bool>,
+    pub lifecycle_tags: Option<Vec<String>>,
     pub created_at: Option<DateTime<Utc>>,
     pub updated_at: Option<DateTime<Utc>>,
 }
@@ -55,12 +56,12 @@ impl ServiceService {
     }
 
     pub async fn get_service_by_id(&self, service_id: Uuid) -> Result<Option<ServiceRow>> {
-        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, created_at, updated_at FROM "ob-poc".services WHERE service_id = $1"#)
+        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, lifecycle_tags, created_at, updated_at FROM "ob-poc".services WHERE service_id = $1"#)
             .bind(service_id).fetch_optional(&self.pool).await.context("Failed to get Service by ID")
     }
 
     pub async fn get_service_by_name(&self, name: &str) -> Result<Option<ServiceRow>> {
-        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, created_at, updated_at FROM "ob-poc".services WHERE name = $1"#)
+        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, lifecycle_tags, created_at, updated_at FROM "ob-poc".services WHERE name = $1"#)
             .bind(name).fetch_optional(&self.pool).await.context("Failed to get Service by name")
     }
 
@@ -69,7 +70,7 @@ impl ServiceService {
         limit: Option<i32>,
         offset: Option<i32>,
     ) -> Result<Vec<ServiceRow>> {
-        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, created_at, updated_at FROM "ob-poc".services ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
+        sqlx::query_as::<_, ServiceRow>(r#"SELECT service_id, name, description, service_code, service_category, sla_definition, is_active, lifecycle_tags, created_at, updated_at FROM "ob-poc".services ORDER BY created_at DESC LIMIT $1 OFFSET $2"#)
             .bind(limit.unwrap_or(100)).bind(offset.unwrap_or(0)).fetch_all(&self.pool).await.context("Failed to list Services")
     }
 

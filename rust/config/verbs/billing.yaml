@@ -17,6 +17,10 @@ domains:
       create-profile:
         description: "Create a fee billing profile - bridges commercial to operational"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.create"
+            - "requires_prior:deal.agree-rate-card"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -235,6 +239,9 @@ domains:
       add-account-target:
         description: "Link a CBU resource instance (account) to a billing profile"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:billing.create-profile"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -341,6 +348,10 @@ domains:
       create-period:
         description: "Create a billing period for calculation"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:billing.create-profile"
+            - "requires_prior:billing.activate-profile"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -371,6 +382,9 @@ domains:
       calculate-period:
         description: "Run fee calculation for a billing period"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:billing.create-period"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -391,6 +405,9 @@ domains:
       review-period:
         description: "Mark billing period as reviewed, optionally apply adjustments"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:billing.calculate-period"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -419,6 +436,9 @@ domains:
       approve-period:
         description: "Approve billing period for invoicing"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:billing.review-period"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -443,6 +463,9 @@ domains:
       generate-invoice:
         description: "Generate invoice from approved billing period"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:billing.approve-period"
         metadata:
           tier: intent
           source_of_truth: operational

@@ -15,6 +15,7 @@ workflows:
   - verb_fqn: kyc.open-case
     route: orchestrated
     process_key: kyc-open-case
+    correlation_field: case_id
     task_bindings:
       - task_type: create_case_record
         verb_fqn: kyc.create-case
@@ -28,5 +29,47 @@ workflows:
 
       - task_type: record_decision
         verb_fqn: kyc.record-decision
+        timeout_ms: 30000
+        max_retries: 3
+
+  # Document Solicitation — single document request lifecycle
+  - verb_fqn: document.solicit
+    route: orchestrated
+    process_key: kyc-document-request
+    correlation_field: workflow-instance-id
+    task_bindings:
+      - task_type: send_request_notification
+        verb_fqn: notification.send-document-request
+        timeout_ms: 30000
+        max_retries: 3
+
+      - task_type: validate_uploaded_document
+        verb_fqn: document.verify
+        timeout_ms: 60000
+        max_retries: 3
+
+      - task_type: update_requirement_status
+        verb_fqn: requirement.create
+        timeout_ms: 30000
+        max_retries: 3
+
+  # Document Solicitation Set — batch document request lifecycle
+  - verb_fqn: document.solicit-set
+    route: orchestrated
+    process_key: kyc-document-request-set
+    correlation_field: workflow-instance-id
+    task_bindings:
+      - task_type: send_request_notification
+        verb_fqn: notification.send-document-request
+        timeout_ms: 30000
+        max_retries: 3
+
+      - task_type: validate_uploaded_document
+        verb_fqn: document.verify
+        timeout_ms: 60000
+        max_retries: 3
+
+      - task_type: update_requirement_status
+        verb_fqn: requirement.create
         timeout_ms: 30000
         max_retries: 3

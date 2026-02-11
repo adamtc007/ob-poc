@@ -1,0 +1,92 @@
+domains:
+  booking-location:
+    description: "Booking location management — jurisdictional perimeters where activity is booked and regulated"
+
+    invocation_hints:
+      - "booking location"
+      - "jurisdiction"
+      - "booking perimeter"
+
+    verbs:
+      create:
+        description: "Create a new booking location (jurisdictional perimeter)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking_location
+        invocation_phrases:
+          - "create booking location"
+          - "new booking location"
+          - "add booking jurisdiction"
+          - "register booking location"
+        args:
+          - name: country-code
+            type: string
+            required: true
+            maps_to: country_code
+            description: "ISO alpha-2 country code"
+          - name: region-code
+            type: string
+            required: false
+            maps_to: region_code
+            description: "Sub-national region code"
+          - name: jurisdiction-code
+            type: string
+            required: false
+            maps_to: jurisdiction_code
+            description: "FK to master_jurisdictions"
+          - name: regulatory-regime-tags
+            type: string_list
+            required: false
+            maps_to: regulatory_regime_tags
+            description: "Applicable regulatory regimes (e.g., MiFID_II, UCITS)"
+        returns:
+          type: record
+          name: booking_location
+
+      update:
+        description: "Update a booking location's fields"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking_location
+        invocation_phrases:
+          - "update booking location"
+          - "modify booking location"
+        args:
+          - name: booking-location-id
+            type: uuid
+            required: true
+            maps_to: booking_location_id
+          - name: region-code
+            type: string
+            required: false
+            maps_to: region_code
+          - name: jurisdiction-code
+            type: string
+            required: false
+            maps_to: jurisdiction_code
+        returns:
+          type: uuid
+          name: booking_location_id
+
+      list:
+        description: "List all booking locations"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: booking_location
+        invocation_phrases:
+          - "list booking locations"
+          - "show booking locations"
+          - "all jurisdictions"
+          - "get booking locations"
+        returns:
+          type: record_set
+          name: booking_locations

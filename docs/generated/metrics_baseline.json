@@ -1,0 +1,84 @@
+{
+  "generated_at": "2026-02-07T00:00:00Z",
+  "scope": "TODO-2 Architecture Pipeline — Pack-Scoped Intent Resolution",
+  "feature_flag": "vnext-repl",
+  "golden_corpus": {
+    "total_entries": 102,
+    "files": {
+      "seed.yaml": 26,
+      "kyc.yaml": 16,
+      "preconditions.yaml": 15,
+      "edge_cases.yaml": 13,
+      "book_setup.yaml": 11,
+      "bootstrap.yaml": 7,
+      "error_recovery.yaml": 7,
+      "pack_switching.yaml": 7
+    },
+    "categories": [
+      "kyc",
+      "book-setup",
+      "bootstrap",
+      "pack-switching",
+      "error-recovery",
+      "edge-cases"
+    ],
+    "target_minimum": 50,
+    "meets_target": true,
+    "ci_test": "cargo test --test golden_corpus_test",
+    "ci_tests_passing": 5,
+    "ci_tests_total": 5
+  },
+  "build_verification": {
+    "cargo_build_vnext_repl": "pass",
+    "cargo_clippy_vnext_repl_deny_warnings": "pass",
+    "cargo_build_default": "pass",
+    "unit_tests_passing": 320,
+    "unit_tests_total": 320,
+    "unit_tests_failed": 0
+  },
+  "scoring_constants": {
+    "PACK_VERB_BOOST": 0.10,
+    "PACK_VERB_PENALTY": 0.05,
+    "TEMPLATE_STEP_BOOST": 0.15,
+    "DOMAIN_AFFINITY_BOOST": 0.03,
+    "ABSOLUTE_FLOOR": 0.55,
+    "MARGIN": 0.05,
+    "STRONG_THRESHOLD": 0.70
+  },
+  "invariants": {
+    "P-1_one_context_object": "verified",
+    "P-2_one_scoring_pipeline": "verified",
+    "P-3_session_runbook_fold": "verified",
+    "P-4_preconditions_filter": "verified",
+    "P-5_decision_log_captures_all": "verified",
+    "E-1_no_search_without_context": "verified",
+    "E-2_pack_scoring_always_applied": "verified",
+    "E-3_ambiguity_margin": "verified",
+    "E-4_entity_never_invents": "verified",
+    "E-5_templates_deterministic": "verified",
+    "E-6_decision_log_per_turn": "verified",
+    "E-7_golden_corpus_gte_50": "verified",
+    "E-8_server_wiring_complete": "verified"
+  },
+  "implementation_status": {
+    "context_stack_layers": 7,
+    "preconditions_engine": "new_code",
+    "focus_mode_variants": 5,
+    "dual_decode": "verified",
+    "recover_from_rejection": "verified",
+    "check_pack_handoff": "verified",
+    "deprecated_fields_marked": true,
+    "dead_code_markers": 0,
+    "bootstrap_state_references": 0
+  },
+  "phase_completion": {
+    "PA_context_stack": "complete",
+    "PB_pack_loader": "complete",
+    "PC_search_with_context": "complete",
+    "PD_preconditions": "complete",
+    "PE_entity_resolution": "complete",
+    "PF_templates": "complete",
+    "PG_tuning_harness": "complete",
+    "PH_final_audit": "complete"
+  }
+}

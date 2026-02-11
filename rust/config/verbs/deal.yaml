@@ -615,6 +615,10 @@ domains:
       create-rate-card:
         description: "Create a negotiated rate card for a product within a deal"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.create"
+            - "requires_prior:deal.add-product"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -664,6 +668,9 @@ domains:
       add-rate-card-line:
         description: "Add a fee line to a rate card"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.create-rate-card"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -818,6 +825,10 @@ domains:
       propose-rate-card:
         description: "Submit rate card for client review"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.create-rate-card"
+            - "requires_prior:deal.add-rate-card-line"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -838,6 +849,9 @@ domains:
       counter-rate-card:
         description: "Client counter-offer - creates new version via clone"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.propose-rate-card"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -864,6 +878,9 @@ domains:
       agree-rate-card:
         description: "Finalise rate card - both parties agree. Lines become immutable."
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.propose-rate-card"
         metadata:
           tier: intent
           source_of_truth: operational
@@ -1266,6 +1283,11 @@ domains:
       request-onboarding:
         description: "Create onboarding request - handoff from Sales to Ops"
         behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:deal.create"
+            - "requires_prior:deal.agree-rate-card"
+            - "requires_prior:deal.add-contract"
         metadata:
           tier: intent
           source_of_truth: operational

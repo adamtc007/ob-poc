@@ -1,0 +1,124 @@
+domains:
+  rule:
+    description: "Rule management — individual eligibility rules within rulesets"
+
+    invocation_hints:
+      - "rule"
+      - "eligibility rule"
+      - "condition"
+      - "booking rule"
+
+    verbs:
+      add:
+        description: "Add a new rule to a ruleset (validates JSON condition and effect structures)"
+        behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:ruleset.create"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rule
+        invocation_phrases:
+          - "add rule"
+          - "create rule"
+          - "new eligibility rule"
+          - "add condition to ruleset"
+        args:
+          - name: ruleset-id
+            type: uuid
+            required: true
+            maps_to: ruleset_id
+            description: "Parent ruleset"
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+            description: "Human-readable rule name"
+          - name: kind
+            type: string
+            required: true
+            maps_to: kind
+            description: "Rule kind (deny, require_gate, allow, constrain, select_contract)"
+          - name: when-expr
+            type: string
+            required: true
+            maps_to: when_expr
+            description: "JSON condition expression"
+          - name: then-effect
+            type: string
+            required: true
+            maps_to: then_effect
+            description: "JSON effect definition"
+          - name: explain
+            type: string
+            required: false
+            maps_to: explain
+            description: "Human-readable explanation"
+          - name: priority
+            type: integer
+            required: false
+            maps_to: priority
+            description: "Evaluation priority (lower = higher priority)"
+        returns:
+          type: record
+          name: rule
+
+      update:
+        description: "Update an existing rule's fields"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rule
+        invocation_phrases:
+          - "update rule"
+          - "modify rule"
+          - "edit eligibility rule"
+        args:
+          - name: rule-id
+            type: uuid
+            required: true
+            maps_to: rule_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: when-expr
+            type: string
+            required: false
+            maps_to: when_expr
+          - name: then-effect
+            type: string
+            required: false
+            maps_to: then_effect
+          - name: priority
+            type: integer
+            required: false
+            maps_to: priority
+        returns:
+          type: uuid
+          name: rule_id
+
+      disable:
+        description: "Disable a rule (soft delete — sets kind to 'disabled')"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rule
+        invocation_phrases:
+          - "disable rule"
+          - "deactivate rule"
+          - "turn off rule"
+        args:
+          - name: rule-id
+            type: uuid
+            required: true
+            maps_to: rule_id
+        returns:
+          type: uuid
+          name: rule_id

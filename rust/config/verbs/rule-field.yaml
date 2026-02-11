@@ -1,0 +1,65 @@
+domains:
+  rule-field:
+    description: "Rule field dictionary — closed-world field registry for rule expression validation"
+
+    invocation_hints:
+      - "rule field"
+      - "field dictionary"
+      - "rule variable"
+
+    verbs:
+      register:
+        description: "Register a new field in the rule field dictionary (unknown fields fail at ruleset publish)"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rule_field
+        invocation_phrases:
+          - "register rule field"
+          - "add field to dictionary"
+          - "define rule variable"
+          - "register eligibility field"
+        args:
+          - name: field-key
+            type: string
+            required: true
+            maps_to: field_key
+            description: "Dot-notation field key (e.g. client.segment, principal.location.country)"
+          - name: field-type
+            type: string
+            required: true
+            maps_to: field_type
+            description: "Field type: string, string_array, boolean, number, date"
+          - name: description
+            type: string
+            required: false
+            maps_to: description
+            description: "Human-readable description"
+          - name: source-table
+            type: string
+            required: false
+            maps_to: source_table
+            description: "Source table or column reference for traceability"
+        returns:
+          type: record
+          name: rule_field
+
+      list:
+        description: "List all registered fields in the rule field dictionary"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: rule_field
+        invocation_phrases:
+          - "list rule fields"
+          - "show field dictionary"
+          - "what fields can rules use"
+          - "list eligibility fields"
+        args: []
+        returns:
+          type: record_set
+          name: rule_fields

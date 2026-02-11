@@ -1,0 +1,176 @@
+# Golden Corpus — Precondition Filter Scenarios (Phase PD)
+#
+# Tests that verbs with precondition_checks in their lifecycle config
+# are correctly filtered based on session context.
+#
+# Fields:
+#   utterance:       User input text
+#   expected_verb:   Expected verb match (or null if filtered)
+#   pack:            Optional pack ID
+#   outcome:         "matched" | "ambiguous" | "no_match"
+#   context:         Session context state for precondition evaluation
+#   notes:           Explanation
+#
+# Context fields:
+#   has_cbu:          Whether a CBU is in scope
+#   has_client_group: Whether a client group is set
+#   executed_verbs:   List of verbs already executed in the session
+
+---
+
+# ============================================================================
+# requires_scope:cbu — verbs that need a CBU in scope
+# ============================================================================
+
+- utterance: "assign a role to this cbu"
+  expected_verb: cbu.assign-role
+  pack: null
+  outcome: matched
+  context:
+    has_cbu: true
+    executed_verbs: [cbu.create]
+  notes: "CBU in scope, assign-role precondition met"
+
+- utterance: "assign a role"
+  expected_verb: null
+  pack: null
+  outcome: no_match
+  context:
+    has_cbu: false
+    executed_verbs: []
+  notes: "No CBU in scope — requires_scope:cbu not met, verb should be filtered"
+
+- utterance: "add a product to this structure"
+  expected_verb: cbu.assign-product
+  pack: null
+  outcome: matched
+  context:
+    has_cbu: true
+    executed_verbs: [cbu.create]
+  notes: "CBU in scope, product assignment allowed"
+
+- utterance: "add a product"
+  expected_verb: null
+  pack: null
+  outcome: no_match
+  context:
+    has_cbu: false
+    executed_verbs: []
+  notes: "No CBU — product assignment blocked by precondition"
+
+# ============================================================================
+# requires_scope:client_group — verbs that need a client group
+# ============================================================================
+
+- utterance: "list all structures for this client"
+  expected_verb: cbu.list
+  pack: session-bootstrap
+  outcome: matched
+  context:
+    has_client_group: true
+    executed_verbs: [session.load-cluster]
+  notes: "Client group set, list structures allowed"
+
+# ============================================================================
+# requires_prior — verbs that need a prior verb executed
+# ============================================================================
+
+- utterance: "run kyc screening"
+  expected_verb: kyc.screen
+  pack: kyc-case
+  outcome: matched
+  context:
+    has_cbu: true
+    executed_verbs: [kyc.create-case]
+  notes: "KYC case created, screening allowed"
+
+- utterance: "run kyc screening"
+  expected_verb: null
+  pack: kyc-case
+  outcome: no_match
+  context:
+    has_cbu: true
+    executed_verbs: []
+  notes: "No KYC case created yet — requires_prior:kyc.create-case not met"
+
+# ============================================================================
+# No preconditions — always eligible
+# ============================================================================
+
+- utterance: "load the allianz book"
+  expected_verb: session.load-cluster
+  pack: session-bootstrap
+  outcome: matched
+  context:
+    has_cbu: false
+    executed_verbs: []
+  notes: "session.load-cluster has no preconditions — always eligible"
+
+- utterance: "create a new structure"
+  expected_verb: cbu.create
+  pack: null
+  outcome: matched
+  context:
+    has_cbu: false
+    executed_verbs: []
+  notes: "cbu.create has no preconditions — always eligible"
+
+- utterance: "select a pack"
+  expected_verb: pack.select
+  pack: null
+  outcome: matched
+  context:
+    has_cbu: false
+    executed_verbs: []
+  notes: "pack.select has no preconditions — always eligible"
+
+# ============================================================================
+# Plan mode — staged verbs count as facts
+# ============================================================================
+
+- utterance: "assign a role"
+  expected_verb: cbu.assign-role
+  pack: null
+  outcome: matched
+  context:
+    has_cbu: true
+    executed_verbs: []
+    staged_verbs: [cbu.create]
+    eligibility_mode: plan
+  notes: "Plan mode: staged cbu.create satisfies requires_prior"
+
+# ============================================================================
+# "Why not" suggestions
+# ============================================================================
+
+- utterance: "add entity to case"
+  expected_verb: null
+  pack: kyc-case
+  outcome: no_match
+  context:
+    has_cbu: false
+    executed_verbs: []
+  notes: "Blocked by requires_scope:cbu — should suggest session.load-cbu"
+  expected_suggestion: session.load-cbu
+
+- utterance: "approve kyc case"
+  expected_verb: null
+  pack: kyc-case
+  outcome: no_match
+  context:
+    has_cbu: true
+    executed_verbs: []
+  notes: "Blocked by requires_prior — should suggest the prerequisite verb"
+
+# ============================================================================
+# forbids_prior — verb blocked after certain actions
+# ============================================================================
+
+- utterance: "recreate the structure"
+  expected_verb: null
+  pack: null
+  outcome: no_match
+  context:
+    has_cbu: true
+    executed_verbs: [cbu.delete]
+  notes: "If cbu.delete has forbids_prior on cbu.create, creation blocked"

@@ -1,0 +1,142 @@
+domains:
+  client-principal-relationship:
+    description: "Client-principal-offering relationship management — tracks which clients are onboarded with which principals for which offerings"
+
+    invocation_hints:
+      - "relationship"
+      - "client principal"
+      - "booking relationship"
+      - "onboarding relationship"
+
+    verbs:
+      record:
+        description: "Record a new client-principal-offering relationship (onboarding)"
+        behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_prior:booking-principal.create"
+            - "requires_scope:client_group"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: client_principal_relationship
+        invocation_phrases:
+          - "record relationship"
+          - "create booking relationship"
+          - "onboard client to principal"
+          - "add client principal relationship"
+        args:
+          - name: client-group-id
+            type: uuid
+            required: true
+            maps_to: client_group_id
+            description: "Client group"
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: booking-principal-id
+            type: uuid
+            required: true
+            maps_to: booking_principal_id
+          - name: product-offering-id
+            type: uuid
+            required: true
+            maps_to: product_offering_id
+            description: "Product offering to onboard"
+          - name: contract-ref
+            type: string
+            required: false
+            maps_to: contract_ref
+            description: "Contract reference"
+        returns:
+          type: record
+          name: relationship
+
+      terminate:
+        description: "Terminate an active client-principal relationship"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: client_principal_relationship
+        invocation_phrases:
+          - "terminate relationship"
+          - "end booking relationship"
+          - "offboard from principal"
+        args:
+          - name: relationship-id
+            type: uuid
+            required: true
+            maps_to: relationship_id
+        returns:
+          type: affected
+          name: rows_affected
+
+      list:
+        description: "List client-principal relationships with optional status filter"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: client_principal_relationship
+        invocation_phrases:
+          - "list relationships"
+          - "show client relationships"
+          - "booking relationships for client"
+          - "client principal history"
+        args:
+          - name: client-group-id
+            type: uuid
+            required: true
+            maps_to: client_group_id
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+            description: "Filter by relationship status (active, terminated)"
+        returns:
+          type: record_set
+          name: relationships
+
+      cross-sell-check:
+        description: "Check cross-sell opportunities — compare existing offerings against available offerings"
+        behavior: plugin
+        lifecycle:
+          precondition_checks:
+            - "requires_scope:client_group"
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: cross_sell
+        invocation_phrases:
+          - "cross sell check"
+          - "cross sell opportunities"
+          - "what else can we offer"
+          - "check cross sell"
+        args:
+          - name: client-group-id
+            type: uuid
+            required: true
+            maps_to: client_group_id
+            lookup:
+              table: client_group
+              entity_type: client_group
+              schema: ob-poc
+              search_key: canonical_name
+              primary_key: id
+        returns:
+          type: record
+          name: cross_sell_result

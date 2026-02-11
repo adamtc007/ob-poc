@@ -182,12 +182,14 @@ impl WorkflowConfigIndex {
             route: ExecutionRoute::Orchestrated,
             process_key: Some(durable.process_key.clone()),
             task_bindings,
+            correlation_field: Some(durable.correlation_field.clone()),
         };
 
         tracing::info!(
-            "WorkflowConfigIndex: auto-registered durable verb {} → process_key={}",
+            "WorkflowConfigIndex: auto-registered durable verb {} → process_key={}, correlation_field={}",
             verb_fqn,
-            durable.process_key
+            durable.process_key,
+            durable.correlation_field,
         );
         self.by_verb.insert(verb_fqn.to_string(), binding);
 
@@ -226,12 +228,14 @@ mod tests {
                             max_retries: 3,
                         },
                     ],
+                    correlation_field: Some("case_id".to_string()),
                 },
                 WorkflowBinding {
                     verb_fqn: "cbu.create".to_string(),
                     route: ExecutionRoute::Direct,
                     process_key: None,
                     task_bindings: vec![],
+                    correlation_field: None,
                 },
             ],
         }

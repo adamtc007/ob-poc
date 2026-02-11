@@ -302,10 +302,19 @@ mod tests {
     #[test]
     fn test_custom_op_exists() {
         let reg = registry();
-        // document.solicit is a plugin verb defined in document.yaml
+        // document.verify is a plugin verb defined in document.yaml
+        let verb = reg.get("document", "verify");
+        assert!(verb.is_some(), "document.verify should exist");
+        assert_eq!(verb.unwrap().behavior, VerbBehavior::CustomOp);
+    }
+
+    #[test]
+    fn test_durable_verb_exists() {
+        let reg = registry();
+        // document.solicit is a durable verb (BPMN-orchestrated)
         let verb = reg.get("document", "solicit");
         assert!(verb.is_some(), "document.solicit should exist");
-        assert_eq!(verb.unwrap().behavior, VerbBehavior::CustomOp);
+        assert_eq!(verb.unwrap().behavior, VerbBehavior::Durable);
     }
 
     #[test]

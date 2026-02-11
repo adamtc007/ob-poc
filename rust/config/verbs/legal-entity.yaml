@@ -1,0 +1,97 @@
+domains:
+  legal-entity:
+    description: "BNY legal entity management — own legal entities that can sign contracts and book activity"
+
+    invocation_hints:
+      - "legal entity"
+      - "BNY entity"
+      - "contracting entity"
+
+    verbs:
+      create:
+        description: "Create a new BNY legal entity"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: legal_entity
+        invocation_phrases:
+          - "create legal entity"
+          - "new legal entity"
+          - "add BNY entity"
+          - "register legal entity"
+        args:
+          - name: name
+            type: string
+            required: true
+            maps_to: name
+            description: "Legal name of the entity"
+          - name: incorporation-jurisdiction
+            type: string
+            required: true
+            maps_to: incorporation_jurisdiction
+            description: "Country of incorporation (ISO alpha-2)"
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+            description: "LEI code if available"
+          - name: entity-id
+            type: uuid
+            required: false
+            maps_to: entity_id
+            description: "Link to entities table if applicable"
+        returns:
+          type: record
+          name: legal_entity
+
+      update:
+        description: "Update a legal entity's fields"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: legal_entity
+        invocation_phrases:
+          - "update legal entity"
+          - "modify legal entity"
+          - "edit legal entity"
+        args:
+          - name: legal-entity-id
+            type: uuid
+            required: true
+            maps_to: legal_entity_id
+          - name: name
+            type: string
+            required: false
+            maps_to: name
+          - name: lei
+            type: string
+            required: false
+            maps_to: lei
+          - name: status
+            type: string
+            required: false
+            maps_to: status
+        returns:
+          type: uuid
+          name: legal_entity_id
+
+      list:
+        description: "List active BNY legal entities"
+        behavior: plugin
+        metadata:
+          tier: intent
+          source_of_truth: operational
+          scope: global
+          noun: legal_entity
+        invocation_phrases:
+          - "list legal entities"
+          - "show legal entities"
+          - "all BNY entities"
+          - "get legal entities"
+        returns:
+          type: record_set
+          name: legal_entities
