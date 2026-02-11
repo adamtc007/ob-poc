@@ -1,8 +1,9 @@
 # OB-POC — Schema Entity Overview
 
-> **Last reconciled:** 2026-02-11 — against 77 migrations, 57 DSL verb domains, CLAUDE.md
+> **Last reconciled:** 2026-02-11 — against 77 migrations, 58 DSL verb domains, CLAUDE.md
 > **Scope:** `"ob-poc"` schema only (226 tables). External schemas (`custody`, `kyc`, `agent`, `teams`) referenced but not detailed.
 > **Method:** SQL DDL cross-referenced with DSL verb YAML (`rust/config/verbs/*.yaml`) to validate domain groupings.
+> **Mermaid ER diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
 
 ---
 
@@ -287,7 +288,7 @@ erDiagram
 
 ## 3) Booking Principals — Who Books It, Where?
 
-**Verb domains:** `booking-principal` (9 verbs), `booking-location` (3), `client-principal-relationship` (4), `legal-entity` (3), `service-availability` (3), `rule` (3), `ruleset` (3), `contract-pack` (2)
+**Verb domains:** `booking-principal` (9 verbs), `booking-location` (3), `client-principal-relationship` (4), `legal-entity` (3), `service-availability` (3), `rule` (3), `ruleset` (3), `rule-field` (2), `contract-pack` (2)
 
 The booking principal is the **policy anchor** — it defines which BNY legal entity, in which jurisdiction, can book which products for which clients. This is the middle layer between commercial (deals) and operational (CBU onboarding).
 
@@ -957,7 +958,7 @@ Small but load-bearing — drives interpretation, UI grouping, and rule selectio
 | `products` | `product` | Product catalog (CUSTODY, FUND_ACCOUNTING, etc.) |
 | `services` | `service` | Service catalog (SAFEKEEPING, SETTLEMENT, etc.) |
 | `regulators` | `regulatory` | Regulatory body definitions |
-| `rule_field_dictionary` | — | Closed-world field registry for rule validation |
+| `rule_field_dictionary` | `rule-field` | Closed-world field registry for rule validation |
 | `placeholder_kinds` | — | Placeholder entity kinds |
 | `client_types` | — | Client type taxonomy |
 
@@ -971,7 +972,7 @@ Small but load-bearing — drives interpretation, UI grouping, and rule selectio
 | Tables with DSL verb domains | ~85 |
 | Tables in this document | ~150 (essential to data model) |
 | Tables omitted (DSL engine, REPL, semantic search, layout cache) | ~76 |
-| DSL verb domains | 57 |
+| DSL verb domains | 58 |
 | Total verb count | ~750+ |
 | Migrations | 77 (001–077 + 072b) |
 
