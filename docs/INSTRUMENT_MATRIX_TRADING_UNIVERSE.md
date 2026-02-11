@@ -1,9 +1,10 @@
 # Instrument Matrix & Trading Universe — Design Paper
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** 2026-02-11  
 **Status:** For Peer Review  
 **Audience:** Engineering, Product, Domain Architects  
+> **Mermaid diagrams** render in GitHub, VS Code, and any CommonMark renderer with mermaid support.
 
 ---
 
@@ -26,41 +27,37 @@ This paper describes the **Instrument Matrix** — the complete model for declar
 
 Every CBU has a trading universe defined by the intersection of four dimensions:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    THE PERMISSION CUBE                                        │
-│                                                                              │
-│     Instrument Class                                                         │
-│         │                                                                    │
-│         ├── EQUITY                                                           │
-│         ├── GOVT_BOND         Market (MIC)                                   │
-│         ├── CORP_BOND            │                                           │
-│         ├── OTC_IRS              ├── XNYS (NYSE)                            │
-│         ├── FX_FORWARD           ├── XLON (LSE)                             │
-│         └── ...                  ├── XETR (Deutsche Börse)                  │
-│                                  └── ...                                     │
-│                                                                              │
-│     Currency                  Counterparty (4th dim, OTC only)              │
-│         │                        │                                           │
-│         ├── EUR                  ├── Goldman Sachs                           │
-│         ├── USD                  ├── Morgan Stanley                          │
-│         ├── GBP                  ├── JP Morgan                              │
-│         └── ...                  └── ...                                     │
-│                                                                              │
-│     For each cell in the cube:                                               │
-│     ┌───────────────────────────────────────────────────┐                   │
-│     │  - Is this combination permitted? (universe)       │                   │
-│     │  - Which SSI settles it? (booking rules → SSI)    │                   │
-│     │  - What products are overlaid? (overlay)           │                   │
-│     │  - What pricing source? (pricing matrix)           │                   │
-│     │  - What CA policy? (corporate actions)             │                   │
-│     └───────────────────────────────────────────────────┘                   │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph "The Permission Cube"
+        IC["Instrument Class<br/>EQUITY | GOVT_BOND | OTC_IRS | FX_FORWARD | ..."]
+        MK["Market (MIC)<br/>XNYS | XLON | XETR | XHKG | ..."]
+        CY["Currency<br/>EUR | USD | GBP | CHF | JPY | ..."]
+        CP["Counterparty (4th dim, OTC only)<br/>Goldman Sachs | Morgan Stanley | JP Morgan | ..."]
+    end
+
+    IC --- CELL
+    MK --- CELL
+    CY --- CELL
+    CP -. "OTC only" .-> CELL
+
+    CELL["Matrix Cell"]
+    CELL --> Q1["Permitted? (universe)"]
+    CELL --> Q2["Which SSI? (booking rules)"]
+    CELL --> Q3["Which products? (overlay)"]
+    CELL --> Q4["Pricing source? (pricing matrix)"]
+    CELL --> Q5["CA policy? (corporate actions)"]
+
+    style IC fill:#4a90d9,color:#fff
+    style MK fill:#50b848,color:#fff
+    style CY fill:#f5a623,color:#fff
+    style CP fill:#d0021b,color:#fff
+    style CELL fill:#9013fe,color:#fff
 ```
 
-For listed instruments (equities, bonds, ETFs), the cube is 3D: **Instrument × Market × Currency**.
+For **listed instruments** (equities, bonds, ETFs), the cube is 3D: **Instrument x Market x Currency**.
 
-For OTC derivatives, a 4th dimension appears: **Counterparty** — because each OTC trade requires a bilateral agreement (ISDA) with a specific counterparty, and collateral flows (CSA) are per-counterparty.
+For **OTC derivatives**, a 4th dimension appears: **Counterparty** — because each OTC trade requires a bilateral agreement (ISDA) with a specific counterparty, and collateral flows (CSA) are per-counterparty.
 
 ---
 
@@ -70,38 +67,35 @@ For OTC derivatives, a 4th dimension appears: **Counterparty** — because each 
 
 The trading profile uses a **document-first** pattern:
 
+```mermaid
+graph TB
+    DOC["TradingProfileDocument (JSONB)<br/><i>Single source of truth</i><br/>Versioned | Immutable once activated<br/>Human-readable YAML seed format"]
+
+    DOC -->|"trading-profile.materialize<br/>(deterministic projection)"| OPS
+
+    subgraph OPS["Operational Tables (15+ in custody schema)"]
+        direction LR
+        T1["cbu_instrument_universe"]
+        T2["cbu_ssi"]
+        T3["ssi_booking_rules"]
+        T4["isda_agreements"]
+        T5["csa_agreements"]
+        T6["cbu_im_assignments"]
+        T7["cbu_pricing_config"]
+        T8["cbu_ca_preferences"]
+        T9["subcustodian_network"]
+    end
+
+    style DOC fill:#2d6da4,color:#fff,stroke:#1a4971
+    style OPS fill:#e8f4e8,stroke:#50b848
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    DOCUMENT-FIRST ARCHITECTURE                                │
-│                                                                              │
-│  TradingProfileDocument (JSONB)                                             │
-│  ═══════════════════════════════                                            │
-│  Single source of truth.                                                    │
-│  Versioned. Immutable once activated.                                       │
-│  Human-readable YAML seed format.                                           │
-│                                                                              │
-│         │ trading-profile.materialize                                        │
-│         │ (deterministic projection)                                        │
-│         ▼                                                                    │
-│  ┌──────────────────────────────────────────────────────────────────┐       │
-│  │  OPERATIONAL TABLES (15+ tables in custody schema)               │       │
-│  │                                                                   │       │
-│  │  cbu_instrument_universe  │  cbu_ssi  │  ssi_booking_rules      │       │
-│  │  isda_agreements          │  csa_agreements  │  isda_product_*   │       │
-│  │  cbu_im_assignments       │  cbu_pricing_config                  │       │
-│  │  cbu_ca_preferences       │  cbu_ca_instruction_windows          │       │
-│  │  cbu_ca_ssi_mappings      │  cbu_cash_sweep_config               │       │
-│  │  subcustodian_network     │  cbu_settlement_chains               │       │
-│  └──────────────────────────────────────────────────────────────────┘       │
-│                                                                              │
-│  Why not write directly to operational tables?                               │
-│  - Atomicity: a profile change may touch 10+ tables                         │
-│  - Versioning: you can diff v3 vs v4 at the document level                 │
-│  - Rollback: revert to v3 = activate v3 + re-materialize                   │
-│  - Audit: the document IS the audit record                                  │
-│  - Import/export: YAML seed files are just the document format              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+
+**Why not write directly to operational tables?**
+- **Atomicity** — a profile change may touch 10+ tables
+- **Versioning** — you can diff v3 vs v4 at the document level
+- **Rollback** — revert to v3 = activate v3 + re-materialize
+- **Audit** — the document IS the audit record
+- **Import/export** — YAML seed files are just the document format
 
 ### 3.2 Storage
 
@@ -130,21 +124,19 @@ CREATE TABLE "ob-poc".cbu_trading_profiles (
 
 ### 3.3 Document Lifecycle State Machine
 
-```
-DRAFT ──► VALIDATED ──► PENDING_REVIEW ──► ACTIVE ──► SUPERSEDED
-  │           │              │                            │
-  │           │              │                            └──► ARCHIVED
-  │           │              └──► (reject) ──► DRAFT
-  │           └──► ARCHIVED
-  └──► ARCHIVED
-
-State Transitions:
-  DRAFT → VALIDATED          validate-go-live-ready passes
-  VALIDATED → PENDING_REVIEW submit (sent to client for approval)
-  PENDING_REVIEW → ACTIVE    approve (client approves, auto-materialize)
-  PENDING_REVIEW → DRAFT     reject (client rejects with reason)
-  ACTIVE → SUPERSEDED        new version activated for same CBU
-  any → ARCHIVED             archive (soft delete)
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT
+    DRAFT --> VALIDATED : validate-go-live-ready passes
+    VALIDATED --> PENDING_REVIEW : submit (sent to client)
+    PENDING_REVIEW --> ACTIVE : approve (auto-materialize)
+    PENDING_REVIEW --> DRAFT : reject (with reason)
+    ACTIVE --> SUPERSEDED : new version activated
+    DRAFT --> ARCHIVED : archive
+    VALIDATED --> ARCHIVED : archive
+    PENDING_REVIEW --> ARCHIVED : archive
+    ACTIVE --> ARCHIVED : archive
+    SUPERSEDED --> ARCHIVED : archive
 ```
 
 ---
@@ -153,72 +145,87 @@ State Transitions:
 
 The JSONB document is a typed Rust struct (`TradingProfileDocument`) with 11 top-level sections:
 
-```
-TradingProfileDocument
-├── universe                    What the CBU can trade
-│   ├── base_currency           EUR, USD, etc.
-│   ├── allowed_currencies      [EUR, USD, GBP, CHF, JPY, ...]
-│   ├── allowed_markets[]       MIC + currencies + settlement types
-│   └── instrument_classes[]    Class code + CFI prefixes + ISDA asset classes
-│
-├── investment_managers[]       IM mandates with priority + scope
-│   ├── manager (EntityRef)     LEI, BIC, Name, or UUID
-│   ├── role                    INVESTMENT_MANAGER, SUB_ADVISOR, etc.
-│   ├── scope                   All, or by markets/instrument classes
-│   └── instruction_method      SWIFT, CTM, FIX, API, ALERT, MANUAL
-│
-├── isda_agreements[]           ISDA master agreements (one per counterparty)
-│   ├── counterparty (EntityRef)
-│   ├── governing_law           NY or ENGLISH
-│   ├── product_coverage[]      Asset class + base products
-│   └── csa (CsaConfig)        Collateral terms
-│       ├── csa_type            VM, VM_IM, IM
-│       ├── thresholds          Amount, currency, MTA, rounding
-│       ├── eligible_collateral[] Type, currencies, haircuts
-│       └── collateral_ssi_ref  → SSI in standing_instructions.OTC_COLLATERAL
-│
-├── settlement_config           Settlement infrastructure
-│   ├── matching_platforms[]    CTM, ALERT with participant IDs + rules
-│   ├── settlement_identities[] BIC, LEI, ALERT/CTM participant IDs
-│   ├── subcustodian_network[]  Market-specific subcustodians
-│   └── instruction_preferences[] SWIFT/ISO20022 message types
-│
-├── booking_rules[]             ALERT-style SSI selection rules
-│   ├── name, priority
-│   ├── match                   Instrument, market, currency, counterparty, etc.
-│   └── ssi_ref                 → SSI name in standing_instructions
-│
-├── standing_instructions{}     SSIs by category
-│   ├── SECURITIES[]            Custody accounts (safekeeping + cash)
-│   ├── CASH[]                  Cash accounts
-│   ├── OTC_COLLATERAL[]        Collateral accounts for CSA
-│   └── FUND_ACCOUNTING[]       NAV/accounting feeds
-│
-├── pricing_matrix[]            Pricing source hierarchy
-│   ├── scope                   Instrument classes + markets
-│   ├── source                  BLOOMBERG, REUTERS, MARKIT, etc.
-│   └── fallback + staleness    Fallback source, max age, tolerance
-│
-├── valuation_config            NAV/valuation settings
-│   ├── frequency, cutoff, timezone
-│   └── swing_pricing           Threshold-based swing factor
-│
-├── constraints                 Trading limits
-│   ├── short_selling           PROHIBITED, RESTRICTED, PERMITTED
-│   └── leverage                Max gross/net leverage ratios
-│
-├── corporate_actions           CA policy (authored via ca.* verbs)
-│   ├── enabled_event_types[]   DVCA, DVOP, RHTS, TEND, MRGR, etc.
-│   ├── notification_policy     Channels, SLA hours, escalation
-│   ├── election_policy         Who elects, evidence required
-│   ├── default_options[]       Default election per event type
-│   ├── cutoff_rules[]          Deadline rules per market/depository
-│   └── proceeds_ssi_mappings[] Which SSI receives CA proceeds
-│
-└── metadata                    Provenance
-    ├── source, source_ref
-    ├── created_by
-    └── regulatory_framework    UCITS, AIFMD, SEC, etc.
+```mermaid
+graph LR
+    DOC["TradingProfileDocument"]
+
+    DOC --> U["universe"]
+    U --> U1["base_currency"]
+    U --> U2["allowed_currencies[]"]
+    U --> U3["allowed_markets[]<br/><i>MIC + currencies + settlement types</i>"]
+    U --> U4["instrument_classes[]<br/><i>Class code + CFI + ISDA asset class</i>"]
+
+    DOC --> IM["investment_managers[]"]
+    IM --> IM1["manager (EntityRef)"]
+    IM --> IM2["role<br/><i>IM, SUB_ADVISOR, ...</i>"]
+    IM --> IM3["scope<br/><i>All or by markets/classes</i>"]
+    IM --> IM4["instruction_method"]
+
+    DOC --> ISDA["isda_agreements[]"]
+    ISDA --> IS1["counterparty (EntityRef)"]
+    ISDA --> IS2["governing_law<br/><i>NY | ENGLISH</i>"]
+    ISDA --> IS3["product_coverage[]"]
+    ISDA --> CSA["csa (CsaConfig)"]
+    CSA --> CSA1["csa_type<br/><i>VM | VM_IM | IM</i>"]
+    CSA --> CSA2["thresholds"]
+    CSA --> CSA3["eligible_collateral[]"]
+    CSA --> CSA4["collateral_ssi_ref"]
+
+    DOC --> SC["settlement_config"]
+    SC --> SC1["matching_platforms[]"]
+    SC --> SC2["settlement_identities[]"]
+    SC --> SC3["subcustodian_network[]"]
+    SC --> SC4["instruction_preferences[]"]
+
+    DOC --> BR["booking_rules[]"]
+    BR --> BR1["name, priority"]
+    BR --> BR2["match<br/><i>instrument, market, ccy, cpty</i>"]
+    BR --> BR3["ssi_ref"]
+
+    DOC --> SI["standing_instructions{}"]
+    SI --> SI1["SECURITIES[]"]
+    SI --> SI2["CASH[]"]
+    SI --> SI3["OTC_COLLATERAL[]"]
+    SI --> SI4["FUND_ACCOUNTING[]"]
+
+    DOC --> PM["pricing_matrix[]"]
+    PM --> PM1["scope"]
+    PM --> PM2["source<br/><i>BBG, REUTERS, MARKIT</i>"]
+    PM --> PM3["fallback + staleness"]
+
+    DOC --> VC["valuation_config"]
+    VC --> VC1["frequency, cutoff, tz"]
+    VC --> VC2["swing_pricing"]
+
+    DOC --> CO["constraints"]
+    CO --> CO1["short_selling"]
+    CO --> CO2["leverage"]
+
+    DOC --> CA["corporate_actions"]
+    CA --> CA1["enabled_event_types[]"]
+    CA --> CA2["notification_policy"]
+    CA --> CA3["election_policy"]
+    CA --> CA4["default_options[]"]
+    CA --> CA5["cutoff_rules[]"]
+    CA --> CA6["proceeds_ssi_mappings[]"]
+
+    DOC --> MD["metadata"]
+    MD --> MD1["source, source_ref"]
+    MD --> MD2["created_by"]
+    MD --> MD3["regulatory_framework"]
+
+    style DOC fill:#2d6da4,color:#fff
+    style U fill:#4a90d9,color:#fff
+    style IM fill:#50b848,color:#fff
+    style ISDA fill:#d0021b,color:#fff
+    style SC fill:#f5a623,color:#fff
+    style BR fill:#9013fe,color:#fff
+    style SI fill:#7b68ee,color:#fff
+    style PM fill:#e67e22,color:#fff
+    style VC fill:#1abc9c,color:#fff
+    style CO fill:#e74c3c,color:#fff
+    style CA fill:#8e44ad,color:#fff
+    style MD fill:#95a5a6,color:#fff
 ```
 
 ### 4.1 Entity Reference Pattern
@@ -240,44 +247,58 @@ This allows the document to be portable — references are resolved to UUIDs at 
 
 Materialization is the deterministic projection from JSONB document to operational tables. It is triggered by the `trading-profile.materialize` verb.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  MATERIALIZATION PIPELINE                                                    │
-│                                                                              │
-│  (trading-profile.materialize :profile-id @profile :sections all)           │
-│                                                                              │
-│  1. Load document from cbu_trading_profiles                                 │
-│  2. Resolve EntityRefs → UUIDs (via entity linking)                         │
-│  3. For each section (or all):                                              │
-│                                                                              │
-│  universe ──────────► custody.cbu_instrument_universe                       │
-│    Cross-product: instrument_class × market × currency                      │
-│    OTC: instrument_class × counterparty (no market)                         │
-│                                                                              │
-│  standing_instructions ──► custody.cbu_ssi                                  │
-│    One row per SSI name per category                                        │
-│                                                                              │
-│  booking_rules ─────────► custody.ssi_booking_rules                         │
-│    Priority-based with specificity_score (GENERATED column)                 │
-│                                                                              │
-│  isda_agreements ───────► custody.isda_agreements                           │
-│                         + custody.isda_product_coverage                     │
-│                         + custody.csa_agreements                            │
-│                                                                              │
-│  investment_managers ───► custody.cbu_im_assignments                        │
-│                                                                              │
-│  pricing_matrix ────────► custody.cbu_pricing_config                        │
-│                                                                              │
-│  corporate_actions ─────► custody.cbu_ca_preferences                        │
-│                         + custody.cbu_ca_instruction_windows                │
-│                         + custody.cbu_ca_ssi_mappings                       │
-│                                                                              │
-│  settlement_config ─────► custody.subcustodian_network                      │
-│                         + custody.cbu_settlement_chains                     │
-│                                                                              │
-│  4. Write MaterializationResult audit record                                │
-│     (sections, records created/updated/deleted, errors, duration)           │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    VERB["(trading-profile.materialize :profile-id @profile :sections all)"]
+
+    VERB --> S1["1. Load document<br/>from cbu_trading_profiles"]
+    S1 --> S2["2. Resolve EntityRefs → UUIDs<br/>via entity linking"]
+    S2 --> S3["3. Project each section"]
+
+    S3 --> P1["universe"]
+    P1 -->|"instrument_class x market x currency<br/>OTC: class x counterparty"| T1["custody.cbu_instrument_universe"]
+
+    S3 --> P2["standing_instructions"]
+    P2 -->|"one row per SSI name per category"| T2["custody.cbu_ssi"]
+
+    S3 --> P3["booking_rules"]
+    P3 -->|"priority-based, specificity_score GENERATED"| T3["custody.ssi_booking_rules"]
+
+    S3 --> P4["isda_agreements"]
+    P4 --> T4a["custody.isda_agreements"]
+    P4 --> T4b["custody.isda_product_coverage"]
+    P4 --> T4c["custody.csa_agreements"]
+
+    S3 --> P5["investment_managers"]
+    P5 --> T5["custody.cbu_im_assignments"]
+
+    S3 --> P6["pricing_matrix"]
+    P6 --> T6["custody.cbu_pricing_config"]
+
+    S3 --> P7["corporate_actions"]
+    P7 --> T7a["custody.cbu_ca_preferences"]
+    P7 --> T7b["custody.cbu_ca_instruction_windows"]
+    P7 --> T7c["custody.cbu_ca_ssi_mappings"]
+
+    S3 --> P8["settlement_config"]
+    P8 --> T8a["custody.subcustodian_network"]
+    P8 --> T8b["custody.cbu_settlement_chains"]
+
+    S3 --> S4["4. Write MaterializationResult audit<br/><i>sections, records created/updated/deleted, errors, duration</i>"]
+
+    style VERB fill:#2d6da4,color:#fff
+    style S1 fill:#e8f4e8,stroke:#50b848
+    style S2 fill:#e8f4e8,stroke:#50b848
+    style S3 fill:#e8f4e8,stroke:#50b848
+    style S4 fill:#e8f4e8,stroke:#50b848
+    style P1 fill:#4a90d9,color:#fff
+    style P2 fill:#4a90d9,color:#fff
+    style P3 fill:#4a90d9,color:#fff
+    style P4 fill:#4a90d9,color:#fff
+    style P5 fill:#4a90d9,color:#fff
+    style P6 fill:#4a90d9,color:#fff
+    style P7 fill:#4a90d9,color:#fff
+    style P8 fill:#4a90d9,color:#fff
 ```
 
 ### 5.1 Idempotency
@@ -305,39 +326,44 @@ The `sections` argument allows materializing only specific sections:
 
 Settlement routing follows a three-layer architecture:
 
+```mermaid
+graph TB
+    subgraph L1["Layer 1: UNIVERSE — What can be traded"]
+        U["custody.cbu_instrument_universe<br/><i>instrument_class x market x currency x counterparty</i><br/>Drives: SSI completeness checks, trade validation"]
+    end
+
+    subgraph L2["Layer 2: SSI — Where to settle"]
+        SSI["custody.cbu_ssi<br/><i>Pure account data: safekeeping account, BIC, cash account</i><br/>No routing logic — just the destination"]
+    end
+
+    subgraph L3["Layer 3: BOOKING RULES — How to route"]
+        BR["custody.ssi_booking_rules<br/><i>ALERT-style priority matching</i><br/>Given a trade's attributes → which SSI?"]
+    end
+
+    U --> BR
+    BR --> SSI
+
+    style L1 fill:#e8f0fe,stroke:#4a90d9
+    style L2 fill:#e8f4e8,stroke:#50b848
+    style L3 fill:#fef3e8,stroke:#f5a623
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    THREE-LAYER SETTLEMENT MODEL                              │
-│                                                                              │
-│  Layer 1: UNIVERSE (What can be traded)                                     │
-│  ─────────────────────────────────────                                      │
-│  custody.cbu_instrument_universe                                            │
-│  Declares: instrument_class × market × currency × counterparty             │
-│  Drives: SSI completeness checks, trade validation                         │
-│                                                                              │
-│  Layer 2: SSI (Where to settle)                                             │
-│  ──────────────────────────────                                             │
-│  custody.cbu_ssi                                                            │
-│  Pure account data: safekeeping account, BIC, cash account                 │
-│  No routing logic — just the destination                                    │
-│                                                                              │
-│  Layer 3: BOOKING RULES (How to route)                                      │
-│  ─────────────────────────────────────                                      │
-│  custody.ssi_booking_rules                                                  │
-│  ALERT-style priority matching:                                             │
-│  Given a trade's attributes → which SSI to use?                            │
-│                                                                              │
-│  ┌──────────────────────────────────────────────────────────────────┐      │
-│  │  Trade: EQUITY on XLON in GBP, DVP                               │      │
-│  │         │                                                         │      │
-│  │         ▼                                                         │      │
-│  │  Rule 10: EQUITY + XLON + GBP → SSI "UK-EQUITY-DVP"     ← match │      │
-│  │  Rule 20: EQUITY + any  + GBP → SSI "GBP-EQUITY"                │      │
-│  │  Rule 50: any    + any  + any → SSI "DEFAULT"                    │      │
-│  │                                                                   │      │
-│  │  Winner: Rule 10 (highest specificity at lowest priority number)  │      │
-│  └──────────────────────────────────────────────────────────────────┘      │
-└─────────────────────────────────────────────────────────────────────────────┘
+
+**Booking rule matching example:**
+
+```mermaid
+graph LR
+    TRADE["Trade<br/>EQUITY on XLON in GBP, DVP"]
+    TRADE --> R10["Rule 10<br/>EQUITY + XLON + GBP<br/>→ SSI 'UK-EQUITY-DVP'"]
+    TRADE -.-> R20["Rule 20<br/>EQUITY + any + GBP<br/>→ SSI 'GBP-EQUITY'"]
+    TRADE -.-> R50["Rule 50<br/>any + any + any<br/>→ SSI 'DEFAULT'"]
+
+    R10 -->|"Winner: highest specificity,<br/>lowest priority number"| WIN["SSI: UK-EQUITY-DVP"]
+
+    style TRADE fill:#2d6da4,color:#fff
+    style R10 fill:#50b848,color:#fff
+    style R20 fill:#ccc,color:#333
+    style R50 fill:#ccc,color:#333
+    style WIN fill:#9013fe,color:#fff
 ```
 
 ### 6.1 Specificity Score
@@ -399,75 +425,89 @@ LIMIT 1;
 
 ISDA master agreements and CSAs are not separate from the trading matrix — they are the **4th dimension**. Without an ISDA in place with a counterparty, a CBU cannot trade OTC derivatives with them. Without a CSA, collateral cannot flow.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    ISDA/CSA IN THE PERMISSION CUBE                           │
-│                                                                              │
-│  Listed Instruments:                                                        │
-│    EQUITY × XLON × GBP = permitted (3D check)                              │
-│                                                                              │
-│  OTC Derivatives:                                                           │
-│    IRS × (no market) × USD × Goldman Sachs = permitted                     │
-│    ONLY IF:                                                                 │
-│      ✓ ISDA master agreement exists with Goldman Sachs                      │
-│      ✓ ISDA product coverage includes RATES/IRS                            │
-│      ✓ CSA is in place (for margined products)                             │
-│      ✓ Collateral SSI is configured                                        │
-│      ✓ Booking rule exists for OTC + Goldman → collateral SSI              │
-│                                                                              │
-│  The ISDA is the "market access agreement" for OTC —                        │
-│  analogous to exchange membership for listed instruments.                   │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph LISTED["Listed Instruments (3D check)"]
+        L["EQUITY x XLON x GBP = permitted"]
+    end
+
+    subgraph OTC["OTC Derivatives (4D check)"]
+        O["IRS x (no market) x USD x Goldman Sachs"]
+        O --> C1["ISDA master agreement exists<br/>with Goldman Sachs"]
+        O --> C2["ISDA product coverage<br/>includes RATES / IRS"]
+        O --> C3["CSA is in place<br/>(for margined products)"]
+        O --> C4["Collateral SSI<br/>is configured"]
+        O --> C5["Booking rule exists<br/>OTC + Goldman → collateral SSI"]
+    end
+
+    C1 & C2 & C3 & C4 & C5 --> PERMIT["Permitted"]
+
+    NOTE["The ISDA is the 'market access agreement' for OTC —<br/>analogous to exchange membership for listed instruments."]
+
+    style LISTED fill:#e8f4e8,stroke:#50b848
+    style OTC fill:#fde8e8,stroke:#d0021b
+    style PERMIT fill:#50b848,color:#fff
+    style NOTE fill:#fffde8,stroke:#f5a623
 ```
 
 ### 7.2 ISDA Data Model
 
-```
-┌────────────────────────────────────────────────────────┐
-│  custody.isda_agreements                                │
-│  ──────────────────────                                 │
-│  isda_id (PK)                                           │
-│  cbu_id → cbus                                          │
-│  counterparty_entity_id → entities                      │
-│  agreement_date, governing_law (NY/ENGLISH)             │
-│  effective_date, termination_date                       │
-│  is_active                                              │
-│                                                         │
-│         │ 1:N                                           │
-│         ▼                                               │
-│  custody.isda_product_coverage                          │
-│  ─────────────────────────────                          │
-│  coverage_id (PK)                                       │
-│  isda_id → isda_agreements                              │
-│  instrument_class_id → instrument_classes               │
-│  isda_taxonomy_id → isda_product_taxonomy               │
-│                                                         │
-│         │ 1:0..1                                        │
-│         ▼                                               │
-│  custody.csa_agreements                                 │
-│  ──────────────────────                                 │
-│  csa_id (PK)                                            │
-│  isda_id → isda_agreements                              │
-│  csa_type: VM, VM_IM, IM                                │
-│  threshold_amount, threshold_currency                   │
-│  minimum_transfer_amount, rounding_amount               │
-│  collateral_ssi_id → cbu_ssi                           │
-│  is_active                                              │
-└────────────────────────────────────────────────────────┘
+```mermaid
+erDiagram
+    isda_agreements {
+        uuid isda_id PK
+        uuid cbu_id FK
+        uuid counterparty_entity_id FK
+        date agreement_date
+        varchar governing_law "NY | ENGLISH"
+        date effective_date
+        date termination_date
+        boolean is_active
+    }
+
+    isda_product_coverage {
+        uuid coverage_id PK
+        uuid isda_id FK
+        uuid instrument_class_id FK
+        uuid isda_taxonomy_id FK
+    }
+
+    csa_agreements {
+        uuid csa_id PK
+        uuid isda_id FK
+        varchar csa_type "VM | VM_IM | IM"
+        numeric threshold_amount
+        varchar threshold_currency
+        numeric minimum_transfer_amount
+        numeric rounding_amount
+        uuid collateral_ssi_id FK
+        boolean is_active
+    }
+
+    isda_agreements ||--o{ isda_product_coverage : "1:N covers"
+    isda_agreements ||--o| csa_agreements : "1:0..1 has"
+    csa_agreements }o--o| cbu_ssi : "collateral account"
+    isda_product_coverage }o--o| instrument_classes : "maps"
+    isda_product_coverage }o--o| isda_product_taxonomy : "maps"
 ```
 
 ### 7.3 CSA Collateral Flow
 
-```
-1. Margin call triggered (threshold breached)
-2. CSA determines:
-   - Threshold amount (below which no call needed)
-   - Minimum transfer amount (MTA)
-   - Rounding
-   - Eligible collateral (CASH, GOVT_BOND, etc. with haircuts)
-3. Collateral transferred to SSI referenced by collateral_ssi_ref
-4. The SSI lives in standing_instructions.OTC_COLLATERAL
-5. Booking rules route collateral flows to the correct account
+```mermaid
+sequenceDiagram
+    participant MC as Margin Call
+    participant CSA as CSA Terms
+    participant SSI as Collateral SSI
+    participant BR as Booking Rules
+    participant ACCT as Settlement Account
+
+    MC->>CSA: Threshold breached
+    CSA->>CSA: Check threshold amount<br/>(below = no call needed)
+    CSA->>CSA: Apply MTA + rounding
+    CSA->>CSA: Select eligible collateral<br/>(CASH, GOVT_BOND, ... with haircuts)
+    CSA->>SSI: Transfer via collateral_ssi_ref<br/>(standing_instructions.OTC_COLLATERAL)
+    SSI->>BR: Route collateral flow
+    BR->>ACCT: Deliver to correct account
 ```
 
 ### 7.4 ISDA Product Taxonomy
@@ -492,42 +532,32 @@ This enables regulatory reporting (UPI codes) and product coverage validation.
 
 Products (CUSTODY, PRIME_BROKERAGE, FUND_ACCOUNTING, etc.) add attributes to matrix entries — they don't define the trading universe. The overlay system layers product-specific services on top of the base matrix.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  PRODUCT OVERLAY ARCHITECTURE                                                │
-│                                                                              │
-│  Base Matrix (from TradingProfileDocument):                                 │
-│  ┌─────────────────────────────────────────────────────────┐               │
-│  │ EQUITY × XLON × GBP = permitted                        │               │
-│  │ EQUITY × XNYS × USD = permitted                        │               │
-│  │ IRS × Goldman × USD = permitted (ISDA in place)         │               │
-│  └─────────────────────────────────────────────────────────┘               │
-│                                                                              │
-│  Product Overlays (from cbu_matrix_product_overlay):                        │
-│  ┌─────────────────────────────────────────────────────────┐               │
-│  │ CUSTODY on EQUITY × XLON:                               │               │
-│  │   + settlement service                                  │               │
-│  │   + corporate actions processing                        │               │
-│  │   + income collection                                   │               │
-│  │                                                          │               │
-│  │ PRIME_BROKERAGE on EQUITY × XNYS:                       │               │
-│  │   + margin lending                                      │               │
-│  │   + short selling                                       │               │
-│  │   + synthetic prime                                     │               │
-│  │                                                          │               │
-│  │ CUSTODY on IRS × Goldman (NULL market, NULL currency):  │               │
-│  │   + OTC clearing support                                │               │
-│  │   + collateral management                               │               │
-│  └─────────────────────────────────────────────────────────┘               │
-│                                                                              │
-│  Effective Matrix (v_cbu_matrix_effective view):                            │
-│  ┌─────────────────────────────────────────────────────────┐               │
-│  │ EQUITY × XLON × GBP                                    │               │
-│  │   products: [CUSTODY]                                   │               │
-│  │   services: [settlement, CA processing, income]         │               │
-│  │   slas: [T+2 settlement, CA notify 24h]                │               │
-│  └─────────────────────────────────────────────────────────┘               │
-└─────────────────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph BASE["Base Matrix (from TradingProfileDocument)"]
+        B1["EQUITY x XLON x GBP = permitted"]
+        B2["EQUITY x XNYS x USD = permitted"]
+        B3["IRS x Goldman x USD = permitted<br/><i>(ISDA in place)</i>"]
+    end
+
+    subgraph OVERLAY["Product Overlays (cbu_matrix_product_overlay)"]
+        O1["CUSTODY on EQUITY x XLON<br/>+ settlement service<br/>+ corporate actions processing<br/>+ income collection"]
+        O2["PRIME_BROKERAGE on EQUITY x XNYS<br/>+ margin lending<br/>+ short selling<br/>+ synthetic prime"]
+        O3["CUSTODY on IRS x Goldman<br/><i>(NULL market, NULL currency)</i><br/>+ OTC clearing support<br/>+ collateral management"]
+    end
+
+    subgraph EFF["Effective Matrix (v_cbu_matrix_effective)"]
+        E1["EQUITY x XLON x GBP<br/>products: CUSTODY<br/>services: settlement, CA processing, income<br/>slas: T+2 settlement, CA notify 24h"]
+    end
+
+    B1 --> O1
+    B2 --> O2
+    B3 --> O3
+    O1 --> E1
+
+    style BASE fill:#e8f0fe,stroke:#4a90d9
+    style OVERLAY fill:#fef3e8,stroke:#f5a623
+    style EFF fill:#e8f4e8,stroke:#50b848
 ```
 
 ### 8.1 Overlay Table
@@ -560,44 +590,50 @@ CREATE TABLE "ob-poc".cbu_matrix_product_overlay (
 
 ### 9.1 Instrument Class Taxonomy (67 Active Classes)
 
-```
-EQUITY
-├── EQUITY_COMMON
-├── EQUITY_PREFERRED
-├── EQUITY_ETF
-├── EQUITY_ADR
-├── EQUITY_GDR
-├── EQUITY_REIT
-├── EQUITY_WARRANT
-├── EQUITY_RIGHT
-└── EQUITY_CONVERTIBLE
+```mermaid
+graph TD
+    ROOT["Instrument Classes<br/><i>67 active</i>"]
 
-FIXED_INCOME
-├── GOVT_BOND
-├── CORP_BOND
-├── MUNI_BOND
-├── COVERED_BOND
-├── INFLATION_LINKED_BOND
-├── CONVERTIBLE_BOND
-├── HIGH_YIELD_BOND
-├── SUKUK
-├── ABS / MBS / CDO / CLO
+    ROOT --> EQ["EQUITY"]
+    EQ --> EQ1["EQUITY_COMMON"]
+    EQ --> EQ2["EQUITY_PREFERRED"]
+    EQ --> EQ3["EQUITY_ETF"]
+    EQ --> EQ4["EQUITY_ADR / GDR"]
+    EQ --> EQ5["EQUITY_REIT"]
+    EQ --> EQ6["EQUITY_WARRANT / RIGHT"]
+    EQ --> EQ7["EQUITY_CONVERTIBLE"]
 
-MONEY_MARKET
-├── MMF / CD / COMMERCIAL_PAPER / T_BILL / REPO
+    ROOT --> FI["FIXED_INCOME"]
+    FI --> FI1["GOVT_BOND"]
+    FI --> FI2["CORP_BOND"]
+    FI --> FI3["MUNI_BOND / COVERED_BOND"]
+    FI --> FI4["INFLATION_LINKED_BOND"]
+    FI --> FI5["CONVERTIBLE / HIGH_YIELD / SUKUK"]
+    FI --> FI6["ABS / MBS / CDO / CLO"]
 
-LISTED_DERIVATIVE
-├── EQUITY_FUTURE / BOND_FUTURE / INDEX_FUTURE / COMMODITY_FUTURE / FX_FUTURE
-├── EQUITY_OPTION / INDEX_OPTION / COMMODITY_OPTION / FX_OPTION_LISTED
+    ROOT --> MM["MONEY_MARKET"]
+    MM --> MM1["MMF / CD / COMMERCIAL_PAPER / T_BILL / REPO"]
 
-OTC_DERIVATIVE
-├── OTC_IRS (IRS, FRA, CAP_FLOOR, SWAPTION, XCCY_SWAP)
-├── OTC_FX  (FX_FORWARD, FX_SWAP, FX_OPTION, FX_NDF)
-├── OTC_CDS (CDS, TRS, CDX, ITRAXX)
-└── OTC_EQD (EQUITY_SWAP, VARIANCE_SWAP, DIVIDEND_SWAP)
+    ROOT --> LD["LISTED_DERIVATIVE"]
+    LD --> LD1["EQUITY / BOND / INDEX /<br/>COMMODITY / FX FUTURE"]
+    LD --> LD2["EQUITY / INDEX /<br/>COMMODITY / FX OPTION"]
 
-CIS (Collective Investment Schemes)
-├── MUTUAL_FUND / ETF / HEDGE_FUND / PRIVATE_EQUITY / REAL_ESTATE_FUND
+    ROOT --> OTC["OTC_DERIVATIVE"]
+    OTC --> OTC1["OTC_IRS<br/><i>IRS, FRA, CAP_FLOOR,<br/>SWAPTION, XCCY_SWAP</i>"]
+    OTC --> OTC2["OTC_FX<br/><i>FX_FORWARD, FX_SWAP,<br/>FX_OPTION, FX_NDF</i>"]
+    OTC --> OTC3["OTC_CDS<br/><i>CDS, TRS, CDX, ITRAXX</i>"]
+    OTC --> OTC4["OTC_EQD<br/><i>EQUITY_SWAP, VARIANCE,<br/>DIVIDEND_SWAP</i>"]
+
+    ROOT --> CIS["CIS"]
+    CIS --> CIS1["MUTUAL_FUND / ETF /<br/>HEDGE_FUND / PE / RE_FUND"]
+
+    style ROOT fill:#2d6da4,color:#fff
+    style EQ fill:#4a90d9,color:#fff
+    style FI fill:#50b848,color:#fff
+    style MM fill:#f5a623,color:#fff
+    style LD fill:#e67e22,color:#fff
+    style OTC fill:#d0021b,color:#fff
+    style CIS fill:#8e44ad,color:#fff
 ```
 
 Each class carries:
@@ -668,8 +704,15 @@ cutoff_rules:
 
 Multi-hop settlement chains define the intermediary path for complex markets:
 
-```
-Trade → Custodian → Subcustodian → Local Agent → CSD
+```mermaid
+graph LR
+    TRADE["Trade"] --> CUST["Custodian"]
+    CUST --> SUB["Subcustodian"]
+    SUB --> LOCAL["Local Agent"]
+    LOCAL --> CSD["CSD"]
+
+    style TRADE fill:#2d6da4,color:#fff
+    style CSD fill:#50b848,color:#fff
 ```
 
 | Table | Purpose |
