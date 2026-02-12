@@ -40,6 +40,11 @@ domains:
             required: false
             default: "5.0"
             description: UBO threshold percentage
+          - name: max-outreach-items
+            type: integer
+            required: false
+            default: "8"
+            description: Maximum number of outreach plan items (1-50)
         returns:
           type: record
           description: Summary of the skeleton build pipeline execution
@@ -60,5 +65,9 @@ domains:
               type: uuid
             - name: skeleton_ready
               type: boolean
+            - name: items_capped
+              type: boolean
+            - name: total_gaps_before_cap
+              type: integer
             - name: steps_completed
               type: list

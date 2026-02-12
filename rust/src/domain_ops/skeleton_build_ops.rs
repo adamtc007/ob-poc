@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use crate::dsl_v2::ast::VerbCall;
 use crate::dsl_v2::executor::{ExecutionContext, ExecutionResult};
+use rust_decimal::prelude::ToPrimitive;
 
 use super::helpers::{extract_string_opt, extract_uuid};
 use super::CustomOperation;
@@ -38,6 +39,8 @@ pub struct SkeletonBuildResult {
     pub coverage_pct: f64,
     pub outreach_plan_id: Option<Uuid>,
     pub skeleton_ready: bool,
+    pub items_capped: bool,
+    pub total_gaps_before_cap: i32,
     pub steps_completed: Vec<String>,
 }
 
@@ -73,6 +76,14 @@ impl CustomOperation for SkeletonBuildOp {
         let threshold: f64 = extract_string_opt(verb_call, "threshold")
             .and_then(|s| s.parse().ok())
             .unwrap_or(5.0);
+        let max_outreach_items: usize = extract_string_opt(verb_call, "max-outreach-items")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(8)
+            .clamp(1, 50);
+
+        // All 7 steps run within a single transaction.
+        // On any failure, the transaction is rolled back automatically (drop).
+        let mut tx = pool.begin().await?;
 
         let mut steps_completed = Vec::new();
 
@@ -87,7 +98,7 @@ impl CustomOperation for SkeletonBuildOp {
         .bind(run_id)
         .bind(&source)
         .bind(case_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
         // Link import run to case
@@ -98,29 +109,30 @@ impl CustomOperation for SkeletonBuildOp {
         )
         .bind(case_id)
         .bind(run_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
         steps_completed.push("import-run.begin".to_string());
 
         // Step 2: Graph validate — real cycle detection, supply checks, anomaly persistence
-        let anomalies_found = run_graph_validate(pool, case_id).await?;
+        let anomalies_found = run_graph_validate(&mut tx, case_id).await?;
         steps_completed.push("graph.validate".to_string());
 
         // Step 3: UBO compute chains — real DFS chain traversal with percentage multiplication
         let (determination_run_id, ubo_candidates_found) =
-            run_ubo_compute(pool, case_id, threshold).await?;
+            run_ubo_compute(&mut tx, case_id, threshold).await?;
         steps_completed.push("ubo.compute-chains".to_string());
 
         // Step 4: Coverage compute — real 4-prong coverage checks
-        let coverage_pct = run_coverage_compute(pool, case_id, determination_run_id).await?;
+        let coverage_pct = run_coverage_compute(&mut tx, case_id, determination_run_id).await?;
         steps_completed.push("coverage.compute".to_string());
 
         // Step 5: Outreach plan generate — real gap-to-doc mapping
-        let outreach_plan_id = run_outreach_plan(pool, case_id, determination_run_id).await?;
+        let (outreach_plan_id, total_gaps_before_cap) =
+            run_outreach_plan(&mut tx, case_id, determination_run_id, max_outreach_items).await?;
         steps_completed.push("outreach.plan-generate".to_string());
 
         // Step 6: Tollgate evaluate (SKELETON_READY) — real gate evaluation
-        let skeleton_ready = run_tollgate_evaluate(pool, case_id).await?;
+        let skeleton_ready = run_tollgate_evaluate(&mut tx, case_id).await?;
         steps_completed.push("tollgate.evaluate-gate".to_string());
 
         // Step 7: Complete import run
@@ -130,9 +142,11 @@ impl CustomOperation for SkeletonBuildOp {
                WHERE run_id = $1"#,
         )
         .bind(run_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
         steps_completed.push("import-run.complete".to_string());
+
+        tx.commit().await?;
 
         let result = SkeletonBuildResult {
             case_id,
@@ -143,6 +157,8 @@ impl CustomOperation for SkeletonBuildOp {
             coverage_pct,
             outreach_plan_id,
             skeleton_ready,
+            items_capped: total_gaps_before_cap > max_outreach_items as i32,
+            total_gaps_before_cap,
             steps_completed,
         };
 
@@ -165,10 +181,10 @@ impl CustomOperation for SkeletonBuildOp {
 //   6. Persist anomalies to kyc.research_anomalies
 // ============================================================================
 
-/// Internal edge representation for graph validation.
+/// Edge representation for graph validation.
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
-struct Edge {
+pub(crate) struct Edge {
     relationship_id: Uuid,
     from_entity_id: Uuid,
     to_entity_id: Uuid,
@@ -177,18 +193,24 @@ struct Edge {
     source: Option<String>,
 }
 
-/// A single graph anomaly.
+/// A single graph anomaly detected during validation.
 #[cfg(feature = "database")]
 #[derive(Debug, Clone)]
-struct GraphAnomaly {
+pub(crate) struct GraphAnomaly {
     anomaly_type: String,
     entity_ids: Vec<Uuid>,
     detail: String,
     severity: String,
 }
 
+/// Shared skeleton build step 2: validate entity relationship graph for a case.
+/// Returns the number of anomalies found.
+/// NOTE: standalone ops in graph_validate_ops.rs have their own pool-based implementation.
 #[cfg(feature = "database")]
-async fn run_graph_validate(pool: &PgPool, case_id: Uuid) -> Result<i64> {
+pub async fn run_graph_validate(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    case_id: Uuid,
+) -> Result<i64> {
     // 1. Load edges scoped to this case's entity workstreams
     let rows: Vec<(Uuid, Uuid, Uuid, String, Option<rust_decimal::Decimal>, Option<String>)> =
         sqlx::query_as(
@@ -210,7 +232,7 @@ async fn run_graph_validate(pool: &PgPool, case_id: Uuid) -> Result<i64> {
             "#,
         )
         .bind(case_id)
-        .fetch_all(pool)
+        .fetch_all(&mut **tx)
         .await?;
 
     let edges: Vec<Edge> = rows
@@ -220,7 +242,7 @@ async fn run_graph_validate(pool: &PgPool, case_id: Uuid) -> Result<i64> {
             from_entity_id: from_id,
             to_entity_id: to_id,
             relationship_type: rel_type,
-            percentage: pct.map(|d| d.to_string().parse::<f64>().unwrap_or(0.0)),
+            percentage: pct.map(|d| d.to_f64().unwrap_or(0.0)),
             source: src,
         })
         .collect();
@@ -254,7 +276,7 @@ async fn run_graph_validate(pool: &PgPool, case_id: Uuid) -> Result<i64> {
                 r#"SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1 LIMIT 1"#,
             )
             .bind(case_id)
-            .fetch_optional(pool)
+            .fetch_optional(&mut **tx)
             .await?;
             row.map(|(id,)| id)
         };
@@ -276,7 +298,7 @@ async fn run_graph_validate(pool: &PgPool, case_id: Uuid) -> Result<i64> {
             )
             .bind(target_entity_id)
             .bind(case_id.to_string())
-            .fetch_one(pool)
+            .fetch_one(&mut **tx)
             .await?;
 
             for anomaly in &anomalies {
@@ -313,7 +335,7 @@ async fn run_graph_validate(pool: &PgPool, case_id: Uuid) -> Result<i64> {
                 .bind(rule_code)
                 .bind(db_severity)
                 .bind(&anomaly.detail)
-                .execute(pool)
+                .execute(&mut **tx)
                 .await?;
             }
         }
@@ -556,15 +578,22 @@ fn check_source_conflicts(edges: &[Edge], anomalies: &mut Vec<GraphAnomaly>) {
 //   7. Persist to ubo_determination_runs with JSONB snapshots
 // ============================================================================
 
+/// Shared skeleton build step 3: compute UBO chains via DFS ownership walk.
+/// Returns the number of UBO candidates found.
+/// NOTE: standalone ops in ubo_compute_ops.rs have their own pool-based implementation.
 #[cfg(feature = "database")]
-async fn run_ubo_compute(pool: &PgPool, case_id: Uuid, threshold: f64) -> Result<(Uuid, i64)> {
+pub async fn run_ubo_compute(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    case_id: Uuid,
+    threshold: f64,
+) -> Result<(Uuid, i64)> {
     let start = std::time::Instant::now();
 
     // 1. Load subject entities
     let subject_entities: Vec<(Uuid,)> =
         sqlx::query_as(r#"SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $1"#)
             .bind(case_id)
-            .fetch_all(pool)
+            .fetch_all(&mut **tx)
             .await?;
 
     let subject_entity_ids: Vec<Uuid> = subject_entities.iter().map(|(eid,)| *eid).collect();
@@ -587,7 +616,7 @@ async fn run_ubo_compute(pool: &PgPool, case_id: Uuid, threshold: f64) -> Result
             rust_decimal::Decimal::from_f64_retain(threshold)
                 .unwrap_or_else(|| rust_decimal::Decimal::new(500, 2)),
         )
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await?;
 
         return Ok((run_id, 0));
@@ -601,15 +630,13 @@ async fn run_ubo_compute(pool: &PgPool, case_id: Uuid, threshold: f64) -> Result
              AND (effective_to IS NULL OR effective_to > CURRENT_DATE)
            ORDER BY from_entity_id"#,
     )
-    .fetch_all(pool)
+    .fetch_all(&mut **tx)
     .await?;
 
     // 3. Build upward adjacency list: to_entity_id → Vec<(from_entity_id, pct)>
     let mut upward_adj: HashMap<Uuid, Vec<(Uuid, f64)>> = HashMap::new();
     for (from_id, to_id, pct) in &edge_rows {
-        let pct_val = pct
-            .map(|d| d.to_string().parse::<f64>().unwrap_or(0.0))
-            .unwrap_or(0.0);
+        let pct_val = pct.map(|d| d.to_f64().unwrap_or(0.0)).unwrap_or(0.0);
         upward_adj
             .entry(*to_id)
             .or_default()
@@ -634,7 +661,7 @@ async fn run_ubo_compute(pool: &PgPool, case_id: Uuid, threshold: f64) -> Result
            WHERE e.entity_id = ANY($1)"#,
     )
     .bind(&entity_id_vec)
-    .fetch_all(pool)
+    .fetch_all(&mut **tx)
     .await?;
 
     let entity_meta: HashMap<Uuid, (Option<String>, bool)> = entity_meta_rows
@@ -790,7 +817,7 @@ async fn run_ubo_compute(pool: &PgPool, case_id: Uuid, threshold: f64) -> Result
     .bind(&output_snapshot)
     .bind(&chains_snapshot)
     .bind(computation_ms)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await?;
 
     tracing::info!(
@@ -818,9 +845,12 @@ async fn run_ubo_compute(pool: &PgPool, case_id: Uuid, threshold: f64) -> Result
 //   7. Persist coverage_snapshot to determination run
 // ============================================================================
 
+/// Shared skeleton build step 4: compute 4-prong coverage for a case.
+/// Returns overall coverage percentage.
+/// NOTE: standalone ops in coverage_compute_ops.rs have their own pool-based implementation.
 #[cfg(feature = "database")]
-async fn run_coverage_compute(
-    pool: &PgPool,
+pub async fn run_coverage_compute(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
     determination_run_id: Uuid,
 ) -> Result<f64> {
@@ -831,7 +861,7 @@ async fn run_coverage_compute(
     )
     .bind(determination_run_id)
     .bind(case_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut **tx)
     .await?;
 
     let output_snapshot = match run_row {
@@ -845,7 +875,7 @@ async fn run_coverage_compute(
             )
             .bind(determination_run_id)
             .bind(serde_json::json!({"overall_coverage_pct": 0.0, "gaps": []}))
-            .execute(pool)
+            .execute(&mut **tx)
             .await?;
             return Ok(0.0);
         }
@@ -861,7 +891,7 @@ async fn run_coverage_compute(
         )
         .bind(determination_run_id)
         .bind(&snapshot)
-        .execute(pool)
+        .execute(&mut **tx)
         .await?;
         return Ok(100.0);
     }
@@ -876,16 +906,18 @@ async fn run_coverage_compute(
     let mut gaps: Vec<serde_json::Value> = Vec::new();
 
     for entity_id in &candidate_entity_ids {
-        // OWNERSHIP: check if entity has ownership edges with percentages
+        // OWNERSHIP: check if entity has ownership edges to case entities with percentages
         let ownership_count: (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
-                 AND relationship_type = 'ownership'
+                 AND to_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $2)
+                 AND relationship_type IN ('ownership', 'OWNERSHIP')
                  AND percentage IS NOT NULL
                  AND (effective_to IS NULL OR effective_to > CURRENT_DATE)"#,
         )
         .bind(entity_id)
-        .fetch_one(pool)
+        .bind(case_id)
+        .fetch_one(&mut **tx)
         .await
         .unwrap_or((0,));
 
@@ -911,7 +943,7 @@ async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await
         .unwrap_or((0,));
 
@@ -922,7 +954,7 @@ async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_optional(pool)
+        .fetch_optional(&mut **tx)
         .await?;
 
         let identity_covered = identity_count.0 > 0 || ws_verified.is_some();
@@ -937,15 +969,17 @@ async fn run_coverage_compute(
             }));
         }
 
-        // CONTROL: check control edges documented
+        // CONTROL: check control edges to case entities documented
         let control_count: (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
+                 AND to_entity_id IN (SELECT entity_id FROM kyc.entity_workstreams WHERE case_id = $2)
                  AND (relationship_type = 'control' OR control_type IS NOT NULL)
                  AND (effective_to IS NULL OR effective_to > CURRENT_DATE)"#,
         )
         .bind(entity_id)
-        .fetch_one(pool)
+        .bind(case_id)
+        .fetch_one(&mut **tx)
         .await
         .unwrap_or((0,));
 
@@ -972,7 +1006,7 @@ async fn run_coverage_compute(
         )
         .bind(entity_id)
         .bind(case_id)
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await
         .unwrap_or((0,));
 
@@ -1030,7 +1064,7 @@ async fn run_coverage_compute(
     )
     .bind(determination_run_id)
     .bind(&coverage_snapshot)
-    .execute(pool)
+    .execute(&mut **tx)
     .await?;
 
     tracing::info!(
@@ -1045,7 +1079,7 @@ async fn run_coverage_compute(
 
 /// Extract candidate entity IDs from a determination run's output_snapshot JSON.
 #[cfg(feature = "database")]
-fn extract_candidate_entity_ids(snapshot: &serde_json::Value) -> Vec<Uuid> {
+pub(crate) fn extract_candidate_entity_ids(snapshot: &serde_json::Value) -> Vec<Uuid> {
     // The snapshot may be an array of candidates or have a "candidates" key
     let arr = snapshot
         .as_array()
@@ -1066,7 +1100,7 @@ fn extract_candidate_entity_ids(snapshot: &serde_json::Value) -> Vec<Uuid> {
 
 /// Update prong (covered, total) counter.
 #[cfg(feature = "database")]
-fn update_prong(totals: &mut HashMap<&str, (i32, i32)>, prong: &str, is_covered: bool) {
+pub(crate) fn update_prong(totals: &mut HashMap<&str, (i32, i32)>, prong: &str, is_covered: bool) {
     if let Some(counts) = totals.get_mut(prong) {
         counts.1 += 1;
         if is_covered {
@@ -1086,12 +1120,16 @@ fn update_prong(totals: &mut HashMap<&str, (i32, i32)>, prong: &str, is_covered:
 //   5. Insert plan + items
 // ============================================================================
 
+/// Shared skeleton build step 5: generate outreach plan from coverage gaps.
+/// Returns (plan_id, total_gaps_before_cap).
+/// NOTE: standalone ops in outreach_plan_ops.rs have their own pool-based implementation.
 #[cfg(feature = "database")]
-async fn run_outreach_plan(
-    pool: &PgPool,
+pub async fn run_outreach_plan(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     case_id: Uuid,
     determination_run_id: Uuid,
-) -> Result<Option<Uuid>> {
+    max_outreach_items: usize,
+) -> Result<(Option<Uuid>, i32)> {
     // 1. Read coverage snapshot to get gaps
     let snapshot_row: Option<(Option<serde_json::Value>,)> = sqlx::query_as(
         r#"SELECT coverage_snapshot FROM kyc.ubo_determination_runs
@@ -1099,7 +1137,7 @@ async fn run_outreach_plan(
     )
     .bind(determination_run_id)
     .bind(case_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut **tx)
     .await?;
 
     let coverage_snapshot = snapshot_row.and_then(|(snap,)| snap);
@@ -1123,10 +1161,10 @@ async fn run_outreach_plan(
         )
         .bind(case_id)
         .bind(determination_run_id)
-        .fetch_one(pool)
+        .fetch_one(&mut **tx)
         .await?;
 
-        return Ok(Some(plan_id.0));
+        return Ok((Some(plan_id.0), 0));
     }
 
     // 2. Map gaps to outreach items with doc type mapping per spec 2A.2
@@ -1144,7 +1182,7 @@ async fn run_outreach_plan(
         r#"SELECT subject_entity_id FROM kyc.ubo_determination_runs WHERE run_id = $1"#,
     )
     .bind(determination_run_id)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await?;
 
     let mut planned_items: Vec<PlannedItem> = gaps
@@ -1208,8 +1246,16 @@ async fn run_outreach_plan(
             .then(a.entity_id.cmp(&b.entity_id))
     });
 
-    // 4. Cap at 8 items
-    planned_items.truncate(8);
+    // 4. Cap at max_outreach_items (configurable, default 8)
+    let total_gaps_before_cap = planned_items.len() as i32;
+    planned_items.truncate(max_outreach_items);
+    if total_gaps_before_cap > max_outreach_items as i32 {
+        tracing::warn!(
+            "skeleton.build: outreach plan capped at {} items, {} gaps dropped",
+            max_outreach_items,
+            total_gaps_before_cap - max_outreach_items as i32
+        );
+    }
 
     let items_count = planned_items.len() as i32;
 
@@ -1222,7 +1268,7 @@ async fn run_outreach_plan(
     .bind(case_id)
     .bind(determination_run_id)
     .bind(items_count)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await?;
 
     for item in &planned_items {
@@ -1240,18 +1286,19 @@ async fn run_outreach_plan(
         .bind(item.doc_type)
         .bind(item.priority)
         .bind(&item.gap_ref)
-        .execute(pool)
+        .execute(&mut **tx)
         .await?;
     }
 
     tracing::info!(
-        "skeleton.build step 5: outreach.plan-generate case={} plan={} items={}",
+        "skeleton.build step 5: outreach.plan-generate case={} plan={} items={} total_gaps={}",
         case_id,
         plan_id.0,
-        items_count
+        items_count,
+        total_gaps_before_cap
     );
 
-    Ok(Some(plan_id.0))
+    Ok((Some(plan_id.0), total_gaps_before_cap))
 }
 
 // ============================================================================
@@ -1264,8 +1311,14 @@ async fn run_outreach_plan(
 //   4. Record evaluation in kyc.tollgate_evaluations
 // ============================================================================
 
+/// Shared skeleton build step 6: evaluate SKELETON_READY tollgate.
+/// Returns true if the skeleton is ready (all gates passed).
+/// NOTE: standalone ops in tollgate_evaluate_ops.rs have their own pool-based implementation.
 #[cfg(feature = "database")]
-async fn run_tollgate_evaluate(pool: &PgPool, case_id: Uuid) -> Result<bool> {
+pub async fn run_tollgate_evaluate(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    case_id: Uuid,
+) -> Result<bool> {
     // 1. Load gate definition (with fallback defaults if ref data not seeded)
     let gate_row: Option<(String, serde_json::Value)> = sqlx::query_as(
         r#"SELECT tollgate_id, default_thresholds
@@ -1273,7 +1326,7 @@ async fn run_tollgate_evaluate(pool: &PgPool, case_id: Uuid) -> Result<bool> {
            WHERE tollgate_id = 'SKELETON_READY'"#,
     )
     .bind(case_id)
-    .fetch_optional(pool)
+    .fetch_optional(&mut **tx)
     .await?;
 
     let thresholds = gate_row
@@ -1294,7 +1347,7 @@ async fn run_tollgate_evaluate(pool: &PgPool, case_id: Uuid) -> Result<bool> {
            WHERE case_id = $1"#,
     )
     .bind(case_id)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await
     .unwrap_or((0, 0));
 
@@ -1319,7 +1372,7 @@ async fn run_tollgate_evaluate(pool: &PgPool, case_id: Uuid) -> Result<bool> {
              )"#,
     )
     .bind(case_id)
-    .fetch_one(pool)
+    .fetch_one(&mut **tx)
     .await
     .unwrap_or((0,));
 
@@ -1362,7 +1415,7 @@ async fn run_tollgate_evaluate(pool: &PgPool, case_id: Uuid) -> Result<bool> {
     .bind(case_id)
     .bind(passed)
     .bind(&evaluation_detail)
-    .execute(pool)
+    .execute(&mut **tx)
     .await?;
 
     tracing::info!(

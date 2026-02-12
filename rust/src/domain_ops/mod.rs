@@ -75,7 +75,12 @@ mod screening_ops;
 mod semantic_ops;
 mod service_pipeline_ops;
 mod session_ops;
-mod skeleton_build_ops;
+pub(crate) mod skeleton_build_ops;
+#[cfg(feature = "database")]
+pub use skeleton_build_ops::{
+    run_coverage_compute, run_graph_validate, run_outreach_plan, run_tollgate_evaluate,
+    run_ubo_compute,
+};
 mod source_loader_ops;
 mod team_ops;
 pub mod template_ops;
