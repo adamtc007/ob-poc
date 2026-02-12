@@ -386,4 +386,27 @@ CREATE TABLE ob_ref.standards_mappings (
 
 CREATE INDEX idx_sm_standard ON ob_ref.standards_mappings(standard, our_value);
 
+-- ============================================================================
+-- 12. Auto-generate case_ref on INSERT (KYC-YYYY-SEQ)
+-- ============================================================================
+
+CREATE SEQUENCE IF NOT EXISTS kyc.case_ref_seq START WITH 108;
+
+CREATE OR REPLACE FUNCTION kyc.generate_case_ref()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.case_ref IS NULL THEN
+        NEW.case_ref := 'KYC-' || EXTRACT(YEAR FROM COALESCE(NEW.opened_at, NOW()))::TEXT
+                        || '-' || LPAD(nextval('kyc.case_ref_seq')::TEXT, 4, '0');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_case_ref ON kyc.cases;
+CREATE TRIGGER trg_case_ref
+    BEFORE INSERT ON kyc.cases
+    FOR EACH ROW
+    EXECUTE FUNCTION kyc.generate_case_ref();
+
 COMMIT;

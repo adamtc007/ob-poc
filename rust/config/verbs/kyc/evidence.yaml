@@ -1,0 +1,183 @@
+domains:
+  evidence:
+    description: "UBO evidence management — track documents and artifacts proving beneficial ownership"
+
+    invocation_hints:
+      - "evidence"
+      - "require evidence"
+      - "link document"
+      - "verify evidence"
+      - "waive evidence"
+
+    verbs:
+      require:
+        description: "Create a new evidence requirement for a UBO registry entry"
+        invocation_phrases:
+          - "require evidence"
+          - "add evidence requirement"
+          - "request proof"
+          - "need evidence for"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: evidence
+          tags: [evidence, create, kyc]
+        behavior: plugin
+        handler: EvidenceRequireOp
+        args:
+          - name: registry-id
+            type: uuid
+            required: true
+            description: UBO registry entry this evidence is for
+          - name: evidence-type
+            type: string
+            required: true
+            description: Type of evidence required
+            valid_values:
+              - OWNERSHIP_CERTIFICATE
+              - SHARE_REGISTER
+              - BOARD_RESOLUTION
+              - TRUST_DEED
+              - PARTNERSHIP_AGREEMENT
+              - ARTICLES_OF_ASSOCIATION
+              - IDENTITY_DOCUMENT
+              - PROOF_OF_ADDRESS
+              - SOURCE_OF_WEALTH
+              - SOURCE_OF_FUNDS
+              - REGULATORY_FILING
+              - ANNUAL_RETURN
+              - OTHER
+          - name: description
+            type: string
+            required: false
+            description: Detailed description of what is needed
+          - name: doc-type
+            type: string
+            required: false
+            description: Expected document type code
+        returns:
+          type: record
+          capture: true
+
+      link:
+        description: "Link a document to an evidence record"
+        invocation_phrases:
+          - "link evidence"
+          - "attach document to evidence"
+          - "evidence received"
+          - "upload evidence"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: evidence
+          tags: [evidence, document, link]
+        behavior: plugin
+        handler: EvidenceLinkOp
+        args:
+          - name: evidence-id
+            type: uuid
+            required: true
+            description: Evidence record to link document to
+          - name: document-id
+            type: uuid
+            required: true
+            description: Document to link
+            lookup:
+              table: document_catalog
+              entity_type: document
+              schema: ob-poc
+              search_key: document_name
+              primary_key: doc_id
+        returns:
+          type: record
+
+      verify:
+        description: "Verify (QA approve) an evidence record"
+        invocation_phrases:
+          - "verify evidence"
+          - "approve evidence"
+          - "evidence verified"
+          - "qa approve evidence"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: evidence
+          tags: [evidence, verify, qa]
+        behavior: plugin
+        handler: EvidenceVerifyOp
+        args:
+          - name: evidence-id
+            type: uuid
+            required: true
+            description: Evidence record to verify
+          - name: verified-by
+            type: string
+            required: true
+            description: Identity of the verifier
+          - name: notes
+            type: string
+            required: false
+            description: Verification notes
+        returns:
+          type: record
+
+      reject:
+        description: "Reject an evidence record (clears document link for re-submission)"
+        invocation_phrases:
+          - "reject evidence"
+          - "evidence rejected"
+          - "send back evidence"
+          - "evidence not acceptable"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: evidence
+          tags: [evidence, reject, qa]
+        behavior: plugin
+        handler: EvidenceRejectOp
+        args:
+          - name: evidence-id
+            type: uuid
+            required: true
+            description: Evidence record to reject
+          - name: reason
+            type: string
+            required: true
+            description: Reason for rejection
+        returns:
+          type: record
+
+      waive:
+        description: "Waive an evidence requirement with documented authority"
+        invocation_phrases:
+          - "waive evidence"
+          - "skip evidence requirement"
+          - "exempt from evidence"
+          - "evidence waiver"
+        metadata:
+          tier: intent
+          source_of_truth: workflow
+          scope: cbu
+          noun: evidence
+          tags: [evidence, waive, override]
+        behavior: plugin
+        handler: EvidenceWaiveOp
+        args:
+          - name: evidence-id
+            type: uuid
+            required: true
+            description: Evidence record to waive
+          - name: reason
+            type: string
+            required: true
+            description: Justification for waiver
+          - name: authority
+            type: string
+            required: true
+            description: Authority granting the waiver
+        returns:
+          type: record

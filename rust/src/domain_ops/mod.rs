@@ -40,8 +40,10 @@ mod document_ops;
 mod economic_exposure_ops;
 mod entity_ops;
 pub mod entity_query;
+mod evidence_ops;
 mod gleif_ops;
 pub mod helpers;
+mod import_run_ops;
 mod investor_ops;
 mod investor_role_ops;
 mod kyc_case_ops;
@@ -79,6 +81,7 @@ mod trading_profile_ca_ops;
 mod trust_ops;
 mod ubo_analysis;
 pub mod ubo_graph_ops;
+mod ubo_registry_ops;
 mod verify_ops;
 mod view_ops;
 
