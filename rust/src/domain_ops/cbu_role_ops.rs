@@ -329,25 +329,27 @@ impl CustomOperation for CbuRoleAssignOwnershipOp {
 
         // 2. Upsert entity relationship (ownership edge)
         let percentage_display = percentage.to_string();
-        let rel_result = sqlx::query_scalar!(
+        let rel_result: (Uuid,) = sqlx::query_as(
             r#"INSERT INTO "ob-poc".entity_relationships
                (from_entity_id, to_entity_id, relationship_type, percentage,
-                ownership_type, effective_from, created_at, updated_at)
-               VALUES ($1, $2, 'ownership', $3, $4, $5, NOW(), NOW())
-               ON CONFLICT (from_entity_id, to_entity_id, relationship_type) DO UPDATE SET
+                ownership_type, effective_from, source, confidence, created_at, updated_at)
+               VALUES ($1, $2, 'ownership', $3, $4, $5, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+               ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
+                   WHERE effective_from IS NOT NULL
+               DO UPDATE SET
                    percentage = EXCLUDED.percentage,
                    ownership_type = EXCLUDED.ownership_type,
-                   effective_from = EXCLUDED.effective_from,
                    updated_at = NOW()
                RETURNING relationship_id"#,
-            owner_entity_id,
-            owned_entity_id,
-            Some(percentage),
-            ownership_type,
-            effective_from
         )
+        .bind(owner_entity_id)
+        .bind(owned_entity_id)
+        .bind(Some(percentage))
+        .bind(&ownership_type)
+        .bind(effective_from)
         .fetch_one(&mut *tx)
         .await?;
+        let rel_result = rel_result.0;
 
         tx.commit().await?;
 
@@ -492,23 +494,25 @@ impl CustomOperation for CbuRoleAssignControlOp {
         .await?;
 
         // 2. Upsert control relationship
-        let rel_result = sqlx::query_scalar!(
+        let rel_result: (Uuid,) = sqlx::query_as(
             r#"INSERT INTO "ob-poc".entity_relationships
                (from_entity_id, to_entity_id, relationship_type, control_type,
-                effective_from, created_at, updated_at)
-               VALUES ($1, $2, 'control', $3, $4, NOW(), NOW())
-               ON CONFLICT (from_entity_id, to_entity_id, relationship_type) DO UPDATE SET
+                effective_from, source, confidence, created_at, updated_at)
+               VALUES ($1, $2, 'control', $3, $4, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+               ON CONFLICT (from_entity_id, to_entity_id, relationship_type, effective_from)
+                   WHERE effective_from IS NOT NULL
+               DO UPDATE SET
                    control_type = EXCLUDED.control_type,
-                   effective_from = EXCLUDED.effective_from,
                    updated_at = NOW()
                RETURNING relationship_id"#,
-            controller_entity_id,
-            controlled_entity_id,
-            control_type,
-            appointment_date
         )
+        .bind(controller_entity_id)
+        .bind(controlled_entity_id)
+        .bind(&control_type)
+        .bind(appointment_date)
         .fetch_one(&mut *tx)
         .await?;
+        let rel_result = rel_result.0;
 
         tx.commit().await?;
 
@@ -674,26 +678,30 @@ impl CustomOperation for CbuRoleAssignTrustOp {
         .await?;
 
         // 2. Upsert trust relationship
-        let rel_result = sqlx::query_scalar!(
+        let rel_result: (Uuid,) = sqlx::query_as(
             r#"INSERT INTO "ob-poc".entity_relationships
                (from_entity_id, to_entity_id, relationship_type, percentage,
-                trust_interest_type, trust_class_description, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-               ON CONFLICT (from_entity_id, to_entity_id, relationship_type) DO UPDATE SET
+                trust_interest_type, trust_class_description, source, confidence,
+                created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+               ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
+                   WHERE effective_from IS NULL AND effective_to IS NULL
+               DO UPDATE SET
                    percentage = EXCLUDED.percentage,
                    trust_interest_type = EXCLUDED.trust_interest_type,
                    trust_class_description = EXCLUDED.trust_class_description,
                    updated_at = NOW()
                RETURNING relationship_id"#,
-            participant_entity_id,
-            trust_entity_id,
-            relationship_type,
-            interest_percentage,
-            interest_type,
-            class_description
         )
+        .bind(participant_entity_id)
+        .bind(trust_entity_id)
+        .bind(&relationship_type)
+        .bind(&interest_percentage)
+        .bind(&interest_type)
+        .bind(&class_description)
         .fetch_one(&mut *tx)
         .await?;
+        let rel_result = rel_result.0;
 
         tx.commit().await?;
 
@@ -855,26 +863,30 @@ impl CustomOperation for CbuRoleAssignFundOp {
                 _ => "fund_role",
             };
 
-            let rel = sqlx::query_scalar!(
+            let rel: (Uuid,) = sqlx::query_as(
                 r#"INSERT INTO "ob-poc".entity_relationships
                    (from_entity_id, to_entity_id, relationship_type, percentage,
-                    is_regulated, regulatory_jurisdiction, created_at, updated_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-                   ON CONFLICT (from_entity_id, to_entity_id, relationship_type) DO UPDATE SET
+                    is_regulated, regulatory_jurisdiction, source, confidence,
+                    created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, 'cbu_role.assign', 'HIGH', NOW(), NOW())
+                   ON CONFLICT (from_entity_id, to_entity_id, relationship_type)
+                       WHERE effective_from IS NULL AND effective_to IS NULL
+                   DO UPDATE SET
                        percentage = EXCLUDED.percentage,
                        is_regulated = EXCLUDED.is_regulated,
                        regulatory_jurisdiction = EXCLUDED.regulatory_jurisdiction,
                        updated_at = NOW()
                    RETURNING relationship_id"#,
-                entity_id,
-                fund_id,
-                relationship_type,
-                investment_percentage,
-                is_regulated,
-                regulatory_jurisdiction
             )
+            .bind(entity_id)
+            .bind(fund_id)
+            .bind(&relationship_type)
+            .bind(&investment_percentage)
+            .bind(&is_regulated)
+            .bind(&regulatory_jurisdiction)
             .fetch_one(&mut *tx)
             .await?;
+            let rel = rel.0;
             Some(rel)
         } else {
             None

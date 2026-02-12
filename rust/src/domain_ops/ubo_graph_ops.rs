@@ -331,25 +331,28 @@ impl CustomOperation for UboConvergenceSupersedeOp {
             .ok_or_else(|| anyhow::anyhow!("Missing reason argument"))?;
 
         // Get the old relationship details
-        let old_rel = sqlx::query!(
+        let old_rel: (
+            Uuid,
+            Uuid,
+            Option<rust_decimal::Decimal>,
+            String,
+            Option<String>,
+            String,
+        ) = sqlx::query_as(
             r#"SELECT r.from_entity_id, r.to_entity_id, r.percentage, r.relationship_type,
-                      r.ownership_type, e.name as from_name
-               FROM "ob-poc".entity_relationships r
-               JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
-               WHERE r.relationship_id = $1"#,
-            old_relationship_id
+                          r.ownership_type, e.name as from_name
+                   FROM "ob-poc".entity_relationships r
+                   JOIN "ob-poc".entities e ON e.entity_id = r.from_entity_id
+                   WHERE r.relationship_id = $1"#,
         )
+        .bind(old_relationship_id)
         .fetch_optional(pool)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Old relationship not found: {}", old_relationship_id))?;
 
         // Use old percentage if not specified
-        let new_percentage = percentage.or_else(|| {
-            old_rel
-                .percentage
-                .as_ref()
-                .and_then(|d| rust_decimal::Decimal::from_str_exact(&d.to_string()).ok())
-        });
+        // old_rel tuple: (from_entity_id, to_entity_id, percentage, relationship_type, ownership_type, from_name)
+        let new_percentage = percentage.or(old_rel.2);
 
         // Begin transaction
         let mut tx = pool.begin().await?;
@@ -389,19 +392,20 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         let new_relationship_id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".entity_relationships
                (from_entity_id, to_entity_id, relationship_type, percentage, ownership_type,
-                effective_from, source, notes)
-               VALUES ($1, $2, $3, $4, $5, $6, 'ubo.supersede', $7)
+                effective_from, source, confidence, notes)
+               VALUES ($1, $2, $3, $4, $5, $6, 'ubo.supersede', 'MEDIUM', $7)
                RETURNING relationship_id"#,
         )
         .bind(new_owner_id)
-        .bind(old_rel.to_entity_id)
-        .bind(&old_rel.relationship_type)
+        .bind(old_rel.1) // to_entity_id
+        .bind(&old_rel.3) // relationship_type
         .bind(new_percentage)
-        .bind(&old_rel.ownership_type)
+        .bind(&old_rel.4) // ownership_type
         .bind(effective_date)
         .bind(format!(
             "Superseded from {} - {}",
-            &old_rel.from_name, reason
+            &old_rel.5,
+            reason // from_name
         ))
         .fetch_one(&mut *tx)
         .await?;
@@ -428,7 +432,7 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         .bind(json!({
             "old_relationship_id": old_relationship_id,
             "new_relationship_id": new_relationship_id,
-            "old_owner_id": old_rel.from_entity_id,
+            "old_owner_id": old_rel.0,
             "new_owner_id": new_owner_id,
             "percentage": new_percentage,
             "effective_date": effective_date,
@@ -444,10 +448,10 @@ impl CustomOperation for UboConvergenceSupersedeOp {
         Ok(ExecutionResult::Record(json!({
             "old_relationship_id": old_relationship_id,
             "new_relationship_id": new_relationship_id,
-            "old_owner_id": old_rel.from_entity_id,
-            "old_owner_name": old_rel.from_name,
+            "old_owner_id": old_rel.0,
+            "old_owner_name": old_rel.5,
             "new_owner_id": new_owner_id,
-            "to_entity_id": old_rel.to_entity_id,
+            "to_entity_id": old_rel.1,
             "percentage": new_percentage,
             "effective_date": effective_date,
             "reason": reason,
@@ -557,21 +561,21 @@ impl CustomOperation for UboTransferControlOp {
         let mut tx = pool.begin().await?;
 
         // 1. Find and end existing control relationship
-        let old_rel = sqlx::query!(
+        let old_rel: Option<(Uuid,)> = sqlx::query_as(
             r#"SELECT relationship_id FROM "ob-poc".entity_relationships
                WHERE from_entity_id = $1
                  AND to_entity_id = $2
                  AND relationship_type = 'control'
                  AND control_type = $3
                  AND (effective_to IS NULL OR effective_to > CURRENT_DATE)"#,
-            from_controller_id,
-            controlled_entity_id,
-            control_type
         )
+        .bind(from_controller_id)
+        .bind(controlled_entity_id)
+        .bind(control_type)
         .fetch_optional(&mut *tx)
         .await?;
 
-        let old_relationship_id = old_rel.map(|r| r.relationship_id);
+        let old_relationship_id = old_rel.map(|r| r.0);
 
         // End old relationship if exists
         if let Some(old_id) = old_relationship_id {
@@ -609,8 +613,8 @@ impl CustomOperation for UboTransferControlOp {
         let new_relationship_id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO "ob-poc".entity_relationships
                (from_entity_id, to_entity_id, relationship_type, control_type,
-                effective_from, source, notes)
-               VALUES ($1, $2, 'control', $3, $4, 'ubo.transfer-control', $5)
+                effective_from, source, confidence, notes)
+               VALUES ($1, $2, 'control', $3, $4, 'ubo.transfer-control', 'MEDIUM', $5)
                RETURNING relationship_id"#,
         )
         .bind(to_controller_id)

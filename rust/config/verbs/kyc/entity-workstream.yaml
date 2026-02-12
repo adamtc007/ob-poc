@@ -4,6 +4,11 @@ domains:
     verbs:
       create:
         description: Create a new entity workstream (idempotent by case+entity)
+        invocation_phrases:
+          - "create workstream"
+          - "add entity workstream"
+          - "add entity to case"
+          - "create entity workstream"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -84,6 +89,11 @@ domains:
           capture: true
       update-status:
         description: Update workstream status
+        invocation_phrases:
+          - "update workstream status"
+          - "advance workstream"
+          - "change workstream status"
+          - "move workstream to"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -124,6 +134,10 @@ domains:
           type: affected
       block:
         description: Block workstream with reason
+        invocation_phrases:
+          - "block workstream"
+          - "hold workstream"
+          - "pause workstream"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -158,6 +172,11 @@ domains:
           type: affected
       complete:
         description: Mark workstream as complete
+        invocation_phrases:
+          - "complete workstream"
+          - "finish workstream"
+          - "mark workstream complete"
+          - "close workstream"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -197,6 +216,11 @@ domains:
           type: affected
       set-enhanced-dd:
         description: Flag workstream for enhanced due diligence
+        invocation_phrases:
+          - "set enhanced due diligence"
+          - "flag for enhanced dd"
+          - "require enhanced dd"
+          - "escalate to enhanced due diligence"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -227,6 +251,11 @@ domains:
           type: affected
       set-ubo:
         description: Mark workstream entity as UBO
+        invocation_phrases:
+          - "mark as ubo"
+          - "set ubo flag"
+          - "flag entity as ubo"
+          - "identify as beneficial owner"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -260,6 +289,11 @@ domains:
           type: affected
       list-by-case:
         description: List workstreams for a case
+        invocation_phrases:
+          - "list workstreams"
+          - "show workstreams for case"
+          - "get case workstreams"
+          - "list entity workstreams"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -289,6 +323,11 @@ domains:
           type: record_set
       read:
         description: Read workstream details
+        invocation_phrases:
+          - "read workstream"
+          - "get workstream details"
+          - "show workstream"
+          - "view workstream"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -314,6 +353,11 @@ domains:
           type: record
       state:
         description: Get workstream state with embedded awaiting requests, checks, and documents
+        invocation_phrases:
+          - "workstream state"
+          - "get workstream state"
+          - "show workstream status"
+          - "workstream summary"
         metadata:
           tier: intent
           source_of_truth: workflow

@@ -38,6 +38,7 @@ mod dilution_ops;
 mod docs_bundle_ops;
 mod document_ops;
 mod economic_exposure_ops;
+mod edge_ops;
 mod entity_ops;
 pub mod entity_query;
 mod evidence_ops;

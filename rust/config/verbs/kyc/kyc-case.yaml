@@ -73,6 +73,12 @@ domains:
           capture: true
       update-status:
         description: Update case status
+        invocation_phrases:
+          - "update case status"
+          - "change case status"
+          - "advance case"
+          - "move case to"
+          - "set case status"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -207,6 +213,11 @@ domains:
           type: affected
       set-risk-rating:
         description: Set case risk rating
+        invocation_phrases:
+          - "set risk rating"
+          - "rate case risk"
+          - "assign risk level"
+          - "set kyc risk"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -244,6 +255,12 @@ domains:
           type: affected
       close:
         description: Close the case
+        invocation_phrases:
+          - "close case"
+          - "close kyc case"
+          - "finalize case"
+          - "approve case"
+          - "reject case"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -288,6 +305,11 @@ domains:
           type: affected
       read:
         description: Read case details
+        invocation_phrases:
+          - "read case"
+          - "get case details"
+          - "show case"
+          - "view case"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -313,6 +335,11 @@ domains:
           type: record
       list-by-cbu:
         description: List cases for a CBU
+        invocation_phrases:
+          - "list cases"
+          - "show cases for"
+          - "list kyc cases"
+          - "get cases for cbu"
         metadata:
           tier: reference
           source_of_truth: workflow
@@ -342,6 +369,11 @@ domains:
           type: record_set
       reopen:
         description: Reopen a closed case for remediation or review
+        invocation_phrases:
+          - "reopen case"
+          - "reopen kyc case"
+          - "restart case"
+          - "remediate case"
         metadata:
           tier: intent
           source_of_truth: workflow
@@ -392,6 +424,12 @@ domains:
           type: affected
       state:
         description: Get full case state with workstreams and embedded awaiting requests
+        invocation_phrases:
+          - "case state"
+          - "get case state"
+          - "show case status"
+          - "case summary"
+          - "case overview"
         metadata:
           tier: intent
           source_of_truth: workflow
